@@ -681,6 +681,17 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /buildCleanupWarningHtml/);
   assert.match(html, /Installed Packages/);
   assert.match(html, /Impact Preview/);
+  assert.match(html, /Section Sync/);
+  assert.match(html, /pkgSectionSyncModal/);
+  assert.match(html, /getSectionSyncModal/);
+  assert.match(html, /Package sections/);
+  assert.match(html, /All manifest/);
+  assert.match(html, /pkgSectionSyncDownloadBtn/);
+  assert.match(html, /pkgSectionSyncUploadBtn/);
+  assert.match(html, /section-sync\/export/);
+  assert.match(html, /section-sync\/restore/);
+  assert.match(html, /pkgSectionSyncFilterChanges/);
+  assert.match(html, /section-sync\/preview/);
   assert.match(html, /Recent Lifecycle Transactions/);
   assert.match(html, /Startup Package Load Warnings \(Registry State Unchanged\)/i);
   assert.match(html, /showRemoveInventoryWizard/);
@@ -782,6 +793,8 @@ test('package manager EJS includes runtime controls and reload action', () => {
   });
 
   assert.match(html, /Runtime Controls/);
+  assert.match(html, /pkgRuntimeControlsPanel/);
+  assert.match(html, /aria-expanded="false"/);
   assert.match(html, /Restart application/);
   assert.match(html, /Reload runtime/);
   assert.match(html, /reload-runtime/);

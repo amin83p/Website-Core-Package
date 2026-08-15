@@ -90,47 +90,168 @@
     </p>
   </div>
 
-  <div class="card border-0 shadow-sm mb-3">
-    <div class="card-header bg-white fw-bold small">Runtime Controls</div>
-    <div class="card-body p-3">
-      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-        <div class="flex-grow-1">
-          <div class="fw-semibold mb-1">Restart application</div>
-          <p class="small text-muted mb-2">
-            Stops the Node process so your host (Railway, Docker, PM2) starts a <strong>new</strong> process.
-            This is <strong>required</strong> to fully apply Pause/Remove because package routes cannot be unmounted in-process.
-            Expect brief downtime; active users may see errors until the new process is healthy.
-            On multi-instance deployments, behavior depends on your platform (instances may restart one at a time).
-            This is <strong>not</strong> a substitute for deploying new code from git — use your normal deploy pipeline for releases.
-          </p>
-          <% if (typeof inAppApplicationRestartAllowed !== 'undefined' && inAppApplicationRestartAllowed) { %>
-            <p class="small text-success mb-0">
-              In-app restart is enabled (<code>ALLOW_IN_APP_APPLICATION_RESTART=true</code>).
-            </p>
-          <% } else { %>
-            <p class="small text-warning mb-0">
-              In-app restart is disabled. Set <code>ALLOW_IN_APP_APPLICATION_RESTART=true</code> in deployment environment variables, or restart from your hosting dashboard.
-            </p>
-          <% } %>
+  <div class="card border-0 shadow-sm mb-3 pkg-runtime-controls-card">
+    <button
+      type="button"
+      class="pkg-runtime-controls-toggle card-header bg-white border-0 w-100 text-start"
+      data-bs-toggle="collapse"
+      data-bs-target="#pkgRuntimeControlsPanel"
+      aria-expanded="false"
+      aria-controls="pkgRuntimeControlsPanel"
+    >
+      <div class="d-flex align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3 min-w-0">
+          <span class="pkg-runtime-controls-icon" aria-hidden="true">
+            <i class="bi bi-cpu"></i>
+          </span>
+          <div class="min-w-0">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="fw-semibold">Runtime Controls</span>
+              <% if (typeof inAppApplicationRestartAllowed !== 'undefined' && inAppApplicationRestartAllowed) { %>
+                <span class="badge text-bg-success-subtle text-success-emphasis border border-success-subtle">In-app restart enabled</span>
+              <% } else { %>
+                <span class="badge text-bg-warning-subtle text-warning-emphasis border border-warning-subtle">In-app restart disabled</span>
+              <% } %>
+            </div>
+            <div class="small text-muted mt-1">Application restart and per-package runtime reload guidance</div>
+          </div>
         </div>
-        <div class="text-end">
-          <button
-            type="button"
-            class="btn btn-outline-danger btn-sm"
-            id="pkgRestartApplicationBtn"
-            <% if (!(typeof inAppApplicationRestartAllowed !== 'undefined' && inAppApplicationRestartAllowed)) { %>disabled<% } %>>
-            <i class="bi bi-arrow-clockwise me-1"></i>Restart application
-          </button>
-        </div>
+        <i class="bi bi-chevron-down pkg-runtime-controls-chevron flex-shrink-0" aria-hidden="true"></i>
       </div>
-      <hr class="my-3">
-      <div class="small text-muted mb-0">
-        <strong>Per-package Reload runtime</strong> (row actions) re-mounts routes, views, assets, and query executors for <em>enabled</em> packages only.
-        It refreshes navigation cache and syncs manifest declarations. It does <strong>not</strong> unmount paused packages and does <strong>not</strong> replace a full application restart after Pause/Remove.
-        Use it after a code deploy when package files changed on disk, or when startup recovery failed for one package.
+    </button>
+    <div id="pkgRuntimeControlsPanel" class="collapse">
+      <div class="card-body pt-0">
+        <div class="row g-3">
+          <div class="col-lg-7">
+            <div class="pkg-runtime-panel pkg-runtime-panel-danger h-100">
+              <div class="pkg-runtime-panel-head">
+                <span class="pkg-runtime-panel-icon"><i class="bi bi-power"></i></span>
+                <div>
+                  <h6 class="mb-1">Restart application</h6>
+                  <p class="small text-muted mb-0">Stops the Node process so your host starts a new one.</p>
+                </div>
+              </div>
+              <ul class="pkg-runtime-panel-list small text-muted mb-3">
+                <li>Required to fully apply <strong>Pause</strong> or <strong>Remove</strong> because package routes cannot be unmounted in-process.</li>
+                <li>Expect brief downtime; active users may see errors until the new process is healthy.</li>
+                <li>On multi-instance deployments, instances may restart one at a time.</li>
+                <li>Not a substitute for deploying new code from git — use your normal deploy pipeline for releases.</li>
+              </ul>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <% if (typeof inAppApplicationRestartAllowed !== 'undefined' && inAppApplicationRestartAllowed) { %>
+                  <span class="small text-success mb-0">
+                    <i class="bi bi-check-circle me-1"></i>
+                    <code>ALLOW_IN_APP_APPLICATION_RESTART=true</code>
+                  </span>
+                <% } else { %>
+                  <span class="small text-warning mb-0">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Set <code>ALLOW_IN_APP_APPLICATION_RESTART=true</code> or restart from your hosting dashboard.
+                  </span>
+                <% } %>
+                <button
+                  type="button"
+                  class="btn btn-outline-danger btn-sm"
+                  id="pkgRestartApplicationBtn"
+                  <% if (!(typeof inAppApplicationRestartAllowed !== 'undefined' && inAppApplicationRestartAllowed)) { %>disabled<% } %>>
+                  <i class="bi bi-arrow-clockwise me-1"></i>Restart application
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="pkg-runtime-panel pkg-runtime-panel-info h-100">
+              <div class="pkg-runtime-panel-head">
+                <span class="pkg-runtime-panel-icon"><i class="bi bi-arrow-clockwise"></i></span>
+                <div>
+                  <h6 class="mb-1">Per-package Reload runtime</h6>
+                  <p class="small text-muted mb-0">Available from each installed package row menu.</p>
+                </div>
+              </div>
+              <ul class="pkg-runtime-panel-list small text-muted mb-0">
+                <li>Re-mounts routes, views, assets, and query executors for <em>enabled</em> packages only.</li>
+                <li>Refreshes navigation cache and syncs manifest declarations.</li>
+                <li>Does <strong>not</strong> unmount paused packages or replace a full application restart.</li>
+                <li>Use after a code deploy when package files changed on disk, or when startup recovery failed for one package.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
+
+  <style>
+    .package-manager-page .pkg-runtime-controls-card {
+      overflow: hidden;
+    }
+    .package-manager-page .pkg-runtime-controls-toggle {
+      padding: 0.95rem 1rem;
+      transition: background-color 0.15s ease;
+    }
+    .package-manager-page .pkg-runtime-controls-toggle:hover,
+    .package-manager-page .pkg-runtime-controls-toggle:focus-visible {
+      background: #f8f9fa !important;
+    }
+    .package-manager-page .pkg-runtime-controls-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(13, 110, 253, 0.1);
+      color: #0d6efd;
+      flex-shrink: 0;
+      font-size: 1.1rem;
+    }
+    .package-manager-page .pkg-runtime-controls-chevron {
+      transition: transform 0.2s ease;
+      color: #6c757d;
+    }
+    .package-manager-page .pkg-runtime-controls-toggle[aria-expanded="true"] .pkg-runtime-controls-chevron {
+      transform: rotate(180deg);
+    }
+    .package-manager-page .pkg-runtime-panel {
+      border: 1px solid var(--bs-border-color);
+      border-radius: 0.85rem;
+      padding: 1rem;
+      background: #fff;
+      height: 100%;
+    }
+    .package-manager-page .pkg-runtime-panel-danger {
+      border-color: rgba(220, 53, 69, 0.25);
+      background: linear-gradient(180deg, rgba(220, 53, 69, 0.04), #fff 42%);
+    }
+    .package-manager-page .pkg-runtime-panel-info {
+      border-color: rgba(13, 202, 240, 0.28);
+      background: linear-gradient(180deg, rgba(13, 202, 240, 0.06), #fff 42%);
+    }
+    .package-manager-page .pkg-runtime-panel-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+    .package-manager-page .pkg-runtime-panel-icon {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0.6rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid var(--bs-border-color);
+      flex-shrink: 0;
+    }
+    .package-manager-page .pkg-runtime-panel-list {
+      margin: 0;
+      padding-left: 1.1rem;
+    }
+    .package-manager-page .pkg-runtime-panel-list li + li {
+      margin-top: 0.45rem;
+    }
+  </style>
 
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-white fw-bold small">Install / Enable Package</div>
@@ -302,6 +423,9 @@
                       <button type="button" class="btn btn-outline-primary btn-sm pkg-action-btn" data-action="sync" data-package-id="<%= row.packageId %>">
                         <i class="bi bi-arrow-repeat me-2"></i>Sync Declarations
                       </button>
+                      <button type="button" class="btn btn-outline-primary btn-sm pkg-action-btn" data-action="section-sync" data-package-id="<%= row.packageId %>">
+                        <i class="bi bi-diagram-3 me-2"></i>Section Sync
+                      </button>
                       <button type="button" class="btn btn-outline-info btn-sm pkg-action-btn" data-action="reload-runtime" data-package-id="<%= row.packageId %>">
                         <i class="bi bi-arrow-clockwise me-2"></i>Reload runtime
                       </button>
@@ -360,6 +484,157 @@
   <input type="hidden" id="pkgActionStateId" value="<%= actionStateValue %>">
   <input type="hidden" id="pkgPackageRootDir" value="<%= packageRoot %>">
 </div>
+
+<div class="modal fade" id="pkgSectionSyncModal" tabindex="-1" aria-labelledby="pkgSectionSyncModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content pkg-section-sync-modal">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pkgSectionSyncModalLabel">Section Sync</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="pkg-section-sync-summary mb-3" id="pkgSectionSyncSummary"></div>
+        <div class="small text-muted mb-3" id="pkgSectionSyncMeta">Compare runtime section records with the package manifest.</div>
+        <div class="form-check mb-4">
+          <input class="form-check-input" type="checkbox" id="pkgSectionSyncIncludeTopology" checked>
+          <label class="form-check-label" for="pkgSectionSyncIncludeTopology">Include topology fields (<code>subsections</code>, <code>related</code>) when applying or restoring changes</label>
+        </div>
+
+        <section class="pkg-section-sync-group mb-4">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <div>
+              <h6 class="mb-0">Package sections</h6>
+              <div class="small text-muted">Manifest-declared sections for this package. App-only sections are not listed.</div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="btn-group btn-group-sm" role="group" aria-label="Package section filter">
+                <input type="radio" class="btn-check" name="pkgSectionSyncFilter" id="pkgSectionSyncFilterChanges" value="changes" checked>
+                <label class="btn btn-outline-secondary" for="pkgSectionSyncFilterChanges">Changes only</label>
+                <input type="radio" class="btn-check" name="pkgSectionSyncFilter" id="pkgSectionSyncFilterAll" value="all">
+                <label class="btn btn-outline-secondary" for="pkgSectionSyncFilterAll">All manifest</label>
+              </div>
+              <div class="form-check m-0">
+                <input class="form-check-input" type="checkbox" id="pkgSectionSyncSelectAll" aria-label="Select all visible package sections">
+                <label class="form-check-label small" for="pkgSectionSyncSelectAll">Select visible</label>
+              </div>
+            </div>
+          </div>
+          <div id="pkgSectionSyncPackageList" class="pkg-section-sync-list">
+            <div class="text-center text-muted py-4">Loading preview...</div>
+          </div>
+        </section>
+      </div>
+      <div class="modal-footer flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary" id="pkgSectionSyncDownloadBtn">
+          <i class="bi bi-download me-1"></i>Download JSON
+        </button>
+        <button type="button" class="btn btn-outline-secondary" id="pkgSectionSyncUploadBtn">
+          <i class="bi bi-upload me-1"></i>Upload JSON
+        </button>
+        <input type="file" id="pkgSectionSyncUploadInput" class="d-none" accept="application/json,.json">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-primary" id="pkgSectionSyncApplyManifestBtn">
+          <i class="bi bi-box-arrow-in-down me-1"></i>Apply Manifest → App
+        </button>
+        <button type="button" class="btn btn-outline-dark" id="pkgSectionSyncApplyRuntimeBtn">
+          <i class="bi bi-box-arrow-up me-1"></i>Apply App → Manifest
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .pkg-section-sync-modal .pkg-section-sync-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-stat {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    background: var(--bs-light);
+    min-width: 7rem;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-stat strong {
+    display: block;
+    font-size: 1.1rem;
+    line-height: 1.2;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-card {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.65rem;
+    background: #fff;
+    overflow: hidden;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-card.is-match {
+    border-color: rgba(25, 135, 84, 0.35);
+  }
+  .pkg-section-sync-modal .pkg-section-sync-card.is-drift {
+    border-color: rgba(255, 193, 7, 0.55);
+  }
+  .pkg-section-sync-modal .pkg-section-sync-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-card-title {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-card-title strong {
+    word-break: break-word;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0 1rem 0.85rem;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-chip {
+    font-size: 0.75rem;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    background: var(--bs-light);
+    border: 1px solid var(--bs-border-color);
+  }
+  .pkg-section-sync-modal .pkg-section-sync-details {
+    display: none;
+    border-top: 1px solid var(--bs-border-color);
+    background: #f8f9fa;
+    padding: 0.75rem 1rem 1rem;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-card.is-open .pkg-section-sync-details {
+    display: block;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-diff-table th,
+  .pkg-section-sync-modal .pkg-section-sync-diff-table td {
+    vertical-align: top;
+    font-size: 0.82rem;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-diff-table code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .pkg-section-sync-modal .pkg-section-sync-diff-row.is-changed td {
+    background: rgba(255, 193, 7, 0.12);
+  }
+  .pkg-section-sync-modal .pkg-section-sync-empty {
+    border: 1px dashed var(--bs-border-color);
+    border-radius: 0.65rem;
+    padding: 1.25rem;
+    text-align: center;
+    color: var(--bs-secondary-color);
+    background: #fff;
+  }
+</style>
 <%- include('../partials/modal_GenericPicker', { user: locals?.user }) %>
 
 <script>
@@ -390,12 +665,418 @@
     'reload-runtime': { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/reload-runtime`, label: 'Reload runtime' },
     'preview-remove': { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/uninstall-preview`, label: 'Impact Preview', dangerous: true },
     remove: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/remove`, label: 'Remove', dangerous: true },
-    sync: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/sync`, label: 'Sync Declarations' }
+    sync: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/sync`, label: 'Sync Declarations' },
+    'section-sync': { label: 'Section Sync' }
   };
 
   const restartRecommendedBanner = document.getElementById('pkgRestartRecommendedBanner');
   const restartRecommendedText = document.getElementById('pkgRestartRecommendedText');
   const restartApplicationBtn = document.getElementById('pkgRestartApplicationBtn');
+  const sectionSyncModalEl = document.getElementById('pkgSectionSyncModal');
+  const sectionSyncPackageListEl = document.getElementById('pkgSectionSyncPackageList');
+  const sectionSyncSummaryEl = document.getElementById('pkgSectionSyncSummary');
+  const sectionSyncMetaEl = document.getElementById('pkgSectionSyncMeta');
+  const sectionSyncSelectAllEl = document.getElementById('pkgSectionSyncSelectAll');
+  const sectionSyncFilterAllEl = document.getElementById('pkgSectionSyncFilterAll');
+  const sectionSyncFilterChangesEl = document.getElementById('pkgSectionSyncFilterChanges');
+  const sectionSyncIncludeTopologyEl = document.getElementById('pkgSectionSyncIncludeTopology');
+  const sectionSyncApplyManifestBtn = document.getElementById('pkgSectionSyncApplyManifestBtn');
+  const sectionSyncApplyRuntimeBtn = document.getElementById('pkgSectionSyncApplyRuntimeBtn');
+  const sectionSyncDownloadBtn = document.getElementById('pkgSectionSyncDownloadBtn');
+  const sectionSyncUploadBtn = document.getElementById('pkgSectionSyncUploadBtn');
+  const sectionSyncUploadInput = document.getElementById('pkgSectionSyncUploadInput');
+  let sectionSyncState = { packageId: '', preview: null, filter: 'changes' };
+
+  const SECTION_SYNC_STATUS_META = {
+    match: { label: 'In sync', badge: 'text-bg-success' },
+    drift: { label: 'Changed', badge: 'text-bg-warning' },
+    'manifest-only': { label: 'Manifest only', badge: 'text-bg-info' },
+    'runtime-only': { label: 'App only', badge: 'text-bg-secondary' }
+  };
+
+  const SECTION_SYNC_COMPARE_FIELDS = [
+    'category',
+    'description',
+    'active',
+    'trackState',
+    'minimumAccessRequirement',
+    'dashboardDisplay',
+    'mainDashboardDisplay',
+    'navigatorSection',
+    'homeURL',
+    'inactiveMessage',
+    'message',
+    'operations',
+    'subsections',
+    'related'
+  ];
+
+  function escapeHtml(value = '') {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatSectionSyncValue(value) {
+    if (value === undefined || value === null || value === '') return '—';
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (Array.isArray(value)) {
+      if (!value.length) return '[]';
+      return JSON.stringify(value);
+    }
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  }
+
+  function sectionSyncStatusMeta(status = '') {
+    return SECTION_SYNC_STATUS_META[status] || { label: status || 'Unknown', badge: 'text-bg-light border' };
+  }
+
+  function isActionableSectionChange(row = {}) {
+    return row.status === 'drift' || row.status === 'manifest-only';
+  }
+
+  function getPackageSectionRows(preview = {}) {
+    const rows = Array.isArray(preview?.packageSections)
+      ? preview.packageSections
+      : (Array.isArray(preview?.sections) ? preview.sections : []);
+    if (sectionSyncState.filter === 'changes') {
+      return rows.filter((row) => isActionableSectionChange(row));
+    }
+    return rows;
+  }
+
+  function buildSectionSyncDiffRows(row = {}) {
+    const drifted = new Set(Array.isArray(row.driftedFields) ? row.driftedFields : []);
+    const fields = new Set([
+      ...SECTION_SYNC_COMPARE_FIELDS,
+      ...drifted,
+      ...Object.keys(row.runtime || {}),
+      ...Object.keys(row.manifest || {})
+    ]);
+    return Array.from(fields).map((field) => ({
+      field,
+      runtime: formatSectionSyncValue(row.runtime?.[field]),
+      manifest: formatSectionSyncValue(row.manifest?.[field]),
+      changed: drifted.has(field)
+    }));
+  }
+
+  function renderSectionSyncStatusBadge(status = '') {
+    const meta = sectionSyncStatusMeta(status);
+    return `<span class="badge ${meta.badge}">${escapeHtml(meta.label)}</span>`;
+  }
+
+  function renderPackageSectionCard(row = {}) {
+    const drifted = Array.isArray(row.driftedFields) ? row.driftedFields : [];
+    const checked = row.status === 'drift' || row.status === 'manifest-only' ? 'checked' : '';
+    const cardClass = row.status === 'match' ? 'is-match' : (row.status === 'drift' ? 'is-drift' : '');
+    const chips = drifted.length
+      ? drifted.map((field) => `<span class="pkg-section-sync-chip">${escapeHtml(field)}</span>`).join('')
+      : '<span class="pkg-section-sync-chip text-muted">No field differences</span>';
+    const diffRows = buildSectionSyncDiffRows(row).map((entry) => `
+      <tr class="pkg-section-sync-diff-row${entry.changed ? ' is-changed' : ''}">
+        <th scope="row">${escapeHtml(entry.field)}</th>
+        <td><code>${escapeHtml(entry.runtime)}</code></td>
+        <td><code>${escapeHtml(entry.manifest)}</code></td>
+      </tr>
+    `).join('');
+    return `
+      <article class="pkg-section-sync-card ${cardClass}" data-section-name="${escapeHtml(row.name)}" data-status="${escapeHtml(row.status || '')}">
+        <div class="pkg-section-sync-card-head">
+          <input type="checkbox" class="form-check-input mt-1 pkg-section-sync-row" data-section-name="${escapeHtml(row.name)}" ${checked} aria-label="Select ${escapeHtml(row.name)}">
+          <div class="pkg-section-sync-card-title">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <strong>${escapeHtml(row.name)}</strong>
+              ${renderSectionSyncStatusBadge(row.status)}
+            </div>
+            <div class="small text-muted mt-1">${escapeHtml(row.id || 'No id')} · compare app runtime with manifest</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary pkg-section-sync-toggle" data-section-name="${escapeHtml(row.name)}">Details</button>
+        </div>
+        <div class="pkg-section-sync-chips">${chips}</div>
+        <div class="pkg-section-sync-details">
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0 pkg-section-sync-diff-table">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:12rem;">Field</th>
+                  <th>App (runtime)</th>
+                  <th>Manifest</th>
+                </tr>
+              </thead>
+              <tbody>${diffRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderSectionSyncSummary(preview = {}) {
+    if (!sectionSyncSummaryEl) return;
+    const summary = preview?.summary || {};
+    const stats = [
+      { label: 'Manifest sections', value: summary.packageTotal ?? summary.total ?? 0 },
+      { label: 'In sync', value: summary.packageMatch ?? summary.match ?? 0 },
+      { label: 'Changed', value: summary.packageDrift ?? summary.drift ?? 0 },
+      { label: 'Manifest only', value: summary.packageManifestOnly ?? summary.manifestOnly ?? 0 }
+    ];
+    sectionSyncSummaryEl.innerHTML = stats.map((stat) => `
+      <div class="pkg-section-sync-stat">
+        <span class="small text-muted">${escapeHtml(stat.label)}</span>
+        <strong>${escapeHtml(stat.value)}</strong>
+      </div>
+    `).join('');
+  }
+
+  function renderSectionSyncPreview(preview = {}) {
+    const packageRows = getPackageSectionRows(preview);
+
+    if (sectionSyncPackageListEl) {
+      if (!packageRows.length) {
+        const emptyLabel = sectionSyncState.filter === 'changes'
+          ? 'No section changes need action.'
+          : 'No manifest sections found for this package.';
+        sectionSyncPackageListEl.innerHTML = `<div class="pkg-section-sync-empty">${escapeHtml(emptyLabel)}</div>`;
+      } else {
+        sectionSyncPackageListEl.innerHTML = packageRows.map((row) => renderPackageSectionCard(row)).join('');
+      }
+    }
+
+    if (sectionSyncSelectAllEl) sectionSyncSelectAllEl.checked = false;
+  }
+
+  function getSelectedSectionSyncNames() {
+    return Array.from(document.querySelectorAll('.pkg-section-sync-row:checked'))
+      .map((input) => String(input.dataset.sectionName || '').trim())
+      .filter(Boolean);
+  }
+
+  function getSectionSyncModal() {
+    const modalEl = sectionSyncModalEl || document.getElementById('pkgSectionSyncModal');
+    if (!modalEl || !window.bootstrap?.Modal) return null;
+    return window.bootstrap.Modal.getOrCreateInstance(modalEl);
+  }
+
+  async function openSectionSyncModal(packageId) {
+    const sectionSyncModal = getSectionSyncModal();
+    if (!sectionSyncModal) throw new Error('Section Sync modal is unavailable. Refresh and try again.');
+    sectionSyncState = { packageId, preview: null, filter: sectionSyncState.filter || 'changes' };
+    if (sectionSyncMetaEl) sectionSyncMetaEl.textContent = `Loading section sync preview for ${packageId}...`;
+    if (sectionSyncPackageListEl) {
+      sectionSyncPackageListEl.innerHTML = '<div class="text-center text-muted py-4">Loading preview...</div>';
+    }
+    if (sectionSyncSummaryEl) sectionSyncSummaryEl.innerHTML = '';
+    sectionSyncModal.show();
+    const result = await runWithWaiting('Section Sync Preview', async () => fetchJson(
+      `/systemSettings/packages/${encodeURIComponent(packageId)}/section-sync/preview`,
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams({ actionStateId }).toString()
+      }
+    ));
+    const preview = result?.report?.preview || {};
+    sectionSyncState = { packageId, preview, filter: sectionSyncState.filter || 'changes' };
+    if (sectionSyncMetaEl) {
+      const summary = preview.summary || {};
+      const hiddenAppOnly = Number(summary.runtimeOnlyHidden ?? summary.packageRuntimeOnly ?? summary.runtimeOnly ?? 0);
+      const hiddenNote = hiddenAppOnly > 0
+        ? ` · ${hiddenAppOnly} app-only section${hiddenAppOnly === 1 ? '' : 's'} not listed`
+        : '';
+      sectionSyncMetaEl.textContent = `Package ${preview.packageName || packageId} · manifest ${result?.report?.manifestPath || 'n/a'} · ${summary.packageDrift ?? summary.drift ?? 0} changed / ${summary.packageTotal ?? summary.total ?? 0} manifest sections${hiddenNote}`;
+    }
+    renderSectionSyncSummary(preview);
+    renderSectionSyncPreview(preview);
+    setOutput('Section Sync Preview', result.report || result);
+    return result;
+  }
+
+  async function applySectionSync(direction) {
+    const packageId = sectionSyncState.packageId;
+    if (!packageId) throw new Error('No package selected for section sync.');
+    const sectionNames = getSelectedSectionSyncNames();
+    if (!sectionNames.length) throw new Error('Select at least one section.');
+    const includeTopology = sectionSyncIncludeTopologyEl?.checked !== false;
+    const endpoint = direction === 'manifest'
+      ? `/systemSettings/packages/${encodeURIComponent(packageId)}/section-sync/apply-manifest`
+      : `/systemSettings/packages/${encodeURIComponent(packageId)}/section-sync/apply-runtime`;
+    const label = direction === 'manifest' ? 'Apply Manifest → App' : 'Apply App → Manifest';
+    const confirmed = await showModal({
+      title: label,
+      icon: 'warning',
+      message: `Apply ${sectionNames.length} selected section(s) ${direction === 'manifest' ? 'from manifest into the app database' : 'from the app database into the manifest file'}?`,
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: label, class: 'btn-primary' }
+      ]
+    });
+    if (confirmed !== label) return null;
+    await requireAdminVerification();
+    const result = await runWithWaiting(label, async () => fetchJson(endpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: JSON.stringify({
+        actionStateId,
+        sectionNames,
+        includeTopology
+      })
+    }));
+    setOutput(label, result.report || result);
+    await openSectionSyncModal(packageId);
+    await showSuccess(result.message || `${label} completed.`);
+    return result;
+  }
+
+  function downloadJsonFile(payload, filename = 'section-sync-backup.json') {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadSectionSyncBackup() {
+    const packageId = sectionSyncState.packageId;
+    if (!packageId) throw new Error('No package selected for section sync.');
+    await requireAdminVerification();
+    const result = await runWithWaiting('Download Section Sync Backup', async () => fetchJson(
+      `/systemSettings/packages/${encodeURIComponent(packageId)}/section-sync/export`,
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams({ actionStateId }).toString()
+      }
+    ));
+    const backup = result?.report?.backup;
+    if (!backup || typeof backup !== 'object') {
+      throw new Error('Backup export did not return JSON data.');
+    }
+    const filename = String(result?.report?.filename || `${packageId}-section-sync-backup.json`).trim();
+    downloadJsonFile(backup, filename);
+    setOutput('Section Sync Backup Export', result.report || result);
+    await showSuccess(result.message || 'Section sync backup downloaded.');
+    return result;
+  }
+
+  async function restoreSectionSyncBackup(file) {
+    const packageId = sectionSyncState.packageId;
+    if (!packageId) throw new Error('No package selected for section sync.');
+    if (!file) throw new Error('Select a JSON backup file to upload.');
+    const includeTopology = sectionSyncIncludeTopologyEl?.checked !== false;
+    const confirmed = await showModal({
+      title: 'Restore Section Sync Backup',
+      icon: 'warning',
+      message: `Restore section sync backup from "${file.name}"? This will overwrite runtime sections and manifest sections for package "${packageId}".`,
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Restore Backup', class: 'btn-danger' }
+      ]
+    });
+    if (confirmed !== 'Restore Backup') return null;
+    await requireAdminVerification();
+    const formData = new FormData();
+    formData.set('actionStateId', actionStateId);
+    formData.set('backupFile', file);
+    formData.set('includeTopology', includeTopology ? 'true' : 'false');
+    const result = await runWithWaiting('Restore Section Sync Backup', async () => fetchJson(
+      `/systemSettings/packages/${encodeURIComponent(packageId)}/section-sync/restore`,
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: formData
+      }
+    ));
+    setOutput('Section Sync Backup Restore', result.report || result);
+    await openSectionSyncModal(packageId);
+    await showSuccess(result.message || 'Section sync backup restored.');
+    return result;
+  }
+
+  sectionSyncSelectAllEl?.addEventListener('change', () => {
+    const checked = sectionSyncSelectAllEl.checked;
+    document.querySelectorAll('#pkgSectionSyncPackageList .pkg-section-sync-row').forEach((input) => {
+      input.checked = checked;
+    });
+  });
+  sectionSyncFilterAllEl?.addEventListener('change', () => {
+    if (!sectionSyncFilterAllEl.checked) return;
+    sectionSyncState.filter = 'all';
+    renderSectionSyncPreview(sectionSyncState.preview || {});
+  });
+  sectionSyncFilterChangesEl?.addEventListener('change', () => {
+    if (!sectionSyncFilterChangesEl.checked) return;
+    sectionSyncState.filter = 'changes';
+    renderSectionSyncPreview(sectionSyncState.preview || {});
+  });
+  sectionSyncPackageListEl?.addEventListener('click', (event) => {
+    const toggleBtn = event.target.closest('.pkg-section-sync-toggle');
+    if (!toggleBtn) return;
+    const card = toggleBtn.closest('.pkg-section-sync-card');
+    if (!card) return;
+    const isOpen = card.classList.toggle('is-open');
+    toggleBtn.textContent = isOpen ? 'Hide' : 'Details';
+  });
+  sectionSyncDownloadBtn?.addEventListener('click', async () => {
+    try {
+      await downloadSectionSyncBackup();
+    } catch (error) {
+      await showError(error.message || 'Download JSON backup failed.');
+    }
+  });
+  sectionSyncUploadBtn?.addEventListener('click', () => {
+    if (sectionSyncUploadInput) sectionSyncUploadInput.click();
+  });
+  sectionSyncUploadInput?.addEventListener('change', async () => {
+    const file = sectionSyncUploadInput.files?.[0] || null;
+    sectionSyncUploadInput.value = '';
+    if (!file) return;
+    try {
+      await restoreSectionSyncBackup(file);
+    } catch (error) {
+      await showError(error.message || 'Upload JSON backup failed.');
+    }
+  });
+  sectionSyncApplyManifestBtn?.addEventListener('click', async () => {
+    try {
+      await applySectionSync('manifest');
+    } catch (error) {
+      await showError(error.message || 'Apply Manifest → App failed.');
+    }
+  });
+  sectionSyncApplyRuntimeBtn?.addEventListener('click', async () => {
+    try {
+      await applySectionSync('runtime');
+    } catch (error) {
+      await showError(error.message || 'Apply App → Manifest failed.');
+    }
+  });
 
   function showRestartRecommendedBanner(message) {
     if (!restartRecommendedBanner) return;
@@ -1250,6 +1931,11 @@
   async function runRowAction(action, packageId) {
     const config = actionMap[action];
     if (!config) throw new Error('Unknown action.');
+    if (action === 'section-sync') {
+      await requireAdminVerification();
+      await openSectionSyncModal(packageId);
+      return { status: 'modal', report: sectionSyncState.preview || {} };
+    }
     if (action === 'preview-remove') {
       await requireAdminVerification();
       const result = await runWithWaiting('Preview Uninstall Impact', async () => fetchJson(config.endpoint(packageId), {
@@ -1514,8 +2200,10 @@
           `Package "${pkgLabel}" registry and sections were updated, but paused package routes may remain mounted until you restart the application.`
         );
       }
-      await showSuccess(result.message || 'Package operation completed.');
-      if (action === 'preview-remove') return;
+      if (action !== 'section-sync') {
+        await showSuccess(result.message || 'Package operation completed.');
+      }
+      if (action === 'preview-remove' || action === 'section-sync') return;
       window.location.reload();
     } catch (error) {
       setOutput('Action Failed', {

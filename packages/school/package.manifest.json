@@ -14,19 +14,6 @@
     }
   ],
   "queryExecutors": [],
-  "views": {
-    "id": "school-package-views",
-    "path": "packages/school/MVC/views",
-    "namespace": "school",
-    "active": true
-  },
-  "assets": {
-    "id": "school-package-public-scripts",
-    "path": "packages/school/public/scripts",
-    "publicPath": "/scripts",
-    "metadataOnly": false,
-    "active": true
-  },
   "operations": [],
   "roles": [
     {
@@ -129,16 +116,10 @@
           "id": "139382"
         },
         {
-          "id": "446110"
-        },
-        {
           "id": "445571"
         },
         {
           "id": "938980"
-        },
-        {
-          "id": "445574"
         },
         {
           "id": "445577"
@@ -147,7 +128,13 @@
           "id": "445581"
         },
         {
+          "id": "445583"
+        },
+        {
           "id": "446106"
+        },
+        {
+          "id": "446110"
         }
       ],
       "related": [],
@@ -174,9 +161,6 @@
         },
         {
           "id": "536458"
-        },
-        {
-          "id": "445580"
         },
         {
           "id": "445562"
@@ -218,9 +202,6 @@
           "id": "778768"
         },
         {
-          "id": "778770"
-        },
-        {
           "id": "445569"
         },
         {
@@ -233,10 +214,19 @@
           "id": "290216"
         },
         {
+          "id": "445580"
+        },
+        {
           "id": "445561"
         },
         {
           "id": "445582"
+        },
+        {
+          "id": "445574"
+        },
+        {
+          "id": "778770"
         }
       ],
       "related": [],
@@ -303,13 +293,7 @@
       "operations": [],
       "subsections": [
         {
-          "id": "332225"
-        },
-        {
-          "id": "332226"
-        },
-        {
-          "id": "111874"
+          "id": "445579"
         },
         {
           "id": "332227"
@@ -319,9 +303,6 @@
         },
         {
           "id": "445568"
-        },
-        {
-          "id": "445579"
         }
       ],
       "related": [],
@@ -930,11 +911,36 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -955,11 +961,36 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -981,12 +1012,24 @@
       "message": "",
       "operations": [],
       "subsections": [
-        { "id": "445585" },
-        { "id": "446111" },
-        { "id": "446112" },
-        { "id": "446113" },
-        { "id": "446114" },
-        { "id": "446115" }
+        {
+          "id": "445585"
+        },
+        {
+          "id": "446111"
+        },
+        {
+          "id": "446112"
+        },
+        {
+          "id": "446113"
+        },
+        {
+          "id": "446114"
+        },
+        {
+          "id": "446115"
+        }
       ],
       "related": [],
       "adoptExisting": true
@@ -1006,11 +1049,36 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -1031,11 +1099,36 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -1056,11 +1149,36 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -1081,11 +1199,36 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -1106,11 +1249,36 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -1921,20 +2089,16 @@
       "dashboardDisplay": true,
       "mainDashboardDisplay": false,
       "navigatorSection": true,
-      "homeURL": "/school/reports",
+      "homeURL": "",
       "inactiveMessage": "",
-      "message": "",
-      "operations": [
-        {
-          "id": "OP1003",
-          "sessionAttempts": 5,
-          "sessionTime": 15,
-          "active": true
-        }
-      ],
+      "message": "/school/reports",
+      "operations": [],
       "subsections": [
         {
           "id": "446101"
+        },
+        {
+          "id": "446104"
         },
         {
           "id": "446102"
@@ -1943,13 +2107,13 @@
           "id": "446103"
         },
         {
-          "id": "446104"
-        },
-        {
           "id": "446105"
         },
         {
           "id": "446107"
+        },
+        {
+          "id": "778770"
         }
       ],
       "related": [],
@@ -2070,12 +2234,42 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -2096,12 +2290,42 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -2122,12 +2346,42 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -2442,11 +2696,36 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -2713,10 +2992,30 @@
       "inactiveMessage": "",
       "message": "",
       "operations": [
-        { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
-        { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
       ],
       "subsections": [],
       "related": [],
@@ -3408,7 +3707,7 @@
       "id": "445576",
       "name": "SCHOOL_TASKS",
       "category": "SCHOOL",
-      "description": "Review school tasks and manage embedded follow-up assignments for package workflows.",
+      "description": "Review school tasks and manage embedded follow-up tasks for package workflows.",
       "active": true,
       "trackState": true,
       "minimumAccessRequirement": 5,
@@ -4370,11 +4669,41 @@
           "sectionId": "445584",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
@@ -4887,22 +5216,82 @@
           "sectionId": "446104",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
           "sectionId": "446105",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1012", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1012",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
@@ -5740,11 +6129,41 @@
           "sectionId": "445584",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
@@ -6257,22 +6676,82 @@
           "sectionId": "446104",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
           "sectionId": "446105",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1012", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1012",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
@@ -7035,11 +7514,41 @@
           "sectionId": "445584",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
@@ -7552,22 +8061,82 @@
           "sectionId": "446104",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1004", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
           "sectionId": "446105",
           "adminAccess": false,
           "operations": [
-            { "operationId": "OP1001", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1002", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1003", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1005", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null },
-            { "operationId": "OP1012", "scopeId": "SCP_OWNER", "maxAttemptsPerSession": null, "maxSessionDurationMinutes": null, "maxFetchUploadVolumeKB": null }
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1012",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
           ]
         },
         {
@@ -8339,221 +8908,6 @@
       "applyDefault": true
     }
   ],
-  "dataEntities": [
-    {
-      "entityType": "accounts",
-      "label": "School Accounts"
-    },
-    {
-      "entityType": "academicLedger",
-      "label": "Academic Ledger"
-    },
-    {
-      "entityType": "academicSnapshots",
-      "label": "Academic Snapshots"
-    },
-    {
-      "entityType": "attendanceMatrixPolicy",
-      "label": "Attendance Matrix Policies"
-    },
-    {
-      "entityType": "conductRatingScalePolicy",
-      "label": "Conduct Rating Scale Policies"
-    },
-    {
-      "entityType": "classEnrollmentPeriods",
-      "label": "Class Enrollment Periods"
-    },
-    {
-      "entityType": "classes",
-      "label": "Classes"
-    },
-    {
-      "entityType": "departments",
-      "label": "Departments"
-    },
-    {
-      "entityType": "examAllocations",
-      "label": "Exam Allocations"
-    },
-    {
-      "entityType": "examAnswers",
-      "label": "Exam Answers"
-    },
-    {
-      "entityType": "examAssignments",
-      "label": "Exam Assignments"
-    },
-    {
-      "entityType": "examAttempts",
-      "label": "Exam Attempts"
-    },
-    {
-      "entityType": "examQuestions",
-      "label": "Exam Questions"
-    },
-    {
-      "entityType": "examRevisions",
-      "label": "Exam Revisions"
-    },
-    {
-      "entityType": "examTemplates",
-      "label": "Exam Templates"
-    },
-    {
-      "entityType": "feeDefinitions",
-      "label": "Fee Definitions"
-    },
-    {
-      "entityType": "globalTransactionLedger",
-      "label": "Global Transaction Ledger"
-    },
-    {
-      "entityType": "holidays",
-      "label": "Holidays"
-    },
-    {
-      "entityType": "payRates",
-      "label": "Pay Rates"
-    },
-    {
-      "entityType": "programs",
-      "label": "Programs"
-    },
-    {
-      "entityType": "reportAssignments",
-      "label": "Report Assignments"
-    },
-    {
-      "entityType": "reportInstances",
-      "label": "Report Instances"
-    },
-    {
-      "entityType": "reportTemplates",
-      "label": "Report Templates"
-    },
-    {
-      "entityType": "overallReportTemplates",
-      "label": "Overall Report Templates"
-    },
-    {
-      "entityType": "overallReportInstances",
-      "label": "Overall Report Instances"
-    },
-    {
-      "entityType": "sessionStatuses",
-      "label": "Session Statuses"
-    },
-    {
-      "entityType": "staff",
-      "label": "Staff"
-    },
-    {
-      "entityType": "studentProgramPriorSubjects",
-      "label": "Student Program Prior Subjects"
-    },
-    {
-      "entityType": "studentProgramRegistrations",
-      "label": "Student Program Registrations"
-    },
-    {
-      "entityType": "funders",
-      "label": "School Funders",
-      "collectionName": "schoolFunders"
-    },
-    {
-      "entityType": "students",
-      "label": "Students"
-    },
-    {
-      "entityType": "studentTermRegistrations",
-      "label": "Student Term Registrations"
-    },
-    {
-      "entityType": "student_enrollments",
-      "label": "Student Enrollments"
-    },
-    {
-      "entityType": "teachingOutlineLevels",
-      "label": "Teaching Outline Levels"
-    },
-    {
-      "entityType": "teachingOutlineSectionTemplates",
-      "label": "Teaching Outline Section Templates"
-    },
-    {
-      "entityType": "teachingOutlineItems",
-      "label": "Teaching Outline Items"
-    },
-    {
-      "entityType": "subjects",
-      "label": "Subjects"
-    },
-    {
-      "entityType": "teachers",
-      "label": "Teachers"
-    },
-    {
-      "entityType": "teacher_schedules",
-      "label": "Teacher Schedules"
-    },
-    {
-      "entityType": "terms",
-      "label": "Terms"
-    },
-    {
-      "entityType": "timesheetPeriods",
-      "label": "Timesheet Periods"
-    },
-    {
-      "entityType": "timesheets",
-      "label": "Timesheets"
-    },
-    {
-      "entityType": "transactionDefinitions",
-      "label": "Transaction Definitions"
-    },
-    {
-      "entityType": "transactionJournals",
-      "label": "Transaction Journals"
-    },
-    {
-      "entityType": "withdrawals",
-      "label": "Withdrawals"
-    },
-    {
-      "entityType": "leaveRequests",
-      "label": "Leave Requests",
-      "collectionName": "schoolLeaveRequests"
-    },
-    {
-      "entityType": "tasks",
-      "label": "Tasks",
-      "collectionName": "schoolTasks"
-    },
-    {
-      "entityType": "taskRoutingRules",
-      "label": "Task Routing Rules",
-      "collectionName": "schoolTaskRoutingRules"
-    },
-    {
-      "entityType": "sessionStudentCases",
-      "label": "Session Student Cases",
-      "collectionName": "schoolSessionStudentCases"
-    },
-    {
-      "entityType": "activityCategories",
-      "label": "Activity Categories",
-      "collectionName": "schoolActivityCategories"
-    },
-    {
-      "entityType": "activities",
-      "label": "School Activities",
-      "collectionName": "schoolActivities"
-    }
-  ],
-  "dataSchemas": [],
-  "upgradeGuards": [],
   "quotaDefinitions": [],
   "mongoIndexes": [
     {
@@ -8894,7 +9248,235 @@
       "active": true
     }
   ],
+  "dataEntities": [
+    {
+      "entityType": "accounts",
+      "label": "School Accounts"
+    },
+    {
+      "entityType": "academicLedger",
+      "label": "Academic Ledger"
+    },
+    {
+      "entityType": "academicSnapshots",
+      "label": "Academic Snapshots"
+    },
+    {
+      "entityType": "attendanceMatrixPolicy",
+      "label": "Attendance Matrix Policies"
+    },
+    {
+      "entityType": "conductRatingScalePolicy",
+      "label": "Conduct Rating Scale Policies"
+    },
+    {
+      "entityType": "classEnrollmentPeriods",
+      "label": "Class Enrollment Periods"
+    },
+    {
+      "entityType": "classes",
+      "label": "Classes"
+    },
+    {
+      "entityType": "departments",
+      "label": "Departments"
+    },
+    {
+      "entityType": "examAllocations",
+      "label": "Exam Allocations"
+    },
+    {
+      "entityType": "examAnswers",
+      "label": "Exam Answers"
+    },
+    {
+      "entityType": "examAssignments",
+      "label": "Exam Assignments"
+    },
+    {
+      "entityType": "examAttempts",
+      "label": "Exam Attempts"
+    },
+    {
+      "entityType": "examQuestions",
+      "label": "Exam Questions"
+    },
+    {
+      "entityType": "examRevisions",
+      "label": "Exam Revisions"
+    },
+    {
+      "entityType": "examTemplates",
+      "label": "Exam Templates"
+    },
+    {
+      "entityType": "feeDefinitions",
+      "label": "Fee Definitions"
+    },
+    {
+      "entityType": "globalTransactionLedger",
+      "label": "Global Transaction Ledger"
+    },
+    {
+      "entityType": "holidays",
+      "label": "Holidays"
+    },
+    {
+      "entityType": "payRates",
+      "label": "Pay Rates"
+    },
+    {
+      "entityType": "programs",
+      "label": "Programs"
+    },
+    {
+      "entityType": "reportAssignments",
+      "label": "Report Assignments"
+    },
+    {
+      "entityType": "reportInstances",
+      "label": "Report Instances"
+    },
+    {
+      "entityType": "reportTemplates",
+      "label": "Report Templates"
+    },
+    {
+      "entityType": "overallReportTemplates",
+      "label": "Overall Report Templates"
+    },
+    {
+      "entityType": "overallReportInstances",
+      "label": "Overall Report Instances"
+    },
+    {
+      "entityType": "sessionStatuses",
+      "label": "Session Statuses"
+    },
+    {
+      "entityType": "staff",
+      "label": "Staff"
+    },
+    {
+      "entityType": "studentProgramPriorSubjects",
+      "label": "Student Program Prior Subjects"
+    },
+    {
+      "entityType": "studentProgramRegistrations",
+      "label": "Student Program Registrations"
+    },
+    {
+      "entityType": "funders",
+      "label": "School Funders",
+      "collectionName": "schoolFunders"
+    },
+    {
+      "entityType": "students",
+      "label": "Students"
+    },
+    {
+      "entityType": "studentTermRegistrations",
+      "label": "Student Term Registrations"
+    },
+    {
+      "entityType": "student_enrollments",
+      "label": "Student Enrollments"
+    },
+    {
+      "entityType": "teachingOutlineLevels",
+      "label": "Teaching Outline Levels"
+    },
+    {
+      "entityType": "teachingOutlineSectionTemplates",
+      "label": "Teaching Outline Section Templates"
+    },
+    {
+      "entityType": "teachingOutlineItems",
+      "label": "Teaching Outline Items"
+    },
+    {
+      "entityType": "subjects",
+      "label": "Subjects"
+    },
+    {
+      "entityType": "teachers",
+      "label": "Teachers"
+    },
+    {
+      "entityType": "teacher_schedules",
+      "label": "Teacher Schedules"
+    },
+    {
+      "entityType": "terms",
+      "label": "Terms"
+    },
+    {
+      "entityType": "timesheetPeriods",
+      "label": "Timesheet Periods"
+    },
+    {
+      "entityType": "timesheets",
+      "label": "Timesheets"
+    },
+    {
+      "entityType": "transactionDefinitions",
+      "label": "Transaction Definitions"
+    },
+    {
+      "entityType": "transactionJournals",
+      "label": "Transaction Journals"
+    },
+    {
+      "entityType": "withdrawals",
+      "label": "Withdrawals"
+    },
+    {
+      "entityType": "leaveRequests",
+      "label": "Leave Requests",
+      "collectionName": "schoolLeaveRequests"
+    },
+    {
+      "entityType": "tasks",
+      "label": "Tasks",
+      "collectionName": "schoolTasks"
+    },
+    {
+      "entityType": "taskRoutingRules",
+      "label": "Task Routing Rules",
+      "collectionName": "schoolTaskRoutingRules"
+    },
+    {
+      "entityType": "sessionStudentCases",
+      "label": "Session Student Cases",
+      "collectionName": "schoolSessionStudentCases"
+    },
+    {
+      "entityType": "activityCategories",
+      "label": "Activity Categories",
+      "collectionName": "schoolActivityCategories"
+    },
+    {
+      "entityType": "activities",
+      "label": "School Activities",
+      "collectionName": "schoolActivities"
+    }
+  ],
   "seeders": [],
   "migrations": [],
+  "dataSchemas": [],
+  "upgradeGuards": [],
+  "views": {
+    "id": "school-package-views",
+    "path": "packages/school/MVC/views",
+    "namespace": "school",
+    "active": true
+  },
+  "assets": {
+    "id": "school-package-public-scripts",
+    "path": "packages/school/public/scripts",
+    "publicPath": "/scripts",
+    "metadataOnly": false,
+    "active": true
+  },
   "dependencies": []
 }

@@ -7,6 +7,7 @@ const PizZip = require('pizzip');
 const packageManifestService = require('./packageManifestService');
 const packageRegistryService = require('./packageRegistryService');
 const packageRegistryInstallerService = require('./packageRegistryInstallerService');
+const packageSectionSyncService = require('./packageSectionSyncService');
 const packageLoaderService = require('./packageLoaderService');
 const packageNavigationService = require('./packageNavigationService');
 const packageLifecycleTransactionService = require('./packageLifecycleTransactionService');
@@ -417,6 +418,7 @@ function createDependencies(overrides = {}) {
     packageManifestService: overrides.packageManifestService || packageManifestService,
     packageRegistryService: overrides.packageRegistryService || packageRegistryService,
     packageRegistryInstallerService: overrides.packageRegistryInstallerService || packageRegistryInstallerService,
+    packageSectionSyncService: overrides.packageSectionSyncService || packageSectionSyncService,
     packageLoaderService: overrides.packageLoaderService || packageLoaderService,
     packageNavigationService: overrides.packageNavigationService || packageNavigationService,
     packageLifecycleTransactionService: overrides.packageLifecycleTransactionService || packageLifecycleTransactionService,
@@ -1210,7 +1212,8 @@ function createService(overrides = {}) {
         actor
       });
       declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
-        backendMode
+        backendMode,
+        sectionSyncMode: 'create-only'
       });
       lifecycleOperations.push(...declarationSummaryToLifecycleOperations(declarationSummary, {
         ownership: { packageId, packageName: cleanText(manifest?.name, 200) }
@@ -1359,7 +1362,10 @@ function createService(overrides = {}) {
             manifest: resolved.previousResolved.manifest,
             manifestPath: resolved.previousResolved.manifestPath || ''
           };
-          await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(restoreContext, { backendMode }).catch(() => null);
+          await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(restoreContext, {
+            backendMode,
+            sectionSyncMode: 'create-only'
+          }).catch(() => null);
         }
 
         if (previousRegistry) {
@@ -2383,7 +2389,8 @@ function createService(overrides = {}) {
       actor
     });
     const declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
-      backendMode
+      backendMode,
+      sectionSyncMode: 'create-only'
     });
     const runtime = await applyRuntimeEnableHooks(context, {
       backendMode,
@@ -3392,7 +3399,8 @@ function createService(overrides = {}) {
       || null;
 
     const declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
-      backendMode
+      backendMode,
+      sectionSyncMode: 'create-only'
     });
 
     let loaderSummary = null;
@@ -3476,7 +3484,8 @@ function createService(overrides = {}) {
     };
 
     const declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
-      backendMode
+      backendMode,
+      sectionSyncMode: 'full'
     });
     const runtime = await applyRuntimeEnableHooks(context, {
       backendMode,
@@ -3511,6 +3520,137 @@ function createService(overrides = {}) {
       runtime,
       navigation,
       restartRecommended: false,
+      warnings
+    };
+  }
+
+  async function resolveSectionSyncContext(packageIdInput = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const packageId = normalizePackageId(packageIdInput);
+    if (!packageId) throw new Error('Package id is required.');
+    const existing = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
+    if (!existing) throw new Error('Package is not in registry. Install it first.');
+    const resolved = await resolveManifestForRegistryRow(existing, options);
+    if (!resolved?.manifest) throw new Error('Manifest file was not found for this package.');
+    return {
+      backendMode,
+      packageId: normalizePackageId(resolved.manifest?.id || packageId),
+      packageName: cleanText(resolved.manifest?.name, 200),
+      manifest: resolved.manifest,
+      manifestPath: resolved.manifestPath
+    };
+  }
+
+  async function previewPackageSectionSync(packageIdInput = '', options = {}) {
+    const context = await resolveSectionSyncContext(packageIdInput, options);
+    const preview = await deps.packageSectionSyncService.buildSectionSyncPreview(context, {
+      backendMode: context.backendMode
+    });
+    return {
+      action: 'section-sync-preview',
+      packageId: context.packageId,
+      packageName: context.packageName,
+      manifestPath: context.manifestPath,
+      preview
+    };
+  }
+
+  async function applyPackageSectionsFromManifest(packageIdInput = '', request = {}, options = {}) {
+    const context = await resolveSectionSyncContext(packageIdInput, options);
+    const sectionNames = sanitizeArray(request?.sectionNames || request?.sections);
+    const includeTopology = request?.includeTopology !== false;
+    const applyResult = await deps.packageSectionSyncService.applySectionsFromManifest(
+      context,
+      sectionNames,
+      {
+        backendMode: context.backendMode,
+        includeTopology
+      }
+    );
+    const navigation = await refreshNavigationSnapshot({ backendMode: context.backendMode });
+    const warnings = [];
+    if (navigation.warning) warnings.push(navigation.warning);
+    return {
+      action: 'section-sync-apply-manifest',
+      packageId: context.packageId,
+      packageName: context.packageName,
+      manifestPath: context.manifestPath,
+      includeTopology,
+      applyResult,
+      navigation,
+      warnings
+    };
+  }
+
+  async function applyPackageSectionsToManifest(packageIdInput = '', request = {}, options = {}) {
+    const context = await resolveSectionSyncContext(packageIdInput, options);
+    const sectionNames = sanitizeArray(request?.sectionNames || request?.sections);
+    const includeTopology = request?.includeTopology !== false;
+    const applyResult = await deps.packageSectionSyncService.applySectionsToManifest(
+      context,
+      sectionNames,
+      {
+        backendMode: context.backendMode,
+        includeTopology
+      }
+    );
+    return {
+      action: 'section-sync-apply-runtime',
+      packageId: context.packageId,
+      packageName: context.packageName,
+      manifestPath: context.manifestPath,
+      includeTopology,
+      applyResult
+    };
+  }
+
+  async function exportPackageSectionSyncBackup(packageIdInput = '', options = {}) {
+    const context = await resolveSectionSyncContext(packageIdInput, options);
+    const backup = await deps.packageSectionSyncService.buildSectionSyncBackup(context, {
+      backendMode: context.backendMode
+    });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    return {
+      action: 'section-sync-export',
+      packageId: context.packageId,
+      packageName: context.packageName,
+      manifestPath: context.manifestPath,
+      backup,
+      filename: `${context.packageId}-section-sync-backup-${stamp}.json`
+    };
+  }
+
+  async function restorePackageSectionSyncBackup(packageIdInput = '', request = {}, options = {}) {
+    const context = await resolveSectionSyncContext(packageIdInput, options);
+    const backup = request?.backup;
+    if (!backup || typeof backup !== 'object') {
+      throw new Error('Backup JSON is required.');
+    }
+    const includeTopology = request?.includeTopology !== false;
+    const restoreResult = await deps.packageSectionSyncService.restoreSectionSyncBackup(
+      context,
+      backup,
+      {
+        backendMode: context.backendMode,
+        restoreRuntime: request?.restoreRuntime !== false,
+        restoreManifest: request?.restoreManifest !== false,
+        includeTopology
+      }
+    );
+    const warnings = [];
+    let navigation = null;
+    if (restoreResult.restoreRuntime) {
+      navigation = await refreshNavigationSnapshot({ backendMode: context.backendMode });
+      if (navigation?.warning) warnings.push(navigation.warning);
+    }
+    return {
+      action: 'section-sync-restore',
+      packageId: context.packageId,
+      packageName: context.packageName,
+      manifestPath: context.manifestPath,
+      includeTopology,
+      restoreResult,
+      navigation,
       warnings
     };
   }
@@ -3554,6 +3694,11 @@ function createService(overrides = {}) {
     removePackage,
     reloadPackageRuntime,
     syncPackage,
+    previewPackageSectionSync,
+    applyPackageSectionsFromManifest,
+    applyPackageSectionsToManifest,
+    exportPackageSectionSyncBackup,
+    restorePackageSectionSyncBackup,
     cleanupFailedInstallAttempts,
     previewPackageUninstallImpact,
     listPackageTransactions,

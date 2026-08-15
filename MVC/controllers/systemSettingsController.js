@@ -1605,6 +1605,113 @@ exports.syncPackageFromManager = async (req, res) => {
   }
 };
 
+exports.previewPackageSectionSyncFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.previewPackageSectionSync(
+      packageId,
+      buildPackageManagerOptions(req)
+    );
+    return res.json({
+      status: 'success',
+      message: `Section sync preview ready for package "${report.packageId}".`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Section sync preview failed.');
+  }
+};
+
+exports.applyPackageSectionsFromManifestFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.applyPackageSectionsFromManifest(
+      packageId,
+      req.body || {},
+      buildPackageManagerOptions(req)
+    );
+    return res.json({
+      status: 'success',
+      message: `Applied manifest sections to runtime for package "${report.packageId}".`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Apply manifest sections failed.');
+  }
+};
+
+exports.applyPackageSectionsToManifestFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.applyPackageSectionsToManifest(
+      packageId,
+      req.body || {},
+      buildPackageManagerOptions(req)
+    );
+    return res.json({
+      status: 'success',
+      message: `Applied runtime sections to manifest for package "${report.packageId}".`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Apply runtime sections to manifest failed.');
+  }
+};
+
+exports.exportPackageSectionSyncBackupFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.exportPackageSectionSyncBackup(
+      packageId,
+      buildPackageManagerOptions(req)
+    );
+    return res.json({
+      status: 'success',
+      message: `Section sync backup ready for package "${report.packageId}".`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Section sync backup export failed.');
+  }
+};
+
+exports.restorePackageSectionSyncBackupFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    let backup = null;
+    if (req.file?.buffer) {
+      try {
+        backup = JSON.parse(req.file.buffer.toString('utf8'));
+      } catch (_) {
+        throw new Error('Backup file is not valid JSON.');
+      }
+    } else if (req.body?.backupJson) {
+      try {
+        backup = JSON.parse(String(req.body.backupJson || '').trim());
+      } catch (_) {
+        throw new Error('Backup JSON payload is invalid.');
+      }
+    }
+    const report = await systemSettingsPackageManagerService.restorePackageSectionSyncBackup(
+      packageId,
+      {
+        backup,
+        includeTopology: req.body?.includeTopology !== false,
+        restoreRuntime: req.body?.restoreRuntime !== false,
+        restoreManifest: req.body?.restoreManifest !== false
+      },
+      buildPackageManagerOptions(req)
+    );
+    return res.json({
+      status: 'success',
+      message: `Restored section sync backup for package "${report.packageId}".`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Section sync backup restore failed.');
+  }
+};
+
 exports.reloadPackageRuntimeFromManager = async (req, res) => {
   try {
     const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();

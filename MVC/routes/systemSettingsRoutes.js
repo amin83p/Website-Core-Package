@@ -371,6 +371,57 @@ router.post('/packages/:packageId/sync',
           ),
           adminApproval,
           ctrl.syncPackageFromManager);
+router.post('/packages/:packageId/section-sync/preview',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.previewPackageSectionSyncFromManager);
+router.post('/packages/:packageId/section-sync/apply-manifest',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.applyPackageSectionsFromManifestFromManager);
+router.post('/packages/:packageId/section-sync/apply-runtime',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.applyPackageSectionsToManifestFromManager);
+router.post('/packages/:packageId/section-sync/export',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.exportPackageSectionSyncBackupFromManager);
+router.post('/packages/:packageId/section-sync/restore',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          handleBackupRestoreUpload,
+          ctrl.restorePackageSectionSyncBackupFromManager);
 router.post('/packages/:packageId/reload-runtime',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),

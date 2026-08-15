@@ -1120,14 +1120,17 @@ async function showStudentAttendanceReportPage(req, res) {
         const reportTemplate = policy.reportTemplateId
             ? await schoolDataService.getDataById('reportTemplates', policy.reportTemplateId, req.user)
             : null;
-        const overallTemplateLabels = [];
+        const overallReportTemplateLabels = [];
         for (const overallTemplateId of policy.overallReportTemplateIds || []) {
             // eslint-disable-next-line no-await-in-loop
             const overallTemplate = await schoolDataService.getDataById('overallReportTemplates', overallTemplateId, req.user);
-            overallTemplateLabels.push(studentAttendanceReportPolicyService.formatTemplateLabel(
-                overallTemplate,
-                overallTemplateId
-            ));
+            overallReportTemplateLabels.push({
+                id: overallTemplateId,
+                label: studentAttendanceReportPolicyService.formatTemplateLabel(
+                    overallTemplate,
+                    overallTemplateId
+                )
+            });
         }
         res.render('school/attendance/studentAttendanceReportViewer', {
             title: 'Student Attendance Report',
@@ -1144,7 +1147,7 @@ async function showStudentAttendanceReportPage(req, res) {
                 reportTemplate,
                 policy.reportTemplateId
             ),
-            overallReportTemplateLabel: overallTemplateLabels[0] || '',
+            overallReportTemplateLabel: overallReportTemplateLabels[0]?.label || '',
             overallReportTemplateLabels
         });
     } catch (error) {
