@@ -9,6 +9,7 @@ const schoolAdminAccessService = require('../../services/school/schoolAdminAcces
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
+const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
 const teacherIdentityService = require('../../services/school/teacherIdentityService');
@@ -23,6 +24,7 @@ const PERIOD_LABELS = Object.freeze({
     season: 'Seasonal',
     year: 'Yearly'
 });
+const SCHEDULE_SOLO_STUDENT_ENROLLMENT_STATUSES = new Set(['active', 'planned', 'to_be_confirmed', 'registered']);
 
 function normalizeId(value) {
     return String(value || '').trim();
@@ -625,7 +627,110 @@ function buildPersonDisplayName(person, fallbackId = '') {
     const fullName = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
     if (fullName) return fullName;
     if (person?.displayName) return String(person.displayName).trim();
+    if (person?.fullName) return String(person.fullName).trim();
+    if (typeof person?.name === 'string') return String(person.name).trim();
     return String(fallbackId || person?.id || '').trim();
+}
+
+function buildStudentDisplayName(student, personNameById = new Map(), fallbackId = '') {
+    const personId = normalizeId(student?.personId || student?.person?.id || student?.person?._id);
+    const personName = personId ? normalizeId(personNameById.get(personId)) : '';
+    if (personName) return personName;
+    const studentName = buildPersonDisplayName(student, '');
+    if (studentName) return studentName;
+    const fromParts = `${student?.firstName || ''} ${student?.lastName || ''}`.trim();
+    if (fromParts) return fromParts;
+    return normalizeId(fallbackId || student?.id || '');
+}
+
+function getClassScheduleCapacity(classRow = {}) {
+    const raw = classRow?.enrollment?.maxCapacity
+        ?? classRow?.maxCapacity
+        ?? classRow?.capacity
+        ?? classRow?.studentCapacity;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isSoloStudentEnrollmentStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return !normalized || SCHEDULE_SOLO_STUDENT_ENROLLMENT_STATUSES.has(normalized);
+}
+
+function scheduleEnrollmentPeriodContainsDate(row = {}, sessionDate = '') {
+    const date = normalizeId(sessionDate);
+    if (!date || !isSoloStudentEnrollmentStatus(row?.status)) return false;
+    const start = normalizeDateOnly(row?.startDate);
+    const end = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(row);
+    if (start && start > date) return false;
+    if (end && end < date) return false;
+    return true;
+}
+
+function buildSoloStudentResolver({
+    students = [],
+    persons = [],
+    enrollmentPeriods = [],
+    activeOrgId = ''
+} = {}) {
+    const personNameById = new Map(
+        (Array.isArray(persons) ? persons : [])
+            .map((person) => [normalizeId(person?.id || person?._id), buildPersonDisplayName(person, '')])
+            .filter(([id, name]) => Boolean(id && name))
+    );
+    const studentById = new Map(
+        (Array.isArray(students) ? students : [])
+            .map((student) => [normalizeId(student?.id || student?._id), student])
+            .filter(([id]) => Boolean(id))
+    );
+    const studentIdByPersonId = new Map(
+        (Array.isArray(students) ? students : [])
+            .map((student) => [normalizeId(student?.personId), normalizeId(student?.id || student?._id)])
+            .filter(([personId, studentId]) => Boolean(personId && studentId))
+    );
+    const canonicalByClassId = new Map();
+    (Array.isArray(enrollmentPeriods) ? enrollmentPeriods : []).forEach((row) => {
+        if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return;
+        const classId = normalizeId(row?.classId);
+        if (!classId) return;
+        if (!canonicalByClassId.has(classId)) canonicalByClassId.set(classId, []);
+        canonicalByClassId.get(classId).push(row);
+    });
+
+    return function resolveSoloStudentForSession(classRow = {}, sessionDate = '') {
+        const classId = normalizeId(classRow?.id || classRow?._id);
+        if (!classId || getClassScheduleCapacity(classRow) !== 1) return null;
+
+        const canonicalRows = canonicalByClassId.get(classId) || [];
+        let studentIds = [];
+        if (canonicalRows.length) {
+            studentIds = Array.from(new Set(
+                canonicalRows
+                    .filter((row) => scheduleEnrollmentPeriodContainsDate(row, sessionDate))
+                    .map((row) => normalizeId(row?.studentId))
+                    .filter(Boolean)
+            ));
+        } else {
+            studentIds = Array.from(new Set(
+                (Array.isArray(classRow?.enrollment?.students) ? classRow.enrollment.students : [])
+                    .filter((row) => isSoloStudentEnrollmentStatus(row?.status || row?.enrollmentStatus))
+                    .map((row) => normalizeId(row?.studentId || row?.id || row?._id) || studentIdByPersonId.get(normalizeId(row?.personId)) || '')
+                    .filter(Boolean)
+            ));
+        }
+
+        if (studentIds.length !== 1) return null;
+        const studentId = studentIds[0];
+        const student = studentById.get(studentId) || { id: studentId };
+        const studentPersonId = normalizeId(student?.personId);
+        const studentName = buildStudentDisplayName(student, personNameById, studentId);
+        if (!studentName) return null;
+        return {
+            soloStudentId: studentId,
+            soloStudentPersonId: studentPersonId,
+            soloStudentName: studentName
+        };
+    };
 }
 
 function extractPersonRolesInOrg(person, orgId) {
@@ -1016,14 +1121,18 @@ async function getPersonById(personId, reqUser) {
 }
 
 async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqUser, activeOrgId, statusMap = null, accessContext = {} }) {
-    const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents] = await Promise.all([
+    const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents, allPersons, allEnrollmentPeriods] = await Promise.all([
         schoolDataService.getStudentIndex(),
         schoolDataService.getTeacherIndex(),
         schoolDataService.fetchAllData('classes', {}, reqUser, accessContext),
         schoolRepositories.reportAssignments.list({ query: {}, scope: { canViewAll: true } }),
         schoolRepositories.reportTemplates.list({ query: {}, scope: { canViewAll: true } }),
         schoolDataService.fetchAllData('teachers', {}, reqUser, accessContext),
-        schoolDataService.fetchAllData('students', {}, reqUser, accessContext)
+        schoolDataService.fetchAllData('students', {}, reqUser, accessContext),
+        listSchoolPersonRecords(reqUser, { query: { limit: 1000 } }).catch(() => []),
+        activeOrgId
+            ? schoolDataService.getClassEnrollmentPeriodsByOrg(activeOrgId, reqUser, accessContext).catch(() => [])
+            : schoolDataService.fetchAllData('classEnrollmentPeriods', {}, reqUser, accessContext).catch(() => [])
     ]);
     const teacherPersonMap = buildTeacherPersonMap(allTeachers);
     const normalizedPersonId = resolveLinkedPersonId(personId, teacherPersonMap);
@@ -1041,8 +1150,16 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
             .map((row) => [normalizeId(row?.id), String(row?.title || '').trim()])
             .filter(([id]) => Boolean(id))
     );
+    const resolveSoloStudentForSession = buildSoloStudentResolver({
+        students: allStudents,
+        persons: allPersons,
+        enrollmentPeriods: allEnrollmentPeriods,
+        activeOrgId
+    });
 
-    const person = await getPersonById(normalizedPersonId, reqUser);
+    const person = (Array.isArray(allPersons) ? allPersons : [])
+        .find((row) => idsEqual(row?.id, normalizedPersonId) || idsEqual(row?._id, normalizedPersonId))
+        || await getPersonById(normalizedPersonId, reqUser);
     const personName = buildPersonDisplayName(person, normalizedPersonId);
     const personOrgRoles = extractPersonRolesInOrg(person, activeOrgId);
     const instructorRoleLabel =
@@ -1210,6 +1327,7 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
             const detailsUrl = sessionId
                 ? sessionNavigationService.buildManageSessionHref(classId, { sessionId, date: sessionDate })
                 : '';
+            const soloStudent = resolveSoloStudentForSession(classDef, sessionDate);
 
             events.push({
                 id: eventId,
@@ -1236,7 +1354,12 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
                 roleLabel: roles.join(' / '),
                 hasOverlap: false,
                 eventType: 'class_session',
-                detailsUrl
+                detailsUrl,
+                isOneOnOneClass: Boolean(soloStudent),
+                soloStudentId: soloStudent?.soloStudentId || '',
+                soloStudentPersonId: soloStudent?.soloStudentPersonId || '',
+                soloStudentName: soloStudent?.soloStudentName || '',
+                singleStudentName: soloStudent?.soloStudentName || ''
             });
         }
     }
@@ -1509,12 +1632,13 @@ async function pickerSchoolSchedulePersons(req, res) {
     try {
         const activeOrgId = getActiveScheduleOrgId(req.user);
         const q = String(req.query.q || req.query.search || '').trim().toLowerCase();
+        const roleFilter = normalizeScheduleRole(req.query.role);
         const page = Math.max(1, Number(req.query.page || 1) || 1);
         const pageSize = Math.max(1, Math.min(100, Number(req.query.pageSize || req.query.limit || 25) || 25));
         const rows = await buildSchoolSchedulePersonPickerRows({ activeOrgId, reqUser: req.user });
-        const filtered = q
-            ? rows.filter((row) => String(row.searchText || '').includes(q))
-            : rows;
+        const filtered = rows
+            .filter((row) => !roleFilter || (Array.isArray(row.roles) && row.roles.map(normalizeScheduleRole).includes(roleFilter)))
+            .filter((row) => !q || String(row.searchText || '').includes(q));
         const start = (page - 1) * pageSize;
         const items = filtered.slice(start, start + pageSize).map(({ searchText, ...row }) => row);
         const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));

@@ -1,4 +1,8 @@
 <style>
+    .schedule-shell {
+        --schedule-day-width: 320px;
+    }
+
     .schedule-shell .filter-panel {
         background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
         border: 1px solid #dce9ff;
@@ -10,14 +14,106 @@
     }
 
     /* --- TIMELINE CSS (Daily/Weekly View) --- */
-    .timeline-container { position: relative; border: 1px solid #dee2e6; border-radius: 12px; background: #fff; margin-bottom: 1.5rem; overflow: hidden; box-shadow: 0 0.25rem 0.75rem rgba(15, 23, 42, 0.06); }
-    .timeline-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 8px 15px; font-weight: bold; display: flex; justify-content: space-between; }
+    .timeline-container { position: relative; border: 1px solid #dee2e6; border-radius: 0.75rem; background: #fff; margin-bottom: 1rem; overflow: hidden; box-shadow: 0 0.25rem 0.75rem rgba(15, 23, 42, 0.06); }
+    .timeline-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 0.55rem 0.9rem; font-weight: 700; display: flex; justify-content: space-between; }
+    .timeline-header.conflict { background: #dc3545; color: #fff; }
     .timeline-body { position: relative; min-height: 76px; background-image: repeating-linear-gradient(to right, transparent, transparent calc(6.66% - 1px), #f1f3f5 calc(6.66% - 1px), #f1f3f5 6.66%); }
     .hour-markers { display: flex; position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
     .hour-marker { flex: 1; border-right: 1px dashed #e9ecef; position: relative; }
     .hour-label { position: absolute; bottom: -20px; left: -10px; font-size: 0.65rem; color: #adb5bd; }
-    .event-block { position: absolute; min-height: 48px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 0.7rem; line-height: 1.1; padding: 4px 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: transform 0.1s; border-left: 4px solid rgba(0,0,0,0.3); z-index: 10; cursor: pointer; display: flex; flex-direction: column; gap: 2px;}
+    .event-block { position: absolute; min-height: 48px; border-radius: 0.45rem; box-shadow: 0 2px 4px rgba(0,0,0,0.12); font-size: 0.78rem; line-height: 1.2; padding: 2rem 0.65rem 6px 8px; overflow: hidden; transition: transform 0.1s; border-left: 4px solid rgba(0,0,0,0.3); z-index: 10; cursor: pointer; display: flex; flex-direction: column; gap: 2px;}
     .event-block:hover { transform: scale(1.02); z-index: 20; }
+    .event-block.is-session-selected,
+    .vertical-event-block.is-session-selected {
+        outline: 3px solid rgba(25, 135, 84, 0.55);
+        box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.16), 0 4px 12px rgba(15, 23, 42, 0.16);
+    }
+    .schedule-session-select {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        z-index: 25;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.35rem;
+        height: 1.35rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(15, 23, 42, 0.16);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
+        cursor: pointer;
+    }
+    .schedule-session-select .form-check-input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .schedule-session-select-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        color: #0d6efd;
+        font-size: 0.9rem;
+        line-height: 1;
+    }
+    .schedule-session-select.is-selected {
+        background: #198754;
+        border-color: #198754;
+    }
+    .schedule-session-select.is-selected .schedule-session-select-icon {
+        color: #fff;
+    }
+    .schedule-session-select.is-disabled {
+        background: #f8d7da;
+        border-color: #f1aeb5;
+        cursor: not-allowed;
+    }
+    .schedule-session-select.is-disabled .schedule-session-select-icon {
+        color: #842029;
+    }
+    .event-block.is-session-unselectable .schedule-event-title,
+    .vertical-event-block.is-session-unselectable .schedule-event-title {
+        opacity: 0.72;
+    }
+    .schedule-event-title {
+        margin-bottom: 0.2rem;
+        color: inherit;
+        font-size: 0.86rem;
+        font-weight: 800;
+        line-height: 1.25;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+    .schedule-event-time {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        width: fit-content;
+        max-width: 100%;
+        padding: 0.12rem 0.35rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.42);
+        color: inherit;
+        font-size: 0.72rem;
+        font-weight: 750;
+    }
+    .schedule-event-student {
+        display: flex;
+        align-items: center;
+        gap: 0.28rem;
+        margin-top: auto;
+        padding-top: 0.18rem;
+        color: inherit;
+        font-size: 0.76rem;
+        font-weight: 800;
+        line-height: 1.2;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
     .sch-event-tip {
         position: fixed;
         z-index: 2000;
@@ -31,7 +127,8 @@
         letter-spacing: 0.01em;
         line-height: 1.3;
         white-space: normal;
-        text-align: center;
+        text-align: left;
+        direction: ltr;
         box-shadow:
             0 14px 34px rgba(15, 23, 42, 0.38),
             0 0 0 1px rgba(255, 255, 255, 0.18),
@@ -44,6 +141,9 @@
         opacity: 1;
         transform: translate(-50%, calc(-100% - 10px)) scale(1);
     }
+    .sch-event-tip.is-below {
+        transform: translate(-50%, 10px) scale(1);
+    }
     .sch-event-tip::after {
         content: '';
         position: absolute;
@@ -53,8 +153,21 @@
         border: 7px solid transparent;
         border-top-color: var(--sch-tip-arrow, #0f172a);
     }
+    .sch-event-tip.is-below::after {
+        top: auto;
+        bottom: 100%;
+        border-top-color: transparent;
+        border-bottom-color: var(--sch-tip-arrow, #0f172a);
+    }
     .sch-event-tip .sch-tip-line {
         display: block;
+    }
+    .sch-event-tip .sch-tip-line + .sch-tip-line {
+        margin-top: 0.28rem;
+    }
+    .sch-event-tip .sch-tip-date {
+        direction: ltr;
+        unicode-bidi: isolate;
     }
     .sch-event-tip .sch-tip-sub {
         display: block;
@@ -67,6 +180,37 @@
     .report-priority-marker .bi { filter: drop-shadow(0 1px 1px rgba(120, 0, 0, 0.35)); }
     .event-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
     .session-status-tag { display: inline-block; border-radius: 999px; padding: 1px 6px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; border: 1px solid transparent; }
+    .schedule-status-chip {
+        position: absolute;
+        top: 4px;
+        right: 5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.2rem;
+        min-width: 1.45rem;
+        max-width: 5.5rem;
+        height: 1.35rem;
+        padding: 0 0.38rem;
+        border: 1px solid rgba(255, 255, 255, 0.42);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.78);
+        color: #0f172a;
+        font-size: 0.68rem;
+        font-weight: 800;
+        line-height: 1;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+    }
+    .schedule-status-chip-label {
+        max-width: 3.8rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .schedule-status-chip.status-complete { background: #d1e7dd; color: #0f5132; border-color: #a3cfbb; }
+    .schedule-status-chip.status-pending { background: #fff3cd; color: #664d03; border-color: #ffda6a; }
+    .schedule-status-chip.status-leave { background: #fff3bf; color: #7a4d00; border-color: #f59f00; }
+    .schedule-status-chip.status-overlap { background: #f8d7da; color: #842029; border-color: #f1aeb5; }
     .status-tag-scheduled { background: #e7f1ff; color: #084298; border-color: #b6d4fe; }
     .status-tag-completed { background: #d1e7dd; color: #0f5132; border-color: #a3cfbb; }
     .status-tag-cancelled { background: #f8d7da; color: #842029; border-color: #f1aeb5; }
@@ -74,6 +218,7 @@
     .status-tag-default { background: #e2e3e5; color: #41464b; border-color: #c6c8ca; }
     .role-teacher { background-color: #0dcaf0; color: #000; }
     .role-student { background-color: #0d6efd; color: #fff; }
+    .role-staff { background-color: #e2e3e5; color: #41464b; }
     .event-leave {
         background: linear-gradient(135deg, #fff3bf 0%, #ffd43b 100%);
         color: #4d3200;
@@ -87,19 +232,8 @@
         border-color: rgba(122,77,0,0.2) !important;
     }
     .schedule-hours-summary {
-        border: 1px solid #dce9ff;
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.85);
-        padding: 0.85rem;
-        margin-top: 0.85rem;
-    }
-    .schedule-hours-summary-title {
-        font-size: 0.75rem;
-        font-weight: 800;
-        color: #6c757d;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-bottom: 0.5rem;
+        padding-top: 0.4rem;
+        margin-top: 0.15rem;
     }
     .schedule-hours-chip {
         display: inline-flex;
@@ -123,6 +257,276 @@
     .hours-category-leave { background: #fff3cd; color: #7a4d00; border-color: #ffda6a; }
     .hours-category-default { background: #f8f9fa; color: #495057; border-color: #dee2e6; }
     .conflict-zone { position: absolute; top: 0; bottom: 0; background-color: rgba(220, 53, 69, 0.3); border-left: 2px dashed #dc3545; border-right: 2px dashed #dc3545; z-index: 5; pointer-events: none; animation: pulseConflict 2s infinite; }
+    .schedule-toolbar-grid {
+        display: grid;
+        grid-template-columns: repeat(10, minmax(0, 1fr));
+        gap: 0.5rem 0.75rem;
+        align-items: end;
+    }
+    .schedule-toolbar-role { grid-column: 1 / span 2; }
+    .schedule-toolbar-people {
+        grid-column: 3 / span 2;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: end;
+    }
+    .schedule-toolbar-date-start { grid-column: 5 / span 2; }
+    .schedule-toolbar-date-end { grid-column: 7 / span 2; }
+    .schedule-toolbar-cases { grid-column: 9 / span 2; }
+    .schedule-toolbar-shortcut { grid-column: 5 / span 2; }
+    .schedule-toolbar-loads {
+        grid-column: 8 / span 3;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+    .schedule-person-tabs {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.85rem 1.15rem;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background: rgba(248, 250, 252, 0.85);
+    }
+    .schedule-person-tab-wrap {
+        position: relative;
+        display: inline-flex;
+    }
+    .schedule-person-tab {
+        --schedule-person-tab-bg: #e7f1ff;
+        --schedule-person-tab-text: #084298;
+        --schedule-person-tab-border: #9ec5fe;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        max-width: 18rem;
+        border-radius: 999px;
+        border-color: var(--schedule-person-tab-border);
+        background: var(--schedule-person-tab-bg);
+        color: var(--schedule-person-tab-text);
+        font-weight: 800;
+    }
+    .schedule-person-tab:hover,
+    .schedule-person-tab:focus-visible {
+        color: var(--schedule-person-tab-text);
+        border-color: var(--schedule-person-tab-border);
+        filter: brightness(0.98);
+    }
+    .schedule-person-tab.active {
+        background: var(--schedule-person-tab-text);
+        color: #fff;
+        border-color: var(--schedule-person-tab-text);
+        box-shadow: 0 0.35rem 0.9rem rgba(15, 23, 42, 0.16);
+    }
+    .schedule-person-tab-close {
+        position: absolute;
+        top: -0.35rem;
+        right: -0.35rem;
+        width: 1.1rem;
+        height: 1.1rem;
+        padding: 0;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        border-radius: 999px;
+        background: #fff;
+        color: #64748b;
+        font-size: 0.8rem;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+    }
+    .schedule-person-tab-close:hover {
+        color: #dc3545;
+        border-color: #dc3545;
+    }
+    .schedule-viewbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        width: 100%;
+    }
+    .schedule-viewbar-left,
+    .schedule-viewbar-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+    }
+    .schedule-viewbar-left {
+        min-width: 0;
+    }
+    .schedule-viewbar-actions {
+        justify-content: flex-end;
+        margin-left: auto;
+    }
+    .schedule-view-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: #084298;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+    .schedule-width-control {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        min-width: min(18rem, 100%);
+    }
+    .schedule-width-control .form-range {
+        min-width: 0;
+        width: 11rem;
+        margin: 0;
+    }
+    .schedule-width-value {
+        min-width: 3.25rem;
+        text-align: right;
+    }
+    .schedule-selected-count-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.34rem 0.65rem;
+        border: 1px solid #a3cfbb;
+        background: #d1e7dd;
+        color: #0f5132;
+        font-weight: 850;
+        box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+        white-space: nowrap;
+    }
+    .schedule-selected-count-pill.is-empty {
+        border-color: #dee2e6;
+        background: #f8f9fa;
+        color: #6c757d;
+        box-shadow: none;
+    }
+    .schedule-legend-modal-body .schedule-legend-items {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.65rem;
+    }
+    .schedule-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .schedule-visual-area {
+        max-height: none;
+        overflow-y: visible;
+    }
+    .schedule-vertical-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 0.45rem;
+    }
+    .schedule-vertical-days {
+        display: flex;
+        align-items: stretch;
+        gap: 1rem;
+        min-width: max-content;
+    }
+    .vertical-day-column {
+        flex: 0 0 var(--schedule-day-width, 320px);
+        border: 1px solid #dee2e6;
+        border-radius: 0.75rem;
+        background: #fff;
+        overflow: hidden;
+    }
+    .vertical-day-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 0.55rem 0.9rem;
+        font-weight: 700;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .vertical-day-header.conflict {
+        background: #dc3545;
+        color: #fff;
+    }
+    .vertical-day-body {
+        position: relative;
+        height: 840px;
+        min-height: 840px;
+        background-image: repeating-linear-gradient(to bottom, transparent, transparent calc(6.66% - 1px), #f1f3f5 calc(6.66% - 1px), #f1f3f5 6.66%);
+    }
+    .vertical-hour-markers {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+    }
+    .vertical-hour-marker {
+        height: calc(100% / 15);
+        border-bottom: 1px dashed #e9ecef;
+        position: relative;
+    }
+    .vertical-hour-label {
+        position: absolute;
+        top: 0.25rem;
+        left: 0.45rem;
+        font-size: 0.65rem;
+        color: #adb5bd;
+    }
+    .vertical-event-block {
+        position: absolute;
+        min-height: 46px;
+        border-radius: 0.45rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+        font-size: 0.78rem;
+        line-height: 1.2;
+        padding: 2rem 0.65rem 6px 8px;
+        overflow: hidden;
+        transition: transform 0.1s;
+        border-left: 4px solid rgba(0,0,0,0.3);
+        border-bottom: 2px solid rgba(15, 23, 42, 0.24);
+        z-index: 10;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .vertical-event-block:hover { transform: scale(1.02); z-index: 20; }
+    .vertical-event-block .schedule-event-title {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .event-block .block-scan-icon,
+    .vertical-event-block .block-scan-icon {
+        position: absolute;
+        top: 3px;
+        right: 4px;
+        font-size: 0.75rem;
+        opacity: 0.9;
+    }
+    @media (max-width: 991.98px) {
+        .schedule-toolbar-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .schedule-toolbar-role,
+        .schedule-toolbar-people,
+        .schedule-toolbar-date-start,
+        .schedule-toolbar-date-end,
+        .schedule-toolbar-cases,
+        .schedule-toolbar-shortcut,
+        .schedule-toolbar-loads {
+            grid-column: auto;
+        }
+        .schedule-toolbar-loads,
+        .schedule-toolbar-people {
+            justify-content: stretch;
+        }
+        .schedule-toolbar-loads .btn,
+        .schedule-toolbar-people .btn {
+            flex: 1 1 auto;
+        }
+    }
     
     /* --- CALENDAR CSS (Monthly/Yearly View) --- */
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
@@ -185,10 +589,22 @@
         background-color: rgba(255, 243, 205, 0.45);
         border-left: 4px solid #ffc107;
     }
+    .single-day-list .event-row.is-session-selected {
+        background-color: rgba(13, 110, 253, 0.1);
+        box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.28);
+    }
+    .single-day-list .event-row.is-session-unselectable .event-main-title {
+        opacity: 0.72;
+    }
     .single-day-list .schedule-scan-cell {
         display: flex;
+        gap: 0.45rem;
         align-items: flex-start;
         padding-top: 0.1rem;
+    }
+    .single-day-list .schedule-session-select {
+        position: static;
+        flex: 0 0 auto;
     }
     .schedule-scan-icon {
         font-size: 1rem;
@@ -279,7 +695,7 @@
 %>
 
 <%- include('partials/tablePages-start', {
-  title,
+  title: '',
   newUrl: null,
   newLabel: null,
   user,
@@ -297,8 +713,6 @@
 }) %>
 
 <div class="schedule-shell">
-  <p class="text-muted small mb-3">Browse any school person's schedule across daily, weekly, and calendar views. Use quick ranges or custom dates, then load results.</p>
-
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
       <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Schedule</div>
@@ -316,82 +730,77 @@
     </div>
     <div class="collapse show" id="scheduleFilterCollapse">
       <div class="card-body filter-panel p-3" id="scheduleFilterForm">
-        <div class="row g-3 align-items-end">
-          <div class="col-lg-4 col-md-6">
-            <label class="form-label" for="sch_personName"><%= canSelectAnyPerson ? 'Select Person' : 'Your Schedule Identity' %></label>
-            <% if (canSelectAnyPerson) { %>
-              <div class="input-group">
-                <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
-                <input type="text" id="sch_personName" class="form-control bg-white" placeholder="All people" value="<%= lockedPersonName %>" readonly>
-                <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker" title="Select person">
-                  <i class="bi bi-person-badge"></i>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" id="btn_clearPerson" title="Clear person">
-                  <i class="bi bi-x-lg"></i>
-                </button>
-              </div>
-            <% } else { %>
-              <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
-              <input type="text" id="sch_personName" class="form-control size-md bg-white" value="<%= lockedPersonName %>" readonly>
-            <% } %>
-          </div>
-          <div class="col-lg-2 col-md-4">
-            <label class="form-label" for="sch_role">Role</label>
-            <select id="sch_role" class="form-select size-md" <%= !canSelectAnyPerson && scheduleRoles.length <= 1 ? 'disabled' : '' %>>
+        <div class="schedule-toolbar-grid">
+          <div class="schedule-toolbar-role">
+            <label class="form-label fw-bold small mb-1" for="sch_role">Role</label>
+            <select id="sch_role" class="form-select form-select-sm" <%= !canSelectAnyPerson && scheduleRoles.length <= 1 ? 'disabled' : '' %>>
               <% if (canSelectAnyPerson) { %>
+                <option value="teacher" selected>Teacher</option>
+                <option value="student">Student</option>
+                <option value="staff">Staff</option>
                 <option value="">All Roles</option>
+              <% } else { %>
+                <% if (!scheduleRoles.length) { %>
+                  <option value="">No school role found</option>
+                <% } %>
+                <% scheduleRoles.forEach((role) => { %>
+                  <option value="<%= role.key %>" <%= role.key === defaultRole ? 'selected' : '' %>><%= role.label %></option>
+                <% }); %>
               <% } %>
-              <% if (!canSelectAnyPerson && !scheduleRoles.length) { %>
-                <option value="">No school role found</option>
-              <% } %>
-              <% scheduleRoles.forEach((role) => { %>
-                <option value="<%= role.key %>" <%= role.key === defaultRole ? 'selected' : '' %>><%= role.label %></option>
-              <% }); %>
             </select>
           </div>
-          <div class="col-lg-2 col-md-4">
-            <label class="form-label" for="sch_startDate">Start Date</label>
-            <input type="date" id="sch_startDate" class="form-control size-md">
+          <div class="schedule-toolbar-people">
+            <% if (canSelectAnyPerson) { %>
+              <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
+              <input type="hidden" id="sch_personName" value="<%= lockedPersonName %>">
+              <button type="button" class="btn btn-outline-primary btn-sm flex-fill" id="btn_openPersonPicker" title="Select people">
+                <i class="bi bi-people-fill me-1"></i>Select People
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_clearPerson" title="Clear people">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            <% } else { %>
+              <label class="form-label fw-bold small mb-1" for="sch_personName">Your Schedule Identity</label>
+              <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
+              <input type="text" id="sch_personName" class="form-control form-control-sm bg-white" value="<%= lockedPersonName %>" readonly>
+            <% } %>
           </div>
-          <div class="col-lg-2 col-md-4">
-            <label class="form-label" for="sch_endDate">End Date</label>
-            <input type="date" id="sch_endDate" class="form-control size-md">
+          <div class="schedule-toolbar-date-start">
+            <label class="form-label fw-bold small mb-1" for="sch_startDate">Start Date</label>
+            <input type="date" id="sch_startDate" class="form-control form-control-sm">
           </div>
-          <div class="col-lg-2 col-md-4">
-            <label class="form-label" for="sch_hasCases">Cases</label>
-            <div class="form-check form-switch pt-2">
+          <div class="schedule-toolbar-date-end">
+            <label class="form-label fw-bold small mb-1" for="sch_endDate">End Date</label>
+            <input type="date" id="sch_endDate" class="form-control form-control-sm">
+          </div>
+          <div class="schedule-toolbar-cases">
+            <label class="form-label fw-bold small mb-1" for="sch_hasCases">Cases</label>
+            <div class="form-check form-switch pt-1">
               <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
               <label class="form-check-label small fw-semibold" for="sch_hasCases">With cases only</label>
             </div>
           </div>
-          <div class="col-12 d-flex justify-content-lg-end gap-2 pt-lg-2">
-            <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary btn-md">Reset</button>
-            <button type="button" id="btn_loadSchedule" class="btn btn-filled btn-primary btn-md">
-              <i class="bi bi-funnel me-1"></i> Apply
+          <div class="schedule-toolbar-shortcut">
+            <button type="button" id="btn_openScheduleShortcuts" class="btn btn-outline-secondary btn-sm w-100">
+              <i class="bi bi-calendar-range me-1"></i> Shortcut Dates
+            </button>
+          </div>
+          <div class="schedule-toolbar-loads">
+            <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary btn-sm">Reset</button>
+            <button type="button" id="btn_loadSchedule" class="btn btn-primary btn-sm flex-fill">
+              <i class="bi bi-arrow-clockwise me-1"></i> Load Tab
+            </button>
+            <button type="button" id="btn_loadAllSchedules" class="btn btn-outline-primary btn-sm flex-fill">
+              <i class="bi bi-cloud-arrow-down me-1"></i> Load All
             </button>
           </div>
         </div>
 
-        <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
-          <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="day">Today</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="week">This Week</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="first15">First 15 Days</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="second15">Second 15 Days</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="month">This Month</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="season">Next 3 Months</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="year">This Year</button>
-          </div>
-        </div>
-
-        <div id="scheduleHoursSummary" class="schedule-hours-summary d-none">
-          <div class="schedule-hours-summary-title">Total Hours By Category</div>
-          <div id="lbl_totalHours" class="d-flex flex-wrap gap-2"></div>
-        </div>
       </div>
     </div>
   </div>
+
+  <div class="schedule-person-tabs" id="schedulePersonTabs"></div>
 
   <div id="scheduleContainer" class="d-none">
     <div class="card border-0 shadow-sm mb-3">
@@ -399,6 +808,9 @@
         <div>
           <div class="text-muted small">Viewing</div>
           <div class="fw-bold text-primary m-0" id="scheduleTitle">Schedule</div>
+          <div id="scheduleHoursSummary" class="schedule-hours-summary d-none">
+            <div id="lbl_totalHours" class="d-flex flex-wrap gap-2"></div>
+          </div>
         </div>
         <span class="badge bg-light text-secondary border" id="viewModeIndicator">Ready</span>
       </div>
@@ -406,11 +818,46 @@
 
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2 py-2 px-3">
-        <div class="fw-bold text-dark"><i class="bi bi-calendar3-week me-2"></i>Schedule View</div>
-        <div class="d-flex gap-3 align-items-center flex-wrap small" id="legendContainer"></div>
+        <div class="d-flex gap-3 align-items-center flex-wrap small w-100" id="legendContainer"></div>
       </div>
       <div class="card-body p-2 p-md-3">
-        <div id="visualDisplayArea" style="max-height: 800px; overflow-y: auto;"></div>
+        <div id="visualDisplayArea" class="schedule-visual-area"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleShortcutsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2 px-3">
+        <h6 class="modal-title mb-0 fw-semibold">Shortcut Dates</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-2">
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="day">Today</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="week">This Week</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="first15">First 15 Days</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="second15">Second 15 Days</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="month">This Month</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="season">Next 3 Months</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="year">This Year</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleLegendModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2 px-3">
+        <h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-info-circle me-1"></i>Schedule Legend</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="scheduleLegendModalBody" class="schedule-legend-modal-body"></div>
       </div>
     </div>
   </div>
@@ -516,6 +963,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span class="badge border ms-1 ${classMap[tone] || classMap.muted}" title="${escapeHtml(title)}"><i class="bi bi-exclamation-diamond-fill me-1"></i>${escapeHtml(label)}</span>`;
     }
     const canSelectAnyPerson = <%- JSON.stringify(canSelectAnyPerson) %>;
+    const initialScheduleRoles = <%- JSON.stringify(scheduleRoles) %>;
+    const initialDefaultRole = <%- JSON.stringify(defaultRole) %>;
+    const initialLockedPersonId = <%- JSON.stringify(lockedPersonId) %>;
+    const initialLockedPersonName = <%- JSON.stringify(lockedPersonName) %>;
     function isLeaveEvent(event) {
         const candidates = [
             event?.eventType,
@@ -536,6 +987,106 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function getEventTitle(event) {
         return String(event?.className || event?.title || event?.label || event?.classId || 'Schedule Item').trim();
+    }
+    function getEventDetailsUrl(event) {
+        return String(event?.detailsUrl || '').trim() || (
+            event?.sessionId && event?.classId
+                ? `/school/classes/${encodeURIComponent(event.classId)}/sessions/${encodeURIComponent(event.sessionId)}`
+                : ''
+        );
+    }
+    function scheduleEventRoleClass(event) {
+        if (isLeaveEvent(event)) return 'event-leave';
+        const roleText = String(event?.role || event?.roleLabel || event?.roles?.[0] || '').trim().toLowerCase();
+        if (roleText.includes('staff')) return 'role-staff';
+        if (roleText.includes('teacher')) return 'role-teacher';
+        return 'role-student';
+    }
+    function scheduleStatusChip(event, statusMap, scan) {
+        const resolvedScan = scan || (window.ScheduleCompletionDisplay ? window.ScheduleCompletionDisplay.resolveScheduleCompletionScan(event, statusMap) : null);
+        const leaveEvent = isLeaveEvent(event);
+        const label = resolvedScan?.scanLabel || formatStatusLabel(event?.status);
+        const normalizedLabel = String(label || '').trim().toLowerCase();
+        const shortLabel = event?.hasOverlap
+            ? 'Overlap'
+            : (leaveEvent ? 'Leave' : (resolvedScan?.isComplete ? 'Done' : (normalizedLabel.includes('cancel') ? 'Cancel' : 'Pending')));
+        const statusClass = event?.hasOverlap
+            ? 'status-overlap'
+            : (leaveEvent ? 'status-leave' : (resolvedScan?.isComplete ? 'status-complete' : 'status-pending'));
+        const icon = event?.hasOverlap
+            ? 'bi-exclamation-triangle-fill'
+            : (leaveEvent ? 'bi-airplane-fill' : (resolvedScan?.isComplete ? 'bi-check-circle-fill' : 'bi-clock-history'));
+        return `<span class="schedule-status-chip ${statusClass}" aria-label="${escapeHtml(label)}"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i><span class="schedule-status-chip-label">${escapeHtml(shortLabel)}</span></span>`;
+    }
+    function normalizeScheduleTooltipValue(value) {
+        const text = String(value ?? '').trim();
+        if (!text || text === '[object Object]') return '';
+        return text;
+    }
+    function scheduleSoloStudentHtml(event) {
+        const name = normalizeScheduleTooltipValue(event?.soloStudentName || event?.singleStudentName);
+        if (!name) return '';
+        return `<div class="schedule-event-student"><i class="bi bi-person-check-fill" aria-hidden="true"></i><span>${escapeHtml(name)}</span></div>`;
+    }
+    function scheduleSessionSelectHtml(event) {
+        const key = scheduleSessionSelectionKey(event);
+        if (!key) return '';
+        const selectionSet = getActiveScheduleSelectionSet();
+        const checked = selectionSet.has(key);
+        const disabled = !checked && !canSelectScheduleSession(event);
+        const icon = checked ? 'bi-check-lg' : (disabled ? 'bi-x-lg' : 'bi-plus-lg');
+        const stateClass = checked ? ' is-selected' : (disabled ? ' is-disabled' : '');
+        const title = checked ? 'Selected session' : (disabled ? 'Only sessions from the selected class can be selected' : 'Select session');
+        return `<label class="schedule-session-select${stateClass}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><input type="checkbox" class="form-check-input" data-schedule-session-select data-session-key="${escapeHtml(key)}" data-session-class-id="${escapeHtml(event?.classId || '')}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="schedule-session-select-icon"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span></label>`;
+    }
+    function formatScheduleDateLabel(dateStr) {
+        const raw = normalizeScheduleTooltipValue(dateStr);
+        if (!raw) return '';
+        const dateObj = new Date(raw + 'T00:00:00');
+        if (Number.isNaN(dateObj.getTime())) return raw;
+        return dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+    function buildScheduleEventTooltip(event, statusMap, scan) {
+        const detailParts = [];
+        const addDetail = (label, value) => {
+            const cleaned = normalizeScheduleTooltipValue(value);
+            if (cleaned) detailParts.push(`${label}: ${cleaned}`);
+        };
+        const role = isLeaveEvent(event) ? 'Approved Leave' : (event?.roleLabel || event?.role || event?.roles?.[0] || '');
+        const time = normalizeScheduleTooltipValue(event?.start)
+            ? `${normalizeScheduleTooltipValue(event?.start)} - ${normalizeScheduleTooltipValue(event?.end || '')}`
+            : '';
+        const caseSummary = event?.caseSummary && typeof event.caseSummary === 'object'
+            ? [
+                event.caseSummary.hasCases === true ? 'Has cases' : '',
+                event.caseSummary.openCount != null ? `Open: ${event.caseSummary.openCount}` : '',
+                event.caseSummary.totalCount != null ? `Total: ${event.caseSummary.totalCount}` : ''
+            ].filter(Boolean).join(' | ')
+            : '';
+        addDetail('Session', getEventTitle(event));
+        addDetail('Date', formatScheduleDateLabel(event?.date));
+        addDetail('Time', time);
+        addDetail('Duration', Number.isFinite(Number(event?.duration)) ? `${Number(event.duration).toFixed(2)} h` : '');
+        addDetail('Status', scan?.scanLabel || formatStatusLabel(event?.status));
+        addDetail('Role', role);
+        addDetail('Person', event?.personName || event?.teacherName || event?.studentName);
+        addDetail('Student', event?.soloStudentName || event?.singleStudentName);
+        addDetail('Room', event?.room || event?.roomName || event?.location);
+        addDetail('Cases', caseSummary);
+        if (event?.hasOverlap) addDetail('Conflict', 'Overlaps another scheduled item');
+        if (window.ScheduleCompletionDisplay && window.ScheduleCompletionDisplay.isMakeupRequiredDisplayEvent(event)) {
+            addDetail('Make-up', window.ScheduleCompletionDisplay.MAKEUP_DISPLAY_TEXT);
+        }
+        return detailParts.join('\n');
+    }
+    function scheduleStatusTipStyle(event, statusMap) {
+        if (isLeaveEvent(event)) return { bg: '#ffd43b', fg: '#4d3200', border: '#f59f00' };
+        const meta = statusMap.get(normalizeSessionStatus(event?.status));
+        return {
+            bg: String(meta?.colorBg || '#0f172a').trim() || '#0f172a',
+            fg: String(meta?.colorText || '#ffffff').trim() || '#ffffff',
+            border: String(meta?.colorBorder || meta?.colorBg || '#0f172a').trim() || '#0f172a'
+        };
     }
     function getEventCategoryLabels(event) {
         if (Array.isArray(event?.hourCategoryLabels) && event.hourCategoryLabels.length) {
@@ -678,79 +1229,589 @@ document.addEventListener('DOMContentLoaded', () => {
         return confirm(message);
     };
 
-    document.getElementById('btn_resetScheduleFilters')?.addEventListener('click', () => {
-        scheduleViewMode = 'auto';
-        if (canSelectAnyPerson) {
-            document.getElementById('sch_personId').value = '';
-            document.getElementById('sch_personName').value = '';
-            const roleEl = document.getElementById('sch_role');
-            if (roleEl) roleEl.value = '';
-        }
-        const hasCasesEl = document.getElementById('sch_hasCases');
-        if (hasCasesEl) hasCasesEl.checked = false;
-        applyDefaultWeekRange();
-        document.getElementById('scheduleContainer')?.classList.add('d-none');
-        document.getElementById('viewModeIndicator').innerText = 'Ready';
-        document.getElementById('scheduleTitle').innerText = 'Schedule';
-        document.getElementById('scheduleHoursSummary')?.classList.add('d-none');
-        const lblHours = document.getElementById('lbl_totalHours');
-        if (lblHours) lblHours.innerHTML = '';
-    });
+    const scheduleState = {
+        persons: [],
+        activePersonId: '',
+        eventsByPersonId: {},
+        statusMetaByPersonId: {},
+        errorByPersonId: {},
+        loadedPersonIds: new Set(),
+        loadingPersonId: '',
+        selectedSessionKeysByPersonId: {},
+        viewMode: 'verticalTimeline'
+    };
+    const SCHEDULE_DAY_WIDTH_STORAGE_KEY = 'schoolMasterViewer.scheduleDayWidth';
+    const SCHEDULE_DEFAULT_DAY_WIDTH = 320;
+    const SCHEDULE_MIN_DAY_WIDTH = 260;
+    const SCHEDULE_MAX_DAY_WIDTH = 520;
 
-    let scheduleViewMode = 'auto';
-    let scheduleViewData = null;
+    function resolveSchedulePersonId(item) {
+        return String(item?.personId || item?.id || item?._id || '').trim();
+    }
+
+    function selectedScheduleRole() {
+        return String(document.getElementById('sch_role')?.value || '').trim();
+    }
+
+    function activeSchedulePerson() {
+        return scheduleState.persons.find((person) => person.id === scheduleState.activePersonId) || null;
+    }
+
+    function scheduleSessionSelectionKey(event) {
+        if (isLeaveEvent(event) || String(event?.eventType || event?.targetType || '').trim().toLowerCase() === 'report_task') return '';
+        const classId = String(event?.classId || '').trim();
+        const sessionId = String(event?.sessionId || event?.sourceSessionId || event?.id || '').trim();
+        const date = String(event?.date || '').trim();
+        if (!classId || !sessionId || !date) return '';
+        return `${classId}::${sessionId}::${date}`;
+    }
+
+    function scheduleSessionClassIdFromKey(key) {
+        return String(key || '').split('::')[0] || '';
+    }
+
+    function getActiveScheduleSelectionSet() {
+        const person = activeSchedulePerson();
+        if (!person?.id) return new Set();
+        if (!(scheduleState.selectedSessionKeysByPersonId[person.id] instanceof Set)) {
+            scheduleState.selectedSessionKeysByPersonId[person.id] = new Set();
+        }
+        return scheduleState.selectedSessionKeysByPersonId[person.id];
+    }
+
+    function activeScheduleSelectedClassId() {
+        const firstKey = Array.from(getActiveScheduleSelectionSet())[0] || '';
+        return scheduleSessionClassIdFromKey(firstKey);
+    }
+
+    function canSelectScheduleSession(event) {
+        const key = scheduleSessionSelectionKey(event);
+        if (!key) return false;
+        const classId = String(event?.classId || '').trim();
+        const selectedClassId = activeScheduleSelectedClassId();
+        return !selectedClassId || selectedClassId === classId || getActiveScheduleSelectionSet().has(key);
+    }
+
+    function countActiveScheduleSelectedSessions() {
+        return getActiveScheduleSelectionSet().size;
+    }
+
+    function updateScheduleSelectedSessionControls() {
+        const count = countActiveScheduleSelectedSessions();
+        document.querySelectorAll('[data-schedule-selected-session-count]').forEach((el) => {
+            el.textContent = `${count} selected`;
+            el.closest('.schedule-selected-count-pill')?.classList.toggle('is-empty', count === 0);
+        });
+        document.querySelectorAll('[data-schedule-clear-selected-sessions]').forEach((btn) => {
+            btn.classList.toggle('d-none', count === 0);
+        });
+    }
+
+    function clearActiveScheduleSessionSelection() {
+        const person = activeSchedulePerson();
+        if (person?.id) scheduleState.selectedSessionKeysByPersonId[person.id] = new Set();
+        refreshScheduleActiveView();
+    }
+
+    function sortSchedulePersons() {
+        scheduleState.persons.sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id), undefined, { sensitivity: 'base' }));
+    }
+
+    function schedulePersonTabStyle(index) {
+        const palettes = [
+            ['#e7f1ff', '#084298', '#9ec5fe'],
+            ['#e8f7ef', '#0f5132', '#a3cfbb'],
+            ['#fff3cd', '#664d03', '#ffda6a'],
+            ['#f3e8ff', '#581c87', '#d8b4fe'],
+            ['#e0f7fa', '#055160', '#8bd7e2'],
+            ['#ffe8e8', '#842029', '#f1aeb5']
+        ];
+        const [bg, text, border] = palettes[index % palettes.length];
+        return `--schedule-person-tab-bg:${bg};--schedule-person-tab-text:${text};--schedule-person-tab-border:${border};`;
+    }
+
+    function syncActivePersonInputs() {
+        const person = activeSchedulePerson();
+        const idEl = document.getElementById('sch_personId');
+        const nameEl = document.getElementById('sch_personName');
+        if (idEl) idEl.value = person?.id || '';
+        if (nameEl) nameEl.value = scheduleState.persons.length
+            ? `${scheduleState.persons.length} selected - ${person?.name || person?.id || ''}`
+            : '';
+    }
+
+    function renderSchedulePersonTabs() {
+        const host = document.getElementById('schedulePersonTabs');
+        if (!host) return;
+        sortSchedulePersons();
+        if (!scheduleState.persons.length) {
+            host.innerHTML = '';
+            syncActivePersonInputs();
+            return;
+        }
+        host.innerHTML = scheduleState.persons.map((person, index) => {
+            const active = person.id === scheduleState.activePersonId;
+            const closeButton = canSelectAnyPerson
+                ? `<button type="button" class="schedule-person-tab-close" data-schedule-remove-person="${escapeHtml(person.id)}" aria-label="Close tab" title="Close tab">&times;</button>`
+                : '';
+            const roleCount = (Array.isArray(person.availableRoles) && person.availableRoles.length) ? person.availableRoles.length : 'All';
+            return `
+                <div class="schedule-person-tab-wrap">
+                    <button type="button" class="btn btn-sm schedule-person-tab ${active ? 'active' : ''}" style="${schedulePersonTabStyle(index)}" data-schedule-person-tab="${escapeHtml(person.id)}">
+                        <i class="bi bi-person-circle"></i>
+                        <span class="text-truncate">${escapeHtml(person.name || person.id)}</span>
+                        <span class="badge text-bg-light border">${escapeHtml(roleCount)}</span>
+                    </button>
+                    ${closeButton}
+                </div>
+            `;
+        }).join('');
+        syncActivePersonInputs();
+    }
+
+    function updateRoleOptionsForActivePerson() {
+        const person = activeSchedulePerson();
+        const roleEl = document.getElementById('sch_role');
+        if (!roleEl) return;
+        if (canSelectAnyPerson) return;
+        const roles = Array.isArray(person?.availableRoles) ? person.availableRoles : [];
+        if (!roles.length) {
+            return;
+        } else {
+            roleEl.innerHTML = roles.length > 1 ? '<option value="">All Roles</option>' : '';
+        }
+        roles.forEach((role) => {
+            const key = String(role?.key || '').trim();
+            if (!key) return;
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = role?.label || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+            roleEl.appendChild(option);
+        });
+        const current = String(person?.selectedRole || '').trim();
+        if (current && Array.from(roleEl.options).some((option) => option.value === current)) roleEl.value = current;
+        else roleEl.value = '';
+        roleEl.disabled = !canSelectAnyPerson && roles.length <= 1;
+    }
+
+    function addSchedulePerson(item, options = {}) {
+        const id = resolveSchedulePersonId(item);
+        if (!id) return null;
+        let person = scheduleState.persons.find((row) => row.id === id);
+        if (!person) {
+            person = {
+                id,
+                name: resolvePersonPickerName(item) || String(item?.displayName || item?.name || id).trim() || id,
+                availableRoles: Array.isArray(item?.availableRoles) ? item.availableRoles : [],
+                selectedRole: String(options.selectedRole || item?.selectedRole || selectedScheduleRole() || '').trim()
+            };
+            scheduleState.persons.push(person);
+        } else {
+            person.name = resolvePersonPickerName(item) || person.name || id;
+            if (Array.isArray(item?.availableRoles)) person.availableRoles = item.availableRoles;
+            person.selectedRole = String(options.selectedRole || item?.selectedRole || selectedScheduleRole() || person.selectedRole || '').trim();
+        }
+        sortSchedulePersons();
+        if (!scheduleState.activePersonId || options.activate) scheduleState.activePersonId = id;
+        return person;
+    }
+
+    function removeSchedulePerson(id) {
+        scheduleState.persons = scheduleState.persons.filter((person) => person.id !== id);
+        delete scheduleState.eventsByPersonId[id];
+        delete scheduleState.statusMetaByPersonId[id];
+        delete scheduleState.errorByPersonId[id];
+        delete scheduleState.selectedSessionKeysByPersonId[id];
+        scheduleState.loadedPersonIds.delete(id);
+        if (scheduleState.activePersonId === id) scheduleState.activePersonId = scheduleState.persons[0]?.id || '';
+        refreshScheduleActiveView();
+    }
+
+    function clearLoadedSchedules() {
+        scheduleState.eventsByPersonId = {};
+        scheduleState.statusMetaByPersonId = {};
+        scheduleState.errorByPersonId = {};
+        scheduleState.selectedSessionKeysByPersonId = {};
+        scheduleState.loadedPersonIds.clear();
+    }
+
+    function getScheduleRange() {
+        return {
+            startDate: document.getElementById('sch_startDate')?.value || '',
+            endDate: document.getElementById('sch_endDate')?.value || ''
+        };
+    }
+
+    function hasCasesOnly() {
+        return document.getElementById('sch_hasCases')?.checked === true;
+    }
+
+    function readScheduleDayWidth() {
+        try {
+            const stored = window.localStorage ? Number(window.localStorage.getItem(SCHEDULE_DAY_WIDTH_STORAGE_KEY)) : NaN;
+            if (Number.isFinite(stored)) return Math.max(SCHEDULE_MIN_DAY_WIDTH, Math.min(SCHEDULE_MAX_DAY_WIDTH, Math.round(stored)));
+        } catch (error) { /* storage can be unavailable */ }
+        return SCHEDULE_DEFAULT_DAY_WIDTH;
+    }
+
+    function applyScheduleDayWidth(width) {
+        const resolved = Math.max(SCHEDULE_MIN_DAY_WIDTH, Math.min(SCHEDULE_MAX_DAY_WIDTH, Math.round(Number(width) || SCHEDULE_DEFAULT_DAY_WIDTH)));
+        document.querySelector('.schedule-shell')?.style.setProperty('--schedule-day-width', `${resolved}px`);
+        const input = document.getElementById('scheduleDayWidth');
+        const value = document.getElementById('scheduleDayWidthValue');
+        if (input) input.value = String(resolved);
+        if (value) value.textContent = `${resolved}px`;
+        return resolved;
+    }
+
+    function saveScheduleDayWidth(width) {
+        try {
+            if (window.localStorage) window.localStorage.setItem(SCHEDULE_DAY_WIDTH_STORAGE_KEY, String(applyScheduleDayWidth(width)));
+        } catch (error) { /* storage can be unavailable */ }
+    }
+
+    function scheduleWidthControlHtml() {
+        const width = readScheduleDayWidth();
+        return `
+            <div class="schedule-width-control">
+                <input type="range" class="form-range" id="scheduleDayWidth" min="${SCHEDULE_MIN_DAY_WIDTH}" max="${SCHEDULE_MAX_DAY_WIDTH}" step="10" value="${escapeHtml(width)}" aria-label="Day width">
+                <span class="badge text-bg-light border schedule-width-value" id="scheduleDayWidthValue">${escapeHtml(width)}px</span>
+            </div>
+        `;
+    }
+
+    function scheduleLegendItemsForMode(mode) {
+        if (mode === 'calendar') {
+            return [
+                '<span class="schedule-legend-item text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</span>',
+                '<span class="schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</span>',
+                '<span class="schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</span>',
+                '<span class="schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> M = Make-up required</span>',
+                '<span class="schedule-legend-item text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</span>',
+                '<span class="schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>',
+                '<span class="schedule-legend-item text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</span>',
+                '<span class="schedule-legend-item text-muted small">Click any day to load it in vertical day view</span>'
+            ];
+        }
+        return [
+            '<span class="schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</span>',
+            '<span class="schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</span>',
+            '<span class="schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</span>',
+            '<span class="schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
+            '<span class="schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
+            '<span class="schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</span>',
+            '<span class="schedule-legend-item text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</span>',
+            '<span class="schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>'
+        ];
+    }
+
+    function scheduleViewName(mode) {
+        if (mode === 'calendar') return 'Month view';
+        if (mode === 'timeline') return 'Horizontal day view';
+        return 'Vertical day view';
+    }
+
+    function normalizedScheduleViewMode(mode = scheduleState.viewMode) {
+        if (mode === 'calendar') return 'calendar';
+        if (mode === 'timeline') return 'timeline';
+        return 'verticalTimeline';
+    }
+
+    function renderScheduleControls(mode) {
+        const legend = document.getElementById('legendContainer');
+        const modalBody = document.getElementById('scheduleLegendModalBody');
+        if (modalBody) modalBody.innerHTML = `<div class="schedule-legend-items">${scheduleLegendItemsForMode(mode).join('')}</div>`;
+        if (!legend) return;
+        let switchButtons = '';
+        if (mode === 'calendar') {
+            switchButtons = '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-vertical aria-label="Switch to day view" title="Show days as vertical columns with horizontal scrolling"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>';
+        } else {
+            switchButtons = [
+                mode === 'verticalTimeline'
+                    ? '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-timeline aria-label="Switch to horizontal day view" title="Show the current stacked horizontal day timeline"><i class="bi bi-layout-three-columns me-1"></i>Switch to horizontal view</button>'
+                    : '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-vertical aria-label="Switch to vertical day view" title="Show days as vertical columns with horizontal scrolling"><i class="bi bi-columns-gap me-1"></i>Switch to vertical view</button>',
+                '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>'
+            ].join('');
+        }
+        legend.innerHTML = `
+            <div class="schedule-viewbar">
+                <div class="schedule-viewbar-left">
+                    <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
+                    ${(mode === 'verticalTimeline' || mode === 'timeline') ? scheduleWidthControlHtml() : ''}
+                    <span class="schedule-selected-count-pill ${countActiveScheduleSelectedSessions() ? '' : 'is-empty'}"><i class="bi bi-check2-square" aria-hidden="true"></i><span data-schedule-selected-session-count>${escapeHtml(String(countActiveScheduleSelectedSessions()))} selected</span></span>
+                </div>
+                <div class="schedule-viewbar-actions">
+                    <button type="button" class="btn btn-sm btn-outline-secondary ${countActiveScheduleSelectedSessions() ? '' : 'd-none'}" data-schedule-clear-selected-sessions aria-label="Clear selected sessions"><i class="bi bi-x-circle me-1"></i>Clear selected</button>
+                    ${switchButtons}
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-schedule-open-legend aria-label="Open schedule legend"><i class="bi bi-info-circle me-1"></i>Legend</button>
+                </div>
+            </div>
+        `;
+        applyScheduleDayWidth(readScheduleDayWidth());
+        updateScheduleSelectedSessionControls();
+    }
+
+    function groupEventsByDate(events) {
+        const grouped = {};
+        (Array.isArray(events) ? events : []).forEach((ev) => {
+            if (!ev?.date) return;
+            if (!grouped[ev.date]) grouped[ev.date] = [];
+            grouped[ev.date].push(ev);
+        });
+        Object.keys(grouped).forEach((date) => {
+            grouped[date].sort((a, b) => {
+                const aStart = timeToMinutes(a?.start);
+                const bStart = timeToMinutes(b?.start);
+                if (aStart !== bStart) return aStart - bStart;
+                return getEventTitle(a).localeCompare(getEventTitle(b));
+            });
+        });
+        return grouped;
+    }
+
+    function refreshScheduleSummary(events) {
+        const lblHours = document.getElementById('lbl_totalHours');
+        if (lblHours) lblHours.innerHTML = renderCategoryHourTotals(events || []);
+        document.getElementById('scheduleHoursSummary')?.classList.toggle('d-none', !(events || []).length);
+    }
+
+    function refreshScheduleActiveView() {
+        renderSchedulePersonTabs();
+        const person = activeSchedulePerson();
+        updateRoleOptionsForActivePerson();
+        const container = document.getElementById('visualDisplayArea');
+        if (!container) return;
+        if (!person) {
+            document.getElementById('scheduleContainer')?.classList.add('d-none');
+            document.getElementById('scheduleTitle').innerText = 'Schedule';
+            document.getElementById('viewModeIndicator').innerText = 'Ready';
+            document.getElementById('legendContainer').innerHTML = '';
+            refreshScheduleSummary([]);
+            return;
+        }
+        document.getElementById('scheduleContainer')?.classList.remove('d-none');
+        document.getElementById('scheduleTitle').innerText = person.name || person.id;
+        if (scheduleState.loadingPersonId === person.id) {
+            document.getElementById('viewModeIndicator').innerText = 'Loading';
+            renderScheduleControls(normalizedScheduleViewMode());
+            container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedule for ${escapeHtml(person.name || person.id)}...</div></div>`;
+            return;
+        }
+        if (!scheduleState.loadedPersonIds.has(person.id)) {
+            document.getElementById('viewModeIndicator').innerText = 'Ready';
+            renderScheduleControls(normalizedScheduleViewMode());
+            refreshScheduleSummary([]);
+            container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-arrow-clockwise fs-1 d-block mb-2"></i>Schedule is ready to load for ${escapeHtml(person.name || person.id)}.</div>`;
+            return;
+        }
+        if (scheduleState.errorByPersonId[person.id]) {
+            document.getElementById('viewModeIndicator').innerText = 'Error';
+            renderScheduleControls(normalizedScheduleViewMode());
+            refreshScheduleSummary([]);
+            container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i>${escapeHtml(scheduleState.errorByPersonId[person.id])}</div>`;
+            return;
+        }
+        const events = scheduleState.eventsByPersonId[person.id] || [];
+        sessionStatusMetaMap = new Map(
+            (scheduleState.statusMetaByPersonId[person.id] || [])
+                .map((row) => [normalizeSessionStatus(row?.code), row])
+                .filter(([code]) => Boolean(code))
+        );
+        refreshScheduleSummary(events);
+        if (!events.length) {
+            document.getElementById('viewModeIndicator').innerText = 'Empty';
+            renderScheduleControls(normalizedScheduleViewMode());
+            container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
+            return;
+        }
+        const grouped = groupEventsByDate(events);
+        const mode = normalizedScheduleViewMode();
+        document.getElementById('viewModeIndicator').innerHTML = mode === 'calendar'
+            ? '<i class="bi bi-grid-3x3-gap"></i> Month View'
+            : (mode === 'timeline' ? '<i class="bi bi-layout-three-columns"></i> Horizontal View' : '<i class="bi bi-columns-gap"></i> Vertical View');
+        renderScheduleControls(mode);
+        if (mode === 'calendar') {
+            const range = getScheduleRange();
+            renderCalendarView(grouped, range.startDate, range.endDate, container);
+        } else if (mode === 'timeline') {
+            renderTimelineView(grouped, container);
+        } else {
+            renderVerticalTimelineView(grouped, container);
+        }
+    }
+
+    async function loadSchedulePerson(person) {
+        if (!person) return;
+        const range = getScheduleRange();
+        if (!range.startDate || !range.endDate) { await uiAlert('Please select a start and end date.'); return; }
+        const role = person.id === scheduleState.activePersonId ? String(selectedScheduleRole() || person.selectedRole || '').trim() : String(person.selectedRole || '').trim();
+        person.selectedRole = role;
+        scheduleState.loadingPersonId = person.id;
+        refreshScheduleActiveView();
+        if (typeof window.showLoading === 'function') window.showLoading(`Loading schedule for ${person.name || person.id}...`);
+        try {
+            const params = new URLSearchParams({ personId: person.id, startDate: range.startDate, endDate: range.endDate });
+            if (role) params.set('role', role);
+            if (hasCasesOnly()) params.set('hasCases', '1');
+            const res = await fetch(`/school/schedules/api/person-schedule?${params.toString()}`, {
+                headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
+                credentials: 'same-origin'
+            });
+            const result = await res.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Schedule Load In Progress', replayTitle: 'Schedule Already Loaded' })
+                : { stop: false };
+            if (guarded.stop) return;
+            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load schedule.');
+            if (Array.isArray(result.availableRoles)) person.availableRoles = result.availableRoles;
+            person.selectedRole = result.selectedRole || role;
+            scheduleState.eventsByPersonId[person.id] = Array.isArray(result.events) ? result.events : [];
+            scheduleState.statusMetaByPersonId[person.id] = Array.isArray(result.statusMeta) ? result.statusMeta : [];
+            delete scheduleState.errorByPersonId[person.id];
+            scheduleState.loadedPersonIds.add(person.id);
+        } catch (error) {
+            scheduleState.eventsByPersonId[person.id] = [];
+            scheduleState.statusMetaByPersonId[person.id] = [];
+            scheduleState.errorByPersonId[person.id] = error.message || 'Unable to load schedule.';
+            scheduleState.loadedPersonIds.add(person.id);
+        } finally {
+            scheduleState.loadingPersonId = '';
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+            refreshScheduleActiveView();
+        }
+    }
+
+    async function loadActiveSchedulePerson() {
+        const person = activeSchedulePerson();
+        if (!person) { await uiAlert('Please select a person first.'); return; }
+        await loadSchedulePerson(person);
+    }
+
+    async function fetchSchedulePeopleForRole(role) {
+        const normalizedRole = String(role || '').trim();
+        if (!normalizedRole) return [];
+        const items = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+            const params = new URLSearchParams({ page: String(page), pageSize: '100' });
+            params.set('role', normalizedRole);
+            const res = await fetch(`/school/schedules/api/school-person-picker?${params.toString()}`, {
+                headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
+                credentials: 'same-origin'
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load people for the selected role.');
+            const pageItems = Array.isArray(result.items)
+                ? result.items
+                : (Array.isArray(result.data) ? result.data : (Array.isArray(result.results) ? result.results : []));
+            pageItems.forEach((item) => items.push(item));
+            const pagination = result.pagination || {};
+            totalPages = Number(pagination.totalPages || result.totalPages || totalPages || 1) || 1;
+            page += 1;
+        } while (page <= totalPages);
+        return items;
+    }
+
+    async function loadAllSchedulePeople() {
+        if (canSelectAnyPerson && selectedScheduleRole()) {
+            const role = selectedScheduleRole();
+            if (typeof window.showLoading === 'function') window.showLoading(`Loading ${role} people...`);
+            try {
+                const rolePeople = await fetchSchedulePeopleForRole(role);
+                if (!rolePeople.length) {
+                    await uiAlert(`No people were found for the selected ${role} role.`);
+                    return;
+                }
+                scheduleState.persons = [];
+                scheduleState.activePersonId = '';
+                clearLoadedSchedules();
+                rolePeople.forEach((item) => addSchedulePerson(item, { selectedRole: role }));
+                sortSchedulePersons();
+                scheduleState.activePersonId = scheduleState.persons[0]?.id || '';
+                renderSchedulePersonTabs();
+                refreshScheduleActiveView();
+            } catch (error) {
+                await uiAlert(error.message || 'Unable to load people for the selected role.', 'Schedule');
+                return;
+            } finally {
+                if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+            }
+        }
+        if (!scheduleState.persons.length) { await uiAlert('Please select at least one person first.'); return; }
+        for (const person of scheduleState.persons) {
+            // eslint-disable-next-line no-await-in-loop
+            await loadSchedulePerson(person);
+        }
+    }
+
+    function applyScheduleRange(range) {
+        setActiveRangeChip(range);
+        const today = new Date();
+        let start = new Date(today);
+        let end = new Date(today);
+        if (range === 'week') {
+            const day = today.getDay() || 7;
+            if (day !== 1) start.setHours(-24 * (day - 1));
+            end.setTime(start.getTime() + (6 * 24 * 60 * 60 * 1000));
+        } else if (range === 'first15') {
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+            end = new Date(today.getFullYear(), today.getMonth(), 15);
+        } else if (range === 'second15') {
+            start = new Date(today.getFullYear(), today.getMonth(), 16);
+            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        } else if (range === 'month') {
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        } else if (range === 'season') {
+            end.setMonth(start.getMonth() + 3);
+        } else if (range === 'year') {
+            start = new Date(today.getFullYear(), 0, 1);
+            end = new Date(today.getFullYear(), 11, 31);
+        }
+        setDateRange(start, end);
+        clearLoadedSchedules();
+        scheduleState.viewMode = 'verticalTimeline';
+        refreshScheduleActiveView();
+    }
 
     // --- 1. Control Logic & Event Listeners ---
-    document.querySelectorAll('.btn-range').forEach(btn => {
+    document.querySelectorAll('.btn-range').forEach((btn) => {
         btn.addEventListener('click', (e) => {
-            const range = e.currentTarget.getAttribute('data-range');
-            scheduleViewMode = 'auto';
-            setActiveRangeChip(range);
-            const today = new Date();
-            let start = new Date(today);
-            let end = new Date(today);
-
-            if (range === 'day') {
-                // Keep today
-            } else if (range === 'week') {
-                const day = today.getDay() || 7; 
-                if (day !== 1) start.setHours(-24 * (day - 1)); 
-                end.setTime(start.getTime() + (6 * 24 * 60 * 60 * 1000));
-            } else if (range === 'first15') {
-                start = new Date(today.getFullYear(), today.getMonth(), 1);
-                end = new Date(today.getFullYear(), today.getMonth(), 15);
-            } else if (range === 'second15') {
-                start = new Date(today.getFullYear(), today.getMonth(), 16);
-                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            } else if (range === 'month') {
-                start = new Date(today.getFullYear(), today.getMonth(), 1);
-                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            } else if (range === 'season') {
-                end.setMonth(start.getMonth() + 3);
-            } else if (range === 'year') {
-                start = new Date(today.getFullYear(), 0, 1);
-                end = new Date(today.getFullYear(), 11, 31);
-            }
-            setDateRange(start, end);
-            if (document.getElementById('sch_personId').value) {
-                document.getElementById('btn_loadSchedule').click();
-            }
+            applyScheduleRange(e.currentTarget.getAttribute('data-range') || 'week');
+            const modalEl = document.getElementById('scheduleShortcutsModal');
+            if (modalEl && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         });
     });
 
-    // Person Picker
+    document.getElementById('btn_openScheduleShortcuts')?.addEventListener('click', () => {
+        const modalEl = document.getElementById('scheduleShortcutsModal');
+        if (modalEl && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    });
+
     const btnPicker = document.getElementById('btn_openPersonPicker');
     if (btnPicker) {
         btnPicker.addEventListener('click', () => {
+            const pickerRole = selectedScheduleRole();
+            const pickerParams = new URLSearchParams();
+            if (pickerRole) pickerParams.set('role', pickerRole);
+            const pickerEndpoint = '/school/schedules/api/school-person-picker' + (pickerParams.toString() ? `?${pickerParams.toString()}` : '');
             GenericPicker.open(GenericPickerPresets.normalizeConfig({
-                title: 'Select School Person',
+                title: 'Select School People',
                 icon: 'bi-person-badge',
-                apiEndpoint: '/school/schedules/api/school-person-picker',
+                apiEndpoint: pickerEndpoint,
                 placeholder: 'Search school people...',
+                multiselect: true,
+                selectedItems: scheduleState.persons.map((person) => ({
+                    id: person.id,
+                    personId: person.id,
+                    displayName: person.name,
+                    availableRoles: person.availableRoles
+                })),
                 context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
                 renderer: (item) => {
                     const displayName = escapeHtml(resolvePersonPickerName(item) || 'School Person');
-                    const personId = escapeHtml(item?.personId || item?.id || '');
+                    const personId = escapeHtml(resolveSchedulePersonId(item));
                     const email = escapeHtml(item?.email || '');
                     const roleBadges = (Array.isArray(item?.availableRoles) ? item.availableRoles : [])
                         .map((role) => `<span class="badge bg-primary-subtle text-primary border">${escapeHtml(role?.label || role?.key || '')}</span>`)
@@ -771,148 +1832,120 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     `;
                 },
-                onSelect: (item) => {
-                    const selectedPersonId = item.personId || item.id || '';
-                    const name = resolvePersonPickerName(item) || selectedPersonId;
-                    scheduleViewMode = 'auto';
-                    document.getElementById('sch_personId').value = selectedPersonId;
-                    document.getElementById('sch_personName').value = name;
-                    document.getElementById('scheduleTitle').innerText = `Schedule: ${name}`;
-                    updateAdminRoleOptions(item.availableRoles, '');
+                onSelect: (items) => {
+                    (Array.isArray(items) ? items : [items]).forEach((item) => addSchedulePerson(item, { selectedRole: pickerRole }));
+                    if (!scheduleState.activePersonId && scheduleState.persons.length) scheduleState.activePersonId = scheduleState.persons[0].id;
+                    refreshScheduleActiveView();
                 }
             }));
         });
     }
 
     document.getElementById('btn_clearPerson')?.addEventListener('click', () => {
-        scheduleViewMode = 'auto';
-        document.getElementById('sch_personId').value = '';
-        document.getElementById('sch_personName').value = '';
+        scheduleState.persons = [];
+        scheduleState.activePersonId = '';
+        clearLoadedSchedules();
         const roleEl = document.getElementById('sch_role');
         if (roleEl) {
-            roleEl.innerHTML = '<option value="">All Roles</option>';
-            roleEl.value = '';
+            roleEl.value = canSelectAnyPerson ? 'teacher' : '';
         }
-        document.getElementById('scheduleTitle').innerText = 'Schedule';
-        document.getElementById('scheduleContainer')?.classList.add('d-none');
-        document.getElementById('viewModeIndicator').innerText = 'Ready';
-        document.getElementById('scheduleHoursSummary')?.classList.add('d-none');
-        const lblHours = document.getElementById('lbl_totalHours');
-        if (lblHours) lblHours.innerHTML = '';
+        refreshScheduleActiveView();
     });
 
-    const roleSelect = document.getElementById('sch_role');
-    if (roleSelect) {
-        roleSelect.addEventListener('change', () => {
-            scheduleViewMode = 'auto';
-            if (document.getElementById('sch_personId').value && document.getElementById('sch_startDate').value && document.getElementById('sch_endDate').value) {
-                document.getElementById('btn_loadSchedule').click();
-            }
-        });
-    }
-    const hasCasesFilter = document.getElementById('sch_hasCases');
-    if (hasCasesFilter) {
-        hasCasesFilter.addEventListener('change', () => {
-            scheduleViewMode = 'auto';
-            if (document.getElementById('sch_personId').value && document.getElementById('sch_startDate').value && document.getElementById('sch_endDate').value) {
-                document.getElementById('btn_loadSchedule').click();
-            }
-        });
-    }
+    document.getElementById('btn_resetScheduleFilters')?.addEventListener('click', () => {
+        if (canSelectAnyPerson) {
+            scheduleState.persons = [];
+            scheduleState.activePersonId = '';
+            const roleEl = document.getElementById('sch_role');
+            if (roleEl) roleEl.value = 'teacher';
+        }
+        clearLoadedSchedules();
+        const hasCasesEl = document.getElementById('sch_hasCases');
+        if (hasCasesEl) hasCasesEl.checked = false;
+        scheduleState.viewMode = 'verticalTimeline';
+        applyDefaultWeekRange();
+        refreshScheduleActiveView();
+    });
 
-    function renderScheduleDisplay(data) {
-        const container = document.getElementById('visualDisplayArea');
-        const legend = document.getElementById('legendContainer');
-        if (!container || !legend || !data) return;
-        const { eventsByDate, startStr, endStr, diffDays } = data;
-        if (scheduleViewMode === 'timeline' || (scheduleViewMode === 'auto' && (startStr === endStr || diffDays <= 10))) {
-            document.getElementById('viewModeIndicator').innerHTML = '<i class="bi bi-distribute-vertical"></i> Day View';
-            legend.innerHTML = '<div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</div><div class="text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</div><div class="text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>';
-            renderTimelineView(eventsByDate, container);
+    document.getElementById('btn_loadSchedule')?.addEventListener('click', loadActiveSchedulePerson);
+    document.getElementById('btn_loadAllSchedules')?.addEventListener('click', loadAllSchedulePeople);
+
+    document.getElementById('sch_role')?.addEventListener('change', () => {
+        const person = activeSchedulePerson();
+        if (canSelectAnyPerson) {
+            scheduleState.persons = [];
+            scheduleState.activePersonId = '';
+            clearLoadedSchedules();
+            scheduleState.viewMode = 'verticalTimeline';
+            refreshScheduleActiveView();
             return;
         }
-        document.getElementById('viewModeIndicator').innerHTML = '<i class="bi bi-grid-3x3-gap"></i> Month View';
-        legend.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</div><div class="text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</div><div class="text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> M = Make-up required</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</div><div class="text-muted small">Click any day to zoom in</div><button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-timeline aria-label="Switch to day view" title="Show scheduled sessions in the colored time timeline"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>';
-        renderCalendarView(eventsByDate, startStr, endStr, container);
-    }
-
-    document.getElementById('legendContainer')?.addEventListener('click', (event) => {
-        const dayButton = event.target.closest('[data-schedule-view-timeline]');
-        const monthButton = event.target.closest('[data-schedule-view-month]');
-        if (!dayButton && !monthButton) return;
-        if (!scheduleViewData) return;
-        scheduleViewMode = dayButton ? 'timeline' : 'calendar';
-        renderScheduleDisplay(scheduleViewData);
+        if (!person) return;
+        person.selectedRole = selectedScheduleRole();
+        delete scheduleState.eventsByPersonId[person.id];
+        delete scheduleState.statusMetaByPersonId[person.id];
+        delete scheduleState.errorByPersonId[person.id];
+        scheduleState.loadedPersonIds.delete(person.id);
+        scheduleState.viewMode = 'verticalTimeline';
+        refreshScheduleActiveView();
     });
 
-    // --- 2. Data Fetch & Rendering Engine ---
-    document.getElementById('btn_loadSchedule').addEventListener('click', async () => {
-        const personId = document.getElementById('sch_personId').value;
-        const startStr = document.getElementById('sch_startDate').value;
-        const endStr = document.getElementById('sch_endDate').value;
-        const role = document.getElementById('sch_role')?.value || '';
+    document.getElementById('sch_hasCases')?.addEventListener('change', () => {
+        clearLoadedSchedules();
+        scheduleState.viewMode = 'verticalTimeline';
+        refreshScheduleActiveView();
+    });
+    document.getElementById('sch_startDate')?.addEventListener('change', () => {
+        clearLoadedSchedules();
+        scheduleState.viewMode = 'verticalTimeline';
+        refreshScheduleActiveView();
+    });
+    document.getElementById('sch_endDate')?.addEventListener('change', () => {
+        clearLoadedSchedules();
+        scheduleState.viewMode = 'verticalTimeline';
+        refreshScheduleActiveView();
+    });
 
-        if (!personId) { await uiAlert('Please select a person first.'); return; }
-
-        const container = document.getElementById('visualDisplayArea');
-        document.getElementById('scheduleContainer').classList.remove('d-none');
-        container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedule...</div></div>`;
-
-        try {
-            const params = new URLSearchParams({ personId, startDate: startStr, endDate: endStr });
-            if (role) params.set('role', role);
-            if (document.getElementById('sch_hasCases')?.checked) params.set('hasCases', '1');
-            const res = await fetch(`/school/schedules/api/person-schedule?${params.toString()}`, {
-                headers: { 'X-AJAX-Request': 'true' }
-            });
-            const result = await res.json();
-            const guarded = typeof window.applyGuardedApiResult === 'function'
-                ? await window.applyGuardedApiResult(result, { busyTitle: 'Schedule Load In Progress', replayTitle: 'Schedule Already Loaded' })
-                : { stop: false };
-            if (guarded.stop) return;
-            if (result.status !== 'success') throw new Error(result.message);
-            updateAdminRoleOptions(result.availableRoles, result.selectedRole);
-            sessionStatusMetaMap = new Map(
-                (Array.isArray(result.statusMeta) ? result.statusMeta : [])
-                    .map((row) => [normalizeSessionStatus(row?.code), row])
-                    .filter(([code]) => Boolean(code))
-            );
-
-            const events = result.events || [];
-            const lblHours = document.getElementById('lbl_totalHours');
-            
-            if (events.length === 0) {
-                if (lblHours) lblHours.innerHTML = '';
-                document.getElementById('scheduleHoursSummary')?.classList.add('d-none');
-                container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
-                document.getElementById('viewModeIndicator').innerText = "Empty";
-                document.getElementById('legendContainer').innerHTML = '';
-                scheduleViewData = null;
-                return;
-            }
-
-            // Calculate and show category totals for the currently displayed events.
-            if (lblHours) {
-                lblHours.innerHTML = renderCategoryHourTotals(events);
-                document.getElementById('scheduleHoursSummary')?.classList.remove('d-none');
-            }
-
-            const eventsByDate = {};
-            events.forEach(ev => {
-                if (!eventsByDate[ev.date]) eventsByDate[ev.date] = [];
-                eventsByDate[ev.date].push(ev);
-            });
-
-            const startD = new Date(startStr);
-            const endD = new Date(endStr);
-            const diffDays = Math.ceil((endD - startD) / (1000 * 60 * 60 * 24));
-
-            scheduleViewData = { eventsByDate, startStr, endStr, diffDays };
-            renderScheduleDisplay(scheduleViewData);
-
-        } catch (error) {
-            container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i> ${error.message}</div>`;
+    document.getElementById('schedulePersonTabs')?.addEventListener('click', (event) => {
+        const closeButton = event.target.closest('[data-schedule-remove-person]');
+        if (closeButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            removeSchedulePerson(closeButton.getAttribute('data-schedule-remove-person') || '');
+            return;
         }
+        const tab = event.target.closest('[data-schedule-person-tab]');
+        if (!tab) return;
+        scheduleState.activePersonId = tab.getAttribute('data-schedule-person-tab') || scheduleState.activePersonId;
+        refreshScheduleActiveView();
+    });
+
+    document.getElementById('legendContainer')?.addEventListener('input', (event) => {
+        const slider = event.target.closest('#scheduleDayWidth');
+        if (slider) applyScheduleDayWidth(slider.value);
+    });
+    document.getElementById('legendContainer')?.addEventListener('change', (event) => {
+        const slider = event.target.closest('#scheduleDayWidth');
+        if (slider) saveScheduleDayWidth(slider.value);
+    });
+    document.getElementById('legendContainer')?.addEventListener('click', (event) => {
+        const legendButton = event.target.closest('[data-schedule-open-legend]');
+        if (legendButton) {
+            const modalEl = document.getElementById('scheduleLegendModal');
+            if (modalEl && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            return;
+        }
+        const clearSelectedButton = event.target.closest('[data-schedule-clear-selected-sessions]');
+        if (clearSelectedButton) {
+            clearActiveScheduleSessionSelection();
+            return;
+        }
+        const verticalButton = event.target.closest('[data-schedule-view-vertical]');
+        const dayButton = event.target.closest('[data-schedule-view-timeline]');
+        const monthButton = event.target.closest('[data-schedule-view-month]');
+        if (!verticalButton && !dayButton && !monthButton) return;
+        scheduleState.viewMode = verticalButton ? 'verticalTimeline' : (dayButton ? 'timeline' : 'calendar');
+        refreshScheduleActiveView();
     });
 
     const TIMELINE_START_HOUR = 7;
@@ -982,6 +2015,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rowClasses = scd
                     ? scd.buildScheduleRowClasses(scan, `event-row ${ev?.hasOverlap ? 'overlap' : ''}`)
                     : `event-row ${ev?.hasOverlap ? 'overlap' : ''} ${leaveEvent ? 'leave-event' : ''}`;
+                const selectionKey = scheduleSessionSelectionKey(ev);
+                const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+                const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
+                const selectionControl = scheduleSessionSelectHtml(ev);
                 const scanIcon = scd ? scd.buildScheduleScanIcon(scan) : '';
                 const statusBadge = scd
                     ? scd.buildScheduleStatusBadge(scan, formatStatusLabel(ev?.status), getStatusTagStyle(ev?.status))
@@ -993,8 +2030,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
                     : `<span class="text-muted small">No details</span>`;
                 html += `
-                    <div class="${rowClasses}">
-                        <div class="schedule-scan-cell">${scanIcon}</div>
+                    <div class="${rowClasses}${selectedClass}${unselectableClass}" data-schedule-session-key="${escapeHtml(selectionKey)}">
+                        <div class="schedule-scan-cell">${selectionControl}${scanIcon}</div>
                         <div class="event-time">${escapeHtml(ev?.start || '-')} - ${escapeHtml(ev?.end || '-')}</div>
                         <div>
                             <div class="event-main-title">${buildReportPriorityMarker(ev)}${escapeHtml(eventTitle)}</div>
@@ -1044,12 +2081,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const bodyHeight = Math.max(76, tracks.length * 64 + 14);
-            const headerColorClass = hasConflict ? 'bg-danger text-white' : 'bg-light';
-
             let html = `
                 <div class="timeline-container shadow-sm border ${hasConflict ? 'border-danger' : ''}">
-                    <div class="timeline-header ${headerColorClass}">
-                        <span>${displayDate}</span>
+                    <div class="timeline-header ${hasConflict ? 'conflict' : ''}">
+                        <span>${escapeHtml(displayDate)}</span>
                         <span>${hasConflict ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> Conflict Detected' : ''}</span>
                     </div>
                     <div class="timeline-body pb-3" style="height: ${bodyHeight}px;">
@@ -1057,53 +2092,48 @@ document.addEventListener('DOMContentLoaded', () => {
             
             dayEvents.forEach(ev => {
                 const topPos = (ev.trackIndex * 62) + 7;
-                const leaveEvent = isLeaveEvent(ev);
                 const eventTitle = getEventTitle(ev);
-                const roleText = String(ev.role || '').toLowerCase();
-                const cssClass = leaveEvent ? 'event-leave' : ((roleText === 'teacher' || roleText === 'staff') ? 'role-teacher' : 'role-student');
+                const cssClass = scheduleEventRoleClass(ev);
                 const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
                 const blockClasses = scd
                     ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
                     : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
-                const statusBadge = scd
-                    ? scd.buildScheduleStatusBadge(scan, formatStatusLabel(ev.status), getStatusTagStyle(ev.status))
-                    : `<span class="session-status-tag" style="${getStatusTagStyle(ev.status)}">${escapeHtml(formatStatusLabel(ev.status))}</span>`;
+                const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
+                const selectionKey = scheduleSessionSelectionKey(ev);
+                const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+                const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
+                const selectionControl = scheduleSessionSelectHtml(ev);
                 const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
-                const scanIcon = scd && scan && scan.state !== 'leave' ? `<i class="bi ${scan.iconClass} block-scan-icon" aria-hidden="true"></i>` : '';
-                const detailsUrl = String(ev.detailsUrl || '').trim();
+                const detailsUrl = getEventDetailsUrl(ev);
                 const encodedDetailsUrl = encodeURIComponent(detailsUrl);
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                 const clickHandler = detailsUrl
                     ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"`
                     : '';
-                const openHint = detailsUrl ? 'Open item details' : 'No linked details';
-                const scanLabel = scan?.scanLabel || formatStatusLabel(ev.status);
-                const rollingNote = String(ev?.classLifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? ' | Rolling' : '';
-                const makeupNote = scd && scd.isMakeupRequiredDisplayEvent(ev) ? ` | ${scd.MAKEUP_DISPLAY_TEXT}` : '';
-                const tipLabel = `${openHint}: ${eventTitle} | ${ev.start} - ${ev.end} | ${scanLabel}${makeupNote}${rollingNote}`;
-                const statusMeta = getStatusMeta(ev.status);
-                const tipBg = String(statusMeta?.colorBg || (leaveEvent ? '#ffd43b' : '#0f172a')).trim() || '#0f172a';
-                const tipFg = String(statusMeta?.colorText || (leaveEvent ? '#4d3200' : '#ffffff')).trim() || '#ffffff';
-                const tipBorder = String(statusMeta?.colorBorder || tipBg).trim() || tipBg;
+                const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
+                const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
+                const soloStudentHtml = scheduleSoloStudentHtml(ev);
 
                 html += `
-                        <div class="${blockClasses}" 
+                        <div class="${blockClasses}${selectedClass}${unselectableClass}" 
                              style="left: ${ev.pos.left}%; width: ${ev.pos.width}%; top: ${topPos}px;"
+                             data-schedule-session-key="${escapeHtml(selectionKey)}"
                              data-tip="${escapeHtml(tipLabel)}"
-                             data-tip-bg="${escapeHtml(tipBg)}"
-                             data-tip-fg="${escapeHtml(tipFg)}"
-                             data-tip-border="${escapeHtml(tipBorder)}"
+                             data-tip-bg="${escapeHtml(tipStyle.bg)}"
+                             data-tip-fg="${escapeHtml(tipStyle.fg)}"
+                             data-tip-border="${escapeHtml(tipStyle.border)}"
                              aria-label="${escapeHtml(tipLabel)}"
                              tabindex="0"
                              ${clickHandler}>
-                             ${scanIcon}
-                             <div class="fw-bold text-truncate">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
-                             ${caseBadge ? `<div>${caseBadge}</div>` : ''}
+                             ${selectionControl}
+                             ${statusChip}
+                             <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
+                             ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
                              <div class="event-meta x-small">
-                                    <span class="text-truncate">${escapeHtml(ev.start)} - ${escapeHtml(ev.end)}</span>
-                            ${statusBadge}
-                            ${makeupBadge}
-                         </div>
+                                <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(ev.start || '-')} - ${escapeHtml(ev.end || '-')}</span>
+                                ${makeupBadge}
+                             </div>
+                             ${soloStudentHtml}
                     </div>
                 `;
             });
@@ -1117,6 +2147,108 @@ document.addEventListener('DOMContentLoaded', () => {
 
             container.innerHTML += html;
         });
+    }
+
+    function renderVerticalTimelineView(eventsByDate, container) {
+        const scd = window.ScheduleCompletionDisplay;
+        const dates = Object.keys(eventsByDate || {}).sort();
+        if (!dates.length) {
+            container.innerHTML = `<div class="alert alert-light text-center border py-4 text-muted">No schedule items found in this range.</div>`;
+            return;
+        }
+        let html = '<div class="schedule-vertical-scroll"><div class="schedule-vertical-days">';
+        dates.forEach((dateStr) => {
+            const dayEvents = eventsByDate[dateStr] || [];
+            const dateObj = new Date(dateStr + 'T00:00:00');
+            const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            const tracks = [];
+            const hasConflict = dayEvents.some((ev) => ev && ev.hasOverlap === true);
+            dayEvents.forEach((ev) => {
+                const pos = calculatePosition(ev.start, ev.end);
+                ev.pos = pos;
+                let placed = false;
+                for (let i = 0; i < tracks.length; i += 1) {
+                    const lastEv = tracks[i][tracks[i].length - 1];
+                    if (lastEv.pos.endMin <= pos.startMin) {
+                        tracks[i].push(ev);
+                        ev.trackIndex = i;
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed) {
+                    tracks.push([ev]);
+                    ev.trackIndex = tracks.length - 1;
+                }
+            });
+
+            const trackCount = Math.max(1, tracks.length);
+            html += `
+                <div class="vertical-day-column shadow-sm ${hasConflict ? 'border-danger' : ''}">
+                    <div class="vertical-day-header ${hasConflict ? 'conflict' : ''}">
+                        <span>${escapeHtml(displayDate)}</span>
+                        <span>${hasConflict ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> Conflict' : `<span class="badge bg-primary">${dayEvents.length}</span>`}</span>
+                    </div>
+                    <div class="vertical-day-body">
+                        <div class="vertical-hour-markers">
+            `;
+            for (let h = TIMELINE_START_HOUR; h < TIMELINE_END_HOUR; h += 1) {
+                const displayHour = h > 12 ? (h - 12) + 'p' : (h === 12 ? '12p' : h + 'a');
+                html += `<div class="vertical-hour-marker"><span class="vertical-hour-label">${displayHour}</span></div>`;
+            }
+            html += '</div>';
+
+            dayEvents.forEach((ev) => {
+                const eventTitle = getEventTitle(ev);
+                const cssClass = scheduleEventRoleClass(ev);
+                const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+                const blockClasses = scd
+                    ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
+                    : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
+                const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
+                const selectionKey = scheduleSessionSelectionKey(ev);
+                const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+                const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
+                const selectionControl = scheduleSessionSelectHtml(ev);
+                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
+                const detailsUrl = getEventDetailsUrl(ev);
+                const encodedDetailsUrl = encodeURIComponent(detailsUrl);
+                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+                const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
+                const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
+                const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
+                const trackLeft = (ev.trackIndex / trackCount) * 100;
+                const trackWidth = 100 / trackCount;
+                const blockHeight = Math.max(1, Number(ev.pos.width || 0));
+                const soloStudentHtml = scheduleSoloStudentHtml(ev);
+
+                html += `
+                    <div class="${blockClasses}${selectedClass}${unselectableClass}"
+                         style="top:${ev.pos.left}%;height:calc(${blockHeight}% - 4px);left:calc(${trackLeft}% + 28px);width:calc(${trackWidth}% - 34px);"
+                         data-schedule-session-key="${escapeHtml(selectionKey)}"
+                         data-tip="${escapeHtml(tipLabel)}"
+                         data-tip-bg="${escapeHtml(tipStyle.bg)}"
+                         data-tip-fg="${escapeHtml(tipStyle.fg)}"
+                         data-tip-border="${escapeHtml(tipStyle.border)}"
+                         aria-label="${escapeHtml(tipLabel)}"
+                         tabindex="0"
+                         ${clickHandler}>
+                         ${selectionControl}
+                         ${statusChip}
+                         <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
+                         ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
+                         <div class="event-meta x-small">
+                            <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(ev.start || '-')} - ${escapeHtml(ev.end || '-')}</span>
+                            ${makeupBadge}
+                         </div>
+                         ${soloStudentHtml}
+                    </div>
+                `;
+            });
+            html += '</div></div>';
+        });
+        html += '</div></div>';
+        container.innerHTML = html;
     }
 
     function renderCalendarView(eventsByDate, startStr, endStr, container) {
@@ -1185,7 +2317,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('visualDisplayArea').addEventListener('click', (e) => {
-        if (e.target.closest('.event-block')) return; 
+        if (e.target.closest('.event-block, .vertical-event-block')) return; 
 
         const dayEl = e.target.closest('.cal-day.active, .cal-day.conflict, .cal-day.leave');
         if (dayEl) {
@@ -1193,8 +2325,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dateStr) {
                 document.getElementById('sch_startDate').value = dateStr;
                 document.getElementById('sch_endDate').value = dateStr;
-                scheduleViewMode = 'timeline';
-                document.getElementById('btn_loadSchedule').click();
+                clearLoadedSchedules();
+                scheduleState.viewMode = 'verticalTimeline';
+                loadActiveSchedulePerson();
             }
         }
     });
@@ -1206,7 +2339,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(scheduleTipEl);
 
     const hideScheduleTip = () => {
-        scheduleTipEl.classList.remove('is-visible');
+        scheduleTipEl.classList.remove('is-visible', 'is-below');
         scheduleTipEl.hidden = true;
     };
     const showScheduleTip = (target) => {
@@ -1218,46 +2351,73 @@ document.addEventListener('DOMContentLoaded', () => {
         const tipBg = target.getAttribute('data-tip-bg') || '#0f172a';
         const tipFg = target.getAttribute('data-tip-fg') || '#ffffff';
         const tipBorder = target.getAttribute('data-tip-border') || tipBg;
-        const parts = label.split(' | ').map((part) => String(part || '').trim()).filter(Boolean);
-        const primary = parts[0] || label;
-        const secondary = parts.slice(1).join(' · ');
-        scheduleTipEl.innerHTML = `<span class="sch-tip-line">${escapeHtml(primary)}</span>${
-            secondary ? `<span class="sch-tip-sub">${escapeHtml(secondary)}</span>` : ''
-        }`;
+        const parts = (label.includes('\n') ? label.split('\n') : label.split(' | '))
+            .map((part) => String(part || '').trim())
+            .filter(Boolean);
+        scheduleTipEl.innerHTML = parts.map((part, index) => {
+            const isDate = /^Date:/i.test(part);
+            return `<span class="sch-tip-line${index > 0 ? ' sch-tip-sub' : ''}${isDate ? ' sch-tip-date' : ''}">${escapeHtml(part)}</span>`;
+        }).join('');
         scheduleTipEl.style.background = tipBg;
         scheduleTipEl.style.color = tipFg;
         scheduleTipEl.style.borderColor = tipBorder;
         scheduleTipEl.style.setProperty('--sch-tip-arrow', tipBg);
         scheduleTipEl.hidden = false;
+        scheduleTipEl.classList.remove('is-below');
         const rect = target.getBoundingClientRect();
         let left = rect.left + (rect.width / 2);
         const tipWidth = scheduleTipEl.offsetWidth || 160;
+        const tipHeight = scheduleTipEl.offsetHeight || 80;
         const pad = 10;
         left = Math.max(pad + tipWidth / 2, Math.min(left, window.innerWidth - pad - tipWidth / 2));
         scheduleTipEl.style.left = `${left}px`;
-        scheduleTipEl.style.top = `${Math.max(8, rect.top)}px`;
+        if ((rect.top - tipHeight - 14) < pad) {
+            scheduleTipEl.classList.add('is-below');
+            scheduleTipEl.style.top = `${Math.min(window.innerHeight - pad - tipHeight, rect.bottom)}px`;
+        } else {
+            scheduleTipEl.style.top = `${Math.max(8, rect.top)}px`;
+        }
         scheduleTipEl.classList.add('is-visible');
     };
 
     const visualArea = document.getElementById('visualDisplayArea');
+    visualArea.addEventListener('click', (event) => {
+        const input = event.target.closest('[data-schedule-session-select]');
+        const label = event.target.closest('.schedule-session-select');
+        const card = event.target.closest('[data-schedule-session-key]');
+        const selectedClassId = activeScheduleSelectedClassId();
+        if (!input && !label && !(selectedClassId && card)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const checkbox = input || label?.querySelector('[data-schedule-session-select]');
+        const key = String((checkbox?.getAttribute('data-session-key') || card?.getAttribute('data-schedule-session-key') || '')).trim();
+        if (!key || checkbox?.disabled) return;
+        const classId = String(checkbox?.getAttribute('data-session-class-id') || scheduleSessionClassIdFromKey(key)).trim();
+        const selectionSet = getActiveScheduleSelectionSet();
+        if (!selectionSet.has(key) && selectedClassId && selectedClassId !== classId) return;
+        const nextChecked = !selectionSet.has(key);
+        if (nextChecked) selectionSet.add(key);
+        else selectionSet.delete(key);
+        refreshScheduleActiveView();
+    }, true);
     visualArea.addEventListener('pointerover', (event) => {
-        const target = event.target.closest('.event-block[data-tip]');
+        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip]');
         if (!target || !visualArea.contains(target)) return;
         showScheduleTip(target);
     });
     visualArea.addEventListener('pointerout', (event) => {
-        const target = event.target.closest('.event-block[data-tip]');
+        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip]');
         if (!target) return;
         const next = event.relatedTarget;
         if (next && target.contains(next)) return;
         hideScheduleTip();
     });
     visualArea.addEventListener('focusin', (event) => {
-        const target = event.target.closest('.event-block[data-tip]');
+        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip]');
         if (target) showScheduleTip(target);
     });
     visualArea.addEventListener('focusout', (event) => {
-        const target = event.target.closest('.event-block[data-tip]');
+        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip]');
         if (!target) return;
         const next = event.relatedTarget;
         if (next && target.contains(next)) return;
@@ -1275,17 +2435,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const prefillStartDate = urlParams.get('startDate');
     const prefillEndDate = urlParams.get('endDate');
     const prefillRole = urlParams.get('role');
+    const initialRoleEl = document.getElementById('sch_role');
+    if (canSelectAnyPerson && prefillRole && initialRoleEl && Array.from(initialRoleEl.options).some((option) => option.value === prefillRole)) {
+        initialRoleEl.value = prefillRole;
+    }
 
     if (prefillId) {
-        document.getElementById('sch_personId').value = prefillId;
-        document.getElementById('sch_personName').value = prefillName || ('ID: ' + prefillId);
-        
-        const titleEl = document.getElementById('scheduleTitle');
-        if (titleEl) titleEl.innerText = `Schedule: ${prefillName || prefillId}`;
-
-        if (prefillRole && document.getElementById('sch_role')) {
-            document.getElementById('sch_role').value = prefillRole;
-        }
+        addSchedulePerson({
+            id: prefillId,
+            personId: prefillId,
+            displayName: prefillName || initialLockedPersonName || prefillId,
+            availableRoles: canSelectAnyPerson ? [] : initialScheduleRoles
+        }, { activate: true, selectedRole: selectedScheduleRole() || prefillRole || initialDefaultRole });
 
         if (prefillStartDate && prefillEndDate) {
             document.getElementById('sch_startDate').value = prefillStartDate;
@@ -1302,13 +2463,21 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             applyDefaultWeekRange();
         }
-        
-        // Everything is defined, click immediately!
-        document.getElementById('btn_loadSchedule').click();
+        refreshScheduleActiveView();
+        loadActiveSchedulePerson();
     } else {
         applyDefaultWeekRange();
-        if (!canSelectAnyPerson && document.getElementById('sch_personId').value) {
-            document.getElementById('btn_loadSchedule').click();
+        if (!canSelectAnyPerson && initialLockedPersonId) {
+            addSchedulePerson({
+                id: initialLockedPersonId,
+                personId: initialLockedPersonId,
+                displayName: initialLockedPersonName || initialLockedPersonId,
+                availableRoles: initialScheduleRoles
+            }, { activate: true, selectedRole: initialDefaultRole });
+            refreshScheduleActiveView();
+            loadActiveSchedulePerson();
+        } else {
+            refreshScheduleActiveView();
         }
     }
 

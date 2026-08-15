@@ -7,6 +7,7 @@
 <style>
   .school-master-hub {
     --hub-left-safe: clamp(3.75rem, 5vw, 5.5rem);
+    --hub-schedule-day-width: 320px;
     width: 100vw;
     max-width: none;
     margin-left: calc(50% - 50vw);
@@ -455,6 +456,29 @@
     display: inline-flex;
   }
 
+  .school-master-hub .hub-schedule-person-tab {
+    --hub-person-tab-bg: #eef6ff;
+    --hub-person-tab-text: #084298;
+    --hub-person-tab-border: #9ec5fe;
+    background: var(--hub-person-tab-bg);
+    color: var(--hub-person-tab-text);
+    border-color: var(--hub-person-tab-border);
+  }
+
+  .school-master-hub .hub-schedule-person-tab:hover,
+  .school-master-hub .hub-schedule-person-tab:focus-visible {
+    color: var(--hub-person-tab-text);
+    border-color: var(--hub-person-tab-border);
+    filter: brightness(0.98);
+  }
+
+  .school-master-hub .hub-schedule-person-tab.active {
+    background: var(--hub-person-tab-text);
+    color: #fff;
+    border-color: var(--hub-person-tab-text);
+    box-shadow: 0 0.35rem 0.9rem rgba(15, 23, 42, 0.16);
+  }
+
   .school-master-hub .hub-schedule-person-tab-close {
     position: absolute;
     top: -0.35rem;
@@ -519,6 +543,44 @@
     gap: 0.5rem;
   }
 
+  .school-master-hub .hub-schedule-width-control {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: min(18rem, 100%);
+  }
+
+  .school-master-hub .hub-schedule-width-control input[type="range"] {
+    min-width: 0;
+    width: 11rem;
+  }
+
+  .school-master-hub .hub-schedule-width-value {
+    min-width: 3.25rem;
+    text-align: right;
+  }
+
+  .school-master-hub .hub-schedule-selected-count-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.34rem 0.65rem;
+    border: 1px solid #a3cfbb;
+    background: #d1e7dd;
+    color: #0f5132;
+    font-weight: 850;
+    box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+    white-space: nowrap;
+  }
+
+  .school-master-hub .hub-schedule-selected-count-pill.is-empty {
+    border-color: #dee2e6;
+    background: #f8f9fa;
+    color: #6c757d;
+    box-shadow: none;
+  }
+
   .school-master-hub .hub-schedule-person-tab {
     border-radius: 999px;
     display: inline-flex;
@@ -570,23 +632,57 @@
   .school-master-hub .hub-schedule-legend {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.75rem;
     padding: 0.8rem 1.15rem;
     border-bottom: 1px solid rgba(15, 23, 42, 0.08);
     background: rgba(255, 255, 255, 0.88);
-    text-align: right;
+    text-align: left;
+  }
+
+  .school-master-hub .hub-schedule-viewbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .school-master-hub .hub-schedule-viewbar-left,
+  .school-master-hub .hub-schedule-viewbar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .school-master-hub .hub-schedule-viewbar-left {
+    min-width: 0;
+  }
+
+  .school-master-hub .hub-schedule-viewbar-actions {
+    justify-content: flex-end;
+    margin-left: auto;
+  }
+
+  .school-master-hub .hub-schedule-view-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #084298;
+    font-weight: 800;
+    white-space: nowrap;
   }
 
   .school-master-hub .hub-schedule-legend-items {
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
     align-items: center;
     gap: 0.75rem;
     width: 100%;
-    margin-left: auto;
+    margin-right: auto;
   }
 
   .school-master-hub .hub-schedule-legend-item {
@@ -594,6 +690,14 @@
     align-items: center;
     gap: 0.35rem;
     white-space: nowrap;
+  }
+
+  .school-master-hub .hub-schedule-legend-modal-body .hub-schedule-legend-items {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+    width: auto;
+    margin-right: 0;
   }
 
   .school-master-hub .timeline-container {
@@ -651,12 +755,10 @@
     min-height: 48px;
     border-radius: 0.45rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.12);
-    font-size: 0.7rem;
-    line-height: 1.1;
-    padding: 4px 6px;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    padding: 6px 8px;
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
     transition: transform 0.1s;
     border-left: 4px solid rgba(0,0,0,0.3);
     z-index: 10;
@@ -666,9 +768,79 @@
     gap: 2px;
   }
 
+  .school-master-hub .event-block,
+  .school-master-hub .vertical-event-block {
+    padding-right: 0.65rem;
+    padding-top: 2rem;
+  }
+
   .school-master-hub .event-block:hover {
     transform: scale(1.02);
     z-index: 20;
+  }
+
+  .school-master-hub .event-block.is-session-selected,
+  .school-master-hub .vertical-event-block.is-session-selected {
+    outline: 3px solid rgba(25, 135, 84, 0.55);
+    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.16), 0 4px 12px rgba(15, 23, 42, 0.16);
+  }
+
+  .school-master-hub .hub-schedule-session-select {
+    position: absolute;
+    top: 4px;
+    left: 5px;
+    z-index: 25;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
+    cursor: pointer;
+  }
+
+  .school-master-hub .hub-schedule-session-select .form-check-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .school-master-hub .hub-schedule-session-select-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: #0d6efd;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+
+  .school-master-hub .hub-schedule-session-select.is-selected {
+    background: #198754;
+    border-color: #198754;
+  }
+
+  .school-master-hub .hub-schedule-session-select.is-selected .hub-schedule-session-select-icon {
+    color: #fff;
+  }
+
+  .school-master-hub .hub-schedule-session-select.is-disabled {
+    background: #f8d7da;
+    border-color: #f1aeb5;
+    cursor: not-allowed;
+  }
+
+  .school-master-hub .hub-schedule-session-select.is-disabled .hub-schedule-session-select-icon {
+    color: #842029;
+  }
+
+  .school-master-hub .event-block.is-session-unselectable .hub-schedule-event-title,
+  .school-master-hub .vertical-event-block.is-session-unselectable .hub-schedule-event-title {
+    opacity: 0.72;
   }
 
   .school-master-hub .report-priority-marker {
@@ -690,6 +862,98 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
+  }
+
+  .school-master-hub .hub-schedule-status-chip {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    min-width: 1.45rem;
+    max-width: 5.5rem;
+    height: 1.35rem;
+    padding: 0 0.38rem;
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    color: #0f172a;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+  }
+
+  .school-master-hub .hub-schedule-status-chip-label {
+    max-width: 3.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .school-master-hub .hub-schedule-event-title {
+    margin-bottom: 0.2rem;
+    color: inherit;
+    font-size: 0.86rem;
+    font-weight: 800;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  .school-master-hub .hub-schedule-event-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    width: fit-content;
+    max-width: 100%;
+    padding: 0.12rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.42);
+    color: inherit;
+    font-size: 0.72rem;
+    font-weight: 750;
+  }
+
+  .school-master-hub .hub-schedule-event-student {
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+    margin-top: auto;
+    padding-top: 0.18rem;
+    color: inherit;
+    font-size: 0.76rem;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .school-master-hub .hub-schedule-status-chip.status-complete {
+    background: #d1e7dd;
+    color: #0f5132;
+    border-color: #a3cfbb;
+  }
+
+  .school-master-hub .hub-schedule-status-chip.status-pending {
+    background: #fff3cd;
+    color: #664d03;
+    border-color: #ffda6a;
+  }
+
+  .school-master-hub .hub-schedule-status-chip.status-leave {
+    background: #fff3bf;
+    color: #7a4d00;
+    border-color: #f59f00;
+  }
+
+  .school-master-hub .hub-schedule-status-chip.status-overlap {
+    background: #f8d7da;
+    color: #842029;
+    border-color: #f1aeb5;
   }
 
   .school-master-hub .event-leave {
@@ -772,10 +1036,25 @@
     border-left: 4px solid #ffc107;
   }
 
+  .school-master-hub .single-day-list .event-row.is-session-selected {
+    background-color: rgba(13, 110, 253, 0.1);
+    box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.28);
+  }
+
+  .school-master-hub .single-day-list .event-row.is-session-unselectable .fw-bold {
+    opacity: 0.72;
+  }
+
   .school-master-hub .single-day-list .schedule-scan-cell {
     display: flex;
+    gap: 0.45rem;
     align-items: flex-start;
     padding-top: 0.1rem;
+  }
+
+  .school-master-hub .single-day-list .hub-schedule-session-select {
+    position: static;
+    flex: 0 0 auto;
   }
 
   .school-master-hub .schedule-scan-icon {
@@ -797,12 +1076,187 @@
     border-left-color: #ffc107 !important;
   }
 
-  .school-master-hub .event-block .block-scan-icon {
+  .school-master-hub .event-block .block-scan-icon,
+  .school-master-hub .vertical-event-block .block-scan-icon {
     position: absolute;
     top: 3px;
     right: 4px;
     font-size: 0.75rem;
     opacity: 0.9;
+  }
+
+  .school-master-hub .hub-schedule-vertical-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.45rem;
+  }
+
+  .school-master-hub .hub-schedule-vertical-days {
+    display: flex;
+    align-items: stretch;
+    gap: 1rem;
+    min-width: max-content;
+  }
+
+  .school-master-hub .vertical-day-column {
+    flex: 0 0 var(--hub-schedule-day-width, 320px);
+    border: 1px solid #dee2e6;
+    border-radius: 0.75rem;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .school-master-hub .vertical-day-column.border-danger {
+    border-color: #dc3545 !important;
+  }
+
+  .school-master-hub .vertical-day-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 0.55rem 0.9rem;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .school-master-hub .vertical-day-header.conflict {
+    background: #dc3545;
+    color: #fff;
+  }
+
+  .school-master-hub .vertical-day-body {
+    position: relative;
+    height: 840px;
+    min-height: 840px;
+    background-image: repeating-linear-gradient(to bottom, transparent, transparent calc(6.66% - 1px), #f1f3f5 calc(6.66% - 1px), #f1f3f5 6.66%);
+  }
+
+  .school-master-hub .vertical-hour-markers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .school-master-hub .vertical-hour-marker {
+    height: calc(100% / 15);
+    border-bottom: 1px dashed #e9ecef;
+    position: relative;
+  }
+
+  .school-master-hub .vertical-hour-label {
+    position: absolute;
+    top: 0.25rem;
+    left: 0.45rem;
+    font-size: 0.65rem;
+    color: #adb5bd;
+  }
+
+  .school-master-hub .vertical-event-block {
+    position: absolute;
+    min-height: 46px;
+    border-radius: 0.45rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+    font-size: 0.78rem;
+    line-height: 1.2;
+    padding: 2rem 0.65rem 6px 8px;
+    overflow: hidden;
+    transition: transform 0.1s;
+    border-left: 4px solid rgba(0,0,0,0.3);
+    border-bottom: 2px solid rgba(15, 23, 42, 0.24);
+    z-index: 10;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .school-master-hub .vertical-event-block:hover {
+    transform: scale(1.02);
+    z-index: 20;
+  }
+
+  .school-master-hub .hub-schedule-tip,
+  #hubScheduleTip.hub-schedule-tip {
+    position: fixed;
+    z-index: 2200;
+    pointer-events: none;
+    max-width: min(340px, calc(100vw - 1.5rem));
+    padding: 0.7rem 1rem;
+    border-radius: 0.7rem;
+    border: 2px solid transparent;
+    background: #0f172a;
+    color: #fff;
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+    white-space: normal;
+    text-align: left;
+    direction: ltr;
+    box-shadow:
+      0 14px 34px rgba(15, 23, 42, 0.38),
+      0 0 0 1px rgba(255, 255, 255, 0.18),
+      0 0 28px rgba(13, 110, 253, 0.28);
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 14px)) scale(0.96);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+
+  .school-master-hub .hub-schedule-tip.is-visible,
+  #hubScheduleTip.hub-schedule-tip.is-visible {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 10px)) scale(1);
+  }
+
+  .school-master-hub .hub-schedule-tip.is-below,
+  #hubScheduleTip.hub-schedule-tip.is-below {
+    transform: translate(-50%, 10px) scale(1);
+  }
+
+  .school-master-hub .hub-schedule-tip::after,
+  #hubScheduleTip.hub-schedule-tip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: var(--sch-tip-arrow, #0f172a);
+  }
+
+  .school-master-hub .hub-schedule-tip.is-below::after,
+  #hubScheduleTip.hub-schedule-tip.is-below::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: var(--sch-tip-arrow, #0f172a);
+  }
+
+  .school-master-hub .hub-schedule-tip .sch-tip-line,
+  #hubScheduleTip.hub-schedule-tip .sch-tip-line {
+    display: block;
+  }
+
+  .school-master-hub .hub-schedule-tip .sch-tip-line + .sch-tip-line,
+  #hubScheduleTip.hub-schedule-tip .sch-tip-line + .sch-tip-line {
+    margin-top: 0.28rem;
+  }
+
+  .school-master-hub .hub-schedule-tip .sch-tip-date,
+  #hubScheduleTip.hub-schedule-tip .sch-tip-date {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  .school-master-hub .hub-schedule-tip .sch-tip-sub,
+  #hubScheduleTip.hub-schedule-tip .sch-tip-sub {
+    display: block;
+    margin-top: 0.28rem;
+    font-size: 0.95rem;
+    font-weight: 650;
+    opacity: 0.92;
   }
 
   .school-master-hub .single-day-list .event-time {
@@ -3740,8 +4194,16 @@
     statusMetaByPersonId: {},
     loadedPersonIds: new Set(),
     loadingPersonId: '',
+    selectedSessionKeysByPersonId: {},
     viewMode: 'auto'
   };
+  const HUB_SCHEDULE_DAY_WIDTH_STORAGE_KEY = 'schoolMasterHub.scheduleDayWidth';
+  const HUB_SCHEDULE_DEFAULT_DAY_WIDTH = 320;
+  const HUB_SCHEDULE_MIN_DAY_WIDTH = 260;
+  const HUB_SCHEDULE_MAX_DAY_WIDTH = 520;
+  let hubScheduleTipEl = null;
+  let activeHubScheduleTipTrigger = null;
+  let hubScheduleTipWindowEventsBound = false;
 
   function resolveHubSchedulePersonId(item) {
     return String(item?.personId || item?.id || item?._id || '').trim();
@@ -3800,6 +4262,20 @@
     return toSessionStatusLabel(normalized || 'scheduled');
   }
 
+  function hubScheduleStatusTipStyle(event, statusMap) {
+    const leave = isHubScheduleLeaveEvent(event);
+    if (leave) {
+      return { bg: '#ffd43b', fg: '#4d3200', border: '#f59f00' };
+    }
+    const normalized = normalizeSessionStatusCode(event && event.status);
+    const meta = statusMap.get(normalized);
+    return {
+      bg: String(meta?.colorBg || '#0f172a').trim() || '#0f172a',
+      fg: String(meta?.colorText || '#ffffff').trim() || '#ffffff',
+      border: String(meta?.colorBorder || meta?.colorBg || '#0f172a').trim() || '#0f172a'
+    };
+  }
+
   function hubScheduleStatusBadge(status, statusMap) {
     const normalized = normalizeSessionStatusCode(status);
     const meta = statusMap.get(normalized);
@@ -3810,6 +4286,151 @@
       return '<span class="status-badge border" style="background:#fff3cd;color:#7a4d00;border-color:#f59f00 !important;">Approved Leave</span>';
     }
     return '<span class="status-badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle">' + escapeHtml(hubScheduleStatusLabel(status, statusMap)) + '</span>';
+  }
+
+  function clampHubScheduleDayWidth(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return HUB_SCHEDULE_DEFAULT_DAY_WIDTH;
+    return Math.max(HUB_SCHEDULE_MIN_DAY_WIDTH, Math.min(HUB_SCHEDULE_MAX_DAY_WIDTH, Math.round(numeric)));
+  }
+
+  function readHubScheduleDayWidth() {
+    try {
+      return clampHubScheduleDayWidth(window.localStorage && window.localStorage.getItem(HUB_SCHEDULE_DAY_WIDTH_STORAGE_KEY));
+    } catch (error) {
+      return HUB_SCHEDULE_DEFAULT_DAY_WIDTH;
+    }
+  }
+
+  function saveHubScheduleDayWidth(width) {
+    try {
+      if (window.localStorage) window.localStorage.setItem(HUB_SCHEDULE_DAY_WIDTH_STORAGE_KEY, String(clampHubScheduleDayWidth(width)));
+    } catch (error) {
+      // Browser storage can be unavailable in private or locked-down contexts.
+    }
+  }
+
+  function applyHubScheduleDayWidth(width) {
+    const resolved = clampHubScheduleDayWidth(width);
+    if (root) root.style.setProperty('--hub-schedule-day-width', resolved + 'px');
+    const input = document.getElementById('hubScheduleDayWidth');
+    const value = document.getElementById('hubScheduleDayWidthValue');
+    if (input) input.value = String(resolved);
+    if (value) value.textContent = resolved + 'px';
+    return resolved;
+  }
+
+  function ensureHubScheduleTipElement() {
+    if (hubScheduleTipEl && document.body.contains(hubScheduleTipEl)) return hubScheduleTipEl;
+    hubScheduleTipEl = document.getElementById('hubScheduleTip');
+    if (!hubScheduleTipEl) {
+      hubScheduleTipEl = document.createElement('div');
+      hubScheduleTipEl.id = 'hubScheduleTip';
+      hubScheduleTipEl.className = 'hub-schedule-tip';
+      hubScheduleTipEl.setAttribute('role', 'tooltip');
+      hubScheduleTipEl.hidden = true;
+      (root || document.body).appendChild(hubScheduleTipEl);
+    }
+    return hubScheduleTipEl;
+  }
+
+  function hideHubScheduleTip() {
+    if (activeHubScheduleTipTrigger) activeHubScheduleTipTrigger.removeAttribute('aria-describedby');
+    activeHubScheduleTipTrigger = null;
+    if (!hubScheduleTipEl) return;
+    hubScheduleTipEl.classList.remove('is-visible', 'is-below');
+    hubScheduleTipEl.hidden = true;
+  }
+
+  function showHubScheduleTip(trigger) {
+    const label = String(trigger?.getAttribute('data-tip') || trigger?.getAttribute('data-hub-schedule-tip') || '').trim();
+    if (!label) {
+      hideHubScheduleTip();
+      return;
+    }
+    const tip = ensureHubScheduleTipElement();
+    if (activeHubScheduleTipTrigger && activeHubScheduleTipTrigger !== trigger) {
+      activeHubScheduleTipTrigger.removeAttribute('aria-describedby');
+    }
+    activeHubScheduleTipTrigger = trigger;
+    trigger.setAttribute('aria-describedby', tip.id);
+    const tipBg = trigger.getAttribute('data-tip-bg') || '#0f172a';
+    const tipFg = trigger.getAttribute('data-tip-fg') || '#ffffff';
+    const tipBorder = trigger.getAttribute('data-tip-border') || tipBg;
+    const parts = (label.includes('\n') ? label.split('\n') : label.split(' | ')).map(function (part) {
+      return String(part || '').trim();
+    }).filter(Boolean);
+    tip.innerHTML = parts.map(function (part, index) {
+      const isDate = /^Date:/i.test(part);
+      return '<span class="sch-tip-line' + (index > 0 ? ' sch-tip-sub' : '') + (isDate ? ' sch-tip-date' : '') + '">' + escapeHtml(part) + '</span>';
+    }).join('');
+    tip.style.background = tipBg;
+    tip.style.color = tipFg;
+    tip.style.borderColor = tipBorder;
+    tip.style.setProperty('--sch-tip-arrow', tipBg);
+    tip.hidden = false;
+    tip.removeAttribute('hidden');
+    tip.classList.remove('is-below');
+    const rect = trigger.getBoundingClientRect();
+    let left = rect.left + (rect.width / 2);
+    const tipWidth = tip.offsetWidth || 160;
+    const tipHeight = tip.offsetHeight || 80;
+    const pad = 10;
+    left = Math.max(pad + tipWidth / 2, Math.min(left, window.innerWidth - pad - tipWidth / 2));
+    tip.style.left = left + 'px';
+    if ((rect.top - tipHeight - 14) < pad) {
+      tip.classList.add('is-below');
+      tip.style.top = Math.min(window.innerHeight - pad - tipHeight, rect.bottom) + 'px';
+    } else {
+      tip.style.top = rect.top + 'px';
+    }
+    tip.classList.add('is-visible');
+  }
+
+  function syncHubScheduleTooltipTriggers(eventsHost) {
+    if (!eventsHost) return;
+    eventsHost.querySelectorAll('[data-tip], [data-hub-schedule-tip]').forEach(function (trigger) {
+      if (trigger.dataset.hubScheduleTipReady === '1') return;
+      trigger.dataset.hubScheduleTipReady = '1';
+      trigger.addEventListener('mouseenter', function () { showHubScheduleTip(trigger); });
+      trigger.addEventListener('mouseleave', hideHubScheduleTip);
+      trigger.addEventListener('focus', function () { showHubScheduleTip(trigger); });
+      trigger.addEventListener('blur', hideHubScheduleTip);
+    });
+  }
+
+  function bindHubScheduleTooltips(eventsHost) {
+    if (!eventsHost || eventsHost.dataset.hubScheduleTooltipsBound === '1') return;
+    eventsHost.dataset.hubScheduleTooltipsBound = '1';
+    syncHubScheduleTooltipTriggers(eventsHost);
+    eventsHost.addEventListener('pointerover', function (event) {
+      const trigger = event.target && event.target.closest('[data-tip], [data-hub-schedule-tip]');
+      if (!trigger || !eventsHost.contains(trigger)) return;
+      showHubScheduleTip(trigger);
+    });
+    eventsHost.addEventListener('pointerout', function (event) {
+      const trigger = event.target && event.target.closest('[data-tip], [data-hub-schedule-tip]');
+      if (!trigger) return;
+      const next = event.relatedTarget;
+      if (next && trigger.contains(next)) return;
+      hideHubScheduleTip();
+    });
+    eventsHost.addEventListener('focusin', function (event) {
+      const trigger = event.target && event.target.closest('[data-tip], [data-hub-schedule-tip]');
+      if (trigger) showHubScheduleTip(trigger);
+    });
+    eventsHost.addEventListener('focusout', function (event) {
+      const trigger = event.target && event.target.closest('[data-tip], [data-hub-schedule-tip]');
+      if (!trigger) return;
+      const next = event.relatedTarget;
+      if (next && trigger.contains(next)) return;
+      hideHubScheduleTip();
+    });
+    if (!hubScheduleTipWindowEventsBound) {
+      hubScheduleTipWindowEventsBound = true;
+      window.addEventListener('scroll', hideHubScheduleTip, true);
+      window.addEventListener('resize', hideHubScheduleTip);
+    }
   }
 
   function getHubScheduleRange() {
@@ -3868,6 +4489,7 @@
     endEl.value = hubDateToIso(end);
     hubScheduleState.eventsByPersonId = {};
     hubScheduleState.statusMetaByPersonId = {};
+    hubScheduleState.selectedSessionKeysByPersonId = {};
     hubScheduleState.loadedPersonIds.clear();
     hubScheduleState.viewMode = 'auto';
     refreshHubScheduleActiveView();
@@ -3879,17 +4501,93 @@
     }) || null;
   }
 
+  function hubScheduleSessionSelectionKey(event) {
+    if (isHubScheduleLeaveEvent(event) || String(event?.eventType || event?.targetType || '').trim().toLowerCase() === 'report_task') return '';
+    const classId = String(event?.classId || '').trim();
+    const sessionId = String(event?.sessionId || event?.sourceSessionId || event?.id || '').trim();
+    const date = String(event?.date || '').trim();
+    if (!classId || !sessionId || !date) return '';
+    return classId + '::' + sessionId + '::' + date;
+  }
+
+  function hubScheduleSessionClassIdFromKey(key) {
+    return String(key || '').split('::')[0] || '';
+  }
+
+  function getActiveHubScheduleSelectionSet() {
+    const person = activeHubSchedulePerson();
+    if (!person?.id) return new Set();
+    if (!(hubScheduleState.selectedSessionKeysByPersonId[person.id] instanceof Set)) {
+      hubScheduleState.selectedSessionKeysByPersonId[person.id] = new Set();
+    }
+    return hubScheduleState.selectedSessionKeysByPersonId[person.id];
+  }
+
+  function activeHubScheduleSelectedClassId() {
+    const firstKey = Array.from(getActiveHubScheduleSelectionSet())[0] || '';
+    return hubScheduleSessionClassIdFromKey(firstKey);
+  }
+
+  function canSelectHubScheduleSession(event) {
+    const key = hubScheduleSessionSelectionKey(event);
+    if (!key) return false;
+    const classId = String(event?.classId || '').trim();
+    const selectedClassId = activeHubScheduleSelectedClassId();
+    return !selectedClassId || selectedClassId === classId || getActiveHubScheduleSelectionSet().has(key);
+  }
+
+  function countActiveHubScheduleSelectedSessions() {
+    return getActiveHubScheduleSelectionSet().size;
+  }
+
+  function updateHubScheduleSelectedSessionControls() {
+    const count = countActiveHubScheduleSelectedSessions();
+    document.querySelectorAll('[data-hub-schedule-selected-session-count]').forEach(function (el) {
+      el.textContent = count + ' selected';
+      el.closest('.hub-schedule-selected-count-pill')?.classList.toggle('is-empty', count === 0);
+    });
+    document.querySelectorAll('[data-hub-schedule-clear-selected-sessions]').forEach(function (btn) {
+      btn.classList.toggle('d-none', count === 0);
+    });
+  }
+
+  function clearActiveHubScheduleSessionSelection() {
+    const person = activeHubSchedulePerson();
+    if (person?.id) hubScheduleState.selectedSessionKeysByPersonId[person.id] = new Set();
+    refreshHubScheduleActiveView();
+  }
+
   function removeHubSchedulePerson(personId) {
     const id = String(personId || '').trim();
     if (!id) return;
     hubScheduleState.persons = hubScheduleState.persons.filter(function (person) { return person.id !== id; });
     delete hubScheduleState.eventsByPersonId[id];
     delete hubScheduleState.statusMetaByPersonId[id];
+    delete hubScheduleState.selectedSessionKeysByPersonId[id];
     hubScheduleState.loadedPersonIds.delete(id);
     if (hubScheduleState.activePersonId === id) {
       hubScheduleState.activePersonId = hubScheduleState.persons[0]?.id || '';
     }
     refreshHubScheduleActiveView();
+  }
+
+  function sortHubSchedulePersons() {
+    hubScheduleState.persons.sort(function (a, b) {
+      return String(a?.name || a?.id || '').localeCompare(String(b?.name || b?.id || ''), undefined, { sensitivity: 'base' });
+    });
+  }
+
+  function hubSchedulePersonTabStyle(index) {
+    const palettes = [
+      { bg: '#e7f1ff', text: '#084298', border: '#9ec5fe' },
+      { bg: '#e8f7ef', text: '#0f5132', border: '#a3cfbb' },
+      { bg: '#fff3cd', text: '#664d03', border: '#ffda6a' },
+      { bg: '#f3e8ff', text: '#581c87', border: '#d8b4fe' },
+      { bg: '#e0f7fa', text: '#055160', border: '#8bd7e2' },
+      { bg: '#ffe8e8', text: '#842029', border: '#f1aeb5' }
+    ];
+    const palette = palettes[Math.abs(Number(index) || 0) % palettes.length];
+    return '--hub-person-tab-bg:' + palette.bg + ';--hub-person-tab-text:' + palette.text + ';--hub-person-tab-border:' + palette.border + ';';
   }
 
   function renderHubScheduleTabs() {
@@ -3899,14 +4597,15 @@
       host.innerHTML = '<div class="text-muted small">Select one or more school people to create schedule tabs.</div>';
       return;
     }
-    host.innerHTML = hubScheduleState.persons.map(function (person) {
+    sortHubSchedulePersons();
+    host.innerHTML = hubScheduleState.persons.map(function (person, index) {
       const active = person.id === hubScheduleState.activePersonId;
       return [
         '<div class="hub-schedule-person-tab-card">',
-        '<button type="button" class="btn btn-sm ' + (active ? 'btn-primary' : 'btn-outline-primary') + ' hub-schedule-person-tab" data-hub-schedule-person-tab="' + escapeHtml(person.id) + '">',
+        '<button type="button" class="btn btn-sm hub-schedule-person-tab ' + (active ? 'active' : '') + '" style="' + escapeHtml(hubSchedulePersonTabStyle(index)) + '" data-hub-schedule-person-tab="' + escapeHtml(person.id) + '">',
         '<i class="bi bi-person-circle"></i>',
         '<span>' + escapeHtml(person.name || person.id) + '</span>',
-        '<span class="badge ' + (active ? 'text-bg-light' : 'text-bg-primary') + '">' + escapeHtml((person.availableRoles || []).length || 'All') + '</span>',
+        '<span class="badge text-bg-light border">' + escapeHtml((person.availableRoles || []).length || 'All') + '</span>',
         '</button>',
         '<button type="button" class="hub-schedule-person-tab-close" data-hub-schedule-remove-person="' + escapeHtml(person.id) + '" aria-label="Close tab" title="Close tab">&times;</button>',
         '</div>'
@@ -3952,6 +4651,29 @@
       startMin,
       endMin
     };
+  }
+
+  function hubSchedulePlaceEventsInTracks(dayEvents) {
+    const tracks = [];
+    (Array.isArray(dayEvents) ? dayEvents : []).forEach(function (event) {
+      const pos = hubScheduleCalculatePosition(event?.start, event?.end);
+      event.__hubPos = pos;
+      let placed = false;
+      for (let i = 0; i < tracks.length; i += 1) {
+        const lastEvent = tracks[i][tracks[i].length - 1];
+        if (lastEvent.__hubPos.endMin <= pos.startMin) {
+          tracks[i].push(event);
+          event.__hubTrackIndex = i;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        tracks.push([event]);
+        event.__hubTrackIndex = tracks.length - 1;
+      }
+    });
+    return tracks;
   }
 
   function isReportScheduleEvent(event) {
@@ -4002,14 +4724,104 @@
     return scd.buildScheduleStatusBadge(scan, hubScheduleStatusLabel(event && event.status, statusMap), '');
   }
 
-  function renderHubScheduleLegend(mode) {
-    const host = document.getElementById('hubScheduleLegend');
-    if (!host) return;
-    const wrapLegend = function (itemsHtml) {
-      return '<div class="hub-schedule-legend-items">' + itemsHtml + '</div>';
+  function hubScheduleStatusChip(event, statusMap, scan) {
+    const resolvedScan = scan || (window.ScheduleCompletionDisplay ? window.ScheduleCompletionDisplay.resolveScheduleCompletionScan(event, statusMap) : null);
+    const leave = isHubScheduleLeaveEvent(event);
+    const label = resolvedScan?.scanLabel || hubScheduleStatusLabel(event && event.status, statusMap);
+    const normalizedLabel = String(label || '').trim().toLowerCase();
+    const shortLabel = event?.hasOverlap
+      ? 'Overlap'
+      : (leave ? 'Leave' : (resolvedScan?.isComplete ? 'Done' : (normalizedLabel.includes('cancel') ? 'Cancel' : 'Pending')));
+    const statusClass = event?.hasOverlap
+      ? 'status-overlap'
+      : (leave ? 'status-leave' : (resolvedScan?.isComplete ? 'status-complete' : 'status-pending'));
+    const icon = event?.hasOverlap
+      ? 'bi-exclamation-triangle-fill'
+      : (leave ? 'bi-airplane-fill' : (resolvedScan?.isComplete ? 'bi-check-circle-fill' : 'bi-clock-history'));
+    return '<span class="hub-schedule-status-chip ' + statusClass + '" aria-label="' + escapeHtml(label) + '"><i class="bi ' + escapeHtml(icon) + '" aria-hidden="true"></i><span class="hub-schedule-status-chip-label">' + escapeHtml(shortLabel) + '</span></span>';
+  }
+
+  function normalizeHubScheduleTooltipValue(value) {
+    const text = String(value ?? '').trim();
+    if (!text || text === '[object Object]') return '';
+    return text;
+  }
+
+  function hubScheduleSoloStudentHtml(event) {
+    const name = normalizeHubScheduleTooltipValue(event?.soloStudentName || event?.singleStudentName);
+    if (!name) return '';
+    return '<div class="hub-schedule-event-student"><i class="bi bi-person-check-fill" aria-hidden="true"></i><span>' + escapeHtml(name) + '</span></div>';
+  }
+
+  function hubScheduleSessionSelectHtml(event) {
+    const key = hubScheduleSessionSelectionKey(event);
+    if (!key) return '';
+    const selectionSet = getActiveHubScheduleSelectionSet();
+    const checked = selectionSet.has(key);
+    const disabled = !checked && !canSelectHubScheduleSession(event);
+    const icon = checked ? 'bi-check-lg' : (disabled ? 'bi-x-lg' : 'bi-plus-lg');
+    const stateClass = checked ? ' is-selected' : (disabled ? ' is-disabled' : '');
+    const title = checked ? 'Selected session' : (disabled ? 'Only sessions from the selected class can be selected' : 'Select session');
+    return '<label class="hub-schedule-session-select' + stateClass + '" title="' + escapeHtml(title) + '" aria-label="' + escapeHtml(title) + '"><input type="checkbox" class="form-check-input" data-hub-schedule-session-select data-session-key="' + escapeHtml(key) + '" data-session-class-id="' + escapeHtml(event?.classId || '') + '"' + (checked ? ' checked' : '') + (disabled ? ' disabled' : '') + '><span class="hub-schedule-session-select-icon"><i class="bi ' + escapeHtml(icon) + '" aria-hidden="true"></i></span></label>';
+  }
+
+  function formatHubScheduleDateLabel(dateStr) {
+    const raw = normalizeHubScheduleTooltipValue(dateStr);
+    if (!raw) return '';
+    const dateObj = new Date(raw + 'T00:00:00');
+    if (Number.isNaN(dateObj.getTime())) return raw;
+    return dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function buildHubScheduleEventTooltip(event, statusMap, scan) {
+    const detailParts = [];
+    const addDetail = function (label, value) {
+      const cleaned = normalizeHubScheduleTooltipValue(value);
+      if (cleaned) detailParts.push(label + ': ' + cleaned);
     };
+    const title = getHubScheduleEventTitle(event);
+    const role = isHubScheduleLeaveEvent(event) ? 'Approved Leave' : (event?.roleLabel || event?.role || event?.roles?.[0] || '');
+    const time = normalizeHubScheduleTooltipValue(event?.start)
+      ? normalizeHubScheduleTooltipValue(event?.start) + ' - ' + normalizeHubScheduleTooltipValue(event?.end || '')
+      : '';
+    const status = scan?.scanLabel || hubScheduleStatusLabel(event && event.status, statusMap);
+    const caseSummary = event?.caseSummary && typeof event.caseSummary === 'object'
+      ? [
+        event.caseSummary.hasCases === true ? 'Has cases' : '',
+        event.caseSummary.openCount != null ? 'Open: ' + event.caseSummary.openCount : '',
+        event.caseSummary.totalCount != null ? 'Total: ' + event.caseSummary.totalCount : ''
+      ].filter(Boolean).join(' | ')
+      : '';
+    addDetail('Session', title);
+    addDetail('Date', formatHubScheduleDateLabel(event?.date));
+    addDetail('Time', time);
+    addDetail('Duration', Number.isFinite(Number(event?.duration)) ? Number(event.duration).toFixed(2) + ' h' : '');
+    addDetail('Status', status);
+    addDetail('Role', role);
+    addDetail('Person', event?.personName || event?.teacherName || event?.studentName);
+    addDetail('Student', event?.soloStudentName || event?.singleStudentName);
+    addDetail('Room', event?.room || event?.roomName || event?.location);
+    addDetail('Cases', caseSummary);
+    if (event?.hasOverlap) addDetail('Conflict', 'Overlaps another scheduled item');
+    if (window.ScheduleCompletionDisplay && window.ScheduleCompletionDisplay.isMakeupRequiredDisplayEvent(event)) {
+      addDetail('Make-up', window.ScheduleCompletionDisplay.MAKEUP_DISPLAY_TEXT);
+    }
+    return detailParts.join('\n');
+  }
+
+  function renderHubScheduleWidthControl() {
+    const width = readHubScheduleDayWidth();
+    return [
+      '<div class="hub-schedule-width-control">',
+      '<input type="range" class="form-range" id="hubScheduleDayWidth" min="' + escapeHtml(HUB_SCHEDULE_MIN_DAY_WIDTH) + '" max="' + escapeHtml(HUB_SCHEDULE_MAX_DAY_WIDTH) + '" step="10" value="' + escapeHtml(width) + '" aria-label="Day width">',
+      '<span class="badge text-bg-light border hub-schedule-width-value" id="hubScheduleDayWidthValue">' + escapeHtml(width) + 'px</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function hubScheduleLegendItemsForMode(mode) {
     if (mode === 'calendar') {
-      host.innerHTML = wrapLegend([
+      return [
         '<span class="hub-schedule-legend-item text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</span>',
         '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</span>',
         '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</span>',
@@ -4017,14 +4829,11 @@
         '<span class="hub-schedule-legend-item text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</span>',
         '<span class="hub-schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>',
         '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</span>',
-        '<span class="hub-schedule-legend-item text-muted small">Click any day to load its day view</span>',
-        '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-timeline aria-label="Switch to day view" title="Show scheduled sessions in the colored time timeline"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>'
-      ].join(''));
-      return;
+        '<span class="hub-schedule-legend-item text-muted small">Click any day to load its day view</span>'
+      ];
     }
-    if (mode === 'timeline') {
-      host.innerHTML = wrapLegend([
-        '<span class="hub-schedule-legend-item text-primary fw-bold"><i class="bi bi-calendar-day me-1"></i> Day view</span>',
+    if (mode === 'verticalTimeline' || mode === 'timeline') {
+      return [
         '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</span>',
         '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</span>',
         '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</span>',
@@ -4032,21 +4841,60 @@
         '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
         '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</span>',
         '<span class="hub-schedule-legend-item text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</span>',
-        '<span class="hub-schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>',
+        '<span class="hub-schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>'
+      ];
+    }
+    return [
+      '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
+      '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
+      '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</span>'
+    ];
+  }
+
+  function hubScheduleViewName(mode) {
+    if (mode === 'calendar') return 'Month view';
+    if (mode === 'timeline') return 'Horizontal day view';
+    if (mode === 'verticalTimeline') return 'Vertical day view';
+    if (mode === 'loading') return 'Loading schedule';
+    return 'Schedule view';
+  }
+
+  function renderHubScheduleLegend(mode) {
+    const host = document.getElementById('hubScheduleLegend');
+    if (!host) return;
+    const modalBody = document.getElementById('hubScheduleLegendModalBody');
+    if (modalBody) {
+      modalBody.innerHTML = '<div class="hub-schedule-legend-items">' + hubScheduleLegendItemsForMode(mode).join('') + '</div>';
+    }
+    let switchButtons = '';
+    if (mode === 'calendar') {
+      switchButtons = '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-vertical aria-label="Switch to day view" title="Show days as vertical columns with horizontal scrolling"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>';
+    }
+    if (mode === 'verticalTimeline' || mode === 'timeline') {
+      const isVertical = mode === 'verticalTimeline';
+      switchButtons = [
+        isVertical
+          ? '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-timeline aria-label="Switch to horizontal day view" title="Show the current stacked horizontal day timeline"><i class="bi bi-layout-three-columns me-1"></i>Switch to horizontal view</button>'
+          : '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-vertical aria-label="Switch to vertical day view" title="Show days as vertical columns with horizontal scrolling"><i class="bi bi-columns-gap me-1"></i>Switch to vertical view</button>',
         '<button type="button" class="btn btn-sm btn-outline-primary" data-hub-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>'
-      ].join(''));
-      return;
+      ].join('');
     }
-    if (mode === 'single') {
-      host.innerHTML = wrapLegend([
-        '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
-        '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
-        '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</span>',
-        '<span class="hub-schedule-legend-item text-muted small">Vertical full-detail day view</span>'
-      ].join(''));
-      return;
-    }
-    host.innerHTML = wrapLegend('<span class="hub-schedule-legend-item text-muted small">Vertical full-detail view for selected day</span>');
+    host.innerHTML = [
+      '<div class="hub-schedule-viewbar">',
+      '<div class="hub-schedule-viewbar-left">',
+      '<span class="hub-schedule-view-name"><i class="bi bi-calendar-day me-1"></i>' + escapeHtml(hubScheduleViewName(mode)) + '</span>',
+      (mode === 'verticalTimeline' || mode === 'timeline') ? renderHubScheduleWidthControl() : '',
+      '<span class="hub-schedule-selected-count-pill ' + (countActiveHubScheduleSelectedSessions() ? '' : 'is-empty') + '"><i class="bi bi-check2-square" aria-hidden="true"></i><span data-hub-schedule-selected-session-count>' + escapeHtml(String(countActiveHubScheduleSelectedSessions())) + ' selected</span></span>',
+      '</div>',
+      '<div class="hub-schedule-viewbar-actions">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary ' + (countActiveHubScheduleSelectedSessions() ? '' : 'd-none') + '" data-hub-schedule-clear-selected-sessions aria-label="Clear selected sessions"><i class="bi bi-x-circle me-1"></i>Clear selected</button>',
+      switchButtons,
+      '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-schedule-open-legend aria-label="Open schedule legend"><i class="bi bi-info-circle me-1"></i>Legend</button>',
+      '</div>',
+      '</div>'
+    ].join('');
+    applyHubScheduleDayWidth(readHubScheduleDayWidth());
+    updateHubScheduleSelectedSessionControls();
   }
 
   function renderHubScheduleSingleDayView(eventsByDate, statusMap) {
@@ -4072,13 +4920,17 @@
         const rowClasses = scd
           ? scd.buildScheduleRowClasses(scan, 'event-row ' + (event?.hasOverlap ? 'overlap ' : ''))
           : 'event-row ' + (event?.hasOverlap ? 'overlap ' : '') + (leave ? 'leave-event' : '');
+        const selectionKey = hubScheduleSessionSelectionKey(event);
+        const selectedClass = selectionKey && getActiveHubScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+        const unselectableClass = selectionKey && !canSelectHubScheduleSession(event) ? ' is-session-unselectable' : '';
+        const selectionControl = hubScheduleSessionSelectHtml(event);
         const scanIcon = scd ? scd.buildScheduleScanIcon(scan) : '';
         const statusBadge = hubScheduleEventScanBadge(event, statusMap);
         const makeupBadge = scd ? scd.buildMakeupRequiredBadge(event) : '';
         const caseBadge = buildSessionCaseBadgeHtml(event?.caseSummary);
         html += [
-          '<div class="' + rowClasses + '">',
-          '<div class="schedule-scan-cell">' + scanIcon + '</div>',
+          '<div class="' + rowClasses + selectedClass + unselectableClass + '" data-hub-schedule-session-key="' + escapeHtml(selectionKey) + '">',
+          '<div class="schedule-scan-cell">' + selectionControl + scanIcon + '</div>',
           '<div class="event-time">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</div>',
           '<div>',
           '<div class="fw-bold">' + buildReportPriorityMarker(event) + escapeHtml(title) + '</div>',
@@ -4107,27 +4959,8 @@
       const dayEvents = eventsByDate[dateStr] || [];
       const dateObj = new Date(dateStr + 'T00:00:00');
       const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-      const tracks = [];
+      const tracks = hubSchedulePlaceEventsInTracks(dayEvents);
       const hasConflict = dayEvents.some(function (event) { return event?.hasOverlap; });
-
-      dayEvents.forEach(function (event) {
-        const pos = hubScheduleCalculatePosition(event?.start, event?.end);
-        event.__hubPos = pos;
-        let placed = false;
-        for (let i = 0; i < tracks.length; i += 1) {
-          const lastEvent = tracks[i][tracks[i].length - 1];
-          if (lastEvent.__hubPos.endMin <= pos.startMin) {
-            tracks[i].push(event);
-            event.__hubTrackIndex = i;
-            placed = true;
-            break;
-          }
-        }
-        if (!placed) {
-          tracks.push([event]);
-          event.__hubTrackIndex = tracks.length - 1;
-        }
-      });
 
       const bodyHeight = Math.max(76, tracks.length * 64 + 14);
       html += '<div class="timeline-container shadow-sm ' + (hasConflict ? 'border-danger' : '') + '"><div class="timeline-header ' + (hasConflict ? 'conflict' : '') + '"><span>' + escapeHtml(displayDate) + '</span><span>' + (hasConflict ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> Conflict Detected' : '') + '</span></div><div class="timeline-body pb-3" style="height:' + escapeHtml(bodyHeight) + 'px;">';
@@ -4145,19 +4978,30 @@
         const blockClasses = scd
           ? scd.buildScheduleBlockClasses(scan, 'event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : ''))
           : 'event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : '');
-        const scanIcon = scd && scan && scan.state !== 'leave' ? '<i class="bi ' + escapeHtml(scan.iconClass) + ' block-scan-icon" aria-hidden="true"></i>' : '';
+        const selectionKey = hubScheduleSessionSelectionKey(event);
+        const selectedClass = selectionKey && getActiveHubScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+        const unselectableClass = selectionKey && !canSelectHubScheduleSession(event) ? ' is-session-unselectable' : '';
+        const selectionControl = hubScheduleSessionSelectHtml(event);
         const makeupBadge = scd ? scd.buildMakeupRequiredBadge(event, { compact: true }) : '';
-        const makeupTitle = scd && scd.isMakeupRequiredDisplayEvent(event) ? ' | ' + scd.MAKEUP_DISPLAY_TEXT : '';
+        const statusChip = hubScheduleStatusChip(event, statusMap, scan);
+        const tooltip = buildHubScheduleEventTooltip(event, statusMap, scan);
+        const tipStyle = hubScheduleStatusTipStyle(event, statusMap);
+        const soloStudentHtml = hubScheduleSoloStudentHtml(event);
         html += [
-          '<div class="' + blockClasses + '"',
+          '<div class="' + blockClasses + selectedClass + unselectableClass + '"',
           ' style="left:' + escapeHtml(event.__hubPos.left) + '%;width:' + escapeHtml(event.__hubPos.width) + '%;top:' + escapeHtml(topPos) + 'px;"',
-          ' title="' + escapeHtml(title) + ' | ' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + escapeHtml(makeupTitle) + '"',
+          ' data-hub-schedule-session-key="' + escapeHtml(selectionKey) + '"',
+          ' data-tip="' + escapeHtml(tooltip) + '" data-hub-schedule-tip="' + escapeHtml(tooltip) + '"',
+          ' data-tip-bg="' + escapeHtml(tipStyle.bg) + '" data-tip-fg="' + escapeHtml(tipStyle.fg) + '" data-tip-border="' + escapeHtml(tipStyle.border) + '"',
+          ' aria-label="' + escapeHtml(tooltip) + '" tabindex="0"',
           detailUrl ? ' onclick="window.open(decodeURIComponent(\'' + escapeHtml(encodedDetailUrl) + '\'), \'_blank\')"' : '',
           '>',
-          scanIcon,
-          '<div class="fw-bold text-truncate">' + buildReportPriorityMarker(event) + ' ' + escapeHtml(title) + '</div>',
+          selectionControl,
+          statusChip,
+          '<div class="hub-schedule-event-title">' + buildReportPriorityMarker(event) + ' ' + escapeHtml(title) + '</div>',
           caseBadge ? '<div class="mt-1">' + caseBadge + '</div>' : '',
-          '<div class="event-meta x-small"><span class="text-truncate">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</span>' + hubScheduleEventScanBadge(event, statusMap) + makeupBadge + '</div>',
+          '<div class="event-meta x-small"><span class="hub-schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</span>' + makeupBadge + '</div>',
+          soloStudentHtml,
           '</div>'
         ].join('');
       });
@@ -4170,6 +5014,76 @@
       html += '</div></div></div>';
     });
     return html || '<div class="alert alert-light text-center border py-4 text-muted">No schedule items found in this range.</div>';
+  }
+
+  function renderHubScheduleVerticalTimelineView(eventsByDate, statusMap) {
+    const scd = window.ScheduleCompletionDisplay;
+    const dates = Object.keys(eventsByDate || {}).sort();
+    if (!dates.length) {
+      return '<div class="alert alert-light text-center border py-4 text-muted">No schedule items found in this range.</div>';
+    }
+    let html = '<div class="hub-schedule-vertical-scroll"><div class="hub-schedule-vertical-days">';
+    dates.forEach(function (dateStr) {
+      const dayEvents = eventsByDate[dateStr] || [];
+      const dateObj = new Date(dateStr + 'T00:00:00');
+      const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      const tracks = hubSchedulePlaceEventsInTracks(dayEvents);
+      const trackCount = Math.max(1, tracks.length);
+      const hasConflict = dayEvents.some(function (event) { return event?.hasOverlap; });
+      html += '<div class="vertical-day-column shadow-sm ' + (hasConflict ? 'border-danger' : '') + '"><div class="vertical-day-header ' + (hasConflict ? 'conflict' : '') + '"><span>' + escapeHtml(displayDate) + '</span><span>' + (hasConflict ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> Conflict' : '<span class="badge bg-primary">' + escapeHtml(dayEvents.length) + '</span>') + '</span></div><div class="vertical-day-body">';
+
+      html += '<div class="vertical-hour-markers">';
+      for (let hour = HUB_TIMELINE_START_HOUR; hour < HUB_TIMELINE_END_HOUR; hour += 1) {
+        const label = hour > 12 ? (hour - 12) + 'p' : (hour === 12 ? '12p' : hour + 'a');
+        html += '<div class="vertical-hour-marker"><span class="vertical-hour-label">' + escapeHtml(label) + '</span></div>';
+      }
+      html += '</div>';
+
+      dayEvents.forEach(function (event) {
+        const leave = isHubScheduleLeaveEvent(event);
+        const roleText = String(event?.role || event?.roleLabel || '').toLowerCase();
+        const cssClass = leave ? 'event-leave' : (roleText.includes('teacher') || roleText.includes('staff') ? 'role-teacher' : 'role-student');
+        const title = getHubScheduleEventTitle(event);
+        const detailUrl = getHubScheduleEventDetailsUrl(event);
+        const encodedDetailUrl = encodeURIComponent(detailUrl);
+        const caseBadge = buildSessionCaseBadgeHtml(event?.caseSummary);
+        const scan = scd ? scd.resolveScheduleCompletionScan(event, statusMap) : null;
+        const blockClasses = scd
+          ? scd.buildScheduleBlockClasses(scan, 'vertical-event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : ''))
+          : 'vertical-event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : '');
+        const selectionKey = hubScheduleSessionSelectionKey(event);
+        const selectedClass = selectionKey && getActiveHubScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+        const unselectableClass = selectionKey && !canSelectHubScheduleSession(event) ? ' is-session-unselectable' : '';
+        const selectionControl = hubScheduleSessionSelectHtml(event);
+        const makeupBadge = scd ? scd.buildMakeupRequiredBadge(event, { compact: true }) : '';
+        const statusChip = hubScheduleStatusChip(event, statusMap, scan);
+        const tooltip = buildHubScheduleEventTooltip(event, statusMap, scan);
+        const tipStyle = hubScheduleStatusTipStyle(event, statusMap);
+        const trackLeft = (event.__hubTrackIndex / trackCount) * 100;
+        const trackWidth = 100 / trackCount;
+        const blockHeight = Math.max(1, Number(event.__hubPos.width || 0));
+        const soloStudentHtml = hubScheduleSoloStudentHtml(event);
+        html += [
+          '<div class="' + blockClasses + selectedClass + unselectableClass + '"',
+          ' style="top:' + escapeHtml(event.__hubPos.left) + '%;height:calc(' + escapeHtml(blockHeight) + '% - 4px);left:calc(' + escapeHtml(trackLeft) + '% + 28px);width:calc(' + escapeHtml(trackWidth) + '% - 34px);"',
+          ' data-hub-schedule-session-key="' + escapeHtml(selectionKey) + '"',
+          ' data-tip="' + escapeHtml(tooltip) + '" data-hub-schedule-tip="' + escapeHtml(tooltip) + '"',
+          ' data-tip-bg="' + escapeHtml(tipStyle.bg) + '" data-tip-fg="' + escapeHtml(tipStyle.fg) + '" data-tip-border="' + escapeHtml(tipStyle.border) + '"',
+          ' aria-label="' + escapeHtml(tooltip) + '" tabindex="0"',
+          detailUrl ? ' onclick="window.open(decodeURIComponent(\'' + escapeHtml(encodedDetailUrl) + '\'), \'_blank\')"' : '',
+          '>',
+          selectionControl,
+          statusChip,
+          '<div class="hub-schedule-event-title">' + buildReportPriorityMarker(event) + ' ' + escapeHtml(title) + '</div>',
+          caseBadge ? '<div class="mt-1">' + caseBadge + '</div>' : '',
+          '<div class="event-meta x-small"><span class="hub-schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</span>' + makeupBadge + '</div>',
+          soloStudentHtml,
+          '</div>'
+        ].join('');
+      });
+      html += '</div></div>';
+    });
+    return html + '</div></div>';
   }
 
   function renderHubScheduleCalendarView(eventsByDate, startStr, endStr, statusMap) {
@@ -4251,29 +5165,25 @@
     }
     const grouped = groupHubScheduleEventsByDate(events);
     const range = getHubScheduleRange();
-    const startDate = new Date(range.startDate + 'T00:00:00');
-    const endDate = new Date(range.endDate + 'T00:00:00');
-    const diffDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
     let mode = 'calendar';
     let content = '';
-    if (hubScheduleState.viewMode === 'timeline') {
+    if (hubScheduleState.viewMode === 'verticalTimeline') {
+      mode = 'verticalTimeline';
+      content = renderHubScheduleVerticalTimelineView(grouped, statusMap);
+    } else if (hubScheduleState.viewMode === 'timeline') {
       mode = 'timeline';
       content = renderHubScheduleTimelineView(grouped, statusMap);
     } else if (hubScheduleState.viewMode === 'calendar') {
       mode = 'calendar';
       content = renderHubScheduleCalendarView(grouped, range.startDate, range.endDate, statusMap);
-    } else if (range.startDate === range.endDate || diffDays <= 0) {
-      mode = 'timeline';
-      content = renderHubScheduleTimelineView(grouped, statusMap);
-    } else if (diffDays <= 10) {
-      mode = 'timeline';
-      content = renderHubScheduleTimelineView(grouped, statusMap);
     } else {
-      mode = 'calendar';
-      content = renderHubScheduleCalendarView(grouped, range.startDate, range.endDate, statusMap);
+      mode = 'verticalTimeline';
+      content = renderHubScheduleVerticalTimelineView(grouped, statusMap);
     }
     renderHubScheduleLegend(mode);
     host.innerHTML = '<div class="hub-schedule-visual">' + content + '</div>';
+    bindHubScheduleTooltips(host);
+    syncHubScheduleTooltipTriggers(host);
   }
 
   function renderHubScheduleSummary(person) {
@@ -4403,10 +5313,13 @@
           selectedRole: 'teacher'
         };
       }).filter(function (person) { return !!person.id; });
+      sortHubSchedulePersons();
       hubScheduleState.activePersonId = hubScheduleState.persons[0]?.id || '';
       hubScheduleState.eventsByPersonId = {};
       hubScheduleState.statusMetaByPersonId = {};
+      hubScheduleState.selectedSessionKeysByPersonId = {};
       hubScheduleState.loadedPersonIds.clear();
+      hubScheduleState.viewMode = 'auto';
       refreshHubScheduleActiveView();
       await loadAllHubSchedulePeople();
     } catch (error) {
@@ -4450,7 +5363,10 @@
           });
         });
         if (!hubScheduleState.activePersonId && hubScheduleState.persons.length) {
+          sortHubSchedulePersons();
           hubScheduleState.activePersonId = hubScheduleState.persons[0].id;
+        } else {
+          sortHubSchedulePersons();
         }
         refreshHubScheduleActiveView();
       }
@@ -4462,6 +5378,16 @@
     if (addBtn) addBtn.addEventListener('click', openHubSchedulePersonPicker);
     const activeTeachersBtn = document.getElementById('hubScheduleAllActiveTeachers');
     if (activeTeachersBtn) activeTeachersBtn.addEventListener('click', loadAllActiveHubScheduleTeachers);
+    const dayWidthInput = document.getElementById('hubScheduleDayWidth');
+    if (dayWidthInput) {
+      applyHubScheduleDayWidth(dayWidthInput.value || readHubScheduleDayWidth());
+      dayWidthInput.addEventListener('input', function () {
+        applyHubScheduleDayWidth(dayWidthInput.value);
+      });
+      dayWidthInput.addEventListener('change', function () {
+        saveHubScheduleDayWidth(applyHubScheduleDayWidth(dayWidthInput.value));
+      });
+    }
     const loadBtn = document.getElementById('hubScheduleLoadActive');
     if (loadBtn) loadBtn.addEventListener('click', function () {
       hubScheduleState.viewMode = 'auto';
@@ -4479,6 +5405,7 @@
         person.selectedRole = roleSelect.value || '';
         delete hubScheduleState.eventsByPersonId[person.id];
         delete hubScheduleState.statusMetaByPersonId[person.id];
+        delete hubScheduleState.selectedSessionKeysByPersonId[person.id];
         hubScheduleState.loadedPersonIds.delete(person.id);
         hubScheduleState.viewMode = 'auto';
         refreshHubScheduleActiveView();
@@ -4488,6 +5415,7 @@
     if (hasCasesEl) hasCasesEl.addEventListener('change', function () {
       hubScheduleState.eventsByPersonId = {};
       hubScheduleState.statusMetaByPersonId = {};
+      hubScheduleState.selectedSessionKeysByPersonId = {};
       hubScheduleState.loadedPersonIds.clear();
       hubScheduleState.viewMode = 'auto';
       refreshHubScheduleActiveView();
@@ -4522,6 +5450,26 @@
     }
     const eventsHost = document.getElementById('hubScheduleEvents');
     if (eventsHost) {
+      bindHubScheduleTooltips(eventsHost);
+      eventsHost.addEventListener('click', function (event) {
+        const input = event.target && event.target.closest('[data-hub-schedule-session-select]');
+        const label = event.target && event.target.closest('.hub-schedule-session-select');
+        const card = event.target && event.target.closest('[data-hub-schedule-session-key]');
+        const selectedClassId = activeHubScheduleSelectedClassId();
+        if (!input && !label && !(selectedClassId && card)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const checkbox = input || (label ? label.querySelector('[data-hub-schedule-session-select]') : null);
+        const key = String((checkbox?.getAttribute('data-session-key') || card?.getAttribute('data-hub-schedule-session-key') || '')).trim();
+        if (!key || checkbox?.disabled) return;
+        const classId = String(checkbox?.getAttribute('data-session-class-id') || hubScheduleSessionClassIdFromKey(key)).trim();
+        const selectionSet = getActiveHubScheduleSelectionSet();
+        if (!selectionSet.has(key) && selectedClassId && selectedClassId !== classId) return;
+        const nextChecked = !selectionSet.has(key);
+        if (nextChecked) selectionSet.add(key);
+        else selectionSet.delete(key);
+        refreshHubScheduleActiveView();
+      }, true);
       eventsHost.addEventListener('click', function (event) {
         const day = event.target && event.target.closest('[data-hub-schedule-date]');
         if (!day) return;
@@ -4532,18 +5480,39 @@
         if (endEl) endEl.value = date;
         hubScheduleState.eventsByPersonId = {};
         hubScheduleState.statusMetaByPersonId = {};
+        hubScheduleState.selectedSessionKeysByPersonId = {};
         hubScheduleState.loadedPersonIds.clear();
-        hubScheduleState.viewMode = 'timeline';
+        hubScheduleState.viewMode = 'verticalTimeline';
         loadActiveHubSchedulePerson();
       });
     }
     const legend = document.getElementById('hubScheduleLegend');
     if (legend) {
+      legend.addEventListener('input', function (event) {
+        const slider = event.target && event.target.closest('#hubScheduleDayWidth');
+        if (slider) applyHubScheduleDayWidth(slider.value);
+      });
+      legend.addEventListener('change', function (event) {
+        const slider = event.target && event.target.closest('#hubScheduleDayWidth');
+        if (slider) saveHubScheduleDayWidth(applyHubScheduleDayWidth(slider.value));
+      });
       legend.addEventListener('click', function (event) {
+        const legendButton = event.target && event.target.closest('[data-hub-schedule-open-legend]');
+        if (legendButton) {
+          const modalEl = document.getElementById('hubScheduleLegendModal');
+          if (modalEl && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+          return;
+        }
+        const clearSelectedButton = event.target && event.target.closest('[data-hub-schedule-clear-selected-sessions]');
+        if (clearSelectedButton) {
+          clearActiveHubScheduleSessionSelection();
+          return;
+        }
+        const verticalButton = event.target && event.target.closest('[data-hub-schedule-view-vertical]');
         const timelineButton = event.target && event.target.closest('[data-hub-schedule-view-timeline]');
         const monthButton = event.target && event.target.closest('[data-hub-schedule-view-month]');
-        if (!timelineButton && !monthButton) return;
-        hubScheduleState.viewMode = timelineButton ? 'timeline' : 'calendar';
+        if (!verticalButton && !timelineButton && !monthButton) return;
+        hubScheduleState.viewMode = verticalButton ? 'verticalTimeline' : (timelineButton ? 'timeline' : 'calendar');
         refreshHubScheduleActiveView();
       });
     }
@@ -4583,6 +5552,26 @@
     ].join('');
   }
 
+  function renderHubScheduleLegendModal() {
+    return [
+      '<div class="modal fade" id="hubScheduleLegendModal" tabindex="-1" aria-hidden="true">',
+      '<div class="modal-dialog modal-dialog-centered">',
+      '<div class="modal-content">',
+      '<div class="modal-header py-2 px-3">',
+      '<h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-info-circle me-1"></i>Schedule Legend</h6>',
+      '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>',
+      '</div>',
+      '<div class="modal-body">',
+      '<div id="hubScheduleLegendModalBody" class="hub-schedule-legend-modal-body">',
+      '<div class="hub-schedule-legend-items">' + hubScheduleLegendItemsForMode('verticalTimeline').join('') + '</div>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
   function renderScheduleWorkspace(payload) {
     const section = payload && payload.section ? payload.section : {};
     const todayDate = new Date();
@@ -4613,11 +5602,13 @@
       '</div>',
       '</div>',
       renderHubScheduleShortcutsModal(),
+      renderHubScheduleLegendModal(),
       '<div class="hub-schedule-tabs" id="hubSchedulePersonTabs"></div>',
       '<div class="hub-schedule-legend" id="hubScheduleLegend"></div>',
       '<div id="hubScheduleEvents"></div>',
       '</div>'
     ].join('');
+    applyHubScheduleDayWidth(readHubScheduleDayWidth());
     bindHubScheduleControls();
     refreshHubScheduleActiveView();
   }
