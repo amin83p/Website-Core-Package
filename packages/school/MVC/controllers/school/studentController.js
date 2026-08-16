@@ -32,6 +32,8 @@ const schoolLinkedPersonProfileService = require('../../services/school/schoolLi
 const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const studentSystemIdMigrationService = require('../../services/school/studentSystemIdMigrationService');
+const programRegistrationApplyService = require('../../services/school/programRegistrationApplyService');
+const programRegistrationViewService = require('../../services/school/programRegistrationViewService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
@@ -69,6 +71,41 @@ function parseJsonSafe(value, fallback) {
     if (value === undefined || value === null || value === '') return fallback;
     if (typeof value !== 'string') return value;
     try { return JSON.parse(value); } catch { return fallback; }
+}
+
+function isDateOnly(value) {
+    const token = String(value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return false;
+    const parsed = new Date(`${token}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === token;
+}
+
+function normalizeProgramRegistrationSelections(rawSelections, admissionDate) {
+    const rows = parseJsonSafe(rawSelections, []);
+    if (!Array.isArray(rows)) throw new Error('Program registration selections must be an array.');
+    const normalizedAdmissionDate = String(admissionDate || '').trim();
+    if (rows.length && !isDateOnly(normalizedAdmissionDate)) {
+        throw new Error('Admission Date is required before adding program registrations.');
+    }
+    const seenProgramIds = new Set();
+    return rows.map((row, index) => {
+        const item = row && typeof row === 'object' && !Array.isArray(row) ? row : {};
+        const programId = toPublicId(item.programId);
+        const registrationDate = String(item.registrationDate || '').trim();
+        if (!programId) throw new Error(`Program registration row ${index + 1} is missing a program.`);
+        if (seenProgramIds.has(programId)) throw new Error('Select each program only once.');
+        seenProgramIds.add(programId);
+        if (!isDateOnly(registrationDate)) throw new Error(`Program registration row ${index + 1} has an invalid Registration Date.`);
+        if (registrationDate < normalizedAdmissionDate) {
+            throw new Error(`Program registration date for row ${index + 1} must be on or after the Admission Date.`);
+        }
+        return {
+            programId,
+            registrationDate,
+            externalReference: String(item.externalReference || '').trim().slice(0, 200),
+            note: String(item.note || '').trim().slice(0, 2000)
+        };
+    });
 }
 
 function toBoolean(v) {
@@ -689,6 +726,7 @@ exports.showForm = async (req, res) => {
         let student = {};
         let personName = '';
         let personOrganizations = [];
+        let existingProgramRegistrations = [];
 
         if (isEdit) {
             student = await dataService.getDataById('students', req.params.id, req.user, routeAccess(req));
@@ -700,6 +738,9 @@ exports.showForm = async (req, res) => {
                 personName = schoolPersonAccessService.formatPersonName(person, '');
                 personOrganizations = Array.isArray(person.organizations) ? person.organizations : [];
             }
+            existingProgramRegistrations = await programRegistrationViewService.buildRegistrationSummaries(req.user, activeOrgId, {
+                filters: { studentId: student.id }
+            });
 
         }
 
@@ -735,7 +776,8 @@ exports.showForm = async (req, res) => {
             actionStateId: req.actionStateId,
             canEditLinkedPerson,
             linkedPersonLinkType: 'student',
-            linkedPersonLinkId: isEdit ? editFormRecordId : ''
+            linkedPersonLinkId: isEdit ? editFormRecordId : '',
+            existingProgramRegistrations
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -794,11 +836,24 @@ exports.saveStudent1 = async (req, res) => {
 exports.saveStudent = async (req, res) => {
     let txContext = null;
     let guardKey = '';
+    let deferProgramRegistrations = false;
+    let failedStage = '';
+    let personOperation = {
+        status: 'waiting',
+        label: 'Person profile',
+        message: 'Waiting to save person profile.'
+    };
+    let studentOperation = {
+        status: 'waiting',
+        label: 'Student record',
+        message: 'Waiting to save student record.'
+    };
     try {
         const { id } = req.params;
         const activeOrgId = id
             ? getActiveOrgIdOrThrow(req.user)
             : await assertCreateOrgContextOrThrow(req.user);
+        deferProgramRegistrations = toBoolean(req.body.deferProgramRegistrations);
         guardKey = idempotencyGuardService.createGuardKey([
             'student_save',
             String(activeOrgId || '').trim(),
@@ -815,6 +870,19 @@ exports.saveStudent = async (req, res) => {
             replayTtlMs: 20000
         });
         if (sendGuardedResponse(req, res, guardResult, 'Student save is already in progress. Please wait.')) return;
+
+        const programRegistrationSelections = deferProgramRegistrations
+            ? []
+            : normalizeProgramRegistrationSelections(
+                req.body.programRegistrationSelections,
+                req.body.enrollmentDate
+            );
+        if (!deferProgramRegistrations && programRegistrationSelections.length) {
+            const canCreateProgramRegistrations = await canCreateOrgScopedItem(req.user, { scopeLabel: 'program registrations' });
+            if (!canCreateProgramRegistrations) {
+                throw new Error('You do not have permission to create program registrations.');
+            }
+        }
 
         txContext = createTransactionContext({
             name: 'student_save',
@@ -869,6 +937,12 @@ exports.saveStudent = async (req, res) => {
         let personId = toPublicId(req.body.personId);
 
         if (!existingStudent && personMode === 'new') {
+            failedStage = 'person';
+            personOperation = {
+                status: 'running',
+                label: 'Person profile',
+                message: 'Creating inline person profile...'
+            };
             await schoolPersonNameDuplicateService.assertNoExactNameDuplicateOrThrow({
                 reqUser: req.user,
                 firstName: String(req.body.newPersonFirstName || '').trim(),
@@ -879,6 +953,11 @@ exports.saveStudent = async (req, res) => {
             const createdPerson = await dataServiceGlobal.addData('persons', personPayload, req.user, { transactionContext: txContext });
             personId = toPublicId(createdPerson?.id);
             if (!personId) throw new Error('Failed to create person profile before student admission.');
+            personOperation = {
+                status: 'success',
+                label: 'Person profile',
+                message: 'Inline person profile saved.'
+            };
             addDeleteCompensation(txContext, {
                 service: dataServiceGlobal,
                 entityType: 'persons',
@@ -886,8 +965,20 @@ exports.saveStudent = async (req, res) => {
                 requestingUser: req.user,
                 label: 'student_new_person'
             });
+        } else {
+            personOperation = {
+                status: 'success',
+                label: 'Person profile',
+                message: existingStudent ? 'Existing student person retained.' : 'Existing person selected.'
+            };
         }
 
+        failedStage = 'student';
+        studentOperation = {
+            status: 'running',
+            label: 'Student record',
+            message: id ? 'Updating student record...' : 'Creating student record and account...'
+        };
         const payload = {
             personId,
             customStudentId: String(req.body.customStudentId || '').trim(),
@@ -932,13 +1023,18 @@ exports.saveStudent = async (req, res) => {
 
         let createdStudentAccount = null;
         let createdStudentDisplayName = 'Student';
+        let savedStudentForRegistrations = null;
+        let savedStudentId = toPublicId(id);
 
         if (id) {
-            await dataService.updateData('students', id, payload, req.user, { transactionContext: txContext });
+            savedStudentForRegistrations = await dataService.updateData('students', id, payload, req.user, { transactionContext: txContext });
+            const person = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId: savedStudentForRegistrations.personId });
+            createdStudentDisplayName = resolvePersonDisplayName(person, savedStudentForRegistrations?.id);
         } else {
             const savedStudent = await dataService.addData('students', payload, req.user, { transactionContext: txContext });
             const createdStudentId = toPublicId(savedStudent?.id);
             if (!createdStudentId) throw new Error('Student was saved but no student id was returned.');
+            savedStudentId = createdStudentId;
 
             addDeleteCompensation(txContext, {
                 service: dataService,
@@ -969,7 +1065,7 @@ exports.saveStudent = async (req, res) => {
                 label: 'student_new_account'
             });
 
-            await dataService.updateData(
+            savedStudentForRegistrations = await dataService.updateData(
                 'students',
                 createdStudentId,
                 { ...savedStudent, studentAccountId: createdStudentAccountId },
@@ -978,7 +1074,48 @@ exports.saveStudent = async (req, res) => {
             );
         }
 
-        await txContext.commit({ flow: 'student_save', studentId: toPublicId(id) });
+        await txContext.commit({ flow: 'student_save', studentId: savedStudentId });
+        failedStage = '';
+        studentOperation = {
+            status: 'success',
+            label: 'Student record',
+            studentId: savedStudentId,
+            message: id ? 'Student record updated.' : 'Student record and account saved.'
+        };
+
+        let programRegistrationSummary = null;
+        if (programRegistrationSelections.length) {
+            const registrationStudent = await dataService.getDataById('students', savedStudentId, req.user, routeAccess(req))
+                || savedStudentForRegistrations;
+            const registrationResults = [];
+            for (const selection of programRegistrationSelections) {
+                try {
+                    registrationResults.push(await programRegistrationApplyService.processSingleStudentProgramRegistration({
+                        student: registrationStudent,
+                        programId: selection.programId,
+                        registrationDate: selection.registrationDate,
+                        note: selection.note,
+                        externalReference: selection.externalReference,
+                        activeOrgId,
+                        reqUser: req.user,
+                        autoApproveZeroFee: true
+                    }));
+                } catch (registrationError) {
+                    registrationResults.push({
+                        status: 'error',
+                        programId: selection.programId,
+                        programLabel: selection.programId,
+                        studentId: savedStudentId,
+                        studentName: createdStudentDisplayName,
+                        totalAmount: 0,
+                        transactionCount: 0,
+                        issues: [registrationError.message || 'Program registration failed.'],
+                        message: registrationError.message || 'Program registration failed.'
+                    });
+                }
+            }
+            programRegistrationSummary = programRegistrationApplyService.summarizeRegistrationResults(registrationResults);
+        }
 
         let nameSync = null;
         if (id) {
@@ -990,11 +1127,24 @@ exports.saveStudent = async (req, res) => {
         }
 
         const syncErrors = Number(nameSync?.updated?.errors || 0);
+        const registrationErrors = Number(programRegistrationSummary?.errorCount || 0);
+        const registrationProcessed = Boolean(programRegistrationSummary);
         const payloadOut = {
             status: 'success',
-            partial: syncErrors > 0,
-            message: syncErrors > 0 ? 'Student saved, but related name synchronization completed with warnings.' : 'Student saved successfully.',
-            nameSync
+            partial: syncErrors > 0 || registrationErrors > 0,
+            message: syncErrors > 0
+                ? 'Student saved, but related name synchronization completed with warnings.'
+                : (registrationProcessed
+                    ? (registrationErrors > 0
+                        ? 'Student saved. Some program registrations need attention.'
+                        : 'Student saved and program registrations completed.')
+                    : 'Student saved successfully.'),
+            nameSync,
+            programRegistrations: programRegistrationSummary,
+            studentId: savedStudentId,
+            studentName: createdStudentDisplayName,
+            personOperation,
+            studentOperation
         };
         if (isAjax(req)) {
             const result = { ...payloadOut };
@@ -1021,6 +1171,34 @@ exports.saveStudent = async (req, res) => {
         if (txContext) {
             await txContext.rollback({ flow: 'student_save', reason: error.message || 'Student save failed' });
         }
+        if (deferProgramRegistrations) {
+            if (failedStage === 'person') {
+                personOperation = {
+                    status: 'failed',
+                    label: 'Person profile',
+                    message: error.message || 'Person profile could not be saved.'
+                };
+                studentOperation = {
+                    status: 'not_executable',
+                    label: 'Student record',
+                    message: 'Student record was not saved because the person profile failed.'
+                };
+            } else {
+                if (personOperation.status === 'success' && String(req.body.personMode || '').trim().toLowerCase() === 'new') {
+                    personOperation = {
+                        status: 'failed',
+                        label: 'Person profile',
+                        message: 'Inline person profile was rolled back because the student record could not be saved.'
+                    };
+                }
+                studentOperation = {
+                    status: 'failed',
+                    label: 'Student record',
+                    message: error.message || 'Student record could not be saved.'
+                };
+                failedStage = failedStage || 'student';
+            }
+        }
         const statusCode = Number(error?.statusCode || 400);
         const responsePayload = {
             status: 'error',
@@ -1028,10 +1206,70 @@ exports.saveStudent = async (req, res) => {
             error,
             message: error.message,
             details: error?.details || null,
-            matches: Array.isArray(error?.details?.matches) ? error.details.matches : undefined
+            matches: Array.isArray(error?.details?.matches) ? error.details.matches : undefined,
+            failedStage: deferProgramRegistrations ? failedStage : undefined,
+            personOperation: deferProgramRegistrations ? personOperation : undefined,
+            studentOperation: deferProgramRegistrations ? studentOperation : undefined
         };
         if (isAjax(req)) return res.status(statusCode).json(responsePayload);
         res.status(statusCode).render('error', { title: 'Error', error, message: error.message, user: req.user, statusCode });
+    }
+};
+
+exports.applySingleProgramRegistrationFromStudentForm = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const studentId = toPublicId(req.params.id);
+        if (!studentId) throw new Error('Student id is required.');
+
+        const canCreateProgramRegistrations = await canCreateOrgScopedItem(req.user, { scopeLabel: 'program registrations' });
+        if (!canCreateProgramRegistrations) {
+            throw new Error('You do not have permission to create program registrations.');
+        }
+
+        const student = await dataService.getDataById('students', studentId, req.user, routeAccess(req));
+        if (!student) throw new Error('Student not found.');
+        assertStudentOrgAccess(student, activeOrgId, req.user);
+
+        const [selection] = normalizeProgramRegistrationSelections(
+            JSON.stringify([{
+                programId: req.body.programId,
+                registrationDate: req.body.registrationDate,
+                externalReference: req.body.externalReference,
+                note: req.body.note
+            }]),
+            student.enrollmentDate
+        );
+
+        const result = await programRegistrationApplyService.processSingleStudentProgramRegistration({
+            student,
+            programId: selection.programId,
+            registrationDate: selection.registrationDate,
+            note: selection.note,
+            externalReference: selection.externalReference,
+            activeOrgId,
+            reqUser: req.user,
+            autoApproveZeroFee: true
+        });
+
+        return res.json({
+            status: result.status === 'error' ? 'error' : 'success',
+            result
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            result: {
+                status: 'error',
+                programId: toPublicId(req.body?.programId),
+                programLabel: toPublicId(req.body?.programId) || 'Program',
+                totalAmount: 0,
+                transactionCount: 0,
+                issues: [error.message || 'Program registration failed.'],
+                message: error.message || 'Program registration failed.'
+            },
+            message: error.message || 'Program registration failed.'
+        });
     }
 };
 

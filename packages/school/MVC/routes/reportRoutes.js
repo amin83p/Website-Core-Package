@@ -263,6 +263,11 @@ router.post('/overall-templates/new',
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, overallTemplateMutationActionState),
   overallCtrl.saveTemplate);
 
+router.post('/overall-templates/copy/:id',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, overallTemplateMutationActionState),
+  overallCtrl.copyTemplate);
+
 router.get('/overall-templates/edit/:id',
   requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),

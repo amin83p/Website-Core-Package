@@ -12,6 +12,7 @@ const registrationStatusLifecycleService = require('../../services/school/regist
 const programRegistrationViewService = require('../../services/school/programRegistrationViewService');
 const { PROGRAM_REGISTRATION_LIST_SEARCHABLE_FIELDS } = programRegistrationViewService;
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
+const programRegistrationApplyService = require('../../services/school/programRegistrationApplyService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
 const {
@@ -396,7 +397,7 @@ exports.listRegistrations = async (req, res) => {
     res.render('school/program/programRegistrationList', {
       title: 'Program Registrations',
       tableName: 'Program_Registrations',
-      newUrl: 'school/programs/register-students',
+      newUrl: 'school/programs/registrations',
       newLabel: 'Register Students',
       data,
       pagination,
@@ -531,66 +532,23 @@ exports.applyBatchRegistration = async (req, res) => {
         }
 
         try {
-          const draftItems = programRegistrationDraftService.normalizeDraftTransactionItems(preview.transactionItems || []);
-          const draftPreviewRows = programRegistrationDraftService.buildDraftPreviewRowsFromItems(draftItems);
-          let created = await dataService.addData('studentProgramRegistrations', {
-            orgId: program.orgId,
-            studentId: preview.studentId,
-            personId: preview.personId,
-            programId: program.id,
+          const draftResult = await programRegistrationApplyService.createDraftRegistrationFromPreview({
+            program,
+            preview,
             registrationDate,
-            status: 'draft',
-            feeCategorySnapshot: preview.feeCategory,
+            reqUser: req.user,
             note,
-            transactionSummary: {
-              previewCount: draftPreviewRows.length,
-              postedCount: 0,
-              totalAmount: programRegistrationDraftService.roundMoney(draftPreviewRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)),
-              externalReference: req.body.externalReference || '',
-              transactionIds: [],
-              reversalIds: [],
-              draftTransactionItems: draftItems,
-              draftPreviewRows,
-              draftSavedAt: new Date().toISOString()
-            },
-            academicSummary: {
-              entryCount: 0,
-              entryIds: [],
-              voidedEntryIds: []
-            }
-          }, req.user);
-          const draftFinance = await registrationFinanceLifecycleService.ensureDraftTransactions(
-            created.transactionSummary,
-            draftItems,
-            {
-              registrationType: 'program',
-              registrationId: created.id,
-              orgId: created.orgId,
-              reason: 'Program registration draft saved.'
-            },
-            { requestingUser: req.user }
-          );
-          created = await dataService.updateData('studentProgramRegistrations', created.id, {
-            status: 'draft',
-            transactionSummary: {
-              ...draftFinance.summary,
-              previewCount: draftPreviewRows.length,
-              postedCount: 0,
-              totalAmount: programRegistrationDraftService.roundMoney(draftPreviewRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)),
-              externalReference: req.body.externalReference || '',
-              draftTransactionItems: draftFinance.items,
-              draftPreviewRows,
-              draftSavedAt: new Date().toISOString()
-            }
-          }, req.user);
+            externalReference: req.body.externalReference || ''
+          });
+          const created = draftResult.registration;
 
           results.push({
             studentId: preview.studentId,
             studentName: preview.studentName,
             status: 'draft',
             registrationId: created.id,
-            transactionCount: draftItems.length,
-            message: 'Draft saved. Review, edit transaction rows if needed, then approve to post.'
+            transactionCount: draftResult.transactionCount,
+            message: draftResult.message
           });
         } catch (registrationError) {
           const message = registrationError.message || 'Failed to save draft registration.';

@@ -918,6 +918,8 @@ test('registry, maintenance, access, seeding, and Mongo index integrations are d
   assert.match(controller, /nextSlotNumber:\s*2/);
   assert.match(controller, /sourceSlots:\s*\[\s*\{\s*slotKey:\s*'T1'/);
   assert.match(routes, /overallTemplateMutationActionState/);
+  assert.match(routes, /router\.post\('\/overall-templates\/copy\/:id'/);
+  assert.match(routes, /requireAccess\(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS\.CREATE\)[\s\S]*overallCtrl\.copyTemplate/);
   assert.match(controller, /includeModal:\s*true/);
   assert.match(controller, /includeModal_Table:\s*true/);
   assert.match(controller, /newUrl:\s*'school\/reports\/overall-reports'/);
@@ -934,6 +936,29 @@ test('registry, maintenance, access, seeding, and Mongo index integrations are d
   assert.ok(sections.some((row) => row.id === '446105' && row.name === 'SCHOOL_REPORTS_OVERALL_INSTANCES'));
   assert.ok(symbols.some((row) => row.id === 'SYM_SYSTEM_129'));
   assert.ok(symbols.some((row) => row.id === 'SYM_SYSTEM_130'));
+});
+
+test('overall template list exposes copy action and controller creates draft copy', () => {
+  const controller = read('packages/school/MVC/controllers/school/overallReportController.js');
+  const list = read('packages/school/MVC/views/school/report/overallTemplateList.ejs');
+
+  assert.match(list, /\/school\/reports\/overall-templates\/copy\/<%= encodeURIComponent\(row\.id\) %>/);
+  assert.match(list, /<i class="bi bi-files me-2"><\/i>Copy/);
+  assert.match(list, /name="actionStateId" value="<%= typeof actionStateId !== 'undefined' \? \(actionStateId \|\| ''\) : '' %>"/);
+  assert.match(controller, /async function copyTemplate/);
+  const copyFunction = controller.slice(
+    controller.indexOf('async function copyTemplate'),
+    controller.indexOf('async function deleteTemplate')
+  );
+  assert.match(controller, /status:\s*'draft'/);
+  assert.match(controller, /title:\s*`\$\{String\(source\.title/);
+  assert.match(controller, /sourceSlots:\s*clonePlainValue\(source\.sourceSlots, \[\]\)/);
+  assert.match(controller, /schema:\s*clonePlainValue\(source\.schema/);
+  assert.match(controller, /docxTemplate:\s*clonePlainValue\(source\.docxTemplate, null\)/);
+  assert.match(controller, /docxTemplatesByFunder:\s*clonePlainValue\(source\.docxTemplatesByFunder, \[\]\)/);
+  assert.match(copyFunction, /schoolDataService\.addData\('overallReportTemplates', payload, req\.user\)/);
+  assert.doesNotMatch(copyFunction, /updateData\('overallReportTemplates'/);
+  assert.match(controller, /copyTemplate,/);
 });
 
 test('overall template, creation, and instance views render searchable pickers and parseable client scripts', async () => {

@@ -218,6 +218,15 @@ test('programRegistrationController rollback route deletes drafts instead of no-
   assert.match(source, /rollbackProgramRegistrationSideEffects/);
 });
 
+test('listRegistrations keeps list URL for reload and export base paths', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/programRegistrationController.js'),
+    'utf8'
+  );
+  assert.match(source, /listRegistrations[\s\S]*?newUrl:\s*'school\/programs\/registrations'/);
+  assert.doesNotMatch(source, /listRegistrations[\s\S]*?newUrl:\s*'school\/programs\/register-students'/);
+});
+
 test('registrationIntegrityService voids program drafts through repository update', () => {
   const source = fs.readFileSync(
     path.join(__dirname, '../MVC/services/school/registrationIntegrityService.js'),

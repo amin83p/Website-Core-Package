@@ -31,6 +31,15 @@ function parseJson(value, fallback) {
   }
 }
 
+function clonePlainValue(value, fallback) {
+  if (value === undefined) return fallback;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_) {
+    return fallback;
+  }
+}
+
 function uploadedFileRecord(file) {
   if (!file) return null;
   const storedPath = uploadMiddleware.getStoredFilePath(file);
@@ -190,6 +199,46 @@ async function saveTemplate(req, res) {
     return res.redirect('/school/reports/overall-templates');
   } catch (error) {
     return sendError(req, res, error, 'Save Overall Report Template');
+  }
+}
+
+async function copyTemplate(req, res) {
+  try {
+    const orgId = activeOrgId(req.user);
+    const source = await schoolDataService.getDataById('overallReportTemplates', req.params.id, req.user);
+    if (!source || !idsEqual(source.orgId, orgId)) throw new Error('Overall report template not found.');
+
+    const now = new Date().toISOString();
+    const payload = overallReportTemplateModel.sanitizeTemplate({
+      orgId,
+      title: `${String(source.title || 'Overall Report Template').trim() || 'Overall Report Template'} Copy`,
+      version: source.version,
+      status: 'draft',
+      description: source.description,
+      sourceSlots: clonePlainValue(source.sourceSlots, []),
+      nextSlotNumber: source.nextSlotNumber,
+      schema: clonePlainValue(source.schema, { version: 1, fields: [] }),
+      placeholderMap: clonePlainValue(source.placeholderMap, {}),
+      docxTemplate: clonePlainValue(source.docxTemplate, null),
+      docxTemplatesByFunder: clonePlainValue(source.docxTemplatesByFunder, []),
+      audit: {
+        createUser: req.user?.id || '',
+        createDateTime: now,
+        lastUpdateUser: req.user?.id || '',
+        lastUpdateDateTime: now
+      }
+    });
+    await overallReportService.validateTemplateReferences(payload, req.user);
+    const saved = await schoolDataService.addData('overallReportTemplates', payload, req.user);
+    if (isAjax(req)) return res.json({
+      status: 'success',
+      message: 'Overall report template copied.',
+      result: saved,
+      redirectTo: `/school/reports/overall-templates/edit/${encodeURIComponent(String(saved?.id || ''))}`
+    });
+    return res.redirect(`/school/reports/overall-templates/edit/${encodeURIComponent(String(saved?.id || ''))}`);
+  } catch (error) {
+    return sendError(req, res, error, 'Copy Overall Report Template');
   }
 }
 
@@ -758,6 +807,7 @@ module.exports = {
   listTemplates,
   showTemplateForm,
   saveTemplate,
+  copyTemplate,
   deleteTemplate,
   sourceTemplates,
   ensureSourceTemplateDocx,

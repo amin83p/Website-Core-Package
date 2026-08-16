@@ -16,6 +16,7 @@
   // safe JSON for embedding into <script>
   const initAttachmentsJson = JSON.stringify(s.attachments || []).replace(/</g, '\\u003c');
   const initClbLevelHistoryJson = JSON.stringify(s.clbLevelHistory || []).replace(/</g, '\\u003c');
+  const initProgramRegistrationsJson = JSON.stringify(typeof existingProgramRegistrations !== 'undefined' ? (existingProgramRegistrations || []) : []).replace(/</g, '\\u003c');
   const routeIdJson = JSON.stringify(routeId).replace(/</g, '\\u003c');
   const initPersonOrganizationsJson = JSON.stringify(typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []).replace(/</g, '\\u003c');
   const initOrganizationLookupJson = JSON.stringify(typeof organizationLookup !== 'undefined' ? (organizationLookup || {}) : {}).replace(/</g, '\\u003c');
@@ -25,8 +26,13 @@
 
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
-      <h1 class="page-heading size-md m-0"><i class="bi bi-person-vcard me-2"></i><% if (isEdit) { %>Edit Student: <%= entityDisplayName %> <small class="text-muted fw-normal">(<%= entityRecordId %>)</small><% } else { %>Admit New Student<% } %></h1>
-      <a href="/school/students" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-person-vcard me-2"></i><% if (isEdit) { %>Edit <%= entityDisplayName %><% } else { %>Admit New Student<% } %></h1>
+      <div class="text-end">
+        <a href="/school/students" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+        <% if (isEdit && entityRecordId) { %>
+          <div class="mt-2"><span class="badge bg-primary border font-monospace">ID: <%= entityRecordId %></span></div>
+        <% } %>
+      </div>
   </div>
 
   <div class="form-container wide" style="max-width: 1400px;">
@@ -46,13 +52,15 @@
       <input type="hidden" name="newPersonEmails" id="hid_newPersonEmails" value="[]">
       <input type="hidden" name="newPersonPhones" id="hid_newPersonPhones" value="[]">
       <input type="hidden" name="newPersonAddresses" id="hid_newPersonAddresses" value="[]">
+      <input type="hidden" name="programRegistrationSelections" id="hid_programRegistrationSelections" value="[]">
       <script type="application/json" id="init_personOrganizations"><%- initPersonOrganizationsJson %></script>
       <script type="application/json" id="init_organizationLookup"><%- initOrganizationLookupJson %></script>
 
       <ul class="nav nav-tabs mb-4" id="studentTabs" role="tablist">
         <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">Step 1: Person</button></li>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-financial" type="button">Step 2: Student</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-documents" type="button">Step 3: Documents</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-programs" type="button">Step 3: Programs</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-documents" type="button">Step 4: Documents</button></li>
       </ul>
 
       <div class="card border-0 shadow-sm mb-4">
@@ -357,6 +365,100 @@
                </div>
            </div>
 
+           <div class="tab-pane fade" id="tab-programs">
+               <div class="alert alert-light border shadow-sm mb-4">
+                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                   <div>
+                     <h6 class="fw-bold mb-1"><i class="bi bi-journal-bookmark-fill me-2"></i>Program Registrations</h6>
+                     <p class="small text-muted mb-0">Add programs to register after the student profile is saved. Zero-fee programs are finalized automatically; programs with fees are saved as drafts for review.</p>
+                   </div>
+                   <button type="button" class="btn btn-primary btn-sm fw-bold" id="btnAddProgramRegistration">
+                     <i class="bi bi-plus-circle me-1"></i>Add Program
+                   </button>
+                 </div>
+               </div>
+
+               <% if (isEdit && (existingProgramRegistrations || []).length) { %>
+                 <div class="card border-0 shadow-sm mb-4">
+                   <div class="card-header bg-light fw-bold">
+                     <i class="bi bi-lock me-2"></i>Existing Program Registrations
+                   </div>
+                   <div class="card-body">
+                     <div class="table-responsive">
+                       <table class="table table-sm align-middle mb-0">
+                         <thead class="table-light">
+                           <tr>
+                             <th>Program</th>
+                             <th>Date</th>
+                             <th>Status</th>
+                             <th>Fee Category</th>
+                             <th class="text-end">Finance</th>
+                             <th class="text-end">Action</th>
+                           </tr>
+                         </thead>
+                         <tbody>
+                           <% (existingProgramRegistrations || []).forEach(function (registration) { %>
+                             <tr>
+                               <td>
+                                 <div class="fw-bold"><%= registration.programLabel || registration.programId || '-' %></div>
+                                 <div class="small text-muted font-monospace"><%= registration.id || '' %></div>
+                               </td>
+                               <td><%= registration.registrationDate || '-' %></td>
+                               <td><span class="badge <%= registration.statusBadgeClass || 'bg-secondary' %>"><%= registration.verificationStatus || registration.status || '-' %></span></td>
+                               <td><%= registration.feeCategorySnapshot || '-' %></td>
+                               <td class="text-end">
+                                 <span class="badge bg-light text-dark border">Posted <%= registration.finance?.posted || 0 %></span>
+                                 <span class="badge bg-light text-dark border">Draft <%= registration.finance?.draft || 0 %></span>
+                               </td>
+                               <td class="text-end">
+                                 <% if (registration.id) { %>
+                                   <a href="/school/programs/registrations/<%= encodeURIComponent(String(registration.id || '')) %>" class="btn btn-outline-primary btn-sm fw-bold">
+                                     <i class="bi bi-box-arrow-up-right me-1"></i>Manage
+                                   </a>
+                                 <% } else { %>
+                                   <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+                                     <i class="bi bi-lock me-1"></i>Unavailable
+                                   </button>
+                                 <% } %>
+                               </td>
+                             </tr>
+                           <% }); %>
+                         </tbody>
+                       </table>
+                     </div>
+                   </div>
+                 </div>
+               <% } %>
+
+               <div class="card border-0 shadow-sm">
+                 <div class="card-body">
+                   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                     <div>
+                       <div class="fw-bold">New Program Registrations</div>
+                       <div class="small text-muted">Registration dates must be on or after the Admission Date.</div>
+                     </div>
+                     <span class="badge bg-light text-dark border" id="programRegistrationCountBadge">0 selected</span>
+                   </div>
+                   <div class="table-responsive">
+                     <table class="table table-sm align-middle mb-0">
+                       <thead class="table-light">
+                         <tr>
+                           <th style="min-width: 260px;">Program</th>
+                           <th style="width: 170px;">Registration Date</th>
+                           <th style="min-width: 190px;">External Reference</th>
+                           <th style="min-width: 260px;">Note</th>
+                           <th class="text-end" style="width: 80px;">Actions</th>
+                         </tr>
+                       </thead>
+                       <tbody id="programRegistrationTbody">
+                         <tr><td colspan="5" class="text-center text-muted py-4">No program registrations selected.</td></tr>
+                       </tbody>
+                     </table>
+                   </div>
+                 </div>
+               </div>
+           </div>
+
            <div class="tab-pane fade" id="tab-documents">
                <div class="alert alert-light border shadow-sm">
                    <h6 class="fw-bold mb-2"><i class="bi bi-paperclip me-2"></i>Attached Documents</h6>
@@ -432,9 +534,59 @@
 <%- include('partials/modal_GenericPicker') %>
 <%- include('school/partials/personProfileEditModal') %>
 
+<style>
+  #studentSaveProgressModal .student-save-progress-table td {
+    vertical-align: middle;
+  }
+  #studentSaveProgressModal .student-save-progress-icon {
+    width: 2rem;
+    text-align: center;
+    font-size: 1.15rem;
+  }
+  #studentSaveProgressModal .student-save-progress-message {
+    line-height: 1.25;
+  }
+</style>
+
+<div class="modal fade" id="studentSaveProgressModal" tabindex="-1" aria-labelledby="studentSaveProgressTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <div>
+          <h5 class="modal-title fw-bold mb-0" id="studentSaveProgressTitle">Saving Student</h5>
+          <div class="small text-muted" id="studentSaveProgressSubtitle">Operations run in order.</div>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle student-save-progress-table mb-0">
+            <tbody id="studentSaveProgressTbody"></tbody>
+          </table>
+        </div>
+        <div class="alert alert-light border mt-3 mb-0 d-none" id="studentSaveProgressSummary"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-primary d-none" id="btnRetryFailedProgramRegistrations">
+          <i class="bi bi-arrow-clockwise me-1"></i>Retry Failed Registrations
+        </button>
+        <button type="button" class="btn btn-outline-secondary d-none" id="btnOpenSavedStudent">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Open Saved Student
+        </button>
+        <button type="button" class="btn btn-success d-none" id="btnStudentSaveProgressOk">
+          <i class="bi bi-check2-circle me-1"></i>OK
+        </button>
+        <button type="button" class="btn btn-secondary d-none" id="btnStudentSaveProgressClose">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   window.__INIT_STUDENT_ATTACHMENTS__ = <%- initAttachmentsJson %>;
   window.__INIT_CLB_LEVEL_HISTORY__ = <%- initClbLevelHistoryJson %>;
+  window.__INIT_STUDENT_PROGRAM_REGISTRATIONS__ = <%- initProgramRegistrationsJson %>;
   window.__STUDENT_ROUTE_ID__ = <%- routeIdJson %>;
 </script>
 
@@ -453,7 +605,7 @@
 
   const newWrap = document.getElementById('newFilesWrap');
   const newTbody = document.getElementById('newFilesTbody');
-  const wizardTabTargets = ['#tab-general', '#tab-financial', '#tab-documents'];
+  const wizardTabTargets = ['#tab-general', '#tab-financial', '#tab-programs', '#tab-documents'];
   const btnWizardPrev = document.getElementById('btnWizardPrev');
   const btnWizardNext = document.getElementById('btnWizardNext');
   const btnWizardSubmit = document.getElementById('btnWizardSubmit');
@@ -527,9 +679,464 @@
   let newPersonAddressDebounceTimer = null;
   let selectedPersonOrganizations = readJsonSafe(document.getElementById('init_personOrganizations')?.textContent, []);
   const organizationLookup = readJsonSafe(document.getElementById('init_organizationLookup')?.textContent, {});
+  const hidProgramRegistrationSelections = document.getElementById('hid_programRegistrationSelections');
+  const programRegistrationTbody = document.getElementById('programRegistrationTbody');
+  const programRegistrationCountBadge = document.getElementById('programRegistrationCountBadge');
+  const btnAddProgramRegistration = document.getElementById('btnAddProgramRegistration');
+  const enrollmentDateInput = form.querySelector('input[name="enrollmentDate"]');
+  const studentSaveProgressModalEl = document.getElementById('studentSaveProgressModal');
+  const studentSaveProgressTitle = document.getElementById('studentSaveProgressTitle');
+  const studentSaveProgressSubtitle = document.getElementById('studentSaveProgressSubtitle');
+  const studentSaveProgressTbody = document.getElementById('studentSaveProgressTbody');
+  const studentSaveProgressSummary = document.getElementById('studentSaveProgressSummary');
+  const btnRetryFailedProgramRegistrations = document.getElementById('btnRetryFailedProgramRegistrations');
+  const btnOpenSavedStudent = document.getElementById('btnOpenSavedStudent');
+  const btnStudentSaveProgressOk = document.getElementById('btnStudentSaveProgressOk');
+  const btnStudentSaveProgressClose = document.getElementById('btnStudentSaveProgressClose');
+  const existingProgramRegistrationIds = new Set(
+    (Array.isArray(window.__INIT_STUDENT_PROGRAM_REGISTRATIONS__) ? window.__INIT_STUDENT_PROGRAM_REGISTRATIONS__ : [])
+      .filter((row) => !['withdrawn', 'cancelled', 'completed', 'rolled_back', 'void'].includes(String(row?.status || '').toLowerCase()))
+      .map((row) => String(row?.programId || '').trim())
+      .filter(Boolean)
+  );
+  let selectedProgramRegistrations = [];
+  let studentSaveProgressModal = null;
+  let activeStudentSaveProgressState = null;
 
   function safeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function isDateOnly(value) {
+    const token = String(value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return false;
+    const parsed = new Date(token + 'T00:00:00.000Z');
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === token;
+  }
+
+  function defaultProgramRegistrationDate() {
+    const admissionDate = String(enrollmentDateInput?.value || '').trim();
+    return isDateOnly(admissionDate) ? admissionDate : '';
+  }
+
+  function syncProgramRegistrationSelections() {
+    if (!hidProgramRegistrationSelections) return;
+    hidProgramRegistrationSelections.value = JSON.stringify(selectedProgramRegistrations.map((row) => ({
+      programId: String(row.programId || '').trim(),
+      registrationDate: String(row.registrationDate || '').trim(),
+      externalReference: String(row.externalReference || '').trim(),
+      note: String(row.note || '').trim()
+    })).filter((row) => row.programId));
+  }
+
+  function renderProgramRegistrationSelections() {
+    if (!programRegistrationTbody) return;
+    if (!selectedProgramRegistrations.length) {
+      programRegistrationTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No program registrations selected.</td></tr>';
+      if (programRegistrationCountBadge) programRegistrationCountBadge.textContent = '0 selected';
+      syncProgramRegistrationSelections();
+      return;
+    }
+    programRegistrationTbody.innerHTML = selectedProgramRegistrations.map((row, index) => {
+      const programLabel = row.programLabel || row.programId || 'Program';
+      return [
+        '<tr data-program-registration-index="' + index + '">',
+          '<td>',
+            '<div class="fw-bold text-dark">' + safeHtml(programLabel) + '</div>',
+            '<div class="small text-muted font-monospace">' + safeHtml(row.programId || '') + '</div>',
+          '</td>',
+          '<td><input type="date" class="form-control form-control-sm program-registration-date" value="' + safeHtml(row.registrationDate || '') + '" required></td>',
+          '<td><input type="text" class="form-control form-control-sm program-registration-reference" value="' + safeHtml(row.externalReference || '') + '" maxlength="200" placeholder="Optional"></td>',
+          '<td><input type="text" class="form-control form-control-sm program-registration-note" value="' + safeHtml(row.note || '') + '" maxlength="2000" placeholder="Optional note"></td>',
+          '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-remove-program-registration="' + index + '" aria-label="Remove program"><i class="bi bi-x-lg"></i></button></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    if (programRegistrationCountBadge) {
+      programRegistrationCountBadge.textContent = selectedProgramRegistrations.length + ' selected';
+    }
+    syncProgramRegistrationSelections();
+  }
+
+  function validateProgramRegistrationSelections({ focusInvalid = false } = {}) {
+    const admissionDate = String(enrollmentDateInput?.value || '').trim();
+    if (!selectedProgramRegistrations.length) return '';
+    if (!isDateOnly(admissionDate)) return 'Admission Date is required before adding program registrations.';
+    for (let i = 0; i < selectedProgramRegistrations.length; i += 1) {
+      const row = selectedProgramRegistrations[i];
+      const registrationDate = String(row.registrationDate || '').trim();
+      if (!isDateOnly(registrationDate)) {
+        if (focusInvalid) programRegistrationTbody?.querySelector('tr[data-program-registration-index="' + i + '"] .program-registration-date')?.focus();
+        return 'Enter a valid Registration Date for each selected program.';
+      }
+      if (registrationDate < admissionDate) {
+        if (focusInvalid) programRegistrationTbody?.querySelector('tr[data-program-registration-index="' + i + '"] .program-registration-date')?.focus();
+        return 'Each program Registration Date must be on or after the Admission Date.';
+      }
+    }
+    return '';
+  }
+
+  function renderProgramRegistrationResult(summary) {
+    if (!summary || !Array.isArray(summary.results) || !summary.results.length) return '';
+    const rows = summary.results.map((row) => {
+      const status = String(row.status || '').toLowerCase();
+      const badge = status === 'finalized'
+        ? 'bg-success'
+        : (status === 'draft' ? 'bg-info text-dark' : 'bg-danger');
+      return [
+        '<tr>',
+          '<td><div class="fw-bold">' + safeHtml(row.programLabel || row.programId || '-') + '</div></td>',
+          '<td><span class="badge ' + badge + '">' + safeHtml(status || '-') + '</span></td>',
+          '<td class="text-end">' + Number(row.totalAmount || 0).toFixed(2) + '</td>',
+          '<td>' + safeHtml(row.message || (Array.isArray(row.issues) ? row.issues.join(' ') : '')) + '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="mt-3">',
+        '<div class="fw-bold mb-2">Program registration results</div>',
+        '<div class="d-flex flex-wrap gap-2 mb-2">',
+          '<span class="badge bg-success">Finalized: ' + Number(summary.finalizedCount || 0) + '</span>',
+          '<span class="badge bg-info text-dark">Draft: ' + Number(summary.draftCount || 0) + '</span>',
+          '<span class="badge bg-danger">Failed: ' + Number(summary.errorCount || 0) + '</span>',
+        '</div>',
+        '<div class="table-responsive"><table class="table table-sm align-middle mb-0">',
+          '<thead><tr><th>Program</th><th>Status</th><th class="text-end">Fee</th><th>Result</th></tr></thead>',
+          '<tbody>' + rows + '</tbody>',
+        '</table></div>',
+      '</div>'
+    ].join('');
+  }
+
+  function startStudentSaveLoading() {
+    if (typeof window.showLoading !== 'function') return { token: null, timer: null };
+    const hasPrograms = selectedProgramRegistrations.length > 0;
+    const token = window.showLoading({
+      title: 'Saving Student',
+      message: 'Saving student profile...',
+      note: hasPrograms ? 'Program registrations will run after the profile is saved.' : 'Please wait.'
+    });
+    let timer = null;
+    if (hasPrograms && typeof window.updateLoading === 'function') {
+      let index = 0;
+      timer = window.setInterval(() => {
+        const row = selectedProgramRegistrations[index % selectedProgramRegistrations.length];
+        index += 1;
+        window.updateLoading({
+          title: 'Saving Student',
+          message: 'Registering ' + (row.programLabel || row.programId || 'selected program') + '...',
+          note: 'Zero-fee programs finalize automatically; fee-bearing programs save as drafts.'
+        });
+      }, 1200);
+    }
+    return { token, timer };
+  }
+
+  function stopStudentSaveLoading(state) {
+    if (state?.timer) window.clearInterval(state.timer);
+    if (state?.token && typeof window.hideLoading === 'function') {
+      window.hideLoading(state.token);
+    }
+  }
+
+  const STUDENT_SAVE_PROGRESS_STATUS = {
+    waiting: { label: 'Waiting', badge: 'text-bg-light border', icon: '<i class="bi bi-hourglass-split text-muted"></i>' },
+    running: { label: 'Running', badge: 'text-bg-primary', icon: '<span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>' },
+    success: { label: 'Successful', badge: 'text-bg-success', icon: '<i class="bi bi-check-circle-fill text-success"></i>' },
+    failed: { label: 'Failed', badge: 'text-bg-danger', icon: '<i class="bi bi-x-circle-fill text-danger"></i>' },
+    not_executable: { label: 'Not executable', badge: 'text-bg-secondary', icon: '<i class="bi bi-slash-circle text-muted"></i>' }
+  };
+
+  function getStudentPersonMode() {
+    return document.querySelector('input[name="personMode"]:checked')?.value || 'existing';
+  }
+
+  function normalizeProgressStatus(status) {
+    const token = String(status || '').toLowerCase();
+    if (token === 'success' || token === 'successful' || token === 'finalized' || token === 'draft') return 'success';
+    if (token === 'error' || token === 'failed') return 'failed';
+    if (token === 'not-executable' || token === 'not_executable' || token === 'blocked') return 'not_executable';
+    if (token === 'running') return 'running';
+    return 'waiting';
+  }
+
+  function createStudentSaveProgressState(personMode) {
+    const rows = [];
+    rows.push({
+      key: 'person',
+      type: 'person',
+      label: 'Person profile',
+      status: 'waiting',
+      message: personMode === 'new' ? 'Waiting to create inline person profile.' : 'Existing person selected.'
+    });
+    rows.push({
+      key: 'student',
+      type: 'student',
+      label: 'Student record',
+      status: 'waiting',
+      message: 'Waiting to save student record.'
+    });
+    selectedProgramRegistrations.forEach((row, index) => {
+      rows.push({
+        key: 'program-' + index,
+        type: 'program',
+        label: row.programLabel || row.programId || 'Program',
+        status: 'waiting',
+        message: 'Waiting for student record.',
+        payload: {
+          programId: String(row.programId || '').trim(),
+          programLabel: String(row.programLabel || row.programId || 'Program').trim(),
+          registrationDate: String(row.registrationDate || '').trim(),
+          externalReference: String(row.externalReference || '').trim(),
+          note: String(row.note || '').trim()
+        },
+        result: null
+      });
+    });
+    return {
+      personMode,
+      rows,
+      studentId: studentRouteId || '',
+      studentName: '',
+      finalState: 'running'
+    };
+  }
+
+  function getStudentSaveProgressRow(state, key) {
+    return state?.rows?.find((row) => row.key === key) || null;
+  }
+
+  function renderStudentSaveProgressRows(state) {
+    if (!studentSaveProgressTbody || !state) return;
+    studentSaveProgressTbody.innerHTML = state.rows.map((row) => {
+      const statusKey = normalizeProgressStatus(row.status);
+      const meta = STUDENT_SAVE_PROGRESS_STATUS[statusKey] || STUDENT_SAVE_PROGRESS_STATUS.waiting;
+      const extra = row.result && row.type === 'program'
+        ? '<div class="small text-muted mt-1">' +
+            'Fee: ' + Number(row.result.totalAmount || 0).toFixed(2) +
+            (row.result.transactionCount ? ' - Transactions: ' + Number(row.result.transactionCount || 0) : '') +
+          '</div>'
+        : '';
+      return [
+        '<tr data-student-save-progress-row="' + safeHtml(row.key) + '">',
+          '<td class="student-save-progress-icon">' + meta.icon + '</td>',
+          '<td>',
+            '<div class="fw-bold">' + safeHtml(row.label || '-') + '</div>',
+            '<div class="small text-muted student-save-progress-message">' + safeHtml(row.message || '') + '</div>',
+            extra,
+          '</td>',
+          '<td class="text-end"><span class="badge ' + meta.badge + '">' + meta.label + '</span></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+  }
+
+  function updateStudentSaveProgressRow(state, key, status, message, result) {
+    const row = getStudentSaveProgressRow(state, key);
+    if (!row) return;
+    row.status = normalizeProgressStatus(status);
+    if (message !== undefined) row.message = String(message || '');
+    if (result !== undefined) row.result = result;
+    renderStudentSaveProgressRows(state);
+  }
+
+  function markProgramRowsNotExecutable(state, message) {
+    (state?.rows || []).forEach((row) => {
+      if (row.type === 'program' && normalizeProgressStatus(row.status) === 'waiting') {
+        row.status = 'not_executable';
+        row.message = message || 'This registration cannot run because an earlier required operation failed.';
+      }
+    });
+    renderStudentSaveProgressRows(state);
+  }
+
+  function applyServerOperationToProgress(state, key, operation, fallbackMessage) {
+    if (!operation) {
+      updateStudentSaveProgressRow(state, key, 'success', fallbackMessage || 'Completed.');
+      return;
+    }
+    updateStudentSaveProgressRow(
+      state,
+      key,
+      operation.status,
+      operation.message || fallbackMessage || 'Completed.',
+      operation
+    );
+  }
+
+  function openStudentSaveProgressModal(state) {
+    activeStudentSaveProgressState = state;
+    if (studentSaveProgressTitle) studentSaveProgressTitle.textContent = 'Saving Student';
+    if (studentSaveProgressSubtitle) studentSaveProgressSubtitle.textContent = 'Operations run in order.';
+    if (studentSaveProgressSummary) {
+      studentSaveProgressSummary.classList.add('d-none');
+      studentSaveProgressSummary.innerHTML = '';
+    }
+    [btnRetryFailedProgramRegistrations, btnOpenSavedStudent, btnStudentSaveProgressOk, btnStudentSaveProgressClose].forEach((btn) => {
+      if (!btn) return;
+      btn.classList.add('d-none');
+      btn.disabled = false;
+      btn.onclick = null;
+    });
+    renderStudentSaveProgressRows(state);
+    if (studentSaveProgressModalEl && window.bootstrap?.Modal) {
+      studentSaveProgressModal = bootstrap.Modal.getOrCreateInstance(studentSaveProgressModalEl, {
+        backdrop: 'static',
+        keyboard: false
+      });
+      studentSaveProgressModal.show();
+    }
+  }
+
+  function closeStudentSaveProgressModal() {
+    if (studentSaveProgressModal) studentSaveProgressModal.hide();
+  }
+
+  function setStudentSaveProgressSummary(kind, html) {
+    if (!studentSaveProgressSummary) return;
+    studentSaveProgressSummary.className = 'alert mt-3 mb-0 ' + (
+      kind === 'success' ? 'alert-success' : (kind === 'warning' ? 'alert-warning' : 'alert-danger')
+    );
+    studentSaveProgressSummary.innerHTML = html;
+    studentSaveProgressSummary.classList.remove('d-none');
+  }
+
+  async function postStudentProgramRegistrationRow(studentId, row) {
+    const response = await fetch('/school/students/' + encodeURIComponent(studentId) + '/program-registrations/apply-one', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: JSON.stringify({
+        programId: row.payload.programId,
+        registrationDate: row.payload.registrationDate,
+        externalReference: row.payload.externalReference,
+        note: row.payload.note
+      })
+    });
+    const contentType = response.headers.get('content-type') || '';
+    const payload = contentType.includes('application/json')
+      ? await response.json().catch(() => ({}))
+      : {};
+    if (!response.ok) {
+      const error = new Error(payload?.message || payload?.result?.message || 'Program registration failed.');
+      error.payload = payload;
+      throw error;
+    }
+    return payload?.result || payload;
+  }
+
+  function describeProgramRegistrationResult(result) {
+    const status = String(result?.status || '').toLowerCase();
+    if (status === 'finalized') return 'Finalized automatically. Zero-fee registration is active.';
+    if (status === 'draft') return 'Draft saved. Fee-bearing registration needs review and approval.';
+    return result?.message || 'Program registration completed.';
+  }
+
+  async function runProgramRegistrationProgressRows(state, rowsToRun) {
+    const studentId = String(state?.studentId || '').trim();
+    if (!studentId) {
+      rowsToRun.forEach((row) => {
+        row.status = 'not_executable';
+        row.message = 'Student id was not returned, so this registration cannot run.';
+      });
+      renderStudentSaveProgressRows(state);
+      return;
+    }
+    for (const row of rowsToRun) {
+      updateStudentSaveProgressRow(state, row.key, 'running', 'Registering ' + (row.label || 'program') + '...');
+      try {
+        const result = await postStudentProgramRegistrationRow(studentId, row);
+        const status = String(result?.status || '').toLowerCase();
+        if (status === 'error') {
+          updateStudentSaveProgressRow(state, row.key, 'failed', result.message || 'Program registration failed.', result);
+        } else {
+          updateStudentSaveProgressRow(state, row.key, 'success', describeProgramRegistrationResult(result), result);
+        }
+      } catch (error) {
+        const result = error?.payload?.result || {
+          status: 'error',
+          programId: row.payload.programId,
+          programLabel: row.payload.programLabel,
+          totalAmount: 0,
+          transactionCount: 0,
+          message: error.message || 'Program registration failed.',
+          issues: [error.message || 'Program registration failed.']
+        };
+        updateStudentSaveProgressRow(state, row.key, 'failed', result.message || error.message || 'Program registration failed.', result);
+      }
+    }
+  }
+
+  function configureStudentSaveProgressActions(state) {
+    const failedPrograms = (state?.rows || []).filter((row) => row.type === 'program' && normalizeProgressStatus(row.status) === 'failed');
+    const failedBlocking = (state?.rows || []).some((row) => row.type !== 'program' && normalizeProgressStatus(row.status) === 'failed');
+    const notExecutable = (state?.rows || []).filter((row) => normalizeProgressStatus(row.status) === 'not_executable');
+    const completedPrograms = (state?.rows || []).filter((row) => row.type === 'program' && normalizeProgressStatus(row.status) === 'success');
+    const draftPrograms = completedPrograms.filter((row) => String(row.result?.status || '').toLowerCase() === 'draft');
+    const finalizedPrograms = completedPrograms.filter((row) => String(row.result?.status || '').toLowerCase() === 'finalized');
+
+    if (studentSaveProgressTitle) {
+      studentSaveProgressTitle.textContent = failedBlocking || failedPrograms.length ? 'Save Needs Attention' : 'Save Complete';
+    }
+    if (studentSaveProgressSubtitle) {
+      studentSaveProgressSubtitle.textContent = failedBlocking
+        ? 'A required operation failed. Later operations were not executable.'
+        : (failedPrograms.length ? 'Student saved. Some program registrations need attention.' : 'All executable operations are complete.');
+    }
+
+    if (failedBlocking) {
+      setStudentSaveProgressSummary('danger', 'The student was not saved. Review the failed line above, correct the form, and try again.');
+      if (btnStudentSaveProgressClose) {
+        btnStudentSaveProgressClose.classList.remove('d-none');
+        btnStudentSaveProgressClose.onclick = closeStudentSaveProgressModal;
+      }
+      return;
+    }
+
+    if (failedPrograms.length) {
+      setStudentSaveProgressSummary(
+        'warning',
+        'Student saved. ' + completedPrograms.length + ' program registration(s) completed, ' +
+        failedPrograms.length + ' failed, and ' + notExecutable.length + ' were not executable. Correct the failed rows or retry them.'
+      );
+      if (btnRetryFailedProgramRegistrations) {
+        btnRetryFailedProgramRegistrations.classList.remove('d-none');
+        btnRetryFailedProgramRegistrations.onclick = async () => {
+          btnRetryFailedProgramRegistrations.disabled = true;
+          if (btnOpenSavedStudent) btnOpenSavedStudent.disabled = true;
+          if (btnStudentSaveProgressClose) btnStudentSaveProgressClose.disabled = true;
+          await runProgramRegistrationProgressRows(state, failedPrograms);
+          configureStudentSaveProgressActions(state);
+        };
+      }
+      if (btnOpenSavedStudent) {
+        btnOpenSavedStudent.classList.remove('d-none');
+        btnOpenSavedStudent.onclick = () => {
+          window.location.href = '/school/students/edit/' + encodeURIComponent(String(state.studentId || ''));
+        };
+      }
+      if (btnStudentSaveProgressClose) {
+        btnStudentSaveProgressClose.classList.remove('d-none');
+        btnStudentSaveProgressClose.onclick = closeStudentSaveProgressModal;
+      }
+      return;
+    }
+
+    setStudentSaveProgressSummary(
+      'success',
+      'Student saved successfully. Finalized: ' + finalizedPrograms.length +
+      '. Draft / Needs review: ' + draftPrograms.length + '.'
+    );
+    if (btnStudentSaveProgressOk) {
+      btnStudentSaveProgressOk.classList.remove('d-none');
+      btnStudentSaveProgressOk.onclick = () => {
+        window.location.href = '/school/students';
+      };
+    }
   }
 
   function formatBytes(bytes) {
@@ -906,6 +1513,20 @@
           return false;
         }
       }
+    }
+
+    if (currentTarget === '#tab-programs') {
+      const programRegistrationIssue = validateProgramRegistrationSelections({ focusInvalid: true });
+      if (programRegistrationIssue) {
+        showMsg({
+          title: 'Program Registration',
+          icon: 'warning',
+          message: programRegistrationIssue,
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+        return false;
+      }
+      syncProgramRegistrationSelections();
     }
 
     return true;
@@ -1385,6 +2006,79 @@
   window.addEventListener('beforeunload', clearNewFileObjectUrls);
 
   document.addEventListener('DOMContentLoaded', () => {
+    renderProgramRegistrationSelections();
+    if (btnAddProgramRegistration) {
+      btnAddProgramRegistration.addEventListener('click', () => {
+        if (typeof GenericPicker === 'undefined' || !GenericPicker.open || typeof GenericPickerPresets === 'undefined') {
+          showMsg({
+            title: 'Program Picker',
+            icon: 'warning',
+            message: 'The program picker is not available on this page.',
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+          return;
+        }
+        GenericPicker.open(GenericPickerPresets.program({
+          title: 'Select Program',
+          onSelect: (item) => {
+            const programId = String(item?.id || '').trim();
+            if (!programId) return;
+            if (existingProgramRegistrationIds.has(programId)) {
+              showMsg({
+                title: 'Program Already Registered',
+                icon: 'warning',
+                message: 'This student already has an existing registration for the selected program.',
+                buttons: [{ text: 'OK', class: 'btn-primary' }]
+              });
+              return;
+            }
+            if (selectedProgramRegistrations.some((row) => String(row.programId || '') === programId)) return;
+            selectedProgramRegistrations.push({
+              programId,
+              programLabel: [String(item.code || programId), String(item.name || '')].filter(Boolean).join(' - '),
+              registrationDate: defaultProgramRegistrationDate(),
+              externalReference: '',
+              note: ''
+            });
+            renderProgramRegistrationSelections();
+          }
+        }));
+      });
+    }
+
+    if (programRegistrationTbody) {
+      programRegistrationTbody.addEventListener('input', (event) => {
+        const rowEl = event.target.closest('tr[data-program-registration-index]');
+        if (!rowEl) return;
+        const index = Number(rowEl.getAttribute('data-program-registration-index'));
+        if (!Number.isInteger(index) || !selectedProgramRegistrations[index]) return;
+        if (event.target.classList.contains('program-registration-date')) {
+          selectedProgramRegistrations[index].registrationDate = event.target.value || '';
+        } else if (event.target.classList.contains('program-registration-reference')) {
+          selectedProgramRegistrations[index].externalReference = event.target.value || '';
+        } else if (event.target.classList.contains('program-registration-note')) {
+          selectedProgramRegistrations[index].note = event.target.value || '';
+        }
+        syncProgramRegistrationSelections();
+      });
+      programRegistrationTbody.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-remove-program-registration]');
+        if (!btn) return;
+        const index = Number(btn.getAttribute('data-remove-program-registration'));
+        if (!Number.isInteger(index)) return;
+        selectedProgramRegistrations.splice(index, 1);
+        renderProgramRegistrationSelections();
+      });
+    }
+
+    enrollmentDateInput?.addEventListener('change', () => {
+      selectedProgramRegistrations = selectedProgramRegistrations.map((row) => ({
+        ...row,
+        registrationDate: row.registrationDate || defaultProgramRegistrationDate()
+      }));
+      renderProgramRegistrationSelections();
+    });
+
     // Wire up Person Picker
     const pBtn = document.getElementById('btnPickPerson');
     if (pBtn && !pBtn.disabled) {
@@ -1634,9 +2328,30 @@
           }
         }
 
+        const programRegistrationIssue = validateProgramRegistrationSelections({ focusInvalid: true });
+        if (programRegistrationIssue) {
+          const programTabBtn = document.querySelector('#studentTabs [data-bs-target="#tab-programs"]');
+          if (programTabBtn) {
+            const tab = new bootstrap.Tab(programTabBtn);
+            tab.show();
+            currentWizardStep = Math.max(0, wizardTabTargets.indexOf('#tab-programs'));
+            updateWizardButtons();
+          }
+          await showMsg({
+            title: 'Program Registration',
+            icon: 'warning',
+            message: programRegistrationIssue,
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+          return;
+        }
+
         syncHiddenAttachments();
         syncClbHiddenField();
         syncNewPersonHiddenState();
+        syncProgramRegistrationSelections();
 
         const submitUrl = (() => {
           const token = document.getElementById('hid_actionStateId')?.value || '';
@@ -1657,12 +2372,21 @@
             fd.append(el.name, el.value ?? '');
           }
           if (ackNameDup) fd.append('acknowledgeNameDuplicate', '1');
+          fd.set('deferProgramRegistrations', '1');
           const files = Array.from(fileInput.files || []);
           files.forEach(f => fd.append('files', f));
           return fd;
         };
 
         let result = null;
+        let progressState = createStudentSaveProgressState(personMode);
+        openStudentSaveProgressModal(progressState);
+        if (personMode === 'new') {
+          updateStudentSaveProgressRow(progressState, 'person', 'running', 'Creating inline person profile...');
+        } else {
+          updateStudentSaveProgressRow(progressState, 'person', 'success', 'Existing person selected.');
+          updateStudentSaveProgressRow(progressState, 'student', 'running', 'Saving student record...');
+        }
         for (let attempt = 0; attempt < 2; attempt += 1) {
           const response = await fetch(submitUrl, {
             method: 'POST',
@@ -1684,6 +2408,7 @@
             && nameDupMatches.length
             && !acknowledgeNameDuplicate
           ) {
+            closeStudentSaveProgressModal();
             const proceed = await confirmNameDuplicateMatches(nameDupMatches);
             if (!proceed) {
               submitBtn.disabled = false;
@@ -1691,7 +2416,15 @@
               return;
             }
             acknowledgeNameDuplicate = true;
+            progressState = createStudentSaveProgressState(personMode);
+            openStudentSaveProgressModal(progressState);
+            updateStudentSaveProgressRow(progressState, 'person', 'running', 'Creating inline person profile...');
             continue;
+          }
+          if (!response.ok) {
+            const error = new Error(result?.message || `Student save failed (Status ${response.status})`);
+            error.payload = result;
+            throw error;
           }
           break;
         }
@@ -1700,62 +2433,60 @@
           ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
           : { stop: false };
         if (guarded.stop) {
+          updateStudentSaveProgressRow(progressState, 'student', 'failed', 'Student save is already in progress. Please wait and try again.');
+          markProgramRowsNotExecutable(progressState, 'Program registrations cannot run until the student save completes.');
+          configureStudentSaveProgressActions(progressState);
           submitBtn.disabled = false;
           submitBtn.innerHTML = originalText;
           return;
         }
 
-        await showMsg({
-          title: result.status === 'success' ? 'Success' : 'Error',
-          icon: result.status === 'success' ? 'success' : 'error',
-          message: result.message || 'Operation completed.',
-          buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
-        });
+        applyServerOperationToProgress(progressState, 'person', result.personOperation, personMode === 'new' ? 'Inline person profile saved.' : 'Existing person selected.');
+        applyServerOperationToProgress(progressState, 'student', result.studentOperation, 'Student record saved.');
+        progressState.studentId = String(result.studentId || result?.studentOperation?.studentId || studentRouteId || '').trim();
+        progressState.studentName = String(result.studentName || result?.autoCreatedAccount?.studentName || '').trim();
 
         if (result.status === 'success') {
-          const autoAcc = result?.autoCreatedAccount || null;
-          if (autoAcc && autoAcc.id) {
-            const studentName = safeHtml(autoAcc.studentName || 'the student');
-            const accountCode = safeHtml(autoAcc.code || '-');
-            const accountName = safeHtml(autoAcc.name || '-');
-            const accountRole = safeHtml(autoAcc.partyRole || 'student');
-            const accountType = safeHtml(autoAcc.type || '-');
-            const accountLevel = safeHtml(autoAcc.level || '-');
-
-            const recheck = await askYesNo({
-              title: 'Student Account Created',
-              message:
-                `The account was saved as follows:<br>` +
-                `<b>Code:</b> ${accountCode}<br>` +
-                `<b>Name:</b> ${accountName}<br>` +
-                `<b>Role:</b> ${accountRole}<br>` +
-                `<b>Type:</b> ${accountType}<br>` +
-                `<b>Level:</b> ${accountLevel}<br><br>` +
-                `Do you want to recheck the account we created for ${studentName}?`,
-              yesText: 'Yes, open account',
-              noText: 'No'
-            });
-
-            if (recheck) {
-              window.location.href = autoAcc.editUrl || `/school/accounts/edit/${encodeURIComponent(String(autoAcc.id))}`;
-              return;
-            }
+          if (result?.autoCreatedAccount?.id) {
+            const accountCode = result.autoCreatedAccount.code || '-';
+            const accountName = result.autoCreatedAccount.name || '-';
+            updateStudentSaveProgressRow(
+              progressState,
+              'student',
+              'success',
+              'Student record and account saved. Account: ' + accountCode + ' - ' + accountName + '.'
+            );
           }
-          window.location.href = '/school/students';
+          const programRows = progressState.rows.filter((row) => row.type === 'program');
+          await runProgramRegistrationProgressRows(progressState, programRows);
+          configureStudentSaveProgressActions(progressState);
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
         } else {
+          updateStudentSaveProgressRow(progressState, 'student', 'failed', result.message || 'Student record could not be saved.');
+          markProgramRowsNotExecutable(progressState, 'Program registrations cannot run because the student was not saved.');
+          configureStudentSaveProgressActions(progressState);
           submitBtn.disabled = false;
           submitBtn.innerHTML = originalText;
         }
       } catch (error) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
-
-        await showMsg({
-          title: 'System Error',
-          icon: 'error',
-          message: error.message || 'An unexpected network error occurred.',
-          buttons: [{ text: 'Close', class: 'btn-secondary' }]
-        });
+        const payload = error?.payload || null;
+        const progressState = activeStudentSaveProgressState || createStudentSaveProgressState(getStudentPersonMode());
+        if (!activeStudentSaveProgressState) openStudentSaveProgressModal(progressState);
+        if (payload?.personOperation) {
+          applyServerOperationToProgress(progressState, 'person', payload.personOperation, payload.message || 'Person profile failed.');
+        } else if (normalizeProgressStatus(getStudentSaveProgressRow(progressState, 'person')?.status) === 'running') {
+          updateStudentSaveProgressRow(progressState, 'person', 'failed', error.message || 'Person profile could not be saved.');
+        }
+        if (payload?.studentOperation) {
+          applyServerOperationToProgress(progressState, 'student', payload.studentOperation, payload.message || 'Student record failed.');
+        } else {
+          updateStudentSaveProgressRow(progressState, 'student', 'failed', error.message || 'Student record could not be saved.');
+        }
+        markProgramRowsNotExecutable(progressState, 'Program registrations cannot run because the required student save failed.');
+        configureStudentSaveProgressActions(progressState);
       }
     });
 

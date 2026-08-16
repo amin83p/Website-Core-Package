@@ -69,6 +69,10 @@
                   <a href="/school/reports/overall-reports/new/<%= encodeURIComponent(row.id) %>" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-2"></i>Create Report</a>
                 <% } %>
                 <a href="/school/reports/overall-templates/edit/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <form method="POST" action="/school/reports/overall-templates/copy/<%= encodeURIComponent(row.id) %>" class="m-0">
+                  <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? (actionStateId || '') : '' %>">
+                  <button type="submit" class="btn btn-outline-primary btn-sm w-100 text-start"><i class="bi bi-files me-2"></i>Copy</button>
+                </form>
                 <a
                   href="/school/reports/overall-templates/delete/<%= encodeURIComponent(row.id) %>"
                   class="btn btn-outline-danger btn-sm js-delete-overall-template"

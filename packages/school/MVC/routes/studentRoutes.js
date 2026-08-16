@@ -97,6 +97,11 @@ router.post('/:id/change-system-id',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.changeStudentSystemId);
 
+router.post('/:id/program-registrations/apply-one',
+  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
+  ctrl.applySingleProgramRegistrationFromStudentForm);
+
 router.get('/new',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE),
