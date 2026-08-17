@@ -156,7 +156,40 @@ test('client SessionCalendarCore mirrors range math and grouping', () => {
     { date: '2026-01-05', start: '10:00', teacherName: 'B' }
   ]);
   assert.equal(grouped['2026-01-05'].length, 2);
-  assert.equal(core.suggestViewModeForPreset('threeMonths'), 'month');
+  assert.equal(core.suggestViewModeForPreset('threeMonths'), 'vertical');
   const shifted = core.shiftViewRange(range, 1);
   assert.equal(shifted.startDate, '2026-01-19');
+});
+
+test('client SessionCalendarCore filters events and builds week blocks', () => {
+  const scriptPath = path.join(__dirname, '../public/scripts/sessionCalendarCore.js');
+  const code = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(code, sandbox);
+  const core = sandbox.window.SessionCalendarCore;
+  const range = core.computeViewRange('week', '2026-01-15');
+  const events = [
+    { date: '2026-01-10', sessionId: 'A' },
+    { date: '2026-01-15', sessionId: 'B' },
+    { date: '2026-01-20', sessionId: 'C' }
+  ];
+  const filtered = core.filterEventsByViewRange(events, range);
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0].sessionId, 'B');
+
+  const twoWeekRange = core.computeViewRange('twoWeeks', '2026-01-15');
+  const weekBlocks = core.buildWeekBlocks(twoWeekRange);
+  assert.equal(weekBlocks.length, 2);
+  assert.equal(weekBlocks[0].days.length, 7);
+  assert.equal(weekBlocks[0].days[0].date, '2026-01-12');
+  assert.equal(weekBlocks[0].days[0].inRange, true);
+  assert.equal(weekBlocks[1].days[6].date, '2026-01-25');
+
+  const monthRange = core.computeViewRange('month', '2026-01-15');
+  const monthWeeks = core.buildWeekBlocks(monthRange);
+  assert.ok(monthWeeks.length >= 4);
+  const partialWeek = monthWeeks[0];
+  assert.equal(partialWeek.days.length, 7);
+  assert.equal(partialWeek.days[0].inRange, false);
+  assert.equal(partialWeek.days[partialWeek.days.length - 1].inRange, true);
 });

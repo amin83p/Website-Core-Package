@@ -204,8 +204,10 @@ function filterEventsByViewRange(events = [], viewRange = {}) {
   });
 }
 
-async function buildEnrollmentSessionPickerPayload({
+function buildEnrollmentSessionPickerPayloadSync({
   classData,
+  persistedSessions = [],
+  statusMap = {},
   studentId = '',
   startDate = '',
   endDate = '',
@@ -215,8 +217,7 @@ async function buildEnrollmentSessionPickerPayload({
   sessions = [],
   sessionsToCreate = [],
   viewPreset = 'week',
-  anchorDate = '',
-  reqUser
+  anchorDate = ''
 } = {}) {
   if (!classData?.id) throw new Error('classData is required.');
 
@@ -232,19 +233,19 @@ async function buildEnrollmentSessionPickerPayload({
     pendingStagedSessions: sessionsToCreate
   });
 
-  let persisted = await schoolDataService.getClassSessions(classData.id, reqUser);
-  persisted = Array.isArray(persisted) ? persisted : [];
-
   const mergedSessions = mergeEnrollmentSessions({
-    persistedSessions: persisted,
+    persistedSessions: Array.isArray(persistedSessions) ? persistedSessions : [],
     sessionsToCreate: stagedSessions,
     clientSessions: sessions
   });
 
-  const statusMap = await sessionStatusPolicyService.getStatusMap(
-    classData?.orgId || reqUser?.activeOrgId || '',
-    { includeInactive: true }
-  );
+  const policyStatusMap = statusMap instanceof Map
+    ? statusMap
+    : (() => {
+      const map = new Map();
+      Object.keys(statusMap || {}).forEach((key) => map.set(key, statusMap[key]));
+      return map;
+    })();
 
   const alignment = rollingEnrollmentSessionAlignmentService.evaluateAlignment({
     sessions: mergedSessions,
@@ -252,7 +253,7 @@ async function buildEnrollmentSessionPickerPayload({
     endDate: enrollmentEnd,
     targetSessionCount: normalizedTargetSessions,
     targetHours: normalizedTargetHours,
-    statusMap
+    statusMap: policyStatusMap
   });
 
   const classifiedById = new Map(
@@ -268,7 +269,7 @@ async function buildEnrollmentSessionPickerPayload({
     const sessionId = String(session?.sessionId || '').trim();
     const classified = classifiedById.get(sessionId) || rollingEnrollmentSessionAlignmentService.classifySessionForWindow(
       session,
-      { startDate: enrollmentStart, endDate: enrollmentEnd, statusMap }
+      { startDate: enrollmentStart, endDate: enrollmentEnd, statusMap: policyStatusMap }
     );
     const date = normalizeDateOnly(classified?.date || session?.date);
     const start = String(classified?.startTime || session?.startTime || '').trim();
@@ -321,10 +322,65 @@ async function buildEnrollmentSessionPickerPayload({
   };
 }
 
+async function buildEnrollmentSessionPickerPayload({
+  classData,
+  studentId = '',
+  startDate = '',
+  endDate = '',
+  targetSessionCount = 0,
+  targetHours = 0,
+  selectedSessionIds = [],
+  sessions = [],
+  sessionsToCreate = [],
+  viewPreset = 'week',
+  anchorDate = '',
+  persistedSessions = null,
+  statusMapOverride = null,
+  reqUser
+} = {}) {
+  if (!classData?.id) throw new Error('classData is required.');
+
+  const stagedSessions = rollingEnrollmentSessionAlignmentService.parsePendingStagedSessions({
+    pendingStagedSessions: sessionsToCreate
+  });
+
+  let persisted = Array.isArray(persistedSessions) ? persistedSessions : null;
+  if (!persisted) {
+    persisted = await schoolDataService.getClassSessions(classData.id, reqUser);
+    persisted = Array.isArray(persisted) ? persisted : [];
+  }
+
+  let resolvedStatusMap = statusMapOverride;
+  if (!resolvedStatusMap || (typeof resolvedStatusMap !== 'object' && !(resolvedStatusMap instanceof Map))) {
+    resolvedStatusMap = await sessionStatusPolicyService.getStatusMap(
+      classData?.orgId || reqUser?.activeOrgId || '',
+      { includeInactive: true }
+    );
+  }
+
+  return buildEnrollmentSessionPickerPayloadSync({
+    classData,
+    persistedSessions: persisted,
+    statusMap: resolvedStatusMap,
+    studentId,
+    startDate,
+    endDate,
+    targetSessionCount,
+    targetHours,
+    selectedSessionIds,
+    sessions,
+    sessionsToCreate: stagedSessions,
+    viewPreset,
+    anchorDate
+  });
+}
+
 module.exports = {
   VIEW_PRESETS,
   computeViewRange,
   summarizeSelection,
+  filterEventsByViewRange,
   buildEnrollmentSessionPickerPayload,
+  buildEnrollmentSessionPickerPayloadSync,
   buildManageSessionUrl
 };

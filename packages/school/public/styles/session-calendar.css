@@ -1,67 +1,428 @@
 /* Session enrollment calendar — shared layout for picker modal and schedule views */
-.session-enrollment-calendar-host {
-  min-height: 280px;
+
+#sessionEnrollmentCalendarModal .modal-dialog.session-enrollment-calendar-dialog {
+  height: calc(100vh - 2rem);
+  max-height: calc(100vh - 2rem);
+  margin: 1rem auto;
 }
 
-.session-vertical-scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.schedule-vertical-days {
+#sessionEnrollmentCalendarModal .modal-content {
+  height: 100%;
   display: flex;
-  gap: 8px;
-  min-height: 420px;
+  flex-direction: column;
+  position: relative;
 }
 
-.vertical-day-column {
-  flex: 0 0 var(--session-day-width, 140px);
+#sessionEnrollmentCalendarModal .modal-body.session-enrollment-calendar-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.session-enrollment-calendar-host {
+  flex: 1 1 auto;
+  min-height: 200px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  --session-cal-day-divider: 2px dashed #9aa8b6;
+}
+
+.session-enrollment-calendar-host .session-cal-vertical-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.session-enrollment-calendar-host .session-cal-horizontal-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.session-cal-week-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.session-cal-week-row {
   border: 1px solid #dee2e6;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
+  overflow: hidden;
 }
 
-.vertical-day-header {
-  padding: 6px 8px;
+.session-cal-week-label,
+.session-cal-week-column-header {
+  padding: 6px 12px;
   font-size: 0.75rem;
+  font-weight: 600;
+  background: linear-gradient(180deg, #f8f9fa 0%, #eef1f4 100%);
+  border-bottom: 1px solid #dee2e6;
+  color: #495057;
+}
+
+.session-cal-week-grid-vertical {
+  display: flex;
+  flex-direction: column;
+}
+
+.session-cal-day-header-row,
+.session-cal-week-body-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.session-cal-time-gutter-spacer,
+.session-cal-day-label-spacer {
+  flex: 0 0 var(--session-time-gutter-width, 64px);
+  min-width: var(--session-time-gutter-width, 64px);
+}
+
+.session-cal-day-header-row .session-cal-day-header {
+  flex: 0 0 var(--session-day-width, 140px);
+  min-width: var(--session-day-width, 140px);
+  padding: 6px 8px;
+  font-size: 0.72rem;
   font-weight: 600;
   background: #f8f9fa;
   border-bottom: 1px solid #dee2e6;
+  border-right: var(--session-cal-day-divider);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 4px;
 }
 
-.vertical-day-header.conflict {
-  background: #f8d7da;
+.session-cal-day-header.is-out-of-range {
+  opacity: 0.45;
+  background: #fafafa;
 }
 
-.vertical-day-body {
+.session-cal-time-gutter {
+  flex: 0 0 var(--session-time-gutter-width, 64px);
+  min-width: var(--session-time-gutter-width, 64px);
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: linear-gradient(180deg, #f4f6f8 0%, #eef1f4 100%);
+  border-right: 1px solid #ced4da;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.04);
+}
+
+.session-cal-hour-slot {
+  height: var(--session-hour-height, 28px);
   position: relative;
-  height: 360px;
+  border-top: 1px solid #d8dde3;
 }
 
-.vertical-hour-markers {
+.session-cal-hour-slot:first-child {
+  border-top-color: #adb5bd;
+}
+
+.session-cal-hour-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #343a40;
+  position: absolute;
+  top: 0;
+  right: 8px;
+  transform: translateY(-50%);
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  padding: 1px 5px;
+  background: #f4f6f8;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+}
+
+.session-cal-time-header .session-cal-hour-label {
+  top: 4px;
+  transform: none;
+  right: auto;
+  left: 4px;
+  font-size: 0.62rem;
+}
+
+.session-cal-days-row {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-week-grid-vertical {
+  width: 100%;
+}
+
+.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-day-header-row,
+.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-week-body-row {
+  width: 100%;
+}
+
+.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-day-header-row .session-cal-day-header,
+.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-day-cell {
+  flex: 1 1 0;
+  min-width: 72px;
+  width: auto;
+  max-width: none;
+}
+
+.session-cal-day-cell {
+  flex: 0 0 var(--session-day-width, 140px);
+  min-width: var(--session-day-width, 140px);
+  border-right: var(--session-cal-day-divider, 2px dashed #9aa8b6);
+  background: #fff;
+}
+
+.session-cal-day-cell.is-out-of-range {
+  background: #fafafa;
+  opacity: 0.55;
+}
+
+.session-cal-day-header.is-weekend:not(.is-out-of-range),
+.session-cal-day-cell.is-weekend:not(.is-out-of-range) {
+  background-color: #e8f4fc;
+}
+
+.session-cal-day-header.is-holiday:not(.is-out-of-range),
+.session-cal-day-cell.is-holiday:not(.is-out-of-range) {
+  background-color: #fdeaea;
+}
+
+.session-cal-day-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.session-cal-day-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  border-radius: 999px;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-cal-day-badge-scheduled {
+  color: #084298;
+  background: #cfe2ff;
+  border-color: #9ec5fe;
+}
+
+.session-cal-day-badge-staged {
+  color: #984c0c;
+  background: #ffe5d0;
+  border-color: #fd9843;
+}
+
+.session-cal-day-grid {
+  position: relative;
+  height: calc(var(--session-hour-height, 28px) * 15);
+  min-height: calc(var(--session-hour-height, 28px) * 15);
+}
+
+.session-cal-week-body-row.session-cal-time-track {
+  position: relative;
+}
+
+.session-cal-hover-line {
   position: absolute;
   left: 0;
+  right: 0;
+  height: 2px;
+  background: #198754;
+  box-shadow: 0 0 0 1px rgba(25, 135, 84, 0.35);
+  pointer-events: none;
+  z-index: 11;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+}
+
+.session-cal-hover-time-label {
+  position: absolute;
+  left: 6px;
+  width: calc(var(--session-time-gutter-width, 64px) - 12px);
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: #198754;
+  border-radius: 4px;
+  padding: 2px 4px;
+  line-height: 1.2;
+  pointer-events: none;
+  z-index: 12;
+  opacity: 0;
+  transform: translateY(-50%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.08s ease;
+}
+
+.session-cal-time-track.is-time-hover .session-cal-hover-line,
+.session-cal-time-track.is-time-hover .session-cal-hover-time-label {
+  opacity: 1;
+}
+
+.session-cal-day-cell .session-cal-day-grid {
+  cursor: crosshair;
+}
+
+.session-cal-hour-grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.session-cal-hour-grid-line {
+  flex: 1 1 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.session-cal-positioned-session {
+  position: absolute;
+  z-index: 2;
+}
+
+.session-cal-positioned-session .session-enrollment-block {
+  height: 100%;
+  min-height: 20px;
+}
+
+/* Timeline weeks stacked as rows (not side-by-side columns) */
+.session-cal-week-stack-timeline .session-cal-week-row-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.session-cal-timeline-header-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid #dee2e6;
+  background: #f8f9fa;
+}
+
+.session-cal-time-header-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.session-cal-time-header {
+  display: flex;
+  position: sticky;
   top: 0;
-  bottom: 0;
-  width: 24px;
+  z-index: 3;
+  background: #f8f9fa;
+  width: 100%;
+}
+
+.session-cal-hour-header-slot {
+  flex: 1 1 0;
+  min-width: 0;
   border-right: 1px solid #eee;
 }
 
-.vertical-hour-marker {
-  height: calc(100% / 15);
+.session-cal-timeline-day-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: var(--session-cal-day-divider, 2px dashed #9aa8b6);
+}
+
+.session-cal-timeline-hover-shell {
   position: relative;
 }
 
-.vertical-hour-label {
-  font-size: 0.6rem;
-  color: #6c757d;
+.session-cal-hover-line-vertical {
   position: absolute;
   top: 0;
-  right: 2px;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #198754;
+  box-shadow: 0 0 0 1px rgba(25, 135, 84, 0.35);
+  pointer-events: none;
+  z-index: 11;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+}
+
+.session-cal-hover-time-label-horizontal {
+  position: absolute;
+  top: 6px;
+  transform: translate(-50%, 0);
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: #198754;
+  border-radius: 4px;
+  padding: 2px 6px;
+  line-height: 1.2;
+  pointer-events: none;
+  z-index: 12;
+  opacity: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.08s ease;
+  white-space: nowrap;
+}
+
+.session-cal-timeline-time-track.is-time-hover .session-cal-hover-line-vertical,
+.session-cal-timeline-time-track.is-time-hover .session-cal-hover-time-label-horizontal {
+  opacity: 1;
+}
+
+.session-cal-timeline-day-row.is-out-of-range {
+  opacity: 0.55;
+  background: #fafafa;
+}
+
+.session-cal-timeline-day-row.is-weekend:not(.is-out-of-range) .session-cal-day-row-label,
+.session-cal-timeline-day-row.is-weekend:not(.is-out-of-range) .session-cal-timeline-track {
+  background-color: #e8f4fc;
+}
+
+.session-cal-timeline-day-row.is-holiday:not(.is-out-of-range) .session-cal-day-row-label,
+.session-cal-timeline-day-row.is-holiday:not(.is-out-of-range) .session-cal-timeline-track {
+  background-color: #fdeaea;
+}
+
+.session-cal-day-row-label {
+  flex: 0 0 var(--session-time-gutter-width, 64px);
+  min-width: var(--session-time-gutter-width, 64px);
+  padding: 8px 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #495057;
+  border-right: var(--session-cal-day-divider, 2px dashed #9aa8b6);
+  background: #fff;
+  line-height: 1.2;
+}
+
+.session-cal-timeline-track {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: #fff;
+  cursor: crosshair;
+}
+
+.session-cal-positioned-horizontal .session-enrollment-block {
+  height: 52px;
 }
 
 .session-enrollment-block {
@@ -78,14 +439,66 @@
   user-select: none;
 }
 
+.session-enrollment-block.is-scheduled {
+  border-color: #0d6efd;
+  background: rgba(13, 110, 253, 0.16);
+}
+
 .session-enrollment-block.is-staged {
+  border-color: #fd7e14;
   border-style: dashed;
+  background: rgba(253, 126, 20, 0.14);
+}
+
+.session-enrollment-block .session-block-status {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin-bottom: 1px;
+}
+
+.session-enrollment-block.is-scheduled .session-block-status {
+  color: #084298;
+}
+
+.session-enrollment-block.is-staged .session-block-status {
+  color: #984c0c;
+}
+
+.session-block-status.session-block-status-inline {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.session-day-card.is-scheduled .session-block-status-inline {
+  color: #084298;
+  background: #cfe2ff;
+  border: 1px solid #9ec5fe;
+}
+
+.session-day-card.is-staged .session-block-status-inline {
+  color: #984c0c;
+  background: #ffe5d0;
+  border: 1px solid #fd9843;
 }
 
 .session-enrollment-block.is-selected {
   border-color: #198754;
   background: rgba(25, 135, 84, 0.18);
   box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.25);
+  border-style: solid;
+}
+
+.session-enrollment-block.is-selected.is-staged {
+  border-style: dashed;
 }
 
 .session-enrollment-block.is-unselectable {
@@ -121,6 +534,7 @@
   color: #0a58ca;
 }
 
+/* Legacy timeline container (person schedule views) */
 .timeline-container {
   border: 1px solid #dee2e6;
   border-radius: 6px;
@@ -212,6 +626,17 @@
   background: rgba(25, 135, 84, 0.08);
 }
 
+.single-day-list .session-day-card.is-scheduled {
+  border-color: #0d6efd;
+  background: rgba(13, 110, 253, 0.06);
+}
+
+.single-day-list .session-day-card.is-staged {
+  border-color: #fd7e14;
+  border-style: dashed;
+  background: rgba(253, 126, 20, 0.08);
+}
+
 .single-day-list .session-day-card.is-unselectable {
   opacity: 0.55;
   cursor: not-allowed;
@@ -220,12 +645,12 @@
 .session-cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 4px;
 }
 
 .session-cal-day {
   aspect-ratio: 1;
-  border: 1px solid #eee;
+  border: var(--session-cal-day-divider, 2px dashed #9aa8b6);
   border-radius: 4px;
   font-size: 0.75rem;
   text-align: center;
@@ -236,6 +661,45 @@
 
 .session-cal-day.empty {
   background: #fafafa;
+}
+
+.session-cal-day.is-outside-month {
+  background: #e9ecef;
+  color: #6c757d;
+  border-color: #ced4da;
+  opacity: 1;
+}
+
+.session-cal-day.is-outside-month.has-events {
+  background: #dee2e6;
+  border-color: #adb5bd;
+  color: #495057;
+}
+
+.session-cal-day.is-outside-month .session-cal-badge {
+  background: #6c757d;
+}
+
+.session-cal-day-header.is-outside-month,
+.session-cal-day-cell.is-outside-month,
+.session-cal-timeline-day-row.is-outside-month {
+  background: #e9ecef !important;
+  color: #6c757d !important;
+  opacity: 1 !important;
+}
+
+.session-cal-day-header.is-outside-month.is-weekend,
+.session-cal-day-cell.is-outside-month.is-weekend,
+.session-cal-timeline-day-row.is-outside-month.is-weekend {
+  background: #dfe3e7 !important;
+}
+
+.session-cal-day.is-weekend {
+  background-color: #e8f4fc;
+}
+
+.session-cal-day.is-holiday {
+  background-color: #fdeaea;
 }
 
 .session-cal-day.has-events {
@@ -265,4 +729,84 @@
 
 #sessionEnrollmentCalendarSummary {
   font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+#sessionEnrollmentDayWidth {
+  width: 120px;
+}
+
+.session-cal-day-grid,
+.session-cal-timeline-track {
+  cursor: crosshair;
+}
+
+#sessionEnrollmentStageModal.show {
+  z-index: 30;
+}
+
+#sessionEnrollmentCalendarModal .modal-dialog {
+  position: relative;
+}
+
+.session-enrollment-calendar-dialog.session-cal-stage-open > .modal-content {
+  pointer-events: none;
+}
+
+.session-enrollment-stage-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  pointer-events: auto;
+}
+
+.session-enrollment-stage-overlay.d-none {
+  display: none !important;
+}
+
+.session-enrollment-stage-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.session-enrollment-stage-panel {
+  position: relative;
+  z-index: 2;
+  max-width: 520px;
+  width: 100%;
+  max-height: calc(100% - 2rem);
+  overflow: auto;
+  pointer-events: auto;
+}
+
+.session-stage-label {
+  font-weight: 600;
+}
+
+.session-stage-chip {
+  min-height: 2.25rem;
+  min-width: 2.75rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+.session-stage-chip.active {
+  font-weight: 600;
+}
+
+.session-stage-count-display {
+  min-width: 2.5rem;
+  text-align: center;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.session-stage-stepper .btn {
+  min-width: 2.25rem;
 }

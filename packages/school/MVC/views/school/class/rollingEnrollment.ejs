@@ -56,11 +56,89 @@
   .rolling-enrollment-page tr.gap-session-row-staged > td {
     background-color: var(--bs-warning-bg-subtle, #fff3cd);
   }
+  .rolling-enrollment-page tr.na-session-row-selected > td,
+  .rolling-enrollment-page tr.enrollment-session-row-selected > td {
+    background-color: var(--bs-success-bg-subtle, #d1e7dd);
+  }
   .rolling-enrollment-page tr.conflict-session-row > td {
     background-color: var(--bs-danger-bg-subtle, #f8d7da);
   }
   #addEnrollmentPeriodModal .enroll-wizard-guide {
     margin-bottom: 1rem;
+  }
+  #addEnrollmentPeriodModal .enroll-cap-inputs-row .form-control {
+    min-height: calc(1.5em + 0.5rem + 2px);
+  }
+  #addEnrollmentPeriodModal .enroll-cap-hints-row .form-text {
+    line-height: 1.35;
+  }
+  #addEnrollmentPeriodModal .gap-step-notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    cursor: help;
+    max-width: 100%;
+  }
+  #addEnrollmentPeriodModal .gap-step-notice i {
+    font-size: 0.95rem;
+    flex-shrink: 0;
+  }
+  #addEnrollmentPeriodModal .gap-step-notice-title {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  #addEnrollmentPeriodModal .gap-step-notice-warning {
+    background: var(--bs-warning-bg-subtle, #fff3cd);
+    border-color: var(--bs-warning-border-subtle, #ffe69c);
+    color: #664d03;
+  }
+  #addEnrollmentPeriodModal .gap-step-notice-info {
+    background: var(--bs-info-bg-subtle, #cff4fc);
+    border-color: var(--bs-info-border-subtle, #9eeaf9);
+    color: #055160;
+  }
+  #addEnrollmentPeriodModal .gap-step-notice-primary {
+    background: var(--bs-primary-bg-subtle, #cfe2ff);
+    border-color: var(--bs-primary-border-subtle, #9ec5fe);
+    color: #052c65;
+  }
+  #addEnrollmentPeriodModal .gap-calendar-picker-btn {
+    font-weight: 600;
+    padding: 0.45rem 0.9rem;
+    box-shadow: 0 0.125rem 0.35rem rgba(13, 110, 253, 0.28);
+  }
+  #addEnrollmentPeriodModal .gap-calendar-picker-btn i {
+    font-size: 1.05rem;
+  }
+  #addEnrollmentPeriodModal .enroll-step-panel-toggle {
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 0.65rem 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: inherit;
+  }
+  #addEnrollmentPeriodModal .enroll-step-panel-toggle:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+  #addEnrollmentPeriodModal .enroll-step-panel-toggle .collapse-chevron {
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+  }
+  #addEnrollmentPeriodModal .enroll-step-panel-toggle[aria-expanded="true"] .collapse-chevron {
+    transform: rotate(180deg);
+  }
+  #addEnrollmentPeriodModal .enroll-step-panel-body {
+    padding: 0 0.85rem 0.85rem;
   }
   #addEnrollmentPeriodModal .wizard-step-rail {
     display: flex;
@@ -332,27 +410,37 @@
               The student must already be registered in a program that appears under this class’s allowed programs (and in the required term, if the class specifies one). Prerequisites are checked before enrollment is saved.
             </div>
           </div>
-          <div class="row g-2">
-            <div class="col-md-4">
+          <div class="row g-2 enroll-cap-inputs-row">
+            <div class="col-lg-3 col-md-6">
               <label class="form-label">Start Date *</label>
               <input type="date" id="inp_startDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
             </div>
-            <div class="col-md-4">
-              <label class="form-label" id="lbl_endDate">End Date<span id="lbl_endDateTargetNote" class="text-muted fw-normal"></span></label>
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" id="lbl_endDate">End Date</label>
               <input type="date" id="inp_endDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %>>
             </div>
-            <div class="col-md-3" id="wrap_inp_targetSessionCount">
+            <div class="col-lg-3 col-md-6" id="wrap_inp_targetSessionCount">
               <label class="form-label">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
               <input type="number" id="inp_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
-              <div class="form-text compact-help">Count sessions until target is reached. Cannot be combined with hour target.</div>
             </div>
-            <div class="col-md-3" id="wrap_inp_targetHours">
+            <div class="col-lg-3 col-md-6" id="wrap_inp_targetHours">
               <label class="form-label">Number of Hours <span class="text-muted fw-normal">(optional)</span></label>
               <input type="number" id="inp_targetHours" class="form-control" min="0.25" step="0.25" placeholder="e.g. 20">
-              <div class="form-text compact-help">Allocate sessions by total hours. Cannot be combined with session target.</div>
             </div>
           </div>
-          <div class="row g-2 mt-1">
+          <div class="row g-1 mt-1 enroll-cap-hints-row">
+            <div class="col-lg-3 col-md-6 d-none d-lg-block"></div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0" id="hint_endDateEnrollment">Used with start date when no session or hour target is set.</div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0">Count sessions until target is reached. Cannot be combined with hour target.</div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0">Allocate sessions by total hours. Cannot be combined with session target.</div>
+            </div>
+          </div>
+          <div class="row g-1 mt-1">
             <div class="col-12">
               <div class="d-flex flex-wrap align-items-center gap-2">
                 <div class="form-text compact-help mb-0" id="hint_sessionAlignment">Leave end date and both targets blank to enroll by date window only.</div>
@@ -411,37 +499,63 @@
         </div>
 
         <div id="enrollWizardStepAddSessions" class="d-none">
-          <div class="alert alert-warning border small" id="gapSummaryText">Session alignment issue.</div>
-          <div class="alert alert-info border small mb-3">
-            <b>Class-wide impact:</b> Sessions staged here are <b>not saved</b> until enrollment completes successfully. They will count toward every enrolled student whose end date covers those session dates once saved.
-          </div>
-          <div class="alert alert-primary border small mb-3 d-none" id="gapStagedBadge"></div>
-          <div class="alert alert-warning border small mb-3 d-none" id="gapCycleExtendWarning"></div>
-          <div class="alert alert-info border small mb-3 d-none" id="gapMarkNaShortcut">
-            Scheduled hours exceed the target. Use <strong>Next</strong> to mark sessions N/A, or
-            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="btn_gapGoMarkNa">open Mark N/A now</button>
-            to choose which sessions count toward enrollment.
-          </div>
-          <div class="mb-3">
-            <div class="fw-semibold mb-2">Sessions currently in enrollment window</div>
-            <div class="table-responsive border rounded">
-              <table class="table table-sm align-middle mb-0">
-                <thead class="table-light">
-                  <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
-                </thead>
-                <tbody id="gapSessionsTbody">
-                  <tr><td colspan="5" class="text-center text-muted py-3">No sessions loaded.</td></tr>
-                </tbody>
-                <tfoot id="gapSessionsTfoot" class="table-light">
-                  <tr>
-                    <td colspan="5" class="small py-2 text-secondary" id="gapSessionsTotals">Staged: 0 session(s), 0 Hrs · Total: 0 session(s), 0 Hrs</td>
-                  </tr>
-                </tfoot>
-              </table>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-3" id="gapSessionsNoticesHost">
+            <div class="gap-step-notice gap-step-notice-warning d-none" id="gapSummaryNotice" data-gap-notice="1" role="button" tabindex="0" aria-label="Session alignment details">
+              <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+              <span class="gap-step-notice-title" id="gapSummaryTitle">Session alignment</span>
+            </div>
+            <div class="gap-step-notice gap-step-notice-info" id="gapClassImpactNotice" data-gap-notice="1" role="button" tabindex="0" aria-label="Class-wide impact details"
+              data-bs-title="Sessions staged here are not saved until enrollment completes successfully. They will count toward every enrolled student whose end date covers those session dates once saved.">
+              <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
+              <span class="gap-step-notice-title">Class-wide impact</span>
+            </div>
+            <div class="gap-step-notice gap-step-notice-primary d-none" id="gapStagedBadge" data-gap-notice="1" role="button" tabindex="0" aria-label="Staged sessions details">
+              <i class="bi bi-calendar-plus" aria-hidden="true"></i>
+              <span class="gap-step-notice-title" id="gapStagedBadgeTitle">Staged sessions</span>
+            </div>
+            <div class="gap-step-notice gap-step-notice-warning d-none" id="gapCycleExtendWarning" data-gap-notice="1" role="button" tabindex="0" aria-label="Cycle extension details">
+              <i class="bi bi-calendar-event" aria-hidden="true"></i>
+              <span class="gap-step-notice-title">Cycle end will change</span>
             </div>
           </div>
-          <div class="border rounded p-3 bg-light-subtle" id="gapBatchPanel">
-            <div class="fw-semibold mb-2">Quick batch add</div>
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <button type="button" class="btn btn-primary btn-sm gap-calendar-picker-btn" id="btn_gapOpenCalendarPicker">
+              <i class="bi bi-calendar3-week me-2" aria-hidden="true"></i>Open calendar picker
+            </button>
+            <div class="small text-muted fw-semibold" id="gapEnrollmentPickCounter">Included 0 for enrollment</div>
+          </div>
+          <div class="border rounded mb-3 enroll-step-panel">
+            <button type="button" class="enroll-step-panel-toggle" id="btn_gapSessionsCollapseToggle" data-bs-toggle="collapse" data-bs-target="#gapSessionsWindowCollapse" aria-expanded="false" aria-controls="gapSessionsWindowCollapse">
+              <span class="d-flex flex-column align-items-start gap-1">
+                <span class="fw-semibold">Sessions currently in enrollment window</span>
+                <span class="small text-muted" id="gapSessionsCollapseMeta">0 session(s)</span>
+              </span>
+              <i class="bi bi-chevron-down collapse-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="collapse enroll-step-panel-body" id="gapSessionsWindowCollapse">
+              <div class="table-responsive border rounded">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
+                  </thead>
+                  <tbody id="gapSessionsTbody">
+                    <tr><td colspan="5" class="text-center text-muted py-3">No sessions loaded.</td></tr>
+                  </tbody>
+                  <tfoot id="gapSessionsTfoot" class="table-light">
+                    <tr>
+                      <td colspan="5" class="small py-2 text-secondary" id="gapSessionsTotals">Staged: 0 session(s), 0 Hrs · Total: 0 session(s), 0 Hrs</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="border rounded enroll-step-panel bg-light-subtle" id="gapBatchPanel">
+            <button type="button" class="enroll-step-panel-toggle" id="btn_gapBatchCollapseToggle" data-bs-toggle="collapse" data-bs-target="#gapBatchCollapse" aria-expanded="false" aria-controls="gapBatchCollapse">
+              <span class="fw-semibold">Quick batch add</span>
+              <i class="bi bi-chevron-down collapse-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="collapse enroll-step-panel-body" id="gapBatchCollapse">
             <div class="row g-2">
               <div class="col-md-3"><label class="form-label small">Start</label><input type="date" id="gap_batchStart" class="form-control form-control-sm"></div>
               <div class="col-md-3"><label class="form-label small">End</label><input type="date" id="gap_batchEnd" class="form-control form-control-sm"></div>
@@ -482,6 +596,7 @@
               <button type="button" class="btn btn-outline-danger btn-sm d-none" id="btn_gapClearStaged"><i class="bi bi-x-circle me-1"></i>Clear Staged</button>
               <a class="btn btn-outline-secondary btn-sm" id="gap_classFormLink" href="/school/classes/edit/<%= encodeURIComponent(c.id || '') %>" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>Open Class Session Builder</a>
             </div>
+            </div>
           </div>
         </div>
 
@@ -494,11 +609,16 @@
           <div class="table-responsive border rounded">
             <table class="table table-sm align-middle mb-0">
               <thead class="table-light">
-                <tr><th style="width:3rem;">N/A</th><th>Date</th><th>Time</th><th class="text-end">Hrs</th><th>Status</th></tr>
+                <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
               </thead>
               <tbody id="naSessionsTbody">
                 <tr><td colspan="5" class="text-center text-muted py-3">No sessions loaded.</td></tr>
               </tbody>
+              <tfoot class="table-light">
+                <tr>
+                  <td colspan="5" class="small py-2 text-secondary" id="naSessionsTotals">Marked N/A: 0 session(s), 0 Hrs</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -981,6 +1101,7 @@
 <link rel="stylesheet" href="/styles/session-calendar.css">
 <script src="/scripts/sessionCalendarCore.js"></script>
 <script src="/scripts/sessionEnrollmentCalendarModal.js"></script>
+<script src="/scripts/rollingEnrollmentAlignmentClient.js"></script>
 <script src="/scripts/wizardStepRail.js"></script>
 <div class="modal fade" id="studentConflictModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1022,6 +1143,12 @@
     return (window.AppOrgDateTime && window.AppOrgDateTime.today) ? String(window.AppOrgDateTime.today) : '';
   }
   const classId = <%- JSON.stringify(String(c.id || '')) %>;
+  const rollingClassData = <%- JSON.stringify({
+    id: String(c.id || ''),
+    orgId: String(c.orgId || ''),
+    room: String(c.room || ''),
+    instructors: classInstructors
+  }) %>;
   const actionStateId = <%- JSON.stringify(String(asid || '')) %>;
   const cycleWindow = {
     startDate: <%- JSON.stringify(cycleStartDate) %>,
@@ -1112,8 +1239,10 @@
   let programShortcutPreview = null;
   let draftReviewMode = 'create';
   let lastRollingEligibility = null;
+  let rollingEnrollmentWorkspace = null;
   let lastAlignmentResult = null;
   let pendingPlannedNaSessionIds = [];
+  let pendingIncludedSessionIds = [];
   let pendingGapBatch = null;
   let pendingGapPreview = null;
   let pendingStagedSessions = [];
@@ -1265,12 +1394,109 @@
 
   function applyEnrollmentCapUi() {
     const capSet = hasEnrollmentCap();
-    const note = qs('lbl_endDateTargetNote');
-    if (note) note.textContent = capSet ? ' (ignored when a session or hour target is set)' : '';
+    const hintEnd = qs('hint_endDateEnrollment');
+    if (hintEnd) {
+      hintEnd.textContent = capSet
+        ? 'Ignored when a session or hour target is set.'
+        : 'Used with start date when no session or hour target is set.';
+    }
   }
 
   function applyTargetSessionCountUi() {
     applyEnrollmentCapUi();
+  }
+
+  function destroyGapStepTooltip(el) {
+    if (!el || !window.bootstrap?.Tooltip) return;
+    const inst = bootstrap.Tooltip.getInstance(el);
+    if (inst) inst.dispose();
+  }
+
+  function setGapStepNotice(el, { title = '', detail = '', visible = true, tone = 'info' } = {}) {
+    if (!el) return;
+    const titleEl = el.querySelector('.gap-step-notice-title');
+    const tipText = String(detail || title || '').trim();
+    const show = visible && tipText;
+    el.classList.toggle('d-none', !show);
+    if (!show) {
+      destroyGapStepTooltip(el);
+      return;
+    }
+    el.classList.remove('gap-step-notice-warning', 'gap-step-notice-info', 'gap-step-notice-primary');
+    el.classList.add(`gap-step-notice-${tone}`);
+    if (titleEl && title) titleEl.textContent = String(title).trim();
+    el.setAttribute('data-bs-title', tipText);
+    destroyGapStepTooltip(el);
+    if (window.bootstrap?.Tooltip) {
+      new bootstrap.Tooltip(el, { trigger: 'hover focus', placement: 'top', container: 'body' });
+    }
+  }
+
+  function initGapStepTooltips() {
+    document.querySelectorAll('#enrollWizardStepAddSessions [data-gap-notice]').forEach((el) => {
+      if (el.classList.contains('d-none')) {
+        destroyGapStepTooltip(el);
+        return;
+      }
+      const tipText = String(el.getAttribute('data-bs-title') || '').trim();
+      if (!tipText) {
+        destroyGapStepTooltip(el);
+        return;
+      }
+      destroyGapStepTooltip(el);
+      if (window.bootstrap?.Tooltip) {
+        new bootstrap.Tooltip(el, { trigger: 'hover focus', placement: 'top', container: 'body' });
+      }
+    });
+  }
+
+  function getGapSummaryTitle(alignment = lastAlignmentResult, status = '') {
+    const hourMode = hasTargetHours() || Number(alignment?.effectiveTargetHours || 0) > 0;
+    const normalized = String(status || alignment?.alignmentStatus || '').trim();
+    if (normalized === 'overage_requires_na') {
+      return hourMode ? 'Hours over target' : 'Sessions over target';
+    }
+    if (normalized === 'insufficient_hours') return 'Hours below target';
+    if (normalized === 'insufficient_sessions') return 'Sessions below target';
+    return hourMode ? 'Hour target alignment' : 'Session target alignment';
+  }
+
+  function buildGapSummaryDetail(alignment = lastAlignmentResult) {
+    const hourMode = hasTargetHours() || Number(alignment?.effectiveTargetHours || 0) > 0;
+    const status = String(alignment?.alignmentStatus || '').trim();
+    if (hourMode) {
+      const needHours = Number(alignment?.effectiveTargetHours || alignment?.targetHours || normalizeTargetHoursValue(qs('inp_targetHours')?.value));
+      const availableHours = Number(alignment?.availableHours || 0);
+      const gapHours = Number(alignment?.gapHours || Math.max(0, needHours - availableHours));
+      if (status === 'overage_requires_na') {
+        const excessHours = Number(alignment?.requiredNaHours || Math.max(0, availableHours - needHours));
+        return `Need ${needHours} hour(s) from the start date, but ${availableHours} hour(s) are scheduled (${excessHours} hr over). Use Include in Actions to pick sessions for this enrollment, or stage sessions if needed.`;
+      }
+      if (status === 'insufficient_hours') {
+        return `Need ${needHours} hour(s) from the start date, but only ${availableHours} hour(s) are scheduled (${gapHours} hr gap). Use Include in Actions and/or stage sessions below.`;
+      }
+      return `Target is ${needHours} hour(s) from the start date (${availableHours} hour(s) currently scheduled). Add or remove sessions below as needed.`;
+    }
+    const need = Number(alignment?.effectiveTarget || alignment?.targetSessionCount || 0);
+    const available = Number(alignment?.availableCount || 0);
+    const gap = Number(alignment?.gapCount || Math.max(0, need - available));
+    if (status === 'overage_requires_na') {
+      const excess = Number(alignment?.requiredNaCount || Math.max(0, available - need));
+      return `Need ${need || 'at least 1'} countable session(s) between ${alignment?.startDate || ''} and ${alignment?.endDate || ''}, but ${available} exist (${excess} over). Use Include in Actions to pick sessions for this enrollment, or stage sessions if needed.`;
+    }
+    if (status === 'insufficient_sessions') {
+      return `Need ${need || 'at least 1'} countable session(s) between ${alignment?.startDate || ''} and ${alignment?.endDate || ''}, but only ${available} exist. Use Include in Actions and/or stage sessions below.`;
+    }
+    return `Target is ${need || 'at least 1'} countable session(s) in the enrollment window (${available} currently scheduled). Add or remove sessions below as needed.`;
+  }
+
+  function updateGapSessionsCollapseMeta() {
+    const meta = qs('gapSessionsCollapseMeta');
+    if (!meta) return;
+    const rows = buildGapModalSessionRows();
+    const staged = Number(pendingStagedSessions.length || 0);
+    const total = rows.length;
+    meta.textContent = `${total} session(s)${staged ? ` · ${staged} staged` : ''}`;
   }
 
   function updateGapCycleExtendWarning() {
@@ -1279,17 +1505,24 @@
     const batchEnd = String(qs('gap_batchEnd')?.value || '').trim();
     const cycleEnd = String(cycleWindow?.endDate || '').trim();
     if (batchEnd && cycleEnd && batchEnd > cycleEnd) {
-      warning.classList.remove('d-none');
-      warning.innerHTML = `<b>Cycle end date will be extended</b> from <b>${htmlEscape(cycleEnd)}</b> to <b>${htmlEscape(batchEnd)}</b> when enrollment completes successfully.`;
+      setGapStepNotice(warning, {
+        title: 'Cycle end will change',
+        detail: `Cycle end date will be extended from ${cycleEnd} to ${batchEnd} when enrollment completes successfully.`,
+        visible: true,
+        tone: 'warning'
+      });
       return;
     }
     if (batchEnd && !cycleEnd) {
-      warning.classList.remove('d-none');
-      warning.innerHTML = `<b>Cycle end date will be set</b> to <b>${htmlEscape(batchEnd)}</b> when enrollment completes successfully.`;
+      setGapStepNotice(warning, {
+        title: 'Cycle end will be set',
+        detail: `Cycle end date will be set to ${batchEnd} when enrollment completes successfully.`,
+        visible: true,
+        tone: 'warning'
+      });
       return;
     }
-    warning.classList.add('d-none');
-    warning.innerHTML = '';
+    setGapStepNotice(warning, { visible: false });
   }
 
   function validateCycleEnrollmentDates(startDate) {
@@ -1360,7 +1593,7 @@
       return;
     }
     setEnrollmentDateValidationState(null);
-    refreshRollingEligibility();
+    refreshRollingEligibilityOnDateChange(changedInput?.id || '');
     scheduleAlignmentRefresh();
   }
 
@@ -2032,14 +2265,237 @@
     }
   }
 
+  function mergeRollingPrerequisiteSlice(baseEligibility = {}, prereqPayload = {}) {
+    const base = baseEligibility && typeof baseEligibility === 'object' ? { ...baseEligibility } : {};
+    const prereq = prereqPayload?.prerequisite || {};
+    const conflictIssues = (base.prerequisite?.issues || []).filter(isStudentConflictMessage);
+    const merged = {
+      ...base,
+      eligible: prereqPayload.eligible === true && !conflictIssues.length,
+      message: prereqPayload.message || base.message || '',
+      resolved: prereqPayload.resolved || base.resolved || null,
+      prerequisite: {
+        ...(prereqPayload.prerequisite || {}),
+        issues: [...(prereq.issues || []), ...conflictIssues],
+        conflicts: base.prerequisite?.conflicts || null,
+        conflictStudentPersonId: base.prerequisite?.conflictStudentPersonId || null,
+        conflictStudentLabel: base.prerequisite?.conflictStudentLabel || null
+      }
+    };
+    if (conflictIssues.length) merged.eligible = false;
+    return merged;
+  }
+
+  function mergeRollingConflictSlice(baseEligibility = {}, conflictSlice = {}) {
+    const base = baseEligibility && typeof baseEligibility === 'object' ? { ...baseEligibility } : {};
+    const prereq = { ...(base.prerequisite || {}) };
+    const otherIssues = (prereq.issues || []).filter((msg) => !isStudentConflictMessage(msg));
+    if (conflictSlice?.hasConflicts) {
+      prereq.issues = [
+        ...otherIssues,
+        conflictSlice.message || 'Scheduling conflicts detected with the student\'s existing schedule.'
+      ];
+      prereq.status = 'error';
+      prereq.conflicts = conflictSlice.conflicts || null;
+      prereq.conflictStudentPersonId = conflictSlice.conflictStudentPersonId || null;
+      prereq.conflictStudentLabel = conflictSlice.conflictStudentLabel || null;
+      return {
+        ...base,
+        eligible: false,
+        prerequisite: prereq
+      };
+    }
+    prereq.issues = otherIssues;
+    prereq.conflicts = null;
+    prereq.conflictStudentPersonId = null;
+    prereq.conflictStudentLabel = null;
+    const missingSubjects = Array.isArray(prereq.missingSubjects) ? prereq.missingSubjects : [];
+    const prereqBlocked = prereq.status === 'error'
+      || (prereq.issues || []).length > 0
+      || missingSubjects.length > 0;
+    return {
+      ...base,
+      eligible: !prereqBlocked,
+      prerequisite: prereq
+    };
+  }
+
+  async function refreshRollingPrerequisites() {
+    const sid = String(qs('inp_studentId')?.value || '').trim();
+    if (!sid) return;
+    const startDate = String(qs('inp_startDate')?.value || '').trim();
+    try {
+      const result = await requestJson(
+        `/school/classes/api/${encodeURIComponent(classId)}/rolling-enrollment-prerequisites`,
+        'POST',
+        { studentId: sid, startDate }
+      );
+      const payload = result?.data;
+      if (!payload) return;
+      const merged = mergeRollingPrerequisiteSlice(lastRollingEligibility, payload);
+      applyRollingEligibilityPayload(merged);
+      if (rollingEnrollmentWorkspace) rollingEnrollmentWorkspace.eligibility = merged;
+    } catch (err) {
+      const message = err?.message || 'Prerequisite check failed.';
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(message) + '</div>');
+    }
+  }
+
+  async function refreshRollingScheduleConflicts() {
+    const sid = String(qs('inp_studentId')?.value || '').trim();
+    const startDate = String(qs('inp_startDate')?.value || '').trim();
+    if (!sid || !startDate) return;
+    const endDate = String(qs('inp_endDate')?.value || '').trim();
+    try {
+      const body = {
+        studentId: sid,
+        startDate,
+        endDate,
+        pendingStagedSessions: pendingStagedSessions.map((row) => ({ ...row }))
+      };
+      if (rollingEnrollmentWorkspace?.sessions) {
+        body.persistedSessions = rollingEnrollmentWorkspace.sessions;
+      }
+      const result = await requestJson(
+        `/school/classes/api/${encodeURIComponent(classId)}/rolling-enrollment-conflicts`,
+        'POST',
+        body
+      );
+      const conflictSlice = result?.data;
+      if (!conflictSlice) return;
+      const merged = mergeRollingConflictSlice(lastRollingEligibility, conflictSlice);
+      applyRollingEligibilityPayload(merged);
+      if (rollingEnrollmentWorkspace) rollingEnrollmentWorkspace.eligibility = merged;
+    } catch (err) {
+      const message = err?.message || 'Conflict check failed.';
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(message) + '</div>');
+    }
+  }
+
+  async function refreshRollingEligibilityOnDateChange(changedInputId = '') {
+    if (changedInputId === 'inp_startDate') {
+      await refreshRollingPrerequisites();
+    }
+    await refreshRollingScheduleConflicts();
+  }
+
+  function applyRollingEligibilityPayload(data) {
+    const panel = qs('roll_enrollmentRegistrationPanel');
+    if (!panel) return;
+    if (!data) {
+      setRollingRegistrationPanelHtml('<span class="text-danger">Unable to check eligibility.</span>');
+      return;
+    }
+    lastRollingEligibility = data;
+    if (data.prerequisite && !data.resolved) {
+      const conflictIssue = (data.prerequisite.issues || []).find(isStudentConflictMessage);
+      const otherIssues = (data.prerequisite.issues || []).filter(msg => !isStudentConflictMessage(msg));
+      const issuesHtml = otherIssues.map((t) => htmlEscape(t)).join('<br>');
+      const msg = issuesHtml || htmlEscape(data.message || 'Not eligible for this class.');
+      const rawIssueMessage = data.message || (data.prerequisite.issues || []).join(' ');
+      if (isMissingTermRegistrationMessage(rawIssueMessage)) {
+        renderTermRegistrationShortcutPanel(rawIssueMessage);
+        return;
+      }
+      if (isMissingProgramRegistrationMessage(rawIssueMessage)) {
+        renderProgramRegistrationShortcutPanel(rawIssueMessage);
+        return;
+      }
+      let inner = '';
+      if (msg) inner += '<div class="text-danger small">' + msg + '</div>';
+      if (conflictIssue) inner += renderStudentConflictHtml(conflictIssue);
+      setRollingRegistrationPanelHtml(inner);
+      return;
+    }
+    if (data.resolved && data.prerequisite) {
+      const ok = data.eligible === true;
+      const conflictIssue = (data.prerequisite.issues || []).find(isStudentConflictMessage);
+      const otherIssues = (data.prerequisite.issues || []).filter(msg => !isStudentConflictMessage(msg));
+      const issuesHtml = otherIssues.map((t) => htmlEscape(t)).join('<br>');
+
+      const capacityWarningHtml = renderClassCapacityWarningPanel(data.prerequisite.capacity || {});
+      const otherWarnings = (data.prerequisite.warnings || [])
+        .filter((text) => !isCapacityWarningText(text))
+        .map((t) => htmlEscape(t))
+        .join('<br>');
+      if (!ok && Array.isArray(data.prerequisite.missingSubjects) && data.prerequisite.missingSubjects.length) {
+        renderPriorCreditRepairPanel(data.message || (data.prerequisite.issues || []).join(' '));
+        return;
+      }
+      let inner = '<div class="fw-semibold text-dark">' + formatResolvedRegistrationLabel(data.resolved) + '</div>';
+      if (issuesHtml) inner += '<div class="text-danger small mt-1">' + issuesHtml + '</div>';
+      if (conflictIssue) inner += renderStudentConflictHtml(conflictIssue);
+      if (capacityWarningHtml) inner += capacityWarningHtml;
+      if (otherWarnings) inner += '<div class="text-warning small mt-1">' + otherWarnings + '</div>';
+      if (ok && !issuesHtml && !conflictIssue) inner += '<div class="text-success small mt-1">Prerequisites satisfied for this start date.</div>';
+      setRollingRegistrationPanelHtml(inner);
+      return;
+    }
+    if (data.message) {
+      if (isMissingTermRegistrationMessage(data.message)) {
+        renderTermRegistrationShortcutPanel(data.message);
+        return;
+      }
+      if (isMissingProgramRegistrationMessage(data.message)) {
+        renderProgramRegistrationShortcutPanel(data.message);
+        return;
+      }
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(data.message) + '</div>');
+    }
+  }
+
+  async function loadRollingEnrollmentWorkspace(studentId) {
+    const panel = qs('roll_enrollmentRegistrationPanel');
+    const sid = String(studentId || qs('inp_studentId')?.value || '').trim();
+    lastRollingEligibility = null;
+    rollingEnrollmentWorkspace = null;
+    if (!panel) return;
+    if (!sid) {
+      setRollingRegistrationPanelHtml('<span class="text-muted">Select a student to verify program registration and prerequisites.</span>');
+      return;
+    }
+    setRollingRegistrationPanelHtml('<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" role="status"></span>Loading enrollment workspace…</span>');
+    try {
+      const result = await requestJson(
+        `/school/classes/api/${encodeURIComponent(classId)}/rolling-enrollment-workspace`,
+        'POST',
+        { studentId: sid }
+      );
+      const workspace = result?.data;
+      if (!workspace) {
+        setRollingRegistrationPanelHtml('<span class="text-danger">Unable to load enrollment workspace.</span>');
+        return;
+      }
+      rollingEnrollmentWorkspace = workspace;
+      if (workspace.eligibility) {
+        applyRollingEligibilityPayload(workspace.eligibility);
+      } else {
+        setRollingRegistrationPanelHtml('<span class="text-danger">Unable to check eligibility.</span>');
+      }
+    } catch (err) {
+      rollingEnrollmentWorkspace = null;
+      lastRollingEligibility = null;
+      const message = err?.message || 'Workspace load failed.';
+      if (isMissingTermRegistrationMessage(message)) {
+        renderTermRegistrationShortcutPanel(message);
+        return;
+      }
+      if (isMissingProgramRegistrationMessage(message)) {
+        renderProgramRegistrationShortcutPanel(message);
+        return;
+      }
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(message) + '</div>');
+    }
+  }
+
   async function refreshRollingEligibility() {
     const panel = qs('roll_enrollmentRegistrationPanel');
     const sid = String(qs('inp_studentId')?.value || '').trim();
     const startDate = String(qs('inp_startDate')?.value || '').trim();
     const endDate = String(qs('inp_endDate')?.value || '').trim();
-    lastRollingEligibility = null;
     if (!panel) return;
     if (!sid) {
+      lastRollingEligibility = null;
       setRollingRegistrationPanelHtml('<span class="text-muted">Select a student to verify program registration and prerequisites.</span>');
       return;
     }
@@ -2049,65 +2505,9 @@
       if (startDate) url += '&startDate=' + encodeURIComponent(startDate);
       if (endDate) url += '&endDate=' + encodeURIComponent(endDate);
       const data = await requestJson(url, 'GET');
-      if (!data) {
-        setRollingRegistrationPanelHtml('<span class="text-danger">Unable to check eligibility.</span>');
-        return;
-      }
-      lastRollingEligibility = data;
-      if (data.prerequisite && !data.resolved) {
-        const conflictIssue = (data.prerequisite.issues || []).find(isStudentConflictMessage);
-        const otherIssues = (data.prerequisite.issues || []).filter(msg => !isStudentConflictMessage(msg));
-        const issuesHtml = otherIssues.map((t) => htmlEscape(t)).join('<br>');
-        const msg = issuesHtml || htmlEscape(data.message || 'Not eligible for this class.');
-        const rawIssueMessage = data.message || (data.prerequisite.issues || []).join(' ');
-        if (isMissingTermRegistrationMessage(rawIssueMessage)) {
-          renderTermRegistrationShortcutPanel(rawIssueMessage);
-          return;
-        }
-        if (isMissingProgramRegistrationMessage(rawIssueMessage)) {
-          renderProgramRegistrationShortcutPanel(rawIssueMessage);
-          return;
-        }
-        let inner = '';
-        if (msg) inner += '<div class="text-danger small">' + msg + '</div>';
-        if (conflictIssue) inner += renderStudentConflictHtml(conflictIssue);
-        setRollingRegistrationPanelHtml(inner);
-        return;
-      }
-      if (data.resolved && data.prerequisite) {
-        const ok = data.eligible === true;
-        const conflictIssue = (data.prerequisite.issues || []).find(isStudentConflictMessage);
-        const otherIssues = (data.prerequisite.issues || []).filter(msg => !isStudentConflictMessage(msg));
-        const issuesHtml = otherIssues.map((t) => htmlEscape(t)).join('<br>');
-        
-        const capacityWarningHtml = renderClassCapacityWarningPanel(data.prerequisite.capacity || {});
-        const otherWarnings = (data.prerequisite.warnings || [])
-          .filter((text) => !isCapacityWarningText(text))
-          .map((t) => htmlEscape(t))
-          .join('<br>');
-        if (!ok && Array.isArray(data.prerequisite.missingSubjects) && data.prerequisite.missingSubjects.length) {
-          renderPriorCreditRepairPanel(data.message || (data.prerequisite.issues || []).join(' '));
-          return;
-        }
-        let inner = '<div class="fw-semibold text-dark">' + formatResolvedRegistrationLabel(data.resolved) + '</div>';
-        if (issuesHtml) inner += '<div class="text-danger small mt-1">' + issuesHtml + '</div>';
-        if (conflictIssue) inner += renderStudentConflictHtml(conflictIssue);
-        if (capacityWarningHtml) inner += capacityWarningHtml;
-        if (otherWarnings) inner += '<div class="text-warning small mt-1">' + otherWarnings + '</div>';
-        if (ok && !issuesHtml && !conflictIssue) inner += '<div class="text-success small mt-1">Prerequisites satisfied for this start date.</div>';
-        setRollingRegistrationPanelHtml(inner);
-        return;
-      }
-      if (data.message) {
-        if (isMissingTermRegistrationMessage(data.message)) {
-          renderTermRegistrationShortcutPanel(data.message);
-          return;
-        }
-        if (isMissingProgramRegistrationMessage(data.message)) {
-          renderProgramRegistrationShortcutPanel(data.message);
-          return;
-        }
-        setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(data.message) + '</div>');
+      applyRollingEligibilityPayload(data);
+      if (rollingEnrollmentWorkspace && data) {
+        rollingEnrollmentWorkspace.eligibility = data;
       }
     } catch (err) {
       lastRollingEligibility = null;
@@ -2591,7 +2991,10 @@
       if (existingKeys.has(key) || (id && existingIds.has(id))) return;
       pendingStagedSessions.push({ ...row });
       existingKeys.add(key);
-      if (id) existingIds.add(id);
+      if (id) {
+        existingIds.add(id);
+        if (!pendingIncludedSessionIds.includes(id)) pendingIncludedSessionIds.push(id);
+      }
       added += 1;
     });
     pendingGapPreview = {
@@ -2623,6 +3026,7 @@
   async function removeStagedSession(sessionId) {
     const id = String(sessionId || '').trim();
     if (!id) return;
+    pendingIncludedSessionIds = pendingIncludedSessionIds.filter((row) => String(row || '').trim() !== id);
     pendingStagedSessions = (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : [])
       .filter((row) => String(row?.sessionId || '').trim() !== id);
     if (!pendingStagedSessions.length) {
@@ -2639,8 +3043,23 @@
     syncEnrollmentWizardPrimaryButton();
   }
 
+  function syncPendingStagedSessionsFromCalendar(sessionsToCreate) {
+    pendingStagedSessions = sessionsToCreate.map((row) => ({ ...row }));
+    if (pendingStagedSessions.length) {
+      pendingGapPreview = {
+        createdCount: pendingStagedSessions.length,
+        proposedSessions: pendingStagedSessions.slice()
+      };
+    } else if (!pendingGapBatch) {
+      pendingGapPreview = null;
+    }
+    updateGapStagedBadge();
+    refreshEnrollmentSessionViews();
+  }
+
   function updateGapStagedBadge() {
     const badge = qs('gapStagedBadge');
+    const titleEl = qs('gapStagedBadgeTitle');
     const clearBtn = qs('btn_gapClearStaged');
     const count = Number(
       pendingStagedSessions.length
@@ -2650,19 +3069,21 @@
     );
     if (!badge) return;
     if (!count) {
-      badge.classList.add('d-none');
-      badge.innerHTML = '';
+      setGapStepNotice(badge, { visible: false });
       clearBtn?.classList.add('d-none');
       return;
     }
-    badge.classList.remove('d-none');
     const stagedHours = normalizeTargetHoursValue(
       (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : [])
         .reduce((sum, row) => sum + resolveSessionRowDurationHours(row), 0)
     );
     const hourSuffix = stagedHours === 1 ? 'Hr' : 'Hrs';
-    badge.innerHTML = `<b>${count} session(s) staged (${stagedHours} ${hourSuffix}, not saved yet).</b> They will be added to the class schedule when enrollment completes successfully.`;
+    const title = `${count} staged session(s)`;
+    const detail = `${count} session(s) staged (${stagedHours} ${hourSuffix}, not saved yet). They will be added to the class schedule when enrollment completes successfully.`;
+    setGapStepNotice(badge, { title, detail, visible: true, tone: 'primary' });
+    if (titleEl) titleEl.textContent = title;
     clearBtn?.classList.remove('d-none');
+    updateGapSessionsCollapseMeta();
   }
 
   async function showSessionConflictModal(conflicts = []) {
@@ -2703,8 +3124,31 @@
   }
 
   async function fetchEnrollmentSessionAlignment(body = {}) {
+    if (canUseLocalAlignment()) {
+      return evaluateLocalEnrollmentAlignment(body);
+    }
     const result = await requestJson(`/school/classes/api/${encodeURIComponent(classId)}/enrollment-session-alignment`, 'POST', body);
     return result?.data || null;
+  }
+
+  function canUseLocalAlignment() {
+    return Boolean(
+      rollingEnrollmentWorkspace
+      && window.RollingEnrollmentAlignmentClient
+      && (!pendingGapBatch || pendingStagedSessions.length > 0)
+    );
+  }
+
+  function evaluateLocalEnrollmentAlignment(body = {}) {
+    return window.RollingEnrollmentAlignmentClient.buildAlignmentPayload({
+      workspace: rollingEnrollmentWorkspace,
+      startDate: body.startDate,
+      endDate: body.endDate,
+      targetSessionCount: body.targetSessionCount,
+      targetHours: body.targetHours,
+      pendingStagedSessions,
+      pendingGapBatch
+    });
   }
 
   function updateViewSessionsButton(alignment) {
@@ -2726,14 +3170,46 @@
     if (listBtn) listBtn.classList.toggle('d-none', !show);
   }
 
-  function openEnrollmentSessionCalendarModal() {
+  async function buildEnrollmentPickerBundleFromWorkspace(payload = {}) {
+    if (!rollingEnrollmentWorkspace) return null;
+    const body = {
+      classId,
+      studentId: payload.studentId,
+      startDate: payload.startDate,
+      endDate: payload.endDate,
+      viewPreset: 'week',
+      anchorDate: payload.startDate,
+      selectedSessionIds: getEnrollmentPickerSelectedIds(),
+      persistedSessions: rollingEnrollmentWorkspace.sessions || [],
+      statusMap: rollingEnrollmentWorkspace.statusMap || {},
+      pendingStagedSessions: pendingStagedSessions.map((row) => ({ ...row }))
+    };
+    if (hasTargetSessionCount()) body.targetSessionCount = Number(qs('inp_targetSessionCount')?.value || 0);
+    if (hasTargetHours()) body.targetHours = Number(qs('inp_targetHours')?.value || 0);
+    const result = await requestJson(
+      `/school/classes/api/${encodeURIComponent(classId)}/enrollment-session-picker`,
+      'POST',
+      body
+    );
+    return result?.data || null;
+  }
+
+  async function openEnrollmentSessionCalendarModal() {
     if (!window.SessionEnrollmentCalendarModal || !window.SessionCalendarCore) {
       openEnrollmentSessionListModal();
       return;
     }
     const payload = collectEnrollmentPayloadFromForm();
-    const studentName = String(qs('inp_studentName')?.value || '').trim();
+    const studentName = String(qs('inp_studentLabel')?.value || '').trim();
     const classTitle = String(document.querySelector('.page-title, h1, h2')?.textContent || '').trim();
+    let prefetchedPickerData = null;
+    if (rollingEnrollmentWorkspace) {
+      try {
+        prefetchedPickerData = await buildEnrollmentPickerBundleFromWorkspace(payload);
+      } catch (err) {
+        console.error(err);
+      }
+    }
     window.SessionEnrollmentCalendarModal.open({
       classId,
       studentId: payload.studentId,
@@ -2743,14 +3219,25 @@
       endDate: payload.endDate,
       targetSessionCount: hasTargetSessionCount() ? Number(qs('inp_targetSessionCount')?.value || 0) : 0,
       targetHours: hasTargetHours() ? Number(qs('inp_targetHours')?.value || 0) : 0,
-      selectedSessionIds: pendingPlannedNaSessionIds.slice(),
+      selectedSessionIds: getEnrollmentPickerSelectedIds(),
       sessionsToCreate: pendingStagedSessions.map((row) => ({ ...row })),
+      scheduleDefaults: rollingEnrollmentWorkspace?.scheduleDefaults || lastAlignmentResult?.scheduleDefaults || {},
+      persistedSessions: rollingEnrollmentWorkspace?.sessions || [],
+      statusMap: rollingEnrollmentWorkspace?.statusMap || null,
+      localPickerMode: Boolean(prefetchedPickerData),
+      prefetchedPickerData,
       requestJson,
-      onSave: ({ selectedSessionIds }) => {
-        pendingPlannedNaSessionIds = Array.isArray(selectedSessionIds) ? selectedSessionIds.slice() : [];
-        renderNaSessionTable(lastAlignmentResult?.countableSessions || [], pendingPlannedNaSessionIds.slice());
-        updateNaSelectionCounter();
-        runAlignmentRefresh({ showSpinner: false });
+      onSelectionChange: ({ selectedSessionIds, sessionsToCreate }) => {
+        if (Array.isArray(sessionsToCreate)) {
+          syncPendingStagedSessionsFromCalendar(sessionsToCreate);
+        }
+        applyEnrollmentSelectionFromIds(selectedSessionIds, { refreshAlignment: false });
+      },
+      onSave: ({ selectedSessionIds, sessionsToCreate }) => {
+        if (Array.isArray(sessionsToCreate)) {
+          syncPendingStagedSessionsFromCalendar(sessionsToCreate);
+        }
+        applyEnrollmentSelectionFromIds(selectedSessionIds, { refreshAlignment: true });
       }
     });
   }
@@ -2775,7 +3262,7 @@
       return 'addSessions';
     }
     if (status === 'overage_requires_na') {
-      return 'markNa';
+      return 'addSessions';
     }
     if (pendingStagedSessions.length > 0) {
       return 'conflicts';
@@ -2847,13 +3334,13 @@
         const available = Number(alignment.availableHours || 0);
         const excess = Number(alignment.requiredNaHours || Math.max(0, available - target));
         hint.className = 'form-text compact-help text-warning mb-0';
-        hint.textContent = `Target is ${target} hr(s) from the start date, but ${available} hr(s) are scheduled (${excess} hr over). Use Next to manage sessions or mark N/A.`;
+        hint.textContent = `Target is ${target} hr(s) from the start date, but ${available} hr(s) are scheduled (${excess} hr over). Use Next to pick sessions and stage more if needed.`;
       } else {
         const target = Number(alignment.targetSessionCount || alignment.effectiveTarget || 0);
         const available = Number(alignment.availableCount || 0);
         const excess = Number(alignment.requiredNaCount || Math.max(0, available - target));
         hint.className = 'form-text compact-help text-warning mb-0';
-        hint.textContent = `Target is ${target} session(s) from the start date, but ${available} exist (${excess} over). Use Next to manage sessions or mark N/A.`;
+        hint.textContent = `Target is ${target} session(s) from the start date, but ${available} exist (${excess} over). Use Next to pick sessions and stage more if needed.`;
       }
       updateViewSessionsButton(alignment);
       syncEnrollmentWizardPathFromCap();
@@ -2892,12 +3379,9 @@
     if (enrollWizardPath === 'planA') {
       const steps = [
         { id: 'form', label: 'Enrollment' },
-        { id: 'addSessions', label: 'Sessions' }
+        { id: 'addSessions', label: 'Sessions' },
+        { id: 'conflicts', label: 'Conflicts' }
       ];
-      if (alignmentRequiresMarkNa()) {
-        steps.push({ id: 'markNa', label: 'Mark N/A' });
-      }
-      steps.push({ id: 'conflicts', label: 'Conflicts' });
       return steps;
     }
     if (enrollWizardPath === 'planB') {
@@ -2959,10 +3443,8 @@
       return;
     }
     if (enrollWizardStep === 'addSessions') {
-      const status = String(lastAlignmentResult?.alignmentStatus || '');
-      const blocked = status === 'insufficient_sessions' || status === 'insufficient_hours';
       btn.innerHTML = `${iconNext}Next`;
-      btn.disabled = blocked;
+      btn.disabled = !canContinueFromAddSessionsStep();
       return;
     }
     if (enrollWizardStep === 'markNa') {
@@ -2998,48 +3480,33 @@
 
   function prepareAddSessionsStep(alignment) {
     lastAlignmentResult = alignment || lastAlignmentResult;
-    const hourMode = hasTargetHours() || Number(alignment?.effectiveTargetHours || 0) > 0;
     const status = String(alignment?.alignmentStatus || '').trim();
-    const summary = qs('gapSummaryText');
-    if (summary) {
-      if (hourMode) {
-        const needHours = Number(alignment?.effectiveTargetHours || alignment?.targetHours || normalizeTargetHoursValue(qs('inp_targetHours')?.value));
-        const availableHours = Number(alignment?.availableHours || 0);
-        const gapHours = Number(alignment?.gapHours || Math.max(0, needHours - availableHours));
-        if (status === 'overage_requires_na') {
-          const excessHours = Number(alignment?.requiredNaHours || Math.max(0, availableHours - needHours));
-          summary.textContent = `Need ${needHours} hour(s) from the start date, but ${availableHours} hour(s) are scheduled (${excessHours} hr over). Stage or remove sessions below, or continue to mark N/A.`;
-        } else if (status === 'insufficient_hours') {
-          summary.textContent = `Need ${needHours} hour(s) from the start date, but only ${availableHours} hour(s) are scheduled (${gapHours} hr gap). Stage missing sessions below or adjust Number of Hours.`;
-        } else {
-          summary.textContent = `Target is ${needHours} hour(s) from the start date (${availableHours} hour(s) currently scheduled). Add or remove sessions below as needed.`;
-        }
-      } else {
-        const need = Number(alignment?.effectiveTarget || alignment?.targetSessionCount || 0);
-        const available = Number(alignment?.availableCount || 0);
-        const gap = Number(alignment?.gapCount || Math.max(0, need - available));
-        if (status === 'overage_requires_na') {
-          const excess = Number(alignment?.requiredNaCount || Math.max(0, available - need));
-          summary.textContent = `Need ${need || 'at least 1'} countable session(s) between ${alignment?.startDate || ''} and ${alignment?.endDate || ''}, but ${available} exist (${excess} over). Stage or remove sessions below, or continue to mark N/A.`;
-        } else if (status === 'insufficient_sessions') {
-          summary.textContent = `Need ${need || 'at least 1'} countable session(s) between ${alignment?.startDate || ''} and ${alignment?.endDate || ''}, but only ${available} exist. Stage missing sessions below or reduce Number of Sessions.`;
-        } else {
-          summary.textContent = `Target is ${need || 'at least 1'} countable session(s) in the enrollment window (${available} currently scheduled). Add or remove sessions below as needed.`;
-        }
-      }
+    const summaryNotice = qs('gapSummaryNotice');
+    if (summaryNotice) {
+      const tone = status === 'overage_requires_na' || status === 'insufficient_sessions' || status === 'insufficient_hours'
+        ? 'warning'
+        : 'info';
+      setGapStepNotice(summaryNotice, {
+        title: getGapSummaryTitle(alignment, status),
+        detail: buildGapSummaryDetail(alignment),
+        visible: true,
+        tone
+      });
     }
     if (gapFormDraft) {
       applyGapFormDraft(gapFormDraft);
     } else {
       applyScheduleDefaultsToGapForm(alignment?.scheduleDefaults || {});
     }
+    if (!pendingIncludedSessionIds.length) {
+      pendingIncludedSessionIds = buildDefaultIncludedSessionIds(alignment);
+    }
+    syncPlannedNaFromIncludedSelection();
     renderGapSessionTable();
     updateGapCycleExtendWarning();
     updateGapStagedBadge();
-    const markNaShortcut = qs('gapMarkNaShortcut');
-    if (markNaShortcut) {
-      markNaShortcut.classList.toggle('d-none', status !== 'overage_requires_na');
-    }
+    updateGapSessionsCollapseMeta();
+    initGapStepTooltips();
   }
 
   function prepareMarkNaStep(alignment) {
@@ -3162,7 +3629,7 @@
   async function goEnrollmentWizardBack() {
     if (enrollWizardStep === 'conflicts') {
       captureGapFormDraft();
-      enrollWizardStep = alignmentRequiresMarkNa() ? 'markNa' : 'addSessions';
+      enrollWizardStep = 'addSessions';
       setEnrollmentWizardStepVisibility();
       return;
     }
@@ -3232,25 +3699,64 @@
     const tbodyEl = qs(tbodyId);
     if (!tbodyEl) return;
     const rows = Array.isArray(sessions) ? sessions.map((row) => normalizeSessionRowForDisplay(row)) : [];
-    const showActions = options.showActions === true;
-    const highlightStaged = options.highlightStaged === true || showActions;
+    const naToggle = options.naToggle === true;
+    const enrollmentPick = options.enrollmentPick === true;
+    const selectedNaIds = new Set(
+      (Array.isArray(options.selectedNaIds) ? options.selectedNaIds : []).map((row) => String(row || '').trim()).filter(Boolean)
+    );
+    const selectedEnrollmentIds = new Set(
+      (Array.isArray(options.selectedEnrollmentIds) ? options.selectedEnrollmentIds : []).map((row) => String(row || '').trim()).filter(Boolean)
+    );
+    const showActions = options.showActions === true || naToggle || enrollmentPick;
+    const highlightStaged = options.highlightStaged === true || (options.showActions === true && !naToggle && !enrollmentPick);
     const footerTotalsId = String(options.footerTotalsId || '').trim();
     const colSpan = showActions ? 5 : 4;
     if (!rows.length) {
       tbodyEl.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted py-3">No sessions in this enrollment window yet.</td></tr>`;
-      if (footerTotalsId) updateSessionTableFooter([], footerTotalsId);
+      if (footerTotalsId) {
+        if (naToggle) updateNaTableFooter();
+        else updateSessionTableFooter([], footerTotalsId);
+      }
       return;
     }
     tbodyEl.innerHTML = rows.map((row) => {
+      const sessionId = String(row.sessionId || '').trim();
+      const hours = resolveSessionRowDurationHours(row);
       const staged = highlightStaged && isStagedSessionRow(row);
-      const rowClass = staged ? 'gap-session-row-staged' : '';
+      const naSelected = naToggle && selectedNaIds.has(sessionId);
+      const picked = enrollmentPick && selectedEnrollmentIds.has(sessionId);
+      const rowClass = naSelected
+        ? 'na-session-row-selected'
+        : (picked ? 'enrollment-session-row-selected' : (staged ? 'gap-session-row-staged' : ''));
       const countableBadge = row.countable
         ? '<span class="badge bg-success-subtle text-success border">Yes</span>'
         : `<span class="badge bg-secondary-subtle text-secondary border" title="${htmlEscape(row.excludeReason || '')}">No</span>`;
       const statusCell = formatSessionStatusCell(row, staged);
-      const actionsCell = showActions && staged
-        ? `<button type="button" class="btn btn-sm btn-outline-danger btn-remove-staged" data-session-id="${htmlEscape(row.sessionId || '')}" title="Remove staged session"><i class="bi bi-trash"></i></button>`
-        : '';
+      let actionsCell = '';
+      if (enrollmentPick && row.countable && !staged) {
+        const isPicked = selectedEnrollmentIds.has(sessionId);
+        const btnClass = isPicked
+          ? 'btn btn-sm btn-success enrollment-session-pick is-selected'
+          : 'btn btn-sm btn-outline-secondary enrollment-session-pick';
+        const btnLabel = isPicked ? 'Included' : 'Include';
+        actionsCell = `<button type="button" class="${btnClass}" data-session-id="${htmlEscape(sessionId)}" data-hours="${hours}" title="Include this session in the enrollment">${btnLabel}</button>`;
+      } else if (enrollmentPick && staged) {
+        const isPicked = selectedEnrollmentIds.has(sessionId);
+        const btnClass = isPicked
+          ? 'btn btn-sm btn-success enrollment-session-pick is-selected'
+          : 'btn btn-sm btn-outline-secondary enrollment-session-pick';
+        const btnLabel = isPicked ? 'Included' : 'Include';
+        actionsCell = `<button type="button" class="${btnClass}" data-session-id="${htmlEscape(sessionId)}" data-hours="${hours}" title="Include this staged session in the enrollment">${btnLabel}</button>`
+          + ` <button type="button" class="btn btn-sm btn-outline-danger btn-remove-staged" data-session-id="${htmlEscape(sessionId)}" title="Remove staged session"><i class="bi bi-trash"></i></button>`;
+      } else if (naToggle) {
+        const btnClass = naSelected
+          ? 'btn btn-sm btn-success na-session-toggle is-selected'
+          : 'btn btn-sm btn-outline-secondary na-session-toggle';
+        const btnLabel = naSelected ? 'N/A' : 'Mark N/A';
+        actionsCell = `<button type="button" class="${btnClass}" data-session-id="${htmlEscape(sessionId)}" data-hours="${hours}" title="Toggle N/A for this session">${btnLabel}</button>`;
+      } else if (showActions && staged) {
+        actionsCell = `<button type="button" class="btn btn-sm btn-outline-danger btn-remove-staged" data-session-id="${htmlEscape(sessionId)}" title="Remove staged session"><i class="bi bi-trash"></i></button>`;
+      }
       const actionsTd = showActions
         ? `<td class="text-end">${actionsCell}</td>`
         : '';
@@ -3263,19 +3769,229 @@
       </tr>`;
     }).join('');
     if (footerTotalsId) {
-      updateSessionTableFooter(rows, footerTotalsId);
+      if (naToggle) updateNaTableFooter();
+      else updateSessionTableFooter(rows, footerTotalsId);
+      if (enrollmentPick) updateEnrollmentPickCounter();
     } else if (tbodyId === 'gapSessionsTbody') {
       updateGapSessionTableFooter(rows);
     }
   }
 
+  function getCountableSessionsFromAlignment(alignment = lastAlignmentResult) {
+    return Array.isArray(alignment?.countableSessions) ? alignment.countableSessions : [];
+  }
+
+  function getEnrollmentPickerSelectedIds() {
+    const ids = new Set(
+      (Array.isArray(pendingIncludedSessionIds) ? pendingIncludedSessionIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    );
+    (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : []).forEach((row) => {
+      const id = String(row?.sessionId || '').trim();
+      if (id) ids.add(id);
+    });
+    return Array.from(ids);
+  }
+
+  function refreshEnrollmentSessionViews() {
+    if (enrollWizardStep === 'addSessions') {
+      renderGapSessionTable();
+    }
+    syncPlannedNaFromIncludedSelection();
+    updateEnrollmentPickCounter();
+    syncEnrollmentWizardPrimaryButton();
+  }
+
+  function applyEnrollmentSelectionFromIds(selectedSessionIds, { refreshAlignment = false } = {}) {
+    const selected = new Set(
+      (Array.isArray(selectedSessionIds) ? selectedSessionIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    );
+    pendingIncludedSessionIds = Array.from(selected);
+    const stagedBefore = pendingStagedSessions.length;
+    pendingStagedSessions = (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : [])
+      .filter((row) => selected.has(String(row?.sessionId || '').trim()));
+    if (pendingStagedSessions.length !== stagedBefore) {
+      if (!pendingStagedSessions.length) {
+        pendingGapBatch = null;
+        pendingGapPreview = null;
+      } else {
+        pendingGapPreview = {
+          createdCount: pendingStagedSessions.length,
+          proposedSessions: pendingStagedSessions.slice()
+        };
+      }
+      updateGapStagedBadge();
+    }
+    refreshEnrollmentSessionViews();
+    if (refreshAlignment) {
+      refreshAlignmentWithStagedSessions().catch((err) => console.error(err));
+    }
+  }
+
+  function buildDefaultIncludedSessionIds(alignment = lastAlignmentResult) {
+    const countable = getCountableSessionsFromAlignment(alignment);
+    const ids = countable.map((row) => String(row?.sessionId || '').trim()).filter(Boolean);
+    const status = String(alignment?.alignmentStatus || '');
+    if (status === 'overage_requires_na' && pendingPlannedNaSessionIds.length) {
+      const naSet = new Set(pendingPlannedNaSessionIds.map(String));
+      return ids.filter((id) => !naSet.has(id));
+    }
+    return ids.slice();
+  }
+
+  function readIncludedEnrollmentSessionIdsFromDom() {
+    return Array.from(document.querySelectorAll('.enrollment-session-pick.is-selected'))
+      .map((btn) => String(btn.dataset?.sessionId || '').trim())
+      .filter(Boolean);
+  }
+
+  function readIncludedEnrollmentSessionIds() {
+    const fromDom = readIncludedEnrollmentSessionIdsFromDom();
+    if (document.querySelector('.enrollment-session-pick')) {
+      pendingIncludedSessionIds = fromDom;
+    }
+    return pendingIncludedSessionIds.slice();
+  }
+
+  function syncPlannedNaFromIncludedSelection() {
+    const countable = getCountableSessionsFromAlignment();
+    const included = new Set(
+      (Array.isArray(pendingIncludedSessionIds) ? pendingIncludedSessionIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    );
+    pendingPlannedNaSessionIds = countable
+      .map((row) => String(row?.sessionId || '').trim())
+      .filter((id) => id && !included.has(id));
+  }
+
+  function readIncludedScheduledHours(countableSessions, includedIds) {
+    const set = new Set(includedIds);
+    let total = 0;
+    (countableSessions || []).forEach((row) => {
+      const id = String(row?.sessionId || '').trim();
+      if (set.has(id)) total += resolveSessionRowDurationHours(row);
+    });
+    return normalizeTargetHoursValue(total);
+  }
+
+  function readStagedEnrollmentHours() {
+    return normalizeTargetHoursValue(
+      (pendingStagedSessions || []).reduce((sum, row) => sum + resolveSessionRowDurationHours(row), 0)
+    );
+  }
+
+  function readIncludedEnrollmentSessionCount(countableSessions, includedIds) {
+    const set = new Set(includedIds);
+    return (countableSessions || []).filter((row) => set.has(String(row?.sessionId || '').trim())).length;
+  }
+
+  function canContinueFromAddSessionsStep() {
+    const alignment = lastAlignmentResult;
+    if (!alignment) return false;
+    const status = String(alignment.alignmentStatus || '');
+    const countable = getCountableSessionsFromAlignment(alignment);
+    const includedIds = readIncludedEnrollmentSessionIds();
+    const targetHours = Number(alignment.effectiveTargetHours || alignment.targetHours || 0);
+    const targetSessions = Number(alignment.effectiveTarget || alignment.targetSessionCount || 0);
+
+    if (hasTargetHours() || targetHours > 0) {
+      const target = targetHours || normalizeTargetHoursValue(qs('inp_targetHours')?.value);
+      const includedHours = readIncludedScheduledHours(countable, includedIds);
+      const totalHours = normalizeTargetHoursValue(includedHours + readStagedEnrollmentHours());
+      if (status === 'overage_requires_na') return includedHours === target;
+      if (status === 'insufficient_hours') return totalHours >= target;
+      return totalHours >= target || status === 'ok';
+    }
+
+    const target = targetSessions || normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value);
+    const includedCount = readIncludedEnrollmentSessionCount(countable, includedIds);
+    const totalCount = includedCount + pendingStagedSessions.length;
+    if (status === 'overage_requires_na') return includedCount === target;
+    if (status === 'insufficient_sessions') return totalCount >= target;
+    return totalCount >= target || status === 'ok';
+  }
+
+  async function validateEnrollmentPickForContinue() {
+    const alignment = lastAlignmentResult;
+    if (!alignment) return false;
+    const status = String(alignment.alignmentStatus || '');
+    const countable = getCountableSessionsFromAlignment(alignment);
+    const includedIds = readIncludedEnrollmentSessionIds();
+    syncPlannedNaFromIncludedSelection();
+
+    if (hasTargetHours() || Number(alignment.effectiveTargetHours || alignment.targetHours || 0) > 0) {
+      const target = Number(alignment.effectiveTargetHours || alignment.targetHours || normalizeTargetHoursValue(qs('inp_targetHours')?.value));
+      const includedHours = readIncludedScheduledHours(countable, includedIds);
+      const totalHours = normalizeTargetHoursValue(includedHours + readStagedEnrollmentHours());
+      if (status === 'insufficient_hours' && totalHours < target) {
+        await showMsg('Sessions required', 'warning', `Include or stage sessions totaling ${target} hr (currently ${totalHours} hr).`);
+        return false;
+      }
+      if (status === 'overage_requires_na' && includedHours !== target) {
+        await showMsg('Selection required', 'warning', `Include exactly ${target} hr from scheduled sessions (${includedHours} hr selected). Other scheduled sessions will be marked N/A.`);
+        return false;
+      }
+      return true;
+    }
+
+    const target = Number(alignment.effectiveTarget || alignment.targetSessionCount || normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value));
+    const includedCount = readIncludedEnrollmentSessionCount(countable, includedIds);
+    const totalCount = includedCount + pendingStagedSessions.length;
+    if (status === 'insufficient_sessions' && totalCount < target) {
+      await showMsg('Sessions required', 'warning', `Include or stage ${target} session(s) (currently ${totalCount}).`);
+      return false;
+    }
+    if (status === 'overage_requires_na' && includedCount !== target) {
+      await showMsg('Selection required', 'warning', `Include exactly ${target} scheduled session(s) (${includedCount} selected). Other scheduled sessions will be marked N/A.`);
+      return false;
+    }
+    return true;
+  }
+
+  function updateEnrollmentPickCounter() {
+    const counter = qs('gapEnrollmentPickCounter');
+    const alignment = lastAlignmentResult;
+    if (!counter || !alignment) return;
+    const countable = getCountableSessionsFromAlignment(alignment);
+    const includedIds = readIncludedEnrollmentSessionIds();
+    if (hasTargetHours() || Number(alignment.effectiveTargetHours || alignment.targetHours || 0) > 0) {
+      const target = Number(alignment.effectiveTargetHours || alignment.targetHours || normalizeTargetHoursValue(qs('inp_targetHours')?.value));
+      const includedHours = readIncludedScheduledHours(countable, includedIds);
+      const stagedHours = readStagedEnrollmentHours();
+      counter.textContent = `Included ${includedHours} hr + staged ${stagedHours} hr · target ${target} hr`;
+      return;
+    }
+    const target = Number(alignment.effectiveTarget || alignment.targetSessionCount || normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value));
+    const includedCount = readIncludedEnrollmentSessionCount(countable, includedIds);
+    counter.textContent = `Included ${includedCount} + staged ${pendingStagedSessions.length} session(s) · target ${target}`;
+  }
+
+  function toggleEnrollmentSessionPick(btn) {
+    const selected = btn.classList.toggle('is-selected');
+    btn.classList.toggle('btn-success', selected);
+    btn.classList.toggle('btn-outline-secondary', !selected);
+    btn.textContent = selected ? 'Included' : 'Include';
+    const row = btn.closest('tr');
+    if (row) row.classList.toggle('enrollment-session-row-selected', selected);
+    pendingIncludedSessionIds = readIncludedEnrollmentSessionIdsFromDom();
+    refreshEnrollmentSessionViews();
+  }
+
   function renderGapSessionTable() {
     const rows = buildGapModalSessionRows();
     renderSessionWindowTable(rows, 'gapSessionsTbody', {
-      showActions: pendingStagedSessions.length > 0,
+      showActions: true,
+      enrollmentPick: true,
+      selectedEnrollmentIds: pendingIncludedSessionIds,
       highlightStaged: true,
       footerTotalsId: 'gapSessionsTotals'
     });
+    updateEnrollmentPickCounter();
+    updateGapSessionsCollapseMeta();
   }
 
   function parseGapExceptionDatesInput() {
@@ -3342,41 +4058,36 @@
   }
 
   function renderNaSessionTable(countableSessions = [], selectedIds = []) {
-    const tbodyEl = qs('naSessionsTbody');
-    if (!tbodyEl) return;
-    const selected = new Set((Array.isArray(selectedIds) ? selectedIds : []).map((row) => String(row)));
-    const rows = (Array.isArray(countableSessions) ? countableSessions : []);
-    if (!rows.length) {
-      tbodyEl.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No countable sessions in this window.</td></tr>';
-      return;
-    }
-    tbodyEl.innerHTML = rows.map((row) => {
-      const sid = String(row.sessionId || '');
-      const checked = selected.has(sid) ? 'checked' : '';
-      const hours = Number(row.durationHours || 0);
-      return `<tr>
-        <td class="text-center"><input type="checkbox" class="form-check-input na-session-cb" data-hours="${hours}" value="${htmlEscape(sid)}" ${checked}></td>
-        <td>${htmlEscape(row.date || '-')}</td>
-        <td>${htmlEscape([row.startTime, row.endTime].filter(Boolean).join(' - ') || '-')}</td>
-        <td class="text-end">${hours ? htmlEscape(String(hours)) : '-'}</td>
-        <td>${htmlEscape(row.status || '-')}</td>
-      </tr>`;
-    }).join('');
-    updateNaSelectionCounter();
+    const rows = (Array.isArray(countableSessions) ? countableSessions : []).map((row) => normalizeSessionRowForDisplay(row));
+    renderSessionWindowTable(rows, 'naSessionsTbody', {
+      enrollmentPick: true,
+      selectedEnrollmentIds: selectedIds,
+      footerTotalsId: 'naSessionsTotals'
+    });
+    updateEnrollmentPickCounter();
   }
 
   function readSelectedNaSessionIds() {
-    return Array.from(document.querySelectorAll('.na-session-cb:checked'))
-      .map((input) => String(input.value || '').trim())
+    return Array.from(document.querySelectorAll('.na-session-toggle.is-selected'))
+      .map((btn) => String(btn.dataset?.sessionId || '').trim())
       .filter(Boolean);
   }
 
   function readSelectedNaSessionHours() {
     let total = 0;
-    document.querySelectorAll('.na-session-cb:checked').forEach((input) => {
-      total = normalizeTargetHoursValue(total + Number(input.dataset?.hours || 0));
+    document.querySelectorAll('.na-session-toggle.is-selected').forEach((btn) => {
+      total = normalizeTargetHoursValue(total + Number(btn.dataset?.hours || 0));
     });
     return total;
+  }
+
+  function updateNaTableFooter() {
+    const totalsEl = qs('naSessionsTotals');
+    if (!totalsEl) return;
+    const selectedCount = readSelectedNaSessionIds().length;
+    const selectedHours = readSelectedNaSessionHours();
+    const hourLabel = selectedHours === 1 ? 'Hr' : 'Hrs';
+    totalsEl.textContent = `Marked N/A: ${selectedCount} session(s), ${selectedHours} ${hourLabel}`;
   }
 
   function updateNaSelectionCounter() {
@@ -3390,6 +4101,7 @@
         ? `Selected ${selectedHours} / ${requiredHours} hr`
         : `Selected ${selectedSessions} / ${requiredSessions}`;
     }
+    updateNaTableFooter();
     if (enrollWizardStep === 'markNa') syncEnrollmentWizardPrimaryButton();
   }
 
@@ -3400,8 +4112,9 @@
       updateSessionCountHint(null);
       return null;
     }
+    const useLocal = canUseLocalAlignment();
     try {
-      if (showSpinner) showBusy('Counting sessions...');
+      if (showSpinner && !useLocal) showBusy('Counting sessions...');
       const alignment = await fetchEnrollmentSessionAlignment(body);
       lastAlignmentResult = alignment;
       updateSessionCountHint(alignment);
@@ -3418,7 +4131,7 @@
       }
       return null;
     } finally {
-      if (showSpinner) hideBusy();
+      if (showSpinner && !useLocal) hideBusy();
     }
   }
 
@@ -3426,7 +4139,7 @@
     if (alignmentDebounceTimer) clearTimeout(alignmentDebounceTimer);
     alignmentDebounceTimer = setTimeout(() => {
       alignmentDebounceTimer = null;
-      runAlignmentRefresh({ showSpinner: true });
+      runAlignmentRefresh({ showSpinner: !canUseLocalAlignment() });
     }, 300);
   }
 
@@ -3592,6 +4305,7 @@
       await loadRows();
       clearEntryDraft();
       pendingPlannedNaSessionIds = [];
+      pendingIncludedSessionIds = [];
       clearPendingGapBatch();
     } catch (error) {
       await showMsg('Create Failed', 'error', error.message || 'Unable to create enrollment period.');
@@ -4176,7 +4890,9 @@
       if (wrapped.stop) return null;
     }
     if (!response.ok || (!allowErrorResult && String(result.status || '').toLowerCase() === 'error')) {
-      throw new Error(result?.message || 'Request failed.');
+      const err = new Error(result?.message || 'Request failed.');
+      if (result?.code) err.code = String(result.code);
+      throw err;
     }
     return result;
   }
@@ -4373,7 +5089,7 @@
         const studentNum = String(item?.studentNumber || '').trim();
         qs('inp_studentId').value = id;
         qs('inp_studentLabel').value = studentNum ? `${personName} (${studentNum})` : (personName || id);
-        refreshRollingEligibility();
+        loadRollingEnrollmentWorkspace(id);
         qs('inp_startDate')?.focus();
       }
     }));
@@ -4394,8 +5110,10 @@
     if (qs('inp_targetHours')) qs('inp_targetHours').value = '';
     pendingEnrollmentCapSnapshot = null;
     lastRollingEligibility = null;
+    rollingEnrollmentWorkspace = null;
     lastAlignmentResult = null;
     pendingPlannedNaSessionIds = [];
+    pendingIncludedSessionIds = [];
     clearPendingGapBatch({ clearFormDraft: true });
     lastConflictReview = null;
     conflictReviewHasConflicts = false;
@@ -4456,19 +5174,11 @@
 
     if (enrollWizardStep === 'addSessions') {
       const alignment = await refreshAlignmentWithStagedSessions();
-      const status = String(alignment?.alignmentStatus || '');
-      if (status === 'insufficient_sessions' || status === 'insufficient_hours') {
-        const msg = hasTargetHours()
-          ? 'Stage enough sessions to match the hour target before continuing.'
-          : 'Stage enough sessions to match Number of Sessions before continuing.';
-        await showMsg('Sessions required', 'warning', msg);
+      if (!await validateEnrollmentPickForContinue()) {
         syncEnrollmentWizardPrimaryButton();
         return;
       }
-      if (status === 'overage_requires_na') {
-        goEnrollmentMarkNaStep(alignment, { skippedAddSessions: false });
-        return;
-      }
+      syncPlannedNaFromIncludedSelection();
       if (pendingStagedSessions.length) {
         const loaded = await loadConflictReviewStep();
         if (!loaded) return;
@@ -5038,14 +5748,7 @@
   qs('btn_pickStudent')?.addEventListener('click', pickStudent);
   qs('btn_addPeriod')?.addEventListener('click', addPeriod);
   qs('btn_enrollWizardBack')?.addEventListener('click', goEnrollmentWizardBack);
-  qs('btn_gapGoMarkNa')?.addEventListener('click', async () => {
-    const alignment = await refreshAlignmentWithStagedSessions();
-    if (!alignmentRequiresMarkNa(alignment)) {
-      await showMsg('No action needed', 'info', 'Session hours already match the target.');
-      return;
-    }
-    goEnrollmentMarkNaStep(alignment, { skippedAddSessions: false });
-  });
+  qs('btn_gapOpenCalendarPicker')?.addEventListener('click', openEnrollmentSessionCalendarModal);
   qs('btn_shortcutPreview')?.addEventListener('click', previewProgramRegistrationShortcut);
   qs('btn_shortcutBack')?.addEventListener('click', returnToProgramRegistrationShortcutDetails);
   qs('btn_shortcutSaveDraft')?.addEventListener('click', saveProgramRegistrationShortcutDraft);
@@ -5065,6 +5768,7 @@
     if (event?.target) event.target.dataset.userEdited = '1';
     readEnrollmentCapFields();
     pendingPlannedNaSessionIds = [];
+    pendingIncludedSessionIds = [];
     applyEnrollmentCapMutualExclusion('inp_targetSessionCount');
     if (alignmentDebounceTimer) clearTimeout(alignmentDebounceTimer);
     alignmentDebounceTimer = setTimeout(() => {
@@ -5075,6 +5779,7 @@
   qs('inp_targetHours')?.addEventListener('input', () => {
     readEnrollmentCapFields();
     pendingPlannedNaSessionIds = [];
+    pendingIncludedSessionIds = [];
     applyEnrollmentCapMutualExclusion('inp_targetHours');
     if (alignmentDebounceTimer) clearTimeout(alignmentDebounceTimer);
     alignmentDebounceTimer = setTimeout(() => {
@@ -5109,6 +5814,11 @@
     input.addEventListener('change', scheduleGapFormDraftCapture);
   });
   function handleStagedSessionTableClick(event) {
+    const pickBtn = event.target?.closest?.('.enrollment-session-pick');
+    if (pickBtn) {
+      toggleEnrollmentSessionPick(pickBtn);
+      return;
+    }
     const btn = event.target?.closest?.('.btn-remove-staged');
     if (!btn) return;
     const sessionId = String(btn.getAttribute('data-session-id') || '').trim();
@@ -5118,8 +5828,16 @@
   qs('gapSessionsTbody')?.addEventListener('click', handleStagedSessionTableClick);
   qs('formEnrollmentSessionsTbody')?.addEventListener('click', handleStagedSessionTableClick);
   qs('enrollmentSessionListTbody')?.addEventListener('click', handleStagedSessionTableClick);
-  qs('naSessionsTbody')?.addEventListener('change', (event) => {
-    if (event.target && event.target.classList.contains('na-session-cb')) updateNaSelectionCounter();
+  qs('naSessionsTbody')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('.na-session-toggle');
+    if (!btn) return;
+    const selected = btn.classList.toggle('is-selected');
+    btn.classList.toggle('btn-success', selected);
+    btn.classList.toggle('btn-outline-secondary', !selected);
+    btn.textContent = selected ? 'N/A' : 'Mark N/A';
+    const row = btn.closest('tr');
+    if (row) row.classList.toggle('na-session-row-selected', selected);
+    updateNaSelectionCounter();
   });
   addEnrollmentModalEl?.addEventListener('hidden.bs.modal', () => {
     if (enrollWizardStep === 'addSessions' || pendingStagedSessions.length) captureGapFormDraft();
@@ -5147,6 +5865,21 @@
   rollingFilterCollapse?.addEventListener('hide.bs.collapse', () => {
     rollingFilterToggleIcon?.classList.remove('bi-chevron-up');
     rollingFilterToggleIcon?.classList.add('bi-chevron-down');
+  });
+
+  const gapSessionsWindowCollapse = document.getElementById('gapSessionsWindowCollapse');
+  const gapBatchCollapse = document.getElementById('gapBatchCollapse');
+  gapSessionsWindowCollapse?.addEventListener('show.bs.collapse', () => {
+    qs('btn_gapSessionsCollapseToggle')?.setAttribute('aria-expanded', 'true');
+  });
+  gapSessionsWindowCollapse?.addEventListener('hide.bs.collapse', () => {
+    qs('btn_gapSessionsCollapseToggle')?.setAttribute('aria-expanded', 'false');
+  });
+  gapBatchCollapse?.addEventListener('show.bs.collapse', () => {
+    qs('btn_gapBatchCollapseToggle')?.setAttribute('aria-expanded', 'true');
+  });
+  gapBatchCollapse?.addEventListener('hide.bs.collapse', () => {
+    qs('btn_gapBatchCollapseToggle')?.setAttribute('aria-expanded', 'false');
   });
 
   resetChargeModalState();

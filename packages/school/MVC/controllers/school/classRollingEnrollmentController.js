@@ -36,6 +36,7 @@ const academicSnapshotService = require('../../services/school/academicSnapshotS
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
+const rollingEnrollmentWorkspaceService = require('../../services/school/rollingEnrollmentWorkspaceService');
 const rollingEnrollmentFunderService = require('../../services/school/rollingEnrollmentFunderService');
 const rollingEnrollmentPeriodFilterService = require('../../services/school/rollingEnrollmentPeriodFilterService');
 const rollingEnrollmentExcelExportService = require('../../services/school/rollingEnrollmentExcelExportService');
@@ -1970,6 +1971,277 @@ async function assertRollingEnrollmentPrerequisitesOrThrow(req, classData, stude
   }
 }
 
+function resolveRollingEnrollmentSaveErrorCode(message = '') {
+  const text = String(message || '').trim().toLowerCase();
+  if (!text) return 'ROLLING_ENROLLMENT_FAILED';
+  if (text.includes('prerequisite') || text.includes('not eligible') || text.includes('program registration')) {
+    return 'ROLLING_ELIGIBILITY_FAILED';
+  }
+  if (text.includes('conflict') || text.includes('scheduling conflict')) {
+    return 'ROLLING_SCHEDULE_CONFLICT';
+  }
+  if (text.includes('alignment') || text.includes('session target') || text.includes('hour target')
+    || text.includes('insufficient session') || text.includes('insufficient hour')
+    || text.includes('overage_requires_na') || text.includes('not applicable')) {
+    return 'ROLLING_ALIGNMENT_FAILED';
+  }
+  if (text.includes('chargeable') || text.includes('fee category') || text.includes('finance')) {
+    return 'ROLLING_CHARGEABLE_FAILED';
+  }
+  if (text.includes('cycle') && text.includes('closed')) {
+    return 'ROLLING_CYCLE_CLOSED';
+  }
+  if (text.includes('startdate') || text.includes('start date') || text.includes('end date')) {
+    return 'ROLLING_DATE_INVALID';
+  }
+  return 'ROLLING_ENROLLMENT_FAILED';
+}
+
+function formatRollingEnrollmentSaveErrorResponse(error) {
+  const message = String(error?.message || error || 'Rolling enrollment failed.');
+  return {
+    status: 'error',
+    message,
+    code: resolveRollingEnrollmentSaveErrorCode(message)
+  };
+}
+
+async function detectRollingEnrollmentScheduleConflicts(req, classData, student, {
+  startDate = '',
+  endDate = '',
+  workspaceSessions = null,
+  extraSessions = []
+} = {}) {
+  const normalizedStart = String(startDate || '').trim();
+  const normalizedEnd = String(endDate || '').trim();
+  const empty = {
+    hasConflicts: false,
+    message: '',
+    conflicts: null,
+    conflictStudentPersonId: null,
+    conflictStudentLabel: null
+  };
+  if (!normalizedStart) return empty;
+
+  let sessions = Array.isArray(workspaceSessions) ? workspaceSessions.slice() : [];
+  if (!sessions.length) {
+    sessions = await schoolDataService.getClassSessions(classData.id, req.user);
+    sessions = Array.isArray(sessions) ? sessions : [];
+  }
+  const mergedSessions = rollingEnrollmentWorkspaceService.mergeWorkspaceSessions(
+    sessions,
+    Array.isArray(extraSessions) ? extraSessions : []
+  );
+  const filteredSessions = rollingEnrollmentWorkspaceService.filterSessionsInEnrollmentWindow(
+    mergedSessions,
+    normalizedStart,
+    normalizedEnd
+  );
+  if (!filteredSessions.length) return empty;
+
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser: req.user,
+    personIds: [student?.personId]
+  });
+  const studentLabel = schoolPersonAccessService.formatPersonName(
+    personById.get(toPublicId(student?.personId)),
+    toPublicId(student?.id)
+  );
+
+  const conflictResult = await sessionConflictDetectionService.detectStudentScheduleConflicts({
+    orgId: classData.orgId,
+    classId: classData.id,
+    proposedSessions: filteredSessions,
+    studentPersonEntries: [{
+      studentId: student.id,
+      personId: student.personId,
+      name: studentLabel
+    }],
+    reqUser: req.user
+  });
+
+  if (!conflictResult.length) return empty;
+
+  return {
+    hasConflicts: true,
+    message: "Scheduling conflicts detected with the student's existing schedule.",
+    conflicts: conflictResult,
+    conflictStudentPersonId: student.personId,
+    conflictStudentLabel: studentLabel
+  };
+}
+
+async function buildRollingEnrollmentPrerequisitePayload(req, classData, student, {
+  startDate = '',
+  programRegistrationId = ''
+} = {}) {
+  const effectiveStart = String(startDate || '').trim() || resolveOrgTodayFromRequest(req);
+  let merged;
+  try {
+    merged = await resolveRollingEnrollmentProgramFromStudentRegistrations(req, classData, student, {
+      programRegistrationId
+    });
+  } catch (err) {
+    return {
+      status: 'success',
+      eligible: false,
+      message: String(err?.message || err || ''),
+      resolved: null,
+      prerequisite: {
+        status: 'blocked',
+        issues: [String(err?.message || err || '')],
+        warnings: [],
+        missingSubjects: [],
+        canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+        repairProgramId: ''
+      }
+    };
+  }
+
+  const choices = buildRollingEnrollmentProgramChoices(classData);
+  const labelRow = choices.find((c) => idsEqual(c.programId, merged.programId)
+    && String(c.termId || '') === String(merged.termId || ''))
+    || choices.find((c) => idsEqual(c.programId, merged.programId));
+  const resolvedLabel = labelRow
+    ? labelRow.label
+    : [merged.programId, merged.termId].filter(Boolean).join(' — ');
+
+  const prereqPreview = await buildRollingEnrollmentPrerequisitePreview(
+    req,
+    classData,
+    student,
+    merged.programId,
+    merged.termId,
+    effectiveStart
+  );
+
+  return {
+    status: 'success',
+    eligible: prereqPreview.status !== 'error',
+    resolved: {
+      programId: merged.programId,
+      termId: merged.termId,
+      programRegistrationId: merged.programRegistrationId,
+      registrationDate: merged.registrationDate || '',
+      label: resolvedLabel
+    },
+    prerequisite: {
+      status: prereqPreview.status,
+      issues: Array.isArray(prereqPreview.issues) ? prereqPreview.issues : [],
+      warnings: Array.isArray(prereqPreview.warnings) ? prereqPreview.warnings : [],
+      capacity: (prereqPreview.capacity && typeof prereqPreview.capacity === 'object')
+        ? {
+          max: Number(prereqPreview.capacity.max || 0),
+          enrolled: Number(prereqPreview.capacity.enrolled || 0),
+          isAtCapacity: prereqPreview.capacity.isAtCapacity === true
+        }
+        : { max: 0, enrolled: 0, isAtCapacity: false },
+      missingSubjects: Array.isArray(prereqPreview.missingSubjects) ? prereqPreview.missingSubjects : [],
+      canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+      repairProgramId: prereqPreview.repairProgramId || merged.programId || '',
+      conflicts: null,
+      conflictStudentPersonId: null,
+      conflictStudentLabel: null
+    }
+  };
+}
+
+async function buildRollingEnrollmentEligibilityPayload(req, classData, student, {
+  startDate = '',
+  endDate = '',
+  programRegistrationId = '',
+  workspaceSessions = null
+} = {}) {
+  const effectiveStart = String(startDate || '').trim() || resolveOrgTodayFromRequest(req);
+  let merged;
+  try {
+    merged = await resolveRollingEnrollmentProgramFromStudentRegistrations(req, classData, student, {
+      programRegistrationId
+    });
+  } catch (err) {
+    return {
+      status: 'success',
+      eligible: false,
+      message: String(err?.message || err || ''),
+      resolved: null,
+      prerequisite: {
+        status: 'blocked',
+        issues: [String(err?.message || err || '')],
+        warnings: [],
+        missingSubjects: [],
+        canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+        repairProgramId: ''
+      }
+    };
+  }
+
+  const choices = buildRollingEnrollmentProgramChoices(classData);
+  const labelRow = choices.find((c) => idsEqual(c.programId, merged.programId)
+    && String(c.termId || '') === String(merged.termId || ''))
+    || choices.find((c) => idsEqual(c.programId, merged.programId));
+  const resolvedLabel = labelRow
+    ? labelRow.label
+    : [merged.programId, merged.termId].filter(Boolean).join(' — ');
+
+  const prereqPreview = await buildRollingEnrollmentPrerequisitePreview(
+    req,
+    classData,
+    student,
+    merged.programId,
+    merged.termId,
+    effectiveStart
+  );
+
+  const normalizedStart = String(startDate || '').trim();
+  const normalizedEnd = String(endDate || '').trim();
+  if (normalizedStart && prereqPreview.status !== 'error') {
+    const conflictSlice = await detectRollingEnrollmentScheduleConflicts(req, classData, student, {
+      startDate: normalizedStart,
+      endDate: normalizedEnd,
+      workspaceSessions: workspaceSessions,
+      extraSessions: []
+    });
+    if (conflictSlice.hasConflicts) {
+      if (!Array.isArray(prereqPreview.issues)) prereqPreview.issues = [];
+      prereqPreview.issues.push(conflictSlice.message);
+      prereqPreview.status = 'error';
+      prereqPreview.conflicts = conflictSlice.conflicts;
+      prereqPreview.conflictStudentPersonId = conflictSlice.conflictStudentPersonId;
+      prereqPreview.conflictStudentLabel = conflictSlice.conflictStudentLabel;
+    }
+  }
+
+  return {
+    status: 'success',
+    eligible: prereqPreview.status !== 'error',
+    resolved: {
+      programId: merged.programId,
+      termId: merged.termId,
+      programRegistrationId: merged.programRegistrationId,
+      registrationDate: merged.registrationDate || '',
+      label: resolvedLabel
+    },
+    prerequisite: {
+      status: prereqPreview.status,
+      issues: Array.isArray(prereqPreview.issues) ? prereqPreview.issues : [],
+      warnings: Array.isArray(prereqPreview.warnings) ? prereqPreview.warnings : [],
+      capacity: (prereqPreview.capacity && typeof prereqPreview.capacity === 'object')
+        ? {
+          max: Number(prereqPreview.capacity.max || 0),
+          enrolled: Number(prereqPreview.capacity.enrolled || 0),
+          isAtCapacity: prereqPreview.capacity.isAtCapacity === true
+        }
+        : { max: 0, enrolled: 0, isAtCapacity: false },
+      missingSubjects: Array.isArray(prereqPreview.missingSubjects) ? prereqPreview.missingSubjects : [],
+      canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+      repairProgramId: prereqPreview.repairProgramId || merged.programId || '',
+      conflicts: prereqPreview.conflicts || null,
+      conflictStudentPersonId: prereqPreview.conflictStudentPersonId || null,
+      conflictStudentLabel: prereqPreview.conflictStudentLabel || null
+    }
+  };
+}
+
 async function previewRollingEnrollmentEligibility(req, res) {
   try {
     const classId = toPublicId(req.params.classId || '');
@@ -1987,119 +2259,117 @@ async function previewRollingEnrollmentEligibility(req, res) {
       throw new Error('Student organization does not match the class organization.');
     }
 
-    const effectiveStart = startDate || resolveOrgTodayFromRequest(req);
-    let merged;
-    try {
-      merged = await resolveRollingEnrollmentProgramFromStudentRegistrations(req, classData, student, {
-        programRegistrationId: req.query.programRegistrationId
-      });
-    } catch (err) {
-      return res.json({
-        status: 'success',
-        eligible: false,
-        message: String(err?.message || err || ''),
-        resolved: null,
-        prerequisite: {
-          status: 'blocked',
-          issues: [String(err?.message || err || '')],
-          warnings: [],
-          missingSubjects: [],
-          canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
-          repairProgramId: ''
-        }
-      });
+    const payload = await buildRollingEnrollmentEligibilityPayload(req, classData, student, {
+      startDate,
+      endDate: String(req.query.endDate || '').trim(),
+      programRegistrationId: req.query.programRegistrationId
+    });
+    return res.json(payload);
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function postRollingEnrollmentWorkspace(req, res) {
+  try {
+    const classId = toPublicId(req.params.classId || req.body?.classId || '');
+    const studentId = toPublicId(req.body?.studentId || req.query?.studentId || '');
+    if (!classId) throw new Error('classId is required.');
+    if (!studentId) throw new Error('studentId is required.');
+
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const student = await schoolDataService.getDataById('students', studentId, req.user);
+    if (!student) throw new Error('Student not found.');
+    if (!idsEqual(student?.orgId, classData?.orgId)) {
+      throw new Error('Student organization does not match the class organization.');
     }
 
-    const choices = buildRollingEnrollmentProgramChoices(classData);
-    const labelRow = choices.find((c) => idsEqual(c.programId, merged.programId)
-      && String(c.termId || '') === String(merged.termId || ''))
-      || choices.find((c) => idsEqual(c.programId, merged.programId));
-    const resolvedLabel = labelRow
-      ? labelRow.label
-      : [merged.programId, merged.termId].filter(Boolean).join(' â€” ');
-
-    const prereqPreview = await buildRollingEnrollmentPrerequisitePreview(
-      req,
+    const workspace = await rollingEnrollmentWorkspaceService.buildRollingEnrollmentWorkspace({
       classData,
-      student,
-      merged.programId,
-      merged.termId,
-      effectiveStart
-    );
-
-    const endDate = String(req.query.endDate || '').trim();
-    if (startDate && prereqPreview.status !== 'error') {
-      const sessions = await schoolDataService.getClassSessions(classData.id, req.user);
-      const filteredSessions = (Array.isArray(sessions) ? sessions : []).filter((s) => {
-        const sDate = String(s?.date || '').trim();
-        if (!sDate) return false;
-        if (sDate < startDate) return false;
-        if (endDate && sDate > endDate) return false;
-        return true;
-      });
-      
-      if (filteredSessions.length > 0) {
-        const personById = await schoolPersonAccessService.buildPersonByIdMap({
-          reqUser: req.user,
-          personIds: [student?.personId]
-        });
-        const studentLabel = schoolPersonAccessService.formatPersonName(
-          personById.get(toPublicId(student?.personId)),
-          toPublicId(student?.id)
-        );
-        
-        const conflictResult = await sessionConflictDetectionService.detectStudentScheduleConflicts({
-          orgId: classData.orgId,
-          classId: classData.id,
-          proposedSessions: filteredSessions,
-          studentPersonEntries: [{
-            studentId: student.id,
-            personId: student.personId,
-            name: studentLabel
-          }],
-          reqUser: req.user
-        });
-        
-        if (conflictResult.length > 0) {
-          const conflictMsg = "Scheduling conflicts detected with the student's existing schedule.";
-          if (!Array.isArray(prereqPreview.issues)) prereqPreview.issues = [];
-          prereqPreview.issues.push(conflictMsg);
-          prereqPreview.status = 'error';
-          prereqPreview.conflicts = conflictResult;
-          prereqPreview.conflictStudentPersonId = student.personId;
-          prereqPreview.conflictStudentLabel = studentLabel;
-        }
-      }
-    }
+      studentId,
+      reqUser: req.user
+    });
+    const eligibility = await buildRollingEnrollmentEligibilityPayload(req, classData, student, {
+      startDate: String(req.body?.startDate || req.query?.startDate || '').trim(),
+      endDate: String(req.body?.endDate || req.query?.endDate || '').trim(),
+      programRegistrationId: req.body?.programRegistrationId || req.query?.programRegistrationId,
+      workspaceSessions: workspace.sessions
+    });
+    workspace.eligibility = eligibility;
+    workspace.studentId = studentId;
 
     return res.json({
       status: 'success',
-      eligible: prereqPreview.status !== 'error',
-      resolved: {
-        programId: merged.programId,
-        termId: merged.termId,
-        programRegistrationId: merged.programRegistrationId,
-        registrationDate: merged.registrationDate || '',
-        label: resolvedLabel
-      },
-      prerequisite: {
-        status: prereqPreview.status,
-        issues: Array.isArray(prereqPreview.issues) ? prereqPreview.issues : [],
-        warnings: Array.isArray(prereqPreview.warnings) ? prereqPreview.warnings : [],
-        capacity: (prereqPreview.capacity && typeof prereqPreview.capacity === 'object')
-          ? {
-            max: Number(prereqPreview.capacity.max || 0),
-            enrolled: Number(prereqPreview.capacity.enrolled || 0),
-            isAtCapacity: prereqPreview.capacity.isAtCapacity === true
-          }
-          : { max: 0, enrolled: 0, isAtCapacity: false },
-        missingSubjects: Array.isArray(prereqPreview.missingSubjects) ? prereqPreview.missingSubjects : [],
-        canCreatePriorCredits: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
-        repairProgramId: prereqPreview.repairProgramId || merged.programId || '',
-        conflicts: prereqPreview.conflicts || null,
-        conflictStudentPersonId: prereqPreview.conflictStudentPersonId || null,
-        conflictStudentLabel: prereqPreview.conflictStudentLabel || null
-      }
+      message: 'Rolling enrollment workspace loaded.',
+      data: workspace
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function postRollingEnrollmentPrerequisites(req, res) {
+  try {
+    const classId = toPublicId(req.params.classId || req.body?.classId || '');
+    const studentId = toPublicId(req.body?.studentId || '');
+    if (!classId) throw new Error('classId is required.');
+    if (!studentId) throw new Error('studentId is required.');
+
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const student = await schoolDataService.getDataById('students', studentId, req.user);
+    if (!student) throw new Error('Student not found.');
+    if (!idsEqual(student?.orgId, classData?.orgId)) {
+      throw new Error('Student organization does not match the class organization.');
+    }
+
+    const payload = await buildRollingEnrollmentPrerequisitePayload(req, classData, student, {
+      startDate: String(req.body?.startDate || '').trim(),
+      programRegistrationId: req.body?.programRegistrationId
+    });
+    return res.json({
+      status: 'success',
+      message: 'Rolling enrollment prerequisites evaluated.',
+      data: payload
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function postRollingEnrollmentConflicts(req, res) {
+  try {
+    const classId = toPublicId(req.params.classId || req.body?.classId || '');
+    const studentId = toPublicId(req.body?.studentId || '');
+    if (!classId) throw new Error('classId is required.');
+    if (!studentId) throw new Error('studentId is required.');
+
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const student = await schoolDataService.getDataById('students', studentId, req.user);
+    if (!student) throw new Error('Student not found.');
+    if (!idsEqual(student?.orgId, classData?.orgId)) {
+      throw new Error('Student organization does not match the class organization.');
+    }
+
+    const workspaceSessions = Array.isArray(req.body?.persistedSessions) ? req.body.persistedSessions : null;
+    const extraSessions = rollingEnrollmentSessionAlignmentService.parsePendingStagedSessions(req.body);
+    const conflictSlice = await detectRollingEnrollmentScheduleConflicts(req, classData, student, {
+      startDate: String(req.body?.startDate || '').trim(),
+      endDate: String(req.body?.endDate || '').trim(),
+      workspaceSessions,
+      extraSessions
+    });
+    return res.json({
+      status: 'success',
+      message: conflictSlice.hasConflicts
+        ? 'Scheduling conflicts detected.'
+        : 'No scheduling conflicts detected.',
+      data: conflictSlice
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
@@ -2490,7 +2760,7 @@ async function postExecuteRollingEnrollment(req, res) {
     };
     return res.json(payloadOut);
   } catch (error) {
-    return res.status(400).json({ status: 'error', message: error.message });
+    return res.status(400).json(formatRollingEnrollmentSaveErrorResponse(error));
   }
 }
 
@@ -2545,6 +2815,10 @@ async function postEnrollmentSessionPicker(req, res) {
       sessionsToCreate,
       viewPreset: String(req.body?.viewPreset || 'week').trim(),
       anchorDate: String(req.body?.anchorDate || '').trim(),
+      persistedSessions: Array.isArray(req.body?.persistedSessions) ? req.body.persistedSessions : null,
+      statusMapOverride: (req.body?.statusMap && typeof req.body.statusMap === 'object')
+        ? req.body.statusMap
+        : null,
       reqUser: req.user
     });
 
@@ -4575,6 +4849,9 @@ module.exports = {
   previewClassEnrollmentStatusTransition,
   applyClassEnrollmentStatusTransition,
   postEnrollmentSessionAlignment,
+  postRollingEnrollmentWorkspace,
+  postRollingEnrollmentPrerequisites,
+  postRollingEnrollmentConflicts,
   postEnrollmentSessionPicker,
   postExecuteRollingEnrollment,
   postPreviewBatchSessions,

@@ -1,0 +1,56 @@
+<div id="sessionEnrollmentStageModal" class="session-enrollment-stage-overlay d-none" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="sessionEnrollmentStageModalTitle">
+  <div class="session-enrollment-stage-backdrop" data-stage-dismiss="1" aria-hidden="true"></div>
+  <div class="session-enrollment-stage-panel card shadow">
+    <div class="card-header py-2 d-flex align-items-start justify-content-between gap-2">
+      <div>
+        <h5 class="card-title mb-0" id="sessionEnrollmentStageModalTitle">Stage sessions</h5>
+        <div class="small text-muted" id="sessionEnrollmentStageContext"></div>
+      </div>
+      <button type="button" class="btn-close" data-stage-dismiss="1" aria-label="Close"></button>
+    </div>
+    <div class="card-body py-2">
+      <div class="session-stage-section mb-3">
+        <div class="session-stage-label small text-muted mb-1">Duration</div>
+        <div class="session-stage-btn-group d-flex flex-wrap gap-2" id="sessionEnrollmentStageDurationGroup" role="group" aria-label="Session duration">
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-stage-duration="0.5">30 Mins</button>
+          <button type="button" class="btn btn-outline-secondary session-stage-chip active" data-stage-duration="1">1 Hr</button>
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-stage-duration="1.5">1:30 Hrs</button>
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-stage-duration="2">2 Hrs</button>
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-stage-duration="2.5">2:30 Hrs</button>
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-stage-duration="3">3 Hrs</button>
+        </div>
+      </div>
+      <div class="session-stage-section mb-3">
+        <div class="session-stage-label small text-muted mb-1">Weekdays</div>
+        <div class="session-stage-btn-group d-flex flex-wrap gap-2" id="sessionEnrollmentStageWeekdayGroup" role="group" aria-label="Weekdays">
+          <% ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach((label, idx) => { %>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-weekday" data-stage-weekday="<%= idx %>"><%= label %></button>
+          <% }) %>
+        </div>
+      </div>
+      <div class="session-stage-section mb-2">
+        <div class="session-stage-label small text-muted mb-1">Number of sessions</div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <div class="btn-group session-stage-stepper" role="group" aria-label="Session count stepper">
+            <button type="button" class="btn btn-outline-secondary" id="btn_sessionEnrollmentStageCountDown" aria-label="Decrease session count"><i class="bi bi-dash-lg"></i></button>
+            <span class="btn btn-light session-stage-count-display" id="sessionEnrollmentStageCountDisplay" aria-live="polite">4</span>
+            <button type="button" class="btn btn-outline-secondary" id="btn_sessionEnrollmentStageCountUp" aria-label="Increase session count"><i class="bi bi-plus-lg"></i></button>
+          </div>
+          <div class="session-stage-btn-group d-flex flex-wrap gap-2" id="sessionEnrollmentStageCountChips" role="group" aria-label="Quick session counts">
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="1">1</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="2">2</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip active" data-stage-count="4">4</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="6">6</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="8">8</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="12">12</button>
+          </div>
+        </div>
+      </div>
+      <div class="small text-warning d-none" id="sessionEnrollmentStageCapacityWarning" role="status"></div>
+    </div>
+    <div class="card-footer py-2 d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-secondary btn-sm" data-stage-dismiss="1">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn_sessionEnrollmentStageCreate">Create staged sessions</button>
+    </div>
+  </div>
+</div>
