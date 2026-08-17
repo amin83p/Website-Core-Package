@@ -2680,7 +2680,7 @@ schoolRepositories.studentTermRegistrations.existsActiveByProgramRegistrationId 
 
 function isBlockingClassEnrollmentForProgramRollback(status) {
   const normalized = String(status || '').trim().toLowerCase();
-  return !['withdrawn', 'cancelled', 'archived', 'error'].includes(normalized);
+  return !['withdrawn', 'cancelled', 'archived', 'error', 'void', 'rolled_back'].includes(normalized);
 }
 
 schoolRepositories.classEnrollmentPeriods.findBlockingByStudentAndProgram = async (studentId, programId, options = {}) => {

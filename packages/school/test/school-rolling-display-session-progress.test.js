@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const applicabilityService = require('../MVC/services/school/classEnrollmentSessionApplicabilityService');
 const alignmentService = require('../MVC/services/school/rollingEnrollmentSessionAlignmentService');
 const attendanceMatrixMetricsService = require('../MVC/services/school/attendanceMatrixMetricsService');
+const progressService = require('../MVC/services/school/classEnrollmentPeriodProgressService');
 
 const studentToPersonMap = new Map([['STU_001', 'PER_001']]);
 
@@ -89,4 +90,27 @@ test('open-ended enrollment without explicit target has no display target', () =
   });
   assert.equal(displayTarget.targetSource, 'none');
   assert.equal(displayTarget.effectiveTargetSessionCount, null);
+});
+
+test('formatEnrollmentCapDisplay shows combined session and hour progress for hour targets', () => {
+  const row = {
+    targetHours: 20,
+    allocatedSessionCount: 7,
+    consumedSessionCount: 3,
+    consumedHours: 9,
+    remainingSessionCount: 4,
+    remainingHours: 11
+  };
+  assert.equal(
+    progressService.formatEnrollmentCapDisplay(row, 'target'),
+    '7 Sessions (20 Hrs)'
+  );
+  assert.equal(
+    progressService.formatEnrollmentCapDisplay(row, 'consumed'),
+    '3 (9 Hrs)'
+  );
+  assert.equal(
+    progressService.formatEnrollmentCapDisplay(row, 'remaining'),
+    '4 (11 Hrs)'
+  );
 });

@@ -68,6 +68,7 @@ test('manageSession passes conduct rating scale to session manager view', () => 
   assert.match(source, /async function saveSessionConduct/);
   assert.match(source, /parseConductReadyFlag/);
   assert.match(source, /conductPrefillByPersonId/);
+  assert.match(source, /sessionHasConductRequiredReports/);
   assert.match(source, /emptyConductPercents\(\)/);
   assert.match(source, /normalizeSessionRatingPercent\(value, fallback = null\)/);
 });
@@ -95,20 +96,32 @@ test('session manager places optional conduct after attendance and Step 1 only i
   assert.ok(optionalIdx > attendanceIdx && optionalIdx < assignmentsIdx, 'optional conduct UI should live outside reports tab');
 
   assert.match(source, /id="sessionReportConductStep"/);
-  assert.match(source, /Step 1 — Class Conduct/);
-  assert.match(source, /id="btnSaveSessionConduct"/);
-  assert.match(source, /id="sessionReportWorkflowToolbar"/);
+  assert.match(source, /id="sessionReportConductDataHost"/);
+  assert.match(source, /id="sessionReportWorkflowHeader"/);
+  assert.doesNotMatch(source, /id="sessionReportWorkflowToolbar"/);
+  assert.match(source, /id="sessionConductStepStatus"/);
+  assert.match(source, /id="btnReportWorkflowNextInline"/);
+  assert.match(source, /id="btnSaveConductFromModal"/);
+  assert.match(source, /id="btnCancelConductModal"/);
   assert.match(source, /id="sessionReportWorkflowProgress"/);
-  assert.match(source, /id="sessionReportWorkflowNav"/);
+  assert.doesNotMatch(source, /id="sessionReportWorkflowNav"/);
   assert.match(source, /id="btnReportWorkflowPrevious"/);
-  assert.match(source, /id="btnReportWorkflowNext"/);
+  assert.match(source, /id="btnReportWorkflowPreviousAfter"/);
+  assert.match(source, /js-report-workflow-back-to-conduct/);
+  assert.match(source, /Back to Class Conduct/);
+  assert.doesNotMatch(source, /Previous step/);
   assert.match(source, /syncReportWorkflowStepUi/);
+  assert.match(source, /instancesStep\?\.classList\.toggle\('d-none', showStep1\)/);
   assert.match(source, /currentReportWorkflowStep/);
-  assert.match(source, /conductReadyForReports \? ' d-none' : ''/);
-  assert.match(source, /\(hasSessionReportsAssigned && !conductReadyForReports\) \? ' d-none' : ''/);
-  assert.match(source, /Rate every student, then save to unlock report filling/);
-  assert.match(source, /Previous step/);
-  assert.match(source, /Next step/);
+  assert.match(source, /sessionHasConductRequiredReports/);
+  assert.match(source, /sessionReportConductRequiredBeforeFill/);
+  assert.match(source, /conductRequiredBeforeFill/);
+  assert.doesNotMatch(source, /\(hasSessionReportsAssigned && !conductReadyForReports\) \? ' d-none' : ''/);
+  assert.match(source, /Rate every student with <strong>Quick Rate<\/strong>/);
+  assert.match(source, /conductModalDirty/);
+  assert.match(source, /conductModalSnapshot/);
+  assert.match(source, /Discard changes/);
+  assert.doesNotMatch(source, /id="btnSaveSessionConduct"/);
   assert.doesNotMatch(source, /id="btnBackToSessionConduct"/);
   assert.doesNotMatch(source, /id="btnContinueToSessionReports"/);
   assert.match(source, /conduct-code-btn/);
@@ -126,8 +139,13 @@ test('session manager places optional conduct after attendance and Step 1 only i
   assert.match(source, /code: 'NI'/);
   assert.match(source, /code: 'U'/);
   assert.match(source, /js-report-action-requires-conduct/);
+  assert.match(source, /id="btnSessionFillReports"/);
   assert.match(source, /Fill Reports<\/a>/);
   assert.match(source, /target="_blank" rel="noopener noreferrer" title="Open Fill Reports in a new tab"/);
+  assert.match(source, /id="sessionReportInstancesStatusSummary"/);
+  assert.match(source, /id="sessionReportInstancesCollapse"/);
+  assert.match(source, /formatReportInstanceStatusSummary/);
+  assert.match(source, /Total: \$\{counts\.total\}; Pending: \$\{counts\.pending\}; Drafted: \$\{counts\.drafted\}; Submitted: \$\{counts\.submitted\}; Locked: \$\{counts\.locked\}/);
   assert.match(source, /id="btnOpenConductBulkModal"/);
   assert.match(source, /id="conductBulkRatingModal"/);
   assert.match(source, /id="btnConductBulkSetAllSuperior"/);
@@ -204,10 +222,49 @@ test('sessionConductService marks ready on save and blocks until ready', async (
     schoolDataService
   });
   await sessionConductService.assertAssignmentSessionConductReadyOrThrow({
+    assignment: { classId: 'c1', sessionId: 'sess-1', targetType: 'session', conductRequiredBeforeFill: false },
+    reqUser: {},
+    schoolDataService: {
+      getClassSessions: async () => [{ sessionId: 'sess-1', conductReadyForReports: false }]
+    }
+  });
+  await sessionConductService.assertAssignmentSessionConductReadyOrThrow({
     assignment: { classId: 'c1', targetType: 'class' },
     reqUser: {},
     schoolDataService: { getClassSessions: async () => { throw new Error('should not load'); } }
   });
+});
+
+test('assignmentRequiresConductBeforeFill defaults to true and can be disabled per assignment', () => {
+  assert.equal(sessionConductService.assignmentRequiresConductBeforeFill({}), true);
+  assert.equal(sessionConductService.assignmentRequiresConductBeforeFill({ conductRequiredBeforeFill: false }), false);
+  assert.equal(sessionConductService.assignmentRequiresConductBeforeFill({
+    conductRequiredBeforeFill: false,
+    targetRows: [{ rowId: 'row-1', conductRequiredBeforeFill: true }]
+  }, { assignmentRowId: 'row-1' }), true);
+});
+
+test('report assignment and template models persist conductRequiredBeforeFill', () => {
+  const assignmentModel = read('packages/school/MVC/models/school/reportAssignmentModel.js');
+  const templateModel = read('packages/school/MVC/models/school/reportTemplateModel.js');
+  assert.match(assignmentModel, /conductRequiredBeforeFill/);
+  assert.match(templateModel, /conductRequiredBeforeFill/);
+});
+
+test('assignment and template forms expose conduct requirement controls', () => {
+  const assignmentForm = read('packages/school/MVC/views/school/report/assignmentForm.ejs');
+  const templateForm = read('packages/school/MVC/views/school/report/templateForm.ejs');
+  assert.match(assignmentForm, /rowModalConductRequiredBeforeFill/);
+  assert.match(assignmentForm, /bulkConductRequiredBeforeFill/);
+  assert.match(assignmentForm, /legacyConductRequiredBeforeFillInput/);
+  assert.match(templateForm, /conductRequiredBeforeFill/);
+  assert.match(templateForm, /Require class conduct before filling/);
+});
+
+test('sessionReportInstanceService includes conductRequiredBeforeFill on row DTOs', () => {
+  const source = read('packages/school/MVC/services/school/sessionReportInstanceService.js');
+  assert.match(source, /conductRequiredBeforeFill/);
+  assert.match(source, /assignmentRequiresConductBeforeFill/);
 });
 
 test('sessionConductService optional save updates selected students without ready flag', () => {

@@ -1,0 +1,268 @@
+/* Session enrollment calendar — shared layout for picker modal and schedule views */
+.session-enrollment-calendar-host {
+  min-height: 280px;
+}
+
+.session-vertical-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.schedule-vertical-days {
+  display: flex;
+  gap: 8px;
+  min-height: 420px;
+}
+
+.vertical-day-column {
+  flex: 0 0 var(--session-day-width, 140px);
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.vertical-day-header {
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.vertical-day-header.conflict {
+  background: #f8d7da;
+}
+
+.vertical-day-body {
+  position: relative;
+  height: 360px;
+}
+
+.vertical-hour-markers {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  border-right: 1px solid #eee;
+}
+
+.vertical-hour-marker {
+  height: calc(100% / 15);
+  position: relative;
+}
+
+.vertical-hour-label {
+  font-size: 0.6rem;
+  color: #6c757d;
+  position: absolute;
+  top: 0;
+  right: 2px;
+}
+
+.session-enrollment-block {
+  position: relative;
+  border: 2px solid #0d6efd;
+  border-radius: 4px;
+  background: rgba(13, 110, 253, 0.12);
+  padding: 2px 4px;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  cursor: pointer;
+  overflow: hidden;
+  z-index: 2;
+  user-select: none;
+}
+
+.session-enrollment-block.is-staged {
+  border-style: dashed;
+}
+
+.session-enrollment-block.is-selected {
+  border-color: #198754;
+  background: rgba(25, 135, 84, 0.18);
+  box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.25);
+}
+
+.session-enrollment-block.is-unselectable {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-color: #adb5bd;
+  background: #f8f9fa;
+}
+
+.session-enrollment-block .session-block-teacher {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-enrollment-block .session-block-hours {
+  color: #495057;
+}
+
+.session-enrollment-block .session-manage-link {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.75rem;
+  color: #0d6efd;
+  line-height: 1;
+  padding: 2px;
+  z-index: 3;
+}
+
+.session-enrollment-block .session-manage-link:hover {
+  color: #0a58ca;
+}
+
+.timeline-container {
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+.timeline-header {
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+}
+
+.timeline-body {
+  position: relative;
+  min-height: 76px;
+}
+
+.timeline-body .session-enrollment-block {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 56px;
+}
+
+.vertical-positioned-session {
+  position: absolute;
+}
+
+.hour-markers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.hour-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid #f0f0f0;
+  width: calc(100% / 15);
+}
+
+.hour-marker:nth-child(1) { left: 0; }
+.hour-marker:nth-child(2) { left: calc(100% / 15); }
+.hour-marker:nth-child(3) { left: calc(200% / 15); }
+.hour-marker:nth-child(4) { left: calc(300% / 15); }
+.hour-marker:nth-child(5) { left: calc(400% / 15); }
+.hour-marker:nth-child(6) { left: calc(500% / 15); }
+.hour-marker:nth-child(7) { left: calc(600% / 15); }
+.hour-marker:nth-child(8) { left: calc(700% / 15); }
+.hour-marker:nth-child(9) { left: calc(800% / 15); }
+.hour-marker:nth-child(10) { left: calc(900% / 15); }
+.hour-marker:nth-child(11) { left: calc(1000% / 15); }
+.hour-marker:nth-child(12) { left: calc(1100% / 15); }
+.hour-marker:nth-child(13) { left: calc(1200% / 15); }
+.hour-marker:nth-child(14) { left: calc(1300% / 15); }
+.hour-marker:nth-child(15) { left: calc(1400% / 15); }
+
+.hour-label {
+  font-size: 0.6rem;
+  color: #6c757d;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+}
+
+.single-day-list .session-day-card {
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.single-day-list .session-day-card.is-selected {
+  border-color: #198754;
+  background: rgba(25, 135, 84, 0.08);
+}
+
+.single-day-list .session-day-card.is-unselectable {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.session-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.session-cal-day {
+  aspect-ratio: 1;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 2px;
+  position: relative;
+  background: #fff;
+}
+
+.session-cal-day.empty {
+  background: #fafafa;
+}
+
+.session-cal-day.has-events {
+  cursor: pointer;
+  background: rgba(13, 110, 253, 0.08);
+  border-color: #b6d4fe;
+}
+
+.session-cal-day.has-selected {
+  background: rgba(25, 135, 84, 0.12);
+  border-color: #198754;
+}
+
+.session-cal-badge {
+  font-size: 0.6rem;
+  background: #0d6efd;
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 4px;
+  display: inline-block;
+  line-height: 1.4;
+}
+
+.session-enrollment-toolbar .btn.active {
+  font-weight: 600;
+}
+
+#sessionEnrollmentCalendarSummary {
+  font-size: 0.85rem;
+}

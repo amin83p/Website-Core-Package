@@ -1,5 +1,6 @@
 const schoolDataService = require('./schoolDataService');
 const reportViewService = require('./reportViewService');
+const sessionConductService = require('./sessionConductService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -112,6 +113,10 @@ function mapRowToDto(row = {}, assignmentMap = new Map()) {
     actionLabel: isPending ? 'Start' : 'Open V2',
     assignmentId,
     assignmentRowId,
+    conductRequiredBeforeFill: sessionConductService.assignmentRequiresConductBeforeFill(
+      assignment || {},
+      { assignmentRowId }
+    ),
     statusBadgeClass: formatInstanceStatusBadgeClass(status, isPending)
   };
 }

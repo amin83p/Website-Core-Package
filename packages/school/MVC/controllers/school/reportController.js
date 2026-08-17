@@ -934,6 +934,9 @@ async function saveAssignment(req, res) {
       notes,
       timesheetReflection: firstActiveRow.timesheetReflection,
       allocatedHours: firstActiveRow.timesheetReflection ? Number(firstActiveRow.allocatedHours) : 0,
+      conductRequiredBeforeFill: firstActiveRow.conductRequiredBeforeFill !== undefined
+        ? Boolean(firstActiveRow.conductRequiredBeforeFill)
+        : requestPayload.conductRequiredBeforeFill,
       audit: {
         createUser: existing?.audit?.createUser || req.user?.id || '',
         createDateTime: existing?.audit?.createDateTime || new Date().toISOString(),

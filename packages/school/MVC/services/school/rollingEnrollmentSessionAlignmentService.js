@@ -109,6 +109,7 @@ function classifySessionForWindow(session = {}, { startDate, endDate, statusMap,
     endTime: cleanText(session.endTime || session.end || ''),
     status: cleanText(session.status || 'scheduled'),
     room: cleanText(session.room || ''),
+    durationHours: classEnrollmentSessionApplicabilityService.resolveSessionDurationHours(session),
     inWindow,
     countable,
     excludeReason
@@ -135,26 +136,208 @@ function listSessionsInWindow({ sessions = [], startDate = '', endDate = '', sta
   };
 }
 
+function sumCountableHours(countableSessions = []) {
+  return classEnrollmentSessionApplicabilityService.roundTargetHours(
+    (Array.isArray(countableSessions) ? countableSessions : [])
+      .reduce((sum, row) => sum + Number(row?.durationHours || 0), 0)
+  );
+}
+
+function computeHourAllocation(countableSessions = [], targetHours = 0) {
+  const target = classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours);
+  if (!target) {
+    return { allocatedSessionCount: 0, allocatedHours: 0, gapHours: 0 };
+  }
+  let allocatedHours = 0;
+  let allocatedSessionCount = 0;
+  (Array.isArray(countableSessions) ? countableSessions : []).forEach((row) => {
+    if (allocatedHours >= target) return;
+    const hours = Number(row?.durationHours || 0);
+    allocatedSessionCount += 1;
+    allocatedHours = classEnrollmentSessionApplicabilityService.roundTargetHours(allocatedHours + hours);
+  });
+  return {
+    allocatedSessionCount,
+    allocatedHours,
+    gapHours: Math.max(0, classEnrollmentSessionApplicabilityService.roundTargetHours(target - allocatedHours))
+  };
+}
+
+function evaluateHourAlignment({
+  sessions = [],
+  startDate = '',
+  endDate = '',
+  targetHours = 0,
+  statusMap = {}
+} = {}) {
+  const normalizedStart = normalizeDateOnly(startDate);
+  const normalizedEnd = normalizeDateOnly(endDate);
+  const target = classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours);
+  if (!target) {
+    return {
+      availableCount: 0,
+      availableHours: 0,
+      sessions: [],
+      countableSessions: [],
+      alignmentStatus: 'no_end_date',
+      requiredNaCount: 0,
+      requiredNaHours: 0,
+      gapCount: 0,
+      gapHours: 0,
+      effectiveTarget: 0,
+      effectiveTargetHours: 0,
+      allocatedSessionCount: 0,
+      allocatedHours: 0
+    };
+  }
+
+  if (!normalizedEnd) {
+    const listed = listSessionsInWindow({
+      sessions,
+      startDate: normalizedStart,
+      endDate: '',
+      statusMap
+    });
+    const availableHours = sumCountableHours(listed.countableSessions);
+    const allocation = computeHourAllocation(listed.countableSessions, target);
+    let alignmentStatus = 'ok';
+    let gapHours = 0;
+    let requiredNaHours = 0;
+
+    if (availableHours < target) {
+      alignmentStatus = 'insufficient_hours';
+      gapHours = classEnrollmentSessionApplicabilityService.roundTargetHours(target - availableHours);
+    } else if (availableHours > target) {
+      alignmentStatus = 'overage_requires_na';
+      requiredNaHours = classEnrollmentSessionApplicabilityService.roundTargetHours(availableHours - target);
+    }
+
+    return {
+      availableCount: listed.availableCount,
+      availableHours,
+      sessions: listed.sessions,
+      countableSessions: listed.countableSessions,
+      alignmentStatus,
+      requiredNaCount: 0,
+      requiredNaHours,
+      gapCount: 0,
+      gapHours,
+      effectiveTarget: 0,
+      effectiveTargetHours: target,
+      allocatedSessionCount: allocation.allocatedSessionCount,
+      allocatedHours: allocation.allocatedHours
+    };
+  }
+
+  const listed = listSessionsInWindow({
+    sessions,
+    startDate: normalizedStart,
+    endDate: normalizedEnd,
+    statusMap
+  });
+  const availableHours = sumCountableHours(listed.countableSessions);
+  const allocation = computeHourAllocation(listed.countableSessions, target);
+  let alignmentStatus = 'ok';
+  let gapHours = 0;
+  let requiredNaHours = 0;
+
+  if (availableHours < target) {
+    alignmentStatus = 'insufficient_hours';
+    gapHours = classEnrollmentSessionApplicabilityService.roundTargetHours(target - availableHours);
+  } else if (availableHours > target) {
+    alignmentStatus = 'overage_requires_na';
+    requiredNaHours = classEnrollmentSessionApplicabilityService.roundTargetHours(availableHours - target);
+  }
+
+  return {
+    availableCount: listed.availableCount,
+    availableHours,
+    sessions: listed.sessions,
+    countableSessions: listed.countableSessions,
+    alignmentStatus,
+    requiredNaCount: 0,
+    requiredNaHours,
+    gapCount: 0,
+    gapHours,
+    effectiveTarget: 0,
+    effectiveTargetHours: target,
+    allocatedSessionCount: allocation.allocatedSessionCount,
+    allocatedHours: allocation.allocatedHours
+  };
+}
+
 function evaluateAlignment({
   sessions = [],
   startDate = '',
   endDate = '',
   targetSessionCount = 0,
+  targetHours = 0,
   statusMap = {}
 } = {}) {
+  const hourTarget = classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours);
+  if (hourTarget > 0) {
+    return evaluateHourAlignment({
+      sessions,
+      startDate,
+      endDate,
+      targetHours: hourTarget,
+      statusMap
+    });
+  }
+
   const normalizedStart = normalizeDateOnly(startDate);
   const normalizedEnd = normalizeDateOnly(endDate);
   const target = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(targetSessionCount);
 
   if (!normalizedEnd) {
+    if (target <= 0) {
+      return {
+        availableCount: 0,
+        availableHours: 0,
+        sessions: [],
+        countableSessions: [],
+        alignmentStatus: 'no_end_date',
+        requiredNaCount: 0,
+        requiredNaHours: 0,
+        gapCount: 0,
+        gapHours: 0,
+        effectiveTarget: target,
+        effectiveTargetHours: 0,
+        allocatedSessionCount: 0,
+        allocatedHours: 0
+      };
+    }
+
+    const listed = listSessionsInWindow({
+      sessions,
+      startDate: normalizedStart,
+      endDate: '',
+      statusMap
+    });
+    const availableCount = listed.availableCount;
+    const effectiveTarget = target;
+    let alignmentStatus = 'ok';
+    let gapCount = 0;
+
+    if (availableCount < effectiveTarget) {
+      alignmentStatus = 'insufficient_sessions';
+      gapCount = effectiveTarget - availableCount;
+    }
+
     return {
-      availableCount: 0,
-      sessions: [],
-      countableSessions: [],
-      alignmentStatus: 'no_end_date',
+      availableCount,
+      availableHours: 0,
+      sessions: listed.sessions,
+      countableSessions: listed.countableSessions,
+      alignmentStatus,
       requiredNaCount: 0,
-      gapCount: 0,
-      effectiveTarget: target
+      requiredNaHours: 0,
+      gapCount,
+      gapHours: 0,
+      effectiveTarget,
+      effectiveTargetHours: 0,
+      allocatedSessionCount: 0,
+      allocatedHours: 0
     };
   }
 
@@ -181,12 +364,50 @@ function evaluateAlignment({
 
   return {
     availableCount,
+    availableHours: sumCountableHours(listed.countableSessions),
     sessions: listed.sessions,
     countableSessions: listed.countableSessions,
     alignmentStatus,
     requiredNaCount,
+    requiredNaHours: 0,
     gapCount,
-    effectiveTarget
+    gapHours: 0,
+    effectiveTarget,
+    effectiveTargetHours: 0,
+    allocatedSessionCount: 0,
+    allocatedHours: 0
+  };
+}
+
+function resolveDisplayHourTarget({
+  sessions = [],
+  startDate = '',
+  endDate = '',
+  targetHours = 0,
+  statusMap = {}
+} = {}) {
+  const target = classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours);
+  if (target <= 0) {
+    return {
+      targetHours: 0,
+      effectiveTargetHours: null,
+      allocatedSessionCount: null,
+      targetSource: 'none'
+    };
+  }
+  const alignment = evaluateHourAlignment({
+    sessions,
+    startDate,
+    endDate,
+    targetHours: target,
+    statusMap
+  });
+  return {
+    targetHours: target,
+    effectiveTargetHours: target,
+    allocatedSessionCount: alignment.allocatedSessionCount,
+    allocatedHours: alignment.allocatedHours,
+    targetSource: 'explicit_hours'
   };
 }
 
@@ -233,8 +454,20 @@ function resolveDisplaySessionTarget({
 function validatePlannedNaSelection({
   countableSessions = [],
   targetSessionCount = 0,
-  plannedNaSessionIds = []
+  targetHours = 0,
+  plannedNaSessionIds = [],
+  sessionsById = null
 } = {}) {
+  const hourTarget = classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours);
+  if (hourTarget > 0) {
+    return validatePlannedNaSelectionForHours({
+      countableSessions,
+      targetHours: hourTarget,
+      plannedNaSessionIds,
+      sessionsById
+    });
+  }
+
   const target = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(targetSessionCount);
   const availableCount = (Array.isArray(countableSessions) ? countableSessions : []).length;
   const requiredNaCount = target > 0 && availableCount > target ? availableCount - target : 0;
@@ -265,6 +498,62 @@ function validatePlannedNaSelection({
   return { valid: true, plannedNaSessionIds: ids };
 }
 
+function resolveCountableSessionHours(row = {}, sessionsById = null) {
+  const sessionId = toPublicId(row?.sessionId);
+  if (sessionsById instanceof Map && sessionId && sessionsById.has(sessionId)) {
+    return classEnrollmentSessionApplicabilityService.resolveSessionDurationHours(sessionsById.get(sessionId));
+  }
+  if (Number.isFinite(Number(row?.durationHours)) && Number(row.durationHours) > 0) {
+    return Number(row.durationHours);
+  }
+  return classEnrollmentSessionApplicabilityService.resolveSessionDurationHours(row);
+}
+
+function validatePlannedNaSelectionForHours({
+  countableSessions = [],
+  targetHours = 0,
+  plannedNaSessionIds = [],
+  sessionsById = null
+} = {}) {
+  const target = classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours);
+  const rows = Array.isArray(countableSessions) ? countableSessions : [];
+  const availableHours = sumCountableHours(rows);
+  const requiredNaHours = target > 0 && availableHours > target
+    ? classEnrollmentSessionApplicabilityService.roundTargetHours(availableHours - target)
+    : 0;
+  const ids = sanitizePlannedNaSessionIds(plannedNaSessionIds);
+
+  if (requiredNaHours <= 0) {
+    if (ids.length) {
+      return { valid: false, message: 'No N/A session selection is required for this enrollment.' };
+    }
+    return { valid: true, plannedNaSessionIds: [] };
+  }
+
+  const allowed = new Set(rows.map((row) => toPublicId(row.sessionId)).filter(Boolean));
+  const invalid = ids.filter((id) => !allowed.has(id));
+  if (invalid.length) {
+    return { valid: false, message: 'One or more selected sessions are not countable sessions in this enrollment window.' };
+  }
+
+  let selectedHours = 0;
+  ids.forEach((id) => {
+    const row = rows.find((item) => idsEqual(item.sessionId, id));
+    if (row) selectedHours = classEnrollmentSessionApplicabilityService.roundTargetHours(
+      selectedHours + resolveCountableSessionHours(row, sessionsById)
+    );
+  });
+
+  if (selectedHours < requiredNaHours) {
+    return {
+      valid: false,
+      message: `Select sessions totaling at least ${requiredNaHours} hour(s) to mark N/A (selected ${selectedHours} hr).`
+    };
+  }
+
+  return { valid: true, plannedNaSessionIds: ids };
+}
+
 function extractScheduleDefaults(classData = {}) {
   const schedule = classData?.schedule?.current && typeof classData.schedule.current === 'object'
     ? classData.schedule.current
@@ -283,14 +572,15 @@ function extractScheduleDefaults(classData = {}) {
 }
 
 function computeDurationHours(startTime, endTime) {
-  const start = cleanText(startTime);
-  const end = cleanText(endTime);
-  if (!start || !end) return 0;
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  if (![sh, sm, eh, em].every((n) => Number.isFinite(n))) return 0;
-  const hours = (eh + em / 60) - (sh + sm / 60);
-  return hours > 0 ? Number(hours.toFixed(2)) : 0;
+  return classEnrollmentSessionApplicabilityService.computeDurationHoursFromTimes(startTime, endTime);
+}
+
+function resolveSessionDurationHours(session = {}) {
+  return classEnrollmentSessionApplicabilityService.resolveSessionDurationHours(session);
+}
+
+function isTargetHoursEnforced(targetHours = 0) {
+  return classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours) > 0;
 }
 
 function buildNextSessionId(classId, existingSessions = []) {
@@ -647,15 +937,21 @@ function parseGapBatchSpec(source = {}, defaults = {}) {
   };
 }
 
-async function previewGapBatchSessions({ classData, batchSpec = {}, reqUser } = {}) {
+async function previewGapBatchSessions({ classData, batchSpec = {}, reqUser, additionalSessions = [] } = {}) {
   if (!classData?.id) throw new Error('classData.id is required.');
   const schoolDataService = resolveSchoolDataService();
   const existingSessions = await schoolDataService.getClassSessions(classData.id, reqUser);
-  const proposedSessions = generateBatchSessionRows({ classData, existingSessions, batchSpec });
+  const stagedSessions = Array.isArray(additionalSessions) ? additionalSessions : [];
+  const mergedExistingSessions = [...existingSessions, ...stagedSessions];
+  const proposedSessions = generateBatchSessionRows({
+    classData,
+    existingSessions: mergedExistingSessions,
+    batchSpec
+  });
   return {
     createdCount: proposedSessions.length,
     proposedSessions,
-    existingSessions
+    existingSessions: mergedExistingSessions
   };
 }
 
@@ -815,8 +1111,13 @@ async function commitStagedSessions({
 module.exports = {
   listSessionsInWindow,
   evaluateAlignment,
+  evaluateHourAlignment,
   resolveDisplaySessionTarget,
+  resolveDisplayHourTarget,
+  computeHourAllocation,
+  sumCountableHours,
   validatePlannedNaSelection,
+  validatePlannedNaSelectionForHours,
   extractScheduleDefaults,
   resolveDefaultTeacherFromClass,
   generateBatchSessionRows,
@@ -832,8 +1133,12 @@ module.exports = {
   sanitizePlannedNaSessionIds,
   parsePlannedNaSessionIdsFromBody,
   assertRollingSessionsWithinCycleWindowOrThrow,
+  classifySessionForWindow,
   isEnrollmentSessionCountEnforced,
   isTargetSessionCountEnforced,
+  isTargetHoursEnforced,
+  resolveSessionDurationHours,
+  computeDurationHours,
   computeProposedCycleEndDate,
   computeLatestSessionDate,
   assertEnrollmentSessionAlignmentForCreate

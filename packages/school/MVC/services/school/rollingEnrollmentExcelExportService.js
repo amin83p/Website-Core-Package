@@ -1,5 +1,6 @@
 // packages/school/MVC/services/school/rollingEnrollmentExcelExportService.js
 const ExcelJS = require('exceljs');
+const classEnrollmentPeriodProgressService = require('./classEnrollmentPeriodProgressService');
 const {
   splitDisplayName,
   fitColumnWidthToContent,
@@ -115,7 +116,8 @@ function resolveFinancialStatus(row = {}) {
 
 function formatEndDateCell(row = {}) {
   const explicitTargetSessionCount = Number(row?.targetSessionCount || 0);
-  if (explicitTargetSessionCount > 0) return 'Target-based';
+  const explicitTargetHours = Number(row?.targetHours || 0);
+  if (explicitTargetHours > 0 || explicitTargetSessionCount > 0) return 'Target-based';
   const endDate = clean(row?.endDate);
   return endDate || 'Open';
 }
@@ -131,22 +133,13 @@ function formatCompletionCell(row = {}) {
 }
 
 function resolveTargetConsumedRemaining(row = {}) {
-  const explicitTargetSessionCount = Number(row?.targetSessionCount || 0);
-  const effectiveTargetSessionCount = row?.effectiveTargetSessionCount === null
-    || row?.effectiveTargetSessionCount === undefined
-    ? (explicitTargetSessionCount || null)
-    : Number(row.effectiveTargetSessionCount || 0);
-  const displayTargetSessionCount = explicitTargetSessionCount || effectiveTargetSessionCount;
-  const consumedSessionCount = row?.consumedSessionCount === null || row?.consumedSessionCount === undefined
-    ? null
-    : Number(row.consumedSessionCount || 0);
-  const remainingSessionCount = displayTargetSessionCount !== null && consumedSessionCount !== null
-    ? Math.max(0, Number(row?.remainingSessionCount ?? (displayTargetSessionCount - consumedSessionCount)))
-    : null;
+  const target = classEnrollmentPeriodProgressService.formatEnrollmentCapDisplay(row, 'target');
+  const consumed = classEnrollmentPeriodProgressService.formatEnrollmentCapDisplay(row, 'consumed');
+  const remaining = classEnrollmentPeriodProgressService.formatEnrollmentCapDisplay(row, 'remaining');
   return {
-    target: displayTargetSessionCount !== null ? String(displayTargetSessionCount) : '',
-    consumed: consumedSessionCount !== null ? String(consumedSessionCount) : '',
-    remaining: remainingSessionCount !== null ? String(remainingSessionCount) : ''
+    target: target || '',
+    consumed: consumed || '',
+    remaining: remaining || ''
   };
 }
 

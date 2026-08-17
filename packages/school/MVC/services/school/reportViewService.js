@@ -291,6 +291,7 @@ function parseTargetRowsField(rawValue) {
       taskEndTime: parseTimeValue(row.taskEndTime),
       conflictPermitted: parseBooleanFlag(row.conflictPermitted, false),
       timesheetReflection: parseBooleanFlag(row.timesheetReflection, false),
+      conductRequiredBeforeFill: parseBooleanFlag(row.conductRequiredBeforeFill, true),
       allocatedHours: (() => {
         const n = parseFloat(row.allocatedHours);
         return Number.isFinite(n) ? n : 0;
@@ -944,6 +945,11 @@ function buildTemplateSavePayload({
     status: String(body.status || 'draft').trim().toLowerCase(),
     description: String(body.description || '').trim(),
     allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(submittedAllowedScopes),
+    conductRequiredBeforeFill: String(body.conductRequiredBeforeFillPresent || '').trim()
+      ? parseBooleanFlag(body.conductRequiredBeforeFill, false)
+      : (existingTemplate?.conductRequiredBeforeFill !== undefined
+        ? parseBooleanFlag(existingTemplate.conductRequiredBeforeFill, true)
+        : true),
     schema: buildSchemaFromBuilderPayload(body),
     placeholderMap: buildPlaceholderMapFromPayload(body),
     audit: {
@@ -1093,6 +1099,7 @@ function parseAssignmentSaveRequest(body) {
     status: String(body.status || 'active').trim().toLowerCase(),
     notes: String(body.notes || '').trim(),
     timesheetReflection: parseBooleanFlag(body.timesheetReflection, false),
+    conductRequiredBeforeFill: parseBooleanFlag(body.conductRequiredBeforeFill, true),
     allocatedHours: (() => {
       const n = parseFloat(body.allocatedHours);
       return Number.isFinite(n) ? n : 0;

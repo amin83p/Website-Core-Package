@@ -1,4 +1,4 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -188,6 +188,7 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
     })(),
     completionDecisionNotes: cleanString(input.completionDecisionNotes, { max: 2000, allowEmpty: true }),
     targetSessionCount: sessionCap.targetSessionCount,
+    targetHours: sessionCap.targetHours,
     sessionCountPolicy: sessionCap.sessionCountPolicy,
     completionDate: sessionCap.completionDate,
     completionSessionId: sessionCap.completionSessionId,

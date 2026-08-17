@@ -137,7 +137,7 @@ test('resolveDefaultTeacherFromClass uses active instructor when primaryTeacherI
 
 test('generateBatchSessionRows skips exception dates', () => {
   const created = alignmentService.generateBatchSessionRows({
-    classData: { registrationMode: 'rolling' },
+    classData: { id: 'CLS_ROLL_001', registrationMode: 'rolling' },
     existingSessions: [],
     batchSpec: {
       startDate: '2026-01-05',
@@ -156,6 +156,7 @@ test('generateBatchSessionRows skips exception dates', () => {
 test('generateBatchSessionRows assigns instructor from class when batchSpec teacher is empty', () => {
   const created = alignmentService.generateBatchSessionRows({
     classData: {
+      id: 'CLS_ROLL_001',
       registrationMode: 'rolling',
       instructors: [{ personId: 'PERSON_99', name: 'Lead Teacher', status: 'active' }]
     },
@@ -172,4 +173,118 @@ test('generateBatchSessionRows assigns instructor from class when batchSpec teac
   assert.equal(created.length, 1);
   assert.equal(created[0].delivery.deliveredBy, 'PERSON_99');
   assert.equal(created[0].delivery.deliveredByName, 'Lead Teacher');
+});
+
+test('generateBatchSessionRows assigns ids after unsaved staged sessions', () => {
+  const created = alignmentService.generateBatchSessionRows({
+    classData: { id: 'CLS_ROLL_001', registrationMode: 'rolling' },
+    existingSessions: [{
+      sessionId: 'SES_001',
+      date: '2026-09-01',
+      startTime: '09:00',
+      endTime: '12:00'
+    }],
+    batchSpec: {
+      startDate: '2026-09-08',
+      endDate: '2026-09-08',
+      daysOfWeek: [2],
+      startTime: '09:00',
+      endTime: '12:00',
+      skipExistingDates: false
+    }
+  });
+  assert.equal(created.length, 1);
+  assert.notEqual(created[0].sessionId, 'SES_001');
+});
+
+test('evaluateAlignment reports insufficient_sessions for target enrollment without end date', () => {
+  const result = alignmentService.evaluateAlignment({
+    sessions: [
+      { sessionId: 'SES_001', date: '2026-08-15', status: 'scheduled' }
+    ],
+    startDate: '2026-09-01',
+    endDate: '',
+    targetSessionCount: 15
+  });
+  assert.equal(result.alignmentStatus, 'insufficient_sessions');
+  assert.equal(result.availableCount, 0);
+  assert.equal(result.gapCount, 15);
+  assert.equal(result.effectiveTarget, 15);
+});
+
+test('evaluateAlignment is ok when enough sessions exist from start without end date', () => {
+  const sessions = Array.from({ length: 20 }, (_, index) => ({
+    sessionId: `SES_${index + 1}`,
+    date: `2026-09-${String(index + 1).padStart(2, '0')}`,
+    status: 'scheduled'
+  }));
+  const result = alignmentService.evaluateAlignment({
+    sessions,
+    startDate: '2026-09-01',
+    endDate: '',
+    targetSessionCount: 15
+  });
+  assert.equal(result.alignmentStatus, 'ok');
+  assert.equal(result.availableCount, 20);
+});
+
+function scheduledSession(id, date, durationHours = 3) {
+  return {
+    sessionId: id,
+    date,
+    status: 'scheduled',
+    durationHours
+  };
+}
+
+test('evaluateAlignment reports insufficient_hours for hour target without end date', () => {
+  const result = alignmentService.evaluateAlignment({
+    sessions: [
+      scheduledSession('SES_001', '2026-09-01', 3),
+      scheduledSession('SES_002', '2026-09-08', 3)
+    ],
+    startDate: '2026-09-01',
+    endDate: '',
+    targetHours: 20
+  });
+  assert.equal(result.alignmentStatus, 'insufficient_hours');
+  assert.equal(result.availableHours, 6);
+  assert.equal(result.gapHours, 14);
+  assert.equal(result.effectiveTargetHours, 20);
+});
+
+test('evaluateAlignment reports overage_requires_na when scheduled hours exceed hour target', () => {
+  const sessions = Array.from({ length: 7 }, (_, index) => scheduledSession(
+    `SES_${index + 1}`,
+    `2026-09-${String(index + 1).padStart(2, '0')}`,
+    3
+  ));
+  const result = alignmentService.evaluateAlignment({
+    sessions,
+    startDate: '2026-09-01',
+    endDate: '',
+    targetHours: 20
+  });
+  assert.equal(result.alignmentStatus, 'overage_requires_na');
+  assert.equal(result.availableHours, 21);
+  assert.equal(result.requiredNaHours, 1);
+  assert.equal(result.allocatedSessionCount, 7);
+});
+
+test('evaluateAlignment is ok when scheduled hours match hour target', () => {
+  const sessions = [
+    scheduledSession('SES_001', '2026-09-01', 5),
+    scheduledSession('SES_002', '2026-09-08', 5),
+    scheduledSession('SES_003', '2026-09-15', 5),
+    scheduledSession('SES_004', '2026-09-22', 5)
+  ];
+  const result = alignmentService.evaluateAlignment({
+    sessions,
+    startDate: '2026-09-01',
+    endDate: '',
+    targetHours: 20
+  });
+  assert.equal(result.alignmentStatus, 'ok');
+  assert.equal(result.availableHours, 20);
+  assert.equal(result.allocatedSessionCount, 4);
 });

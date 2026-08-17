@@ -54,6 +54,8 @@ test('rolling enrollment preserves and renders structured program-registration s
   assert.match(controllerSource, /studentAccountId: preview\.studentAccountId/);
   assert.match(controllerSource, /issues: \[message\]/);
   assert.match(viewSource, /\{ allowErrorResult: true \}/);
-  assert.match(viewSource, /setProgramRegistrationShortcutFeedback\('danger', result\.message/);
+  assert.match(viewSource, /notifyProgramRegistrationShortcutOutcome\('danger', result\.message/);
+  assert.match(viewSource, /notifyProgramRegistrationShortcutOutcome/);
+  assert.match(viewSource, /showMessageModal/);
   assert.match(viewSource, /row\?\.message && !issues\.length/);
 });

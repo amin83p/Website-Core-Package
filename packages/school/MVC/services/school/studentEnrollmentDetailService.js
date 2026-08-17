@@ -226,9 +226,14 @@ async function buildClassEnrollmentDetail({
       pricing: period?.pricing || null,
       sessions: {
         targetSessionCount: progress?.targetSessionCount ?? null,
+        targetHours: progress?.targetHours ?? null,
         effectiveTargetSessionCount: progress?.effectiveTargetSessionCount ?? null,
+        effectiveTargetHours: progress?.effectiveTargetHours ?? null,
+        allocatedSessionCount: progress?.allocatedSessionCount ?? null,
         consumedSessionCount: progress?.consumedSessionCount ?? null,
+        consumedHours: progress?.consumedHours ?? null,
         remainingSessionCount: progress?.remainingSessionCount ?? null,
+        remainingHours: progress?.remainingHours ?? null,
         windowSessionCount: progress?.windowSessionCount ?? null,
         targetSource: progress?.targetSource || '',
         sessionCompletion: progress?.sessionCompletion || null

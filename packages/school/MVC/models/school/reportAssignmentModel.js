@@ -1,4 +1,4 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -170,6 +170,7 @@ function sanitizeAssignmentTargetRows(v, input = {}, existing = null) {
     conflictPermitted: input.conflictPermitted,
     timesheetReflection: input.timesheetReflection,
     allocatedHours: input.allocatedHours,
+    conductRequiredBeforeFill: input.conductRequiredBeforeFill,
     teacherId: input.teacherId || (Array.isArray(input.teacherIds) ? input.teacherIds[0] : ''),
     status: input.status,
     notes: input.notes
@@ -209,6 +210,10 @@ function sanitizeAssignmentTargetRows(v, input = {}, existing = null) {
     const rowStatus = cleanString(row?.status, { max: 20, allowEmpty: true }).toLowerCase() || 'active';
     if (!ASSIGNMENT_STATUSES.has(rowStatus)) throw new Error('Invalid assignment row status.');
     const timesheetReflection = cleanBoolean(row?.timesheetReflection, false);
+    const conductRequiredBeforeFill = cleanBoolean(
+      row?.conductRequiredBeforeFill ?? input.conductRequiredBeforeFill,
+      true
+    );
 
     return {
       rowId,
@@ -223,6 +228,7 @@ function sanitizeAssignmentTargetRows(v, input = {}, existing = null) {
       conflictPermitted: cleanBoolean(row?.conflictPermitted, targetType === 'session'),
       timesheetReflection,
       allocatedHours: timesheetReflection ? cleanAllocatedHours(row?.allocatedHours) : 0,
+      conductRequiredBeforeFill,
       teacherId,
       status: rowStatus,
       notes: cleanString(row?.notes, { max: 1500, allowEmpty: true })
@@ -247,6 +253,7 @@ function getEffectiveTargetRows(assignment = {}) {
     conflictPermitted: cleanBoolean(row?.conflictPermitted, String(row?.targetType || '').trim().toLowerCase() === 'session'),
     timesheetReflection: cleanBoolean(row?.timesheetReflection, false),
     allocatedHours: Number(row?.allocatedHours || 0),
+    conductRequiredBeforeFill: cleanBoolean(row?.conductRequiredBeforeFill, true),
     teacherId: cleanString(row?.teacherId, { max: 80, allowEmpty: true }),
     status: cleanString(row?.status, { max: 20, allowEmpty: true }).toLowerCase() || String(assignment?.status || 'active').toLowerCase(),
     notes: cleanString(row?.notes, { max: 1500, allowEmpty: true })
@@ -271,6 +278,7 @@ function getEffectiveTargetRows(assignment = {}) {
     conflictPermitted: cleanBoolean(assignment?.conflictPermitted, targetType === 'session'),
     timesheetReflection: cleanBoolean(assignment?.timesheetReflection, false),
     allocatedHours: Number(assignment?.allocatedHours || 0),
+    conductRequiredBeforeFill: cleanBoolean(assignment?.conductRequiredBeforeFill, true),
     teacherId: cleanString(assignment?.teacherId || (Array.isArray(assignment?.teacherIds) ? assignment.teacherIds[0] : ''), { max: 80, allowEmpty: true }),
     status: cleanString(assignment?.status, { max: 20, allowEmpty: true }).toLowerCase() || 'active',
     notes: cleanString(assignment?.notes, { max: 1500, allowEmpty: true })
@@ -305,6 +313,7 @@ function applyTargetRowToAssignment(assignment = {}, row = null) {
     conflictPermitted: effectiveRow.conflictPermitted,
     timesheetReflection: effectiveRow.timesheetReflection,
     allocatedHours: effectiveRow.allocatedHours,
+    conductRequiredBeforeFill: cleanBoolean(effectiveRow.conductRequiredBeforeFill, true),
     teacherId: effectiveRow.teacherId || '',
     teacherIds: effectiveRow.teacherId ? [effectiveRow.teacherId] : (Array.isArray(assignment?.teacherIds) ? assignment.teacherIds : []),
     rowStatus: effectiveRow.status,
@@ -362,6 +371,7 @@ function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
   const conflictPermitted = firstActiveRow.conflictPermitted;
   const timesheetReflection = firstActiveRow.timesheetReflection;
   const allocatedHours = firstActiveRow.allocatedHours;
+  const conductRequiredBeforeFill = firstActiveRow.conductRequiredBeforeFill;
 
   const out = {
     orgId,
@@ -384,6 +394,7 @@ function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
     targetRows,
     timesheetReflection,
     allocatedHours,
+    conductRequiredBeforeFill,
     sharedAnswers: cleanSharedAnswersObject(
       input.sharedAnswers !== undefined ? input.sharedAnswers : (existing?.sharedAnswers || {})
     ),

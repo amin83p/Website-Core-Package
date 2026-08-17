@@ -337,6 +337,68 @@ document.addEventListener('DOMContentLoaded', function () {
     return token ? escapeHtml(token) : '-';
   }
 
+  function normalizeTargetHoursValue(value) {
+    const parsed = Number.parseFloat(String(value ?? '').trim());
+    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+    const stepped = Math.round(parsed / 0.25) * 0.25;
+    return Number(stepped.toFixed(2));
+  }
+
+  function formatHoursLabel(hours) {
+    const value = normalizeTargetHoursValue(hours);
+    if (!value) return '';
+    return value + ' Hr' + (value === 1 ? '' : 's');
+  }
+
+  function formatEnrollmentCapDisplay(sessionsPayload, kind) {
+    const row = sessionsPayload || {};
+    const targetHours = normalizeTargetHoursValue(row.targetHours);
+    const explicitSessionCount = Number.parseInt(String(row.targetSessionCount ?? '').trim(), 10);
+    const sessionCount = Number.isFinite(explicitSessionCount) && explicitSessionCount > 0 ? explicitSessionCount : 0;
+    const effectiveSessionCount = row.effectiveTargetSessionCount === null || row.effectiveTargetSessionCount === undefined
+      ? (sessionCount || null)
+      : Number(row.effectiveTargetSessionCount || 0);
+    const displaySessionCount = targetHours > 0
+      ? (row.allocatedSessionCount ?? effectiveSessionCount)
+      : (sessionCount || effectiveSessionCount);
+    const consumedSessionCount = row.consumedSessionCount === null || row.consumedSessionCount === undefined
+      ? null
+      : Number(row.consumedSessionCount || 0);
+    const remainingSessionCount = displaySessionCount !== null && consumedSessionCount !== null
+      ? Math.max(0, Number(row.remainingSessionCount ?? (displaySessionCount - consumedSessionCount)))
+      : null;
+    const effectiveHours = targetHours > 0 ? targetHours : null;
+    const consumedHours = row.consumedHours === null || row.consumedHours === undefined
+      ? null
+      : Number(row.consumedHours || 0);
+    const remainingHours = effectiveHours !== null && consumedHours !== null
+      ? Math.max(0, Number(row.remainingHours ?? normalizeTargetHoursValue(effectiveHours - consumedHours)))
+      : null;
+    const withHours = function (sessions, hours) {
+      if (sessions === null || sessions === undefined) return '';
+      const sessionLabel = sessions + ' Session' + (Number(sessions) === 1 ? '' : 's');
+      if (hours !== null && hours !== undefined && targetHours > 0) {
+        return sessionLabel + ' (' + formatHoursLabel(hours) + ')';
+      }
+      return sessionLabel;
+    };
+    if (kind === 'target') {
+      if (displaySessionCount === null && effectiveHours === null) return '-';
+      return withHours(displaySessionCount, effectiveHours);
+    }
+    if (kind === 'consumed') {
+      if (consumedSessionCount === null) return '-';
+      if (targetHours > 0) return consumedSessionCount + ' (' + formatHoursLabel(consumedHours) + ')';
+      return String(consumedSessionCount);
+    }
+    if (kind === 'remaining') {
+      if (remainingSessionCount === null) return '-';
+      if (targetHours > 0) return remainingSessionCount + ' (' + formatHoursLabel(remainingHours) + ')';
+      return String(remainingSessionCount);
+    }
+    return '-';
+  }
+
   async function fetchEnrollmentDetail(url) {
     const headers = {
       'X-Requested-With': 'XMLHttpRequest',
@@ -438,9 +500,9 @@ document.addEventListener('DOMContentLoaded', function () {
       + '</div></div></div><div class="col-lg-6"><div class="card border h-100"><div class="card-body">'
       + '<div class="fw-bold mb-2">Sessions</div>'
       + renderDefinitionList([
-        { label: 'Target', value: sessions.effectiveTargetSessionCount ?? sessions.targetSessionCount ?? '-' },
-        { label: 'Consumed', value: sessions.consumedSessionCount ?? '-' },
-        { label: 'Remaining', value: sessions.remainingSessionCount ?? '-' },
+        { label: 'Target', value: formatEnrollmentCapDisplay(sessions, 'target') },
+        { label: 'Consumed', value: formatEnrollmentCapDisplay(sessions, 'consumed') },
+        { label: 'Remaining', value: formatEnrollmentCapDisplay(sessions, 'remaining') },
         { label: 'Window Sessions', value: sessions.windowSessionCount ?? '-' },
         { label: 'Target Source', value: sessions.targetSource },
         { label: 'Completion', value: sessions.sessionCompletion ? ((sessions.sessionCompletion.date || '-') + ' (' + (sessions.sessionCompletion.reason || '') + ')') : '-' }

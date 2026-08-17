@@ -133,6 +133,20 @@
             </fieldset>
           </div>
           <div class="col-12">
+            <input type="hidden" name="conductRequiredBeforeFillPresent" value="true">
+            <div class="form-check form-switch">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="conductRequiredBeforeFill"
+                id="conductRequiredBeforeFill"
+                value="true"
+                <%= (template?.conductRequiredBeforeFill !== false) ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="conductRequiredBeforeFill">Require class conduct before filling</label>
+            </div>
+            <div class="form-text">When this template is assigned to a session, teachers must complete Step 1 class conduct before opening or filling reports unless the assignment overrides this setting.</div>
+          </div>
+          <div class="col-12">
             <label class="form-label fw-bold">Description</label>
             <textarea name="description" class="form-control" rows="2" maxlength="4000"><%= template?.description || '' %></textarea>
           </div>

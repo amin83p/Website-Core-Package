@@ -23,6 +23,8 @@ const COUNTED_ATTENDANCE_STATUSES = new Set([
 ]);
 const SESSION_COUNT_POLICY = 'all_non_na';
 const TARGET_SESSION_COMPLETION_REASON = 'target_session_count_reached';
+const TARGET_HOURS_COMPLETION_REASON = 'target_hours_reached';
+const HOUR_STEP = 0.25;
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -42,15 +44,48 @@ function normalizeTargetSessionCount(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
+function roundTargetHours(value) {
+  const parsed = Number.parseFloat(String(value ?? '').trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  const stepped = Math.round(parsed / HOUR_STEP) * HOUR_STEP;
+  return Number(stepped.toFixed(2));
+}
+
+function normalizeTargetHours(value) {
+  return roundTargetHours(value);
+}
+
 function normalizeSessionCountPolicy(value) {
   const token = cleanText(value).toLowerCase();
   return token || SESSION_COUNT_POLICY;
 }
 
+function computeDurationHoursFromTimes(startTime, endTime) {
+  const start = cleanText(startTime);
+  const end = cleanText(endTime);
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  if (![sh, sm, eh, em].every((n) => Number.isFinite(n))) return 0;
+  const hours = (eh + em / 60) - (sh + sm / 60);
+  return hours > 0 ? Number(hours.toFixed(2)) : 0;
+}
+
+function resolveSessionDurationHours(session = {}) {
+  const stored = Number(session?.durationHours);
+  if (Number.isFinite(stored) && stored > 0) return Number(stored.toFixed(2));
+  return computeDurationHoursFromTimes(session.startTime || session.start, session.endTime || session.end);
+}
+
 function sanitizeSessionCapFields(input = {}) {
   const targetSessionCount = normalizeTargetSessionCount(input.targetSessionCount);
+  const targetHours = normalizeTargetHours(input.targetHours);
+  if (targetSessionCount > 0 && targetHours > 0) {
+    throw new Error('Set either a session target or an hour target, not both.');
+  }
   return {
     targetSessionCount,
+    targetHours,
     sessionCountPolicy: targetSessionCount ? normalizeSessionCountPolicy(input.sessionCountPolicy) : '',
     completionDate: normalizeDateOnly(input.completionDate),
     completionSessionId: toPublicId(input.completionSessionId || ''),
@@ -95,14 +130,23 @@ function hasTargetSessionCount(period = {}) {
   return normalizeTargetSessionCount(period.targetSessionCount) > 0;
 }
 
+function hasTargetHours(period = {}) {
+  return normalizeTargetHours(period.targetHours) > 0;
+}
+
+function hasEnrollmentCap(period = {}) {
+  return hasTargetSessionCount(period) || hasTargetHours(period);
+}
+
 function isAutomaticallyCompletedTargetPeriod(period = {}) {
-  return hasTargetSessionCount(period)
+  const reason = cleanText(period.completionReason);
+  return hasEnrollmentCap(period)
     && cleanText(period.status).toLowerCase() === 'completed'
-    && cleanText(period.completionReason) === TARGET_SESSION_COMPLETION_REASON;
+    && (reason === TARGET_SESSION_COMPLETION_REASON || reason === TARGET_HOURS_COMPLETION_REASON);
 }
 
 function periodEffectiveEndDate(period = {}) {
-  const targetSessionEnrollment = hasTargetSessionCount(period);
+  const targetSessionEnrollment = hasEnrollmentCap(period);
   const endDate = normalizeDateOnly(period.endDate) || '9999-12-31';
   const completionDate = normalizeDateOnly(period.completionDate);
   const status = cleanText(period.status).toLowerCase();
@@ -127,7 +171,7 @@ function periodCoversSession(period = {}, session = {}, options = {}) {
   const end = ignoreAutomaticTargetCompletion
     ? '9999-12-31'
     : (options.honorCompletion === false
-      ? (hasTargetSessionCount(period) ? '9999-12-31' : (normalizeDateOnly(period.endDate) || '9999-12-31'))
+      ? (hasEnrollmentCap(period) ? '9999-12-31' : (normalizeDateOnly(period.endDate) || '9999-12-31'))
       : periodEffectiveEndDate(period));
   return Boolean(date && start && start <= date && end >= date);
 }
@@ -255,8 +299,13 @@ function resolveRollingEnrollmentApplicability({
       personIds.add(personId);
       const periodId = toPublicId(period.id);
       const targetSessionCount = normalizeTargetSessionCount(period.targetSessionCount);
+      const targetHours = normalizeTargetHours(period.targetHours);
+      const hourCap = targetHours > 0;
+      const sessionCap = targetSessionCount > 0;
       let consumedCount = 0;
+      let consumedHours = 0;
       let reservedCount = 0;
+      let reservedHours = 0;
       let completionCandidate = null;
 
       sessionRows.forEach(({ session, sessionId, date }) => {
@@ -265,6 +314,7 @@ function resolveRollingEnrollmentApplicability({
           ignoreAutomaticTargetCompletion
         })) return;
         const key = buildApplicabilityKey(personId, session, sessionId);
+        const sessionHours = resolveSessionDurationHours(session);
         const rosterRecord = getRosterRecord(session, personId);
         const attendance = rosterRecord
           ? attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '')
@@ -279,21 +329,43 @@ function resolveRollingEnrollmentApplicability({
             reason: forceNotApplicable ? 'makeup_required' : (hasApprovedLeave ? 'approved_leave' : 'manual_not_applicable'),
             periodId,
             targetSessionCount,
+            targetHours,
             consumedCount,
-            reservedCount
+            consumedHours,
+            reservedCount,
+            reservedHours
           };
           stateByKey.set(key, mergeState(stateByKey.get(key), next));
           return;
         }
 
-        if (targetSessionCount && consumedCount >= targetSessionCount) {
+        if (hourCap && consumedHours >= targetHours) {
+          const next = {
+            expected: false,
+            reason: 'hour_cap_reached',
+            periodId,
+            targetSessionCount,
+            targetHours,
+            consumedCount,
+            consumedHours,
+            reservedCount,
+            reservedHours
+          };
+          stateByKey.set(key, mergeState(stateByKey.get(key), next));
+          return;
+        }
+
+        if (sessionCap && consumedCount >= targetSessionCount) {
           const next = {
             expected: false,
             reason: 'session_cap_reached',
             periodId,
             targetSessionCount,
+            targetHours,
             consumedCount,
-            reservedCount
+            consumedHours,
+            reservedCount,
+            reservedHours
           };
           stateByKey.set(key, mergeState(stateByKey.get(key), next));
           return;
@@ -302,30 +374,41 @@ function resolveRollingEnrollmentApplicability({
         const counted = rosterRecord && COUNTED_ATTENDANCE_STATUSES.has(attendance);
         if (counted) {
           consumedCount += 1;
+          consumedHours = roundTargetHours(consumedHours + sessionHours);
           completionCandidate = { sessionId, date };
-        } else if (targetSessionCount) {
+        } else if (hourCap || sessionCap) {
           reservedCount += 1;
+          reservedHours = roundTargetHours(reservedHours + sessionHours);
         }
         const next = {
           expected: true,
-          reason: targetSessionCount ? 'session_count' : 'date_window',
+          reason: hourCap ? 'hour_count' : (sessionCap ? 'session_count' : 'date_window'),
           periodId,
           targetSessionCount,
+          targetHours,
           consumedCount,
-          reservedCount
+          consumedHours,
+          reservedCount,
+          reservedHours
         };
         stateByKey.set(key, mergeState(stateByKey.get(key), next));
       });
 
+      const hourTargetReached = hourCap && consumedHours >= targetHours;
+      const sessionTargetReached = sessionCap && consumedCount >= targetSessionCount;
       summariesByPeriodId.set(periodId, {
         periodId,
         personId,
         targetSessionCount,
+        targetHours,
         consumedCount,
+        consumedHours,
         reservedCount,
-        remainingCount: targetSessionCount ? Math.max(0, targetSessionCount - consumedCount) : null,
+        reservedHours,
+        remainingCount: sessionCap ? Math.max(0, targetSessionCount - consumedCount) : null,
+        remainingHours: hourCap ? Math.max(0, roundTargetHours(targetHours - consumedHours)) : null,
         lastConsumedSession: consumedCount > 0 ? completionCandidate : null,
-        completionCandidate: targetSessionCount && consumedCount >= targetSessionCount ? completionCandidate : null
+        completionCandidate: (sessionTargetReached || hourTargetReached) ? completionCandidate : null
       });
     });
 
@@ -399,7 +482,8 @@ function getApplicabilityState(stateByKey, personId, session = {}, fallback = ''
 
 function buildSessionCappedEnrollmentCompletionPatch(period = {}, summary = {}, updatedBy = '') {
   const targetSessionCount = normalizeTargetSessionCount(period.targetSessionCount);
-  if (!targetSessionCount) return null;
+  const targetHours = normalizeTargetHours(period.targetHours);
+  if (!targetSessionCount && !targetHours) return null;
 
   const status = cleanText(period.status).toLowerCase();
   const isOpen = OPEN_STATUSES.has(status);
@@ -407,6 +491,9 @@ function buildSessionCappedEnrollmentCompletionPatch(period = {}, summary = {}, 
   if (!isOpen && !isAutoCompleted) return null;
 
   const completion = summary?.completionCandidate || null;
+  const completionReason = targetHours > 0
+    ? TARGET_HOURS_COMPLETION_REASON
+    : TARGET_SESSION_COMPLETION_REASON;
   if (!completion && isAutoCompleted) {
     return {
       status: 'active',
@@ -430,7 +517,7 @@ function buildSessionCappedEnrollmentCompletionPatch(period = {}, summary = {}, 
     status: 'completed',
     completionDate: completion.date,
     completionSessionId: nextSessionId,
-    completionReason: TARGET_SESSION_COMPLETION_REASON,
+    completionReason,
     updatedBy
   };
 }
@@ -459,7 +546,8 @@ async function recomputeSessionCappedEnrollmentCompletionsForClass({
   const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
   const reconcilablePeriods = (Array.isArray(effectivePeriods) ? effectivePeriods : [])
     .filter((period) => OPEN_STATUSES.has(cleanText(period.status).toLowerCase())
-      || isAutomaticallyCompletedTargetPeriod(period));
+      || isAutomaticallyCompletedTargetPeriod(period)
+      || hasEnrollmentCap(period));
   const applicability = await resolveRollingEnrollmentApplicabilityWithLeaves({
     sessions,
     periodRows: reconcilablePeriods,
@@ -493,10 +581,19 @@ module.exports = {
   OPEN_STATUSES,
   SESSION_COUNT_POLICY,
   TARGET_SESSION_COMPLETION_REASON,
+  TARGET_HOURS_COMPLETION_REASON,
+  HOUR_STEP,
   normalizeDateOnly,
   normalizeTargetSessionCount,
+  normalizeTargetHours,
+  roundTargetHours,
   normalizeSessionCountPolicy,
   sanitizeSessionCapFields,
+  resolveSessionDurationHours,
+  computeDurationHoursFromTimes,
+  hasTargetSessionCount,
+  hasTargetHours,
+  hasEnrollmentCap,
   getSessionId,
   buildApplicabilityKey,
   periodEffectiveEndDate,

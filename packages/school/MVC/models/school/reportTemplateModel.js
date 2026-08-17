@@ -1,4 +1,4 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -43,6 +43,15 @@ function cleanInteger(v, { min = 1, max = 1000000, allowEmpty = true } = {}) {
   if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('Invalid integer value.');
   if (n < min || n > max) throw new Error('Integer out of range.');
   return n;
+}
+
+function cleanBoolean(v, fallback = false) {
+  if (typeof v === 'boolean') return v;
+  if (v === undefined || v === null || v === '') return Boolean(fallback);
+  const raw = String(v).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(raw)) return true;
+  if (['0', 'false', 'no', 'off'].includes(raw)) return false;
+  return Boolean(fallback);
 }
 
 function cleanHexColor(v, { allowEmpty = true } = {}) {
@@ -389,6 +398,12 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
     status,
     description: cleanString(input.description, { max: 4000, allowEmpty: true }),
     allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(input.allowedReportScopes),
+    conductRequiredBeforeFill: cleanBoolean(
+      input.conductRequiredBeforeFill,
+      existing?.conductRequiredBeforeFill !== undefined
+        ? cleanBoolean(existing.conductRequiredBeforeFill, true)
+        : true
+    ),
     schema,
     placeholderMap,
     docxTemplate: sanitizeDocxTemplate(input.docxTemplate) || sanitizeDocxTemplate(existing?.docxTemplate),

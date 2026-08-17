@@ -951,6 +951,13 @@
     .session-inactive-workspace .session-panel { display: none !important; }
     @keyframes sessionPanelIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
+    .session-report-workflow-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
     .session-report-workflow-progress {
         display: flex;
         align-items: center;
@@ -960,18 +967,112 @@
     .session-report-workflow-step {
         display: inline-flex;
         align-items: center;
-        gap: 0.35rem;
-        font-size: 0.875rem;
+        gap: 0.4rem;
+        font-size: 0.9rem;
         font-weight: 600;
         color: #94a3b8;
+        padding: 0.4rem 0.85rem;
+        border-radius: 999px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        line-height: 1.2;
     }
-    .session-report-workflow-step.is-active { color: #0d6efd; }
-    .session-report-workflow-step.is-complete { color: #198754; }
-    .session-report-workflow-step.is-locked { color: #94a3b8; opacity: 0.7; }
+    .session-report-workflow-step.is-active {
+        color: #0d6efd;
+        border-color: #b6d4fe;
+        background: #e7f1ff;
+    }
+    .session-report-workflow-step.is-complete {
+        color: #198754;
+        border-color: #a3cfbb;
+        background: #d1e7dd;
+    }
+    .session-report-workflow-step.is-locked {
+        color: #94a3b8;
+        opacity: 0.75;
+        background: #f1f5f9;
+    }
     .session-report-workflow-divider {
         color: #cbd5e1;
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         user-select: none;
+    }
+    .session-report-workflow-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+    .session-conduct-step-cta-zone {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 10rem;
+        margin-top: 1rem;
+    }
+    .session-conduct-step-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .session-conduct-step-status-pending,
+    .session-conduct-step-status-complete {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .session-conduct-step-footer {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        margin-top: 0.75rem;
+        padding-top: 0.5rem;
+    }
+    .session-report-step-cta-zone {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 10rem;
+        margin-top: 1rem;
+    }
+    .session-report-step-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .session-report-instances-panel {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        background: #fff;
+    }
+    .session-report-instances-toggle {
+        border: 0;
+        border-radius: 0;
+        background: #f8fafc;
+        padding: 0.75rem 1rem;
+    }
+    .session-report-instances-toggle:not(.collapsed) {
+        background: #f1f5f9;
+    }
+    .session-report-instances-toggle:focus {
+        box-shadow: none;
+    }
+    .session-report-step-nav {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+    }
+    .session-report-step-nav-top {
+        margin-top: 0.75rem;
+    }
+    .session-report-step-nav-bottom {
+        padding: 0.75rem 1rem 0.25rem;
     }
     .session-report-workflow-nav {
         display: flex;
@@ -1304,6 +1405,9 @@
             ? sessionReportInstanceRows
             : [];
         const hasSessionReportsAssigned = sessionReportRowsInitial.length > 0;
+        const sessionHasConductRequiredReportsResolved = (typeof sessionHasConductRequiredReports !== 'undefined')
+            ? Boolean(sessionHasConductRequiredReports)
+            : sessionReportRowsInitial.some((row) => row && row.conductRequiredBeforeFill !== false);
         const conductPrefillMap = (typeof conductPrefillByPersonId !== 'undefined' && conductPrefillByPersonId && typeof conductPrefillByPersonId === 'object')
             ? conductPrefillByPersonId
             : {};
@@ -2172,133 +2276,148 @@
             </div>
             <div class="session-panel" id="session-panel-assignments" role="tabpanel">
                 <% if (hasSessionReportsAssigned) { %>
-                <div class="card border-0 shadow-sm mb-3" id="sessionReportWorkflowToolbar">
-                    <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div class="session-report-workflow-progress" id="sessionReportWorkflowProgress" aria-label="Report workflow progress">
-                            <span class="session-report-workflow-step" id="sessionReportWorkflowStep1Label" data-workflow-step="1"><i class="bi bi-1-circle"></i>Class Conduct</span>
-                            <span class="session-report-workflow-divider" aria-hidden="true">→</span>
-                            <span class="session-report-workflow-step" id="sessionReportWorkflowStep2Label" data-workflow-step="2"><i class="bi bi-2-circle"></i>Report instances</span>
-                        </div>
-                        <div class="d-flex flex-wrap gap-2 flex-shrink-0">
-                            <% if (canAssignSessionReports) { %>
-                                <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
-                            <% } %>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="card border-0 shadow-sm mb-3<%= conductReadyForReports ? ' d-none' : '' %>" id="sessionReportConductStep">
-                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
-                        <div>
-                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-1-circle me-2"></i>Step 1 — Class Conduct</h5>
-                            <div class="conduct-rating-help mt-1">Rate every student, then save to unlock report filling. Early Class Conduct ratings are prefilled when available; other students default to <strong>N/A</strong>. Use <strong>S</strong>, <strong>Sat</strong>, <strong>NI</strong>, <strong>U</strong>, or <strong>N/A</strong>.</div>
-                            <div class="d-flex flex-wrap gap-2 mt-2">
-                                <% conductPickerLevels.forEach((level) => { %>
-                                    <span class="conduct-legend-chip" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>">
-                                        <strong><%= level.displayCode || level.code %></strong>
-                                        <span class="text-muted"><%= level.label %></span>
-                                    </span>
-                                <% }) %>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                            <span class="badge <%= conductReadyForReports ? 'bg-success' : 'bg-warning text-dark' %>" id="conductReadyBadge"><%= conductReadyForReports ? 'Completed' : 'Required before reports' %></span>
-                            <% if (!isReadOnly && session.roster.length > 0) { %>
-                                <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenConductBulkModal"><i class="bi bi-lightning-charge me-1"></i>Quick rate</button>
-                            <% } %>
-                            <% if (!isReadOnly) { %>
-                                <button type="button" class="btn btn-primary btn-sm" id="btnSaveSessionConduct"><i class="bi bi-check2-circle me-1"></i>Save class conduct</button>
-                            <% } %>
-                        </div>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive" style="max-height: min(50vh, 520px); overflow-y: auto;">
-                            <table class="table table-hover align-middle mb-0" id="conductTable">
-                                <thead class="table-light position-sticky top-0" style="z-index: 1;">
-                                    <tr>
-                                        <th class="ps-4">Student Name</th>
-                                        <% conductDimensions.forEach((dim) => { %>
-                                            <th class="text-center <%= dim.peClass %>"><div><%= dim.label %></div></th>
-                                        <% }) %>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <% if (session.roster.length === 0) { %>
-                                        <tr><td colspan="5" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
-                                    <% } else { %>
-                                        <% session.roster.forEach((student) => { %>
-                                            <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
-                                                <td class="ps-4 fw-bold align-middle">
-                                                    <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
-                                                </td>
-                                                <% conductDimensions.forEach((dim) => { %>
-                                                    <td class="text-center <%= dim.peClass %>">
-                                                        <div class="conduct-rating-cell" data-dimension="<%= dim.key %>">
-                                                            <div class="conduct-emoji-picker" role="group" aria-label="<%= dim.label %> rating">
-                                                                <% conductPickerLevels.forEach((level) => { %>
-                                                                    <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"><%= level.displayCode || level.code %></button>
-                                                                <% }) %>
-                                                            </div>
-                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%- disabledAttr %>>
-                                                        </div>
-                                                    </td>
-                                                <% }) %>
-                                            </tr>
-                                        <% }) %>
-                                    <% } %>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                <% } %>
-
-                <div class="card border-0 shadow-sm<%= (hasSessionReportsAssigned && !conductReadyForReports) ? ' d-none' : '' %>" id="sessionReportInstancesStep">
-                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
-                        <div>
-                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-<%= hasSessionReportsAssigned ? '2-circle' : 'clipboard-check' %> me-2"></i><%= hasSessionReportsAssigned ? 'Step 2 — ' : '' %>Report instances</h5>
-                            <div class="small text-muted mt-1">
-                                <% if (hasSessionReportsAssigned) { %>
-                                    Fill reports for this session. Use <strong>Fill Reports</strong> for the student matrix, or open an individual report when needed. Use <strong>Previous step</strong> below to edit class conduct ratings.
-                                <% } else { %>
-                                    Assign a report to this session to unlock class conduct and report filling.
+                <div class="card border-0 shadow-sm mb-3" id="sessionReportWorkflowHeader">
+                    <div class="card-body py-3">
+                        <div class="session-report-workflow-header-row">
+                            <div class="session-report-workflow-progress" id="sessionReportWorkflowProgress" aria-label="Report workflow progress">
+                                <% if (sessionHasConductRequiredReportsResolved) { %>
+                                <span class="session-report-workflow-step" id="sessionReportWorkflowStep1Label" data-workflow-step="1"><i class="bi bi-1-circle"></i>Class Conduct</span>
+                                <span class="session-report-workflow-divider" aria-hidden="true">→</span>
                                 <% } %>
+                                <span class="session-report-workflow-step" id="sessionReportWorkflowStep2Label" data-workflow-step="2"><i class="bi bi-<%= sessionHasConductRequiredReportsResolved ? '2-circle' : 'clipboard-check' %>"></i>Report instances</span>
                             </div>
-                        </div>
-                        <div class="d-flex flex-wrap gap-2 flex-shrink-0">
-                            <% if (!hasSessionReportsAssigned) { %>
+                            <div class="session-report-workflow-actions">
                                 <% if (canAssignSessionReports) { %>
                                     <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
                                 <% } %>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <% if (sessionHasConductRequiredReportsResolved) { %>
+                <div class="d-none" id="sessionReportConductDataHost">
+                    <table class="table table-hover align-middle mb-0" id="conductTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Student Name</th>
+                                <% conductDimensions.forEach((dim) => { %>
+                                    <th class="text-center <%= dim.peClass %>"><div><%= dim.label %></div></th>
+                                <% }) %>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (session.roster.length === 0) { %>
+                                <tr><td colspan="5" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
+                            <% } else { %>
+                                <% session.roster.forEach((student) => { %>
+                                    <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
+                                        <td class="ps-4 fw-bold align-middle">
+                                            <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
+                                        </td>
+                                        <% conductDimensions.forEach((dim) => { %>
+                                            <td class="text-center <%= dim.peClass %>">
+                                                <div class="conduct-rating-cell" data-dimension="<%= dim.key %>">
+                                                    <div class="conduct-emoji-picker" role="group" aria-label="<%= dim.label %> rating">
+                                                        <% conductPickerLevels.forEach((level) => { %>
+                                                            <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"><%= level.displayCode || level.code %></button>
+                                                        <% }) %>
+                                                    </div>
+                                                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%- disabledAttr %>>
+                                                </div>
+                                            </td>
+                                        <% }) %>
+                                    </tr>
+                                <% }) %>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card border-0 shadow-sm mb-3" id="sessionReportConductStep">
+                    <div class="card-body py-4">
+                        <div class="conduct-rating-help">Rate every student with <strong>Quick Rate</strong>, then save class conduct to unlock report filling. Use <strong>S</strong>, <strong>Sat</strong>, <strong>NI</strong>, <strong>U</strong>, or <strong>N/A</strong>.</div>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <% conductPickerLevels.forEach((level) => { %>
+                                <span class="conduct-legend-chip" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>">
+                                    <strong><%= level.displayCode || level.code %></strong>
+                                    <span class="text-muted"><%= level.label %></span>
+                                </span>
+                            <% }) %>
+                        </div>
+                        <div class="session-conduct-step-cta-zone" id="sessionConductStepStatus">
+                            <% if (!isReadOnly && session.roster.length > 0) { %>
+                            <div class="session-conduct-step-actions">
+                                <button type="button" class="btn btn-primary btn-lg" id="btnOpenConductBulkModal"><i class="bi bi-lightning-charge me-2"></i>Quick Rate</button>
+                                <div id="sessionConductStepStatusPending" class="session-conduct-step-status-pending<%= conductReadyForReports ? ' d-none' : '' %>">
+                                    <span class="badge bg-warning text-dark">Required before reports</span>
+                                </div>
+                                <div id="sessionConductStepStatusComplete" class="session-conduct-step-status-complete<%= conductReadyForReports ? '' : ' d-none' %>">
+                                    <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Class conduct saved</span>
+                                </div>
+                            </div>
                             <% } %>
                         </div>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th class="ps-4">Report</th>
-                                        <th>Student / target</th>
-                                        <th>Teacher</th>
-                                        <th>Status</th>
-                                        <th class="pe-4 text-end">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sessionReportInstancesBody">
-                                    <tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>
-                                </tbody>
-                            </table>
+                        <div class="session-conduct-step-footer">
+                            <button type="button" class="btn btn-success<%= conductReadyForReports ? '' : ' d-none' %>" id="btnReportWorkflowNextInline"><i class="bi bi-arrow-right me-1"></i>Continue to reports</button>
                         </div>
                     </div>
                 </div>
-                <% if (hasSessionReportsAssigned) { %>
-                <div class="session-report-workflow-nav" id="sessionReportWorkflowNav" aria-label="Report workflow navigation">
-                    <button type="button" class="btn btn-outline-secondary" id="btnReportWorkflowPrevious"><i class="bi bi-arrow-left me-1"></i>Previous step</button>
-                    <button type="button" class="btn btn-primary" id="btnReportWorkflowNext">Next step<i class="bi bi-arrow-right ms-1"></i></button>
-                </div>
                 <% } %>
+                <% } %>
+
+                <div class="card border-0 shadow-sm" id="sessionReportInstancesStep">
+                    <div class="card-body py-4">
+                        <% if (hasSessionReportsAssigned) { %>
+                            <div class="conduct-rating-help">Fill reports for this session using the student matrix. Open individual reports from the list below when needed.<% if (sessionHasConductRequiredReportsResolved) { %> Use <strong>Back to Class Conduct</strong> above or below the report instances list to edit class conduct ratings.<% } %></div>
+                            <div id="sessionReportInstancesStatusSummary" class="small text-muted mt-2"></div>
+                            <div class="session-report-step-cta-zone" id="sessionReportFillReportsZone">
+                                <div class="session-report-step-actions" id="sessionReportFillReportsActions"></div>
+                            </div>
+                            <% if (sessionHasConductRequiredReportsResolved) { %>
+                            <div class="session-report-step-nav session-report-step-nav-top">
+                                <button type="button" class="btn btn-primary d-none js-report-workflow-back-to-conduct" id="btnReportWorkflowPrevious"><i class="bi bi-arrow-left me-1"></i>Back to Class Conduct</button>
+                            </div>
+                            <% } %>
+                            <div class="session-report-instances-panel mt-3">
+                                <button type="button" class="btn session-report-instances-toggle collapsed w-100 d-flex justify-content-between align-items-center" id="btnToggleSessionReportInstancesTable" data-bs-toggle="collapse" data-bs-target="#sessionReportInstancesCollapse" aria-expanded="false" aria-controls="sessionReportInstancesCollapse">
+                                    <span><i class="bi bi-table me-2"></i>Report instances</span>
+                                    <span class="small text-muted" id="sessionReportInstancesCollapseHint"></span>
+                                </button>
+                                <div class="collapse" id="sessionReportInstancesCollapse">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th class="ps-4">Report</th>
+                                                    <th>Student / target</th>
+                                                    <th>Teacher</th>
+                                                    <th>Status</th>
+                                                    <th class="pe-4 text-end">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="sessionReportInstancesBody">
+                                                <tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <% if (sessionHasConductRequiredReportsResolved) { %>
+                                    <div class="session-report-step-nav session-report-step-nav-bottom">
+                                        <button type="button" class="btn btn-primary d-none js-report-workflow-back-to-conduct" id="btnReportWorkflowPreviousAfter"><i class="bi bi-arrow-left me-1"></i>Back to Class Conduct</button>
+                                    </div>
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% } else { %>
+                            <div class="conduct-rating-help">Assign a report to this session to unlock class conduct and report filling.</div>
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <% if (canAssignSessionReports) { %>
+                                    <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
+                                <% } %>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
             </div>
             <div class="session-panel" id="session-panel-student-cases" role="tabpanel">
                 <div class="card border-0 shadow-sm">
@@ -2385,7 +2504,8 @@
                         <button type="button" class="btn <%= level.code === 'S' ? 'btn-outline-success' : 'btn-outline-secondary' %> btn-sm conduct-bulk-set-all-level" data-code="<%= level.code %>" title="Set all students to <%= level.label %>"<%= level.code === 'S' ? ' id="btnConductBulkSetAllSuperior"' : '' %>><%= level.displayCode || level.code %> <%= level.label %></button>
                     <% }) %>
                 </div>
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+                <button type="button" class="btn btn-primary" id="btnSaveConductFromModal"><i class="bi bi-check2-circle me-1"></i>Save class conduct</button>
+                <button type="button" class="btn btn-outline-secondary" id="btnCancelConductModal">Cancel</button>
             </div>
         </div>
     </div>
@@ -2684,6 +2804,10 @@
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="sessionReportConflictPermitted">
                             <label class="form-check-label" for="sessionReportConflictPermitted">Permit schedule conflict</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="sessionReportConductRequiredBeforeFill" checked>
+                            <label class="form-check-label" for="sessionReportConductRequiredBeforeFill">Require class conduct before filling</label>
                         </div>
                     </div>
                     <div class="col-12">
@@ -3648,8 +3772,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
     let sessionConductReadyForReports = <%- jsonForScript(Boolean(conductReadyForReports)) %>;
-    const sessionHasReportsForConduct = <%- jsonForScript(Boolean(hasSessionReportsAssigned)) %>;
-    let currentReportWorkflowStep = (sessionHasReportsForConduct && !sessionConductReadyForReports) ? 1 : 2;
+    const sessionHasConductRequiredReports = <%- jsonForScript(Boolean(sessionHasConductRequiredReportsResolved)) %>;
+    const hasSessionReportsAssigned = <%- jsonForScript(Boolean(hasSessionReportsAssigned)) %>;
+    let currentReportWorkflowStep = (sessionHasConductRequiredReports && !sessionConductReadyForReports) ? 1 : 2;
+    const REPORT_CONDUCT_TABLE_SELECTOR = '#sessionReportConductDataHost #conductTable';
     const optionalConductRosterSeed = <%- jsonForScript((session.roster || []).map((student) => ({
         personId: String(student.personId || ''),
         name: String(student.name || ''),
@@ -3790,16 +3916,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (sessionConductReadOnly) return;
                 applyConductLevel(cell, btn.dataset.code);
                 markSessionAutosaveRosterDirty();
+                markConductModalDirty();
             });
         });
         const percentInput = cell.querySelector('.conduct-percent-input');
         percentInput?.addEventListener('change', () => {
             updateConductCellUi(cell);
             markSessionAutosaveRosterDirty();
+            markConductModalDirty();
         });
         percentInput?.addEventListener('input', () => {
             updateConductCellUi(cell);
             markSessionAutosaveRosterDirty();
+            markConductModalDirty();
         });
     }
 
@@ -3827,22 +3956,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    function updateSessionConductStepStatusUi() {
+        const pending = document.getElementById('sessionConductStepStatusPending');
+        const complete = document.getElementById('sessionConductStepStatusComplete');
+        const continueBtn = document.getElementById('btnReportWorkflowNextInline');
+        if (pending) pending.classList.toggle('d-none', sessionConductReadyForReports);
+        if (complete) complete.classList.toggle('d-none', !sessionConductReadyForReports);
+        if (continueBtn) continueBtn.classList.toggle('d-none', !sessionConductReadyForReports);
+    }
+
     function setConductReadyUi(ready) {
         sessionConductReadyForReports = !!ready;
-        const badge = document.getElementById('conductReadyBadge');
-        if (badge) {
-            badge.className = `badge ${sessionConductReadyForReports ? 'bg-success' : 'bg-warning text-dark'}`;
-            badge.textContent = sessionConductReadyForReports ? 'Completed' : 'Required before reports';
-        }
-        if (sessionConductReadyForReports && sessionHasReportsForConduct) {
-            currentReportWorkflowStep = 2;
+        updateSessionConductStepStatusUi();
+        if (!sessionConductReadyForReports && sessionHasConductRequiredReports) {
+            currentReportWorkflowStep = 1;
         }
         syncReportWorkflowStepUi();
         renderSessionReportInstances();
     }
 
     function syncReportWorkflowStepUi() {
-        if (!sessionHasReportsForConduct) return;
+        if (!sessionHasConductRequiredReports) return;
 
         if (!sessionConductReadyForReports) {
             currentReportWorkflowStep = 1;
@@ -3870,19 +4004,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const prevBtn = document.getElementById('btnReportWorkflowPrevious');
-        const nextBtn = document.getElementById('btnReportWorkflowNext');
-        if (prevBtn) {
-            const showPrevious = sessionConductReadyForReports && !showStep1;
-            prevBtn.classList.toggle('d-none', !showPrevious);
-            prevBtn.disabled = !showPrevious;
-        }
-        if (nextBtn) {
-            const showNext = showStep1;
-            nextBtn.classList.toggle('d-none', !showNext);
-            nextBtn.disabled = !sessionConductReadyForReports;
-            nextBtn.title = sessionConductReadyForReports
-                ? 'Continue to report instances'
-                : 'Save class conduct before continuing to the next step';
+        const showPrevious = sessionConductReadyForReports && !showStep1;
+        document.querySelectorAll('.js-report-workflow-back-to-conduct').forEach((btn) => {
+            btn.classList.toggle('d-none', !showPrevious);
+            btn.disabled = !showPrevious;
+        });
+        if (prevBtn && showPrevious) {
+            prevBtn.disabled = false;
         }
     }
 
@@ -3929,23 +4057,35 @@ document.addEventListener('DOMContentLoaded', () => {
         return result;
     }
 
-    async function saveSessionConductForReports() {
-        if (sessionConductReadOnly) return;
-        const btn = document.getElementById('btnSaveSessionConduct');
+    async function saveSessionConductForReports(options = {}) {
+        if (sessionConductReadOnly) return false;
+        const fromModal = options.fromModal === true;
+        const btn = fromModal ? document.getElementById('btnSaveConductFromModal') : null;
+        if (fromModal) {
+            syncConductTableFromModal();
+        }
         if (btn) btn.disabled = true;
         if (typeof window.showLoading === 'function') window.showLoading('Saving class conduct...');
         try {
             const result = await postSessionConductRoster({
-                roster: collectConductRosterPayload('#conductTable'),
+                roster: collectConductRosterPayload(REPORT_CONDUCT_TABLE_SELECTOR),
                 ready: true,
                 loadingMessage: 'Failed to save class conduct.'
             });
             setConductReadyUi(true);
-            await sessionMessageBox({
-                title: 'Class conduct saved',
-                icon: 'success',
-                message: result.message || 'You can now fill reports for this session.'
-            });
+            if (!fromModal) {
+                await sessionMessageBox({
+                    title: 'Class conduct saved',
+                    icon: 'success',
+                    message: result.message || 'You can now fill reports for this session.'
+                });
+            }
+            if (fromModal) {
+                conductModalDirty = false;
+                conductModalCloseConfirmed = true;
+                conductBulkModalInstance?.hide();
+            }
+            return true;
         } catch (error) {
             await sessionMessageBox({
                 title: 'Unable to save class conduct',
@@ -3953,6 +4093,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 message: error?.message || 'Failed to save class conduct.',
                 okClass: 'btn-danger'
             });
+            return false;
         } finally {
             if (btn) btn.disabled = false;
             if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
@@ -4076,20 +4217,18 @@ document.addEventListener('DOMContentLoaded', () => {
         renderOptionalConductTable();
     }
 
-    document.getElementById('btnSaveSessionConduct')?.addEventListener('click', () => {
-        saveSessionConductForReports();
-    });
     document.getElementById('btnReportWorkflowPrevious')?.addEventListener('click', () => {
-        if (!sessionHasReportsForConduct || !sessionConductReadyForReports) return;
+        if (!sessionHasConductRequiredReports || !sessionConductReadyForReports) return;
         currentReportWorkflowStep = 1;
         syncReportWorkflowStepUi();
     });
-    document.getElementById('btnReportWorkflowNext')?.addEventListener('click', () => {
-        if (!sessionHasReportsForConduct) return;
-        if (!sessionConductReadyForReports) {
-            showConductRequiredModal();
-            return;
-        }
+    document.getElementById('btnReportWorkflowPreviousAfter')?.addEventListener('click', () => {
+        if (!sessionHasConductRequiredReports || !sessionConductReadyForReports) return;
+        currentReportWorkflowStep = 1;
+        syncReportWorkflowStepUi();
+    });
+    document.getElementById('btnReportWorkflowNextInline')?.addEventListener('click', () => {
+        if (!sessionHasConductRequiredReports || !sessionConductReadyForReports) return;
         currentReportWorkflowStep = 2;
         syncReportWorkflowStepUi();
     });
@@ -4106,7 +4245,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', function (event) {
         const gated = event.target.closest('.js-report-action-requires-conduct');
         if (!gated) return;
-        if (!sessionHasReportsForConduct || sessionConductReadyForReports) return;
+        if (!sessionHasConductRequiredReports || sessionConductReadyForReports) return;
         event.preventDefault();
         event.stopPropagation();
         showConductRequiredModal();
@@ -4117,7 +4256,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return row?.querySelector(`.conduct-rating-cell[data-dimension="${dimensionKey}"]`) || null;
     }
 
-    function syncConductModalFromTable(rootSelector = '#conductTable') {
+    function syncConductModalFromTable(rootSelector = REPORT_CONDUCT_TABLE_SELECTOR) {
         const body = document.getElementById('conductBulkRatingBody');
         if (!body) return;
         const rows = Array.from(document.querySelectorAll(`${rootSelector} .conduct-row`));
@@ -4142,7 +4281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function syncConductTableFromModal() {
         const body = document.getElementById('conductBulkRatingBody');
-        const rootSelector = body?.dataset?.conductSyncRoot || '#conductTable';
+        const rootSelector = body?.dataset?.conductSyncRoot || REPORT_CONDUCT_TABLE_SELECTOR;
         document.querySelectorAll('#conductBulkRatingBody .conduct-bulk-cell').forEach((bulkCell) => {
             const personId = bulkCell.dataset.personid;
             const dimensionKey = bulkCell.dataset.dimension;
@@ -4154,11 +4293,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    function markConductModalDirty() {
+        if (conductModalContext !== 'report' || sessionConductReadOnly) return;
+        if (!conductBulkModalEl?.classList.contains('show')) return;
+        conductModalDirty = true;
+    }
+
+    function applyConductRosterToTable(rootSelector, roster) {
+        const byPerson = new Map((roster || []).map((row) => [String(row.personId || '').trim(), row]));
+        document.querySelectorAll(`${rootSelector} .conduct-row`).forEach((row) => {
+            const personId = String(row.dataset.personid || '').trim();
+            const data = byPerson.get(personId);
+            if (!data) return;
+            (conductDimensionMeta || []).forEach((dim) => {
+                const cell = row.querySelector(`.conduct-rating-cell[data-dimension="${dim.key}"]`);
+                applyConductPercent(cell, data[dim.valueKey]);
+            });
+        });
+    }
+
+    function snapshotConductTableRoster(rootSelector) {
+        return JSON.stringify(collectConductRosterPayload(rootSelector));
+    }
+
+    function restoreConductFromSnapshot(rootSelector, snapshotJson) {
+        if (!snapshotJson) return;
+        try {
+            const roster = JSON.parse(snapshotJson);
+            applyConductRosterToTable(rootSelector, roster);
+        } catch (_) {
+            /* ignore invalid snapshot */
+        }
+    }
+
+    function updateConductModalFooterForContext() {
+        const saveBtn = document.getElementById('btnSaveConductFromModal');
+        if (saveBtn) {
+            saveBtn.classList.toggle('d-none', conductModalContext !== 'report');
+        }
+    }
+
+    async function requestCloseConductModal() {
+        if (conductModalContext === 'report' && conductModalDirty && !conductModalCloseConfirmed) {
+            const choice = await sessionMessageBox({
+                title: 'Discard unsaved conduct ratings?',
+                icon: 'warning',
+                html: true,
+                message: '<p class="mb-0">You have unsaved changes to class conduct. Keep editing or discard your changes.</p>',
+                buttons: [
+                    { text: 'Keep editing', class: 'btn-primary' },
+                    { text: 'Discard changes', class: 'btn-outline-danger' }
+                ]
+            });
+            if (choice !== 'Discard changes') return;
+            const body = document.getElementById('conductBulkRatingBody');
+            const rootSelector = body?.dataset?.conductSyncRoot || REPORT_CONDUCT_TABLE_SELECTOR;
+            restoreConductFromSnapshot(rootSelector, conductModalSnapshot);
+            syncConductModalFromTable(rootSelector);
+            conductModalDirty = false;
+        }
+        conductModalCloseConfirmed = true;
+        conductBulkModalInstance?.hide();
+    }
+
     function setAllConductCellsToLevel(code, root = document) {
         const level = levelByConductCode(code);
         if (!level || sessionConductReadOnly) return;
         root.querySelectorAll(".conduct-rating-cell").forEach((cell) => applyConductLevel(cell, level.code));
         markSessionAutosaveRosterDirty();
+        if (root.id === 'conductBulkRatingBody' || root.closest('#conductBulkRatingModal')) {
+            markConductModalDirty();
+        }
     }
 
     function setConductColumnToLevel(dimensionKey, code, root = document) {
@@ -4167,29 +4372,67 @@ document.addEventListener('DOMContentLoaded', () => {
         const selector = '.conduct-rating-cell[data-dimension="' + CSS.escape(String(dimensionKey || '')) + '"]';
         root.querySelectorAll(selector).forEach((cell) => applyConductLevel(cell, level.code));
         markSessionAutosaveRosterDirty();
+        if (root === conductBulkModalEl || root?.closest?.('#conductBulkRatingModal')) {
+            markConductModalDirty();
+        }
     }
 
     let conductBulkModalInstance = null;
+    let conductModalContext = 'report';
+    let conductModalDirty = false;
+    let conductModalSnapshot = null;
+    let conductModalCloseConfirmed = false;
     const conductBulkModalEl = document.getElementById('conductBulkRatingModal');
     if (conductBulkModalEl && window.bootstrap) conductBulkModalInstance = new bootstrap.Modal(conductBulkModalEl);
 
     document.getElementById('btnOpenConductBulkModal')?.addEventListener('click', () => {
+        conductModalContext = 'report';
+        conductModalDirty = false;
+        conductModalCloseConfirmed = false;
+        updateConductModalFooterForContext();
         renderConductBulkLegend();
-        syncConductModalFromTable('#conductTable');
+        syncConductModalFromTable(REPORT_CONDUCT_TABLE_SELECTOR);
+        conductModalSnapshot = snapshotConductTableRoster(REPORT_CONDUCT_TABLE_SELECTOR);
         conductBulkModalInstance?.show();
     });
     document.getElementById('btnOpenOptionalConductBulkModal')?.addEventListener('click', () => {
+        conductModalContext = 'optional';
+        conductModalDirty = false;
+        conductModalCloseConfirmed = false;
+        updateConductModalFooterForContext();
         renderConductBulkLegend();
         syncConductModalFromTable('#optionalConductTable');
         conductBulkModalInstance?.show();
     });
-    conductBulkModalEl?.addEventListener('hidden.bs.modal', () => syncConductTableFromModal());
+    document.getElementById('btnSaveConductFromModal')?.addEventListener('click', () => {
+        if (conductModalContext !== 'report') return;
+        saveSessionConductForReports({ fromModal: true });
+    });
+    document.getElementById('btnCancelConductModal')?.addEventListener('click', () => {
+        requestCloseConductModal();
+    });
+    conductBulkModalEl?.addEventListener('hide.bs.modal', (event) => {
+        if (conductModalContext === 'report' && conductModalDirty && !conductModalCloseConfirmed) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            requestCloseConductModal();
+            return;
+        }
+    });
+    conductBulkModalEl?.addEventListener('hidden.bs.modal', () => {
+        conductModalCloseConfirmed = false;
+        if (conductModalContext === 'optional') {
+            syncConductTableFromModal();
+        }
+    });
     document.querySelectorAll(".conduct-bulk-set-all-level").forEach((button) => button.addEventListener("click", () => setAllConductCellsToLevel(button.dataset.code, document.getElementById("conductBulkRatingBody"))));
     document.querySelectorAll(".conduct-bulk-column-emoji-btn").forEach((button) => button.addEventListener("click", () => setConductColumnToLevel(button.dataset.dimension, button.dataset.code, conductBulkModalEl)));
 
     initAllConductRatingCells();
     initOptionalConductTableFromSavedStudents();
     renderConductBulkLegend();
+    updateConductModalFooterForContext();
+    updateSessionConductStepStatusUi();
 
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
     const canDeleteStudentCases = <%- jsonForScript(typeof canDeleteStudentCases !== 'undefined' && Boolean(canDeleteStudentCases)) %>;
@@ -4287,10 +4530,111 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    function computeReportInstanceStatusCounts(rows = []) {
+        const counts = { total: 0, pending: 0, drafted: 0, submitted: 0, locked: 0 };
+        (Array.isArray(rows) ? rows : []).forEach((row) => {
+            counts.total += 1;
+            if (row?.isPending || String(row?.status || '').trim().toLowerCase() === 'pending') {
+                counts.pending += 1;
+                return;
+            }
+            const status = String(row?.status || 'draft').trim().toLowerCase();
+            if (status === 'draft') counts.drafted += 1;
+            else if (status === 'submitted') counts.submitted += 1;
+            else if (status === 'locked') counts.locked += 1;
+            else counts.drafted += 1;
+        });
+        return counts;
+    }
+
+    function formatReportInstanceStatusSummary(rows = []) {
+        const counts = computeReportInstanceStatusCounts(rows);
+        if (!counts.total) return 'No report instances for this session.';
+        return `Total: ${counts.total}; Pending: ${counts.pending}; Drafted: ${counts.drafted}; Submitted: ${counts.submitted}; Locked: ${counts.locked}`;
+    }
+
+    function getSessionFillReportsMatrixOptions() {
+        const rows = Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [];
+        const seen = new Set();
+        const options = [];
+        rows.forEach((row) => {
+            const href = String(row?.matrixHref || '').trim();
+            if (!href || seen.has(href)) return;
+            seen.add(href);
+            options.push({
+                href,
+                templateTitle: String(row?.templateTitle || 'Report').trim(),
+                teacherName: String(row?.teacherName || '').trim()
+            });
+        });
+        return options;
+    }
+
+    function isReportMatrixHrefLocked(matrixHref = '') {
+        const href = String(matrixHref || '').trim();
+        if (!href) return false;
+        return (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : []).some((row) => {
+            if (String(row?.matrixHref || '').trim() !== href) return false;
+            return Boolean(row?.conductRequiredBeforeFill) && sessionHasConductRequiredReports && !sessionConductReadyForReports;
+        });
+    }
+
+    function buildSessionFillReportsButtonHtml(option = {}) {
+        const href = String(option?.href || '').trim();
+        if (!href) return '';
+        const locked = isReportMatrixHrefLocked(href);
+        if (locked) {
+            return `<button type="button" class="btn btn-primary btn-lg js-report-action-requires-conduct" id="btnSessionFillReports" title="Complete class conduct first"><i class="bi bi-table me-2"></i>Fill Reports</button>`;
+        }
+        return `<a href="${scEscapeHtml(href)}" class="btn btn-primary btn-lg" id="btnSessionFillReports" target="_blank" rel="noopener noreferrer" title="Open Fill Reports in a new tab"><i class="bi bi-table me-2"></i>Fill Reports</a>`;
+    }
+
+    function updateSessionReportInstancesSummaryUi() {
+        const rows = Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [];
+        const summaryEl = document.getElementById('sessionReportInstancesStatusSummary');
+        if (summaryEl) summaryEl.textContent = formatReportInstanceStatusSummary(rows);
+
+        const collapseHint = document.getElementById('sessionReportInstancesCollapseHint');
+        if (collapseHint) {
+            collapseHint.textContent = rows.length ? `${rows.length} instance(s)` : '';
+        }
+
+        const zone = document.getElementById('sessionReportFillReportsZone');
+        const actions = document.getElementById('sessionReportFillReportsActions');
+        if (!actions) return;
+
+        if (!rows.length) {
+            actions.innerHTML = '';
+            zone?.classList.add('d-none');
+            return;
+        }
+        zone?.classList.remove('d-none');
+
+        const options = getSessionFillReportsMatrixOptions();
+        const unsubmitted = getUnsubmittedSessionReports().length;
+        const allSubmitted = unsubmitted === 0;
+        const completeBadge = allSubmitted
+            ? '<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>All reports submitted</span>'
+            : '';
+
+        if (!options.length) {
+            actions.innerHTML = `${completeBadge}<span class="text-muted small">No student matrix for these reports. Expand <strong>Report instances</strong> below to open individual reports.</span>`;
+            return;
+        }
+
+        const primary = options[0];
+        const fillBtn = buildSessionFillReportsButtonHtml(primary);
+        const moreMatricesNote = options.length > 1
+            ? `<span class="text-muted small">${options.length - 1} more matrix report(s) in the list below.</span>`
+            : '';
+        actions.innerHTML = `${fillBtn}${completeBadge}${moreMatricesNote}`;
+    }
+
     function renderSessionReportInstances() {
         const body = document.getElementById('sessionReportInstancesBody');
         if (!body) return;
         const rows = Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [];
+        updateSessionReportInstancesSummaryUi();
         if (!rows.length) {
             body.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>';
             syncPendingReportsHint();
@@ -4304,23 +4648,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         body.innerHTML = Array.from(groups.values()).map((groupRows) => {
             const first = groupRows[0] || {};
-            const matrixHref = String(first.matrixHref || '');
-            const reportActionsLocked = sessionHasReportsForConduct && !sessionConductReadyForReports;
-            const matrixBtn = matrixHref
-                ? (reportActionsLocked
-                    ? `<button type="button" class="btn btn-sm btn-primary js-report-action-requires-conduct" title="Complete class conduct first"><i class="bi bi-table me-1"></i>Fill Reports</button>`
-                    : `<a href="${scEscapeHtml(matrixHref)}" class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" title="Open Fill Reports in a new tab"><i class="bi bi-table me-1"></i>Fill Reports</a>`)
-                : '';
+            const reportActionsLocked = Boolean(first.conductRequiredBeforeFill) && sessionHasConductRequiredReports && !sessionConductReadyForReports;
             const groupHeader = `
                 <tr class="table-primary-subtle border-top">
                     <td colspan="5" class="px-4 py-3">
-                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                            <div>
-                                <div class="fw-bold text-primary">${scEscapeHtml(first.templateTitle || 'Report')}</div>
-                                <div class="small text-muted">${scEscapeHtml(first.teacherName || '-')} · ${groupRows.length} student target(s) · ${scEscapeHtml(first.scopeLabel || '')}</div>
-                            </div>
-                            ${matrixBtn}
-                        </div>
+                        <div class="fw-bold text-primary">${scEscapeHtml(first.templateTitle || 'Report')}</div>
+                        <div class="small text-muted">${scEscapeHtml(first.teacherName || '-')} · ${groupRows.length} student target(s) · ${scEscapeHtml(first.scopeLabel || '')}</div>
                     </td>
                 </tr>`;
             const instanceRows = groupRows.map((row) => {
@@ -4461,6 +4794,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.querySelector('#sessionReportTaskEnd').value = sessionDefaultEndTime || '';
         modal.querySelector('#sessionReportConflictPermitted').checked = false;
         modal.querySelector('#sessionReportTimesheetReflection').checked = false;
+        modal.querySelector('#sessionReportConductRequiredBeforeFill').checked = true;
         modal.querySelector('#sessionReportAllocatedHours').value = '0';
         modal.querySelector('#sessionReportNotes').value = '';
         const teacherLabel = sessionDefaultTeacherName || sessionDefaultTeacherId || 'No teacher assigned';
@@ -4502,6 +4836,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const version = Number(item?.version || 1);
                 modal.querySelector('#sessionReportTemplateId').value = id;
                 modal.querySelector('#sessionReportTemplateLabel').value = `${item?.title || id} | ${item?.type || '-'} v${version}`;
+                const conductRequired = item?.conductRequiredBeforeFill !== false;
+                const conductCheckbox = modal.querySelector('#sessionReportConductRequiredBeforeFill');
+                if (conductCheckbox) conductCheckbox.checked = conductRequired;
             }
         }));
     }
@@ -4568,6 +4905,7 @@ document.addEventListener('DOMContentLoaded', () => {
             taskEndTime: String(modal.querySelector('#sessionReportTaskEnd')?.value || '').trim(),
             conflictPermitted: modal.querySelector('#sessionReportConflictPermitted')?.checked === true,
             timesheetReflection: modal.querySelector('#sessionReportTimesheetReflection')?.checked === true,
+            conductRequiredBeforeFill: modal.querySelector('#sessionReportConductRequiredBeforeFill')?.checked !== false,
             allocatedHours: String(modal.querySelector('#sessionReportAllocatedHours')?.value || '0').trim(),
             notes: String(modal.querySelector('#sessionReportNotes')?.value || '').trim(),
             targetStudentIds: Array.from(selectedSessionReportStudents.keys())

@@ -288,6 +288,16 @@ router.post('/api/:classId/enrollment-session-alignment',
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL, { keepActive: true }),
   rollingCtrl.postEnrollmentSessionAlignment);
 
+router.post('/api/:classId/enrollment-session-picker',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL, { keepActive: true }),
+  rollingCtrl.postEnrollmentSessionPicker);
+
+router.post('/api/:classId/rolling-enrollment/execute',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.postExecuteRollingEnrollment);
+
 router.post('/api/:classId/sessions/preview-batch',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),

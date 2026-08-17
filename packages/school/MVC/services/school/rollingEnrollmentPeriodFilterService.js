@@ -58,6 +58,7 @@ const PERIOD_STATUS_OPTIONS = Object.freeze([
 const TARGET_TYPE_OPTIONS = Object.freeze([
   { value: 'all', label: 'All target types' },
   { value: 'session_target', label: 'Session target' },
+  { value: 'hour_target', label: 'Hour target' },
   { value: 'date_window', label: 'Date window only' }
 ]);
 
@@ -71,6 +72,14 @@ function periodStatus(period = {}) {
 
 function hasTargetSessionCount(period = {}) {
   return applicabilityService.normalizeTargetSessionCount(period?.targetSessionCount) > 0;
+}
+
+function hasTargetHours(period = {}) {
+  return applicabilityService.normalizeTargetHours(period?.targetHours) > 0;
+}
+
+function hasEnrollmentCap(period = {}) {
+  return hasTargetSessionCount(period) || hasTargetHours(period);
 }
 
 function periodEffectiveEndDate(period = {}) {
@@ -156,9 +165,11 @@ function matchesFunderFilter(period = {}, funderFilter = '') {
 function matchesTargetType(period = {}, targetType = '') {
   const token = String(targetType || 'all').trim().toLowerCase();
   if (!token || token === 'all') return true;
-  const hasTarget = hasTargetSessionCount(period);
-  if (token === 'session_target') return hasTarget;
-  if (token === 'date_window') return !hasTarget;
+  const sessionTarget = hasTargetSessionCount(period);
+  const hourTarget = hasTargetHours(period);
+  if (token === 'session_target') return sessionTarget && !hourTarget;
+  if (token === 'hour_target') return hourTarget;
+  if (token === 'date_window') return !hasEnrollmentCap(period);
   return true;
 }
 

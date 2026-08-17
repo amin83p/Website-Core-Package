@@ -3930,6 +3930,14 @@ async function manageSession(req, res) {
             viewerContext: sessionReportViewerContext,
             sessionRoster: session.roster
         });
+        const sessionHasConductRequiredReports = [...new Set(
+            (Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : [])
+                .map((row) => toPublicId(row?.assignmentId))
+                .filter(Boolean)
+        )].some((assignmentId) => {
+            const assignment = sessionReportViewerContext.assignmentMap.get(assignmentId);
+            return sessionConductService.assignmentRequiresConductBeforeFill(assignment);
+        });
         const reportAssignmentCreateAccess = await accessService.evaluateAccess({
             user: req.user,
             sectionId: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
@@ -4027,6 +4035,7 @@ async function manageSession(req, res) {
             sessionExamContentItems,
             combinedSessionContent,
             sessionReportInstanceRows,
+            sessionHasConductRequiredReports,
             canAssignSessionReports: Boolean(reportAssignmentCreateAccess?.allowed),
             conductPrefillByPersonId,
             sessionConductReportPeriod,

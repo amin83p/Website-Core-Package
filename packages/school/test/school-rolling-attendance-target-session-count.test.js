@@ -126,3 +126,74 @@ test('ACF attendance counts toward rolling enrollment target like absent', () =>
   assert.equal(summary.remainingCount, 0);
   assert.deepEqual(summary.completionCandidate, { sessionId: 'SES_PRESENT', date: '2026-02-08' });
 });
+
+function attendanceWithHours(sessionId, date, status, durationHours = 3) {
+  return {
+    sessionId,
+    date,
+    status: 'completed',
+    durationHours,
+    roster: [{ personId, attendance: status }]
+  };
+}
+
+test('hour target enrollment consumes session hours until target is reached', () => {
+  const hourPeriod = {
+    id: 'PERIOD_HOURS',
+    studentId: 'STUDENT_001',
+    status: 'active',
+    startDate: '2026-02-01',
+    endDate: '',
+    targetHours: 6,
+    sessionCountPolicy: 'all_non_na'
+  };
+  const sessions = [
+    attendanceWithHours('SES_001', '2026-02-01', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT, 3),
+    attendanceWithHours('SES_002', '2026-02-08', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT, 3),
+    attendanceWithHours('SES_003', '2026-02-15', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT, 3)
+  ];
+  const result = applicabilityService.resolveRollingEnrollmentApplicability({
+    sessions,
+    periodRows: [hourPeriod],
+    studentToPersonMap
+  });
+  const summary = result.summariesByPeriodId.get(hourPeriod.id);
+  const afterTarget = applicabilityService.getApplicabilityState(
+    result.stateByKey,
+    personId,
+    sessions[2]
+  );
+
+  assert.equal(summary.consumedCount, 2);
+  assert.equal(summary.consumedHours, 6);
+  assert.equal(summary.remainingHours, 0);
+  assert.deepEqual(summary.completionCandidate, { sessionId: 'SES_002', date: '2026-02-08' });
+  assert.equal(afterTarget.expected, false);
+  assert.equal(afterTarget.reason, 'hour_cap_reached');
+});
+
+test('hour target enrollment ignores stored end date until completion', () => {
+  const hourPeriod = {
+    id: 'PERIOD_HOURS_END',
+    studentId: 'STUDENT_001',
+    status: 'active',
+    startDate: '2026-02-01',
+    endDate: '2026-02-15',
+    targetHours: 6,
+    sessionCountPolicy: 'all_non_na'
+  };
+  assert.equal(applicabilityService.periodEffectiveEndDate(hourPeriod), '9999-12-31');
+  assert.equal(applicabilityService.periodCoversSession(hourPeriod, {
+    sessionId: 'SES_LATER',
+    date: '2026-06-01'
+  }), true);
+});
+
+test('sanitizeSessionCapFields rejects both session and hour targets', () => {
+  assert.throws(() => {
+    applicabilityService.sanitizeSessionCapFields({
+      targetSessionCount: 5,
+      targetHours: 20
+    });
+  }, /not both/);
+});

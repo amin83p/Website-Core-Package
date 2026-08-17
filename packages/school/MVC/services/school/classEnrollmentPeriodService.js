@@ -7,7 +7,7 @@ const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSes
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
-const TERMINAL_STATUSES = new Set(['cancelled', 'archived', 'error']);
+const TERMINAL_STATUSES = new Set(['cancelled', 'archived', 'error', 'void', 'rolled_back']);
 const OPEN_STATUSES = new Set(['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active']);
 const REENTRY_SOURCE_STATUSES = new Set(['completed', 'withdrawn', 'cancelled', 'archived']);
 
@@ -143,7 +143,9 @@ async function evaluateReentryRules({
   const excludedId = toPublicId(excludePeriodId);
   const policy = dependencies.policyService.getPolicy();
   const rows = await listStudentClassPeriods(classId, studentId, options);
-  const effectiveRows = rows.filter((row) => !excludedId || !idsEqual(row?.id, excludedId));
+  const effectiveRows = rows
+    .filter((row) => !excludedId || !idsEqual(row?.id, excludedId))
+    .filter((row) => !TERMINAL_STATUSES.has(normalizeStatus(row?.status)));
 
   const violations = [];
   const maxPeriods = Number(policy.maxPeriodsPerStudentPerClass || 0);
@@ -298,6 +300,7 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
       ? { ...input.pricing }
       : {},
     targetSessionCount: sessionCap.targetSessionCount,
+    targetHours: sessionCap.targetHours,
     sessionCountPolicy: sessionCap.sessionCountPolicy,
     completionDate: sessionCap.completionDate,
     completionSessionId: sessionCap.completionSessionId,
@@ -494,9 +497,10 @@ async function updatePeriod(periodId, input = {}, requestingUser = null, options
   if (input.reasonStart !== undefined) patch.reasonStart = String(input.reasonStart || '').trim();
   if (input.reasonEnd !== undefined) patch.reasonEnd = String(input.reasonEnd || '').trim();
   if (input.notes !== undefined) patch.notes = String(input.notes || '').trim();
-  if (input.targetSessionCount !== undefined) {
+  if (input.targetSessionCount !== undefined || input.targetHours !== undefined) {
     const sessionCap = classEnrollmentSessionApplicabilityService.sanitizeSessionCapFields(input);
     patch.targetSessionCount = sessionCap.targetSessionCount;
+    patch.targetHours = sessionCap.targetHours;
     patch.sessionCountPolicy = sessionCap.sessionCountPolicy;
     patch.completionDate = sessionCap.completionDate;
     patch.completionSessionId = sessionCap.completionSessionId;

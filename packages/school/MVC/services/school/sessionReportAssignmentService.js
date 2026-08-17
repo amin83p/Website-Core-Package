@@ -116,6 +116,9 @@ async function createAssignmentForSession({
   const taskEndTime = normalizeTime(input.taskEndTime || sessionEndTime);
   const conflictPermitted = parseBoolean(input.conflictPermitted, false);
   const timesheetReflection = parseBoolean(input.timesheetReflection, false);
+  const conductRequiredBeforeFill = input.conductRequiredBeforeFill !== undefined
+    ? parseBoolean(input.conductRequiredBeforeFill, true)
+    : true;
   const allocatedHours = timesheetReflection
     ? parseNumber(input.allocatedHours, resolveAllocatedHours(taskStartTime, taskEndTime))
     : 0;
@@ -155,6 +158,7 @@ async function createAssignmentForSession({
     conflictPermitted,
     timesheetReflection,
     allocatedHours,
+    conductRequiredBeforeFill,
     teacherId,
     status: 'active',
     notes
@@ -182,6 +186,14 @@ async function createAssignmentForSession({
   });
 
   const firstActiveRow = effectiveTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active') || effectiveTargetRows[0];
+  const resolvedConductRequired = input.conductRequiredBeforeFill !== undefined
+    ? parseBoolean(input.conductRequiredBeforeFill, true)
+    : parseBoolean(template?.conductRequiredBeforeFill, true);
+  const normalizedTargetRows = effectiveTargetRows.map((row) => ({
+    ...row,
+    conductRequiredBeforeFill: resolvedConductRequired
+  }));
+  const normalizedFirstActiveRow = normalizedTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active') || normalizedTargetRows[0];
   const now = new Date().toISOString();
   const payload = {
     orgId: clean(classData.orgId || reqUser?.activeOrgId),
@@ -191,20 +203,21 @@ async function createAssignmentForSession({
     templateId: template.id,
     templateVersion: Number(template.version || 1),
     teacherIds: [teacherId],
-    targetRows: effectiveTargetRows,
-    targetType: firstActiveRow.targetType,
-    sessionId: firstActiveRow.sessionId,
-    sessionDate: firstActiveRow.sessionDate,
-    dueDate: firstActiveRow.dueDate,
-    conflictPermitted: firstActiveRow.conflictPermitted,
-    taskStartTime: firstActiveRow.taskStartTime,
-    taskEndTime: firstActiveRow.taskEndTime,
-    reportStartDate: firstActiveRow.reportStartDate,
-    reportDueDate: firstActiveRow.reportDueDate,
+    targetRows: normalizedTargetRows,
+    targetType: normalizedFirstActiveRow.targetType,
+    sessionId: normalizedFirstActiveRow.sessionId,
+    sessionDate: normalizedFirstActiveRow.sessionDate,
+    dueDate: normalizedFirstActiveRow.dueDate,
+    conflictPermitted: normalizedFirstActiveRow.conflictPermitted,
+    taskStartTime: normalizedFirstActiveRow.taskStartTime,
+    taskEndTime: normalizedFirstActiveRow.taskEndTime,
+    reportStartDate: normalizedFirstActiveRow.reportStartDate,
+    reportDueDate: normalizedFirstActiveRow.reportDueDate,
     status: 'active',
     notes,
-    timesheetReflection: firstActiveRow.timesheetReflection,
-    allocatedHours: firstActiveRow.timesheetReflection ? Number(firstActiveRow.allocatedHours) : 0,
+    timesheetReflection: normalizedFirstActiveRow.timesheetReflection,
+    allocatedHours: normalizedFirstActiveRow.timesheetReflection ? Number(normalizedFirstActiveRow.allocatedHours) : 0,
+    conductRequiredBeforeFill: resolvedConductRequired,
     audit: {
       createUser: reqUser?.id || '',
       createDateTime: now,
@@ -220,7 +233,7 @@ async function createAssignmentForSession({
     template,
     teacherId,
     teacherName,
-    targetRows: effectiveTargetRows,
+    targetRows: normalizedTargetRows,
     message: `Report assigned to this session for ${teacherName || teacherId}.`
   };
 }

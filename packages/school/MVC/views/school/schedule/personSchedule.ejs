@@ -867,8 +867,35 @@
 <%- include('partials/tablePages-end') %>
 
 <script src="/scripts/scheduleCompletionDisplay.js"></script>
+<script src="/scripts/sessionCalendarCore.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const scheduleCalendarCore = window.SessionCalendarCore;
+    const TIMELINE_START_HOUR = scheduleCalendarCore?.TIMELINE_START_HOUR ?? 7;
+    const TIMELINE_END_HOUR = scheduleCalendarCore?.TIMELINE_END_HOUR ?? 22;
+    const TOTAL_MINUTES = (TIMELINE_END_HOUR - TIMELINE_START_HOUR) * 60;
+
+    function timeToMinutes(timeStr) {
+        if (scheduleCalendarCore) return scheduleCalendarCore.timeToMinutes(timeStr);
+        if (!timeStr) return 0;
+        const [h, m] = timeStr.split(':').map(Number);
+        return (h * 60) + m;
+    }
+
+    function calculatePosition(startStr, endStr) {
+        if (scheduleCalendarCore) return scheduleCalendarCore.calculatePosition(startStr, endStr);
+        let startMin = timeToMinutes(startStr);
+        let endMin = timeToMinutes(endStr);
+        const timelineStartMin = TIMELINE_START_HOUR * 60;
+        const timelineEndMin = TIMELINE_END_HOUR * 60;
+        if (startMin < timelineStartMin) startMin = timelineStartMin;
+        if (endMin > timelineEndMin) endMin = timelineEndMin;
+        if (endMin <= startMin) endMin = startMin + 30;
+        const leftPercent = ((startMin - timelineStartMin) / TOTAL_MINUTES) * 100;
+        const widthPercent = ((endMin - startMin) / TOTAL_MINUTES) * 100;
+        return { left: leftPercent, width: widthPercent, startMin, endMin };
+    }
+
     function bindCollapseToggle(options = {}) {
         const collapseEl = document.getElementById(String(options.collapseId || ''));
         const buttonEl = document.getElementById(String(options.buttonId || ''));
@@ -1552,6 +1579,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function groupEventsByDate(events) {
+        if (scheduleCalendarCore) {
+            const grouped = scheduleCalendarCore.groupEventsByDate(events);
+            Object.keys(grouped).forEach((date) => {
+                grouped[date].sort((a, b) => {
+                    const aStart = timeToMinutes(a?.start);
+                    const bStart = timeToMinutes(b?.start);
+                    if (aStart !== bStart) return aStart - bStart;
+                    return getEventTitle(a).localeCompare(getEventTitle(b));
+                });
+            });
+            return grouped;
+        }
         const grouped = {};
         (Array.isArray(events) ? events : []).forEach((ev) => {
             if (!ev?.date) return;
@@ -1947,32 +1986,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleState.viewMode = verticalButton ? 'verticalTimeline' : (dayButton ? 'timeline' : 'calendar');
         refreshScheduleActiveView();
     });
-
-    const TIMELINE_START_HOUR = 7;
-    const TIMELINE_END_HOUR = 22;  
-    const TOTAL_MINUTES = (TIMELINE_END_HOUR - TIMELINE_START_HOUR) * 60;
-
-    function timeToMinutes(timeStr) {
-        if (!timeStr) return 0;
-        const [h, m] = timeStr.split(':').map(Number);
-        return (h * 60) + m;
-    }
-
-    function calculatePosition(startStr, endStr) {
-        let startMin = timeToMinutes(startStr);
-        let endMin = timeToMinutes(endStr);
-        const timelineStartMin = TIMELINE_START_HOUR * 60;
-        const timelineEndMin = TIMELINE_END_HOUR * 60;
-        
-        if (startMin < timelineStartMin) startMin = timelineStartMin;
-        if (endMin > timelineEndMin) endMin = timelineEndMin;
-        if (endMin <= startMin) endMin = startMin + 30;
-
-        const leftPercent = ((startMin - timelineStartMin) / TOTAL_MINUTES) * 100;
-        const widthPercent = ((endMin - startMin) / TOTAL_MINUTES) * 100;
-
-        return { left: leftPercent, width: widthPercent, startMin, endMin };
-    }
 
     function renderSingleDayListView(eventsByDate, container) {
         const scd = window.ScheduleCompletionDisplay;

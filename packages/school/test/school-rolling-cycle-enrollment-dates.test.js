@@ -47,8 +47,22 @@ function buildMockRepositories({
       async findByClassId() {
         return Array.from(periods.values());
       },
-      async findByClassIdInRange() {
-        return [];
+      async findByClassIdInRange(classId, startDate, endDate, options = {}) {
+        const statuses = Array.isArray(options?.statuses)
+          ? options.statuses.map((row) => String(row || '').trim().toLowerCase())
+          : [];
+        const overlaps = (row) => {
+          const aStart = String(row?.startDate || '').trim();
+          const aEnd = String(row?.endDate || '').trim() || '9999-12-31';
+          const bStart = String(startDate || '').trim();
+          const bEnd = String(endDate || '').trim() || '9999-12-31';
+          return aStart <= bEnd && bStart <= aEnd;
+        };
+        return Array.from(periods.values()).filter((row) => {
+          if (String(row?.classId || '') !== String(classId || '')) return false;
+          if (statuses.length && !statuses.includes(String(row?.status || '').trim().toLowerCase())) return false;
+          return overlaps(row);
+        });
       },
       async create(input) {
         const created = {
@@ -294,4 +308,42 @@ test('isProgramRegistrationDateWithinCycle excludes late registrations but allow
     policyService.isProgramRegistrationDateWithinCycle(rollingClass, '2025-12-15'),
     true
   );
+});
+
+test('createPeriod allows a new enrollment when the only overlapping period is void', async () => {
+  periodService.__setDependenciesForTest({
+    repositories: buildMockRepositories({
+      existingPeriods: [{
+        id: 'PER_VOID',
+        orgId: rollingClass.orgId,
+        classId: rollingClass.id,
+        studentId: 'STU_001',
+        status: 'void',
+        startDate: '2026-02-01',
+        endDate: '2026-06-30',
+        sequenceNo: 1
+      }]
+    }),
+    policyService: {
+      getPolicy: () => ({
+        allowImmediateReentry: true,
+        minGapDaysBetweenPeriods: 0,
+        maxPeriodsPerStudentPerClass: 0
+      })
+    }
+  });
+  try {
+    const created = await periodService.createPeriod({
+      orgId: rollingClass.orgId,
+      classId: rollingClass.id,
+      studentId: 'STU_001',
+      startDate: '2026-02-01',
+      endDate: '2026-06-30',
+      status: 'active'
+    }, { id: 'USR_001' });
+    assert.ok(created?.period?.id);
+    assert.notEqual(created.period.id, 'PER_VOID');
+  } finally {
+    periodService.__resetDependenciesForTest();
+  }
 });

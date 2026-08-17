@@ -57,6 +57,7 @@
     <input type="hidden" name="taskEndTime" id="legacyTaskEndTimeInput" value="">
     <input type="hidden" name="conflictPermitted" id="legacyConflictPermittedInput" value="false">
     <input type="hidden" name="timesheetReflection" id="legacyTimesheetReflectionInput" value="false">
+    <input type="hidden" name="conductRequiredBeforeFill" id="legacyConductRequiredBeforeFillInput" value="true">
     <input type="hidden" name="allocatedHours" id="legacyAllocatedHoursInput" value="0">
     <input type="hidden" name="status" id="legacyStatusInput" value="active">
 
@@ -256,6 +257,14 @@
           </div>
 
           <div class="col-md-3">
+            <label class="form-label fw-bold d-block">Class Conduct</label>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="rowModalConductRequiredBeforeFill" checked>
+              <label class="form-check-label" for="rowModalConductRequiredBeforeFill">Require before filling</label>
+            </div>
+          </div>
+
+          <div class="col-md-3">
             <label class="form-label fw-bold">Allocated Hours</label>
             <input type="number" class="form-control" id="rowModalAllocatedHours" min="0.25" max="24" step="0.25" placeholder="e.g. 1.5">
           </div>
@@ -362,6 +371,12 @@
             </div>
             <div class="col-md-3">
               <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" id="bulkConductRequiredBeforeFill" checked>
+                <label class="form-check-label" for="bulkConductRequiredBeforeFill">Require class conduct before filling</label>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check mt-4">
                 <input class="form-check-input" type="checkbox" id="bulkConflictPermitted">
                 <label class="form-check-label" for="bulkConflictPermitted">Intentional overlap permitted</label>
               </div>
@@ -450,6 +465,7 @@
       taskEndTime: document.getElementById('rowModalTaskEndTime'),
       conflictPermitted: document.getElementById('rowModalConflictPermitted'),
       timesheetReflection: document.getElementById('rowModalTimesheetReflection'),
+      conductRequiredBeforeFill: document.getElementById('rowModalConductRequiredBeforeFill'),
       allocatedHours: document.getElementById('rowModalAllocatedHours'),
       status: document.getElementById('rowModalStatus'),
       notes: document.getElementById('rowModalNotes')
@@ -466,6 +482,7 @@
       reportScopeDefinitions.map((scope) => [scope.value, scope.label])
     );
     let selectedTemplateAllowedReportScopes = <%- JSON.stringify(initialTemplateAllowedReportScopes) %>;
+    let selectedTemplateConductRequired = <%= (typeof assignment !== 'undefined' && assignment && assignment.conductRequiredBeforeFill === false) ? 'false' : 'true' %>;
     const firstTeacherId = <%- JSON.stringify(firstTeacherId) %>;
     const isEditAssignment = <%= isEdit ? 'true' : 'false' %>;
     const assignmentId = <%- JSON.stringify(assignment?.id || '') %>;
@@ -604,6 +621,9 @@
         taskEndTime: String(row.taskEndTime || session?.endTime || '').trim(),
         conflictPermitted: row.conflictPermitted !== undefined ? Boolean(row.conflictPermitted) : targetType === 'session',
         timesheetReflection: row.timesheetReflection === true,
+        conductRequiredBeforeFill: row.conductRequiredBeforeFill !== undefined && row.conductRequiredBeforeFill !== null
+          ? Boolean(row.conductRequiredBeforeFill)
+          : selectedTemplateConductRequired !== false,
         allocatedHours: row.allocatedHours !== undefined && row.allocatedHours !== null ? row.allocatedHours : '',
         teacherId,
         teacherName: String(row.teacherName || getTeacherName(teacherId)).trim(),
@@ -627,6 +647,7 @@
       document.getElementById('legacyTaskEndTimeInput').value = activeRow.taskEndTime || '';
       document.getElementById('legacyConflictPermittedInput').value = activeRow.conflictPermitted ? 'true' : 'false';
       document.getElementById('legacyTimesheetReflectionInput').value = activeRow.timesheetReflection ? 'true' : 'false';
+      document.getElementById('legacyConductRequiredBeforeFillInput').value = activeRow.conductRequiredBeforeFill ? 'true' : 'false';
       document.getElementById('legacyAllocatedHoursInput').value = activeRow.allocatedHours || 0;
       document.getElementById('legacyStatusInput').value = activeRow.status || 'active';
     }
@@ -705,6 +726,7 @@
       modalFields.taskEndTime.value = normalized.taskEndTime;
       modalFields.conflictPermitted.checked = normalized.conflictPermitted === true;
       modalFields.timesheetReflection.checked = normalized.timesheetReflection === true;
+      modalFields.conductRequiredBeforeFill.checked = normalized.conductRequiredBeforeFill !== false;
       modalFields.allocatedHours.value = normalized.allocatedHours || '';
       modalFields.status.value = normalized.status || 'active';
       modalFields.notes.value = normalized.notes || '';
@@ -729,6 +751,7 @@
         taskEndTime: modalFields.taskEndTime.value,
         conflictPermitted: modalFields.conflictPermitted.checked,
         timesheetReflection: modalFields.timesheetReflection.checked,
+        conductRequiredBeforeFill: modalFields.conductRequiredBeforeFill.checked,
         allocatedHours: modalFields.allocatedHours.value,
         status: modalFields.status.value,
         notes: modalFields.notes.value
@@ -795,6 +818,7 @@
       allocatedHours: document.getElementById('bulkAllocatedHours'),
       linkSessions: document.getElementById('bulkLinkSessions'),
       timesheetReflection: document.getElementById('bulkTimesheetReflection'),
+      conductRequiredBeforeFill: document.getElementById('bulkConductRequiredBeforeFill'),
       conflictPermitted: document.getElementById('bulkConflictPermitted'),
       previewSection: document.getElementById('bulkPreviewSection'),
       previewBody: document.getElementById('bulkPreviewBody'),
@@ -1054,6 +1078,7 @@
         taskStartTime: String(bulkFields.taskStartTime?.value || '').trim(),
         taskEndTime: String(bulkFields.taskEndTime?.value || '').trim(),
         timesheetReflection: bulkFields.timesheetReflection?.checked === true,
+        conductRequiredBeforeFill: bulkFields.conductRequiredBeforeFill?.checked !== false,
         allocatedHours: bulkFields.allocatedHours?.value,
         conflictPermitted: bulkFields.conflictPermitted?.checked === true,
         status: String(bulkFields.status?.value || 'active').trim(),
@@ -1495,6 +1520,9 @@
           const version = Number(item?.version || 1);
           templateTitleInput.value = `${item?.title || id} | ${item?.type || '-'} v${version}`;
           selectedTemplateAllowedReportScopes = normalizeTemplateAllowedScopes(item?.allowedReportScopes);
+          selectedTemplateConductRequired = item?.conductRequiredBeforeFill !== false;
+          const bulkConduct = document.getElementById('bulkConductRequiredBeforeFill');
+          if (bulkConduct) bulkConduct.checked = selectedTemplateConductRequired !== false;
           applyTemplateScopePolicy();
         }
       }));

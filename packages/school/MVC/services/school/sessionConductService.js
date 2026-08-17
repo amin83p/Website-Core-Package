@@ -289,6 +289,28 @@ function assignmentTargetsSession(assignment = {}, instance = {}) {
   return Boolean(resolveSessionIdFromAssignmentContext(assignment, instance));
 }
 
+function parseConductRequiredFlag(value, fallback = true) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  const raw = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(raw)) return true;
+  if (['0', 'false', 'no', 'off'].includes(raw)) return false;
+  return fallback;
+}
+
+function assignmentRequiresConductBeforeFill(assignment = {}, instance = {}) {
+  const assignmentRowId = String(instance?.assignmentRowId || assignment?.assignmentRowId || '').trim();
+  const rows = Array.isArray(assignment?.targetRows) ? assignment.targetRows : [];
+  if (assignmentRowId && rows.length) {
+    const row = rows.find((entry) => String(entry?.rowId || '').trim() === assignmentRowId);
+    if (row) return parseConductRequiredFlag(row.conductRequiredBeforeFill, true);
+  }
+  if (rows.length === 1) {
+    return parseConductRequiredFlag(rows[0]?.conductRequiredBeforeFill, true);
+  }
+  return parseConductRequiredFlag(assignment?.conductRequiredBeforeFill, true);
+}
+
 /**
  * When the assignment/instance is session-scoped, refuse report fill until conduct is saved.
  * Non-session assignments (date/class-only with no session link) are skipped.
@@ -301,6 +323,7 @@ async function assertAssignmentSessionConductReadyOrThrow({
   schoolDataService
 } = {}) {
   if (!assignmentTargetsSession(assignment, instance)) return;
+  if (!assignmentRequiresConductBeforeFill(assignment, instance)) return;
   const sessionId = resolveSessionIdFromAssignmentContext(assignment, instance);
   if (!sessionId) return;
 
@@ -343,5 +366,7 @@ module.exports = {
   applyConductRosterToSession,
   resolveSessionIdFromAssignmentContext,
   assignmentTargetsSession,
+  assignmentRequiresConductBeforeFill,
+  parseConductRequiredFlag,
   assertAssignmentSessionConductReadyOrThrow
 };
