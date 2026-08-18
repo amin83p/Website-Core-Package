@@ -67,12 +67,21 @@
     return `background:${palette.bg};color:${palette.text};border-color:${palette.border};`;
   }
 
-  function rowStyleFromColors(colors, locked) {
+  function rowStyleFromColors(colors) {
     const palette = colors || DEFAULT_PENDING;
-    const alpha = locked ? 0.14 : 0.2;
     return [
       `background-color:${palette.bg}`,
+      `color:${palette.text}`,
       `border-left:4px solid ${palette.border}`
+    ].join(';');
+  }
+
+  function blockStyleFromColors(colors) {
+    const palette = colors || DEFAULT_PENDING;
+    return [
+      `background-color:${palette.bg}`,
+      `color:${palette.text}`,
+      `border-left-color:${palette.border}`
     ].join(';');
   }
 
@@ -83,7 +92,8 @@
       isComplete: Boolean(isComplete),
       scanLabel: String(scanLabel || ''),
       badgeStyle: badgeStyleFromColors(palette),
-      rowStyle: rowStyleFromColors(palette, false),
+      rowStyle: rowStyleFromColors(palette),
+      blockStyle: blockStyleFromColors(palette),
       borderColor: palette.border,
       iconClass: iconClass || (isComplete ? 'bi-check-circle-fill text-success' : 'bi-clock-history text-warning')
     };
@@ -133,8 +143,6 @@
     const classes = String(baseClasses || '').trim();
     if (!scan) return classes;
     if (scan.state === 'leave') return `${classes} leave-event`.trim();
-    if (scan.isComplete) return `${classes} event-row-complete`.trim();
-    if (scan.state === 'pending') return `${classes} event-row-pending`.trim();
     return classes;
   }
 
@@ -142,9 +150,12 @@
     const classes = String(baseClasses || '').trim();
     if (!scan) return classes;
     if (scan.state === 'leave') return classes;
-    if (scan.isComplete) return `${classes} event-block-complete`.trim();
-    if (scan.state === 'pending') return `${classes} event-block-pending`.trim();
     return classes;
+  }
+
+  function buildScheduleBlockStyle(scan) {
+    if (!scan || scan.state === 'leave') return '';
+    return scan.blockStyle || '';
   }
 
   function buildScheduleScanIcon(scan) {
@@ -212,6 +223,7 @@
     resolveScheduleCompletionScan,
     buildScheduleRowClasses,
     buildScheduleBlockClasses,
+    buildScheduleBlockStyle,
     buildScheduleScanIcon,
     summarizeDayCompletion,
     buildDayCompletionChip,

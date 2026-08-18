@@ -458,7 +458,7 @@
 
   .school-master-hub .hub-schedule-person-tab {
     --hub-person-tab-bg: #eef6ff;
-    --hub-person-tab-text: #084298;
+    --hub-person-tab-text: #4a6fa5;
     --hub-person-tab-border: #9ec5fe;
     background: var(--hub-person-tab-bg);
     color: var(--hub-person-tab-text);
@@ -589,7 +589,7 @@
   }
 
   .school-master-hub .hub-schedule-event {
-    border-left: 5px solid #0d6efd;
+    border-left: 5px solid #b6d4fe;
   }
 
   .school-master-hub .hub-schedule-event.is-leave {
@@ -670,8 +670,8 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    color: #084298;
-    font-weight: 800;
+    color: #4a6fa5;
+    font-weight: 400;
     white-space: nowrap;
   }
 
@@ -814,7 +814,7 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    color: #0d6efd;
+    color: #8ec5ff;
     font-size: 0.9rem;
     line-height: 1;
   }
@@ -897,7 +897,7 @@
     margin-bottom: 0.2rem;
     color: inherit;
     font-size: 0.86rem;
-    font-weight: 800;
+    font-weight: 400;
     line-height: 1.25;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -915,7 +915,7 @@
     background: rgba(255, 255, 255, 0.42);
     color: inherit;
     font-size: 0.72rem;
-    font-weight: 750;
+    font-weight: 400;
   }
 
   .school-master-hub .hub-schedule-event-student {
@@ -926,7 +926,7 @@
     padding-top: 0.18rem;
     color: inherit;
     font-size: 0.76rem;
-    font-weight: 800;
+    font-weight: 400;
     line-height: 1.2;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -964,14 +964,9 @@
     box-shadow: 0 3px 10px rgba(240, 140, 0, 0.22);
   }
 
-  .school-master-hub .role-teacher {
-    background-color: #0dcaf0;
-    color: #000;
-  }
-
+  .school-master-hub .role-teacher,
   .school-master-hub .role-student {
-    background-color: #0d6efd;
-    color: #fff;
+    /* Block colors come from Session Status settings via inline styles. */
   }
 
   .school-master-hub .role-staff {
@@ -1037,8 +1032,18 @@
   }
 
   .school-master-hub .single-day-list .event-row.is-session-selected {
-    background-color: rgba(13, 110, 253, 0.1);
-    box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.28);
+    background-color: rgba(108, 117, 125, 0.12);
+    box-shadow: inset 0 0 0 2px rgba(108, 117, 125, 0.28);
+  }
+
+  .school-master-hub .single-day-list .event-row .fw-bold {
+    font-weight: 400;
+  }
+
+  .school-master-hub .single-day-list .event-time {
+    font-weight: 400;
+    color: #4a6fa5;
+    white-space: nowrap;
   }
 
   .school-master-hub .single-day-list .event-row.is-session-unselectable .fw-bold {
@@ -1259,12 +1264,6 @@
     opacity: 0.92;
   }
 
-  .school-master-hub .single-day-list .event-time {
-    font-weight: 700;
-    color: #0d6efd;
-    white-space: nowrap;
-  }
-
   .school-master-hub .cal-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -1293,10 +1292,10 @@
   }
 
   .school-master-hub .cal-day.active {
-    background-color: #e7f1ff;
-    border-color: #b6d4fe;
-    color: #084298;
-    font-weight: 700;
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+    color: #495057;
+    font-weight: 400;
     cursor: pointer;
   }
 
@@ -4579,7 +4578,7 @@
 
   function hubSchedulePersonTabStyle(index) {
     const palettes = [
-      { bg: '#e7f1ff', text: '#084298', border: '#9ec5fe' },
+      { bg: '#eef6ff', text: '#4a6fa5', border: '#9ec5fe' },
       { bg: '#e8f7ef', text: '#0f5132', border: '#a3cfbb' },
       { bg: '#fff3cd', text: '#664d03', border: '#ffda6a' },
       { bg: '#f3e8ff', text: '#581c87', border: '#d8b4fe' },
@@ -4835,7 +4834,7 @@
     if (mode === 'verticalTimeline' || mode === 'timeline') {
       return [
         '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</span>',
-        '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</span>',
+        '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#8ec5ff;"></span> Student</span>',
         '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</span>',
         '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
         '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
@@ -4897,6 +4896,13 @@
     updateHubScheduleSelectedSessionControls();
   }
 
+  function mergeHubScheduleBlockLayoutStyle(layoutStyle, scan) {
+    const scd = window.ScheduleCompletionDisplay;
+    if (!scd || !scan) return layoutStyle;
+    const statusStyle = scd.buildScheduleBlockStyle(scan);
+    return statusStyle ? layoutStyle + ';' + statusStyle : layoutStyle;
+  }
+
   function renderHubScheduleSingleDayView(eventsByDate, statusMap) {
     const scd = window.ScheduleCompletionDisplay;
     const dates = Object.keys(eventsByDate || {}).sort();
@@ -4929,13 +4935,13 @@
         const makeupBadge = scd ? scd.buildMakeupRequiredBadge(event) : '';
         const caseBadge = buildSessionCaseBadgeHtml(event?.caseSummary);
         html += [
-          '<div class="' + rowClasses + selectedClass + unselectableClass + '" data-hub-schedule-session-key="' + escapeHtml(selectionKey) + '">',
+          '<div class="' + rowClasses + selectedClass + unselectableClass + '" data-hub-schedule-session-key="' + escapeHtml(selectionKey) + '"' + (scan && scan.rowStyle ? ' style="' + escapeHtml(scan.rowStyle) + '"' : '') + '>',
           '<div class="schedule-scan-cell">' + selectionControl + scanIcon + '</div>',
           '<div class="event-time">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</div>',
           '<div>',
           '<div class="fw-bold">' + buildReportPriorityMarker(event) + escapeHtml(title) + '</div>',
           '<div class="mt-1 d-flex flex-wrap gap-2 align-items-center">',
-          '<span class="badge ' + (leave ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-primary-subtle text-primary border') + '">' + escapeHtml(leave ? 'Approved Leave' : (event?.role || event?.roleLabel || '-')) + '</span>',
+          '<span class="badge ' + (leave ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-info-subtle text-info-emphasis border') + '">' + escapeHtml(leave ? 'Approved Leave' : (event?.role || event?.roleLabel || '-')) + '</span>',
           caseBadge,
           statusBadge,
           makeupBadge,
@@ -4989,7 +4995,7 @@
         const soloStudentHtml = hubScheduleSoloStudentHtml(event);
         html += [
           '<div class="' + blockClasses + selectedClass + unselectableClass + '"',
-          ' style="left:' + escapeHtml(event.__hubPos.left) + '%;width:' + escapeHtml(event.__hubPos.width) + '%;top:' + escapeHtml(topPos) + 'px;"',
+          ' style="' + escapeHtml(mergeHubScheduleBlockLayoutStyle('left:' + event.__hubPos.left + '%;width:' + event.__hubPos.width + '%;top:' + topPos + 'px;', scan)) + '"',
           ' data-hub-schedule-session-key="' + escapeHtml(selectionKey) + '"',
           ' data-tip="' + escapeHtml(tooltip) + '" data-hub-schedule-tip="' + escapeHtml(tooltip) + '"',
           ' data-tip-bg="' + escapeHtml(tipStyle.bg) + '" data-tip-fg="' + escapeHtml(tipStyle.fg) + '" data-tip-border="' + escapeHtml(tipStyle.border) + '"',
@@ -5065,7 +5071,7 @@
         const soloStudentHtml = hubScheduleSoloStudentHtml(event);
         html += [
           '<div class="' + blockClasses + selectedClass + unselectableClass + '"',
-          ' style="top:' + escapeHtml(event.__hubPos.left) + '%;height:calc(' + escapeHtml(blockHeight) + '% - 4px);left:calc(' + escapeHtml(trackLeft) + '% + 28px);width:calc(' + escapeHtml(trackWidth) + '% - 34px);"',
+          ' style="' + escapeHtml(mergeHubScheduleBlockLayoutStyle('top:' + event.__hubPos.left + '%;height:calc(' + blockHeight + '% - 4px);left:calc(' + trackLeft + '% + 28px);width:calc(' + trackWidth + '% - 34px);', scan)) + '"',
           ' data-hub-schedule-session-key="' + escapeHtml(selectionKey) + '"',
           ' data-tip="' + escapeHtml(tooltip) + '" data-hub-schedule-tip="' + escapeHtml(tooltip) + '"',
           ' data-tip-bg="' + escapeHtml(tipStyle.bg) + '" data-tip-fg="' + escapeHtml(tipStyle.fg) + '" data-tip-border="' + escapeHtml(tipStyle.border) + '"',

@@ -55,7 +55,7 @@
         justify-content: center;
         width: 100%;
         height: 100%;
-        color: #0d6efd;
+        color: #6c757d;
         font-size: 0.9rem;
         line-height: 1;
     }
@@ -82,7 +82,7 @@
         margin-bottom: 0.2rem;
         color: inherit;
         font-size: 0.86rem;
-        font-weight: 800;
+        font-weight: 400;
         line-height: 1.25;
         white-space: normal;
         overflow-wrap: anywhere;
@@ -99,7 +99,7 @@
         background: rgba(255,255,255,0.42);
         color: inherit;
         font-size: 0.72rem;
-        font-weight: 750;
+        font-weight: 400;
     }
     .schedule-event-student {
         display: flex;
@@ -109,7 +109,7 @@
         padding-top: 0.18rem;
         color: inherit;
         font-size: 0.76rem;
-        font-weight: 800;
+        font-weight: 400;
         line-height: 1.2;
         white-space: normal;
         overflow-wrap: anywhere;
@@ -216,8 +216,10 @@
     .status-tag-cancelled { background: #f8d7da; color: #842029; border-color: #f1aeb5; }
     .status-tag-holiday { background: #fff3cd; color: #664d03; border-color: #ffe69c; }
     .status-tag-default { background: #e2e3e5; color: #41464b; border-color: #c6c8ca; }
-    .role-teacher { background-color: #0dcaf0; color: #000; }
-    .role-student { background-color: #0d6efd; color: #fff; }
+    .role-teacher,
+    .role-student {
+        /* Block colors come from Session Status settings via inline styles. */
+    }
     .role-staff { background-color: #e2e3e5; color: #41464b; }
     .event-leave {
         background: linear-gradient(135deg, #fff3bf 0%, #ffd43b 100%);
@@ -252,7 +254,7 @@
         background: currentColor;
     }
     .hours-category-teacher { background: #cff4fc; color: #055160; border-color: #9eeaf9; }
-    .hours-category-student { background: #cfe2ff; color: #084298; border-color: #9ec5fe; }
+    .hours-category-student { background: #e7f1ff; color: #084298; border-color: #b6d4fe; }
     .hours-category-staff { background: #e2e3e5; color: #41464b; border-color: #c6c8ca; }
     .hours-category-leave { background: #fff3cd; color: #7a4d00; border-color: #ffda6a; }
     .hours-category-default { background: #f8f9fa; color: #495057; border-color: #dee2e6; }
@@ -294,8 +296,8 @@
         display: inline-flex;
     }
     .schedule-person-tab {
-        --schedule-person-tab-bg: #e7f1ff;
-        --schedule-person-tab-text: #084298;
+        --schedule-person-tab-bg: #eef6ff;
+        --schedule-person-tab-text: #4a6fa5;
         --schedule-person-tab-border: #9ec5fe;
         display: inline-flex;
         align-items: center;
@@ -532,7 +534,7 @@
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
     .cal-day { aspect-ratio: 1/1; border: 1px solid #f8f9fa; border-radius: 4px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: 0.2s; font-size: 0.85rem;}
     .cal-day.empty { color: #adb5bd; cursor: default; }
-    .cal-day.active { background-color: #e7f1ff; border-color: #b6d4fe; color: #084298; font-weight: bold; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .cal-day.active { background-color: #f8f9fa; border-color: #dee2e6; color: #495057; font-weight: 400; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .cal-day.active:hover { background-color: #cfe2ff; transform: translateY(-2px); }
     .cal-day.conflict { background-color: #f8d7da; border-color: #f5c2c7; color: #842029; font-weight: bold; cursor: pointer; animation: pulseCal 2s infinite; }
     .cal-day.conflict:hover { background-color: #f1b0b7; transform: translateY(-2px); }
@@ -590,8 +592,8 @@
         border-left: 4px solid #ffc107;
     }
     .single-day-list .event-row.is-session-selected {
-        background-color: rgba(13, 110, 253, 0.1);
-        box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.28);
+        background-color: rgba(108, 117, 125, 0.12);
+        box-shadow: inset 0 0 0 2px rgba(108, 117, 125, 0.28);
     }
     .single-day-list .event-row.is-session-unselectable .event-main-title {
         opacity: 0.72;
@@ -641,12 +643,12 @@
         right: 36px;
     }
     .single-day-list .event-time {
-        font-weight: 700;
-        color: #0d6efd;
+        font-weight: 400;
+        color: #6c757d;
         white-space: nowrap;
     }
     .single-day-list .event-main-title {
-        font-weight: 700;
+        font-weight: 400;
         line-height: 1.2;
         word-break: break-word;
     }
@@ -1022,6 +1024,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 : ''
         );
     }
+    function mergeScheduleBlockLayoutStyle(layoutStyle, scan) {
+        const scd = window.ScheduleCompletionDisplay;
+        if (!scd || !scan) return layoutStyle;
+        const statusStyle = scd.buildScheduleBlockStyle(scan);
+        return statusStyle ? `${layoutStyle};${statusStyle}` : layoutStyle;
+    }
+
     function scheduleEventRoleClass(event) {
         if (isLeaveEvent(event)) return 'event-leave';
         const roleText = String(event?.role || event?.roleLabel || event?.roles?.[0] || '').trim().toLowerCase();
@@ -1346,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function schedulePersonTabStyle(index) {
         const palettes = [
-            ['#e7f1ff', '#084298', '#9ec5fe'],
+            ['#eef6ff', '#4a6fa5', '#9ec5fe'],
             ['#e8f7ef', '#0f5132', '#a3cfbb'],
             ['#fff3cd', '#664d03', '#ffda6a'],
             ['#f3e8ff', '#581c87', '#d8b4fe'],
@@ -1522,7 +1531,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return [
             '<span class="schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</span>',
-            '<span class="schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</span>',
+            '<span class="schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#8ec5ff;"></span> Student</span>',
             '<span class="schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</span>',
             '<span class="schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
             '<span class="schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
@@ -2043,7 +2052,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
                     : `<span class="text-muted small">No details</span>`;
                 html += `
-                    <div class="${rowClasses}${selectedClass}${unselectableClass}" data-schedule-session-key="${escapeHtml(selectionKey)}">
+                    <div class="${rowClasses}${selectedClass}${unselectableClass}" data-schedule-session-key="${escapeHtml(selectionKey)}"${scan?.rowStyle ? ` style="${scan.rowStyle}"` : ''}>
                         <div class="schedule-scan-cell">${selectionControl}${scanIcon}</div>
                         <div class="event-time">${escapeHtml(ev?.start || '-')} - ${escapeHtml(ev?.end || '-')}</div>
                         <div>
@@ -2129,7 +2138,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 html += `
                         <div class="${blockClasses}${selectedClass}${unselectableClass}" 
-                             style="left: ${ev.pos.left}%; width: ${ev.pos.width}%; top: ${topPos}px;"
+                             style="${mergeScheduleBlockLayoutStyle(`left: ${ev.pos.left}%; width: ${ev.pos.width}%; top: ${topPos}px;`, scan)}"
                              data-schedule-session-key="${escapeHtml(selectionKey)}"
                              data-tip="${escapeHtml(tipLabel)}"
                              data-tip-bg="${escapeHtml(tipStyle.bg)}"
@@ -2237,7 +2246,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 html += `
                     <div class="${blockClasses}${selectedClass}${unselectableClass}"
-                         style="top:${ev.pos.left}%;height:calc(${blockHeight}% - 4px);left:calc(${trackLeft}% + 28px);width:calc(${trackWidth}% - 34px);"
+                         style="${mergeScheduleBlockLayoutStyle(`top:${ev.pos.left}%;height:calc(${blockHeight}% - 4px);left:calc(${trackLeft}% + 28px);width:calc(${trackWidth}% - 34px);`, scan)}"
                          data-schedule-session-key="${escapeHtml(selectionKey)}"
                          data-tip="${escapeHtml(tipLabel)}"
                          data-tip-bg="${escapeHtml(tipStyle.bg)}"
