@@ -91,15 +91,24 @@
     .schedule-event-time {
         display: inline-flex;
         align-items: center;
-        gap: 0.25rem;
+        gap: 0.3rem;
         width: fit-content;
         max-width: 100%;
-        padding: 0.12rem 0.35rem;
+        padding: 0.14rem 0.45rem;
         border-radius: 999px;
-        background: rgba(255,255,255,0.42);
+        background: rgba(255, 255, 255, 0.5);
+        border: 1px solid rgba(15, 23, 42, 0.08);
         color: inherit;
         font-size: 0.72rem;
-        font-weight: 400;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.01em;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+    .schedule-event-time .bi {
+        font-size: 0.68rem;
+        opacity: 0.85;
     }
     .schedule-event-student {
         display: flex;
@@ -214,7 +223,6 @@
     .status-tag-scheduled { background: #e7f1ff; color: #084298; border-color: #b6d4fe; }
     .status-tag-completed { background: #d1e7dd; color: #0f5132; border-color: #a3cfbb; }
     .status-tag-cancelled { background: #f8d7da; color: #842029; border-color: #f1aeb5; }
-    .status-tag-holiday { background: #fff3cd; color: #664d03; border-color: #ffe69c; }
     .status-tag-default { background: #e2e3e5; color: #41464b; border-color: #c6c8ca; }
     .role-teacher,
     .role-student {
@@ -345,24 +353,56 @@
     }
     .schedule-viewbar {
         display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        width: 100%;
+    }
+    .schedule-viewbar-row {
+        display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
         width: 100%;
+        min-width: 0;
     }
-    .schedule-viewbar-left,
-    .schedule-viewbar-actions {
+    .schedule-viewbar-row-left,
+    .schedule-viewbar-row-right {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 0.65rem;
-    }
-    .schedule-viewbar-left {
+        gap: 0.5rem;
         min-width: 0;
     }
-    .schedule-viewbar-actions {
+    .schedule-viewbar-row-right {
         justify-content: flex-end;
         margin-left: auto;
+    }
+    .schedule-viewbar-row-right.is-controls-row {
+        flex-wrap: nowrap;
+        flex-shrink: 0;
+    }
+    .schedule-viewbar-grid-controls {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    .schedule-viewbar-chips {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+    }
+    .schedule-toolbar-hours {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+    }
+    .schedule-toolbar-hours:empty {
+        display: none;
     }
     .schedule-view-name {
         display: inline-flex;
@@ -373,15 +413,18 @@
         white-space: nowrap;
     }
     .schedule-width-control {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 0.55rem;
-        min-width: min(18rem, 100%);
+        flex-shrink: 0;
+        width: auto;
+        min-width: 0;
     }
     .schedule-width-control .form-range {
         min-width: 0;
-        width: 11rem;
+        width: 8.5rem;
         margin: 0;
+        flex-shrink: 0;
     }
     .schedule-width-value {
         min-width: 3.25rem;
@@ -420,6 +463,12 @@
     .schedule-visual-area {
         max-height: none;
         overflow-y: visible;
+    }
+    .schedule-calendar-card-body {
+        min-height: min(92vh, 1280px);
+    }
+    .schedule-calendar-card-body.schedule-calendar-card-body-multi-week {
+        min-height: auto;
     }
     .schedule-vertical-scroll {
         overflow-x: auto;
@@ -643,9 +692,42 @@
         right: 36px;
     }
     .single-day-list .event-time {
-        font-weight: 400;
-        color: #6c757d;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #084298;
         white-space: nowrap;
+        letter-spacing: 0.01em;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        background: #e7f1ff;
+        border: 1px solid #b6d4fe;
+        font-size: 0.78rem;
+        line-height: 1.2;
+    }
+    .schedule-day-card-date {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+        line-height: 1.15;
+    }
+    .schedule-day-card-weekday {
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #084298;
+    }
+    .schedule-day-card-date-line {
+        font-size: 1rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #212529;
+    }
+    .single-day-list .day-card-header.conflict .schedule-day-card-weekday {
+        color: rgba(255, 255, 255, 0.94);
+    }
+    .single-day-list .day-card-header.conflict .schedule-day-card-date-line {
+        color: inherit;
     }
     .single-day-list .event-main-title {
         font-weight: 400;
@@ -684,6 +766,8 @@
     @media (prefers-reduced-motion: reduce) { .report-priority-marker { animation: none; } }
 </style>
 
+<link rel="stylesheet" href="/styles/session-calendar.css">
+
 <%
   const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
     ? schoolSectionDashboardHref
@@ -697,7 +781,7 @@
 %>
 
 <%- include('partials/tablePages-start', {
-  title: '',
+  title: 'Master Schedule Viewer',
   newUrl: null,
   newLabel: null,
   user,
@@ -805,24 +889,11 @@
   <div class="schedule-person-tabs" id="schedulePersonTabs"></div>
 
   <div id="scheduleContainer" class="d-none">
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div>
-          <div class="text-muted small">Viewing</div>
-          <div class="fw-bold text-primary m-0" id="scheduleTitle">Schedule</div>
-          <div id="scheduleHoursSummary" class="schedule-hours-summary d-none">
-            <div id="lbl_totalHours" class="d-flex flex-wrap gap-2"></div>
-          </div>
-        </div>
-        <span class="badge bg-light text-secondary border" id="viewModeIndicator">Ready</span>
-      </div>
-    </div>
-
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2 py-2 px-3">
         <div class="d-flex gap-3 align-items-center flex-wrap small w-100" id="legendContainer"></div>
       </div>
-      <div class="card-body p-2 p-md-3">
+      <div class="card-body p-2 p-md-3 schedule-calendar-card-body">
         <div id="visualDisplayArea" class="schedule-visual-area"></div>
       </div>
     </div>
@@ -960,7 +1031,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (normalized === 'approved_leave' || normalized === 'approved_leave_snapshot') return 'Approved Leave';
         const meta = getStatusMeta(status);
         if (meta?.label) return meta.label;
-        if (normalized === 'holiday') return 'Holiday';
         return normalized.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
     function escapeHtml(value) {
@@ -1015,7 +1085,49 @@ document.addEventListener('DOMContentLoaded', () => {
         return '<span class="report-priority-marker" role="img" aria-label="Important report" title="Important report"><i class="bi bi-stars" aria-hidden="true"></i></span>';
     }
     function getEventTitle(event) {
+        const soloName = normalizeScheduleTooltipValue(event?.soloStudentName || event?.singleStudentName);
+        const soloStudentId = String(event?.soloStudentId || '').trim();
+        const soloPersonId = String(event?.soloStudentPersonId || '').trim();
+        const readableSoloName = soloName && !isScheduleOpaqueLabel(soloName, soloStudentId, soloPersonId) ? soloName : '';
+        if (readableSoloName && (event?.isOneOnOneClass || event?.soloStudentId)) return readableSoloName;
         return String(event?.className || event?.title || event?.label || event?.classId || 'Schedule Item').trim();
+    }
+
+    function mapScheduleSliderToTrackStep(sliderValue) {
+        const width = Math.max(SCHEDULE_MIN_DAY_WIDTH, Math.min(SCHEDULE_MAX_DAY_WIDTH, Math.round(Number(sliderValue) || SCHEDULE_DEFAULT_DAY_WIDTH)));
+        const ratio = (width - SCHEDULE_MIN_DAY_WIDTH) / (SCHEDULE_MAX_DAY_WIDTH - SCHEDULE_MIN_DAY_WIDTH);
+        return Math.round(72 + ratio * (132 - 72));
+    }
+
+    function readScheduleTrackStepFromSlider(widthOverride, mode = normalizedScheduleViewMode()) {
+        const width = Number.isFinite(Number(widthOverride))
+            ? Number(widthOverride)
+            : readScheduleSliderValueForMode(mode);
+        return mapScheduleSliderToTrackStep(width);
+    }
+
+    function applyHorizontalTimelineTrackLayout(container, trackStep) {
+        if (!container) return false;
+        const step = Math.max(60, Math.min(140, Math.round(Number(trackStep) || 76)));
+        container.style.setProperty('--session-timeline-track-step', `${step}px`);
+        const tracks = container.querySelectorAll('.session-cal-timeline-track');
+        if (!tracks.length) return false;
+        tracks.forEach((track) => {
+            const blocks = track.querySelectorAll('.session-cal-positioned-horizontal');
+            let maxTrackIndex = 0;
+            blocks.forEach((block) => {
+                const idx = Number(block.getAttribute('data-track-index'));
+                const trackIndex = Number.isFinite(idx) ? idx : 0;
+                maxTrackIndex = Math.max(maxTrackIndex, trackIndex);
+                const blockHeight = Math.max(48, step - 8);
+                block.style.top = `${(trackIndex * step) + 4}px`;
+                block.style.height = `${blockHeight}px`;
+                block.style.minHeight = `${blockHeight}px`;
+            });
+            const trackCount = Math.max(1, maxTrackIndex + 1);
+            track.style.height = `${Math.max(72, trackCount * step + 12)}px`;
+        });
+        return true;
     }
     function getEventDetailsUrl(event) {
         return String(event?.detailsUrl || '').trim() || (
@@ -1060,7 +1172,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return text;
     }
     function scheduleSoloStudentHtml(event) {
-        const name = normalizeScheduleTooltipValue(event?.soloStudentName || event?.singleStudentName);
+        const rawName = normalizeScheduleTooltipValue(event?.soloStudentName || event?.singleStudentName);
+        const name = rawName && !isScheduleOpaqueLabel(rawName, event?.soloStudentId, event?.soloStudentPersonId) ? rawName : '';
         if (!name) return '';
         return `<div class="schedule-event-student"><i class="bi bi-person-check-fill" aria-hidden="true"></i><span>${escapeHtml(name)}</span></div>`;
     }
@@ -1075,12 +1188,45 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = checked ? 'Selected session' : (disabled ? 'Only sessions from the selected class can be selected' : 'Select session');
         return `<label class="schedule-session-select${stateClass}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><input type="checkbox" class="form-check-input" data-schedule-session-select data-session-key="${escapeHtml(key)}" data-session-class-id="${escapeHtml(event?.classId || '')}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="schedule-session-select-icon"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span></label>`;
     }
+    function formatScheduleClockTime(timeStr) {
+        if (scheduleCalendarCore?.formatClockTime) return scheduleCalendarCore.formatClockTime(timeStr);
+        return String(timeStr || '').trim() || '-';
+    }
+
+    function formatScheduleClockRange(startStr, endStr) {
+        if (scheduleCalendarCore?.formatClockTimeRange) return scheduleCalendarCore.formatClockTimeRange(startStr, endStr);
+        const start = String(startStr || '').trim();
+        const end = String(endStr || '').trim();
+        if (!start && !end) return '-';
+        if (!start) return end;
+        if (!end) return start;
+        return `${start} – ${end}`;
+    }
+
     function formatScheduleDateLabel(dateStr) {
         const raw = normalizeScheduleTooltipValue(dateStr);
         if (!raw) return '';
+        if (scheduleCalendarCore?.formatDayHeaderLong) return scheduleCalendarCore.formatDayHeaderLong(raw);
         const dateObj = new Date(raw + 'T00:00:00');
         if (Number.isNaN(dateObj.getTime())) return raw;
         return dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatScheduleDayCardDateHtml(dateStr) {
+        const raw = normalizeScheduleTooltipValue(dateStr);
+        if (!raw) return '';
+        const parts = scheduleCalendarCore?.formatDayHeaderParts
+            ? scheduleCalendarCore.formatDayHeaderParts(raw)
+            : null;
+        if (!parts || !parts.weekdayLong) {
+            return escapeHtml(formatScheduleDateLabel(raw));
+        }
+        return `
+            <span class="schedule-day-card-date">
+                <span class="schedule-day-card-weekday">${escapeHtml(parts.weekdayLong)}</span>
+                <span class="schedule-day-card-date-line">${escapeHtml(parts.monthShort)} ${escapeHtml(parts.dayNum)}, ${escapeHtml(parts.year)}</span>
+            </span>
+        `;
     }
     function buildScheduleEventTooltip(event, statusMap, scan) {
         const detailParts = [];
@@ -1089,9 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cleaned) detailParts.push(`${label}: ${cleaned}`);
         };
         const role = isLeaveEvent(event) ? 'Approved Leave' : (event?.roleLabel || event?.role || event?.roles?.[0] || '');
-        const time = normalizeScheduleTooltipValue(event?.start)
-            ? `${normalizeScheduleTooltipValue(event?.start)} - ${normalizeScheduleTooltipValue(event?.end || '')}`
-            : '';
+        const time = formatScheduleClockRange(event?.start, event?.end);
         const caseSummary = event?.caseSummary && typeof event.caseSummary === 'object'
             ? [
                 event.caseSummary.hasCases === true ? 'Has cases' : '',
@@ -1265,6 +1409,48 @@ document.addEventListener('DOMContentLoaded', () => {
         return confirm(message);
     };
 
+    const SCHEDULE_DAY_WIDTH_STORAGE_KEY = 'schoolMasterViewer.scheduleDayWidth';
+    const SCHEDULE_VERTICAL_DAY_WIDTH_KEY = 'schoolMasterViewer.scheduleVerticalDayWidth';
+    const SCHEDULE_HORIZONTAL_SLIDER_KEY = 'schoolMasterViewer.scheduleHorizontalSliderWidth';
+    const SCHEDULE_DAY_WIDTH_USER_KEY = 'schoolMasterViewer.scheduleDayWidthUserAdjusted';
+    const SCHEDULE_VERTICAL_DAY_WIDTH_USER_KEY = 'schoolMasterViewer.scheduleVerticalDayWidthUserAdjusted';
+    const SCHEDULE_HORIZONTAL_SLIDER_USER_KEY = 'schoolMasterViewer.scheduleHorizontalSliderUserAdjusted';
+    const SCHEDULE_HIDE_EMPTY_DAYS_KEY = 'schoolMasterViewer.scheduleHideEmptyDays';
+    const SCHEDULE_VIEW_MODE_STORAGE_KEY = 'schoolMasterViewer.scheduleViewMode';
+    const SCHEDULE_DEFAULT_DAY_WIDTH = 320;
+    const SCHEDULE_MIN_DAY_WIDTH = 72;
+    const SCHEDULE_MAX_DAY_WIDTH = 520;
+    const SCHEDULE_HOUR_SLOTS = 15;
+    const SCHEDULE_GRID_MIN_HEIGHT = 680;
+    const SCHEDULE_GRID_SINGLE_WEEK_MAX = 1280;
+    const SCHEDULE_GRID_WEEK_OVERHEAD = 112;
+    const SCHEDULE_GRID_TARGET_HOUR_HEIGHT = 48;
+    const SCHEDULE_GRID_PER_WEEK_HEIGHT = SCHEDULE_GRID_WEEK_OVERHEAD + (SCHEDULE_HOUR_SLOTS * SCHEDULE_GRID_TARGET_HOUR_HEIGHT);
+    let scheduleGridResizeObserver = null;
+
+    function isScheduleOpaqueLabel(label, ...candidateIds) {
+        const cleaned = String(label || '').trim();
+        if (!cleaned) return true;
+        if (/^[0-9]+$/.test(cleaned)) return true;
+        return candidateIds.some((id) => {
+            const candidate = String(id || '').trim();
+            return candidate && cleaned === candidate;
+        });
+    }
+
+    function readScheduleViewMode() {
+        try {
+            const stored = window.localStorage ? String(window.localStorage.getItem(SCHEDULE_VIEW_MODE_STORAGE_KEY) || '').trim() : '';
+            if (stored === 'calendar' || stored === 'timeline' || stored === 'verticalTimeline') return stored;
+        } catch (error) { /* storage can be unavailable */ }
+        return 'verticalTimeline';
+    }
+
+    function resolveScheduleViewMode(mode = 'verticalTimeline') {
+        if (mode === 'calendar' || mode === 'timeline' || mode === 'verticalTimeline') return mode;
+        return 'verticalTimeline';
+    }
+
     const scheduleState = {
         persons: [],
         activePersonId: '',
@@ -1274,12 +1460,20 @@ document.addEventListener('DOMContentLoaded', () => {
         loadedPersonIds: new Set(),
         loadingPersonId: '',
         selectedSessionKeysByPersonId: {},
-        viewMode: 'verticalTimeline'
+        viewMode: readScheduleViewMode(),
+        hideEmptyDays: false,
+        isAdminViewer: canSelectAnyPerson,
+        verticalDayWidthUserAdjusted: false,
+        horizontalSliderUserAdjusted: false
     };
-    const SCHEDULE_DAY_WIDTH_STORAGE_KEY = 'schoolMasterViewer.scheduleDayWidth';
-    const SCHEDULE_DEFAULT_DAY_WIDTH = 320;
-    const SCHEDULE_MIN_DAY_WIDTH = 260;
-    const SCHEDULE_MAX_DAY_WIDTH = 520;
+
+    function saveScheduleViewMode(mode) {
+        const normalized = resolveScheduleViewMode(mode);
+        scheduleState.viewMode = normalized;
+        try {
+            if (window.localStorage) window.localStorage.setItem(SCHEDULE_VIEW_MODE_STORAGE_KEY, normalized);
+        } catch (error) { /* storage can be unavailable */ }
+    }
 
     function resolveSchedulePersonId(item) {
         return String(item?.personId || item?.id || item?._id || '').trim();
@@ -1353,19 +1547,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleState.persons.sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id), undefined, { sensitivity: 'base' }));
     }
 
-    function schedulePersonTabStyle(index) {
-        const palettes = [
-            ['#eef6ff', '#4a6fa5', '#9ec5fe'],
-            ['#e8f7ef', '#0f5132', '#a3cfbb'],
-            ['#fff3cd', '#664d03', '#ffda6a'],
-            ['#f3e8ff', '#581c87', '#d8b4fe'],
-            ['#e0f7fa', '#055160', '#8bd7e2'],
-            ['#ffe8e8', '#842029', '#f1aeb5']
-        ];
-        const [bg, text, border] = palettes[index % palettes.length];
-        return `--schedule-person-tab-bg:${bg};--schedule-person-tab-text:${text};--schedule-person-tab-border:${border};`;
-    }
-
     function syncActivePersonInputs() {
         const person = activeSchedulePerson();
         const idEl = document.getElementById('sch_personId');
@@ -1393,7 +1574,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const roleCount = (Array.isArray(person.availableRoles) && person.availableRoles.length) ? person.availableRoles.length : 'All';
             return `
                 <div class="schedule-person-tab-wrap">
-                    <button type="button" class="btn btn-sm schedule-person-tab ${active ? 'active' : ''}" style="${schedulePersonTabStyle(index)}" data-schedule-person-tab="${escapeHtml(person.id)}">
+                    <button type="button" class="btn btn-sm schedule-person-tab ${active ? 'active' : ''}" data-schedule-person-tab="${escapeHtml(person.id)}">
                         <i class="bi bi-person-circle"></i>
                         <span class="text-truncate">${escapeHtml(person.name || person.id)}</span>
                         <span class="badge text-bg-light border">${escapeHtml(roleCount)}</span>
@@ -1482,36 +1663,320 @@ document.addEventListener('DOMContentLoaded', () => {
         return document.getElementById('sch_hasCases')?.checked === true;
     }
 
-    function readScheduleDayWidth() {
+    function readScheduleHideEmptyDays() {
         try {
-            const stored = window.localStorage ? Number(window.localStorage.getItem(SCHEDULE_DAY_WIDTH_STORAGE_KEY)) : NaN;
-            if (Number.isFinite(stored)) return Math.max(SCHEDULE_MIN_DAY_WIDTH, Math.min(SCHEDULE_MAX_DAY_WIDTH, Math.round(stored)));
+            if (window.localStorage) return window.localStorage.getItem(SCHEDULE_HIDE_EMPTY_DAYS_KEY) === '1';
+        } catch (error) { /* storage can be unavailable */ }
+        return false;
+    }
+
+    function saveScheduleHideEmptyDays(enabled) {
+        try {
+            if (window.localStorage) window.localStorage.setItem(SCHEDULE_HIDE_EMPTY_DAYS_KEY, enabled ? '1' : '0');
+        } catch (error) { /* storage can be unavailable */ }
+    }
+
+    scheduleState.hideEmptyDays = readScheduleHideEmptyDays();
+
+    function clampScheduleSliderValue(value, fallback = SCHEDULE_DEFAULT_DAY_WIDTH) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.max(SCHEDULE_MIN_DAY_WIDTH, Math.min(SCHEDULE_MAX_DAY_WIDTH, Math.round(parsed)));
+    }
+
+    function isScheduleWeekGridMode(mode = normalizedScheduleViewMode()) {
+        return mode === 'verticalTimeline' || mode === 'timeline';
+    }
+
+    function readScheduleVerticalDayWidthUserAdjusted() {
+        try {
+            if (window.localStorage) {
+                const stored = window.localStorage.getItem(SCHEDULE_VERTICAL_DAY_WIDTH_USER_KEY);
+                if (stored === '1') return true;
+                if (stored === '0') return false;
+                return window.localStorage.getItem(SCHEDULE_DAY_WIDTH_USER_KEY) === '1';
+            }
+        } catch (error) { /* storage can be unavailable */ }
+        return false;
+    }
+
+    function readScheduleHorizontalSliderUserAdjusted() {
+        try {
+            if (window.localStorage) return window.localStorage.getItem(SCHEDULE_HORIZONTAL_SLIDER_USER_KEY) === '1';
+        } catch (error) { /* storage can be unavailable */ }
+        return false;
+    }
+
+    function saveScheduleVerticalDayWidthUserAdjusted(adjusted) {
+        scheduleState.verticalDayWidthUserAdjusted = adjusted === true;
+        try {
+            if (window.localStorage) window.localStorage.setItem(SCHEDULE_VERTICAL_DAY_WIDTH_USER_KEY, adjusted ? '1' : '0');
+        } catch (error) { /* storage can be unavailable */ }
+    }
+
+    function saveScheduleHorizontalSliderUserAdjusted(adjusted) {
+        scheduleState.horizontalSliderUserAdjusted = adjusted === true;
+        try {
+            if (window.localStorage) window.localStorage.setItem(SCHEDULE_HORIZONTAL_SLIDER_USER_KEY, adjusted ? '1' : '0');
+        } catch (error) { /* storage can be unavailable */ }
+    }
+
+    function readScheduleVerticalDayWidth() {
+        try {
+            if (window.localStorage) {
+                const stored = Number(window.localStorage.getItem(SCHEDULE_VERTICAL_DAY_WIDTH_KEY));
+                if (Number.isFinite(stored)) return clampScheduleSliderValue(stored);
+                const legacy = Number(window.localStorage.getItem(SCHEDULE_DAY_WIDTH_STORAGE_KEY));
+                if (Number.isFinite(legacy)) return clampScheduleSliderValue(legacy);
+            }
         } catch (error) { /* storage can be unavailable */ }
         return SCHEDULE_DEFAULT_DAY_WIDTH;
     }
 
-    function applyScheduleDayWidth(width) {
-        const resolved = Math.max(SCHEDULE_MIN_DAY_WIDTH, Math.min(SCHEDULE_MAX_DAY_WIDTH, Math.round(Number(width) || SCHEDULE_DEFAULT_DAY_WIDTH)));
-        document.querySelector('.schedule-shell')?.style.setProperty('--schedule-day-width', `${resolved}px`);
-        const input = document.getElementById('scheduleDayWidth');
-        const value = document.getElementById('scheduleDayWidthValue');
-        if (input) input.value = String(resolved);
-        if (value) value.textContent = `${resolved}px`;
+    function readScheduleHorizontalSliderWidth() {
+        try {
+            const stored = window.localStorage ? Number(window.localStorage.getItem(SCHEDULE_HORIZONTAL_SLIDER_KEY)) : NaN;
+            if (Number.isFinite(stored)) return clampScheduleSliderValue(stored);
+        } catch (error) { /* storage can be unavailable */ }
+        return SCHEDULE_DEFAULT_DAY_WIDTH;
+    }
+
+    function readScheduleSliderValueForMode(mode = normalizedScheduleViewMode()) {
+        return mode === 'timeline' ? readScheduleHorizontalSliderWidth() : readScheduleVerticalDayWidth();
+    }
+
+    function saveScheduleSliderValueForMode(mode, width) {
+        const resolved = clampScheduleSliderValue(width);
+        try {
+            if (!window.localStorage) return resolved;
+            if (mode === 'timeline') {
+                window.localStorage.setItem(SCHEDULE_HORIZONTAL_SLIDER_KEY, String(resolved));
+            } else if (mode === 'verticalTimeline') {
+                window.localStorage.setItem(SCHEDULE_VERTICAL_DAY_WIDTH_KEY, String(resolved));
+                window.localStorage.setItem(SCHEDULE_DAY_WIDTH_STORAGE_KEY, String(resolved));
+            }
+        } catch (error) { /* storage can be unavailable */ }
         return resolved;
     }
 
+    scheduleState.verticalDayWidthUserAdjusted = readScheduleVerticalDayWidthUserAdjusted();
+    scheduleState.horizontalSliderUserAdjusted = readScheduleHorizontalSliderUserAdjusted();
+    if (scheduleState.verticalDayWidthUserAdjusted && isScheduleWeekGridMode(scheduleState.viewMode) && scheduleState.viewMode !== 'timeline') {
+        applyScheduleDayWidth(readScheduleVerticalDayWidth(), { mode: 'verticalTimeline' });
+    }
+    if (scheduleState.horizontalSliderUserAdjusted && scheduleState.viewMode === 'timeline') {
+        applyScheduleDayWidth(readScheduleHorizontalSliderWidth(), { mode: 'timeline' });
+    }
+
+    function readScheduleDayWidth() {
+        return readScheduleSliderValueForMode();
+    }
+
     function saveScheduleDayWidth(width) {
-        try {
-            if (window.localStorage) window.localStorage.setItem(SCHEDULE_DAY_WIDTH_STORAGE_KEY, String(applyScheduleDayWidth(width)));
-        } catch (error) { /* storage can be unavailable */ }
+        return saveScheduleSliderValueForMode(normalizedScheduleViewMode(), width);
+    }
+
+    function applyScheduleDayWidth(width, options = {}) {
+        const userInitiated = options.userInitiated === true;
+        const mode = resolveScheduleViewMode(options.mode || normalizedScheduleViewMode());
+        const resolved = clampScheduleSliderValue(width);
+        if (userInitiated) {
+            saveScheduleSliderValueForMode(mode, resolved);
+            if (mode === 'timeline') {
+                saveScheduleHorizontalSliderUserAdjusted(true);
+            } else if (mode === 'verticalTimeline') {
+                saveScheduleVerticalDayWidthUserAdjusted(true);
+                document.getElementById('visualDisplayArea')?.classList.remove('session-cal-auto-day-width');
+            }
+        }
+        if (mode === 'verticalTimeline') {
+            document.querySelector('.schedule-shell')?.style.setProperty('--schedule-day-width', `${resolved}px`);
+            const container = document.getElementById('visualDisplayArea');
+            if (container) container.style.setProperty('--session-day-width', `${resolved}px`);
+        }
+        if (mode === 'timeline') {
+            const container = document.getElementById('visualDisplayArea');
+            applyHorizontalTimelineTrackLayout(container, readScheduleTrackStepFromSlider(resolved, 'timeline'));
+        }
+        syncScheduleWidthControlDisplay(resolved, mode);
+        return resolved;
+    }
+
+    function syncScheduleWidthControlDisplay(widthOverride, modeOverride) {
+        const input = document.getElementById('scheduleDayWidth');
+        const value = document.getElementById('scheduleDayWidthValue');
+        if (!input || !value) return;
+        const mode = resolveScheduleViewMode(modeOverride || normalizedScheduleViewMode());
+        const container = document.getElementById('visualDisplayArea');
+        let width = Number(widthOverride);
+        if (!Number.isFinite(width)) {
+            if (mode === 'timeline') {
+                width = readScheduleHorizontalSliderWidth();
+            } else if (mode === 'verticalTimeline') {
+                const cssWidth = Number(String(container?.style.getPropertyValue('--session-day-width') || '').replace('px', '').trim());
+                width = Number.isFinite(cssWidth) && cssWidth > 0
+                    ? cssWidth
+                    : (scheduleState.verticalDayWidthUserAdjusted ? readScheduleVerticalDayWidth() : SCHEDULE_DEFAULT_DAY_WIDTH);
+            } else {
+                width = readScheduleSliderValueForMode(mode);
+            }
+        }
+        const resolved = clampScheduleSliderValue(width);
+        input.value = String(resolved);
+        if (mode === 'timeline') {
+            value.textContent = `${readScheduleTrackStepFromSlider(resolved, 'timeline')}px`;
+        } else {
+            value.textContent = `${resolved}px`;
+        }
+    }
+
+    function estimateScheduleWeekCountForRange() {
+        if (!scheduleCalendarCore?.buildWeekBlocks) return 1;
+        const range = getScheduleRange();
+        if (!range.startDate || !range.endDate) return 1;
+        const blocks = scheduleCalendarCore.buildWeekBlocks({
+            startDate: range.startDate,
+            endDate: range.endDate,
+            preset: 'custom',
+            anchorDate: range.startDate
+        });
+        return Math.max(1, blocks.length || 1);
+    }
+
+    function computeScheduleGridViewportHeight(container, weekCount = 1) {
+        const el = container || document.getElementById('visualDisplayArea');
+        if (!el) return SCHEDULE_GRID_MIN_HEIGHT;
+        const top = el.getBoundingClientRect().top || 0;
+        const weeks = Math.max(1, Number(weekCount) || 1);
+        const viewportRemainder = Math.max(SCHEDULE_GRID_MIN_HEIGHT, window.innerHeight - top - 16);
+        const singleWeekHeight = Math.min(viewportRemainder, SCHEDULE_GRID_SINGLE_WEEK_MAX);
+        if (weeks <= 1) {
+            return singleWeekHeight;
+        }
+        const stackedHeight = (weeks * SCHEDULE_GRID_PER_WEEK_HEIGHT) + 32;
+        return Math.max(stackedHeight, singleWeekHeight);
+    }
+
+    function syncScheduleCalendarCardBody(weekCount, gridHeight) {
+        const body = document.querySelector('.schedule-calendar-card-body');
+        if (!body) return;
+        const weeks = Math.max(1, Number(weekCount) || 1);
+        const minBody = Math.max(SCHEDULE_GRID_MIN_HEIGHT, Number(gridHeight) || 0) + 16;
+        body.style.minHeight = `${minBody}px`;
+        body.classList.toggle('schedule-calendar-card-body-multi-week', weeks > 1);
+    }
+
+    function applyScheduleWeekGridHostSize(container, weekCountOverride) {
+        const weekCount = Math.max(1, Number(weekCountOverride) || estimateScheduleWeekCountForRange());
+        const height = computeScheduleGridViewportHeight(container, weekCount);
+        container.style.height = `${height}px`;
+        container.style.minHeight = `${height}px`;
+        syncScheduleCalendarCardBody(weekCount, height);
+        return height;
+    }
+
+    function computeScheduleWeekGridLayout(mode, container, options = {}) {
+        const el = container || document.getElementById('visualDisplayArea');
+        const isVertical = mode === 'verticalTimeline';
+        const autoFit = isVertical && !scheduleState.verticalDayWidthUserAdjusted;
+        const scrollEl = el?.querySelector('.session-cal-vertical-scroll');
+        const weekRows = scrollEl ? scrollEl.querySelectorAll('.session-cal-week-row') : [];
+        const weekCount = options.weekCountOverride || weekRows.length || estimateScheduleWeekCountForRange();
+        const gridHeight = applyScheduleWeekGridHostSize(el, weekCount);
+        const dayCount = Math.max(1, Number(el?.dataset?.sessionVisibleDayCount || options.dayCountOverride || 7));
+
+        let dayWidth;
+        if (autoFit && scheduleCalendarCore?.computeAutoDayWidth) {
+            dayWidth = scheduleCalendarCore.computeAutoDayWidth(el, {
+                gutterWidth: 64,
+                dayCount,
+                min: SCHEDULE_MIN_DAY_WIDTH,
+                max: 280,
+                padding: 24,
+                fallback: 120
+            });
+        } else {
+            dayWidth = readScheduleVerticalDayWidth();
+        }
+
+        const scrollHeight = scrollEl?.clientHeight || Math.max(320, gridHeight - 12);
+        const overheadPerWeek = SCHEDULE_GRID_WEEK_OVERHEAD;
+        const availableForGrid = Math.max(220, scrollHeight - weekCount * overheadPerWeek);
+        const hourHeight = Math.max(34, Math.min(72, Math.floor(availableForGrid / (SCHEDULE_HOUR_SLOTS * weekCount))));
+        let trackStep = Math.max(76, Math.min(132, Math.round(hourHeight * 2.35)));
+        if (mode === 'timeline' && scheduleState.horizontalSliderUserAdjusted) {
+            trackStep = readScheduleTrackStepFromSlider(undefined, 'timeline');
+        }
+
+        return { dayWidth, hourHeight, trackStep, autoFit, gridHeight, dayCount, weekCount };
+    }
+
+    function applyScheduleWeekGridLayout(mode) {
+        const container = document.getElementById('visualDisplayArea');
+        if (!container || !container.classList.contains('schedule-week-grid-host')) return null;
+        const isVertical = mode === 'verticalTimeline';
+        container.classList.toggle('session-cal-auto-day-width', isVertical && !scheduleState.verticalDayWidthUserAdjusted);
+        container.classList.toggle('schedule-cal-horizontal-mode', mode === 'timeline');
+        const layout = computeScheduleWeekGridLayout(mode, container);
+        container.style.setProperty('--session-day-width', `${layout.dayWidth}px`);
+        container.style.setProperty('--session-hour-height', `${layout.hourHeight}px`);
+        container.style.setProperty('--session-timeline-track-step', `${layout.trackStep}px`);
+        if (mode === 'timeline') {
+            applyHorizontalTimelineTrackLayout(container, layout.trackStep);
+        }
+        if (mode === 'timeline' && scheduleState.horizontalSliderUserAdjusted) {
+            applyScheduleDayWidth(readScheduleHorizontalSliderWidth(), { mode: 'timeline' });
+        } else if (isVertical && scheduleState.verticalDayWidthUserAdjusted) {
+            applyScheduleDayWidth(readScheduleVerticalDayWidth(), { mode: 'verticalTimeline' });
+        }
+        syncScheduleWidthControlDisplay(readScheduleSliderValueForMode(mode), mode);
+        return layout;
+    }
+
+    function scheduleWeekGridLayoutAfterRender(mode) {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                applyScheduleWeekGridLayout(mode);
+            });
+        });
+    }
+
+    function bindScheduleGridResizeObserver() {
+        const container = document.getElementById('visualDisplayArea');
+        if (!container || scheduleGridResizeObserver) return;
+        scheduleGridResizeObserver = new ResizeObserver(() => {
+            const mode = normalizedScheduleViewMode();
+            if (mode === 'calendar' || !container.classList.contains('schedule-week-grid-host')) return;
+            applyScheduleWeekGridLayout(mode);
+        });
+        scheduleGridResizeObserver.observe(container);
+        window.addEventListener('resize', () => {
+            const mode = normalizedScheduleViewMode();
+            if (mode === 'calendar' || !container.classList.contains('schedule-week-grid-host')) return;
+            applyScheduleWeekGridLayout(mode);
+        });
+    }
+
+    function scheduleHideEmptyDaysControlHtml() {
+        const checked = scheduleState.hideEmptyDays ? 'checked' : '';
+        return `
+            <div class="schedule-hide-empty-days-wrap">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="scheduleHideEmptyDays" ${checked}>
+                    <label class="form-check-label small" for="scheduleHideEmptyDays">Hide days without sessions</label>
+                </div>
+            </div>
+        `;
     }
 
     function scheduleWidthControlHtml() {
-        const width = readScheduleDayWidth();
+        const mode = normalizedScheduleViewMode();
+        const width = readScheduleSliderValueForMode(mode);
+        const ariaLabel = mode === 'timeline' ? 'Row height' : 'Day width';
         return `
             <div class="schedule-width-control">
-                <input type="range" class="form-range" id="scheduleDayWidth" min="${SCHEDULE_MIN_DAY_WIDTH}" max="${SCHEDULE_MAX_DAY_WIDTH}" step="10" value="${escapeHtml(width)}" aria-label="Day width">
-                <span class="badge text-bg-light border schedule-width-value" id="scheduleDayWidthValue">${escapeHtml(width)}px</span>
+                <input type="range" class="form-range" id="scheduleDayWidth" min="${SCHEDULE_MIN_DAY_WIDTH}" max="${SCHEDULE_MAX_DAY_WIDTH}" step="10" value="${escapeHtml(width)}" aria-label="${escapeHtml(ariaLabel)}">
+                <span class="badge text-bg-light border schedule-width-value" id="scheduleDayWidthValue">${escapeHtml(mode === 'timeline' ? `${readScheduleTrackStepFromSlider(width, 'timeline')}px` : `${width}px`)}</span>
             </div>
         `;
     }
@@ -1548,9 +2013,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function normalizedScheduleViewMode(mode = scheduleState.viewMode) {
-        if (mode === 'calendar') return 'calendar';
-        if (mode === 'timeline') return 'timeline';
-        return 'verticalTimeline';
+        return resolveScheduleViewMode(mode);
     }
 
     function renderScheduleControls(mode) {
@@ -1569,21 +2032,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>'
             ].join('');
         }
+        const showWeekGridControls = mode === 'verticalTimeline' || mode === 'timeline';
+        const row2RightControls = showWeekGridControls
+            ? `<div class="schedule-viewbar-grid-controls">${scheduleWidthControlHtml()}${scheduleHideEmptyDaysControlHtml()}</div>`
+            : '';
         legend.innerHTML = `
             <div class="schedule-viewbar">
-                <div class="schedule-viewbar-left">
-                    <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
-                    ${(mode === 'verticalTimeline' || mode === 'timeline') ? scheduleWidthControlHtml() : ''}
-                    <span class="schedule-selected-count-pill ${countActiveScheduleSelectedSessions() ? '' : 'is-empty'}"><i class="bi bi-check2-square" aria-hidden="true"></i><span data-schedule-selected-session-count>${escapeHtml(String(countActiveScheduleSelectedSessions()))} selected</span></span>
+                <div class="schedule-viewbar-row">
+                    <div class="schedule-viewbar-row-left">
+                        <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
+                    </div>
+                    <div class="schedule-viewbar-row-right">
+                        ${switchButtons}
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-schedule-open-legend aria-label="Open schedule legend"><i class="bi bi-info-circle me-1"></i>Legend</button>
+                    </div>
                 </div>
-                <div class="schedule-viewbar-actions">
-                    <button type="button" class="btn btn-sm btn-outline-secondary ${countActiveScheduleSelectedSessions() ? '' : 'd-none'}" data-schedule-clear-selected-sessions aria-label="Clear selected sessions"><i class="bi bi-x-circle me-1"></i>Clear selected</button>
-                    ${switchButtons}
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-schedule-open-legend aria-label="Open schedule legend"><i class="bi bi-info-circle me-1"></i>Legend</button>
+                <div class="schedule-viewbar-row">
+                    <div class="schedule-viewbar-row-left schedule-viewbar-chips">
+                        <span class="schedule-selected-count-pill ${countActiveScheduleSelectedSessions() ? '' : 'is-empty'}"><i class="bi bi-check2-square" aria-hidden="true"></i><span data-schedule-selected-session-count>${escapeHtml(String(countActiveScheduleSelectedSessions()))} selected</span></span>
+                        <div id="lbl_totalHours" class="schedule-toolbar-hours"></div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ${countActiveScheduleSelectedSessions() ? '' : 'd-none'}" data-schedule-clear-selected-sessions aria-label="Clear selected sessions"><i class="bi bi-x-circle me-1"></i>Clear selected</button>
+                    </div>
+                    <div class="schedule-viewbar-row-right is-controls-row">
+                        ${row2RightControls}
+                    </div>
                 </div>
             </div>
         `;
-        applyScheduleDayWidth(readScheduleDayWidth());
+        syncScheduleWidthControlDisplay();
         updateScheduleSelectedSessionControls();
     }
 
@@ -1620,7 +2096,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function refreshScheduleSummary(events) {
         const lblHours = document.getElementById('lbl_totalHours');
         if (lblHours) lblHours.innerHTML = renderCategoryHourTotals(events || []);
-        document.getElementById('scheduleHoursSummary')?.classList.toggle('d-none', !(events || []).length);
     }
 
     function refreshScheduleActiveView() {
@@ -1631,29 +2106,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!container) return;
         if (!person) {
             document.getElementById('scheduleContainer')?.classList.add('d-none');
-            document.getElementById('scheduleTitle').innerText = 'Schedule';
-            document.getElementById('viewModeIndicator').innerText = 'Ready';
             document.getElementById('legendContainer').innerHTML = '';
             refreshScheduleSummary([]);
             return;
         }
         document.getElementById('scheduleContainer')?.classList.remove('d-none');
-        document.getElementById('scheduleTitle').innerText = person.name || person.id;
         if (scheduleState.loadingPersonId === person.id) {
-            document.getElementById('viewModeIndicator').innerText = 'Loading';
             renderScheduleControls(normalizedScheduleViewMode());
+            refreshScheduleSummary([]);
             container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedule for ${escapeHtml(person.name || person.id)}...</div></div>`;
             return;
         }
         if (!scheduleState.loadedPersonIds.has(person.id)) {
-            document.getElementById('viewModeIndicator').innerText = 'Ready';
             renderScheduleControls(normalizedScheduleViewMode());
             refreshScheduleSummary([]);
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-arrow-clockwise fs-1 d-block mb-2"></i>Schedule is ready to load for ${escapeHtml(person.name || person.id)}.</div>`;
             return;
         }
         if (scheduleState.errorByPersonId[person.id]) {
-            document.getElementById('viewModeIndicator').innerText = 'Error';
             renderScheduleControls(normalizedScheduleViewMode());
             refreshScheduleSummary([]);
             container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i>${escapeHtml(scheduleState.errorByPersonId[person.id])}</div>`;
@@ -1665,26 +2135,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 .map((row) => [normalizeSessionStatus(row?.code), row])
                 .filter(([code]) => Boolean(code))
         );
+        const grouped = groupEventsByDate(events);
+        const mode = normalizedScheduleViewMode();
+        renderScheduleControls(mode);
         refreshScheduleSummary(events);
-        if (!events.length) {
-            document.getElementById('viewModeIndicator').innerText = 'Empty';
-            renderScheduleControls(normalizedScheduleViewMode());
+        if (mode === 'calendar') {
+            const range = getScheduleRange();
+            container.classList.remove('schedule-week-grid-host');
+            const calendarBody = document.querySelector('.schedule-calendar-card-body');
+            if (calendarBody) {
+                calendarBody.style.removeProperty('min-height');
+                calendarBody.classList.remove('schedule-calendar-card-body-multi-week');
+            }
+            renderCalendarView(grouped, range.startDate, range.endDate, container);
+            return;
+        }
+        container.classList.add('schedule-week-grid-host');
+        if (!events.length && scheduleState.hideEmptyDays) {
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
             return;
         }
-        const grouped = groupEventsByDate(events);
-        const mode = normalizedScheduleViewMode();
-        document.getElementById('viewModeIndicator').innerHTML = mode === 'calendar'
-            ? '<i class="bi bi-grid-3x3-gap"></i> Month View'
-            : (mode === 'timeline' ? '<i class="bi bi-layout-three-columns"></i> Horizontal View' : '<i class="bi bi-columns-gap"></i> Vertical View');
-        renderScheduleControls(mode);
-        if (mode === 'calendar') {
-            const range = getScheduleRange();
-            renderCalendarView(grouped, range.startDate, range.endDate, container);
-        } else if (mode === 'timeline') {
-            renderTimelineView(grouped, container);
+        const rendered = mode === 'timeline'
+            ? renderTimelineView(grouped, container)
+            : renderVerticalTimelineView(grouped, container);
+        if (!rendered) {
+            container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
         } else {
-            renderVerticalTimelineView(grouped, container);
+            scheduleWeekGridLayoutAfterRender(mode);
         }
     }
 
@@ -1819,7 +2296,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         setDateRange(start, end);
         clearLoadedSchedules();
-        scheduleState.viewMode = 'verticalTimeline';
         refreshScheduleActiveView();
     }
 
@@ -1911,6 +2387,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasCasesEl = document.getElementById('sch_hasCases');
         if (hasCasesEl) hasCasesEl.checked = false;
         scheduleState.viewMode = 'verticalTimeline';
+        try {
+            if (window.localStorage) window.localStorage.setItem(SCHEDULE_VIEW_MODE_STORAGE_KEY, 'verticalTimeline');
+        } catch (error) { /* storage can be unavailable */ }
         applyDefaultWeekRange();
         refreshScheduleActiveView();
     });
@@ -1924,7 +2403,6 @@ document.addEventListener('DOMContentLoaded', () => {
             scheduleState.persons = [];
             scheduleState.activePersonId = '';
             clearLoadedSchedules();
-            scheduleState.viewMode = 'verticalTimeline';
             refreshScheduleActiveView();
             return;
         }
@@ -1934,23 +2412,19 @@ document.addEventListener('DOMContentLoaded', () => {
         delete scheduleState.statusMetaByPersonId[person.id];
         delete scheduleState.errorByPersonId[person.id];
         scheduleState.loadedPersonIds.delete(person.id);
-        scheduleState.viewMode = 'verticalTimeline';
         refreshScheduleActiveView();
     });
 
     document.getElementById('sch_hasCases')?.addEventListener('change', () => {
         clearLoadedSchedules();
-        scheduleState.viewMode = 'verticalTimeline';
         refreshScheduleActiveView();
     });
     document.getElementById('sch_startDate')?.addEventListener('change', () => {
         clearLoadedSchedules();
-        scheduleState.viewMode = 'verticalTimeline';
         refreshScheduleActiveView();
     });
     document.getElementById('sch_endDate')?.addEventListener('change', () => {
         clearLoadedSchedules();
-        scheduleState.viewMode = 'verticalTimeline';
         refreshScheduleActiveView();
     });
 
@@ -1970,11 +2444,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('legendContainer')?.addEventListener('input', (event) => {
         const slider = event.target.closest('#scheduleDayWidth');
-        if (slider) applyScheduleDayWidth(slider.value);
+        if (slider) {
+            applyScheduleDayWidth(slider.value, { userInitiated: true });
+        }
     });
     document.getElementById('legendContainer')?.addEventListener('change', (event) => {
+        const hideEmptyToggle = event.target.closest('#scheduleHideEmptyDays');
+        if (hideEmptyToggle) {
+            scheduleState.hideEmptyDays = hideEmptyToggle.checked === true;
+            saveScheduleHideEmptyDays(scheduleState.hideEmptyDays);
+            refreshScheduleActiveView();
+            return;
+        }
         const slider = event.target.closest('#scheduleDayWidth');
-        if (slider) saveScheduleDayWidth(slider.value);
+        if (slider) {
+            saveScheduleDayWidth(slider.value);
+            if (normalizedScheduleViewMode() === 'timeline') {
+                const container = document.getElementById('visualDisplayArea');
+                if (!applyHorizontalTimelineTrackLayout(container, readScheduleTrackStepFromSlider(slider.value, 'timeline'))) {
+                    refreshScheduleActiveView();
+                }
+            }
+        }
     });
     document.getElementById('legendContainer')?.addEventListener('click', (event) => {
         const legendButton = event.target.closest('[data-schedule-open-legend]');
@@ -1992,7 +2483,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const dayButton = event.target.closest('[data-schedule-view-timeline]');
         const monthButton = event.target.closest('[data-schedule-view-month]');
         if (!verticalButton && !dayButton && !monthButton) return;
-        scheduleState.viewMode = verticalButton ? 'verticalTimeline' : (dayButton ? 'timeline' : 'calendar');
+        saveScheduleViewMode(verticalButton ? 'verticalTimeline' : (dayButton ? 'timeline' : 'calendar'));
         refreshScheduleActiveView();
     });
 
@@ -2007,8 +2498,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let html = '<div class="single-day-list">';
         dates.forEach((dateStr) => {
-            const dateObj = new Date(dateStr + 'T00:00:00');
-            const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
             const dayEvents = (eventsByDate[dateStr] || []).slice().sort((a, b) => {
                 const aStart = timeToMinutes(a?.start);
                 const bStart = timeToMinutes(b?.start);
@@ -2022,7 +2511,7 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `
                 <div class="day-card">
                     <div class="day-card-header ${hasConflict ? 'conflict' : ''}">
-                        <span>${escapeHtml(displayDate)}</span>
+                        ${formatScheduleDayCardDateHtml(dateStr)}
                         <span class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                             ${completionChip}
                             <span class="badge ${hasConflict ? 'bg-danger' : 'bg-primary'}">${dayEvents.length} item${dayEvents.length === 1 ? '' : 's'}</span>
@@ -2054,7 +2543,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += `
                     <div class="${rowClasses}${selectedClass}${unselectableClass}" data-schedule-session-key="${escapeHtml(selectionKey)}"${scan?.rowStyle ? ` style="${scan.rowStyle}"` : ''}>
                         <div class="schedule-scan-cell">${selectionControl}${scanIcon}</div>
-                        <div class="event-time">${escapeHtml(ev?.start || '-')} - ${escapeHtml(ev?.end || '-')}</div>
+                        <div class="event-time">${escapeHtml(formatScheduleClockRange(ev?.start, ev?.end))}</div>
                         <div>
                             <div class="event-main-title">${buildReportPriorityMarker(ev)}${escapeHtml(eventTitle)}</div>
                             <div class="event-meta-line">
@@ -2077,200 +2566,164 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = html;
     }
 
-    function renderTimelineView(eventsByDate, container) {
-        const scd = window.ScheduleCompletionDisplay;
-        container.innerHTML = '';
-        Object.keys(eventsByDate).sort().forEach(dateStr => {
-            const dayEvents = eventsByDate[dateStr];
-            const dateObj = new Date(dateStr + 'T00:00:00');
-            const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-
-            let tracks = [];
-            const hasConflict = dayEvents.some((ev) => ev && ev.hasOverlap === true);
-
-            dayEvents.forEach(ev => {
-                const pos = calculatePosition(ev.start, ev.end);
-                ev.pos = pos;
-
-                let placed = false;
-                for (let i = 0; i < tracks.length; i++) {
-                    const lastEv = tracks[i][tracks[i].length - 1];
-                    if (lastEv.pos.endMin <= pos.startMin) {
-                        tracks[i].push(ev); ev.trackIndex = i; placed = true; break;
-                    }
-                }
-                if (!placed) { tracks.push([ev]); ev.trackIndex = tracks.length - 1; }
-            });
-
-            const bodyHeight = Math.max(76, tracks.length * 64 + 14);
-            let html = `
-                <div class="timeline-container shadow-sm border ${hasConflict ? 'border-danger' : ''}">
-                    <div class="timeline-header ${hasConflict ? 'conflict' : ''}">
-                        <span>${escapeHtml(displayDate)}</span>
-                        <span>${hasConflict ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> Conflict Detected' : ''}</span>
-                    </div>
-                    <div class="timeline-body pb-3" style="height: ${bodyHeight}px;">
-            `;
-            
-            dayEvents.forEach(ev => {
-                const topPos = (ev.trackIndex * 62) + 7;
-                const eventTitle = getEventTitle(ev);
-                const cssClass = scheduleEventRoleClass(ev);
-                const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
-                const blockClasses = scd
-                    ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
-                    : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
-                const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
-                const selectionKey = scheduleSessionSelectionKey(ev);
-                const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
-                const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
-                const selectionControl = scheduleSessionSelectHtml(ev);
-                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
-                const detailsUrl = getEventDetailsUrl(ev);
-                const encodedDetailsUrl = encodeURIComponent(detailsUrl);
-                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
-                const clickHandler = detailsUrl
-                    ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"`
-                    : '';
-                const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
-                const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
-                const soloStudentHtml = scheduleSoloStudentHtml(ev);
-
-                html += `
-                        <div class="${blockClasses}${selectedClass}${unselectableClass}" 
-                             style="${mergeScheduleBlockLayoutStyle(`left: ${ev.pos.left}%; width: ${ev.pos.width}%; top: ${topPos}px;`, scan)}"
-                             data-schedule-session-key="${escapeHtml(selectionKey)}"
-                             data-tip="${escapeHtml(tipLabel)}"
-                             data-tip-bg="${escapeHtml(tipStyle.bg)}"
-                             data-tip-fg="${escapeHtml(tipStyle.fg)}"
-                             data-tip-border="${escapeHtml(tipStyle.border)}"
-                             aria-label="${escapeHtml(tipLabel)}"
-                             tabindex="0"
-                             ${clickHandler}>
-                             ${selectionControl}
-                             ${statusChip}
-                             <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
-                             ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
-                             <div class="event-meta x-small">
-                                <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(ev.start || '-')} - ${escapeHtml(ev.end || '-')}</span>
-                                ${makeupBadge}
-                             </div>
-                             ${soloStudentHtml}
-                    </div>
-                `;
-            });
-
-            html += `<div class="hour-markers">`;
-            for (let h = TIMELINE_START_HOUR; h < TIMELINE_END_HOUR; h++) {
-                let displayHour = h > 12 ? (h - 12) + 'p' : (h === 12 ? '12p' : h + 'a');
-                html += `<div class="hour-marker"><span class="hour-label">${displayHour}</span></div>`;
-            }
-            html += `</div></div></div>`; 
-
-            container.innerHTML += html;
+    function buildScheduleWeekGridRenderOptions(mode) {
+        const container = document.getElementById('visualDisplayArea');
+        const layout = computeScheduleWeekGridLayout(mode, container, {
+            weekCountOverride: estimateScheduleWeekCountForRange(),
+            dayCountOverride: 7
         });
+        return {
+            ...buildScheduleWeekGridOptions(),
+            dayWidth: layout.dayWidth,
+            hourHeight: layout.hourHeight,
+            timelineTrackStep: layout.trackStep
+        };
+    }
+
+    function buildScheduleWeekGridOptions() {
+        const range = getScheduleRange();
+        return {
+            viewRange: {
+                startDate: range.startDate,
+                endDate: range.endDate,
+                preset: 'custom',
+                anchorDate: range.startDate
+            },
+            dayWidth: readScheduleVerticalDayWidth(),
+            filterEmptyDays: scheduleState.hideEmptyDays === true,
+            enableTimeHover: scheduleState.isAdminViewer === true,
+            buildPositionedBlockHtml: buildSchedulePositionedBlockHtml,
+            buildDayHeaderBadgeHtml: (day, dayEvents, inRange) => {
+                if (!inRange) return '';
+                const hasConflict = (dayEvents || []).some((ev) => ev && ev.hasOverlap === true);
+                if (hasConflict) {
+                    return '<i class="bi bi-exclamation-triangle-fill text-danger" aria-label="Conflict"></i>';
+                }
+                const count = (dayEvents || []).length;
+                return count ? `<span class="badge bg-primary">${escapeHtml(String(count))}</span>` : '';
+            },
+            buildDayExtraClasses: (day, dayEvents, inRange, mode) => {
+                if (!inRange) return '';
+                const hasConflict = (dayEvents || []).some((ev) => ev && ev.hasOverlap === true);
+                if (!hasConflict) return '';
+                if (mode === 'vertical-header') return 'conflict';
+                return 'border-danger';
+            }
+        };
+    }
+
+    function buildScheduleVerticalBlockInner(ev) {
+        const scd = window.ScheduleCompletionDisplay;
+        const eventTitle = getEventTitle(ev);
+        const cssClass = scheduleEventRoleClass(ev);
+        const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+        const blockClasses = scd
+            ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
+            : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
+        const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
+        const selectionKey = scheduleSessionSelectionKey(ev);
+        const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+        const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
+        const selectionControl = scheduleSessionSelectHtml(ev);
+        const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
+        const detailsUrl = getEventDetailsUrl(ev);
+        const encodedDetailsUrl = encodeURIComponent(detailsUrl);
+        const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+        const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
+        const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
+        const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
+        const soloStudentHtml = scheduleSoloStudentHtml(ev);
+        return `
+            <div class="${blockClasses}${selectedClass}${unselectableClass}"
+                 style="${mergeScheduleBlockLayoutStyle('position:absolute;inset:2px;', scan)}"
+                 data-schedule-session-key="${escapeHtml(selectionKey)}"
+                 data-tip="${escapeHtml(tipLabel)}"
+                 data-tip-bg="${escapeHtml(tipStyle.bg)}"
+                 data-tip-fg="${escapeHtml(tipStyle.fg)}"
+                 data-tip-border="${escapeHtml(tipStyle.border)}"
+                 aria-label="${escapeHtml(tipLabel)}"
+                 tabindex="0"
+                 ${clickHandler}>
+                 ${selectionControl}
+                 ${statusChip}
+                 <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
+                 ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
+                 <div class="event-meta x-small">
+                    <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatScheduleClockRange(ev.start, ev.end))}</span>
+                    ${makeupBadge}
+                 </div>
+                 ${soloStudentHtml}
+            </div>
+        `;
+    }
+
+    function buildScheduleHorizontalBlockInner(ev) {
+        const scd = window.ScheduleCompletionDisplay;
+        const eventTitle = getEventTitle(ev);
+        const cssClass = scheduleEventRoleClass(ev);
+        const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+        const blockClasses = scd
+            ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
+            : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
+        const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
+        const selectionKey = scheduleSessionSelectionKey(ev);
+        const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+        const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
+        const selectionControl = scheduleSessionSelectHtml(ev);
+        const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
+        const detailsUrl = getEventDetailsUrl(ev);
+        const encodedDetailsUrl = encodeURIComponent(detailsUrl);
+        const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+        const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
+        const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
+        const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
+        const soloStudentHtml = scheduleSoloStudentHtml(ev);
+        return `
+            <div class="${blockClasses}${selectedClass}${unselectableClass}"
+                 style="${mergeScheduleBlockLayoutStyle('position:absolute;inset:2px 2px 2px 2px;', scan)}"
+                 data-schedule-session-key="${escapeHtml(selectionKey)}"
+                 data-tip="${escapeHtml(tipLabel)}"
+                 data-tip-bg="${escapeHtml(tipStyle.bg)}"
+                 data-tip-fg="${escapeHtml(tipStyle.fg)}"
+                 data-tip-border="${escapeHtml(tipStyle.border)}"
+                 aria-label="${escapeHtml(tipLabel)}"
+                 tabindex="0"
+                 ${clickHandler}>
+                 ${selectionControl}
+                 ${statusChip}
+                 <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
+                 ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
+                 <div class="event-meta x-small">
+                    <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatScheduleClockRange(ev.start, ev.end))}</span>
+                    ${makeupBadge}
+                 </div>
+                 ${soloStudentHtml}
+            </div>
+        `;
+    }
+
+    function buildSchedulePositionedBlockHtml(ev, layout = {}) {
+        const mode = String(layout?.mode || '').trim();
+        if (mode === 'timeline') return buildScheduleHorizontalBlockInner(ev);
+        return buildScheduleVerticalBlockInner(ev);
+    }
+
+    function renderTimelineView(eventsByDate, container) {
+        if (!scheduleCalendarCore?.renderHorizontalWeekGrid) {
+            container.innerHTML = `<div class="alert alert-warning">Calendar layout is unavailable.</div>`;
+            return false;
+        }
+        applyScheduleWeekGridHostSize(container, estimateScheduleWeekCountForRange());
+        return scheduleCalendarCore.renderHorizontalWeekGrid(eventsByDate, container, null, buildScheduleWeekGridRenderOptions('timeline'));
     }
 
     function renderVerticalTimelineView(eventsByDate, container) {
-        const scd = window.ScheduleCompletionDisplay;
-        const dates = Object.keys(eventsByDate || {}).sort();
-        if (!dates.length) {
-            container.innerHTML = `<div class="alert alert-light text-center border py-4 text-muted">No schedule items found in this range.</div>`;
-            return;
+        if (!scheduleCalendarCore?.renderVerticalWeekGrid) {
+            container.innerHTML = `<div class="alert alert-warning">Calendar layout is unavailable.</div>`;
+            return false;
         }
-        let html = '<div class="schedule-vertical-scroll"><div class="schedule-vertical-days">';
-        dates.forEach((dateStr) => {
-            const dayEvents = eventsByDate[dateStr] || [];
-            const dateObj = new Date(dateStr + 'T00:00:00');
-            const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-            const tracks = [];
-            const hasConflict = dayEvents.some((ev) => ev && ev.hasOverlap === true);
-            dayEvents.forEach((ev) => {
-                const pos = calculatePosition(ev.start, ev.end);
-                ev.pos = pos;
-                let placed = false;
-                for (let i = 0; i < tracks.length; i += 1) {
-                    const lastEv = tracks[i][tracks[i].length - 1];
-                    if (lastEv.pos.endMin <= pos.startMin) {
-                        tracks[i].push(ev);
-                        ev.trackIndex = i;
-                        placed = true;
-                        break;
-                    }
-                }
-                if (!placed) {
-                    tracks.push([ev]);
-                    ev.trackIndex = tracks.length - 1;
-                }
-            });
-
-            const trackCount = Math.max(1, tracks.length);
-            html += `
-                <div class="vertical-day-column shadow-sm ${hasConflict ? 'border-danger' : ''}">
-                    <div class="vertical-day-header ${hasConflict ? 'conflict' : ''}">
-                        <span>${escapeHtml(displayDate)}</span>
-                        <span>${hasConflict ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> Conflict' : `<span class="badge bg-primary">${dayEvents.length}</span>`}</span>
-                    </div>
-                    <div class="vertical-day-body">
-                        <div class="vertical-hour-markers">
-            `;
-            for (let h = TIMELINE_START_HOUR; h < TIMELINE_END_HOUR; h += 1) {
-                const displayHour = h > 12 ? (h - 12) + 'p' : (h === 12 ? '12p' : h + 'a');
-                html += `<div class="vertical-hour-marker"><span class="vertical-hour-label">${displayHour}</span></div>`;
-            }
-            html += '</div>';
-
-            dayEvents.forEach((ev) => {
-                const eventTitle = getEventTitle(ev);
-                const cssClass = scheduleEventRoleClass(ev);
-                const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
-                const blockClasses = scd
-                    ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
-                    : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
-                const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
-                const selectionKey = scheduleSessionSelectionKey(ev);
-                const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
-                const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
-                const selectionControl = scheduleSessionSelectHtml(ev);
-                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
-                const detailsUrl = getEventDetailsUrl(ev);
-                const encodedDetailsUrl = encodeURIComponent(detailsUrl);
-                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
-                const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
-                const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
-                const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
-                const trackLeft = (ev.trackIndex / trackCount) * 100;
-                const trackWidth = 100 / trackCount;
-                const blockHeight = Math.max(1, Number(ev.pos.width || 0));
-                const soloStudentHtml = scheduleSoloStudentHtml(ev);
-
-                html += `
-                    <div class="${blockClasses}${selectedClass}${unselectableClass}"
-                         style="${mergeScheduleBlockLayoutStyle(`top:${ev.pos.left}%;height:calc(${blockHeight}% - 4px);left:calc(${trackLeft}% + 28px);width:calc(${trackWidth}% - 34px);`, scan)}"
-                         data-schedule-session-key="${escapeHtml(selectionKey)}"
-                         data-tip="${escapeHtml(tipLabel)}"
-                         data-tip-bg="${escapeHtml(tipStyle.bg)}"
-                         data-tip-fg="${escapeHtml(tipStyle.fg)}"
-                         data-tip-border="${escapeHtml(tipStyle.border)}"
-                         aria-label="${escapeHtml(tipLabel)}"
-                         tabindex="0"
-                         ${clickHandler}>
-                         ${selectionControl}
-                         ${statusChip}
-                         <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
-                         ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
-                         <div class="event-meta x-small">
-                            <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(ev.start || '-')} - ${escapeHtml(ev.end || '-')}</span>
-                            ${makeupBadge}
-                         </div>
-                         ${soloStudentHtml}
-                    </div>
-                `;
-            });
-            html += '</div></div>';
-        });
-        html += '</div></div>';
-        container.innerHTML = html;
+        applyScheduleWeekGridHostSize(container, estimateScheduleWeekCountForRange());
+        return scheduleCalendarCore.renderVerticalWeekGrid(eventsByDate, container, null, buildScheduleWeekGridRenderOptions('verticalTimeline'));
     }
 
     function renderCalendarView(eventsByDate, startStr, endStr, container) {
@@ -2447,6 +2900,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     window.addEventListener('scroll', hideScheduleTip, true);
     window.addEventListener('resize', hideScheduleTip);
+    bindScheduleGridResizeObserver();
 
     // --- 3. Deep Link Auto-Loader (Moved to BOTTOM) ---
     // Pure Javascript URL parsing avoids EJS syntax breaks!

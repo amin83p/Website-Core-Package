@@ -2501,8 +2501,8 @@
   function buildSessionRowStyle(status, locked, statusMap) {
     const normalized = normalizeSessionStatusCode(status);
     const meta = statusMap.get(normalized);
-    const colorBg = normalizeHubHexColor(meta && meta.colorBg, normalized === 'holiday' ? '#fff3cd' : '#e2e3e5');
-    const colorBorder = normalizeHubHexColor(meta && meta.colorBorder, normalized === 'holiday' ? '#ffe69c' : '#c6c8ca');
+    const colorBg = normalizeHubHexColor(meta && meta.colorBg, '#e2e3e5');
+    const colorBorder = normalizeHubHexColor(meta && meta.colorBorder, '#c6c8ca');
     const baseLayer = 'linear-gradient(' + hubColorToRgba(colorBg, 0.20, colorBg) + ', ' + hubColorToRgba(colorBg, 0.20, colorBg) + ')';
     const lockLayer = locked
       ? ', repeating-linear-gradient(-45deg, ' + hubColorToRgba('#6c757d', 0.08, '#6c757d') + ' 0 10px, ' + hubColorToRgba('#adb5bd', 0.18, '#adb5bd') + ' 10px 20px)'
@@ -2553,6 +2553,7 @@
   };
   let hubSessionRowsByKey = new Map();
   let hubSessionStatusMeta = [];
+  let hubSessionSelectableStatusMeta = [];
   let hubSessionCanUpdateSessions = false;
   let hubSessionCanOverrideMakeupDuration = false;
 
@@ -3249,7 +3250,14 @@
     modal.querySelector('#hubEditSessionContext').innerHTML = '<strong>' + escapeHtml(row.className || row.classId || 'Class') + '</strong><div class="text-muted font-monospace">' + escapeHtml(row.sessionId || '') + '</div>';
     const statusSelect = modal.querySelector('#hubEditSessionStatus');
     const selectedStatus = normalizeSessionStatusCode(row.status || '');
-    const statusOptions = (Array.isArray(hubSessionStatusMeta) ? hubSessionStatusMeta : []).slice().sort(function (a, b) {
+    const pickerMeta = (Array.isArray(hubSessionSelectableStatusMeta) ? hubSessionSelectableStatusMeta : hubSessionStatusMeta).slice();
+    if (selectedStatus && !pickerMeta.some(function (meta) { return normalizeSessionStatusCode(meta && meta.code) === selectedStatus; })) {
+      const lockedMeta = (Array.isArray(hubSessionStatusMeta) ? hubSessionStatusMeta : []).find(function (meta) {
+        return normalizeSessionStatusCode(meta && meta.code) === selectedStatus;
+      });
+      if (lockedMeta) pickerMeta.unshift(lockedMeta);
+    }
+    const statusOptions = pickerMeta.sort(function (a, b) {
       const ao = Number(a?.sortOrder ?? a?.order ?? 999);
       const bo = Number(b?.sortOrder ?? b?.order ?? 999);
       if (ao !== bo) return ao - bo;
@@ -3397,6 +3405,9 @@
     }
     const statusMeta = Array.isArray(payload && payload.statusMeta) ? payload.statusMeta : [];
     hubSessionStatusMeta = statusMeta.slice();
+    hubSessionSelectableStatusMeta = Array.isArray(payload && payload.selectableStatusMeta)
+      ? payload.selectableStatusMeta.slice()
+      : statusMeta.slice();
     hubSessionRowsByKey = new Map();
     const statusMap = buildSessionStatusMetaMap(statusMeta);
     const refreshed = payload && payload.refreshedAt ? formatHubInstant(payload.refreshedAt) : 'just now';

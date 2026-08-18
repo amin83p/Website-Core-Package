@@ -64,12 +64,6 @@
         border-color: #f1aeb5;
     }
 
-    .schedule-shell .status-holiday {
-        background: #fff3cd;
-        color: #997404;
-        border-color: #ffda6a;
-    }
-
     .schedule-shell .status-other {
         background: #e9ecef;
         color: #495057;
@@ -117,12 +111,6 @@
         background: #f8d7da;
         color: #842029;
         border-color: #f1aeb5;
-    }
-
-    .schedule-shell .status-tag.holiday {
-        background: #fff3cd;
-        color: #664d03;
-        border-color: #ffe69c;
     }
 
     .schedule-shell .status-tag.other {
@@ -381,8 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const rowStyle = (status, locked) => {
         const meta = getStatusMeta(status);
         const normalized = normalizeStatusCode(status);
-        const colorBg = normalizeHexColor(meta?.colorBg, normalized === 'holiday' ? '#fff3cd' : '#e2e3e5');
-        const colorBorder = normalizeHexColor(meta?.colorBorder, normalized === 'holiday' ? '#ffe69c' : '#c6c8ca');
+        const colorBg = normalizeHexColor(meta?.colorBg, '#e2e3e5');
+        const colorBorder = normalizeHexColor(meta?.colorBorder, '#c6c8ca');
         const baseLayer = `linear-gradient(${colorToRgba(colorBg, 0.20, colorBg)}, ${colorToRgba(colorBg, 0.20, colorBg)})`;
         const lockLayer = locked
             ? `, repeating-linear-gradient(-45deg, ${colorToRgba('#6c757d', 0.08, '#6c757d')} 0 10px, ${colorToRgba('#adb5bd', 0.18, '#adb5bd')} 10px 20px)`
@@ -400,7 +388,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (meta?.label) return meta.label;
         const normalized = normalizeStatusCode(status);
         if (!normalized || normalized === 'other') return 'Other';
-        if (normalized === 'holiday') return 'Holiday';
         return normalized.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     };
 

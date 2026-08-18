@@ -1054,6 +1054,23 @@ function getActiveSessionStatusMeta(statusMeta = []) {
     return rows.length ? rows : (Array.isArray(statusMeta) ? statusMeta : []);
 }
 
+function getSelectableSessionStatusMeta(statusMeta = [], allowAdminStatuses = false) {
+    return sessionStatusPolicyService.filterSelectableStatusMeta(
+        getActiveSessionStatusMeta(statusMeta),
+        { allowAdminStatuses }
+    );
+}
+
+async function getSessionStatusMetaBundleForUser(orgId, reqUser) {
+    const sessionStatusMeta = await getSessionStatusMetaForOrg(orgId);
+    const allowAdminStatuses = await schoolAdminAccessService.canSelectAdminSessionStatuses(reqUser);
+    return {
+        sessionStatusMeta,
+        selectableSessionStatusMeta: getSelectableSessionStatusMeta(sessionStatusMeta, allowAdminStatuses),
+        allowAdminStatuses
+    };
+}
+
 function resolveDefaultSessionStatusCode(statusMeta = []) {
     const activeRows = getActiveSessionStatusMeta(statusMeta);
     if (!activeRows.length) return 'scheduled';
@@ -2672,7 +2689,7 @@ async function showAddForm(req, res) {
     await assertCreateOrgContextOrThrow(req.user);
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const subjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
-    const sessionStatusMeta = await getSessionStatusMetaForOrg(activeOrgId);
+    const { sessionStatusMeta, selectableSessionStatusMeta } = await getSessionStatusMetaBundleForUser(activeOrgId, req.user);
     const skillCatalog = await loadClassFormSkillCatalog(activeOrgId, req.user);
     const subjectFeeCatalog = subjects.map((subject) => ({
       id: String(subject.id || ''),
@@ -2689,6 +2706,7 @@ async function showAddForm(req, res) {
       allFeeCategoryKey: ALL_FEE_CATEGORIES_KEY,
       allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
       sessionStatusMeta,
+      selectableSessionStatusMeta,
       defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
       skillCatalog,
       subjectFeeCatalog,
@@ -2704,7 +2722,7 @@ async function showAddWizardForm(req, res) {
     await assertCreateOrgContextOrThrow(req.user);
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const subjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
-    const sessionStatusMeta = await getSessionStatusMetaForOrg(activeOrgId);
+    const { sessionStatusMeta, selectableSessionStatusMeta } = await getSessionStatusMetaBundleForUser(activeOrgId, req.user);
     const skillCatalog = await loadClassFormSkillCatalog(activeOrgId, req.user);
     const subjectFeeCatalog = subjects.map((subject) => ({
       id: String(subject.id || ''),
@@ -2722,6 +2740,7 @@ async function showAddWizardForm(req, res) {
       allFeeCategoryKey: ALL_FEE_CATEGORIES_KEY,
       allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
       sessionStatusMeta,
+      selectableSessionStatusMeta,
       defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
       skillCatalog,
       subjectFeeCatalog,
@@ -2736,7 +2755,10 @@ async function showEditForm(req, res) {
   try {
     const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user, resolveOrgTodayFromRequest(req));
-    const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+    const { sessionStatusMeta, selectableSessionStatusMeta } = await getSessionStatusMetaBundleForUser(
+      classData?.orgId || getActiveOrgIdOrThrow(req.user),
+      req.user
+    );
     const subjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
     const skillCatalog = await loadClassFormSkillCatalog(classData?.orgId || getActiveOrgIdOrThrow(req.user), req.user, classData?.skillIds);
     const subjectFeeCatalog = subjects.map((subject) => ({
@@ -2786,6 +2808,7 @@ async function showEditForm(req, res) {
       allFeeCategoryKey: ALL_FEE_CATEGORIES_KEY,
       allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
       sessionStatusMeta,
+      selectableSessionStatusMeta,
       defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
       skillCatalog,
       subjectFeeCatalog,
@@ -2801,7 +2824,10 @@ async function showEditWizardForm(req, res) {
   try {
     const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user, resolveOrgTodayFromRequest(req));
-    const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+    const { sessionStatusMeta, selectableSessionStatusMeta } = await getSessionStatusMetaBundleForUser(
+      classData?.orgId || getActiveOrgIdOrThrow(req.user),
+      req.user
+    );
     const subjects = await schoolDataService.fetchAllData('subjects', {}, req.user);
     const skillCatalog = await loadClassFormSkillCatalog(classData?.orgId || getActiveOrgIdOrThrow(req.user), req.user, classData?.skillIds);
     const subjectFeeCatalog = subjects.map((subject) => ({
@@ -2849,6 +2875,7 @@ async function showEditWizardForm(req, res) {
       allFeeCategoryKey: ALL_FEE_CATEGORIES_KEY,
       allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
       sessionStatusMeta,
+      selectableSessionStatusMeta,
       defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
       skillCatalog,
       subjectFeeCatalog,
@@ -3679,7 +3706,10 @@ async function manageSession(req, res) {
         
         // 1. Fetch Core Data
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-        const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+        const { sessionStatusMeta, selectableSessionStatusMeta } = await getSessionStatusMetaBundleForUser(
+            classData?.orgId || getActiveOrgIdOrThrow(req.user),
+            req.user
+        );
         
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const requestedSessionDate = sessionNavigationService.normalizeSessionDate(req.query?.sessionDate || req.query?.date);
@@ -4040,6 +4070,7 @@ async function manageSession(req, res) {
             conductPrefillByPersonId,
             sessionConductReportPeriod,
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
+            selectableSessionStatusMeta,
             defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
             prevSessionId,
             prevSessionDate,
@@ -4668,6 +4699,11 @@ async function saveSession(req, res) {
         if (!normalizedStatus || !statusMap.has(normalizedStatus)) {
             throw new Error('Invalid session status.');
         }
+        sessionStatusPolicyService.assertStatusSelectableByAccess(
+            normalizedStatus,
+            statusMap,
+            { allowAdminStatuses: await schoolAdminAccessService.canSelectAdminSessionStatuses(req.user) }
+        );
         const wasCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, originalSession);
         const willBeCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, {
             ...originalSession,

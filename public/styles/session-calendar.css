@@ -61,12 +61,44 @@
 
 .session-cal-week-label,
 .session-cal-week-column-header {
-  padding: 6px 12px;
-  font-size: 0.75rem;
+  padding: 8px 12px;
+  font-size: 0.78rem;
   font-weight: 600;
   background: linear-gradient(180deg, #f8f9fa 0%, #eef1f4 100%);
   border-bottom: 1px solid #dee2e6;
   color: #495057;
+}
+
+.session-cal-week-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+  line-height: 1.35;
+}
+
+.session-cal-week-label-primary {
+  font-weight: 800;
+  color: #084298;
+  letter-spacing: 0.01em;
+}
+
+.session-cal-week-label-year {
+  font-weight: 600;
+  color: #343a40;
+}
+
+.session-cal-week-label-dates {
+  font-variant-numeric: tabular-nums;
+  color: #6c757d;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.session-cal-week-label-sep {
+  color: #adb5bd;
+  font-weight: 500;
+  user-select: none;
 }
 
 .session-cal-week-grid-vertical {
@@ -82,23 +114,64 @@
 
 .session-cal-time-gutter-spacer,
 .session-cal-day-label-spacer {
-  flex: 0 0 var(--session-time-gutter-width, 64px);
-  min-width: var(--session-time-gutter-width, 64px);
+  flex: 0 0 var(--session-time-gutter-width, 76px);
+  min-width: var(--session-time-gutter-width, 76px);
 }
 
 .session-cal-day-header-row .session-cal-day-header {
   flex: 0 0 var(--session-day-width, 140px);
   min-width: var(--session-day-width, 140px);
-  padding: 6px 8px;
+  padding: 8px 6px;
   font-size: 0.72rem;
   font-weight: 600;
-  background: #f8f9fa;
+  background: linear-gradient(180deg, #f8f9fa 0%, #eef1f4 100%);
   border-bottom: 1px solid #dee2e6;
   border-right: var(--session-cal-day-divider);
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   gap: 4px;
+  text-align: center;
+  position: relative;
+}
+
+.session-cal-day-header-row .session-cal-day-header .session-cal-day-badges {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.session-cal-day-header-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.session-cal-day-header-weekday {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #084298;
+}
+
+.session-cal-day-header-date {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #212529;
+  letter-spacing: 0.01em;
+}
+
+.session-cal-day-header.is-weekend:not(.is-out-of-range) .session-cal-day-header-weekday {
+  color: #0a58ca;
+}
+
+.session-cal-day-header.is-holiday:not(.is-out-of-range) .session-cal-day-header-weekday {
+  color: #b02a37;
 }
 
 .session-cal-day-header.is-out-of-range {
@@ -107,8 +180,8 @@
 }
 
 .session-cal-time-gutter {
-  flex: 0 0 var(--session-time-gutter-width, 64px);
-  min-width: var(--session-time-gutter-width, 64px);
+  flex: 0 0 var(--session-time-gutter-width, 76px);
+  min-width: var(--session-time-gutter-width, 76px);
   position: sticky;
   left: 0;
   z-index: 4;
@@ -128,21 +201,22 @@
 }
 
 .session-cal-hour-label {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.66rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: #343a40;
+  color: #495057;
   position: absolute;
   top: 0;
-  right: 8px;
+  right: 6px;
   transform: translateY(-50%);
-  line-height: 1;
+  line-height: 1.1;
   white-space: nowrap;
   letter-spacing: 0.02em;
-  padding: 1px 5px;
-  background: #f4f6f8;
-  border-radius: 3px;
-  border: 1px solid #dee2e6;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 999px;
+  border: 1px solid #ced4da;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 .session-cal-time-header .session-cal-hour-label {
@@ -159,17 +233,22 @@
   min-width: 0;
 }
 
-.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-week-grid-vertical {
+.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-week-grid-vertical,
+.schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-week-grid-vertical {
   width: 100%;
 }
 
 .session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-day-header-row,
-.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-week-body-row {
+.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-week-body-row,
+.schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-day-header-row,
+.schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-week-body-row {
   width: 100%;
 }
 
 .session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-day-header-row .session-cal-day-header,
-.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-day-cell {
+.session-enrollment-calendar-host.session-cal-auto-day-width .session-cal-day-cell,
+.schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-day-header-row .session-cal-day-header,
+.schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-day-cell {
   flex: 1 1 0;
   min-width: 72px;
   width: auto;
@@ -307,6 +386,11 @@
 .session-cal-week-stack-timeline .session-cal-week-row-timeline {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+.session-cal-week-stack-timeline .session-cal-timeline-time-track {
+  min-height: 88px;
 }
 
 .session-cal-timeline-header-row {
@@ -402,15 +486,31 @@
 }
 
 .session-cal-day-row-label {
-  flex: 0 0 var(--session-time-gutter-width, 64px);
-  min-width: var(--session-time-gutter-width, 64px);
+  flex: 0 0 var(--session-time-gutter-width, 76px);
+  min-width: var(--session-time-gutter-width, 76px);
   padding: 8px 6px;
   font-size: 0.68rem;
   font-weight: 600;
   color: #495057;
   border-right: var(--session-cal-day-divider, 2px dashed #9aa8b6);
-  background: #fff;
-  line-height: 1.2;
+  background: linear-gradient(180deg, #f8f9fa 0%, #eef1f4 100%);
+  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.session-cal-day-row-label .session-cal-day-header-content {
+  gap: 0.1rem;
+}
+
+.session-cal-day-row-label .session-cal-day-header-weekday {
+  font-size: 0.58rem;
+}
+
+.session-cal-day-row-label .session-cal-day-header-date {
+  font-size: 0.72rem;
 }
 
 .session-cal-timeline-track {
@@ -422,7 +522,8 @@
 }
 
 .session-cal-positioned-horizontal .session-enrollment-block {
-  height: 52px;
+  height: 100%;
+  min-height: 48px;
 }
 
 .session-enrollment-block {
@@ -809,4 +910,147 @@
 
 .session-stage-stepper .btn {
   min-width: 2.25rem;
+}
+
+/* Master Schedule Viewer — week grid host */
+.schedule-calendar-card-body {
+  min-height: min(92vh, 1280px);
+}
+
+.schedule-calendar-card-body.schedule-calendar-card-body-multi-week {
+  min-height: auto;
+}
+
+.schedule-visual-area.schedule-week-grid-host {
+  display: flex;
+  flex-direction: column;
+  min-height: 680px;
+  height: min(92vh, 1280px);
+  box-sizing: border-box;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-vertical-scroll {
+  flex: 1 1 auto;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-week-stack {
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-week-row {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-week-grid-vertical {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-week-body-row {
+  flex: 1 1 auto;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-time-gutter {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-hour-slot {
+  flex: 1 1 0;
+  min-height: var(--session-hour-height, 28px);
+  height: auto;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-days-row {
+  flex: 1 1 auto;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-day-cell {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  min-height: 100%;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-day-grid {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: calc(var(--session-hour-height, 28px) * 15);
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-hour-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-hour-grid-line {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-vertical-scroll {
+  overflow-x: hidden;
+}
+
+.schedule-visual-area.schedule-week-grid-host:not(.session-cal-auto-day-width) .session-cal-vertical-scroll {
+  overflow-x: auto;
+}
+
+.schedule-visual-area .session-cal-day-header.conflict {
+  background: #dc3545;
+  color: #fff;
+}
+
+.schedule-visual-area .session-cal-timeline-day-row.border-danger .session-cal-day-row-label {
+  color: #dc3545;
+  font-weight: 700;
+}
+
+.schedule-visual-area .session-cal-positioned-session .vertical-event-block,
+.schedule-visual-area .session-cal-positioned-session .event-block {
+  position: absolute;
+  inset: 2px;
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.schedule-visual-area.schedule-week-grid-host.schedule-cal-horizontal-mode .session-cal-positioned-session.session-cal-positioned-horizontal {
+  height: calc(var(--session-timeline-track-step, 76px) - 8px);
+  min-height: calc(var(--session-timeline-track-step, 76px) - 8px);
+}
+
+.schedule-visual-area.schedule-week-grid-host.schedule-cal-horizontal-mode .session-cal-positioned-session.session-cal-positioned-horizontal .event-block {
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.schedule-visual-area .session-cal-positioned-session.session-cal-positioned-horizontal .event-block {
+  min-height: 48px;
+}
+
+.schedule-hide-empty-days-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid #dee2e6;
+  border-radius: 999px;
+  background: #f8f9fa;
+  flex-shrink: 0;
+  white-space: nowrap;
 }

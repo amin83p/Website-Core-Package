@@ -111,6 +111,10 @@ function isExamsAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_EXAMS, OPERATIONS.READ_ALL);
 }
 
+async function canSelectAdminSessionStatuses(user) {
+  return isAdminForRequestAsync(user, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE);
+}
+
 function isAttendancesAdminViewer(user, operationId = OPERATIONS.UPDATE) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_ATTENDANCES, operationId);
 }
@@ -129,6 +133,7 @@ module.exports = {
   isTaskRoutingAdminViewer,
   isReportsInstancesAdminViewer,
   isSessionsAdminViewer,
+  canSelectAdminSessionStatuses,
   isLeaveRequestsAdminViewer,
   isTimesheetsAdminViewer,
   isTimesheetsAdminViewerAsync,

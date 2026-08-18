@@ -20,6 +20,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     excludeFromStudentIndex: false,
     active: true,
     sortOrder: 10,
+    accessType: 'users',
     colorBg: '#e7f1ff',
     colorText: '#084298',
     colorBorder: '#b6d4fe'
@@ -37,6 +38,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     excludeFromStudentIndex: false,
     active: true,
     sortOrder: 20,
+    accessType: 'users',
     colorBg: '#d1e7dd',
     colorText: '#0f5132',
     colorBorder: '#a3cfbb'
@@ -54,6 +56,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     excludeFromStudentIndex: true,
     active: true,
     sortOrder: 30,
+    accessType: 'users',
     colorBg: '#f8d7da',
     colorText: '#842029',
     colorBorder: '#f1aeb5'
@@ -71,6 +74,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     excludeFromStudentIndex: false,
     active: true,
     sortOrder: 40,
+    accessType: 'users',
     colorBg: '#fff3cd',
     colorText: '#664d03',
     colorBorder: '#ffe69c'
@@ -132,6 +136,14 @@ function cleanFormula(v) {
   return s;
 }
 
+function cleanAccessType(v, { defaultValue = 'users' } = {}) {
+  const normalized = String(v || '').trim().toLowerCase();
+  if (!normalized) return defaultValue === 'admins' ? 'admins' : 'users';
+  if (normalized === 'admins' || normalized === 'admin') return 'admins';
+  if (normalized === 'users' || normalized === 'user') return 'users';
+  throw new Error('Access type must be Users or Admins.');
+}
+
 function cleanMakeupDurationPercent(v, { defaultValue = 100 } = {}) {
   if (v === undefined || v === null || v === '') return Number(defaultValue);
   const n = Number(v);
@@ -189,6 +201,7 @@ function normalizeStoredStatus(row) {
     excludeFromStudentIndex: cleanBoolean(row?.excludeFromStudentIndex, false),
     active: cleanBoolean(row?.active, true),
     sortOrder: cleanNumber(row?.sortOrder, { min: 0, max: 9999, defaultValue: 100 }),
+    accessType: cleanAccessType(row?.accessType, { defaultValue: 'users' }),
     colorBg: cleanColor(row?.colorBg, '#E2E3E5'),
     colorText: cleanColor(row?.colorText, '#41464B'),
     colorBorder: cleanColor(row?.colorBorder, '#C6C8CA'),
@@ -228,6 +241,7 @@ function sanitizeInput(input, { isUpdate = false } = {}) {
     excludeFromStudentIndex: cleanBoolean(input.excludeFromStudentIndex, false),
     active: cleanBoolean(input.active, true),
     sortOrder: cleanNumber(input.sortOrder, { min: 0, max: 9999, defaultValue: 100 }),
+    accessType: cleanAccessType(input.accessType, { defaultValue: 'users' }),
     colorBg: cleanColor(input.colorBg, '#E2E3E5'),
     colorText: cleanColor(input.colorText, '#41464B'),
     colorBorder: cleanColor(input.colorBorder, '#C6C8CA')

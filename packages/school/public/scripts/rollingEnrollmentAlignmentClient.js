@@ -37,14 +37,11 @@
       .replace(/^_+|_+$/g, '');
   }
 
-  function isHolidayOff(notes) {
-    const normalized = cleanText(notes).toLowerCase();
-    return normalized === 'holiday/off' || normalized === 'holiday off' || normalized === 'holiday';
-  }
-
   function normalizeSessionStatus(status, notes = '') {
-    if (isHolidayOff(notes)) return 'holiday';
-    return normalizeStatusCode(status) || 'scheduled';
+    void notes;
+    const normalized = normalizeStatusCode(status) || 'scheduled';
+    if (normalized === 'holiday') return 'cancelled';
+    return normalized;
   }
 
   function normalizeStatusMap(statusMap = {}) {
@@ -73,7 +70,6 @@
 
   function shouldExcludeFromAttendanceByMap(statusMap, { status, notes = '' } = {}) {
     const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
-    if (normalized === 'holiday') return true;
     if (!definition) return normalized === 'cancelled';
     if (definition.makeUpRequired === true) return false;
     return definition.excludeFromAttendance === true;

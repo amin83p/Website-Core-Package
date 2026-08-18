@@ -16,39 +16,15 @@ function normalizeStatusCode(value) {
     .replace(/^_+|_+$/g, '');
 }
 
-function isHolidayOff(notes) {
-  const normalized = String(notes || '').trim().toLowerCase();
-  return normalized === 'holiday/off' || normalized === 'holiday off' || normalized === 'holiday';
-}
-
 function normalizeSessionStatus(status, notes = '') {
-  if (isHolidayOff(notes)) return 'holiday';
-  return normalizeStatusCode(status) || 'scheduled';
+  void notes;
+  const normalized = normalizeStatusCode(status) || 'scheduled';
+  if (normalized === 'holiday') return 'cancelled';
+  return normalized;
 }
 
 function getCacheKey(orgId) {
   return toPublicId(orgId) || '__GLOBAL__';
-}
-
-function getVirtualHolidayDefinition() {
-  return {
-    id: 'VIRTUAL_HOLIDAY',
-    orgId: 'SYSTEM',
-    code: 'holiday',
-    label: 'Holiday',
-    description: 'Session marked as holiday/off.',
-    timesheetFormula: '0',
-    isFinal: true,
-    makeUpRequired: false,
-    excludeFromAttendance: true,
-    excludeFromTeacherIndex: true,
-    excludeFromStudentIndex: true,
-    active: true,
-    sortOrder: 9998,
-    colorBg: '#fff3cd',
-    colorText: '#664d03',
-    colorBorder: '#ffe69c'
-  };
 }
 
 function generateStatusId(orgToday = '') {
@@ -64,7 +40,6 @@ function buildDefaultFallbackByCode() {
     if (!code) return;
     out.set(code, { ...row, code });
   });
-  out.set('holiday', getVirtualHolidayDefinition());
   return out;
 }
 
@@ -121,8 +96,10 @@ async function buildStatusBundle(orgId, { includeInactive = false } = {}) {
   });
 
   fallbackByCode.forEach((fallback, code) => {
+    if (code === 'holiday') return;
     if (!byCode.has(code)) byCode.set(code, { ...fallback, code });
   });
+  byCode.delete('holiday');
 
   const list = [...byCode.values()].sort(sortStatusRows);
   return { list, byCode };
@@ -213,7 +190,7 @@ function getStatusMetaMap(statusMeta = []) {
 
 function getFallbackFormula(statusCode) {
   const code = normalizeStatusCode(statusCode);
-  if (code === 'cancelled' || code === 'holiday') return '0';
+  if (code === 'cancelled') return '0';
   return 'duration';
 }
 
@@ -226,7 +203,6 @@ function resolveStatusDefinition(statusMap, { status, notes = '' } = {}) {
 
 function isFinalStatusByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
-  if (normalized === 'holiday') return true;
   if (!definition) return normalized !== 'scheduled';
   return definition.isFinal === true;
 }
@@ -251,7 +227,6 @@ function isMakeUpRequiredByMap(statusMap, { status, notes = '' } = {}) {
 
 function shouldExcludeFromAttendanceByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
-  if (normalized === 'holiday') return true;
   if (!definition) return normalized === 'cancelled';
   if (definition.makeUpRequired === true) return false;
   return definition.excludeFromAttendance === true;
@@ -275,14 +250,12 @@ function buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions = []) 
 
 function shouldExcludeFromTeacherIndexByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
-  if (normalized === 'holiday') return true;
   if (!definition) return normalized === 'cancelled';
   return definition.excludeFromTeacherIndex === true || definition.makeUpRequired === true;
 }
 
 function shouldExcludeFromStudentIndexByMap(statusMap, { status, notes = '' } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
-  if (normalized === 'holiday') return true;
   if (!definition) return normalized === 'cancelled';
   return definition.excludeFromStudentIndex === true || definition.makeUpRequired === true;
 }
@@ -335,7 +308,6 @@ function evaluateTimesheetFormula(formula, durationHours) {
 
 function calculateTimesheetHoursByMap(statusMap, { status, notes = '', durationHours = 0, session = null } = {}) {
   const { normalized, definition } = resolveStatusDefinition(statusMap, { status, notes });
-  if (normalized === 'holiday') return 0;
   const safeDuration = Number(durationHours);
   const effectiveDuration = Number.isFinite(safeDuration) && safeDuration > 0 ? safeDuration : 0;
   const formula = String(definition?.timesheetFormula || getFallbackFormula(normalized));
@@ -348,38 +320,38 @@ function calculateTimesheetHoursByMap(statusMap, { status, notes = '', durationH
 
 async function calculateTimesheetHours({ orgId, status, notes = '', durationHours = 0, session = null }) {
   const normalized = normalizeSessionStatus(status, notes);
-  if (normalized === 'holiday') return 0;
-
   const statusMap = await getStatusMap(orgId);
   return calculateTimesheetHoursByMap(statusMap, { status: normalized, notes, durationHours, session });
 }
 
 async function isFinalStatus({ orgId, status, notes = '' }) {
   const normalized = normalizeSessionStatus(status, notes);
-  if (normalized === 'holiday') return true;
   const statusMap = await getStatusMap(orgId);
   return isFinalStatusByMap(statusMap, { status: normalized, notes });
 }
 
 async function shouldExcludeFromAttendance({ orgId, status, notes = '' }) {
   const normalized = normalizeSessionStatus(status, notes);
-  if (normalized === 'holiday') return true;
   const statusMap = await getStatusMap(orgId);
   return shouldExcludeFromAttendanceByMap(statusMap, { status: normalized, notes });
 }
 
 async function shouldExcludeFromTeacherIndex({ orgId, status, notes = '' }) {
   const normalized = normalizeSessionStatus(status, notes);
-  if (normalized === 'holiday') return true;
   const statusMap = await getStatusMap(orgId);
   return shouldExcludeFromTeacherIndexByMap(statusMap, { status: normalized, notes });
 }
 
 async function shouldExcludeFromStudentIndex({ orgId, status, notes = '' }) {
   const normalized = normalizeSessionStatus(status, notes);
-  if (normalized === 'holiday') return true;
   const statusMap = await getStatusMap(orgId);
   return shouldExcludeFromStudentIndexByMap(statusMap, { status: normalized, notes });
+}
+
+function normalizeAccessType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'admins' || normalized === 'admin') return 'admins';
+  return 'users';
 }
 
 function buildClientStatusMeta(definitions) {
@@ -396,10 +368,31 @@ function buildClientStatusMeta(definitions) {
     excludeFromStudentIndex: row?.excludeFromStudentIndex === true,
     active: row?.active !== false,
     sortOrder: Number(row?.sortOrder || 0),
+    accessType: normalizeAccessType(row?.accessType),
     colorBg: String(row?.colorBg || '#e2e3e5'),
     colorText: String(row?.colorText || '#41464b'),
     colorBorder: String(row?.colorBorder || '#c6c8ca')
-  })).filter((row) => row.code);
+  })).filter((row) => row.code && row.code !== 'holiday');
+}
+
+function filterSelectableStatusMeta(meta = [], options = {}) {
+  const rows = Array.isArray(meta) ? meta : [];
+  const allowAdminStatuses = options.allowAdminStatuses === true;
+  if (allowAdminStatuses) return rows.slice();
+  return rows.filter((row) => normalizeAccessType(row?.accessType) !== 'admins');
+}
+
+function assertStatusSelectableByAccess(statusCode, statusMap = new Map(), options = {}) {
+  const normalized = normalizeStatusCode(statusCode);
+  if (!normalized) throw new Error('Session status is required.');
+  const row = statusMap instanceof Map
+    ? statusMap.get(normalized)
+    : null;
+  if (!row) throw new Error('Invalid session status.');
+  if (options.allowAdminStatuses === true) return;
+  if (normalizeAccessType(row?.accessType) === 'admins') {
+    throw new Error('This session status is restricted to school session administrators.');
+  }
 }
 
 function clearStatusCache(orgId = null) {
@@ -429,6 +422,9 @@ module.exports = {
   shouldExcludeFromStudentIndexByMap,
   calculateTimesheetHoursByMap,
   buildClientStatusMeta,
+  normalizeAccessType,
+  filterSelectableStatusMeta,
+  assertStatusSelectableByAccess,
   calculateTimesheetHours,
   normalizeMakeupDurationPercent,
   resolveMakeupSchedulingContext,

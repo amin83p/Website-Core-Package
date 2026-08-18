@@ -21,8 +21,10 @@
   );
   const initSessions = JSON.stringify(typeof sessionsData !== 'undefined' ? sessionsData : []);
   const sessionStatuses = Array.isArray(sessionStatusMeta) ? sessionStatusMeta : [];
+  const selectableStatuses = Array.isArray(selectableSessionStatusMeta) ? selectableSessionStatusMeta : sessionStatuses;
   const activeSessionStatuses = sessionStatuses.filter((row) => row && row.active !== false);
-  const availableSessionStatuses = activeSessionStatuses.length ? activeSessionStatuses : sessionStatuses;
+  const activeSelectableStatuses = selectableStatuses.filter((row) => row && row.active !== false);
+  const availableSessionStatuses = activeSelectableStatuses.length ? activeSelectableStatuses : selectableStatuses;
   const resolvedDefaultSessionStatusCode = String(
     defaultSessionStatusCode
     || (availableSessionStatuses.find((row) => row.code === 'scheduled')?.code)
@@ -30,7 +32,7 @@
     || 'scheduled'
   );
   const sessionStatusLabelMap = {};
-  availableSessionStatuses.forEach((row) => {
+  activeSessionStatuses.forEach((row) => {
     const key = String(row?.code || '').trim().toLowerCase();
     if (!key) return;
     sessionStatusLabelMap[key] = String(row?.label || key);
@@ -1084,6 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const feeCategories = <%- JSON.stringify(typeof feeCategories !== 'undefined' ? feeCategories : []) %>;
     const allFeeCategoryKey = <%- JSON.stringify(typeof allFeeCategoryKey !== 'undefined' ? allFeeCategoryKey : '__ALL__') %>;
     const allFeeCategoryLabel = <%- JSON.stringify(typeof allFeeCategoryLabel !== 'undefined' ? allFeeCategoryLabel : 'All Categories') %>;
+    const sessionStatusDisplayMeta = <%- JSON.stringify(activeSessionStatuses.length ? activeSessionStatuses : sessionStatuses) %>;
     const sessionStatusMeta = <%- JSON.stringify(availableSessionStatuses || []) %>;
     const defaultSessionStatusCode = <%- JSON.stringify(resolvedDefaultSessionStatusCode || 'scheduled') %>;
     const subjectFeeCatalog = new Map((<%- JSON.stringify(typeof subjectFeeCatalog !== 'undefined' ? subjectFeeCatalog : []) %> || []).map((item) => [String(item.id || ''), item]));
@@ -1095,11 +1098,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const creditsInput = document.getElementById('inp_credits');
     let classCreditsTouched = <%- JSON.stringify(Number(c.credits || 0) > 0) %>;
     const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-    const isHolidayOff = (notes) => {
-        const normalized = String(notes || '').trim().toLowerCase();
-        return normalized === 'holiday/off' || normalized === 'holiday off' || normalized === 'holiday';
-    };
-    const sessionStatusMap = new Map((sessionStatusMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
+    const sessionStatusMap = new Map((sessionStatusDisplayMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
     const resolveSessionStatusMeta = (statusCode) => sessionStatusMap.get(normalizeStatusCode(statusCode)) || null;
     const normalizeHexColor = (value, fallback = '#e2e3e5') => {
         const raw = String(value || '').trim();
@@ -1116,8 +1115,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
     };
     const resolveSessionStatusCode = (session) => {
-        if (isHolidayOff(session?.notes)) return 'holiday';
-        return normalizeStatusCode(session?.status) || normalizeStatusCode(defaultSessionStatusCode) || 'scheduled';
+        const normalized = normalizeStatusCode(session?.status) || normalizeStatusCode(defaultSessionStatusCode) || 'scheduled';
+        if (normalized === 'holiday') return 'cancelled';
+        return normalized;
     };
     const resolveSessionStatusLabel = (statusCode) => {
         const meta = resolveSessionStatusMeta(statusCode);
@@ -1134,7 +1134,6 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/'/g, '&#39;');
     const shouldExcludeFromTeacherIndex = (session) => {
         const normalized = resolveSessionStatusCode(session);
-        if (normalized === 'holiday') return true;
         const meta = resolveSessionStatusMeta(normalized);
         if (!meta) return normalized === 'cancelled';
         return meta.excludeFromTeacherIndex === true;
@@ -1198,8 +1197,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const meta = resolveSessionStatusMeta(statusCode);
         const isLocked = options.locked === true;
         const hasConflict = options.conflict === true;
-        const colorBg = normalizeHexColor(meta?.colorBg, statusCode === 'holiday' ? '#fff3cd' : '#e2e3e5');
-        const colorBorder = normalizeHexColor(meta?.colorBorder, statusCode === 'holiday' ? '#ffe69c' : '#c6c8ca');
+        const colorBg = normalizeHexColor(meta?.colorBg, '#e2e3e5');
+        const colorBorder = normalizeHexColor(meta?.colorBorder, '#c6c8ca');
         const baseLayer = `linear-gradient(${colorToRgba(colorBg, 0.22, colorBg)}, ${colorToRgba(colorBg, 0.22, colorBg)})`;
         const lockLayer = isLocked
             ? `, repeating-linear-gradient(-45deg, ${colorToRgba('#6c757d', 0.08, '#6c757d')} 0 10px, ${colorToRgba('#adb5bd', 0.18, '#adb5bd')} 10px 20px)`

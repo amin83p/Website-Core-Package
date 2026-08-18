@@ -39,6 +39,14 @@
               <label class="form-label fw-bold">Sort Order</label>
               <input type="number" name="sortOrder" class="form-control size-md" value="<%= Number(item.sortOrder || 0) %>" min="0" max="9999">
             </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="accessType">Access Type</label>
+              <select name="accessType" id="accessType" class="form-select size-md" required>
+                <option value="users" <%= String(item.accessType || 'users').toLowerCase() !== 'admins' ? 'selected' : '' %>>Users</option>
+                <option value="admins" <%= String(item.accessType || '').toLowerCase() === 'admins' ? 'selected' : '' %>>Admins</option>
+              </select>
+              <div class="form-text small">Users: teachers and session editors. Admins: school session administrators only.</div>
+            </div>
             <div class="col-12">
               <label class="form-label fw-bold">Description</label>
               <textarea name="description" class="form-control" rows="2" placeholder="Explain the workflow meaning of this status..."><%= item.description || '' %></textarea>
@@ -294,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInputValue('input[name="code"]', source.code || '');
     setInputValue('input[name="label"]', source.label || '');
     setInputValue('input[name="sortOrder"]', Number(source.sortOrder || 0));
+    setInputValue('#accessType', String(source.accessType || 'users').toLowerCase() === 'admins' ? 'admins' : 'users');
     setInputValue('textarea[name="description"]', source.description || '');
     setInputValue('input[name="timesheetFormula"]', source.timesheetFormula || 'duration');
     setCheckboxValue('#isFinal', source.isFinal, false);

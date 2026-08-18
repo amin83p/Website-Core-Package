@@ -15,6 +15,7 @@ const activityService = require('../../services/school/activityService');
 const teacherIdentityService = require('../../services/school/teacherIdentityService');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -632,15 +633,164 @@ function buildPersonDisplayName(person, fallbackId = '') {
     return String(fallbackId || person?.id || '').trim();
 }
 
-function buildStudentDisplayName(student, personNameById = new Map(), fallbackId = '') {
+function isOpaqueDisplayLabel(label, ...candidateIds) {
+    const cleaned = String(label || '').trim();
+    if (!cleaned) return true;
+    const candidates = candidateIds.map((id) => normalizeId(id)).filter(Boolean);
+    return candidates.some((id) => idsEqual(cleaned, id));
+}
+
+function isNumericOnlyLabel(label) {
+    return /^[0-9]+$/.test(String(label || '').trim());
+}
+
+function resolveReadableStudentLabel(name, studentId = '', personId = '', personNameById = new Map()) {
+    const fromPerson = personId ? String(personNameById.get(normalizeId(personId)) || '').trim() : '';
+    const direct = String(name || '').trim();
+    const directUsable = direct
+        && !isOpaqueDisplayLabel(direct, studentId, personId)
+        && !isNumericOnlyLabel(direct);
+    if (fromPerson && !isOpaqueDisplayLabel(fromPerson, studentId, personId)) {
+        if (!directUsable) return fromPerson;
+    }
+    if (directUsable) return direct;
+    if (fromPerson && !isOpaqueDisplayLabel(fromPerson, studentId, personId)) return fromPerson;
+    return '';
+}
+
+async function buildSchedulePersonNameById({
+    reqUser,
+    students = [],
+    persons = [],
+    enrollmentPeriods = [],
+    classes = []
+} = {}) {
+    const personNameById = new Map(
+        (Array.isArray(persons) ? persons : [])
+            .map((person) => [normalizeId(person?.id || person?._id), buildPersonDisplayName(person, '')])
+            .filter(([id, name]) => Boolean(id && name && !isOpaqueDisplayLabel(name, id)))
+    );
+
+    const personIds = new Set();
+    const addPersonId = (value) => {
+        const id = normalizeId(value);
+        if (id) personIds.add(id);
+    };
+
+    (Array.isArray(students) ? students : []).forEach((student) => addPersonId(student?.personId));
+    (Array.isArray(enrollmentPeriods) ? enrollmentPeriods : []).forEach((row) => addPersonId(row?.personId));
+    (Array.isArray(classes) ? classes : []).forEach((classRow) => {
+        (Array.isArray(classRow?.enrollment?.students) ? classRow.enrollment.students : []).forEach((entry) => {
+            addPersonId(entry?.personId);
+        });
+    });
+
+    const missingPersonIds = [...personIds].filter((personId) => {
+        const existing = personNameById.get(personId);
+        return !existing || isOpaqueDisplayLabel(existing, personId);
+    });
+
+    if (missingPersonIds.length) {
+        const personById = await schoolPersonAccessService.buildPersonByIdMap({
+            reqUser,
+            personIds: missingPersonIds
+        });
+        missingPersonIds.forEach((personId) => {
+            const person = personById.get(personId);
+            const name = schoolPersonAccessService.formatPersonName(person, '');
+            if (name && !isOpaqueDisplayLabel(name, personId)) {
+                personNameById.set(personId, name);
+            }
+        });
+    }
+
+    return personNameById;
+}
+
+function buildStudentDisplayName(student, personNameById = new Map(), fallbackId = '', studentNameByStudentId = new Map()) {
+    const studentId = normalizeId(student?.id || student?._id || fallbackId);
     const personId = normalizeId(student?.personId || student?.person?.id || student?.person?._id);
-    const personName = personId ? normalizeId(personNameById.get(personId)) : '';
-    if (personName) return personName;
+    const mappedStudentName = studentId ? String(studentNameByStudentId.get(studentId) || '').trim() : '';
+    if (
+        mappedStudentName
+        && !isNumericOnlyLabel(mappedStudentName)
+        && !isOpaqueDisplayLabel(mappedStudentName, studentId, personId)
+    ) {
+        return mappedStudentName;
+    }
+    const personName = personId ? String(personNameById.get(personId) || '').trim() : '';
+    if (personName && !isOpaqueDisplayLabel(personName, studentId, personId)) return personName;
     const studentName = buildPersonDisplayName(student, '');
     if (studentName) return studentName;
     const fromParts = `${student?.firstName || ''} ${student?.lastName || ''}`.trim();
     if (fromParts) return fromParts;
-    return normalizeId(fallbackId || student?.id || '');
+    return '';
+}
+
+function resolveEnrollmentStudentRowDisplayName(entry = {}) {
+    if (!entry || typeof entry !== 'object') return '';
+    const direct = String(
+        entry.studentName
+        || entry.displayName
+        || entry.fullName
+        || entry.name
+        || ''
+    ).trim();
+    if (direct && direct !== '[object Object]') return direct;
+    const fromParts = `${entry.firstName || entry.name?.first || ''} ${entry.lastName || entry.name?.last || ''}`.trim();
+    if (fromParts) return fromParts;
+    return buildPersonDisplayName(entry, '');
+}
+
+function enrichStudentNameMaps({
+    students = [],
+    classes = [],
+    enrollmentPeriods = [],
+    personNameById = new Map(),
+    studentNameByStudentId = new Map()
+} = {}) {
+    (Array.isArray(classes) ? classes : []).forEach((classRow) => {
+        (Array.isArray(classRow?.enrollment?.students) ? classRow.enrollment.students : []).forEach((entry) => {
+            const name = resolveEnrollmentStudentRowDisplayName(entry);
+            if (!name) return;
+            const studentId = normalizeId(entry?.studentId || entry?.id || entry?._id);
+            const personId = normalizeId(entry?.personId);
+            if (studentId) studentNameByStudentId.set(studentId, name);
+            if (personId) personNameById.set(personId, name);
+        });
+    });
+    (Array.isArray(enrollmentPeriods) ? enrollmentPeriods : []).forEach((row) => {
+        const name = resolveEnrollmentStudentRowDisplayName(row);
+        const studentId = normalizeId(row?.studentId);
+        const personId = normalizeId(row?.personId);
+        if (name && !isOpaqueDisplayLabel(name, studentId, personId)) {
+            if (studentId) studentNameByStudentId.set(studentId, name);
+            if (personId) personNameById.set(personId, name);
+        } else if (personId && personNameById.has(personId) && studentId) {
+            studentNameByStudentId.set(studentId, personNameById.get(personId));
+        }
+    });
+    (Array.isArray(students) ? students : []).forEach((student) => {
+        const studentId = normalizeId(student?.id || student?._id);
+        const personId = normalizeId(student?.personId);
+        const name = buildStudentDisplayName(student, personNameById, studentId, studentNameByStudentId);
+        if (studentId && name) studentNameByStudentId.set(studentId, name);
+        if (personId && name) personNameById.set(personId, name);
+    });
+}
+
+function resolveStudentNameFromSessionRoster(session = {}, soloStudent = {}) {
+    const roster = Array.isArray(session?.roster) ? session.roster : [];
+    const candidateIds = [
+        soloStudent?.soloStudentPersonId,
+        soloStudent?.soloStudentId
+    ].map((value) => normalizeId(value)).filter(Boolean);
+    if (!candidateIds.length) return '';
+    const row = roster.find((entry) => {
+        const rowId = normalizeId(entry?.personId || entry?.studentId || entry?.id);
+        return rowId && candidateIds.some((candidateId) => idsEqual(rowId, candidateId));
+    });
+    return resolveEnrollmentStudentRowDisplayName(row);
 }
 
 function getClassScheduleCapacity(classRow = {}) {
@@ -671,13 +821,36 @@ function buildSoloStudentResolver({
     students = [],
     persons = [],
     enrollmentPeriods = [],
-    activeOrgId = ''
+    classes = [],
+    activeOrgId = '',
+    personNameByIdSeed = null
 } = {}) {
-    const personNameById = new Map(
-        (Array.isArray(persons) ? persons : [])
-            .map((person) => [normalizeId(person?.id || person?._id), buildPersonDisplayName(person, '')])
-            .filter(([id, name]) => Boolean(id && name))
-    );
+    const personNameById = new Map();
+    if (personNameByIdSeed instanceof Map) {
+        personNameByIdSeed.forEach((name, id) => {
+            const personId = normalizeId(id);
+            const label = String(name || '').trim();
+            if (personId && label && !isOpaqueDisplayLabel(label, personId)) {
+                personNameById.set(personId, label);
+            }
+        });
+    }
+    (Array.isArray(persons) ? persons : [])
+        .forEach((person) => {
+            const id = normalizeId(person?.id || person?._id);
+            const name = buildPersonDisplayName(person, '');
+            if (id && name && !isOpaqueDisplayLabel(name, id) && !personNameById.has(id)) {
+                personNameById.set(id, name);
+            }
+        });
+    const studentNameByStudentId = new Map();
+    enrichStudentNameMaps({
+        students,
+        classes,
+        enrollmentPeriods,
+        personNameById,
+        studentNameByStudentId
+    });
     const studentById = new Map(
         (Array.isArray(students) ? students : [])
             .map((student) => [normalizeId(student?.id || student?._id), student])
@@ -699,7 +872,7 @@ function buildSoloStudentResolver({
 
     return function resolveSoloStudentForSession(classRow = {}, sessionDate = '') {
         const classId = normalizeId(classRow?.id || classRow?._id);
-        if (!classId || getClassScheduleCapacity(classRow) !== 1) return null;
+        if (!classId) return null;
 
         const canonicalRows = canonicalByClassId.get(classId) || [];
         let studentIds = [];
@@ -723,8 +896,15 @@ function buildSoloStudentResolver({
         const studentId = studentIds[0];
         const student = studentById.get(studentId) || { id: studentId };
         const studentPersonId = normalizeId(student?.personId);
-        const studentName = buildStudentDisplayName(student, personNameById, studentId);
-        if (!studentName) return null;
+        const enrollmentRow = (Array.isArray(classRow?.enrollment?.students) ? classRow.enrollment.students : [])
+            .find((entry) => idsEqual(entry?.studentId || entry?.id || entry?._id, studentId));
+        const enrollmentName = resolveEnrollmentStudentRowDisplayName(enrollmentRow);
+        const studentName = resolveReadableStudentLabel(
+            buildStudentDisplayName(student, personNameById, studentId, studentNameByStudentId) || enrollmentName,
+            studentId,
+            studentPersonId,
+            personNameById
+        );
         return {
             soloStudentId: studentId,
             soloStudentPersonId: studentPersonId,
@@ -1150,12 +1330,6 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
             .map((row) => [normalizeId(row?.id), String(row?.title || '').trim()])
             .filter(([id]) => Boolean(id))
     );
-    const resolveSoloStudentForSession = buildSoloStudentResolver({
-        students: allStudents,
-        persons: allPersons,
-        enrollmentPeriods: allEnrollmentPeriods,
-        activeOrgId
-    });
 
     const person = (Array.isArray(allPersons) ? allPersons : [])
         .find((row) => idsEqual(row?.id, normalizedPersonId) || idsEqual(row?._id, normalizedPersonId))
@@ -1277,6 +1451,22 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
         if (classRow) classMap.set(classId, classRow);
     }
 
+    const schedulePersonNameById = await buildSchedulePersonNameById({
+        reqUser,
+        students: allStudents,
+        persons: allPersons,
+        enrollmentPeriods: allEnrollmentPeriods,
+        classes: allClasses
+    });
+    const resolveSoloStudentForSession = buildSoloStudentResolver({
+        students: allStudents,
+        persons: allPersons,
+        enrollmentPeriods: allEnrollmentPeriods,
+        classes: [...classMap.values()],
+        activeOrgId,
+        personNameByIdSeed: schedulePersonNameById
+    });
+
     const classIdsToScan = candidateClassIds.size
         ? [...candidateClassIds]
         : [...classMap.keys()];
@@ -1328,6 +1518,14 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
                 ? sessionNavigationService.buildManageSessionHref(classId, { sessionId, date: sessionDate })
                 : '';
             const soloStudent = resolveSoloStudentForSession(classDef, sessionDate);
+            const resolvedSoloStudentName = soloStudent
+                ? resolveReadableStudentLabel(
+                    soloStudent.soloStudentName || resolveStudentNameFromSessionRoster(session, soloStudent) || '',
+                    soloStudent.soloStudentId,
+                    soloStudent.soloStudentPersonId,
+                    schedulePersonNameById
+                )
+                : '';
 
             events.push({
                 id: eventId,
@@ -1358,8 +1556,8 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
                 isOneOnOneClass: Boolean(soloStudent),
                 soloStudentId: soloStudent?.soloStudentId || '',
                 soloStudentPersonId: soloStudent?.soloStudentPersonId || '',
-                soloStudentName: soloStudent?.soloStudentName || '',
-                singleStudentName: soloStudent?.soloStudentName || ''
+                soloStudentName: resolvedSoloStudentName,
+                singleStudentName: resolvedSoloStudentName
             });
         }
     }

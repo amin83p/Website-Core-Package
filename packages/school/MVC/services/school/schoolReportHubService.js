@@ -6,7 +6,8 @@ const activityService = require('./activityService');
 const reportViewService = require('./reportViewService');
 const weeklyReportsHubService = require('./weeklyReportsHubService');
 const personDisplayNameService = require('./personDisplayNameService');
-const sessionExplorerService = require('./sessionExplorerService');
+const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const schoolIndexService = require('./schoolIndexService');
@@ -1374,6 +1375,18 @@ async function updateWorkspaceSession(input = {}, req = {}) {
   if (index < 0) throw new Error('Session not found.');
 
   const session = sessions[index];
+  if (input.status !== undefined) {
+    const statusMap = await sessionStatusPolicyService.getStatusMap(classRow?.orgId, { includeInactive: true });
+    const normalizedStatus = sessionStatusPolicyService.normalizeStatusCode(input.status);
+    if (!normalizedStatus || !statusMap.has(normalizedStatus)) {
+      throw new Error('Invalid session status.');
+    }
+    sessionStatusPolicyService.assertStatusSelectableByAccess(
+      normalizedStatus,
+      statusMap,
+      { allowAdminStatuses: await schoolAdminAccessService.canSelectAdminSessionStatuses(req.user) }
+    );
+  }
   const nextDate = normalizeDateOnly(input.date, 'date') || session.date;
   const nextStart = normalizeClock(input.startTime, 'startTime') || session.startTime || '';
   const nextEnd = normalizeClock(input.endTime, 'endTime') || session.endTime || '';

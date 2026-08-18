@@ -134,6 +134,70 @@
     return addDaysIso(anchor, -((new Date(`${anchor}T00:00:00`).getDay() + 6) % 7));
   }
 
+  const WEEK_OF_MONTH_WORDS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+
+  function weekOfMonthWord(weekStartDateStr) {
+    const monday = new Date(`${normalizeDateOnly(weekStartDateStr)}T12:00:00`);
+    if (Number.isNaN(monday.getTime())) return '';
+    const month = monday.getMonth();
+    let mondayCount = 0;
+    for (let day = 1; day <= monday.getDate(); day += 1) {
+      const cursor = new Date(monday.getFullYear(), month, day);
+      if (cursor.getDay() === 1) mondayCount += 1;
+    }
+    if (!mondayCount) return WEEK_OF_MONTH_WORDS[0];
+    return WEEK_OF_MONTH_WORDS[Math.min(mondayCount - 1, WEEK_OF_MONTH_WORDS.length - 1)] || String(mondayCount);
+  }
+
+  function getIsoWeekYear(dateStr) {
+    const date = new Date(`${normalizeDateOnly(dateStr)}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return { week: 0, year: 0 };
+    const target = new Date(date.getTime());
+    target.setHours(0, 0, 0, 0);
+    target.setDate(target.getDate() + 3 - ((target.getDay() + 6) % 7));
+    const week1 = new Date(target.getFullYear(), 0, 4);
+    const week = 1 + Math.round(((target - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+    return { week, year: target.getFullYear() };
+  }
+
+  function formatWeekLabel(weekStart, weekEnd) {
+    const start = normalizeDateOnly(weekStart);
+    const end = normalizeDateOnly(weekEnd) || start;
+    if (!start) return '';
+    const anchor = new Date(`${start}T12:00:00`);
+    const monthName = Number.isNaN(anchor.getTime())
+      ? ''
+      : anchor.toLocaleDateString('en-US', { month: 'long' });
+    const monthWeek = weekOfMonthWord(start);
+    const iso = getIsoWeekYear(start);
+    const monthWeekLabel = monthName && monthWeek ? `${monthName} Week ${monthWeek}` : '';
+    const yearWeekLabel = iso.week ? `Year Week ${iso.week}` : '';
+    const dateRangeLabel = end ? `${start} – ${end}` : start;
+    return [monthWeekLabel, yearWeekLabel, dateRangeLabel].filter(Boolean).join(' - ');
+  }
+
+  function formatWeekLabelHtml(weekStart, weekEnd) {
+    const start = normalizeDateOnly(weekStart);
+    const end = normalizeDateOnly(weekEnd) || start;
+    if (!start) return '';
+    const anchor = new Date(`${start}T12:00:00`);
+    const monthName = Number.isNaN(anchor.getTime())
+      ? ''
+      : anchor.toLocaleDateString('en-US', { month: 'long' });
+    const monthWeek = weekOfMonthWord(start);
+    const iso = getIsoWeekYear(start);
+    const monthWeekLabel = monthName && monthWeek ? `${monthName} Week ${monthWeek}` : '';
+    const yearWeekLabel = iso.week ? `Year Week ${iso.week}` : '';
+    const dateRangeLabel = end ? `${start} – ${end}` : start;
+    return `
+      <span class="session-cal-week-label-primary">${escapeHtml(monthWeekLabel)}</span>
+      <span class="session-cal-week-label-sep" aria-hidden="true">-</span>
+      <span class="session-cal-week-label-year">${escapeHtml(yearWeekLabel)}</span>
+      <span class="session-cal-week-label-sep" aria-hidden="true">-</span>
+      <span class="session-cal-week-label-dates">${escapeHtml(dateRangeLabel)}</span>
+    `;
+  }
+
   function computeViewRange(preset = 'week', anchorDate = '') {
     const anchor = parseAnchorDate(anchorDate);
     const key = String(preset || 'week').trim();
@@ -321,21 +385,101 @@
   }
 
   function formatHourLabelCompact(hour) {
-    const pad = (n) => String(n).padStart(2, '0');
-    if (hour === 0) return '12:00 AM';
-    if (hour < 12) return `${pad(hour)}:00 AM`;
-    if (hour === 12) return '12:00 PM';
-    return `${pad(hour - 12)}:00 PM`;
+    return formatClockTime(`${String(hour).padStart(2, '0')}:00`, { alwaysShowMinutes: true });
+  }
+
+  function parseClockTimeParts(timeStr) {
+    const raw = String(timeStr || '').trim();
+    if (!raw) return null;
+    const match = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return null;
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour > 23 || minute > 59) return null;
+    return { hour, minute };
+  }
+
+  function formatClockTime(timeStr, options = {}) {
+    const parts = parseClockTimeParts(timeStr);
+    if (!parts) return String(timeStr || '').trim() || '-';
+    const period = parts.hour >= 12 ? 'PM' : 'AM';
+    const h12 = parts.hour % 12 === 0 ? 12 : parts.hour % 12;
+    const minuteText = String(parts.minute).padStart(2, '0');
+    const clock = (parts.minute === 0 && !options.alwaysShowMinutes)
+      ? String(h12)
+      : `${h12}:${minuteText}`;
+    return `${clock} ${period}`;
+  }
+
+  function formatClockTimeRange(startStr, endStr) {
+    const start = parseClockTimeParts(startStr);
+    const end = parseClockTimeParts(endStr);
+    if (!start && !end) return '-';
+    if (!start) return formatClockTime(endStr);
+    if (!end) return formatClockTime(startStr);
+
+    const startPeriod = start.hour >= 12 ? 'PM' : 'AM';
+    const endPeriod = end.hour >= 12 ? 'PM' : 'AM';
+    const formatPart = (parts, withPeriod) => {
+      const h12 = parts.hour % 12 === 0 ? 12 : parts.hour % 12;
+      const minuteText = String(parts.minute).padStart(2, '0');
+      const clock = parts.minute === 0 ? String(h12) : `${h12}:${minuteText}`;
+      const period = parts.hour >= 12 ? 'PM' : 'AM';
+      return withPeriod ? `${clock} ${period}` : clock;
+    };
+
+    if (startPeriod === endPeriod) {
+      return `${formatPart(start, false)} – ${formatPart(end, true)}`;
+    }
+    return `${formatPart(start, true)} – ${formatPart(end, true)}`;
+  }
+
+  function formatDayHeaderParts(dateStr) {
+    const normalized = normalizeDateOnly(dateStr);
+    const dateObj = new Date(`${normalized}T12:00:00`);
+    if (Number.isNaN(dateObj.getTime())) {
+      return {
+        weekdayShort: '',
+        weekdayLong: '',
+        monthShort: '',
+        dayNum: '',
+        year: ''
+      };
+    }
+    return {
+      weekdayShort: dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
+      weekdayLong: dateObj.toLocaleDateString('en-US', { weekday: 'long' }),
+      monthShort: dateObj.toLocaleDateString('en-US', { month: 'short' }),
+      dayNum: String(dateObj.getDate()),
+      year: String(dateObj.getFullYear())
+    };
+  }
+
+  function formatDayHeaderHtml(dateStr, layout = 'vertical') {
+    const parts = formatDayHeaderParts(dateStr);
+    if (!parts.weekdayShort && !parts.dayNum) return escapeHtml(dateStr || '');
+    const weekday = layout === 'horizontal' ? parts.weekdayShort : parts.weekdayShort;
+    const dateLine = parts.monthShort && parts.dayNum
+      ? `${parts.monthShort} ${parts.dayNum}`
+      : normalizeDateOnly(dateStr);
+    return `
+      <span class="session-cal-day-header-content">
+        <span class="session-cal-day-header-weekday">${escapeHtml(weekday)}</span>
+        <span class="session-cal-day-header-date">${escapeHtml(dateLine)}</span>
+      </span>
+    `;
   }
 
   function formatDayHeaderShort(dateStr) {
-    const dateObj = new Date(`${dateStr}T00:00:00`);
-    return dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const parts = formatDayHeaderParts(dateStr);
+    if (!parts.weekdayShort || !parts.dayNum) return String(dateStr || '').trim();
+    return `${parts.weekdayShort} ${parts.monthShort} ${parts.dayNum}`;
   }
 
   function formatDayHeaderLong(dateStr) {
-    const dateObj = new Date(`${dateStr}T00:00:00`);
-    return dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    const parts = formatDayHeaderParts(dateStr);
+    if (!parts.weekdayLong || !parts.dayNum) return String(dateStr || '').trim();
+    return `${parts.weekdayLong}, ${parts.monthShort} ${parts.dayNum}, ${parts.year}`;
   }
 
   function buildEnrollmentBlockHtml(ev, selectedSet) {
@@ -441,7 +585,43 @@
 
   function isPointerOverSessionUi(target) {
     if (!target || typeof target.closest !== 'function') return false;
-    return Boolean(target.closest('.session-enrollment-block, .session-cal-positioned-session, .session-manage-link'));
+    return Boolean(target.closest(
+      '.session-enrollment-block, .session-cal-positioned-session, .session-manage-link, .event-block, .vertical-event-block'
+    ));
+  }
+
+  function filterWeekDaysForDisplay(days, eventsByDate, filterEmptyDays) {
+    const rows = Array.isArray(days) ? days : [];
+    if (!filterEmptyDays) return rows;
+    return rows.filter((day) => {
+      if (!day?.inRange) return true;
+      const count = (eventsByDate[day.date] || []).length;
+      return count > 0;
+    });
+  }
+
+  function resolvePositionedBlockHtml(ev, selectedSet, options, layout) {
+    const build = options?.buildPositionedBlockHtml;
+    if (typeof build === 'function') {
+      return build(ev, { ...layout, selectedSet });
+    }
+    return buildEnrollmentBlockHtml(ev, selectedSet);
+  }
+
+  function resolveDayHeaderBadgeHtml(day, dayEvents, inRange, options) {
+    const build = options?.buildDayHeaderBadgeHtml;
+    if (typeof build === 'function') {
+      return build(day, dayEvents, inRange);
+    }
+    return inRange ? buildDaySessionBadges(dayEvents, true) : '';
+  }
+
+  function resolveDayExtraClasses(day, dayEvents, inRange, mode, options) {
+    const build = options?.buildDayExtraClasses;
+    if (typeof build === 'function') {
+      return String(build(day, dayEvents, inRange, mode) || '').trim();
+    }
+    return '';
   }
 
   function isSnappedTimeOccupiedOnDay(dayCell, snappedOffset) {
@@ -620,21 +800,31 @@
     return html;
   }
 
-  function renderVerticalDayCell(dateStr, dayEvents, selectedSet, inRange, holidayDates) {
+  function renderVerticalDayCell(dateStr, dayEvents, inRange, holidayDates, options = {}) {
+    const selectedSet = options.selectedSet || null;
     const tracks = assignTracks((dayEvents || []).slice());
     const trackCount = Math.max(1, tracks.length);
+    const extraClass = resolveDayExtraClasses({ date: dateStr, inRange }, dayEvents, inRange, 'vertical', options);
     const dayClass = buildDayCalendarClasses(
       dateStr,
       holidayDates,
       'session-cal-day-cell',
-      inRange ? '' : 'is-out-of-range is-outside-month'
+      outOfViewRangeDayClass(inRange),
+      extraClass
     );
     let sessionsHtml = '';
     (dayEvents || []).forEach((ev) => {
       const trackLeft = (ev.trackIndex / trackCount) * 100;
       const trackWidth = 100 / trackCount;
       const blockHeight = Math.max(1, Number(ev.pos?.width || 0));
-      const blockHtml = buildEnrollmentBlockHtml(ev, selectedSet);
+      const blockHtml = resolvePositionedBlockHtml(ev, selectedSet, options, {
+        mode: 'vertical',
+        trackLeft,
+        trackWidth,
+        blockHeight,
+        trackIndex: ev.trackIndex,
+        trackCount
+      });
       sessionsHtml += `<div class="session-cal-positioned-session session-cal-positioned-vertical" data-timeline-start="${ev.pos.startMin}" data-timeline-end="${ev.pos.endMin}" style="top:${ev.pos.left}%;height:calc(${blockHeight}% - 4px);left:${trackLeft}%;width:calc(${trackWidth}% - 4px);">${blockHtml}</div>`;
     });
     return `
@@ -653,38 +843,47 @@
     const weekBlocks = buildWeekBlocks(viewRange, blockOptions);
     if (!weekBlocks.length) {
       container.innerHTML = '<div class="alert alert-light text-center border py-4 text-muted">No sessions in this range.</div>';
-      return;
+      return false;
     }
 
     const dayWidth = Number(options.dayWidth || 140);
+    const hourHeight = Math.max(20, Number(options.hourHeight || 28));
     const holidayDates = options.holidayDates || null;
+    const filterEmptyDays = options.filterEmptyDays === true;
+    const cellOptions = { ...options, selectedSet };
     container.style.setProperty('--session-day-width', `${dayWidth}px`);
-    container.style.setProperty('--session-time-gutter-width', '64px');
-    container.style.setProperty('--session-hour-height', '28px');
-    const visibleDayCount = weekBlocks.reduce((max, week) => Math.max(max, week.days.length), 0) || 7;
-    container.dataset.sessionVisibleDayCount = String(visibleDayCount);
+    container.style.setProperty('--session-time-gutter-width', '76px');
+    container.style.setProperty('--session-hour-height', `${hourHeight}px`);
+    let renderedWeekCount = 0;
+    let visibleDayCount = 0;
 
     let html = '<div class="session-cal-vertical-scroll"><div class="session-cal-week-stack">';
     weekBlocks.forEach((week) => {
+      const days = filterWeekDaysForDisplay(week.days, eventsByDate, filterEmptyDays);
+      if (!days.length) return;
+      renderedWeekCount += 1;
+      visibleDayCount = Math.max(visibleDayCount, days.length);
       html += `
         <div class="session-cal-week-row">
-          <div class="session-cal-week-label">${escapeHtml(week.weekStart)} – ${escapeHtml(week.weekEnd)}</div>
+          <div class="session-cal-week-label">${formatWeekLabelHtml(week.weekStart, week.weekEnd)}</div>
           <div class="session-cal-week-grid-vertical">
             <div class="session-cal-day-header-row">
               <div class="session-cal-time-gutter-spacer" aria-hidden="true"></div>
       `;
-      week.days.forEach((day) => {
+      days.forEach((day) => {
         const dayEvents = eventsByDate[day.date] || [];
+        const headerExtra = resolveDayExtraClasses(day, dayEvents, day.inRange, 'vertical-header', cellOptions);
         const headerClass = buildDayCalendarClasses(
           day.date,
           holidayDates,
           'session-cal-day-header',
-          outOfViewRangeDayClass(day.inRange)
+          outOfViewRangeDayClass(day.inRange),
+          headerExtra
         );
         html += `
           <div class="${headerClass}">
-            <span>${escapeHtml(formatDayHeaderShort(day.date))}</span>
-            ${day.inRange ? buildDaySessionBadges(dayEvents, true) : ''}
+            ${formatDayHeaderHtml(day.date, 'vertical')}
+            ${resolveDayHeaderBadgeHtml(day, dayEvents, day.inRange, cellOptions)}
           </div>
         `;
       });
@@ -694,15 +893,23 @@
               ${buildVerticalTimeGutterHtml()}
               <div class="session-cal-days-row">
       `;
-      week.days.forEach((day) => {
+      days.forEach((day) => {
         const dayEvents = day.inRange ? (eventsByDate[day.date] || []) : [];
-        html += renderVerticalDayCell(day.date, dayEvents, selectedSet, day.inRange, holidayDates);
+        html += renderVerticalDayCell(day.date, dayEvents, day.inRange, holidayDates, cellOptions);
       });
       html += '</div><div class="session-cal-hover-line" aria-hidden="true"></div><div class="session-cal-hover-time-label" aria-hidden="true"></div></div></div></div>';
     });
     html += '</div></div>';
+    if (!renderedWeekCount) {
+      container.innerHTML = '<div class="alert alert-light text-center border py-4 text-muted">No sessions in this range.</div>';
+      return false;
+    }
+    container.dataset.sessionVisibleDayCount = String(visibleDayCount || 7);
     container.innerHTML = html;
-    bindVerticalTimeHover(container);
+    if (options.enableTimeHover !== false) {
+      bindVerticalTimeHover(container);
+    }
+    return true;
   }
 
   function renderHorizontalWeekGrid(eventsByDate, container, selectedSet, options = {}) {
@@ -711,15 +918,26 @@
     const weekBlocks = buildWeekBlocks(viewRange, blockOptions);
     if (!weekBlocks.length) {
       container.innerHTML = '<div class="alert alert-light text-center border py-4 text-muted">No sessions in this range.</div>';
-      return;
+      return false;
     }
 
     const holidayDates = options.holidayDates || null;
+    const filterEmptyDays = options.filterEmptyDays === true;
+    const timelineTrackStep = Math.max(48, Number(options.timelineTrackStep || 76));
+    const hourHeight = Math.max(20, Number(options.hourHeight || 28));
+    const cellOptions = { ...options, selectedSet };
+    container.style.setProperty('--session-hour-height', `${hourHeight}px`);
+    container.style.setProperty('--session-timeline-track-step', `${timelineTrackStep}px`);
+    let renderedWeekCount = 0;
+
     let html = '<div class="session-cal-vertical-scroll"><div class="session-cal-week-stack session-cal-week-stack-timeline">';
     weekBlocks.forEach((week) => {
+      const days = filterWeekDaysForDisplay(week.days, eventsByDate, filterEmptyDays);
+      if (!days.length) return;
+      renderedWeekCount += 1;
       html += `
         <div class="session-cal-week-row session-cal-week-row-timeline session-cal-timeline-time-track">
-          <div class="session-cal-week-label">${escapeHtml(week.weekStart)} – ${escapeHtml(week.weekEnd)}</div>
+          <div class="session-cal-week-label">${formatWeekLabelHtml(week.weekStart, week.weekEnd)}</div>
           <div class="session-cal-timeline-hover-shell">
             <div class="session-cal-timeline-header-row">
               <div class="session-cal-day-label-spacer" aria-hidden="true"></div>
@@ -728,7 +946,7 @@
               </div>
             </div>
       `;
-      week.days.forEach((day) => {
+      days.forEach((day) => {
         const dayEvents = day.inRange ? (eventsByDate[day.date] || []) : [];
         assignTracks(dayEvents.slice());
         const tracks = [];
@@ -737,22 +955,30 @@
           tracks[ev.trackIndex].push(ev);
         });
         const trackCount = Math.max(1, tracks.length);
-        const bodyHeight = Math.max(56, trackCount * 58 + 8);
+        const bodyHeight = Math.max(72, trackCount * timelineTrackStep + 12);
+        const extraClass = resolveDayExtraClasses(day, dayEvents, day.inRange, 'timeline', cellOptions);
         const rowClass = buildDayCalendarClasses(
           day.date,
           holidayDates,
           'session-cal-timeline-day-row',
-          outOfViewRangeDayClass(day.inRange)
+          outOfViewRangeDayClass(day.inRange),
+          extraClass
         );
         let sessionsHtml = '';
         dayEvents.forEach((ev) => {
-          const topPos = (ev.trackIndex * 58) + 4;
-          const block = buildEnrollmentBlockHtml(ev, selectedSet);
-          sessionsHtml += `<div class="session-cal-positioned-session session-cal-positioned-horizontal" data-timeline-start="${ev.pos.startMin}" data-timeline-end="${ev.pos.endMin}" style="left:${ev.pos.left}%;width:${ev.pos.width}%;top:${topPos}px;">${block}</div>`;
+          const topPos = (ev.trackIndex * timelineTrackStep) + 4;
+          const blockHeight = Math.max(48, timelineTrackStep - 8);
+          const block = resolvePositionedBlockHtml(ev, selectedSet, cellOptions, {
+            mode: 'timeline',
+            topPos,
+            trackIndex: ev.trackIndex,
+            trackCount
+          });
+          sessionsHtml += `<div class="session-cal-positioned-session session-cal-positioned-horizontal" data-timeline-start="${ev.pos.startMin}" data-timeline-end="${ev.pos.endMin}" data-track-index="${ev.trackIndex}" style="left:${ev.pos.left}%;width:${ev.pos.width}%;top:${topPos}px;height:${blockHeight}px;">${block}</div>`;
         });
         html += `
           <div class="${rowClass}" data-cal-date="${escapeHtml(day.date)}">
-            <div class="session-cal-day-row-label">${escapeHtml(formatDayHeaderShort(day.date))}</div>
+            <div class="session-cal-day-row-label">${formatDayHeaderHtml(day.date, 'horizontal')}</div>
             <div class="session-cal-timeline-track" style="height:${bodyHeight}px;">
               ${buildHourGridBackgroundHtml()}
               ${sessionsHtml}
@@ -763,8 +989,15 @@
       html += '<div class="session-cal-hover-line-vertical" aria-hidden="true"></div><div class="session-cal-hover-time-label-horizontal" aria-hidden="true"></div></div></div>';
     });
     html += '</div></div>';
+    if (!renderedWeekCount) {
+      container.innerHTML = '<div class="alert alert-light text-center border py-4 text-muted">No sessions in this range.</div>';
+      return false;
+    }
     container.innerHTML = html;
-    bindCalendarTimeHover(container);
+    if (options.enableTimeHover !== false) {
+      bindCalendarTimeHover(container);
+    }
+    return true;
   }
 
   function renderSingleDayList(eventsByDate, container, selectedSet, displayStartDate = '') {
@@ -1243,6 +1476,10 @@
     computeAutoDayWidth,
     filterEventsByViewRange,
     buildWeekBlocks,
+    formatWeekLabel,
+    formatWeekLabelHtml,
+    weekOfMonthWord,
+    getIsoWeekYear,
     timeToMinutes,
     calculatePosition,
     snapTimelineOffsetMinutes,
@@ -1251,8 +1488,19 @@
     timelineMinutesFromOffset,
     isSnappedTimeOccupiedOnDay,
     groupEventsByDate,
-    formatHours,
+    formatDayHeaderShort,
+    formatDayHeaderLong,
+    formatDayHeaderHtml,
+    formatDayHeaderParts,
+    formatClockTime,
+    formatClockTimeRange,
+    parseClockTimeParts,
     renderEnrollmentCalendar,
+    renderVerticalWeekGrid,
+    renderHorizontalWeekGrid,
+    bindCalendarTimeHover,
+    clearCalendarTimeHover,
+    filterWeekDaysForDisplay,
     summarizeSelectionFromEvents,
     sessionScheduleKey,
     minutesToTime24,

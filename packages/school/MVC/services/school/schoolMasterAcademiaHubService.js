@@ -6,6 +6,8 @@ const activityService = require('./activityService');
 const reportViewService = require('./reportViewService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionExplorerService = require('./sessionExplorerService');
+const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const schoolIndexService = require('./schoolIndexService');
@@ -1105,6 +1107,16 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     );
     const result = await sessionExplorerService.listSessions(req, queryInput || {});
     const rows = Array.isArray(result.rows) ? result.rows : [];
+    const statusMeta = Array.isArray(result.statusMeta) ? result.statusMeta : [];
+    const activeStatusMeta = (() => {
+      const activeRows = statusMeta.filter((row) => row?.active !== false);
+      return activeRows.length ? activeRows : statusMeta;
+    })();
+    const allowAdminStatuses = await schoolAdminAccessService.canSelectAdminSessionStatuses(req.user);
+    const selectableStatusMeta = sessionStatusPolicyService.filterSelectableStatusMeta(
+      activeStatusMeta,
+      { allowAdminStatuses }
+    );
     return {
       section: {
         key: 'sessions',
@@ -1115,7 +1127,8 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       rows,
       total: rows.length,
       pagination: result.pagination,
-      statusMeta: result.statusMeta,
+      statusMeta,
+      selectableStatusMeta,
       canUpdateSessions: updateAccess.allowed === true,
       canOverrideMakeupDuration: canOverrideMakeupDuration === true,
       filters: result.filters,
@@ -1756,6 +1769,18 @@ async function updateWorkspaceSession(input = {}, req = {}) {
   if (index < 0) throw new Error('Session not found.');
 
   const session = sessions[index];
+  if (input.status !== undefined) {
+    const statusMap = await sessionStatusPolicyService.getStatusMap(classRow?.orgId, { includeInactive: true });
+    const normalizedStatus = sessionStatusPolicyService.normalizeStatusCode(input.status);
+    if (!normalizedStatus || !statusMap.has(normalizedStatus)) {
+      throw new Error('Invalid session status.');
+    }
+    sessionStatusPolicyService.assertStatusSelectableByAccess(
+      normalizedStatus,
+      statusMap,
+      { allowAdminStatuses: await schoolAdminAccessService.canSelectAdminSessionStatuses(req.user) }
+    );
+  }
   const nextDate = normalizeDateOnly(input.date, 'date') || session.date;
   const nextStart = normalizeClock(input.startTime, 'startTime') || session.startTime || '';
   const nextEnd = normalizeClock(input.endTime, 'endTime') || session.endTime || '';

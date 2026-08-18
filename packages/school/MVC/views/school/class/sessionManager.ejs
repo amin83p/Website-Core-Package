@@ -1298,8 +1298,12 @@
         };
         const statusRows = Array.isArray(sessionStatusMeta) ? sessionStatusMeta : [];
         const activeStatusRows = statusRows.filter((row) => row && row.active !== false);
-        const availableStatusRows = activeStatusRows.length ? activeStatusRows : statusRows;
-        const fallbackStatusCode = String(defaultSessionStatusCode || availableStatusRows.find((row) => row?.code === 'scheduled')?.code || availableStatusRows[0]?.code || 'scheduled').toLowerCase();
+        const displayStatusRows = activeStatusRows.length ? activeStatusRows : statusRows;
+        const selectableRows = Array.isArray(selectableSessionStatusMeta) ? selectableSessionStatusMeta : displayStatusRows;
+        const activeSelectableRows = selectableRows.filter((row) => row && row.active !== false);
+        const pickerStatusRows = activeSelectableRows.length ? activeSelectableRows : selectableRows;
+        const availableStatusRows = pickerStatusRows;
+        const fallbackStatusCode = String(defaultSessionStatusCode || displayStatusRows.find((row) => row?.code === 'scheduled')?.code || displayStatusRows[0]?.code || 'scheduled').toLowerCase();
         const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         const attendanceSummary = (session.roster || []).reduce((acc, row) => {
             const rawKey = String(row?.attendance || '').trim().toLowerCase();
@@ -1335,10 +1339,10 @@
             return currentNorm === normalized;
         };
         const normalizedSessionStatus = normalizeStatusCode(session.status || fallbackStatusCode);
-        const currentSessionStatus = availableStatusRows.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)
+        const currentSessionStatus = displayStatusRows.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)
             ? normalizedSessionStatus
             : fallbackStatusCode;
-        const currentSessionStatusMeta = availableStatusRows.find((row) => normalizeStatusCode(row?.code) === currentSessionStatus) || null;
+        const currentSessionStatusMeta = displayStatusRows.find((row) => normalizeStatusCode(row?.code) === currentSessionStatus) || null;
         const isSessionCompleted = currentSessionStatusMeta
             ? (currentSessionStatusMeta.isFinal === true && currentSessionStatusMeta.makeUpRequired !== true && currentSessionStatusMeta.excludeFromAttendance !== true)
             : currentSessionStatus === 'completed';
@@ -1555,7 +1559,12 @@
                     <i class="bi bi-pencil-square" aria-hidden="true"></i>
                 </button>
                 <select id="sessionStatusSelect" class="d-none" aria-hidden="true" tabindex="-1" <%= disabledAttr ? 'disabled' : '' %>>
-                    <% availableStatusRows.forEach((statusRow) => { %>
+                    <% const pickerRowsForSelect = [...availableStatusRows]; %>
+                    <% if (normalizedSessionStatus && !pickerRowsForSelect.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)) {
+                        const lockedRow = displayStatusRows.find((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus);
+                        if (lockedRow) pickerRowsForSelect.unshift(lockedRow);
+                    } %>
+                    <% pickerRowsForSelect.forEach((statusRow) => { %>
                         <% const statusCode = normalizeStatusCode(statusRow?.code); %>
                         <% if (statusCode) { %>
                             <option
@@ -2975,7 +2984,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function markSessionAutosaveInstructionalDirty() { sessionAutosaveDirty.instructionalDirty = true; }
     function markSessionAutosaveMetadataDirty() { sessionAutosaveDirty.metadataDirty = true; }
     const sessionManagerSchoolDashboardHref = <%- jsonForScript(typeof schoolSectionDashboardHref !== 'undefined' ? schoolSectionDashboardHref : '/dashboard/section-nav/SCHOOL') %>;
-    const sessionStatusMeta = <%- jsonForScript(availableStatusRows || []) %>;
+    const sessionStatusMeta = <%- jsonForScript(displayStatusRows || []) %>;
+    const selectableSessionStatusMeta = <%- jsonForScript(availableStatusRows || []) %>;
     let sessionMakeupSummary = <%- jsonForScript(makeupAllocationSummary || {}) %>;
     const sessionMakeupHistory = Array.isArray(sessionMakeupSummary.sessions) ? sessionMakeupSummary.sessions : [];
     const sessionCanCreateMakeup = <%- jsonForScript(Boolean(canCreateMakeupSession)) %>;
