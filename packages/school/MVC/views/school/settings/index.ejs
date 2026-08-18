@@ -11,6 +11,8 @@
     ? true
     : attendanceThresholdsEnabled !== false;
   const rollupFormulaJson = JSON.stringify(typeof rollupFormula !== 'undefined' ? rollupFormula : {}).replace(/</g, '\\u003c');
+  const attendanceMarkAppearancePolicyJson = JSON.stringify(typeof attendanceMarkAppearancePolicy !== 'undefined' ? attendanceMarkAppearancePolicy : { marks: [] }).replace(/</g, '\\u003c');
+  const attendanceMarkCuratedIconsJson = JSON.stringify(typeof attendanceMarkCuratedIcons !== 'undefined' ? attendanceMarkCuratedIcons : []).replace(/</g, '\\u003c');
 %>
 
 <style>
@@ -28,6 +30,26 @@
   .school-settings-workspace.sidebar-collapsed {
     grid-template-columns: var(--settings-sidebar-collapsed-width) minmax(0, 1fr);
   }
+  .attendance-timing-excuse-icon {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 1.35em;
+    height: 1.35em;
+    line-height: 1;
+  }
+  .attendance-timing-excuse-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0.02em;
+    border: 3px solid #198754;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .attendance-timing-excuse-left::before { clip-path: inset(0 50% 0 0); }
+  .attendance-timing-excuse-right::before { clip-path: inset(0 0 0 50%); }
+  .attendance-timing-excuse-full::before { clip-path: none; }
+  .attendance-timing-excuse-icon > i { position: relative; z-index: 1; }
   .school-settings-sidebar {
     position: sticky;
     top: 1rem;
@@ -369,6 +391,53 @@
         </div>
       </section>
 
+      <section class="school-settings-panel card border-0 shadow-sm" id="attendance-marks" role="tabpanel" aria-labelledby="settings-tab-attendance-marks" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-palette" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Attendance Marks</h2>
+              <p class="small text-muted mb-0">Configure labels, Bootstrap icons, and colors for the Attendance Matrix and Student Attendance Report.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted mb-3">
+            Late and early-leave timing marks share the <span class="fw-semibold">late</span> color. The timing excuse ring color applies to half- and full-ring overlays on excused timing marks.
+          </p>
+          <div class="alert alert-danger d-none js-settings-error" id="attendanceMarksSettingsError" role="alert"></div>
+          <form id="attendanceMarksSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <datalist id="attendanceMarkIconOptions">
+              <% (attendanceMarkCuratedIcons || []).forEach((icon) => { %>
+                <option value="<%= icon %>"></option>
+              <% }); %>
+            </datalist>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle school-settings-table">
+                <thead class="table-light">
+                  <tr>
+                    <th>Mark</th>
+                    <th style="min-width:11rem;">Label</th>
+                    <th style="min-width:9rem;">Icon</th>
+                    <th style="min-width:8rem;">Color</th>
+                    <th class="text-center" style="width:3rem;">Preview</th>
+                  </tr>
+                </thead>
+                <tbody id="attendanceMarksSettingsBody"></tbody>
+              </table>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit" id="btnSaveAttendanceMarksSettings">
+                  <i class="bi bi-save me-1"></i>Save Attendance Marks
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+
       <section class="school-settings-panel card border-0 shadow-sm" id="attendance-rollup" role="tabpanel" aria-labelledby="settings-tab-attendance-rollup" tabindex="0" hidden>
         <header class="school-settings-panel-header card-header px-4 py-3">
           <div class="d-flex align-items-center gap-3">
@@ -655,7 +724,10 @@
   let sarOverallTemplates = [];
   let attendanceThresholdsEnabled = <%= attendanceThresholdsEnabledFlag ? 'true' : 'false' %>;
   let rollupFormula = <%- rollupFormulaJson %>;
+  let attendanceMarkAppearancePolicy = <%- attendanceMarkAppearancePolicyJson %>;
+  const attendanceMarkCuratedIcons = <%- attendanceMarkCuratedIconsJson %>;
   const conductBody = document.getElementById('conductSettingsBody');
+  const attendanceMarksBody = document.getElementById('attendanceMarksSettingsBody');
   const attendanceBody = document.getElementById('attendanceSettingsBody');
   const rollupGraceBody = document.getElementById('rollupGraceBody');
   const autosaveBody = document.getElementById('autosaveSettingsBody');
@@ -822,6 +894,103 @@
     });
   }
 
+  function getAttendanceMarksRows() {
+    return Array.isArray(attendanceMarkAppearancePolicy?.marks)
+      ? attendanceMarkAppearancePolicy.marks
+      : [];
+  }
+
+  function syncAttendanceMarkColorInputs(row) {
+    const colorInput = row.querySelector('.js-attendance-mark-color');
+    const hexInput = row.querySelector('.js-attendance-mark-color-hex');
+    if (!colorInput || !hexInput) return;
+    const syncFromColor = () => {
+      hexInput.value = String(colorInput.value || '').toUpperCase();
+      refreshAttendanceMarkPreview(row);
+    };
+    const syncFromHex = () => {
+      const token = String(hexInput.value || '').trim();
+      if (/^#[0-9A-Fa-f]{6}$/.test(token)) {
+        colorInput.value = token.toUpperCase();
+        refreshAttendanceMarkPreview(row);
+      }
+    };
+    colorInput.addEventListener('input', syncFromColor);
+    hexInput.addEventListener('change', syncFromHex);
+    row.querySelector('.js-attendance-mark-label')?.addEventListener('input', () => refreshAttendanceMarkPreview(row));
+    row.querySelector('.js-attendance-mark-icon')?.addEventListener('input', () => refreshAttendanceMarkPreview(row));
+  }
+
+  function refreshAttendanceMarkPreview(row) {
+    const preview = row.querySelector('.js-attendance-mark-preview');
+    if (!preview) return;
+    const key = String(row.dataset.markKey || '').trim();
+    const icon = String(row.querySelector('.js-attendance-mark-icon')?.value || '').trim();
+    const color = String(row.querySelector('.js-attendance-mark-color')?.value || '#000000').trim();
+    if (key === 'timing_excuse_ring') {
+      preview.innerHTML = `<span class="attendance-timing-excuse-icon attendance-timing-excuse-full d-inline-grid" style="width:1.35em;height:1.35em;border-color:${escapeHtml(color)}"><i class="bi bi-clock-fill" style="color:${escapeHtml(color)}"></i></span>`;
+      return;
+    }
+  const ringClass = key === 'excused_absence'
+      ? 'attendance-timing-excuse-full'
+      : (key === 'late_excused'
+        ? 'attendance-timing-excuse-left'
+        : (key === 'early_leave_excused' ? 'attendance-timing-excuse-right' : ''));
+    const iconHtml = icon ? `<i class="bi bi-${escapeHtml(icon)}" style="color:${escapeHtml(color)}"></i>` : '';
+    preview.innerHTML = ringClass
+      ? `<span class="attendance-timing-excuse-icon ${ringClass} d-inline-grid" style="width:1.35em;height:1.35em;"><span style="color:${escapeHtml(color)}">${iconHtml}</span></span>`
+      : iconHtml;
+  }
+
+  function renderAttendanceMarks() {
+    if (!attendanceMarksBody) return;
+    const disabled = canUpdate ? '' : 'disabled';
+    const marks = getAttendanceMarksRows();
+    attendanceMarksBody.innerHTML = marks.map((mark, index) => {
+      const key = String(mark.key || '').trim();
+      const colorOnly = key === 'timing_excuse_ring';
+      const color = String(mark.color || '#000000').trim();
+      return `
+        <tr data-mark-index="${index}" data-mark-key="${escapeHtml(key)}">
+          <td class="fw-semibold font-monospace small">${escapeHtml(key)}</td>
+          <td><input class="form-control form-control-sm js-attendance-mark-label" maxlength="80" value="${escapeHtml(mark.label || key)}" ${disabled} aria-label="${escapeHtml(key)} label"></td>
+          <td>
+            ${colorOnly
+              ? '<span class="small text-muted">Color only</span>'
+              : `<input class="form-control form-control-sm js-attendance-mark-icon" maxlength="64" list="attendanceMarkIconOptions" value="${escapeHtml(mark.icon || '')}" ${disabled} aria-label="${escapeHtml(key)} icon">`}
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <input class="form-control form-control-color js-attendance-mark-color p-1" type="color" value="${escapeHtml(color)}" ${disabled} aria-label="${escapeHtml(key)} color">
+              <input class="form-control form-control-sm js-attendance-mark-color-hex font-monospace" maxlength="7" value="${escapeHtml(color)}" ${disabled} aria-label="${escapeHtml(key)} hex color">
+            </div>
+          </td>
+          <td class="text-center js-attendance-mark-preview"></td>
+        </tr>
+      `;
+    }).join('');
+    attendanceMarksBody.querySelectorAll('tr[data-mark-index]').forEach((row) => {
+      syncAttendanceMarkColorInputs(row);
+      refreshAttendanceMarkPreview(row);
+    });
+  }
+
+  function collectAttendanceMarks() {
+    return [...attendanceMarksBody.querySelectorAll('tr[data-mark-index]')].map((row) => {
+      const index = Number(row.dataset.markIndex);
+      const key = String(getAttendanceMarksRows()[index]?.key || row.dataset.markKey || '').trim();
+      const colorOnly = key === 'timing_excuse_ring';
+      return {
+        key,
+        label: row.querySelector('.js-attendance-mark-label')?.value || '',
+        icon: colorOnly ? '' : (row.querySelector('.js-attendance-mark-icon')?.value || ''),
+        color: row.querySelector('.js-attendance-mark-color-hex')?.value
+          || row.querySelector('.js-attendance-mark-color')?.value
+          || ''
+      };
+    });
+  }
+
   function normalizeAttendanceClientItems() {
     if (!attendanceItems.length) {
       attendanceItems = [{
@@ -955,6 +1124,23 @@
     if (!result) return;
     conductLevels = Array.isArray(result.policy?.levels) ? result.policy.levels : conductLevels;
     renderConductLevels();
+  renderAttendanceMarks();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
+  document.getElementById('attendanceMarksSettingsForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveAttendanceMarksSettings');
+    if (!button) return;
+    const result = await postSettings('/school/settings/attendance-marks', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      marks: JSON.stringify(collectAttendanceMarks())
+    }, button, 'attendanceMarksSettingsError');
+    if (!result) return;
+    attendanceMarkAppearancePolicy = result.policy && typeof result.policy === 'object'
+      ? result.policy
+      : attendanceMarkAppearancePolicy;
+    renderAttendanceMarks();
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
@@ -1498,6 +1684,7 @@
   });
 
   renderConductLevels();
+  renderAttendanceMarks();
   renderAttendanceItems();
   renderRollupFormulaControls();
   renderRollupGraceItems();

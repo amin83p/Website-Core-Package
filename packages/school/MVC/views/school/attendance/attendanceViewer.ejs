@@ -1,13 +1,7 @@
+<%- include('_attendanceMarkAppearance') %>
 <style>
     .att-cell { text-align: center; vertical-align: middle; min-width: 80px; position: relative; cursor: pointer; transition: background-color 0.2s; }
     .att-cell:hover { background-color: #f1f3f5; }
-    
-    .status-present { color: #198754; font-weight: bold; }
-    .status-late { color: #ffc107; font-weight: bold; }
-    .status-excused { color: #0dcaf0; font-weight: bold; }
-    .status-absent { color: #dc3545; font-weight: bold; }
-    .status-acf { color: #b02a37; font-weight: bold; }
-    .status-na { color: #adb5bd; }
     .attendance-timing-excuse-icon {
       position: relative;
       display: inline-grid;
@@ -20,7 +14,7 @@
       content: "";
       position: absolute;
       inset: 0.02em;
-      border: 3px solid #198754;
+      border: 3px solid var(--att-mark-timing-excuse-ring, #198754);
       border-radius: 50%;
       pointer-events: none;
     }
@@ -253,15 +247,7 @@
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h5 class="m-0 fw-bold text-primary" id="lbl_displayClassName">Class Name</h5>
-            <div class="small text-muted text-md-end">
-                <span class="me-3"><i class="bi bi-check-circle-fill text-success"></i> Present</span>
-                <span class="me-3"><i class="bi bi-clock-fill text-warning"></i> Late</span>
-                <span class="me-3"><i class="bi bi-envelope-paper-fill text-info"></i> Excused</span>
-                <span class="me-3"><i class="bi bi-x-circle-fill text-danger"></i> Absent</span>
-                <span class="me-3"><i class="bi bi-camera-video-off-fill status-acf"></i> ACF</span>
-                <span class="me-3"><i class="bi bi-percent text-secondary"></i> Rollup % = time-based credit (see column header)</span>
-                <span><i class="bi bi-chat-dots-fill text-primary"></i> Notes Exist</span>
-            </div>
+            <div class="small text-muted text-md-end" id="attendanceMatrixLegend"></div>
         </div>
         <div class="card-body p-0">
             <div class="matrix-wrapper">
@@ -391,6 +377,7 @@
 
 <%- include('partials/modal_GenericPicker') %>
 <%- include('partials/tablePages-end') %>
+<script src="/scripts/attendanceMarkAppearanceClient.js"></script>
 
 <script>
 // Store the loaded matrix globally so we can access it on clicks
@@ -445,6 +432,13 @@ function syncModalAttendanceOptions(enabledStatuses, currentStatus) {
 }
 
 function buildAttendanceLegendText(enabledStatuses) {
+    if (window.AttendanceMarkAppearance?.buildAttendanceLegendText) {
+        return window.AttendanceMarkAppearance.buildAttendanceLegendText({
+            includeTimingNote: true,
+            includeRollup: true,
+            includeNotes: true
+        });
+    }
     const enabled = new Set(enabledStatuses || DEFAULT_ENABLED_ATTENDANCE_STATUSES);
     const parts = [];
     if (enabled.has('present')) parts.push('P Present');
@@ -453,8 +447,18 @@ function buildAttendanceLegendText(enabledStatuses) {
     if (enabled.has('absent')) parts.push('A Absent');
     if (enabled.has('acf')) parts.push('ACF Absent Camera Off');
     if (enabled.has('not_applicable')) parts.push('— N/A');
+    parts.push('Late excused · Early leave excused · Not marked · Notes exist');
     parts.push("minutes as late'/early' (e.g. L 12', L /5', or L 12'/5')");
+    parts.push('Rollup % = time-based credit');
     return 'Legend: ' + parts.join(' · ');
+}
+
+function renderAttendanceMatrixLegend() {
+    if (!window.AttendanceMarkAppearance?.renderAttendanceLegend) return;
+    window.AttendanceMarkAppearance.renderAttendanceLegend('attendanceMatrixLegend', {
+        includeRollup: true,
+        includeNotes: true
+    });
 }
 
 function resetAttendanceStudentVisibility(matrixRows) {
@@ -1110,6 +1114,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildTimingExcuseIcon(innerIcon, ringClass) {
+        if (window.AttendanceMarkAppearance?.buildTimingExcuseIcon) {
+            return window.AttendanceMarkAppearance.buildTimingExcuseIcon(innerIcon, ringClass);
+        }
         return `<span class="attendance-timing-excuse-icon ${ringClass}">${innerIcon}</span>`;
     }
 
@@ -1118,7 +1125,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const early = Number(rec?.earlyLeaveMinutes) || 0;
         const lateExcused = late > 0 && attendanceFlagIsTrue(rec?.lateExcused);
         const earlyExcused = early > 0 && attendanceFlagIsTrue(rec?.earlyLeaveExcused);
-        const icon = '<i class="bi bi-clock-fill status-late"></i>';
+        const icon = window.AttendanceMarkAppearance?.buildMarkIconHtml
+            ? window.AttendanceMarkAppearance.buildMarkIconHtml('late')
+            : '<i class="bi bi-clock-fill status-late"></i>';
         if (lateExcused && earlyExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-full');
         if (lateExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-left');
         if (earlyExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-right');
@@ -1136,30 +1145,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildAttendanceRecordCell(stu, rec) {
-        let icon = '<i class="bi bi-dash text-muted"></i>';
+        const markAppearance = window.AttendanceMarkAppearance;
+        const buildIcon = (key, ringClass) => {
+            if (markAppearance?.buildMarkIconHtml) {
+                return ringClass
+                    ? markAppearance.buildMarkIconHtml(key, { ringClass })
+                    : markAppearance.buildMarkIconHtml(key);
+            }
+            return '';
+        };
+        let icon = buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
         let tooltip = 'Not marked yet';
-        if (rec.status === 'present') { icon = '<i class="bi bi-check-circle-fill status-present"></i>'; tooltip = 'Present'; }
-        else if (rec.status === 'late') { icon = buildLateTimingIcon(rec); tooltip = buildTimingExcuseTooltip(rec, 'Late'); }
+        if (rec.status === 'present') { icon = buildIcon('present'); tooltip = markAppearance?.getMark('present')?.label || 'Present'; }
+        else if (rec.status === 'late') { icon = buildLateTimingIcon(rec); tooltip = buildTimingExcuseTooltip(rec, markAppearance?.getMark('late')?.label || 'Late'); }
         else if (rec.status === 'excused' || (rec.status === 'absent' && attendanceAbsenceIsExcused(rec))) {
-            icon = buildTimingExcuseIcon('<i class="bi bi-x-circle-fill status-absent"></i>', 'attendance-timing-excuse-full');
-            tooltip = 'Excused absence';
+            icon = buildIcon('excused_absence', 'attendance-timing-excuse-full');
+            tooltip = markAppearance?.getMark('excused_absence')?.label || 'Excused absence';
         }
-        else if (rec.status === 'absent') { icon = '<i class="bi bi-x-circle-fill status-absent"></i>'; tooltip = 'Absent'; }
+        else if (rec.status === 'absent') { icon = buildIcon('absent'); tooltip = markAppearance?.getMark('absent')?.label || 'Absent'; }
         else if (rec.status === 'acf' && attendanceAbsenceIsExcused(rec)) {
-            icon = buildTimingExcuseIcon('<i class="bi bi-camera-video-off-fill status-acf"></i>', 'attendance-timing-excuse-full');
-            tooltip = 'Excused ACF';
+            icon = buildIcon('excused_absence', 'attendance-timing-excuse-full');
+            tooltip = markAppearance?.getMark('excused_absence')?.label || 'Excused ACF';
         }
-        else if (rec.status === 'acf') { icon = '<i class="bi bi-camera-video-off-fill status-acf"></i>'; tooltip = 'Absent Camera Off'; }
+        else if (rec.status === 'acf') { icon = buildIcon('acf'); tooltip = markAppearance?.getMark('acf')?.label || 'Absent Camera Off'; }
         else if (rec.status === 'not_applicable') {
-            icon = '<i class="bi bi-dash-circle-fill status-na"></i>';
+            icon = buildIcon('not_applicable');
             tooltip = rec.withinEnrollmentWindow === false
                 ? 'N/A - not enrolled for this session'
                 : (rec.applicability === 'approved_leave'
                     ? 'N/A - approved leave'
-                    : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : 'N/A'));
+                    : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : (markAppearance?.getMark('not_applicable')?.label || 'N/A')));
         }
         const hasComments = (rec.comments && rec.comments.length > 0);
-        const noteBadge = hasComments ? '<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>' : '';
+        const noteBadge = hasComments
+            ? `<div class="position-absolute top-0 end-0 pe-1 pt-1">${buildIcon('notes', '') || '<i class="bi bi-chat-dots-fill status-notes" style="font-size: 0.65rem;"></i>'}</div>`
+            : '';
         return `<td class="att-cell" title="${tooltip} (Click for Details)" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">${icon}${noteBadge}</td>`;
     }
 
@@ -1338,6 +1358,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetAttendanceStudentVisibility(result.matrix);
             }
             document.getElementById('resultsContainer').classList.remove('d-none');
+            renderAttendanceMatrixLegend();
             setAttendancePrintEnabled(true);
 
             document.getElementById('filter_className').value = result.className || 'Loaded Class';
@@ -1634,6 +1655,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function buildPrintMarkAppearanceCss() {
+        const marks = Array.isArray(window.__attendanceMarkAppearance?.marks)
+            ? window.__attendanceMarkAppearance.marks
+            : [];
+        const vars = marks.map((row) => {
+            const key = String(row?.key || '').trim().replace(/_/g, '-');
+            const color = String(row?.color || '').trim();
+            if (!key || !color) return '';
+            return `--att-mark-${key}: ${color};`;
+        }).filter(Boolean).join('\n');
+        return vars ? `:root {\n${vars}\n}` : '';
+    }
+
     function buildAttendancePrintDocument(matrixData, meta = {}) {
         const data = matrixData && typeof matrixData === 'object' ? matrixData : {};
         const sessions = Array.isArray(data.sessions) ? data.sessions : [];
@@ -1803,6 +1837,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <title>${attPrintEscapeHtml(`Attendance Matrix — ${className}`)}</title>
   <style id="print-page-orientation-css">${pageCss}</style>
   <style>
+    ${buildPrintMarkAppearanceCss()}
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -1892,13 +1927,13 @@ document.addEventListener('DOMContentLoaded', () => {
       font-weight: 600;
       font-size: 9.5px;
     }
-    .st-present { color: #0f5132; }
-    .st-late { color: #997404; }
-    .st-excused { color: #055160; }
-    .st-absent { color: #842029; }
-    .st-acf { color: #a71d2a; }
-    .st-not-applicable, .st-na { color: #6c757d; font-weight: 500; }
-    .fn-mark { font-size: 8px; font-weight: 700; color: #0d6efd; margin-left: 1px; }
+    .st-present { color: var(--att-mark-present, #198754); }
+    .st-late { color: var(--att-mark-late, #FFFF00); }
+    .st-excused { color: var(--att-mark-excused-absence, #055160); }
+    .st-absent { color: var(--att-mark-absent, #dc3545); }
+    .st-acf { color: var(--att-mark-acf, #b02a37); }
+    .st-not-applicable, .st-na { color: var(--att-mark-not-applicable, #6c757d); font-weight: 500; }
+    .fn-mark { font-size: 8px; font-weight: 700; color: var(--att-mark-notes, #0d6efd); margin-left: 1px; }
     .session-fn-mark { color: #6f42c1; }
     .empty-msg { text-align: center; color: #666; padding: 16px !important; }
     .footnotes {
@@ -2291,6 +2326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         document.querySelector('.btn-range[data-range="thisWeek"]').click();
     }
+    renderAttendanceMatrixLegend();
 });
 
 // --- NEW: Global Function to handle Header Clicks ---

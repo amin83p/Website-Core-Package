@@ -14,6 +14,8 @@ const leaveRequestService = require('../../services/school/leaveRequestService')
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const attendanceExcelExportService = require('../../services/school/attendanceExcelExportService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
+const attendanceMarkAppearanceService = require('../../services/school/attendanceMarkAppearanceService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const accessService = requireCoreModule('MVC/services/security/index');
@@ -304,6 +306,14 @@ function classBelongsToActiveOrg(row = {}, activeOrgId = '') {
     return idsEqual(rowOrgId, scopedOrgId);
 }
 
+async function resolveAttendanceMarkAppearanceForRequest(req) {
+    const activeOrgId = String(req.user?.activeOrgId || '').trim();
+    if (!activeOrgId) {
+        return attendanceMarkAppearanceService.resolvePolicy(attendanceMarkAppearanceService.DEFAULT_POLICY);
+    }
+    return attendanceMarkAppearancePolicyModel.getPolicyForOrg(activeOrgId);
+}
+
 async function showAttendancePage(req, res) {
     try {
         const editEval = await accessService.evaluateAccess({
@@ -342,6 +352,8 @@ async function showAttendancePage(req, res) {
             }
         }
 
+        const attendanceMarkAppearanceResolved = await resolveAttendanceMarkAppearanceForRequest(req);
+
         res.render('school/attendance/attendanceViewer', {
             title: 'Attendance Matrix',
             includeModal: true,
@@ -351,6 +363,7 @@ async function showAttendancePage(req, res) {
             tableName: 'Attendance_Matrix',
             canEditAttendanceRoster,
             canOverrideSessionLock,
+            attendanceMarkAppearanceResolved,
             initialClassId,
             initialClassName,
             initialStartDate,
@@ -1117,6 +1130,7 @@ async function showStudentAttendanceReportPage(req, res) {
         const policy = studentAttendanceReportPolicyService.resolvePolicy(activeOrgId
             ? await studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId)
             : {});
+        const attendanceMarkAppearanceResolved = await resolveAttendanceMarkAppearanceForRequest(req);
         const reportTemplate = policy.reportTemplateId
             ? await schoolDataService.getDataById('reportTemplates', policy.reportTemplateId, req.user)
             : null;
@@ -1138,6 +1152,7 @@ async function showStudentAttendanceReportPage(req, res) {
             user: req.user,
             actionStateId: req.actionStateId,
             tableName: 'Student_Attendance_Report',
+            attendanceMarkAppearanceResolved,
             initialStartDate,
             initialEndDate,
             initialStudentIds,

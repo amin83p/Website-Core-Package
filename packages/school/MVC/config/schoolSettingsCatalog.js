@@ -16,6 +16,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     order: 20
   }),
   Object.freeze({
+    key: 'attendance-marks',
+    title: 'Attendance Marks',
+    description: 'Configure labels, icons, and colors for attendance matrix and report marks.',
+    icon: 'bi-palette',
+    order: 22
+  }),
+  Object.freeze({
     key: 'attendance-rollup',
     title: 'Attendance Rollup Formula',
     description: 'Configure how rollup % is calculated across matrix, reports, and exports.',

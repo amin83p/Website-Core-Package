@@ -102,7 +102,10 @@ test('attendance views and controller wire timing excuse fields', () => {
   assert.match(viewer, /wrap_cellEarlyLeaveExcused/);
   assert.match(viewer, /syncTimingExcuseControls/);
   assert.match(viewer, /attendance-timing-excuse-left/);
-  assert.match(viewer, /border:\s*3px\s+solid\s+#198754/);
+  assert.match(viewer, /attendanceMarkAppearanceClient\.js/);
+  assert.match(viewer, /renderAttendanceMatrixLegend/);
+  assert.match(viewer, /attendanceMatrixLegend/);
+  assert.match(viewer, /var\(--att-mark-timing-excuse-ring/);
   assert.match(viewer, /attendance-status-picker/);
   assert.match(viewer, /grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(viewer, /modal-dialog modal-xl/);

@@ -1,12 +1,7 @@
+<%- include('_attendanceMarkAppearance') %>
 <style>
     .att-cell { text-align: center; vertical-align: middle; min-width: 64px; position: relative; }
     .att-cell[data-sar-cell-key] { cursor: pointer; }
-    .status-present { color: #198754; font-weight: bold; }
-    .status-late { color: #ffc107; font-weight: bold; }
-    .status-excused { color: #0dcaf0; font-weight: bold; }
-    .status-absent { color: #dc3545; font-weight: bold; }
-    .status-acf { color: #b02a37; font-weight: bold; }
-    .status-na { color: #adb5bd; }
     .attendance-timing-excuse-icon {
         position: relative;
         display: inline-grid;
@@ -19,7 +14,7 @@
         content: "";
         position: absolute;
         inset: 0.02em;
-        border: 3px solid #198754;
+        border: 3px solid var(--att-mark-timing-excuse-ring, #198754);
         border-radius: 50%;
         pointer-events: none;
     }
@@ -276,17 +271,7 @@
 
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div class="small text-muted">
-                <span class="me-3"><i class="bi bi-check-circle-fill text-success"></i> Present</span>
-                <span class="me-3"><i class="bi bi-clock-fill text-warning"></i> Late</span>
-                <span class="me-3"><span class="attendance-timing-excuse-icon attendance-timing-excuse-full d-inline-grid align-middle" style="width:1.2em;height:1.2em;vertical-align:-0.15em;"><i class="bi bi-x-circle-fill status-absent" style="font-size:0.82rem;"></i></span> Excused absence</span>
-                <span class="me-3"><i class="bi bi-x-circle-fill text-danger"></i> Absent</span>
-                <span class="me-3"><i class="bi bi-camera-video-off-fill status-acf"></i> ACF</span>
-                <span class="me-3"><span class="attendance-timing-excuse-icon attendance-timing-excuse-left d-inline-grid align-middle" style="width:1.2em;height:1.2em;vertical-align:-0.15em;"><i class="bi bi-clock-fill status-late" style="font-size:0.82rem;"></i></span> Late excused</span>
-                <span class="me-3"><span class="attendance-timing-excuse-icon attendance-timing-excuse-right d-inline-grid align-middle" style="width:1.2em;height:1.2em;vertical-align:-0.15em;"><i class="bi bi-clock-fill status-late" style="font-size:0.82rem;"></i></span> Early leave excused</span>
-                <span class="me-3"><i class="bi bi-percent text-secondary"></i> Rollup % = time-based credit</span>
-                <span><i class="bi bi-chat-dots-fill text-primary"></i> Notes Exist</span>
-            </div>
+            <div class="small text-muted" id="studentAttendanceReportLegend"></div>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_expandAllStudents">Expand All</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_collapseAllStudents">Collapse All</button>
@@ -467,6 +452,7 @@
 <%- include('school/partials/modal_SchoolEntityPicker') %>
 <%- include('../report/partials/reportMessageHelpers') %>
 <%- include('partials/tablePages-end') %>
+<script src="/scripts/attendanceMarkAppearanceClient.js"></script>
 
 <script>
 (() => {
@@ -1074,7 +1060,19 @@
         return value === true || value === 1 || ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
     }
 
+    function renderStudentAttendanceReportLegend() {
+        if (window.AttendanceMarkAppearance?.renderAttendanceLegend) {
+            window.AttendanceMarkAppearance.renderAttendanceLegend('studentAttendanceReportLegend', {
+                includeRollup: true,
+                includeNotes: true
+            });
+        }
+    }
+
     function buildTimingExcuseIcon(innerIcon, ringClass) {
+        if (window.AttendanceMarkAppearance?.buildTimingExcuseIcon) {
+            return window.AttendanceMarkAppearance.buildTimingExcuseIcon(innerIcon, ringClass);
+        }
         return `<span class="attendance-timing-excuse-icon ${ringClass}">${innerIcon}</span>`;
     }
 
@@ -1083,7 +1081,9 @@
         const early = Number(cell?.earlyLeaveMinutes) || 0;
         const lateExcused = late > 0 && attendanceFlagIsTrue(cell?.lateExcused);
         const earlyExcused = early > 0 && attendanceFlagIsTrue(cell?.earlyLeaveExcused);
-        const icon = '<i class="bi bi-clock-fill status-late"></i>';
+        const icon = window.AttendanceMarkAppearance?.buildMarkIconHtml
+            ? window.AttendanceMarkAppearance.buildMarkIconHtml('late')
+            : '<i class="bi bi-clock-fill status-late"></i>';
         if (lateExcused && earlyExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-full');
         if (lateExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-left');
         if (earlyExcused) return buildTimingExcuseIcon(icon, 'attendance-timing-excuse-right');
@@ -1120,22 +1120,29 @@
 
     function buildStatusIcon(cell) {
         if (!cell?.hasSession) return '';
+        const markAppearance = window.AttendanceMarkAppearance;
+        const buildIcon = (key, ringClass) => {
+            if (!markAppearance?.buildMarkIconHtml) return '';
+            return ringClass
+                ? markAppearance.buildMarkIconHtml(key, { ringClass })
+                : markAppearance.buildMarkIconHtml(key);
+        };
         const status = String(cell.status || '').trim();
-        if (!status) return '<i class="bi bi-dash text-muted"></i>';
-        if (status === 'present') return '<i class="bi bi-check-circle-fill status-present"></i>';
+        if (!status) return buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
+        if (status === 'present') return buildIcon('present');
         if (status === 'late') return buildLateTimingIcon(cell);
         if (status === 'excused' || (sarAbsenceIsExcused(cell) && status === 'absent')) {
-            return buildTimingExcuseIcon('<i class="bi bi-x-circle-fill status-absent"></i>', 'attendance-timing-excuse-full');
+            return buildIcon('excused_absence', 'attendance-timing-excuse-full');
         }
-        if (status === 'absent') return '<i class="bi bi-x-circle-fill status-absent"></i>';
+        if (status === 'absent') return buildIcon('absent');
         if (status === 'acf') {
             if (sarAbsenceIsExcused(cell)) {
-                return buildTimingExcuseIcon('<i class="bi bi-camera-video-off-fill status-acf"></i>', 'attendance-timing-excuse-full');
+                return buildIcon('excused_absence', 'attendance-timing-excuse-full');
             }
-            return '<i class="bi bi-camera-video-off-fill status-acf"></i>';
+            return buildIcon('acf');
         }
-        if (status === 'not_applicable') return '<i class="bi bi-dash-circle-fill status-na"></i>';
-        return '<i class="bi bi-dash text-muted"></i>';
+        if (status === 'not_applicable') return buildIcon('not_applicable');
+        return buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
     }
 
     function buildDayHeader(dateToken) {
@@ -1302,6 +1309,7 @@
             mergeSelectedStudentsFromReportPayload(students);
             syncSarUrlFromFilters();
             document.getElementById('resultsContainer').classList.remove('d-none');
+            renderStudentAttendanceReportLegend();
         } finally {
             hideSarReportWaiting();
             if (loadBtn) {
@@ -2099,6 +2107,7 @@
     }
 
     syncSarUrlFromFilters();
+    renderStudentAttendanceReportLegend();
 
     if ((initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate) {
         showSarReportWaiting();

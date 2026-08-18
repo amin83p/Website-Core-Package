@@ -2,6 +2,8 @@
 
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
+const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
+const attendanceMarkAppearanceService = require('../../services/school/attendanceMarkAppearanceService');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
@@ -235,6 +237,7 @@ async function loadSettingsPageData(req) {
     conductPolicy,
     attendancePolicy,
     attendanceConfig,
+    attendanceMarkAppearancePolicy,
     autosavePolicy,
     studentAttendanceReportPolicy,
     canUpdate
@@ -242,6 +245,7 @@ async function loadSettingsPageData(req) {
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
     attendanceMatrixPolicyModel.getPolicyForOrg(activeOrgId),
     attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId),
+    attendanceMarkAppearancePolicyModel.getPolicyForOrg(activeOrgId),
     autosavePolicyModel.getPolicyForOrg(activeOrgId),
     studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
@@ -260,6 +264,8 @@ async function loadSettingsPageData(req) {
     attendancePolicy,
     attendanceThresholdsEnabled: attendanceConfig.thresholdsEnabled,
     attendanceItems: attendanceConfig.items.length ? attendanceConfig.items : defaultAttendanceItems(),
+    attendanceMarkAppearancePolicy,
+    attendanceMarkCuratedIcons: attendanceMarkAppearanceService.CURATED_ICONS,
     rollupFormula: attendanceConfig.rollupFormula || defaultAttendanceRollupFormula(),
     autosavePolicy,
     autosaveSections: listAutosaveSections(),
@@ -349,6 +355,31 @@ async function saveAttendanceRollupFormula(req, res) {
     return res.status(Number(error?.statusCode) || 500).json({
       status: 'error',
       message: error?.message || 'Failed to save attendance rollup formula settings.'
+    });
+  }
+}
+
+async function saveAttendanceMarkAppearance(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const policy = await attendanceMarkAppearancePolicyModel.savePolicyForOrg(
+      activeOrgId,
+      req.body || {},
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Attendance mark settings were updated.',
+      policy
+    });
+  } catch (error) {
+    const validationErrors = Array.isArray(error?.validationErrors) ? error.validationErrors : [];
+    return res.status(validationErrors.length ? 400 : (Number(error?.statusCode) || 500)).json({
+      status: 'error',
+      message: validationErrors.length
+        ? validationErrors.join(' ')
+        : (error?.message || 'Failed to save attendance mark settings.'),
+      validationErrors
     });
   }
 }
@@ -461,6 +492,7 @@ module.exports = {
   showSchoolSettings,
   showAttendanceRollupFormula,
   saveConductRatingScale,
+  saveAttendanceMarkAppearance,
   saveAttendanceMatrix,
   saveAttendanceRollupFormula,
   saveStudentAttendanceReportSettings,

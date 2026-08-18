@@ -1,0 +1,35 @@
+<% const appearanceMarks = (typeof attendanceMarkAppearanceResolved !== 'undefined'
+  && attendanceMarkAppearanceResolved
+  && Array.isArray(attendanceMarkAppearanceResolved.marks))
+  ? attendanceMarkAppearanceResolved.marks
+  : []; %>
+<style id="attendanceMarkAppearanceStyles">
+  :root {
+<% appearanceMarks.forEach((row) => {
+  const key = String(row?.key || '').trim().replace(/_/g, '-');
+  const color = String(row?.color || '').trim();
+  if (!key || !color) return;
+%>
+    --att-mark-<%= key %>: <%= color %>;
+<% }); %>
+  }
+  .status-present, .st-present { color: var(--att-mark-present); font-weight: bold; }
+  .status-late, .st-late { color: var(--att-mark-late); font-weight: bold; }
+  .status-excused, .st-excused { color: var(--att-mark-excused-absence, #0dcaf0); font-weight: bold; }
+  .status-absent, .st-absent { color: var(--att-mark-absent); font-weight: bold; }
+  .status-acf, .st-acf { color: var(--att-mark-acf); font-weight: bold; }
+  .status-na, .st-not-applicable, .st-na { color: var(--att-mark-not-applicable); }
+  .status-unmarked, .st-unmarked { color: var(--att-mark-unmarked); }
+  .status-notes { color: var(--att-mark-notes); }
+  .attendance-timing-excuse-icon::before {
+    border-color: var(--att-mark-timing-excuse-ring);
+  }
+  .attendance-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+</style>
+<script>
+  window.__attendanceMarkAppearance = <%- JSON.stringify(typeof attendanceMarkAppearanceResolved !== 'undefined' ? attendanceMarkAppearanceResolved : { marks: [] }) %>;
+</script>

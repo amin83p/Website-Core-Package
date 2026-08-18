@@ -5,6 +5,7 @@ const classDeleteCascadeService = require('./classDeleteCascadeService');
 const sessionIdRemapService = require('./sessionIdRemapService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
+const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -54,6 +55,7 @@ function resolveRepository(entityType, catalogEntry) {
 
 function resolvePolicyModel(catalogEntry) {
   if (catalogEntry?.policyModel === 'attendanceMatrix') return attendanceMatrixPolicyModel;
+  if (catalogEntry?.policyModel === 'attendanceMarkAppearance') return attendanceMarkAppearancePolicyModel;
   if (catalogEntry?.policyModel === 'conductRatingScale') return conductRatingScalePolicyModel;
   if (catalogEntry?.policyModel === 'autosave') return autosavePolicyModel;
   if (catalogEntry?.policyModel === 'studentAttendanceReport') return studentAttendanceReportPolicyModel;
