@@ -833,7 +833,16 @@ window.GenericPicker = (function() {
               contextSection.style.display = 'none';
             }
 
+            const initialTerm = String(currentConfig.initialSearchTerm || '').trim();
+            if (initialTerm.length >= 2) {
+              inputEl.value = initialTerm;
+            }
+
             bsModal.show();
+
+            if (initialTerm.length >= 2) {
+              scheduleSearch(initialTerm);
+            }
         }
     };
 })();

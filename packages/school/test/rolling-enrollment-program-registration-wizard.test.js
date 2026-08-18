@@ -66,3 +66,15 @@ test('wizard allows no-fee warning previews to continue to draft creation', () =
   assert.match(preview, /const previewHasWarning/);
   assert.match(preview, /The academic registration will still be recorded/);
 });
+
+test('new enrollment student field supports type-to-search via generic picker', () => {
+  assert.match(viewSource, /id="inp_studentLabel"[^>]*placeholder="Type at least 2 characters to search students\.\.\."/);
+  assert.doesNotMatch(viewSource, /id="inp_studentLabel"[^>]*readonly/);
+  assert.match(viewSource, /function clearSelectedStudentForSearch\(\)/);
+  assert.match(viewSource, /function isGenericPickerOpen\(\)/);
+  assert.match(viewSource, /function pickStudent\(initialSearchTerm = ''\)/);
+  assert.match(viewSource, /initialSearchTerm: term/);
+  assert.match(viewSource, /if \(isGenericPickerOpen\(\)\) return/);
+  assert.match(viewSource, /clearSelectedStudentForSearch\(\)/);
+  assert.match(viewSource, /addEnrollmentModalEl\?\.addEventListener\('shown\.bs\.modal'/);
+});

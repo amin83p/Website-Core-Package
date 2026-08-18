@@ -43,3 +43,10 @@ test('generic picker uses configurable debounce instead of hard-coded 300ms sear
   assert.match(picker, /hidden\.bs\.modal/);
   assert.doesNotMatch(picker, /setTimeout\(\(\) => \{ fetchData\(term\); \}, 300\)/);
 });
+
+test('generic picker supports initialSearchTerm prefill and search', () => {
+  const picker = read('MVC/views/partials/modal_GenericPicker.ejs');
+
+  assert.match(picker, /initialSearchTerm/);
+  assert.match(picker, /scheduleSearch\(initialTerm\)/);
+});

@@ -397,7 +397,7 @@
           <div class="mb-2">
             <label class="form-label">Student *</label>
             <div class="input-group">
-              <input type="text" id="inp_studentLabel" class="form-control bg-white" placeholder="Select student..." readonly>
+              <input type="text" id="inp_studentLabel" class="form-control bg-white" placeholder="Type at least 2 characters to search students..." autocomplete="off">
               <button type="button" class="btn btn-outline-primary" id="btn_pickStudent"><i class="bi bi-person-vcard"></i></button>
             </div>
           </div>
@@ -5067,15 +5067,32 @@
     reapplyActiveTableSort();
   }
 
-  function pickStudent() {
+  function isGenericPickerOpen() {
+    const modal = document.getElementById('genericPickerModal');
+    return Boolean(modal && modal.classList.contains('show'));
+  }
+
+  function clearSelectedStudentForSearch() {
+    if (qs('inp_studentId')) qs('inp_studentId').value = '';
+    pendingEnrollmentCapSnapshot = null;
+    lastRollingEligibility = null;
+    rollingEnrollmentWorkspace = null;
+    setRollingRegistrationPanelHtml('<span class="text-muted">Select a student to verify program registration and prerequisites.</span>');
+    updateSessionCountHint(null);
+  }
+
+  function pickStudent(initialSearchTerm = '') {
     if (!window.GenericPicker || !window.GenericPickerPresets) {
       showMsg('Picker Unavailable', 'warning', 'Student picker is not loaded on this page.');
       return;
     }
+    if (isGenericPickerOpen()) return;
+    const term = String(initialSearchTerm || '').trim();
     GenericPicker.open(GenericPickerPresets.student({
       title: 'Select Student',
       multiselect: false,
       searchFields: 'id,firstName,lastName,name.first,name.last,studentNumber,personId',
+      initialSearchTerm: term,
       context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
         ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
         : undefined,
@@ -5745,7 +5762,29 @@
   });
 
   qs('btn_openAddEnrollmentModal')?.addEventListener('click', openAddEnrollmentModal);
-  qs('btn_pickStudent')?.addEventListener('click', pickStudent);
+  addEnrollmentModalEl?.addEventListener('shown.bs.modal', () => {
+    qs('inp_studentLabel')?.focus();
+  });
+  qs('btn_pickStudent')?.addEventListener('click', () => pickStudent(qs('inp_studentLabel')?.value || ''));
+  qs('inp_studentLabel')?.addEventListener('input', (event) => {
+    if (isGenericPickerOpen()) return;
+    const input = event.target;
+    const value = String(input?.value || '').trim();
+    if (String(qs('inp_studentId')?.value || '').trim()) {
+      clearSelectedStudentForSearch();
+    }
+    if (value.length >= 2) {
+      pickStudent(value);
+    }
+  });
+  qs('inp_studentLabel')?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (String(qs('inp_studentId')?.value || '').trim()) return;
+    const input = event.target;
+    if (!String(input?.value || '').trim()) return;
+    event.preventDefault();
+    input.value = '';
+  });
   qs('btn_addPeriod')?.addEventListener('click', addPeriod);
   qs('btn_enrollWizardBack')?.addEventListener('click', goEnrollmentWizardBack);
   qs('btn_gapOpenCalendarPicker')?.addEventListener('click', openEnrollmentSessionCalendarModal);
