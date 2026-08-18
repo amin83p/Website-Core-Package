@@ -1739,6 +1739,7 @@ async function showSchedulePage(req, res) {
         res.render('school/schedule/personSchedule', {
             title: 'Master Schedule Viewer',
             includeModal: true,
+            includePrintManager: true,
             user: req.user,
             
             // Pass the variables to the view (fallback to empty strings if null)

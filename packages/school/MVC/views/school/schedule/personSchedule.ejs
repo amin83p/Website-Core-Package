@@ -785,9 +785,12 @@
   newUrl: null,
   newLabel: null,
   user,
-  tableName: 'Master_Schedule_Viewer',
+  tableName: null,
   btn_export: false,
   print: false,
+  optionalBtnsBeforePrint: [
+    '<button type="button" id="btn_printSchedule" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load a schedule first">🖨 Print</button>'
+  ],
   headerManageBtns: [
     '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
@@ -876,9 +879,11 @@
             <button type="button" id="btn_loadSchedule" class="btn btn-primary btn-sm flex-fill">
               <i class="bi bi-arrow-clockwise me-1"></i> Load Tab
             </button>
+            <% if (canSelectAnyPerson) { %>
             <button type="button" id="btn_loadAllSchedules" class="btn btn-outline-primary btn-sm flex-fill">
               <i class="bi bi-cloud-arrow-down me-1"></i> Load All
             </button>
+            <% } %>
           </div>
         </div>
 
@@ -2093,6 +2098,431 @@ document.addEventListener('DOMContentLoaded', () => {
         return grouped;
     }
 
+    function formatSchoolInstant(value) {
+        if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatSchoolInstant === 'function') {
+            return window.AppOrgDateTime.formatSchoolInstant(value);
+        }
+        const dateObj = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(dateObj.getTime())) return String(value || '');
+        return dateObj.toLocaleString();
+    }
+
+    function schPrintFormatDateShort(ymd) {
+        const raw = String(ymd || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw || '—';
+        const d = new Date(`${raw}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return raw;
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function schPrintFormatWeekday(ymd) {
+        const raw = String(ymd || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+        const d = new Date(`${raw}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+
+    function schPrintFormatRangeLabel(startDate, endDate) {
+        const start = String(startDate || '').trim();
+        const end = String(endDate || '').trim();
+        if (!start && !end) return 'All dates';
+        if (start && end) return `${schPrintFormatDateShort(start)} – ${schPrintFormatDateShort(end)}`;
+        if (start) return `From ${schPrintFormatDateShort(start)}`;
+        return `Through ${schPrintFormatDateShort(end)}`;
+    }
+
+    function setSchedulePrintEnabled(enabled) {
+        const printBtn = document.getElementById('btn_printSchedule');
+        if (!printBtn) return;
+        printBtn.disabled = !enabled;
+        printBtn.title = enabled ? 'Print the loaded schedule' : 'Load a schedule first';
+    }
+
+    function collectSchedulePrintData() {
+        const person = activeSchedulePerson();
+        if (!person || !scheduleState.loadedPersonIds.has(person.id) || scheduleState.errorByPersonId[person.id]) {
+            return null;
+        }
+        const events = Array.isArray(scheduleState.eventsByPersonId[person.id])
+            ? [...scheduleState.eventsByPersonId[person.id]]
+            : [];
+        events.sort((a, b) => {
+            const dateCmp = String(a?.date || '').localeCompare(String(b?.date || ''));
+            if (dateCmp !== 0) return dateCmp;
+            const aStart = timeToMinutes(a?.start);
+            const bStart = timeToMinutes(b?.start);
+            if (aStart !== bStart) return aStart - bStart;
+            return getEventTitle(a).localeCompare(getEventTitle(b));
+        });
+        const statusMeta = scheduleState.statusMetaByPersonId[person.id] || [];
+        const statusMap = new Map(
+            statusMeta
+                .map((row) => [normalizeSessionStatus(row?.code), row])
+                .filter(([code]) => Boolean(code))
+        );
+        const range = getScheduleRange();
+        const role = String(person.selectedRole || selectedScheduleRole() || '').trim();
+        return {
+            personName: String(person.name || person.id || 'Schedule').trim() || 'Schedule',
+            role,
+            viewMode: normalizedScheduleViewMode(),
+            startDate: range.startDate,
+            endDate: range.endDate,
+            events,
+            statusMap
+        };
+    }
+
+    function schPrintBuildSummary(events) {
+        const list = Array.isArray(events) ? events : [];
+        let totalHours = 0;
+        const categoryTotals = new Map();
+        list.forEach((event) => {
+            if (event?.scheduleDisplayOnly === true || event?.countsTowardHours === false) return;
+            const duration = Number(event?.duration || 0);
+            if (!Number.isFinite(duration) || duration <= 0) return;
+            totalHours += duration;
+            getEventCategoryLabels(event).forEach((label) => {
+                categoryTotals.set(label, (categoryTotals.get(label) || 0) + duration);
+            });
+        });
+        const statParts = [
+            `<span class="stat"><b>${list.length}</b> items</span>`,
+            `<span class="stat">Total <b>${totalHours.toFixed(2)}</b> h</span>`
+        ];
+        Array.from(categoryTotals.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .forEach(([label, hours]) => {
+                statParts.push(`<span class="stat">${escapeHtml(label)} <b>${hours.toFixed(2)}</b> h</span>`);
+            });
+        return statParts;
+    }
+
+    function schPrintBuildLegend() {
+        return 'Columns: # · Date · Time · Session · Role · Status · Hours · Student · Room · Notes';
+    }
+
+    function buildSchedulePrintDocument(data, meta = {}) {
+        const payload = data && typeof data === 'object' ? data : {};
+        const events = Array.isArray(payload.events) ? payload.events : [];
+        const statusMap = payload.statusMap instanceof Map ? payload.statusMap : new Map();
+        const personName = String(payload.personName || meta.personName || 'Schedule').trim() || 'Schedule';
+        const roleLabel = String(payload.role || meta.role || '').trim();
+        const viewModeLabel = scheduleViewName(payload.viewMode || meta.viewMode || 'verticalTimeline');
+        const orgName = String(meta.orgName || '').trim();
+        const rangeLabel = schPrintFormatRangeLabel(meta.startDate || payload.startDate, meta.endDate || payload.endDate);
+        const printedAt = meta.printedAt instanceof Date ? meta.printedAt : new Date();
+        const printedAtLabel = formatSchoolInstant(printedAt);
+        const fallbackSettings = {
+            includeOrg: true,
+            orgName,
+            includeHeaderNote: false,
+            headerNote: '',
+            orientation: 'landscape',
+            density: 'compact',
+            requestedByLabel: '',
+            logoUrl: ''
+        };
+        const settings = window.AppPrintManager?.normalizeSettings
+            ? window.AppPrintManager.normalizeSettings({ ...fallbackSettings, ...(meta.printSettings || {}) })
+            : fallbackSettings;
+        const displayOrgName = settings.includeOrg ? String(settings.orgName || orgName || '').trim() : '';
+        const logoUrl = String(settings.logoUrl || '').trim();
+        const logoHtml = logoUrl
+            ? `<img class="print-logo" src="${escapeHtml(logoUrl)}" alt="Organization logo" onerror="this.style.display='none'">`
+            : '';
+        const pageCss = window.PrintDocumentBuilder?.buildPageCss
+            ? window.PrintDocumentBuilder.buildPageCss(settings.orientation)
+            : `@page { margin: 10mm; size: ${settings.orientation === 'portrait' ? 'portrait' : 'landscape'}; }`;
+        const previewControlsHtml = window.AppPrintManager?.buildPreviewControlsHtml
+            ? window.AppPrintManager.buildPreviewControlsHtml(settings)
+            : '<div class="screen-actions no-print"><button type="button" onclick="window.print()">Print</button><button type="button" onclick="window.close()">Close</button></div>';
+        const printNoteHtml = window.AppPrintManager?.buildPrintNoteHtml
+            ? window.AppPrintManager.buildPrintNoteHtml(settings)
+            : '';
+        const orientationScript = window.PrintDocumentBuilder?.buildPreviewOrientationScript
+            ? window.PrintDocumentBuilder.buildPreviewOrientationScript({ orientation: settings.orientation, sourcePath: location.pathname, mode: 'master-schedule' })
+            : '';
+
+        const bodyRows = events.map((event, index) => {
+            const scan = window.ScheduleCompletionDisplay
+                ? window.ScheduleCompletionDisplay.resolveScheduleCompletionScan(event, statusMap)
+                : null;
+            const statusLabel = scan?.scanLabel || formatStatusLabel(event?.status);
+            const soloName = normalizeScheduleTooltipValue(event?.soloStudentName || event?.singleStudentName);
+            const student = soloName && !isScheduleOpaqueLabel(soloName, event?.soloStudentId, event?.soloStudentPersonId)
+                ? soloName
+                : '';
+            const room = normalizeScheduleTooltipValue(event?.room || event?.roomName || event?.location);
+            const role = isLeaveEvent(event)
+                ? 'Approved Leave'
+                : String(event?.roleLabel || event?.role || event?.roles?.[0] || '').trim();
+            const duration = Number.isFinite(Number(event?.duration)) ? `${Number(event.duration).toFixed(2)} h` : '';
+            const caseSummary = event?.caseSummary?.hasCases
+                ? String(event.caseSummary.badgeLabel || `${event.caseSummary.totalCount || 0} case(s)`)
+                : '';
+            const conflict = event?.hasOverlap ? 'Overlap' : '';
+            const notes = [caseSummary, conflict].filter(Boolean).join(' · ');
+            const shortDate = schPrintFormatDateShort(event?.date);
+            const weekday = schPrintFormatWeekday(event?.date);
+            return `
+                <tr>
+                    <td class="num-col">${index + 1}</td>
+                    <td class="date-col"><div class="day-date">${escapeHtml(shortDate)}</div>${weekday ? `<div class="day-wd">${escapeHtml(weekday)}</div>` : ''}</td>
+                    <td class="time-col">${escapeHtml(formatScheduleClockRange(event?.start, event?.end))}</td>
+                    <td class="session-col">${escapeHtml(getEventTitle(event))}</td>
+                    <td class="role-col">${escapeHtml(role || '—')}</td>
+                    <td class="status-col">${escapeHtml(statusLabel || '—')}</td>
+                    <td class="dur-col">${escapeHtml(duration || '—')}</td>
+                    <td class="student-col">${escapeHtml(student || '—')}</td>
+                    <td class="room-col">${escapeHtml(room || '—')}</td>
+                    <td class="notes-col">${escapeHtml(notes || '—')}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const emptyRow = `<tr><td colspan="10" class="empty-msg">No schedule items found in this date range.</td></tr>`;
+        const printStatParts = schPrintBuildSummary(events);
+        const printLegend = schPrintBuildLegend();
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(`Master Schedule — ${personName}`)}</title>
+  <style id="print-page-orientation-css">${pageCss}</style>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10px;
+      color: #111;
+      line-height: 1.25;
+    }
+    body.print-density-normal { font-size: 11px; line-height: 1.35; }
+    .sheet { padding: 0; }
+    .identity-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 8px; }
+    .identity-copy { min-width: 0; flex: 1 1 auto; }
+    .print-logo { display: block; flex: 0 0 auto; width: auto; height: 58px; max-width: 180px; object-fit: contain; object-position: right top; }
+    .doc-header { margin-bottom: 8px; }
+    .doc-header h1 {
+      margin: 0 0 2px 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .org-name {
+      font-size: 13px;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+    }
+    .print-note {
+      margin: 0 0 8px;
+      border: 1px solid #cfd7e3;
+      background: #f4f7fb;
+      padding: 6px 8px;
+      color: #333;
+      white-space: pre-wrap;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    .meta-row span strong { font-weight: 600; }
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      border: 1px solid #ccc;
+      background: #f8f9fa;
+      padding: 6px 8px;
+      margin-bottom: 8px;
+      border-radius: 2px;
+    }
+    .summary .stat { white-space: nowrap; }
+    .summary .stat b { font-weight: 700; }
+    .legend {
+      margin: 0 0 8px 0;
+      color: #444;
+      font-size: 9.5px;
+    }
+    table.matrix {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+    }
+    table.matrix th,
+    table.matrix td {
+      border: 1px solid #bbb;
+      padding: 3px 4px;
+      vertical-align: middle;
+    }
+    table.matrix thead th {
+      background: #eef1f4;
+      font-weight: 700;
+      text-align: center;
+    }
+    table.matrix thead { display: table-header-group; }
+    table.matrix tbody tr { page-break-inside: avoid; }
+    .num-col { width: 28px; text-align: center; color: #555; }
+    .date-col { text-align: center; min-width: 52px; white-space: nowrap; }
+    .day-date { font-size: 9.5px; }
+    .day-wd { font-size: 8px; color: #666; font-weight: 500; }
+    .time-col { text-align: center; min-width: 72px; white-space: nowrap; }
+    .session-col { text-align: left; min-width: 110px; font-weight: 600; }
+    .role-col, .status-col, .student-col, .room-col, .notes-col { text-align: left; }
+    .dur-col { text-align: center; min-width: 44px; white-space: nowrap; font-weight: 600; }
+    .empty-msg { text-align: center; color: #666; padding: 16px !important; }
+    .doc-footer {
+      margin-top: 10px;
+      padding-top: 4px;
+      border-top: 1px solid #ddd;
+      color: #666;
+      font-size: 9px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none !important; }
+      a { color: inherit; text-decoration: none; }
+    }
+    @media screen {
+      body { background: #e9ecef; padding: 16px; }
+      .sheet {
+        background: #fff;
+        padding: 14px 16px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+        max-width: 100%;
+      }
+      .screen-actions {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .screen-actions-label { color: #333; font-weight: 600; }
+      .screen-actions button {
+        font: inherit;
+        padding: 6px 12px;
+        cursor: pointer;
+        border: 1px solid #adb5bd;
+        background: #fff;
+        border-radius: 4px;
+      }
+      .screen-actions button.is-active { background: #174ea6; border-color: #174ea6; color: #fff; }
+      .screen-actions-hint { margin: -4px 0 10px; color: #555; font-size: 11px; }
+    }
+  </style>
+</head>
+<body class="print-density-${settings.density}" data-print-orientation="${settings.orientation}">
+  ${previewControlsHtml}
+  <div class="sheet">
+    <div class="identity-block">
+      <div class="identity-copy">
+        <header class="doc-header">
+          ${displayOrgName ? `<div class="org-name">${escapeHtml(displayOrgName)}</div>` : ''}
+          <h1>Master Schedule</h1>
+          <div class="meta-row">
+            <span><strong>Person:</strong> ${escapeHtml(personName)}</span>
+            ${roleLabel ? `<span><strong>Role:</strong> ${escapeHtml(roleLabel)}</span>` : ''}
+            <span><strong>Range:</strong> ${escapeHtml(rangeLabel)}</span>
+            <span><strong>View:</strong> ${escapeHtml(viewModeLabel)}</span>
+            <span><strong>Printed:</strong> ${escapeHtml(printedAtLabel)}</span>
+            ${settings.requestedByLabel ? `<span><strong>Requested by:</strong> ${escapeHtml(settings.requestedByLabel)}</span>` : ''}
+          </div>
+        </header>
+      </div>
+      ${logoHtml}
+    </div>
+    ${printNoteHtml}
+
+    <div class="summary">
+      ${printStatParts.join('\n      ')}
+    </div>
+    <div class="legend">${escapeHtml(printLegend)}</div>
+
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="num-col">#</th>
+          <th class="date-col">Date</th>
+          <th class="time-col">Time</th>
+          <th class="session-col">Session</th>
+          <th class="role-col">Role</th>
+          <th class="status-col">Status</th>
+          <th class="dur-col">Hours</th>
+          <th class="student-col">Student</th>
+          <th class="room-col">Room</th>
+          <th class="notes-col">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${bodyRows || emptyRow}
+      </tbody>
+    </table>
+
+    <footer class="doc-footer">
+      <span>Generated from Master Schedule Viewer</span>
+      <span>${escapeHtml(personName)} · ${escapeHtml(rangeLabel)}</span>
+    </footer>
+  </div>
+  ${orientationScript}
+</body>
+</html>`;
+    }
+
+    function openSchedulePrint() {
+        const printData = collectSchedulePrintData();
+        if (!printData) {
+            uiAlert('Load a schedule for the active person first.', 'Nothing to print');
+            return;
+        }
+
+        const orgName = String(document.getElementById('activeOrgNameRef')?.getAttribute('data-name') || '').trim();
+        const defaults = { orgName, orientation: 'landscape', density: 'compact' };
+        const openPreview = (settings = defaults) => {
+            const html = buildSchedulePrintDocument(printData, {
+                orgName,
+                startDate: printData.startDate,
+                endDate: printData.endDate,
+                personName: printData.personName,
+                role: printData.role,
+                viewMode: printData.viewMode,
+                printedAt: new Date(),
+                printSettings: settings
+            });
+            const printWindow = window.AppPrintManager?.openHtmlPreview
+                ? window.AppPrintManager.openHtmlPreview({
+                    title: 'Master Schedule',
+                    html,
+                    settings,
+                    sourcePath: location.pathname,
+                    view: 'master-schedule'
+                })
+                : null;
+            if (!printWindow) {
+                uiAlert('Allow pop-ups for this site to open the print page.', 'Popup blocked');
+            }
+        };
+
+        if (window.AppPrintManager?.openSettings) {
+            window.AppPrintManager.openSettings({
+                mode: 'master-schedule',
+                defaults,
+                onConfirm: openPreview
+            });
+        } else {
+            openPreview(defaults);
+        }
+    }
+
     function refreshScheduleSummary(events) {
         const lblHours = document.getElementById('lbl_totalHours');
         if (lblHours) lblHours.innerHTML = renderCategoryHourTotals(events || []);
@@ -2108,24 +2538,28 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('scheduleContainer')?.classList.add('d-none');
             document.getElementById('legendContainer').innerHTML = '';
             refreshScheduleSummary([]);
+            setSchedulePrintEnabled(false);
             return;
         }
         document.getElementById('scheduleContainer')?.classList.remove('d-none');
         if (scheduleState.loadingPersonId === person.id) {
             renderScheduleControls(normalizedScheduleViewMode());
             refreshScheduleSummary([]);
+            setSchedulePrintEnabled(false);
             container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedule for ${escapeHtml(person.name || person.id)}...</div></div>`;
             return;
         }
         if (!scheduleState.loadedPersonIds.has(person.id)) {
             renderScheduleControls(normalizedScheduleViewMode());
             refreshScheduleSummary([]);
+            setSchedulePrintEnabled(false);
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-arrow-clockwise fs-1 d-block mb-2"></i>Schedule is ready to load for ${escapeHtml(person.name || person.id)}.</div>`;
             return;
         }
         if (scheduleState.errorByPersonId[person.id]) {
             renderScheduleControls(normalizedScheduleViewMode());
             refreshScheduleSummary([]);
+            setSchedulePrintEnabled(false);
             container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i>${escapeHtml(scheduleState.errorByPersonId[person.id])}</div>`;
             return;
         }
@@ -2148,11 +2582,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 calendarBody.classList.remove('schedule-calendar-card-body-multi-week');
             }
             renderCalendarView(grouped, range.startDate, range.endDate, container);
+            setSchedulePrintEnabled(true);
             return;
         }
         container.classList.add('schedule-week-grid-host');
         if (!events.length && scheduleState.hideEmptyDays) {
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
+            setSchedulePrintEnabled(true);
             return;
         }
         const rendered = mode === 'timeline'
@@ -2163,6 +2599,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             scheduleWeekGridLayoutAfterRender(mode);
         }
+        setSchedulePrintEnabled(true);
     }
 
     async function loadSchedulePerson(person) {
@@ -2396,6 +2833,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn_loadSchedule')?.addEventListener('click', loadActiveSchedulePerson);
     document.getElementById('btn_loadAllSchedules')?.addEventListener('click', loadAllSchedulePeople);
+    document.getElementById('btn_printSchedule')?.addEventListener('click', () => openSchedulePrint());
 
     document.getElementById('sch_role')?.addEventListener('change', () => {
         const person = activeSchedulePerson();

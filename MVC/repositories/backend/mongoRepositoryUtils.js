@@ -292,12 +292,19 @@ function resolveMongoIdFilter(id) {
 
 async function generateUniqueStringId(collection, requestedId = null, options = {}) {
   const requested = toPublicId(requestedId);
-  if (requested) return requested;
-
   const min = Number.isFinite(options?.min) ? options.min : 100000;
   const max = Number.isFinite(options?.max) ? options.max : 999999;
+  const maxAttempts = Number.isFinite(options?.maxAttempts) ? options.maxAttempts : 50;
 
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  if (requested) {
+    const existing = await collection.findOne({ id: requested }, { projection: { _id: 1 } });
+    if (!existing) return requested;
+    if (typeof options?.warnOnCollision === 'function') {
+      options.warnOnCollision(requested);
+    }
+  }
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const candidate = String(Math.floor(min + Math.random() * (max - min + 1)));
     // eslint-disable-next-line no-await-in-loop
     const exists = await collection.findOne({ id: candidate }, { projection: { _id: 1 } });

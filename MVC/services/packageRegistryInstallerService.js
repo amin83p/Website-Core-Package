@@ -548,6 +548,70 @@ async function findAccessByNameOrg(repo, name, orgId, options = {}) {
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
+function collectManifestDuplicateIdErrors(rows = [], category = 'sections') {
+  const byId = new Map();
+  for (const row of normalizeDeclarationArray(rows)) {
+    const id = cleanText(row?.id, 120);
+    if (!id) continue;
+    const name = cleanText(row?.name, 180).toUpperCase();
+    if (!byId.has(id)) byId.set(id, []);
+    byId.get(id).push(name);
+  }
+
+  const errors = [];
+  const label = category === 'operations' ? 'operation' : 'section';
+  for (const [id, names] of byId.entries()) {
+    if (names.length <= 1) continue;
+    const message = `Duplicate ${label} id "${id}" used by ${names.join(' and ')}`;
+    for (const name of names) {
+      errors.push({ category, key: name, id, message });
+    }
+  }
+  return errors;
+}
+
+async function validateManifestEntityIds(manifest = {}, deps = {}, options = {}) {
+  const repoOptions = { backendMode: options?.backendMode || '' };
+  const errors = [
+    ...collectManifestDuplicateIdErrors(manifest.sections, 'sections'),
+    ...collectManifestDuplicateIdErrors(manifest.operations, 'operations')
+  ];
+
+  for (const row of normalizeDeclarationArray(manifest.sections)) {
+    const id = cleanText(row?.id, 120);
+    const name = cleanText(row?.name, 180).toUpperCase();
+    if (!id || !name) continue;
+    const existing = await deps.sectionRepository.getById(id, repoOptions);
+    if (!existing) continue;
+    const existingName = cleanText(existing?.name, 180).toUpperCase();
+    if (existingName === name) continue;
+    errors.push({
+      category: 'sections',
+      key: name,
+      id,
+      message: `Section id collision: id ${id} already used by ${existing.name}`
+    });
+  }
+
+  for (const row of normalizeDeclarationArray(manifest.operations)) {
+    const id = cleanText(row?.id, 120);
+    const name = cleanText(row?.name, 180).toUpperCase();
+    if (!id || !name) continue;
+    const existing = await deps.operationRepository.getById(id, repoOptions);
+    if (!existing) continue;
+    const existingName = cleanText(existing?.name, 180).toUpperCase();
+    if (existingName === name) continue;
+    errors.push({
+      category: 'operations',
+      key: name,
+      id,
+      message: `Operation id collision: id ${id} already used by ${existing.name}`
+    });
+  }
+
+  return errors;
+}
+
 function isAccessIdentityMatch(existing = {}, normalized = {}) {
   const existingOrg = normalizeOrgIdComparable(existing?.orgId);
   const incomingOrg = normalizeOrgIdComparable(normalized?.orgId);
@@ -698,6 +762,20 @@ async function installEntityDeclarations(manifest, summary, context, deps, optio
     summary.backendMode
   );
 
+  const idValidationErrors = await validateManifestEntityIds(manifest, deps, {
+    backendMode: summary.backendMode
+  });
+  const blockedDeclarationKeys = new Set();
+  for (const validationError of idValidationErrors) {
+    blockedDeclarationKeys.add(`${validationError.category}:${validationError.key}`);
+    markResult(summary, validationError.category, {
+      status: 'failed',
+      key: validationError.key,
+      id: validationError.id,
+      message: validationError.message
+    });
+  }
+
   for (const category of ENTITY_KEYS) {
     const rows = declarationsByCategory[category] || [];
     const entityDef = entityDefs[category];
@@ -718,6 +796,9 @@ async function installEntityDeclarations(manifest, summary, context, deps, optio
       }
 
       const identity = findStableIdentity(category, normalized);
+      if (blockedDeclarationKeys.has(`${category}:${identity}`)) {
+        continue;
+      }
       try {
         const existing = await entityDef.find(normalized);
         if (existing && !rowBelongsToSameIdentity(category, existing, normalized)) {
@@ -1273,6 +1354,36 @@ function createLoaderHooks(options = {}) {
         uploadFoldersOnly: false,
         sectionSyncMode: 'create-only'
       });
+      const backendMode = cleanText(context?.backendMode || options?.backendMode, 40).toLowerCase();
+      if (backendMode === 'mongo') {
+        try {
+          // eslint-disable-next-line global-require
+          const packageDataLifecycleService = require('./packageDataLifecycleService');
+          const lifecycleReport = await packageDataLifecycleService.runPackageDataUpgradeLifecycle({
+            ...context,
+            packageVersion: cleanText(context?.manifest?.version, 120),
+            packageName: cleanText(context?.manifest?.name, 200)
+          }, {
+            backendMode,
+            actor: { id: SYSTEM_ACTOR, username: SYSTEM_ACTOR }
+          });
+          summary.dataLifecycle = lifecycleReport?.dataSummary || null;
+          if (lifecycleReport?.failedStep && logger && typeof logger.warn === 'function') {
+            logger.warn('PACKAGE_INSTALLER', 'DATA_LIFECYCLE_FAIL', `Package data lifecycle reported a failure for ${summary.packageId}.`, {
+              packageId: summary.packageId,
+              stepId: lifecycleReport.failedStep.stepId,
+              message: lifecycleReport.failedStep.message
+            });
+          }
+        } catch (error) {
+          if (logger && typeof logger.warn === 'function') {
+            logger.warn('PACKAGE_INSTALLER', 'DATA_LIFECYCLE_ERROR', `Package data lifecycle could not run for ${summary.packageId}.`, {
+              packageId: summary.packageId,
+              error: error?.message || String(error)
+            });
+          }
+        }
+      }
       if (logger && typeof logger.info === 'function') {
         logger.info('PACKAGE_INSTALLER', 'REGISTRY_SYNC', `Registry sync complete for ${summary.packageId}.`, {
           packageId: summary.packageId,
@@ -1330,6 +1441,8 @@ module.exports = {
   pickSectionCompareSnapshot,
   normalizeSectionSyncMode,
   normalizeSectionDeclaration,
+  validateManifestEntityIds,
+  collectManifestDuplicateIdErrors,
   mergeEntityPayload,
   normalizeTopologyRefIds
 };

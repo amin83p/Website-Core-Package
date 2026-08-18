@@ -22,14 +22,14 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { 'participants.userId': 1, lastMessageAt: -1 }, options: { name: 'idx_chat_conversations_participant_last_message' } }
   ],
   sections: [
-    { key: { id: 1 }, options: { name: 'idx_sections_id' } },
+    { key: { id: 1 }, options: { name: 'idx_sections_id', unique: true } },
     { key: { name: 1 }, options: { name: 'idx_sections_name' } },
     { key: { category: 1 }, options: { name: 'idx_sections_category' } },
     { key: { dashboardDisplay: 1, mainDashboardDisplay: 1 }, options: { name: 'idx_sections_dashboard_flags' } },
     { key: { navigatorSection: 1 }, options: { name: 'idx_sections_navigatorSection' } }
   ],
   operations: [
-    { key: { id: 1 }, options: { name: 'idx_operations_id' } },
+    { key: { id: 1 }, options: { name: 'idx_operations_id', unique: true } },
     { key: { name: 1 }, options: { name: 'idx_operations_name' } }
   ],
   accesses: [

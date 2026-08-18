@@ -117,6 +117,21 @@ function generateId() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function generateUniqueSectionId(sections = []) {
+  const usedIds = new Set(
+    (Array.isArray(sections) ? sections : [])
+      .map((row) => String(row?.id || '').trim())
+      .filter(Boolean)
+  );
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = generateId();
+    if (!usedIds.has(candidate)) return candidate;
+  }
+
+  return `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+}
+
 /* ---------------- VALIDATION ---------------- */
 
 function validateData(config) {
@@ -179,7 +194,7 @@ async function addSection(section) {
     const sections = await getAllSections();
     if(sections.find(s => s.name === section.name)) throw new Error('Name exists');
 
-    section.id = generateId();
+    section.id = generateUniqueSectionId(sections);
     
     // Default legacy records if needed (handled in controller usually, but safe here)
     if(!section.category) section.category = 'GENERAL';
@@ -240,5 +255,6 @@ module.exports = {
   getSectionByName,
   addSection, updateSection, deleteSection,
   getCategories,
+  generateUniqueSectionId,
   VALID_CATEGORIES // kept for backward compatibility; prefer getCategories()
 };

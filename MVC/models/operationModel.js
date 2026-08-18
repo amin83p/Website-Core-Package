@@ -89,6 +89,30 @@ function generateNextId(operations) {
   return 'OP' + nextIdVal;
 }
 
+function generateUniqueOperationId(operations = []) {
+  const usedIds = new Set(
+    (Array.isArray(operations) ? operations : [])
+      .map((row) => String(row?.id || '').trim())
+      .filter(Boolean)
+  );
+
+  let candidate = generateNextId(operations);
+  for (let attempt = 0; attempt < 50 && usedIds.has(candidate); attempt += 1) {
+    const numPart = parseInt(String(candidate).replace(/^OP/i, ''), 10);
+    const nextNum = Number.isFinite(numPart) ? numPart + 1 : 1001;
+    if (nextNum > 8999) {
+      throw new Error('Maximum Operation ID limit (OP8999) reached.');
+    }
+    candidate = `OP${nextNum}`;
+  }
+
+  if (usedIds.has(candidate)) {
+    throw new Error('Unable to generate a unique operation ID.');
+  }
+
+  return candidate;
+}
+
 /* ---------------- VALIDATION ---------------- */
 
 function validateData(operation) {
@@ -149,7 +173,7 @@ async function addOperation(operation) {
     }
 
     // 2. Generate Sequential ID (OP1001 - OP8999)
-    operation.id = generateNextId(operations);
+    operation.id = generateUniqueOperationId(operations);
 
     // 3. Validate
     const resultValidity = validateData(operation);
@@ -246,5 +270,6 @@ module.exports = {
   getOperationByName,
   addOperation, 
   updateOperation, 
-  deleteOperation 
+  deleteOperation,
+  generateUniqueOperationId
 };

@@ -1,4 +1,4 @@
-const SECTION_ID = '445580';
+const SECTION_ID = '555012';
 const SECTION_NAME = 'SCHOOL_ACTIVITIES';
 const SECTION_LABEL = 'School Activities';
 const PARENT_SECTION_ID = '139382';
@@ -69,6 +69,11 @@ db.sections.updateOne(
   { $set: section, $setOnInsert: { createdAt: now } },
   { upsert: true }
 );
+
+db.sections.deleteMany({
+  name: SECTION_NAME,
+  id: { $ne: SECTION_ID }
+});
 
 db.symbols.updateOne(
   { $or: [{ id: SYMBOL_ID }, { name: SECTION_NAME }] },

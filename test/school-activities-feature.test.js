@@ -22,29 +22,31 @@ function readJson(relativePath) {
 
 test('School activities manifest declares section, symbol, navigation, data entities, and staff grants', () => {
   const manifest = readJson('packages/school/package.manifest.json');
-  const section = (manifest.sections || []).find((row) => row.id === '445580');
-  assert.ok(section, 'section 445580 should be declared');
+  const section = (manifest.sections || []).find((row) => row.id === '555012');
+  assert.ok(section, 'section 555012 should be declared');
   assert.equal(section.name, 'SCHOOL_ACTIVITIES');
   assert.equal(section.homeURL, '/school/activities');
   assert.equal(section.trackState, true);
 
   const academia = (manifest.sections || []).find((row) => row.name === 'SCHOOL_ACADEMIA');
-  assert.ok((academia.subsections || []).some((row) => row.id === '445580'), 'section should be under SCHOOL_ACADEMIA');
+  assert.ok((academia.subsections || []).some((row) => row.id === '555012'), 'section should be under SCHOOL_ACADEMIA');
+  assert.ok((academia.subsections || []).some((row) => row.id === '445580'), 'teaching outlines should remain under SCHOOL_ACADEMIA');
 
   const symbol = (manifest.symbols || []).find((row) => row.id === 'SYM_SYSTEM_062');
   assert.ok(symbol, 'symbol SYM_SYSTEM_062 should be declared');
   assert.equal(symbol.name, 'SCHOOL_ACTIVITIES');
   assert.equal(symbol.orgId, 'SYSTEM');
-  assert.deepEqual(symbol.tags, ['SCHOOL_ACTIVITIES', '445580']);
+  assert.deepEqual(symbol.tags, ['SCHOOL_ACTIVITIES', '555012']);
 
   assert.ok((manifest.menuEntries || []).some((row) => row.id === 'school-menu-activities' && row.href === '/school/activities'));
   assert.ok((manifest.dashboardEntries || []).some((row) => row.id === 'school-dashboard-activities' && row.href === '/school/activities'));
+  assert.ok((manifest.seeders || []).some((row) => row.id === 'school-activities-section' && row.run === 'seeders/school-activities-section-run.js'));
   assert.ok((manifest.dataEntities || []).some((row) => row.entityType === 'activityCategories' && row.collectionName === 'schoolActivityCategories'));
   assert.ok((manifest.dataEntities || []).some((row) => row.entityType === 'activities' && row.collectionName === 'schoolActivities'));
 
   const profile = (manifest.accesses || []).find((row) => row.name === 'SCHOOL_STAFF');
   assert.ok(profile, 'SCHOOL_STAFF profile should exist');
-  const grant = (profile.sections || []).find((row) => row.sectionId === '445580');
+  const grant = (profile.sections || []).find((row) => row.sectionId === '555012');
   assert.ok(grant, 'SCHOOL_STAFF should include school activities section');
   assert.equal(grant.adminAccess, false);
   assert.deepEqual((grant.operations || []).map((row) => `${row.operationId}:${row.scopeId}`), [
@@ -54,6 +56,25 @@ test('School activities manifest declares section, symbol, navigation, data enti
     'OP1004:SCP_ORG',
     'OP1005:SCP_ORG'
   ]);
+
+  const academiaGrant = (profile.sections || []).find((row) => row.sectionId === '139382');
+  assert.ok(academiaGrant, 'SCHOOL_STAFF should include SCHOOL_ACADEMIA navigator section');
+  assert.deepEqual(academiaGrant.operations || [], []);
+
+  const sectionIds = new Set();
+  for (const row of manifest.sections || []) {
+    const id = String(row?.id || '').trim();
+    if (!id) continue;
+    assert.ok(!sectionIds.has(id), `duplicate school section id ${id} on ${row.name}`);
+    sectionIds.add(id);
+  }
+  const operationIds = new Set();
+  for (const row of manifest.operations || []) {
+    const id = String(row?.id || '').trim();
+    if (!id) continue;
+    assert.ok(!operationIds.has(id), `duplicate school operation id ${id} on ${row.name}`);
+    operationIds.add(id);
+  }
 });
 
 test('School activities package route, repository, service, views, and seed script are wired', () => {

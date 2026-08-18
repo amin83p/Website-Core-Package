@@ -1,7 +1,7 @@
 {
   "id": "school",
   "name": "School",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "mountPath": "/school",
   "enabledByDefault": false,
   "routes": [
@@ -215,6 +215,9 @@
         },
         {
           "id": "445580"
+        },
+        {
+          "id": "555012"
         },
         {
           "id": "445561"
@@ -1285,7 +1288,7 @@
       "adoptExisting": true
     },
     {
-      "id": "445580",
+      "id": "555012",
       "name": "SCHOOL_ACTIVITIES",
       "category": "SCHOOL",
       "description": "Define school activities such as PD sessions, track attendee participation, and reflect payable attendance into schedules and timesheets.",
@@ -4546,7 +4549,7 @@
       "value": "bi bi-calendar-event",
       "tags": [
         "SCHOOL_ACTIVITIES",
-        "445580"
+        "555012"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -5975,7 +5978,12 @@
           ]
         },
         {
-          "sectionId": "445580",
+          "sectionId": "139382",
+          "adminAccess": false,
+          "operations": []
+        },
+        {
+          "sectionId": "555012",
           "adminAccess": false,
           "operations": [
             {
@@ -9461,7 +9469,18 @@
       "collectionName": "schoolActivities"
     }
   ],
-  "seeders": [],
+  "seeders": [
+    {
+      "id": "school-activities-section",
+      "version": "0.1.1",
+      "description": "Ensure School Activities section, symbol, School Academia dashboard link, and SCHOOL_STAFF access are present in MongoDB.",
+      "run": "seeders/school-activities-section-run.js",
+      "revert": "seeders/school-activities-section-revert.js",
+      "mode": "upsert",
+      "backendModes": ["mongo"],
+      "idempotencyKey": "school:section:school-activities"
+    }
+  ],
   "migrations": [],
   "dataSchemas": [],
   "upgradeGuards": [],
