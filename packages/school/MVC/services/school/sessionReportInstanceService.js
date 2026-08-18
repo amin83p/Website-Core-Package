@@ -1,6 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const reportViewService = require('./reportViewService');
 const sessionConductService = require('./sessionConductService');
+const reportRosterService = require('./reportRosterService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -200,6 +201,103 @@ async function buildSessionReportViewerContext({
   };
 }
 
+async function buildSessionRosterReconciliation({
+  classId,
+  sessionId,
+  sessionDate = '',
+  sessionRoster = [],
+  reqUser
+} = {}) {
+  const cleanClassId = String(classId || '').trim();
+  const cleanSessionId = String(sessionId || '').trim();
+  if (!cleanClassId || !cleanSessionId) return [];
+
+  const expectedStudentIds = reportRosterService.resolveSessionRosterPersonIds(sessionRoster);
+  const expectedSet = new Set(expectedStudentIds.map((id) => toPublicId(id)).filter(Boolean));
+  const sessionContext = { sessionId: cleanSessionId, sessionDate };
+
+  const [reportAssignments, allRows] = await Promise.all([
+    schoolDataService.fetchData('reportAssignments', { classId__eq: cleanClassId }, reqUser),
+    reportViewService.buildInstanceListRows({ reqUser, sessionFilter: cleanSessionId, sessionDateFilter: sessionDate })
+  ]);
+
+  const sessionRows = (Array.isArray(allRows) ? allRows : [])
+    .filter((row) => idsEqual(row?.classId, cleanClassId))
+    .filter((row) => instanceRowMatchesSession(row, sessionContext));
+
+  const templateMap = new Map();
+  const assignments = (Array.isArray(reportAssignments) ? reportAssignments : [])
+    .filter((assignment) => reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, {
+      classId: cleanClassId,
+      sessionId: cleanSessionId,
+      sessionDate
+    }))
+    .filter((assignment) => reportAssignmentSessionUtils.inferAssignmentReportScope(assignment) === 'each_student');
+
+  const reconciliation = [];
+
+  for (const assignment of assignments) {
+    const assignmentId = toPublicId(assignment?.id);
+    if (!assignmentId) continue;
+    const templateId = toPublicId(assignment?.templateId);
+    let templateTitle = templateId || 'Report';
+    if (templateId && !templateMap.has(templateId)) {
+      // eslint-disable-next-line no-await-in-loop
+      const template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
+      templateTitle = String(template?.title || templateId).trim();
+      templateMap.set(templateId, templateTitle);
+    } else if (templateId) {
+      templateTitle = templateMap.get(templateId);
+    }
+
+    const targetRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
+      .filter((row) => String(row?.status || 'active').trim().toLowerCase() === 'active')
+      .filter((row) => instanceRowMatchesSession({
+        sessionId: row?.sessionId,
+        sessionDate: row?.sessionDate || row?.reportDueDate || row?.dueDate
+      }, sessionContext));
+
+    for (const targetRow of targetRows) {
+      const assignmentRowId = String(targetRow?.rowId || '').trim();
+      const groupInstances = sessionRows.filter((row) => {
+        if (!idsEqual(row?.assignmentId, assignmentId)) return false;
+        if (assignmentRowId && String(row?.assignmentRowId || '').trim() !== assignmentRowId) return false;
+        return Boolean(toPublicId(row?.studentId)) && !row?.isPendingAssignment;
+      });
+
+      const instanceStudentIds = new Set(
+        groupInstances.map((row) => toPublicId(row?.studentId)).filter(Boolean)
+      );
+      const orphanedInstances = groupInstances
+        .filter((row) => !expectedSet.has(toPublicId(row?.studentId)))
+        .map((row) => ({
+          instanceId: toPublicId(row?.id),
+          studentId: toPublicId(row?.studentId),
+          studentName: String(row?.studentName || row?.studentId || '').trim()
+        }))
+        .filter((row) => Boolean(row.instanceId));
+
+      const missingStudentIds = expectedStudentIds
+        .map((id) => toPublicId(id))
+        .filter((id) => id && !instanceStudentIds.has(id));
+
+      if (!orphanedInstances.length && !missingStudentIds.length) continue;
+
+      reconciliation.push({
+        assignmentId,
+        assignmentRowId,
+        templateTitle,
+        expectedCount: expectedStudentIds.length,
+        missingCount: missingStudentIds.length,
+        missingStudentIds,
+        orphanedInstances
+      });
+    }
+  }
+
+  return reconciliation;
+}
+
 async function buildSessionReportInstanceRows({
   classId,
   sessionId,
@@ -271,6 +369,7 @@ module.exports = {
   canViewerSeeSessionReportRow,
   buildSessionReportViewerContext,
   buildSessionReportInstanceRows,
+  buildSessionRosterReconciliation,
   mapRowToDto,
   isReportRowSubmitted,
   isSessionCompletionStatusByMeta,

@@ -1063,6 +1063,14 @@
     .session-report-instances-toggle:focus {
         box-shadow: none;
     }
+    .session-report-roster-alert {
+        border-radius: 0.5rem;
+        border: 1px solid #f5c2c7;
+        background: #fff5f5;
+    }
+    .session-report-roster-alert .orphan-delete-btn {
+        white-space: nowrap;
+    }
     .session-report-step-nav {
         display: flex;
         justify-content: flex-start;
@@ -2379,6 +2387,7 @@
                         <% if (hasSessionReportsAssigned) { %>
                             <div class="conduct-rating-help">Fill reports for this session using the student matrix. Open individual reports from the list below when needed.<% if (sessionHasConductRequiredReportsResolved) { %> Use <strong>Back to Class Conduct</strong> above or below the report instances list to edit class conduct ratings.<% } %></div>
                             <div id="sessionReportInstancesStatusSummary" class="small text-muted mt-2"></div>
+                            <div id="sessionReportRosterReconciliationHost" class="mt-2"></div>
                             <div class="session-report-step-cta-zone" id="sessionReportFillReportsZone">
                                 <div class="session-report-step-actions" id="sessionReportFillReportsActions"></div>
                             </div>
@@ -4447,6 +4456,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
     const canDeleteStudentCases = <%- jsonForScript(typeof canDeleteStudentCases !== 'undefined' && Boolean(canDeleteStudentCases)) %>;
     let sessionReportInstancesState = <%- jsonForScript(Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : []) %>;
+    let sessionRosterReconciliationState = <%- jsonForScript(Array.isArray(sessionRosterReconciliation) ? sessionRosterReconciliation : []) %>;
+    const dismissedRosterReconciliationKeys = new Set();
     const requestedStudentCaseId = new URLSearchParams(window.location.search || '').get('caseId') || '';
     let requestedStudentCaseHandled = false;
     let studentCaseModalInstance = null;
@@ -4640,6 +4651,81 @@ document.addEventListener('DOMContentLoaded', () => {
         actions.innerHTML = `${fillBtn}${completeBadge}${moreMatricesNote}`;
     }
 
+    function renderSessionRosterReconciliation() {
+        const host = document.getElementById('sessionReportRosterReconciliationHost');
+        if (!host) return;
+        const items = (Array.isArray(sessionRosterReconciliationState) ? sessionRosterReconciliationState : [])
+            .filter((item) => Array.isArray(item?.orphanedInstances) && item.orphanedInstances.length)
+            .filter((item) => {
+                const key = [item.assignmentId, item.assignmentRowId || ''].join('|');
+                return !dismissedRosterReconciliationKeys.has(key);
+            });
+        if (!items.length) {
+            host.innerHTML = '';
+            return;
+        }
+        host.innerHTML = items.map((item) => {
+            const templateTitle = scEscapeHtml(item.templateTitle || 'Report');
+            const orphanRows = (item.orphanedInstances || []).map((orphan) => {
+                const studentName = scEscapeHtml(orphan.studentName || orphan.studentId || 'Student');
+                const instanceId = scEscapeHtml(orphan.instanceId || '');
+                return `<li class="d-flex align-items-center justify-content-between gap-2 py-1">
+                    <span>${studentName}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger orphan-delete-btn js-delete-orphan-report-instance" data-instance-id="${instanceId}" title="Delete report instance">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </li>`;
+            }).join('');
+            const dismissKey = scEscapeHtml([item.assignmentId, item.assignmentRowId || ''].join('|'));
+            const missingNote = Number(item.missingCount || 0) > 0
+                ? `<div class="small text-muted mt-2">${Number(item.missingCount)} roster student(s) do not have a report instance yet.</div>`
+                : '';
+            return `<div class="alert session-report-roster-alert mb-2" role="alert" data-reconciliation-key="${dismissKey}">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <div class="fw-semibold text-danger-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>Students not on session roster</div>
+                        <div class="small mt-1">For <strong>${templateTitle}</strong>, these report instances belong to students who are not on this session&apos;s attendance roster. You can delete them or keep them.</div>
+                    </div>
+                    <button type="button" class="btn-close js-dismiss-roster-reconciliation" data-reconciliation-key="${dismissKey}" aria-label="Dismiss"></button>
+                </div>
+                <ul class="list-unstyled mb-0 mt-2">${orphanRows}</ul>
+                ${missingNote}
+            </div>`;
+        }).join('');
+    }
+
+    async function deleteOrphanReportInstance(instanceId) {
+        const id = String(instanceId || '').trim();
+        if (!id) return;
+        const confirmed = await sessionConfirmBox({
+            title: 'Delete report instance?',
+            message: 'This will permanently delete the report instance for a student not on this session roster.',
+            icon: 'warning',
+            confirmText: 'Delete',
+            confirmClass: 'btn-danger'
+        });
+        if (!confirmed) return;
+        if (typeof window.showLoading === 'function') window.showLoading('Deleting report instance...');
+        try {
+            const res = await fetch(`/school/reports/instances/delete/${encodeURIComponent(id)}`, {
+                method: 'GET',
+                headers: {
+                    'x-ajax-request': 'true',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    Accept: 'application/json'
+                },
+                credentials: 'same-origin'
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status === 'error') throw new Error(result.message || 'Could not delete report instance.');
+            await refreshSessionReportInstances();
+        } catch (error) {
+            await showStudentCaseMessage('Delete Failed', error.message || 'Could not delete report instance.', 'error');
+        } finally {
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+        }
+    }
+
     function renderSessionReportInstances() {
         const body = document.getElementById('sessionReportInstancesBody');
         if (!body) return;
@@ -4689,6 +4775,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return groupHeader + instanceRows;
         }).join('');
         syncPendingReportsHint();
+        renderSessionRosterReconciliation();
     }
 
     async function refreshSessionReportInstances() {
@@ -4702,6 +4789,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await res.json().catch(() => ({}));
             if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to load report instances.');
             sessionReportInstancesState = result.rows || [];
+            sessionRosterReconciliationState = result.rosterReconciliation || [];
             renderSessionReportInstances();
             renderSessionStatusButtons();
         } finally {
@@ -5204,6 +5292,22 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSessionReportInstances();
     document.getElementById('btnRefreshSessionReportInstances')?.addEventListener('click', () => {
         refreshSessionReportInstances().catch((error) => showStudentCaseMessage('Refresh Failed', error.message, 'error'));
+    });
+    document.getElementById('sessionReportRosterReconciliationHost')?.addEventListener('click', (event) => {
+        const deleteBtn = event.target.closest('.js-delete-orphan-report-instance');
+        if (deleteBtn) {
+            event.preventDefault();
+            deleteOrphanReportInstance(deleteBtn.dataset.instanceId).catch((error) => {
+                showStudentCaseMessage('Delete Failed', error.message, 'error');
+            });
+            return;
+        }
+        const dismissBtn = event.target.closest('.js-dismiss-roster-reconciliation');
+        if (dismissBtn) {
+            const key = String(dismissBtn.dataset.reconciliationKey || '').trim();
+            if (key) dismissedRosterReconciliationKeys.add(key);
+            renderSessionRosterReconciliation();
+        }
     });
     if (sessionCanAssignReports) {
         document.getElementById('btnOpenSessionReportAssignmentModal')?.addEventListener('click', openSessionReportAssignmentModal);

@@ -14,6 +14,7 @@ const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const reportScopePolicy = require('./reportScopePolicy');
+const reportRosterService = require('./reportRosterService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function isSchoolReportAdminViewer(reqUser) {
@@ -906,7 +907,7 @@ function resolveAssignmentTargetDate(assignment = {}) {
   ).trim();
 }
 
-async function resolvePendingAssignmentStudentTargets({ assignment, classItem, reqUser, students = [] } = {}) {
+async function resolvePendingAssignmentStudentTargets({ assignment, classItem, reqUser, students = [], sessionRoster = null } = {}) {
   const reportScope = inferAssignmentReportScope(assignment);
   if (reportScope === 'class') return [''];
   if (reportScope === 'selected_students') {
@@ -916,6 +917,24 @@ async function resolvePendingAssignmentStudentTargets({ assignment, classItem, r
   }
   if (!classItem) return [];
   const sessions = await schoolDataService.getClassSessions(toPublicId(classItem?.id), reqUser);
+  const sessionId = String(assignment?.sessionId || '').trim();
+  if (sessionId || (Array.isArray(sessionRoster) && sessionRoster.length)) {
+    return reportRosterService.resolveEachStudentTargetPersonIds({
+      assignment,
+      classData: classItem,
+      sessions,
+      session: sessionId ? reportRosterService.findSessionInList(sessions, sessionId) : null,
+      sessionRoster,
+      reqUser,
+      resolveEnrollmentPersonIds: async () => resolveClassStudentIds({
+        classData: classItem,
+        sessions,
+        reqUser,
+        referenceDate: resolveAssignmentTargetDate(assignment),
+        students
+      })
+    });
+  }
   return resolveClassStudentIds({
     classData: classItem,
     sessions,
@@ -2032,6 +2051,7 @@ module.exports = {
   partitionAssignmentDeleteBlockers,
   resolveInstanceNextStatus,
   isReportInstanceAdminEditor,
+  isSchoolReportAdminViewer,
   canEditReportInstanceAnswers,
   canUnlockReportInstance,
   canReopenReportInstanceToDraft,

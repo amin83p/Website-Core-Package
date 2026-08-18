@@ -134,6 +134,70 @@ test('matrix marks an unsaved shared value as conflicting instead of choosing a 
   assert.equal(groups.sharedFields[0].hasConflictingInitialValues, true);
 });
 
+test('matrix classifies report context prefill fields as common using rendered answers', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'student_full_name', type: 'text', readOnly: true, prefillKey: 'student_full_name' },
+        { id: 'report_date', type: 'date', label: 'Report Date', readOnly: true, prefillKey: 'report_date' },
+        { id: 'class_name', type: 'text', label: 'Class Name', readOnly: true, prefillKey: 'class_name' },
+        { id: 'teacher_name', type: 'text', label: 'Teacher Name', readOnly: true, prefillKey: 'teacher_name' },
+        { id: 'comment', type: 'textarea', label: 'Comment' }
+      ]
+    }
+  };
+  const rows = [
+    {
+      answers: {
+        student_full_name: 'Alice',
+        report_date: '2026-07-30',
+        class_name: 'EAL Class',
+        teacher_name: 'Fatima Majoka',
+        comment: 'Saved Alice'
+      }
+    },
+    {
+      answers: {
+        student_full_name: 'Bob',
+        report_date: '2026-07-30',
+        class_name: 'EAL Class',
+        teacher_name: 'Fatima Majoka'
+      }
+    }
+  ];
+  const groups = reportMatrixService.classifyMatrixFields(template, rows, { sharedAnswers: {} }, {
+    className: 'EAL Class',
+    teacherName: 'Fatima Majoka',
+    reportDate: '2026-07-30'
+  });
+  assert.deepEqual(
+    groups.commonFields.map((field) => field.id),
+    ['report_date', 'class_name', 'teacher_name']
+  );
+  assert.deepEqual(groups.tableFields.map((field) => field.id), ['comment']);
+  assert.equal(groups.commonFields.find((field) => field.id === 'teacher_name').value, 'Fatima Majoka');
+});
+
+test('matrix always places common-context prefill keys in common fields even when saved values differ', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'teacher_name', type: 'text', label: 'Teacher Name', readOnly: true, prefillKey: 'teacher_name' },
+        { id: 'comment', type: 'textarea', label: 'Comment' }
+      ]
+    }
+  };
+  const groups = reportMatrixService.classifyMatrixFields(template, [
+    { answers: { teacher_name: 'Old Teacher', comment: 'A' } },
+    { answers: { teacher_name: 'New Teacher', comment: 'B' } }
+  ], { sharedAnswers: {} }, {
+    teacherName: 'New Teacher'
+  });
+  assert.deepEqual(groups.commonFields.map((field) => field.id), ['teacher_name']);
+  assert.equal(groups.commonFields[0].value, 'Old Teacher');
+  assert.deepEqual(groups.tableFields.map((field) => field.id), ['comment']);
+});
+
 test('matrix context uses stored instances and synthesizes pending rows without creating records', async () => {
   const assignment = {
     id: 'ASN-1',
@@ -508,7 +572,9 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/export/);
   assert.match(routes, /requireReportMatrixEditorAccess/);
   assert.match(matrixView, /matrix-student-col/);
-  assert.match(matrixView, /matrix-student-name[\s\S]*js-matrix-status/);
+  assert.match(matrixView, /matrix-student-tools/);
+  assert.match(matrixView, /matrix-status-icon/);
+  assert.match(matrixView, /matrix-row-icon-btn js-matrix-open/);
   assert.doesNotMatch(matrixView, /matrix-actions-col/);
   assert.match(matrixView, /data-bs-toggle="tooltip"/);
   assert.match(matrixView, /aria-label="Required"/);
@@ -530,6 +596,12 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.doesNotMatch(matrixView, /js-matrix-save/);
   assert.match(matrixView, /include\('partials\/reportSelectField'/);
   assert.match(matrixView, /processedRadioFields/);
+  assert.match(matrixView, /id="btnReportMatrixExpandTable"/);
+  assert.match(matrixView, /id="reportMatrixTableModal"/);
+  assert.match(matrixView, /id="reportMatrixTableInlineHost"/);
+  assert.match(matrixView, /Open expanded view/);
+  assert.match(matrixView, /matrix-context-card/);
+  assert.match(matrixView, /matrix-context-label/);
   assert.match(sessionView, /matrixGroupKey/);
   assert.match(sessionView, />Fill Reports</);
 });
@@ -580,4 +652,7 @@ test('report matrix EJS renders supported controls and locked row state', async 
   assert.match(html, /class="col-12"/);
   assert.match(html, /data-prefill-key/);
   assert.doesNotMatch(html, /js-matrix-save/);
+  assert.match(html, /id="btnReportMatrixExpandTable"/);
+  assert.match(html, /id="reportMatrixTableModal"/);
+  assert.match(html, /id="reportMatrixTableInlineHost"/);
 });

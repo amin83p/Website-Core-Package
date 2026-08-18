@@ -1474,12 +1474,14 @@ async function showReportMatrix(req, res) {
     const canExportReportInstance = await reportViewService.canExportReportInstance(req.user);
     const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
     const canReopenReportInstanceToDraft = await reportViewService.canReopenReportInstanceToDraft(req.user);
+    const isMatrixAdminViewer = reportViewService.isSchoolReportAdminViewer(req.user);
     return res.render('school/report/instanceMatrix', {
       title: `Fill Reports: ${matrix.templateTitle}`,
       matrix,
       canExportReportInstance,
       canUnlockReportInstance,
       canReopenReportInstanceToDraft,
+      isMatrixAdminViewer,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId

@@ -4,6 +4,7 @@ const reportRuleEngineService = require('./reportRuleEngineService');
 const reportIntegrityService = require('./reportIntegrityService');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const reportScopePolicy = require('./reportScopePolicy');
+const reportRosterService = require('./reportRosterService');
 const reportDocxRenderService = require('./reportDocxRenderService');
 const reportPdfRenderService = require('./reportPdfRenderService');
 const reportFunderDocxService = require('./reportFunderDocxService');
@@ -234,13 +235,27 @@ async function resolveTargetStudentIds({
     endDate: normalizeDateOnly(assignment?.reportDueDate) || referenceDate
   });
   const classStudentSet = new Set(classStudentIds);
+  const sessionId = String(assignment?.sessionId || '').trim();
+  const sessionMatch = sessionId
+    ? reportRosterService.findSessionInList(sessions, sessionId)
+    : null;
 
   let targetStudentIds = [];
   if (reportScope === 'class') {
     targetStudentIds = [''];
   } else if (reportScope === 'each_student') {
-    targetStudentIds = classStudentIds;
-    if (!targetStudentIds.length) throw new Error('No students found for this class assignment.');
+    targetStudentIds = await reportRosterService.resolveEachStudentTargetPersonIds({
+      assignment,
+      classData,
+      sessions,
+      session: sessionMatch,
+      reqUser,
+      resolveEnrollmentPersonIds: async () => classStudentIds
+    });
+    if (!targetStudentIds.length) {
+      if (sessionId) throw new Error('No students found on the session roster for this assignment.');
+      throw new Error('No students found for this class assignment.');
+    }
   } else {
     const configured = Array.isArray(assignment.targetStudentIds)
       ? assignment.targetStudentIds.map((id) => String(id || '').trim()).filter(Boolean)

@@ -10,6 +10,7 @@ const {
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const reportScopePolicy = require('./reportScopePolicy');
+const reportRosterService = require('./reportRosterService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function inferAssignmentReportScope(row) {
@@ -617,6 +618,19 @@ const reportIntegrityService = {
 
     const studentIdsByTargetDate = new Map();
     for (const targetDate of targetDates) {
+      const sessionTargetRows = effectiveTargetRows.filter((row) => {
+        const rowDate = normalizeDateOnly(row?.reportDueDate || row?.dueDate || row?.sessionDate);
+        return rowDate === targetDate && String(row?.sessionId || '').trim();
+      });
+      if (reportScope === 'each_student' && sessionTargetRows.length) {
+        const rosterSet = new Set();
+        sessionTargetRows.forEach((row) => {
+          const session = reportRosterService.findSessionInList(sessions, row.sessionId);
+          reportRosterService.resolveSessionRosterPersonIds(session).forEach((personId) => rosterSet.add(personId));
+        });
+        studentIdsByTargetDate.set(targetDate, rosterSet);
+        continue;
+      }
       // eslint-disable-next-line no-await-in-loop
       const studentIds = await resolveClassStudentIds({
         classData,
@@ -631,6 +645,13 @@ const reportIntegrityService = {
     if (reportScope === 'each_student') {
       const emptyDates = targetDates.filter((targetDate) => (studentIdsByTargetDate.get(targetDate)?.size || 0) === 0);
       if (emptyDates.length) {
+        const sessionLinkedDates = emptyDates.filter((targetDate) => effectiveTargetRows.some((row) => {
+          const rowDate = normalizeDateOnly(row?.reportDueDate || row?.dueDate || row?.sessionDate);
+          return rowDate === targetDate && String(row?.sessionId || '').trim();
+        }));
+        if (sessionLinkedDates.length) {
+          throw new Error(`No students on the session roster for ${sessionLinkedDates.join(', ')} for "each student" scope.`);
+        }
         throw new Error(`No students with active enrollment on ${emptyDates.join(', ')} for "each student" scope.`);
       }
     }
@@ -793,13 +814,27 @@ const reportIntegrityService = {
       strictCanonical: true
     });
     const classStudentSet = new Set(classStudentIds);
+    const sessionId = String(assignment?.sessionId || '').trim();
+    const sessionMatch = sessionId
+      ? reportRosterService.findSessionInList(sessions, sessionId)
+      : null;
 
     let targetStudentIds = [];
     if (reportScope === 'class') {
       targetStudentIds = [''];
     } else if (reportScope === 'each_student') {
-      targetStudentIds = classStudentIds;
-      if (!targetStudentIds.length) throw new Error('No students found for this class assignment.');
+      targetStudentIds = await reportRosterService.resolveEachStudentTargetPersonIds({
+        assignment,
+        classData,
+        sessions,
+        session: sessionMatch,
+        reqUser,
+        resolveEnrollmentPersonIds: async () => classStudentIds
+      });
+      if (!targetStudentIds.length) {
+        if (sessionId) throw new Error('No students found on the session roster for this assignment.');
+        throw new Error('No students found for this class assignment.');
+      }
     } else {
       const configured = Array.isArray(assignment.targetStudentIds)
         ? assignment.targetStudentIds.map((id) => String(id || '').trim()).filter(Boolean)

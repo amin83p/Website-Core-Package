@@ -96,6 +96,7 @@
     "reportIntegrityService.js",
     "reportMatrixService.js",
     "reportPrefillKeyUtils.js",
+    "reportRosterService.js",
     "reportRuleEngineService.js",
     "reportScopePolicy.js",
     "reportService.js",

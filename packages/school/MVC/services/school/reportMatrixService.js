@@ -16,6 +16,11 @@ const STUDENT_NAME_KEYS = new Set([
   'student_full_name',
   'student_preferred_name'
 ]);
+const COMMON_CONTEXT_PREFILL_KEYS = new Set(
+  (reportService.getPrefillCatalog()?.common || [])
+    .map((entry) => clean(entry?.key).toLowerCase())
+    .filter(Boolean)
+);
 
 function clean(value) {
   return String(value || '').trim();
@@ -44,6 +49,45 @@ function isOverallAttendanceDayField(field = {}) {
   const prefillKey = clean(field?.prefillKey).toLowerCase();
   return /^attendance_(day|presence|note)_\d{2}$/.test(fieldId)
     || /^attendance_(day|presence|note)_\d{2}$/.test(prefillKey);
+}
+
+function fieldPrefillTokens(field = {}) {
+  return [clean(field.prefillKey).toLowerCase(), clean(field.id).toLowerCase()].filter(Boolean);
+}
+
+function isCommonContextPrefillField(field = {}) {
+  if (
+    !isReadOnlyField(field)
+    || isCalculatedField(field)
+    || isStudentNameField(field)
+    || isOverallAttendanceDayField(field)
+  ) return false;
+  return fieldPrefillTokens(field).some((token) => COMMON_CONTEXT_PREFILL_KEYS.has(token));
+}
+
+function resolveCommonFieldValue(field, rows = [], sharedAnswers = {}, contextHints = {}) {
+  const fieldId = clean(field.id);
+  if (Object.prototype.hasOwnProperty.call(sharedAnswers, fieldId)) {
+    return sharedAnswers[fieldId];
+  }
+  for (const row of rows) {
+    const value = row?.answers?.[fieldId];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  const contextMap = {
+    class_name: contextHints.className,
+    teacher_name: contextHints.teacherName,
+    report_date: contextHints.reportDate,
+    report_period_start_date: contextHints.reportStartDate,
+    report_period_due_date: contextHints.reportDueDate,
+    session_date: contextHints.sessionDate
+  };
+  for (const token of fieldPrefillTokens(field)) {
+    if (Object.prototype.hasOwnProperty.call(contextMap, token) && contextMap[token]) {
+      return contextMap[token];
+    }
+  }
+  return rows[0]?.answers?.[fieldId] ?? '';
 }
 
 function stableValueToken(value) {
@@ -247,7 +291,7 @@ async function buildStudentMatrixRow({
   };
 }
 
-function classifyMatrixFields(template, rows, assignment) {
+function classifyMatrixFields(template, rows, assignment, contextHints = {}) {
   const fields = (Array.isArray(template?.schema?.fields) ? template.schema.fields : [])
     .filter((field) => field?.id && !isVisualField(field));
   const sectionMap = buildFieldSectionMap(template);
@@ -276,6 +320,11 @@ function classifyMatrixFields(template, rows, assignment) {
       || isCalculatedField(field)
       || isOverallAttendanceDayField(field)
     ) return;
+    if (isCommonContextPrefillField(field)) {
+      commonReadOnlyFields.push(field);
+      consumed.add(clean(field.id));
+      return;
+    }
     const values = rows.map((row) => row.answers?.[field.id]);
     if (valuesAreIdentical(values)) {
       commonReadOnlyFields.push(field);
@@ -299,9 +348,7 @@ function classifyMatrixFields(template, rows, assignment) {
 
   const commonFieldDtos = commonReadOnlyFields.map((field) => toFieldDto(field, {
     ...dtoExtras(field),
-    value: Object.prototype.hasOwnProperty.call(sharedAnswers, field.id)
-      ? sharedAnswers[field.id]
-      : rows[0]?.answers?.[field.id]
+    value: resolveCommonFieldValue(field, rows, sharedAnswers, contextHints)
   }));
   const tableFields = fields
     .filter((field) => !consumed.has(clean(field.id)))
@@ -371,33 +418,7 @@ async function buildMatrixContext({
     .filter(Boolean)
     .sort((left, right) => left.localeCompare(right));
 
-  const classificationRows = sortedStudentIds.map((studentId) => {
-    const instance = findMatchingInstance(instances, {
-      assignmentId: assignment.id,
-      assignmentRowId: assignmentRowKey,
-      teacherId: resolvedTeacherId,
-      studentId
-    });
-    return {
-      studentId,
-      answers: instance?.answers && typeof instance.answers === 'object' ? instance.answers : {},
-      status: clean(instance?.status),
-      instanceId: instance?.id,
-      isPending: !instance
-    };
-  });
-
-  const fieldGroups = classifyMatrixFields(template, classificationRows, assignment);
-  const progress = buildProgress(classificationRows);
-  const parsedWindow = windowParams || matrixWindowService.parseMatrixWindowQuery({});
-  const totalStudents = sortedStudentIds.length;
-  const studentStart = Math.min(parsedWindow.studentOffset, totalStudents);
-  const studentEnd = parsedWindow.applyWindow
-    ? Math.min(studentStart + parsedWindow.studentLimit, totalStudents)
-    : totalStudents;
-  const windowedStudentIds = sortedStudentIds.slice(studentStart, studentEnd);
-
-  const rows = await Promise.all(windowedStudentIds.map((studentId) => buildStudentMatrixRow({
+  const allRows = await Promise.all(sortedStudentIds.map((studentId) => buildStudentMatrixRow({
     assignment,
     template,
     teacherId: resolvedTeacherId,
@@ -411,14 +432,29 @@ async function buildMatrixContext({
     reqUser,
     treatSubmittedAsLocked
   })));
-  rows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.studentId.localeCompare(b.studentId));
+  allRows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.studentId.localeCompare(b.studentId));
 
   const teacherName = clean(
-    rows[0]?.answers?.teacher_name
-    || rows[0]?.answers?.instructor_name
-    || classificationRows.find((row) => row.answers?.teacher_name)?.answers?.teacher_name
+    allRows[0]?.answers?.teacher_name
+    || allRows[0]?.answers?.instructor_name
+    || allRows.find((row) => row.answers?.teacher_name)?.answers?.teacher_name
     || resolvedTeacherId
   );
+  const className = clean(classData?.title || assignment.classId);
+  const reportStartDate = clean(assignment.reportStartDate);
+  const reportDueDate = clean(assignment.reportDueDate || assignment.dueDate || assignment.sessionDate);
+  const sessionDate = clean(assignment.sessionDate || assignment.reportDueDate);
+  const fieldGroups = classifyMatrixFields(template, allRows, assignment, {
+    className,
+    teacherName,
+    reportDate: clean(allRows[0]?.answers?.report_date),
+    reportStartDate,
+    reportDueDate,
+    sessionDate
+  });
+  const progress = buildProgress(allRows);
+  const parsedWindow = windowParams || matrixWindowService.parseMatrixWindowQuery({});
+  const rows = allRows;
   const sharedFieldsGate = reportViewService.evaluateSharedFieldsEditability({
     assignment,
     template,
@@ -433,11 +469,11 @@ async function buildMatrixContext({
     templateId: toPublicId(template.id),
     templateTitle: clean(template.title || template.name || 'Report'),
     classId: toPublicId(classData?.id || assignment.classId),
-    className: clean(classData?.title || assignment.classId),
+    className,
     sessionId: clean(assignment.sessionId),
-    sessionDate: clean(assignment.sessionDate || assignment.reportDueDate),
-    reportStartDate: clean(assignment.reportStartDate),
-    reportDueDate: clean(assignment.reportDueDate || assignment.dueDate || assignment.sessionDate),
+    sessionDate,
+    reportStartDate,
+    reportDueDate,
     teacherId: clean(resolvedTeacherId),
     teacherName,
     scope: clean(assignment.reportScope).toLowerCase(),
@@ -892,6 +928,7 @@ module.exports = {
   isCalculatedField,
   isReadOnlyField,
   isStudentNameField,
+  isCommonContextPrefillField,
   valuesAreIdentical,
   buildFieldHelpText,
   buildFieldSectionMap,

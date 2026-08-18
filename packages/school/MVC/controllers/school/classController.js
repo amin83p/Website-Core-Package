@@ -3960,6 +3960,13 @@ async function manageSession(req, res) {
             viewerContext: sessionReportViewerContext,
             sessionRoster: session.roster
         });
+        const sessionRosterReconciliation = await sessionReportInstanceService.buildSessionRosterReconciliation({
+            classId,
+            sessionId,
+            sessionDate: session?.date,
+            sessionRoster: session.roster,
+            reqUser: req.user
+        });
         const sessionHasConductRequiredReports = [...new Set(
             (Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : [])
                 .map((row) => toPublicId(row?.assignmentId))
@@ -4065,6 +4072,7 @@ async function manageSession(req, res) {
             sessionExamContentItems,
             combinedSessionContent,
             sessionReportInstanceRows,
+            sessionRosterReconciliation,
             sessionHasConductRequiredReports,
             canAssignSessionReports: Boolean(reportAssignmentCreateAccess?.allowed),
             conductPrefillByPersonId,
@@ -4190,9 +4198,17 @@ async function listSessionReportInstances(req, res) {
             viewerContext,
             sessionRoster: enrichedRoster
         });
+        const rosterReconciliation = await sessionReportInstanceService.buildSessionRosterReconciliation({
+            classId,
+            sessionId,
+            sessionDate: session?.date,
+            sessionRoster: enrichedRoster,
+            reqUser: req.user
+        });
         return res.json({
             status: 'success',
             rows,
+            rosterReconciliation,
             refreshedAt: new Date().toISOString()
         });
     } catch (error) {
