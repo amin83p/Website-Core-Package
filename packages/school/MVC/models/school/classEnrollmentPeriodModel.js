@@ -25,6 +25,92 @@ const PERIOD_STATUSES = new Set([
   'void',
   'error'
 ]);
+const ENROLLMENT_KINDS = new Set(['standard', 'extension']);
+
+function sanitizeEnrollmentKind(value) {
+  const token = cleanString(value, { max: 40, allowEmpty: true }).toLowerCase();
+  return ENROLLMENT_KINDS.has(token) ? token : 'standard';
+}
+
+function sanitizeCycleAttendanceSummary(value) {
+  if (!isPlainObject(value)) return null;
+  const num = (field) => {
+    const parsed = Number(value[field]);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  return {
+    cycleClassId: cleanId(value.cycleClassId, { max: 80, allowEmpty: true }) || '',
+    boundaryDate: normalizeDateOrEmpty(value.boundaryDate),
+    consumedSessions: Math.max(0, Math.floor(num('consumedSessions'))),
+    present: Math.max(0, Math.floor(num('present'))),
+    absent: Math.max(0, Math.floor(num('absent'))),
+    absentExcused: Math.max(0, Math.floor(num('absentExcused'))),
+    acf: Math.max(0, Math.floor(num('acf'))),
+    acfExcused: Math.max(0, Math.floor(num('acfExcused'))),
+    lateMinutes: Math.max(0, Math.floor(num('lateMinutes'))),
+    earlyLeaveMinutes: Math.max(0, Math.floor(num('earlyLeaveMinutes'))),
+    lateExcusedMinutes: Math.max(0, Math.floor(num('lateExcusedMinutes'))),
+    earlyLeaveExcusedMinutes: Math.max(0, Math.floor(num('earlyLeaveExcusedMinutes'))),
+    notApplicableSessions: Math.max(0, Math.floor(num('notApplicableSessions'))),
+    targetSessionCount: Math.max(0, Math.floor(num('targetSessionCount'))),
+    targetHours: Number.isFinite(Number(value.targetHours)) ? Number(Number(value.targetHours).toFixed(2)) : 0,
+    consumedHours: Number.isFinite(Number(value.consumedHours)) ? Number(Number(value.consumedHours).toFixed(2)) : 0,
+    remainingSessions: Math.max(0, Math.floor(num('remainingSessions'))),
+    remainingHours: Number.isFinite(Number(value.remainingHours)) ? Number(Number(value.remainingHours).toFixed(2)) : 0,
+    generatedAt: cleanString(value.generatedAt, { max: 40, allowEmpty: true }),
+    generatedBy: cleanId(value.generatedBy, { max: 80, allowEmpty: true }) || ''
+  };
+}
+
+function sanitizeEnrollmentSessionMarks(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  const seen = new Set();
+  value.forEach((row) => {
+    if (!isPlainObject(row)) return;
+    const sessionId = cleanId(row.sessionId, { max: 120, allowEmpty: true });
+    if (!sessionId || seen.has(sessionId)) return;
+    seen.add(sessionId);
+    const status = cleanString(row.status, { max: 40, allowEmpty: true }).toLowerCase();
+    out.push({
+      sessionId,
+      status: status === 'not_applicable' ? 'not_applicable' : 'not_applicable',
+      note: cleanString(row.note, { max: 500, allowEmpty: true }),
+      markedAt: cleanString(row.markedAt, { max: 40, allowEmpty: true }),
+      markedBy: cleanId(row.markedBy, { max: 80, allowEmpty: true }) || '',
+      locked: row.locked === true || String(row.locked).toLowerCase() === 'true'
+    });
+  });
+  return out.slice(0, 500);
+}
+
+function sanitizeEnrollmentExtensions(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 100).map((row) => {
+    if (!isPlainObject(row)) return null;
+    const extensionPeriodId = cleanId(row.extensionPeriodId, { max: 80, allowEmpty: true });
+    if (!extensionPeriodId) return null;
+    return {
+      extensionPeriodId,
+      extensionKind: cleanString(row.extensionKind, { max: 40, allowEmpty: true }),
+      reason: cleanString(row.reason, { max: 500, allowEmpty: true }),
+      createdAt: cleanString(row.createdAt, { max: 40, allowEmpty: true }),
+      createdBy: cleanId(row.createdBy, { max: 80, allowEmpty: true }) || ''
+    };
+  }).filter(Boolean);
+}
+
+function mergePlannedNaFromMarks(marks, plannedIds) {
+  const ids = new Set();
+  sanitizeEnrollmentSessionMarks(marks).forEach((mark) => {
+    if (mark.sessionId) ids.add(mark.sessionId);
+  });
+  (Array.isArray(plannedIds) ? plannedIds : []).forEach((id) => {
+    const token = cleanId(id, { max: 120, allowEmpty: true });
+    if (token) ids.add(token);
+  });
+  return [...ids].slice(0, 200);
+}
 const { applyVoidMetadata } = require('./voidRecordMetadata');
 const { normalizeTransactionSummary } = require('./registrationTransactionSummary');
 
@@ -193,17 +279,16 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
     completionDate: sessionCap.completionDate,
     completionSessionId: sessionCap.completionSessionId,
     completionReason: sessionCap.completionReason,
+    enrollmentKind: sanitizeEnrollmentKind(input.enrollmentKind),
+    extensionOfPeriodId: cleanId(input.extensionOfPeriodId, { max: 80, allowEmpty: true }) || '',
+    carriedForwardFromPeriodId: cleanId(input.carriedForwardFromPeriodId, { max: 80, allowEmpty: true }) || '',
+    cycleAttendanceSummary: sanitizeCycleAttendanceSummary(input.cycleAttendanceSummary),
+    enrollmentSessionMarks: sanitizeEnrollmentSessionMarks(input.enrollmentSessionMarks),
+    enrollmentExtensions: sanitizeEnrollmentExtensions(input.enrollmentExtensions),
     plannedNotApplicableSessionIds: (() => {
+      const marks = sanitizeEnrollmentSessionMarks(input.enrollmentSessionMarks);
       const raw = Array.isArray(input.plannedNotApplicableSessionIds) ? input.plannedNotApplicableSessionIds : [];
-      const out = [];
-      const seen = new Set();
-      raw.forEach((row) => {
-        const id = cleanId(row, { max: 120, allowEmpty: true });
-        if (!id || seen.has(id)) return;
-        seen.add(id);
-        out.push(id);
-      });
-      return out.slice(0, 200);
+      return mergePlannedNaFromMarks(marks, raw);
     })(),
     transactionSummary: sanitizeTransactionSummary(input.transactionSummary, input.id),
     sequenceNo,
@@ -395,6 +480,12 @@ async function clearByOrg(orgId) {
 
 module.exports = {
   PERIOD_STATUSES: Object.freeze([...PERIOD_STATUSES]),
+  ENROLLMENT_KINDS: Object.freeze([...ENROLLMENT_KINDS]),
+  sanitizeEnrollmentKind,
+  sanitizeCycleAttendanceSummary,
+  sanitizeEnrollmentSessionMarks,
+  sanitizeEnrollmentExtensions,
+  mergePlannedNaFromMarks,
   getAllEnrollmentPeriods,
   getEnrollmentPeriodById,
   findByClassId,

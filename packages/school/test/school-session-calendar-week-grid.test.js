@@ -12,6 +12,13 @@ function loadSessionCalendarCore() {
   return sandbox.window.SessionCalendarCore;
 }
 
+test('formatHours is exported for enrollment calendar modal', () => {
+  const core = loadSessionCalendarCore();
+  assert.equal(typeof core.formatHours, 'function');
+  assert.equal(core.formatHours(1), '1 Hr');
+  assert.equal(core.formatHours(2), '2 Hrs');
+});
+
 test('buildWeekBlocks pads partial weeks with inRange flags', () => {
   const core = loadSessionCalendarCore();
   const blocks = core.buildWeekBlocks({ startDate: '2026-01-13', endDate: '2026-01-16' });

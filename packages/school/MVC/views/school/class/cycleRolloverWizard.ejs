@@ -147,10 +147,13 @@
                   <th>Split Across Boundary</th>
                   <th>Move Whole</th>
                   <th>Ineligible</th>
+                  <th>Consumed</th>
+                  <th>Remaining Cap</th>
+                  <th>Carry Dates</th>
                 </tr>
               </thead>
               <tbody id="tbody_studentPreview">
-                <tr><td colspan="5" class="text-center py-3 text-muted">No preview yet.</td></tr>
+                <tr><td colspan="8" class="text-center py-3 text-muted">No preview yet.</td></tr>
               </tbody>
             </table>
           </div>
@@ -286,9 +289,21 @@
     }
 
     if (!studentRows.length) {
-      studentTbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted">No candidate students found.</td></tr>';
+      studentTbody.innerHTML = '<tr><td colspan="8" class="text-center py-3 text-muted">No candidate students found.</td></tr>';
     } else {
-      studentTbody.innerHTML = studentRows.map((row) => `
+      studentTbody.innerHTML = studentRows.map((row) => {
+        const plans = Array.isArray(row.carryPlans) ? row.carryPlans : [];
+        const firstPlan = plans[0] || null;
+        const consumed = Number(row.consumedSessions || 0);
+        const remainingSessions = Number(row.remainingSessions || 0);
+        const remainingHours = Number(row.remainingHours || 0);
+        const remainingCap = remainingSessions > 0
+          ? `${remainingSessions} session(s)`
+          : (remainingHours > 0 ? `${remainingHours} hr(s)` : '-');
+        const carryDates = firstPlan
+          ? `${htmlEscape(String(firstPlan.targetStartDate || '-'))} → ${htmlEscape(String(firstPlan.targetEndDate || 'Open'))}`
+          : '-';
+        return `
         <tr>
           <td>
             <div class="fw-semibold">${htmlEscape(String(row.studentLabel || row.studentName || row.studentId || '-'))}</div>
@@ -298,8 +313,11 @@
           <td>${htmlEscape(String(row.splitCount || 0))}</td>
           <td>${htmlEscape(String(row.moveWholeCount || 0))}</td>
           <td>${htmlEscape(String(row.ineligibleCount || 0))}</td>
-        </tr>
-      `).join('');
+          <td>${htmlEscape(String(consumed))}</td>
+          <td>${htmlEscape(remainingCap)}</td>
+          <td class="small">${carryDates}</td>
+        </tr>`;
+      }).join('');
     }
 
     btnExecute.disabled = !isRolling || !preview || hasBlockingIssues;

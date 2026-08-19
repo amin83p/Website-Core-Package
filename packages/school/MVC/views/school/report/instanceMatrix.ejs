@@ -692,14 +692,6 @@
         updateReportMatrixTableModalSize();
         moveReportMatrixTableToModal();
       });
-      reportMatrixTableModalEl.addEventListener('shown.bs.modal', () => {
-        // #region agent log
-        const dialog = document.getElementById('reportMatrixTableModalDialog');
-        const modalEl = document.getElementById('reportMatrixTableModal');
-        const dialogRect = dialog?.getBoundingClientRect();
-        fetch('http://127.0.0.1:7806/ingest/c7fa1798-3774-4efe-9724-2848436aa81e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a4ed36'},body:JSON.stringify({sessionId:'a4ed36',runId:'railway-verify',location:'instanceMatrix.ejs:shown.bs.modal',message:'modal shown dimensions',data:{hypothesisId:'H3',host:location.host,dialogWidth:dialogRect?.width,windowWidth:window.innerWidth,modalParentTag:modalEl?.parentElement?.tagName,modalParentClass:modalEl?.parentElement?.className||'',bodyTransform:document.body?.style?.transform||'',appZoom:document.body?.dataset?.appZoom||'',dialogClasses:dialog?.className||''},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-      });
       reportMatrixTableModalEl.addEventListener('hidden.bs.modal', () => {
         restoreReportMatrixTableInline();
       });

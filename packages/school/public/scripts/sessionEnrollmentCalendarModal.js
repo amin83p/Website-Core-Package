@@ -11,6 +11,7 @@
     day: 'Day',
     week: 'Week',
     twoWeeks: '2 Weeks',
+    thirtyDays: '30 Days',
     month: 'Month',
     twoMonths: '2 Months',
     threeMonths: '3 Months'
@@ -32,6 +33,510 @@
   let stageSessionCount = 4;
   let stageWeekdays = new Set();
   let stageModalBound = false;
+
+  function isManageMode() {
+    return String(state?.mode || '').trim() === 'manageEnrollmentSessions';
+  }
+
+  function isEventNaMarked(ev = {}) {
+    if (isManageMode()) {
+      return resolveManageNaState(ev) !== 'normal';
+    }
+    const attendance = String(ev?.attendance || '').trim().toLowerCase();
+    return Boolean(ev?.marked) || attendance === 'not_applicable';
+  }
+
+  function resolveManageNaState(ev = {}) {
+    const sessionId = String(ev?.sessionId || '').trim();
+    const pending = state?.pendingMarkChanges?.get(sessionId);
+    if (pending?.action === 'mark_na') return 'pending';
+    if (pending?.action === 'unmark') return 'normal';
+    if (ev?.savedMarked || ev?.savedRosterNa) return 'saved';
+    return 'normal';
+  }
+
+  function hasPendingMarkChanges() {
+    return Boolean(state?.pendingMarkChanges?.size);
+  }
+
+  function syncEventNaFromPending(sessionId) {
+    const id = String(sessionId || '').trim();
+    const ev = allEvents.find((row) => String(row?.sessionId || '').trim() === id);
+    if (!ev) return;
+    const naState = resolveManageNaState(ev);
+    ev.marked = naState !== 'normal';
+    ev.pendingNa = naState === 'pending';
+  }
+
+  function syncDoneButtonLabel() {
+    const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
+    if (!doneBtn || !isManageMode()) return;
+    const pendingCount = state?.pendingMarkChanges?.size || 0;
+    doneBtn.textContent = pendingCount ? `Save & close (${pendingCount})` : 'Done';
+  }
+
+  function initManageModeViewRange() {
+    if (!state) return;
+    const today = core.parseAnchorDate('');
+    const enrollmentStart = core.normalizeDateOnly(state.startDate || '');
+    const enrollmentEnd = core.normalizeDateOnly(state.endDate || '');
+    const rangeStart = enrollmentStart && today < enrollmentStart ? enrollmentStart : today;
+    let rangeEnd = core.addDaysIso(rangeStart, 30);
+    if (enrollmentEnd && enrollmentEnd < rangeEnd) rangeEnd = enrollmentEnd;
+    state.viewPreset = 'thirtyDays';
+    state.anchorDate = rangeStart;
+    state.viewRange = {
+      startDate: rangeStart,
+      endDate: rangeEnd,
+      preset: 'thirtyDays',
+      anchorDate: rangeStart
+    };
+  }
+
+  function syncModalChromeForMode() {
+    const titleEl = qs('sessionEnrollmentCalendarModalTitle');
+    const hintEl = qs('sessionEnrollmentCalendarHint');
+    const clearBtn = qs('btn_sessionEnrollmentCalendarClear');
+    const saveBtn = qs('btn_sessionEnrollmentCalendarSave');
+    const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
+    const thirtyDaysBtn = qs('btn_sessionEnrollmentPresetThirtyDays');
+    const dialogEl = modalEl?.querySelector('.modal-dialog') || qs('sessionEnrollmentCalendarModal')?.querySelector('.modal-dialog');
+    const manage = isManageMode();
+    if (titleEl) {
+      titleEl.textContent = manage ? 'Manage enrollment sessions' : 'Select sessions';
+    }
+    if (hintEl) {
+      hintEl.textContent = manage
+        ? 'Blue = open session, green = attendance recorded, light red = saved N/A, light amber = pending N/A. Click a session to mark or unmark, then Save & close.'
+        : 'Click empty grid space to stage sessions; click sessions to include or exclude.';
+    }
+    clearBtn?.classList.toggle('d-none', manage);
+    saveBtn?.classList.toggle('d-none', manage);
+    doneBtn?.classList.toggle('d-none', !manage);
+    thirtyDaysBtn?.classList.toggle('d-none', !manage);
+    if (dialogEl) dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage);
+    syncDoneButtonLabel();
+    syncPresetButtons();
+  }
+
+  function mapSessionWindowRowToEvent(row = {}) {
+    const sessionId = String(row?.sessionId || '').trim();
+    const date = core.normalizeDateOnly(row?.date);
+    const start = String(row?.startTime || '').trim();
+    const end = String(row?.endTime || '').trim();
+    const startMin = core.timeToMinutes(start);
+    const endMin = core.timeToMinutes(end);
+    const durationHours = Number.isFinite(startMin) && Number.isFinite(endMin) && endMin > startMin
+      ? Math.round(((endMin - startMin) / 60) * 100) / 100
+      : 0;
+    const attendance = String(row?.attendance || '').trim();
+    const savedMarked = Boolean(row?.mark);
+    const savedRosterNa = !savedMarked && attendance.toLowerCase() === 'not_applicable';
+    const marked = savedMarked || savedRosterNa;
+    return {
+      sessionId,
+      classId: state?.classId || '',
+      date,
+      start,
+      end,
+      durationHours,
+      teacherName: 'Session',
+      manageable: false,
+      manageSessionUrl: '',
+      selectable: true,
+      excludeReason: '',
+      isStaged: false,
+      selected: false,
+      attendance,
+      savedMarked,
+      savedRosterNa,
+      marked,
+      pendingNa: false,
+      locked: Boolean(row?.mark?.locked),
+      markNote: String(row?.mark?.note || '').trim(),
+      enrollmentManageMode: true
+    };
+  }
+
+  function applySessionWindowData(data = {}, options = {}) {
+    const preserveViewRange = options.preserveViewRange === true;
+    const skipScroll = options.skipScroll === true;
+    if (state) {
+      state.pendingMarkChanges = new Map();
+      state.sessionWindowLoaded = true;
+    }
+    manageSummaryMeta = {
+      startDate: String(data?.startDate || state?.startDate || '').trim(),
+      endDate: String(data?.endDate || state?.endDate || '').trim(),
+      cycleAttendanceSummary: data?.cycleAttendanceSummary || null
+    };
+    if (data?.startDate) state.startDate = String(data.startDate).trim();
+    if (data?.endDate !== undefined) state.endDate = String(data.endDate || '').trim();
+    allEvents = (Array.isArray(data?.sessions) ? data.sessions : [])
+      .map((row) => mapSessionWindowRowToEvent(row))
+      .filter((row) => row.sessionId && row.date);
+
+    if (!preserveViewRange) {
+      initManageModeViewRange();
+    }
+    syncPresetButtons();
+    syncViewModeButtons();
+    renderCalendar();
+    updateManageSummary();
+    if (!skipScroll) {
+      scrollToFirstNaInView();
+    }
+  }
+
+  function scrollToFirstNaInView() {
+    const naEvent = getVisibleEvents().find(isEventNaMarked) || allEvents.find(isEventNaMarked);
+    if (!naEvent?.date) return;
+    requestAnimationFrame(() => {
+      scrollHostToStagedDate(naEvent.date);
+    });
+  }
+
+  async function fetchSessionWindowData({ reload = false } = {}) {
+    if (!state?.periodId) throw new Error('periodId is required for manage enrollment sessions.');
+    if (!reload && state.sessionWindowLoaded && isManageMode()) {
+      await refreshPickerViewLocally();
+      return;
+    }
+    await ensureHolidaysLoaded();
+    const requestJson = state.requestJson || defaultRequestJson;
+    let url = `/school/classes/api/enrollment-periods/${encodeURIComponent(state.periodId)}/session-window`;
+    if (reload) {
+      url += `${url.includes('?') ? '&' : '?'}_=${Date.now()}`;
+    }
+    const scrollSnapshot = captureScrollPositions();
+    const result = await requestJson(url, 'GET');
+    const preserveUi = reload && state?.sessionWindowLoaded;
+    applySessionWindowData(result?.data || {}, {
+      preserveViewRange: preserveUi,
+      skipScroll: preserveUi
+    });
+    restoreScrollPositions(scrollSnapshot);
+  }
+
+  function formatManageAttendanceLabel(raw = '') {
+    const key = String(raw || '').trim().toLowerCase();
+    const labels = {
+      present: 'Present',
+      late: 'Late',
+      absent: 'Absent',
+      acf: 'ACF',
+      not_applicable: 'N/A',
+      excused: 'Excused'
+    };
+    return labels[key] || String(raw || '').trim();
+  }
+
+  function buildManageSessionTimeLabel(ev = {}) {
+    const start = String(ev?.start || '').trim();
+    const end = String(ev?.end || '').trim();
+    if (start && end && typeof core.formatClockTimeRange === 'function') {
+      return core.formatClockTimeRange(start, end);
+    }
+    return [start, end].filter(Boolean).join(' – ') || String(ev?.date || '');
+  }
+
+  function buildManageSessionMetaLine(ev = {}, naState = 'normal') {
+    const parts = [];
+    const attendance = formatManageAttendanceLabel(ev?.attendance);
+    if (naState === 'normal' && attendance) parts.push(attendance);
+    parts.push(core.formatHours(ev?.durationHours));
+    return parts.join(' · ');
+  }
+
+  function buildManageNaHeadHtml(naState) {
+    if (naState === 'pending') {
+      return '<div class="session-manage-na-head is-pending" style="color:#997404;font-weight:800;font-size:0.68rem;line-height:1.1;">N/A · pending</div>';
+    }
+    if (naState === 'saved') {
+      return '<div class="session-manage-na-head is-saved" style="color:#b02a37;font-weight:800;font-size:0.68rem;line-height:1.1;">N/A</div>';
+    }
+    return '';
+  }
+
+  function buildManageBlockInlineStyle(naState, attendance = '') {
+    const att = String(attendance || '').trim().toLowerCase();
+    const base = 'box-sizing:border-box;border-radius:4px;';
+    if (naState === 'saved') {
+      return `${base}border:2px solid #f1aeb5;background-color:#fde8ea;`;
+    }
+    if (naState === 'pending') {
+      return `${base}border:2px dashed #ffda6a;background-color:#fff8e1;`;
+    }
+    if (att && att !== 'not_applicable') {
+      return `${base}border:2px solid #a3cfbb;background-color:#e8f5ee;`;
+    }
+    return `${base}border:2px solid #9ec5fe;background-color:#f0f6ff;`;
+  }
+
+  function buildManageEnrollmentBlockHtml(ev) {
+    const sessionId = String(ev?.sessionId || '').trim();
+    const naState = resolveManageNaState(ev);
+    const attendance = String(ev?.attendance || '').trim().toLowerCase();
+    const isOpenSession = naState === 'normal' && !attendance;
+    const hasAttendance = naState === 'normal' && attendance && attendance !== 'not_applicable';
+    const classes = [
+      'session-enrollment-block',
+      'session-manage-block',
+      naState === 'saved' ? 'is-na-saved' : '',
+      naState === 'pending' ? 'is-na-pending' : '',
+      hasAttendance ? 'has-attendance' : '',
+      isOpenSession ? 'is-scheduled-open' : ''
+    ].filter(Boolean).join(' ');
+    const inlineStyle = buildManageBlockInlineStyle(naState, attendance);
+    const timeLabel = buildManageSessionTimeLabel(ev);
+    const metaLabel = buildManageSessionMetaLine(ev, naState);
+    return `
+      <div class="${classes}"
+           style="${inlineStyle}"
+           data-session-id="${core.escapeHtml(sessionId)}"
+           data-selectable="1"
+           data-session-kind="scheduled"
+           data-na-marked="${naState !== 'normal' ? '1' : '0'}"
+           data-na-state="${core.escapeHtml(naState)}"
+           role="button"
+           aria-selected="false"
+           tabindex="0">
+        ${buildManageNaHeadHtml(naState)}
+        <div class="session-block-time" style="font-weight:600;font-size:0.72rem;line-height:1.2;font-variant-numeric:tabular-nums;">${core.escapeHtml(timeLabel)}</div>
+        <div class="session-block-meta" style="font-size:0.64rem;color:#5c636a;line-height:1.2;">${core.escapeHtml(metaLabel)}</div>
+      </div>
+    `;
+  }
+
+  function buildManageListChipHtml(naState, attendance = '') {
+    if (naState === 'saved') return '<span class="session-manage-chip is-na-saved">N/A</span>';
+    if (naState === 'pending') return '<span class="session-manage-chip is-na-pending">N/A · pending</span>';
+    const attendanceLabel = formatManageAttendanceLabel(attendance);
+    if (attendanceLabel) {
+      return `<span class="session-manage-chip has-attendance">${core.escapeHtml(attendanceLabel)}</span>`;
+    }
+    return '';
+  }
+
+  function buildManageListDayCardHtml(ev) {
+    const sessionId = String(ev?.sessionId || '').trim();
+    const naState = resolveManageNaState(ev);
+    const attendance = String(ev?.attendance || '').trim();
+    const isOpenSession = naState === 'normal' && !String(attendance || '').trim();
+    const hasAttendance = naState === 'normal' && attendance && attendance.toLowerCase() !== 'not_applicable';
+    const classes = [
+      'session-day-card',
+      'session-manage-card',
+      naState === 'saved' ? 'is-na-saved' : '',
+      naState === 'pending' ? 'is-na-pending' : '',
+      hasAttendance ? 'has-attendance' : '',
+      isOpenSession ? 'is-scheduled-open' : ''
+    ].filter(Boolean).join(' ');
+    const timeLabel = buildManageSessionTimeLabel(ev);
+    const metaLabel = buildManageSessionMetaLine(ev, naState);
+    const chipHtml = buildManageListChipHtml(naState, attendance);
+    const inlineStyle = buildManageBlockInlineStyle(naState, attendance);
+    return `
+      <div class="${classes}" style="${inlineStyle}" data-session-id="${core.escapeHtml(sessionId)}" data-selectable="1" data-session-kind="scheduled" data-na-marked="${naState !== 'normal' ? '1' : '0'}" data-na-state="${core.escapeHtml(naState)}" role="button" aria-selected="false">
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            ${chipHtml}
+            <div class="fw-semibold session-manage-list-time">${core.escapeHtml(timeLabel)}</div>
+          </div>
+          <div class="small text-muted">${core.escapeHtml(metaLabel)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function updateManageSummary() {
+    summaryEl = qs('sessionEnrollmentCalendarSummary');
+    if (!summaryEl || !state) return;
+    const savedNa = allEvents.filter((row) => resolveManageNaState(row) === 'saved').length;
+    const pendingNa = allEvents.filter((row) => resolveManageNaState(row) === 'pending').length;
+    const visible = getVisibleEvents().length;
+    const viewStart = state.viewRange?.startDate || '—';
+    const viewEnd = state.viewRange?.endDate || '—';
+    const consumed = allEvents.filter((row) => {
+      const status = String(row?.attendance || '').trim().toLowerCase();
+      return status === 'present' || status === 'late' || status === 'absent' || status === 'acf';
+    }).length;
+    const summary = manageSummaryMeta?.cycleAttendanceSummary;
+    let text = `View: ${viewStart} → ${viewEnd} · showing ${visible} session(s) · ${savedNa} saved N/A · ${pendingNa} unsaved N/A · ${consumed} with attendance`;
+    if (summary) {
+      text += ` · Consumed ${summary.consumedSessions || 0}, remaining cap ${summary.remainingSessions || summary.remainingHours || 0}`;
+    }
+    summaryEl.textContent = text;
+    syncDoneButtonLabel();
+  }
+
+  function resolveMarkOverlayEl() {
+    const calendarModal = qs('sessionEnrollmentCalendarModal');
+    return calendarModal?.querySelector('#sessionEnrollmentMarkModal')
+      || qs('sessionEnrollmentMarkModal');
+  }
+
+  function hideMarkModalLayer() {
+    markModalEl = resolveMarkOverlayEl();
+    if (!markModalEl) {
+      setStageOverlayLock(false);
+      markContext = null;
+      return;
+    }
+    markModalEl.classList.add('d-none');
+    markModalEl.classList.remove('show');
+    markModalEl.style.display = 'none';
+    markModalEl.setAttribute('aria-hidden', 'true');
+    setStageOverlayLock(false);
+    markContext = null;
+  }
+
+  function showMarkModalLayer() {
+    const calendarModal = qs('sessionEnrollmentCalendarModal');
+    markModalEl = resolveMarkOverlayEl();
+    if (!markModalEl) return;
+    const dialog = calendarModal?.querySelector('.modal-dialog');
+    if (dialog && markModalEl.parentElement !== dialog) {
+      dialog.appendChild(markModalEl);
+    }
+    markModalEl.classList.remove('d-none');
+    markModalEl.classList.add('show');
+    markModalEl.style.display = 'flex';
+    markModalEl.setAttribute('aria-hidden', 'false');
+    setStageOverlayLock(true);
+    const focusTarget = markModalEl.querySelector('#sessionEnrollmentMarkNote, #btn_sessionEnrollmentMarkUnmark');
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      focusTarget.focus();
+    }
+  }
+
+  function showMarkFormError(message) {
+    const errorEl = qs('sessionEnrollmentMarkError');
+    if (!errorEl) return;
+    errorEl.textContent = String(message || '').trim();
+    errorEl.classList.toggle('d-none', !errorEl.textContent);
+  }
+
+  function openMarkModalForEvent(ev) {
+    if (!ev || !state) return;
+    markContext = ev;
+    bindMarkModalEvents();
+    const naState = resolveManageNaState(ev);
+    const naMarked = naState !== 'normal';
+    const sessionId = String(ev.sessionId || '').trim();
+    const pending = state.pendingMarkChanges?.get(sessionId);
+    const contextEl = qs('sessionEnrollmentMarkContext');
+    const attendanceEl = qs('sessionEnrollmentMarkAttendance');
+    const statusEl = qs('sessionEnrollmentMarkStatus');
+    const noteWrap = qs('sessionEnrollmentMarkNoteWrap');
+    const noteInput = qs('sessionEnrollmentMarkNote');
+    const unmarkBtn = qs('btn_sessionEnrollmentMarkUnmark');
+    const applyBtn = qs('btn_sessionEnrollmentMarkApply');
+    const dateLabel = core.formatDayHeaderLong(ev.date);
+    const timeLabel = buildManageSessionTimeLabel(ev);
+    if (contextEl) contextEl.textContent = `${dateLabel} · ${timeLabel}`;
+    if (attendanceEl) {
+      const attendanceLabel = formatManageAttendanceLabel(ev.attendance);
+      attendanceEl.textContent = attendanceLabel
+        ? `Attendance: ${attendanceLabel}`
+        : 'Attendance: not recorded';
+    }
+    if (statusEl) {
+      if (naState === 'pending') {
+        const pendingNote = String(pending?.note || '').trim();
+        statusEl.innerHTML = `<span class="badge bg-warning text-dark">N/A · pending</span>${pendingNote ? ` <span class="text-muted">${core.escapeHtml(pendingNote)}</span>` : ''}`;
+      } else if (naState === 'saved') {
+        statusEl.innerHTML = `<span class="badge text-bg-danger">N/A</span>${ev.markNote ? ` <span class="text-muted">${core.escapeHtml(ev.markNote)}</span>` : ''}`;
+      } else {
+        statusEl.innerHTML = '<span class="text-muted">Open session</span>';
+      }
+    }
+    if (noteInput) noteInput.value = naState === 'pending' ? String(pending?.note || '').trim() : '';
+    if (noteWrap) noteWrap.classList.toggle('d-none', naMarked);
+    if (unmarkBtn) unmarkBtn.classList.toggle('d-none', !naMarked);
+    if (applyBtn) applyBtn.classList.toggle('d-none', naMarked);
+    showMarkFormError('');
+    showMarkModalLayer();
+  }
+
+  function applyPendingSessionMark(action, note = '') {
+    if (!markContext || !state) return;
+    const sessionId = String(markContext.sessionId || '').trim();
+    if (!sessionId) return;
+    if (!state.pendingMarkChanges) state.pendingMarkChanges = new Map();
+    const ev = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+    if (action === 'unmark') {
+      if (ev?.savedMarked || ev?.savedRosterNa) {
+        state.pendingMarkChanges.set(sessionId, { action: 'unmark', note: '' });
+      } else {
+        state.pendingMarkChanges.delete(sessionId);
+      }
+    } else {
+      state.pendingMarkChanges.set(sessionId, { action: 'mark_na', note: String(note || '').trim() });
+    }
+    syncEventNaFromPending(sessionId);
+    hideMarkModalLayer();
+    const scrollSnapshot = captureScrollPositions();
+    renderCalendar();
+    restoreScrollPositions(scrollSnapshot);
+    updateManageSummary();
+  }
+
+  async function flushPendingMarks() {
+    if (!state?.periodId || !hasPendingMarkChanges()) return null;
+    const changes = [];
+    state.pendingMarkChanges.forEach((change, sessionId) => {
+      changes.push({
+        sessionId: String(sessionId || '').trim(),
+        action: change.action,
+        note: String(change?.note || '').trim()
+      });
+    });
+    const requestJson = state.requestJson || defaultRequestJson;
+    const result = await requestJson(
+      `/school/classes/api/enrollment-periods/${encodeURIComponent(state.periodId)}/session-marks`,
+      'POST',
+      { changes }
+    );
+    if (!result || String(result?.status || '').toLowerCase() === 'error') {
+      throw new Error(result?.message || 'Unable to update enrollment session marks.');
+    }
+    state.pendingMarkChanges.clear();
+    return result;
+  }
+
+  function bindMarkModalEvents() {
+    if (markModalBound) return;
+    markModalBound = true;
+    bindStackEscapeHandler();
+    markModalEl = resolveMarkOverlayEl();
+
+    markModalEl?.addEventListener('click', (event) => {
+      if (event.target.closest('#btn_sessionEnrollmentMarkApply')) {
+        event.preventDefault();
+        const note = String(qs('sessionEnrollmentMarkNote')?.value || '').trim();
+        if (!note) {
+          showMarkFormError('Enter a note explaining why this session is N/A.');
+          return;
+        }
+        applyPendingSessionMark('mark_na', note);
+        return;
+      }
+      if (event.target.closest('#btn_sessionEnrollmentMarkUnmark')) {
+        event.preventDefault();
+        applyPendingSessionMark('unmark', '');
+        return;
+      }
+      if (event.target.closest('[data-mark-dismiss]')) {
+        hideMarkModalLayer();
+      }
+    });
+  }
+
+  let markModalEl = null;
+  let markContext = null;
+  let markModalBound = false;
+  let manageSummaryMeta = null;
   const STAGE_COUNT_MIN = 1;
   const STAGE_COUNT_MAX = 52;
 
@@ -175,13 +680,19 @@
 
   let stackEscapeBound = false;
 
+  function isMarkOverlayOpen() {
+    const el = resolveMarkOverlayEl();
+    return Boolean(el && el.classList.contains('show') && !el.classList.contains('d-none'));
+  }
+
   function handleEnrollmentModalStackEscape(event) {
     if (event.key !== 'Escape') return;
-    if (stageOverlayLockActive || isStageOverlayOpen()) {
+    if (stageOverlayLockActive || isStageOverlayOpen() || isMarkOverlayOpen()) {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      hideStageQuickModalLayer();
+      if (isMarkOverlayOpen()) hideMarkModalLayer();
+      else hideStageQuickModalLayer();
       return;
     }
     const calendarEl = qs('sessionEnrollmentCalendarModal');
@@ -627,6 +1138,7 @@
 
   function getVisibleEvents() {
     const inRange = core.filterEventsByViewRange(allEvents, state.viewRange);
+    const enrollStart = core.normalizeDateOnly(state?.startDate || '');
     const visibleIds = new Set(
       inRange.map((row) => String(row?.sessionId || '').trim()).filter(Boolean)
     );
@@ -638,6 +1150,9 @@
         visibleIds.add(id);
       }
     });
+    if (enrollStart) {
+      return inRange.filter((row) => !row?.date || row.date >= enrollStart);
+    }
     return inRange;
   }
 
@@ -660,6 +1175,10 @@
   }
 
   async function fetchPickerData({ remote = false } = {}) {
+    if (isManageMode()) {
+      await fetchSessionWindowData({ reload: remote });
+      return;
+    }
     if (state?.localPickerMode && !remote && allEvents.length) {
       await refreshPickerViewLocally();
       return;
@@ -697,7 +1216,7 @@
     syncAutoDayWidthMode();
     applyAutoDayWidthIfNeeded({ dayCount: getVisibleDayCountForState() });
     syncDayWidthControlVisibility();
-    core.renderEnrollmentCalendar(hostEl, getVisibleEvents(), {
+    const calendarOptions = {
       viewMode: state.viewMode,
       viewPreset: state.viewPreset,
       viewRange: state.viewRange,
@@ -706,7 +1225,12 @@
       dayWidth: state.dayWidth || 140,
       holidayDates: state.holidayDates || null,
       enrollmentStartDate: state.startDate || ''
-    });
+    };
+    if (isManageMode()) {
+      calendarOptions.buildPositionedBlockHtml = (ev) => buildManageEnrollmentBlockHtml(ev);
+      calendarOptions.buildListDayCardHtml = (ev) => buildManageListDayCardHtml(ev);
+    }
+    core.renderEnrollmentCalendar(hostEl, getVisibleEvents(), calendarOptions);
     syncAutoDayWidthMode();
     if (shouldAutoFitDayColumns()) {
       scheduleCalendarAutoFit();
@@ -714,6 +1238,10 @@
   }
 
   function updateSummary(serverSummary) {
+    if (isManageMode()) {
+      updateManageSummary();
+      return;
+    }
     summaryEl = qs('sessionEnrollmentCalendarSummary');
     if (!summaryEl) return;
     const summary = serverSummary || core.summarizeSelectionFromEvents(allEvents, state.selectedSet);
@@ -769,10 +1297,18 @@
     }
     const block = event.target.closest('[data-session-id]');
     if (block) {
+      if (isManageMode()) {
+        const sessionId = String(block.getAttribute('data-session-id') || '').trim();
+        const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+        if (eventRow) openMarkModalForEvent(eventRow);
+        return;
+      }
       if (String(block.getAttribute('data-selectable') || '') !== '1') return;
       toggleSession(block.getAttribute('data-session-id'), block);
       return;
     }
+
+    if (isManageMode()) return;
 
     hostEl = qs('sessionEnrollmentCalendarHost');
     const gridContext = hostEl
@@ -884,6 +1420,33 @@
       getModal()?.hide();
     });
 
+    qs('btn_sessionEnrollmentCalendarDone')?.addEventListener('click', async () => {
+      if (!state) return;
+      const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
+      const summaryEl = qs('sessionEnrollmentCalendarSummary');
+      const onMarksChanged = state.onMarksChanged;
+      if (doneBtn) doneBtn.disabled = true;
+      let saveResult = null;
+      try {
+        if (hasPendingMarkChanges()) {
+          saveResult = await flushPendingMarks();
+        }
+        const refreshAfterHide = saveResult && typeof onMarksChanged === 'function';
+        if (refreshAfterHide) {
+          modalEl?.addEventListener('hidden.bs.modal', () => {
+            onMarksChanged(saveResult).catch((err) => console.error(err));
+          }, { once: true });
+        }
+        getModal()?.hide();
+      } catch (err) {
+        if (summaryEl) {
+          summaryEl.textContent = `Unable to save N/A marks: ${err?.message || 'Request failed.'}`;
+        }
+      } finally {
+        if (doneBtn) doneBtn.disabled = false;
+      }
+    });
+
     qs('sessionEnrollmentDayWidth')?.addEventListener('input', (event) => {
       if (!state) return;
       const scrollSnapshot = captureScrollPositions();
@@ -901,19 +1464,30 @@
 
     modalEl?.addEventListener('hidden.bs.modal', () => {
       hideStageQuickModalLayer();
+      hideMarkModalLayer();
       setStageOverlayLock(false);
       state = null;
       allEvents = [];
+      manageSummaryMeta = null;
     });
   }
 
   function open(options = {}) {
     const classId = String(options.classId || '').trim();
+    const mode = String(options.mode || 'picker').trim();
+    const periodId = String(options.periodId || '').trim();
     if (!classId) {
       console.error('SessionEnrollmentCalendarModal.open requires classId');
       return;
     }
+    if (mode === 'manageEnrollmentSessions' && !periodId) {
+      console.error('SessionEnrollmentCalendarModal.open manage mode requires periodId');
+      return;
+    }
     bindModalEvents();
+    modalEl = qs('sessionEnrollmentCalendarModal');
+    allEvents = [];
+    manageSummaryMeta = null;
     contextLabelEl = qs('sessionEnrollmentCalendarContext');
     if (contextLabelEl) {
       const student = String(options.studentLabel || options.studentName || options.studentId || '').trim();
@@ -921,12 +1495,18 @@
       contextLabelEl.textContent = [student, classLabel].filter(Boolean).join(' · ') || classId;
     }
 
-    const viewPreset = String(options.viewPreset || 'week').trim();
-    const anchorDate = core.clampAnchorDate(
-      core.parseAnchorDate(options.anchorDate || options.startDate || ''),
-      options.startDate || ''
-    );
+    const viewPreset = mode === 'manageEnrollmentSessions'
+      ? 'thirtyDays'
+      : String(options.viewPreset || 'week').trim();
+    const anchorDate = mode === 'manageEnrollmentSessions'
+      ? core.parseAnchorDate('')
+      : core.clampAnchorDate(
+        core.parseAnchorDate(options.anchorDate || options.startDate || ''),
+        options.startDate || ''
+      );
     state = {
+      mode,
+      periodId,
       classId,
       studentId: String(options.studentId || '').trim(),
       startDate: String(options.startDate || '').trim(),
@@ -956,8 +1536,13 @@
       onSave: options.onSave,
       onSelectionChange: options.onSelectionChange,
       onStagedSessionsChange: options.onStagedSessionsChange,
-      requestJson: options.requestJson
+      onMarksChanged: options.onMarksChanged,
+      requestJson: options.requestJson,
+      pendingMarkChanges: new Map(),
+      sessionWindowLoaded: false
     };
+
+    syncModalChromeForMode();
 
     const dayWidth = Number(options.dayWidth || 140);
     state.dayWidth = dayWidth;
@@ -965,7 +1550,7 @@
     if (dayWidthInput) dayWidthInput.value = String(dayWidth);
 
     hostEl = qs('sessionEnrollmentCalendarHost');
-    if (options.prefetchedPickerData) {
+    if (options.prefetchedPickerData && mode !== 'manageEnrollmentSessions') {
       getModal()?.show();
       ensureHolidaysLoaded()
         .then(() => applyPickerData(options.prefetchedPickerData))
@@ -978,6 +1563,14 @@
     }
 
     getModal()?.show();
+    if (mode === 'manageEnrollmentSessions') {
+      fetchSessionWindowData({ reload: true }).catch((err) => {
+        if (hostEl) {
+          hostEl.innerHTML = `<div class="alert alert-warning">${core.escapeHtml(err.message || 'Unable to load sessions.')}</div>`;
+        }
+      });
+      return;
+    }
     fetchPickerData().catch((err) => {
       if (hostEl) {
         hostEl.innerHTML = `<div class="alert alert-warning">${core.escapeHtml(err.message || 'Unable to load sessions.')}</div>`;

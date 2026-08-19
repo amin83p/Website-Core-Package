@@ -41,6 +41,7 @@ const academicLedgerService = require('../../services/school/academicLedgerServi
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
+const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
@@ -1296,15 +1297,49 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
     };
 }
 
-async function assertSessionRosterEnrollmentWindows({ classData, session, incomingRoster, reqUser }) {
+async function assertSessionRosterEnrollmentWindows({ classData, session, incomingRoster, reqUser, existingRoster = [] }) {
     if (getClassRegistrationModeKey(classData) !== 'rolling') return;
     const rows = Array.isArray(incomingRoster) ? incomingRoster : [];
     if (!rows.length) return;
+
+    const canOverride = await adminAuthorityService.isAdminForRequestAsync(
+        reqUser,
+        SECTIONS.SCHOOL_CLASSES,
+        OPERATIONS.UPDATE,
+        { section: { id: SECTIONS.SCHOOL_CLASSES } }
+    );
 
     const [periodRows, students] = await Promise.all([
         schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser),
         schoolDataService.fetchAllData('students', {}, reqUser)
     ]);
+    const sessionId = toPublicId(session?.sessionId || session?.id);
+    const existing = Array.isArray(existingRoster) ? existingRoster : [];
+    if (!canOverride && sessionId) {
+        const lockedRow = rows.find((row) => {
+            const personId = cleanPersonId(row?.personId);
+            if (!personId) return false;
+            const lock = enrollmentSessionMarksService.findLockedEnrollmentNaMark(
+                periodRows,
+                classData?.id,
+                sessionId,
+                personId
+            );
+            if (!lock) return false;
+            const prior = existing.find((item) => idsEqual(item?.personId, personId)) || {};
+            const nextAttendance = String(row?.attendance || '').trim().toLowerCase();
+            const priorAttendance = String(prior?.attendance || '').trim().toLowerCase();
+            if (nextAttendance !== priorAttendance) return true;
+            const nextLate = Number(row?.lateMinutes || 0);
+            const priorLate = Number(prior?.lateMinutes || 0);
+            const nextEarly = Number(row?.earlyLeaveMinutes || 0);
+            const priorEarly = Number(prior?.earlyLeaveMinutes || 0);
+            return nextLate !== priorLate || nextEarly !== priorEarly;
+        });
+        if (lockedRow) {
+            throw new Error('One or more students have enrollment-locked N/A sessions that cannot be changed here.');
+        }
+    }
     const studentToPersonMap = new Map(
         (Array.isArray(students) ? students : [])
             .map((row) => [toPublicId(row?.id), cleanPersonId(row?.personId)])
@@ -4083,6 +4118,21 @@ async function manageSession(req, res) {
             && (!isSessionLocked || canOverride || String(session?.lockReason || '') === 'timesheet_approved')
         );
 
+        let enrollmentLockedAttendancePersonIds = [];
+        if (getClassRegistrationModeKey(classData) === 'rolling') {
+            const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, req.user);
+            const lockedSessionId = toPublicId(session.sessionId || session.id);
+            const locked = new Set();
+            (Array.isArray(periodRows) ? periodRows : []).forEach((period) => {
+                enrollmentSessionMarksService.getMarksMap(period).forEach((mark, sid) => {
+                    if (sid === lockedSessionId && mark.locked && period.personId) {
+                        locked.add(toPublicId(period.personId));
+                    }
+                });
+            });
+            enrollmentLockedAttendancePersonIds = [...locked];
+        }
+
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,
@@ -4132,6 +4182,7 @@ async function manageSession(req, res) {
             studentCaseDetailPresets: getPresetConfig(),
             gradebookSkills: sessionSkillPolicy.renderCatalog,
             teachingOutlineContext,
+            enrollmentLockedAttendancePersonIds,
             includeModal: true,  
             user: req.user,
             actionStateId: req.actionStateId
@@ -4966,7 +5017,8 @@ async function saveSession(req, res) {
                 classData,
                 session: sessionForAttendanceWindow,
                 incomingRoster,
-                reqUser: req.user
+                reqUser: req.user,
+                existingRoster: existingRoster
             });
             const existingRoster = originalSession.roster || [];
             const orgPolicyCatalogSave = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(

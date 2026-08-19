@@ -1408,6 +1408,7 @@
 
 <div class="sections-page session-manager-page">
     <% const disabledAttr = isReadOnly ? 'disabled' : ''; %>
+    <% const enrollmentLockedPersonIdSet = new Set((Array.isArray(enrollmentLockedAttendancePersonIds) ? enrollmentLockedAttendancePersonIds : []).map((id) => String(id || '').trim()).filter(Boolean)); %>
     <% function jsonForScript(value) {
         if (value === undefined) return 'undefined';
         const s = JSON.stringify(value);
@@ -2086,9 +2087,13 @@
                                         <tr><td colspan="2" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
                                     <% } else { %>
                                         <% session.roster.forEach((student, i) => { %>
+                                            <% const rowDisabledAttr = (isReadOnly || enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) ? 'disabled' : ''; %>
                                             <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
                                                 <td class="ps-4 fw-bold align-middle">
                                                     <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
+                                                    <% if (enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) { %>
+                                                        <i class="bi bi-lock-fill text-secondary ms-1" title="Enrollment office locked this session as N/A"></i>
+                                                    <% } %>
                                                     <% if (student.comments && student.comments.length > 0) { %>
                                                         <i class="bi bi-chat-dots-fill text-primary ms-1" style="font-size: 0.75rem;" title="Notes Exist"></i>
                                                     <% } %>
@@ -2097,23 +2102,23 @@
                                                     <div class="d-flex gap-2 align-items-center flex-wrap">
                                                         <div class="btn-group btn-group-sm flex-grow-1" role="group">
                                                             <% if (isAttendanceStatusShown('present', student.attendance)) { %>
-                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="p_<%= i %>" value="present" <%= student.attendance === 'present' ? 'checked' : '' %> <%- disabledAttr %>>
+                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="p_<%= i %>" value="present" <%= student.attendance === 'present' ? 'checked' : '' %> <%- rowDisabledAttr %>>
                                                             <label class="btn att-label" for="p_<%= i %>" title="Present"><i class="bi bi-check-lg me-1"></i>Present</label>
                                                             <% } %>
                                                             <% if (isAttendanceStatusShown('late', student.attendance)) { %>
-                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="l_<%= i %>" value="late" <%= student.attendance === 'late' ? 'checked' : '' %> <%- disabledAttr %>>
+                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="l_<%= i %>" value="late" <%= student.attendance === 'late' ? 'checked' : '' %> <%- rowDisabledAttr %>>
                                                             <label class="btn att-label" for="l_<%= i %>" title="Late"><i class="bi bi-clock-history"></i> Late</label>
                                                             <% } %>
                                                             <% if (isAttendanceStatusShown('absent', student.attendance)) { %>
-                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="a_<%= i %>" value="absent" <%= student.attendance === 'absent' ? 'checked' : '' %> <%- disabledAttr %>>
+                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="a_<%= i %>" value="absent" <%= student.attendance === 'absent' ? 'checked' : '' %> <%- rowDisabledAttr %>>
                                                             <label class="btn att-label" for="a_<%= i %>" title="Absent"><i class="bi bi-x-lg"></i> Absent</label>
                                                             <% } %>
                                                             <% if (isAttendanceStatusShown('acf', student.attendance)) { %>
-                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="acf_<%= i %>" value="acf" <%= student.attendance === 'acf' ? 'checked' : '' %> <%- disabledAttr %>>
+                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="acf_<%= i %>" value="acf" <%= student.attendance === 'acf' ? 'checked' : '' %> <%- rowDisabledAttr %>>
                                                             <label class="btn att-label" for="acf_<%= i %>" title="Absent Camera Off"><i class="bi bi-camera-video-off"></i> ACF</label>
                                                             <% } %>
                                                             <% if (isAttendanceStatusShown('not_applicable', student.attendance)) { %>
-                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="na_<%= i %>" value="not_applicable" <%= (student.attendance === 'not_applicable' || student.attendance === 'N/A' || student.attendance === 'n/a') ? 'checked' : '' %> <%- disabledAttr %>>
+                                                            <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="na_<%= i %>" value="not_applicable" <%= (student.attendance === 'not_applicable' || student.attendance === 'N/A' || student.attendance === 'n/a') ? 'checked' : '' %> <%- rowDisabledAttr %>>
                                                             <label class="btn att-label" for="na_<%= i %>" title="Not applicable"><i class="bi bi-dash-circle"></i> N/A</label>
                                                             <% } %>
                                                         </div>

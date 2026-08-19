@@ -306,6 +306,12 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
     completionSessionId: sessionCap.completionSessionId,
     completionReason: sessionCap.completionReason,
     plannedNotApplicableSessionIds: rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(input.plannedNotApplicableSessionIds),
+    enrollmentKind: input.enrollmentKind,
+    extensionOfPeriodId: toPublicId(input.extensionOfPeriodId),
+    carriedForwardFromPeriodId: toPublicId(input.carriedForwardFromPeriodId),
+    cycleAttendanceSummary: input.cycleAttendanceSummary,
+    enrollmentSessionMarks: input.enrollmentSessionMarks,
+    enrollmentExtensions: input.enrollmentExtensions,
     funderType: String(input.funderType || '').trim(),
     funderId: String(input.funderId || '').trim(),
     authorizationRef: String(input.authorizationRef || '').trim(),
@@ -511,6 +517,12 @@ async function updatePeriod(periodId, input = {}, requestingUser = null, options
   if (input.plannedNotApplicableSessionIds !== undefined) {
     patch.plannedNotApplicableSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(input.plannedNotApplicableSessionIds);
   }
+  if (input.enrollmentKind !== undefined) patch.enrollmentKind = input.enrollmentKind;
+  if (input.extensionOfPeriodId !== undefined) patch.extensionOfPeriodId = toPublicId(input.extensionOfPeriodId);
+  if (input.carriedForwardFromPeriodId !== undefined) patch.carriedForwardFromPeriodId = toPublicId(input.carriedForwardFromPeriodId);
+  if (input.cycleAttendanceSummary !== undefined) patch.cycleAttendanceSummary = input.cycleAttendanceSummary;
+  if (input.enrollmentSessionMarks !== undefined) patch.enrollmentSessionMarks = input.enrollmentSessionMarks;
+  if (input.enrollmentExtensions !== undefined) patch.enrollmentExtensions = input.enrollmentExtensions;
   if (input.transactionSummary !== undefined) {
     patch.transactionSummary = (input.transactionSummary && typeof input.transactionSummary === 'object')
       ? input.transactionSummary

@@ -734,6 +734,103 @@
   </div>
 </div>
 
+<div class="modal fade" id="rollingEnrollmentDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-easel me-2"></i>Enrollment Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="rollingEnrollmentDetailBody">
+        <div class="text-muted text-center py-4">Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="enrollmentSessionManagerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-calendar-week me-2"></i>Manage enrollment sessions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="enrollmentSessionManagerSummary" class="small text-muted mb-3"></div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Attendance</th>
+                <th>Enrollment mark</th>
+                <th>Note</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="enrollmentSessionManagerBody">
+              <tr><td colspan="6" class="text-center text-muted py-4">Loading sessions...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="extensionEnrollmentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Create extension enrollment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="extension_sourcePeriodId" value="">
+        <div class="mb-3">
+          <label class="form-label" for="extension_kind">Extension type</label>
+          <select class="form-select form-select-sm" id="extension_kind">
+            <option value="additional_sessions">Additional sessions</option>
+            <option value="additional_hours">Additional hours</option>
+            <option value="extended_end_date">Extended end date</option>
+          </select>
+        </div>
+        <div class="mb-3" id="extension_sessionsWrap">
+          <label class="form-label" for="extension_additionalSessions">Additional sessions</label>
+          <input type="number" min="1" step="1" class="form-control form-control-sm" id="extension_additionalSessions" value="1">
+        </div>
+        <div class="mb-3 d-none" id="extension_hoursWrap">
+          <label class="form-label" for="extension_additionalHours">Additional hours</label>
+          <input type="number" min="0.25" step="0.25" class="form-control form-control-sm" id="extension_additionalHours" value="1">
+        </div>
+        <div class="mb-3 d-none" id="extension_endDateWrap">
+          <label class="form-label" for="extension_newEndDate">New end date</label>
+          <input type="date" class="form-control form-control-sm" id="extension_newEndDate">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="extension_startDate">Extension start date</label>
+          <input type="date" class="form-control form-control-sm" id="extension_startDate">
+        </div>
+        <div class="mb-0">
+          <label class="form-label" for="extension_reason">Reason</label>
+          <textarea class="form-control form-control-sm" id="extension_reason" rows="3" placeholder="Why is this extension needed?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn_confirmExtensionEnrollment">Create extension</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="priorCreditRepairModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -1162,6 +1259,7 @@
   const enrollmentProgramChoices = <%- enrollmentProgramChoicesJson %>;
   const canCreateProgramRegistrations = <%- canCreateProgramRegistrationsJson %>;
   const canCreatePriorSubjectCredits = <%- canCreatePriorSubjectCreditsJson %>;
+  const canManageEnrollmentOffice = <%- JSON.stringify(Boolean(typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice)) %>;
   const defaultTeacher = <%- defaultTeacherJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
@@ -2555,6 +2653,175 @@
     return s.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
   }
 
+  function buildEnrollmentDetailApiUrl(studentId, enrollmentId) {
+    const normalizedStudentId = String(studentId || '').trim();
+    const normalizedEnrollmentId = String(enrollmentId || '').trim();
+    if (!normalizedStudentId || !normalizedEnrollmentId) return '';
+    return `/school/academic-ledger/student-overview/${encodeURIComponent(normalizedStudentId)}/enrollment-detail/${encodeURIComponent(normalizedEnrollmentId)}`;
+  }
+
+  function renderEnrollmentDetailDefinitionList(rows = []) {
+    return '<dl class="row small mb-0">' + rows.map((row) => {
+      return '<dt class="col-sm-4 text-muted">' + htmlEscape(row.label) + '</dt>'
+        + '<dd class="col-sm-8">' + (row.value ? htmlEscape(String(row.value)) : '-') + '</dd>';
+    }).join('') + '</dl>';
+  }
+
+  function renderEnrollmentDetailTable(headers = [], rows = [], rowRenderer) {
+    if (!rows.length) {
+      return '<div class="text-muted small py-3 text-center">No records found.</div>';
+    }
+    return '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr>'
+      + headers.map((header) => '<th>' + htmlEscape(header) + '</th>').join('')
+      + '</tr></thead><tbody>'
+      + rows.map(rowRenderer).join('')
+      + '</tbody></table></div>';
+  }
+
+  function formatEnrollmentDetailCapDisplay(sessionsPayload, kind) {
+    const row = sessionsPayload || {};
+    const targetHours = normalizeTargetHoursValue(row.targetHours);
+    const explicitSessionCount = normalizeTargetSessionCountValue(row.targetSessionCount);
+    const sessionCount = explicitSessionCount > 0 ? explicitSessionCount : 0;
+    const effectiveSessionCount = row.effectiveTargetSessionCount === null || row.effectiveTargetSessionCount === undefined
+      ? (sessionCount || null)
+      : Number(row.effectiveTargetSessionCount || 0);
+    const displaySessionCount = targetHours > 0
+      ? (row.allocatedSessionCount ?? effectiveSessionCount)
+      : (sessionCount || effectiveSessionCount);
+    const consumedSessionCount = row.consumedSessionCount === null || row.consumedSessionCount === undefined
+      ? null
+      : Number(row.consumedSessionCount || 0);
+    const remainingSessionCount = displaySessionCount !== null && consumedSessionCount !== null
+      ? Math.max(0, Number(row.remainingSessionCount ?? (displaySessionCount - consumedSessionCount)))
+      : null;
+    const effectiveHours = targetHours > 0 ? targetHours : null;
+    const consumedHours = row.consumedHours === null || row.consumedHours === undefined
+      ? null
+      : Number(row.consumedHours || 0);
+    const remainingHours = effectiveHours !== null && consumedHours !== null
+      ? Math.max(0, Number(row.remainingHours ?? normalizeTargetHoursValue(effectiveHours - consumedHours)))
+      : null;
+    const withHours = (sessions, hours) => {
+      if (sessions === null || sessions === undefined) return '';
+      const sessionLabel = sessions + ' Session' + (Number(sessions) === 1 ? '' : 's');
+      if (hours !== null && hours !== undefined && targetHours > 0) {
+        return sessionLabel + ' (' + formatHoursLabel(hours) + ')';
+      }
+      return sessionLabel;
+    };
+    if (kind === 'target') {
+      if (displaySessionCount === null && effectiveHours === null) return '-';
+      return withHours(displaySessionCount, effectiveHours);
+    }
+    if (kind === 'consumed') {
+      if (consumedSessionCount === null) return '-';
+      if (targetHours > 0) return consumedSessionCount + ' (' + formatHoursLabel(consumedHours) + ')';
+      return String(consumedSessionCount);
+    }
+    if (kind === 'remaining') {
+      if (remainingSessionCount === null) return '-';
+      if (targetHours > 0) return remainingSessionCount + ' (' + formatHoursLabel(remainingHours) + ')';
+      return String(remainingSessionCount);
+    }
+    return '-';
+  }
+
+  function renderEnrollmentDetailModal(payload = {}) {
+    const enrollment = payload.enrollment || {};
+    const sessions = enrollment.sessions || {};
+    const gradebook = payload.gradebookHistory || {};
+    const bodyEl = document.getElementById('rollingEnrollmentDetailBody');
+    if (!bodyEl) return;
+    const periodFields = [
+      { label: 'Enrollment ID', value: enrollment.enrollmentId },
+      { label: 'Class', value: enrollment.classTitle },
+      { label: 'Program', value: enrollment.programLabel },
+      { label: 'Term', value: enrollment.termLabel },
+      { label: 'Period', value: `${enrollment.startDate || '-'} to ${enrollment.endDate || 'Open'}` },
+      { label: 'Status', value: enrollment.status },
+      { label: 'Source', value: payload.registrationLabel || enrollment.enrollmentSource },
+      { label: 'Program Registration', value: enrollment.programRegistrationId },
+      { label: 'Reason Start', value: enrollment.reasonStart },
+      { label: 'Reason End', value: enrollment.reasonEnd },
+      { label: 'Notes', value: enrollment.notes }
+    ];
+    if (String(enrollment.status || '').trim().toLowerCase() === 'void') {
+      periodFields.push(
+        { label: 'Voided At', value: enrollment.voidedAt },
+        { label: 'Voided By', value: enrollment.voidedBy },
+        { label: 'Void Reason', value: enrollment.voidReason }
+      );
+    }
+    const summaryHtml = '<div class="row g-3 mb-3"><div class="col-lg-6"><div class="card border h-100"><div class="card-body">'
+      + '<div class="fw-bold mb-2">Enrollment Period</div>'
+      + renderEnrollmentDetailDefinitionList(periodFields)
+      + '</div></div></div><div class="col-lg-6"><div class="card border h-100"><div class="card-body">'
+      + '<div class="fw-bold mb-2">Sessions</div>'
+      + renderEnrollmentDetailDefinitionList([
+        { label: 'Target', value: formatEnrollmentDetailCapDisplay(sessions, 'target') },
+        { label: 'Consumed', value: formatEnrollmentDetailCapDisplay(sessions, 'consumed') },
+        { label: 'Remaining', value: formatEnrollmentDetailCapDisplay(sessions, 'remaining') },
+        { label: 'Window Sessions', value: sessions.windowSessionCount ?? '-' },
+        { label: 'Target Source', value: sessions.targetSource },
+        { label: 'Completion', value: sessions.sessionCompletion
+          ? `${sessions.sessionCompletion.date || '-'} (${sessions.sessionCompletion.reason || ''})`
+          : '-' }
+      ])
+      + '<div class="small text-muted mt-2">Attendance: ' + htmlEscape(payload.attendancePercent != null ? `${payload.attendancePercent}%` : '-') + '</div>'
+      + '<div class="small text-muted">Assignments: ' + htmlEscape(gradebook.assignmentsPercent != null ? `${gradebook.assignmentsPercent}%` : '-') + '</div>'
+      + '<div class="small text-muted">Final: ' + htmlEscape(gradebook.finalPercent != null ? `${gradebook.finalPercent}%` : '-') + '</div>'
+      + '</div></div></div></div>';
+    const attendanceHtml = '<div class="fw-bold mb-2">Attendance History</div>'
+      + renderEnrollmentDetailTable(
+        ['Date', 'Status', 'Late Min', 'Early Leave Min'],
+        Array.isArray(payload.attendanceHistory) ? payload.attendanceHistory : [],
+        (row) => '<tr><td>' + htmlEscape(row.date || '-') + '</td><td>' + htmlEscape(row.status || '-') + '</td>'
+          + '<td>' + htmlEscape(row.lateMinutes ?? '-') + '</td><td>' + htmlEscape(row.earlyLeaveMinutes ?? '-') + '</td></tr>'
+      );
+    const gradebookHtml = '<div class="fw-bold mb-2 mt-4">Gradebook History</div>'
+      + renderEnrollmentDetailTable(
+        ['Date', 'Activity', 'Score', 'Percent', 'Attendance'],
+        Array.isArray(gradebook.activities) ? gradebook.activities : [],
+        (row) => '<tr><td>' + htmlEscape(row.date || '-') + '</td><td>' + htmlEscape(row.label || '-') + '</td>'
+          + '<td>' + htmlEscape(row.score ?? '-') + (row.totalScore != null ? ' / ' + htmlEscape(row.totalScore) : '') + '</td>'
+          + '<td>' + htmlEscape(row.percent != null ? `${row.percent}%` : '-') + '</td>'
+          + '<td>' + htmlEscape(row.attendanceStatus || '-') + '</td></tr>'
+      );
+    const relatedHtml = '<div class="fw-bold mb-2 mt-4">Related Academic Records</div>'
+      + renderEnrollmentDetailTable(
+        ['Date', 'Type', 'Status', 'Memo'],
+        Array.isArray(payload.relatedRecords) ? payload.relatedRecords : [],
+        (row) => '<tr><td>' + htmlEscape(row.effectiveDate || '-') + '</td><td>' + htmlEscape(row.entryType || '-') + '</td>'
+          + '<td>' + htmlEscape(row.status || '-') + '</td><td>' + htmlEscape(row.memo || '-') + '</td></tr>'
+      );
+    bodyEl.innerHTML = summaryHtml + attendanceHtml + gradebookHtml + relatedHtml;
+  }
+
+  async function openEnrollmentDetailModal(periodId) {
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    if (!row) return;
+    const detailUrl = buildEnrollmentDetailApiUrl(row.studentId, row.id);
+    if (!detailUrl) {
+      await showMsg('Details unavailable', 'warning', 'Student or enrollment id is missing.');
+      return;
+    }
+    const bodyEl = document.getElementById('rollingEnrollmentDetailBody');
+    const modalEl = document.getElementById('rollingEnrollmentDetailModal');
+    if (!bodyEl || !modalEl) return;
+    bodyEl.innerHTML = '<div class="text-muted text-center py-4">Loading...</div>';
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    try {
+      const result = await requestJson(detailUrl);
+      if (!result || String(result.status || '').toLowerCase() === 'error') {
+        throw new Error(result?.message || 'Failed to load enrollment details.');
+      }
+      renderEnrollmentDetailModal(result);
+    } catch (error) {
+      bodyEl.innerHTML = '<div class="alert alert-warning">' + htmlEscape(error?.message || 'Failed to load enrollment details.') + '</div>';
+    }
+  }
+
   function oneDayAfter(dateText) {
     const raw = String(dateText || '').trim();
     if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
@@ -3257,13 +3524,6 @@
   }
 
   function resolveEnrollmentAlignmentNextStep(alignment = lastAlignmentResult) {
-    const status = String(alignment?.alignmentStatus || '').trim();
-    if (status === 'insufficient_sessions' || status === 'insufficient_hours') {
-      return 'addSessions';
-    }
-    if (status === 'overage_requires_na') {
-      return 'addSessions';
-    }
     if (pendingStagedSessions.length > 0) {
       return 'conflicts';
     }
@@ -3307,7 +3567,7 @@
       const available = Number(alignment.availableHours || 0);
       const gap = Number(alignment.gapHours || Math.max(0, target - available));
       hint.className = 'form-text compact-help text-warning mb-0';
-      hint.textContent = `Need ${target} hr(s) from the start date; only ${available} hr(s) scheduled (${gap} hr gap). Use Next to stage missing sessions.`;
+      hint.textContent = `Target is ${target} hr(s). Consumption is tracked from recorded attendance; only ${available} hr(s) are scheduled so far (${gap} hr gap). You can still enroll and add sessions later.`;
       updateViewSessionsButton(alignment);
       syncEnrollmentWizardPathFromCap();
       renderFormStepSessionTable();
@@ -3320,7 +3580,7 @@
       const available = Number(alignment.availableCount || 0);
       const gap = Number(alignment.gapCount || Math.max(0, target - available));
       hint.className = 'form-text compact-help text-warning mb-0';
-      hint.textContent = `Need ${target} countable session(s) from the start date; only ${available} exist. Use Next to stage missing sessions.`;
+      hint.textContent = `Target is ${target} session(s). Consumption is tracked from recorded attendance; only ${available} scheduled session(s) exist (${gap} gap). You can still enroll and add sessions later.`;
       updateViewSessionsButton(alignment);
       syncEnrollmentWizardPathFromCap();
       renderFormStepSessionTable();
@@ -5025,6 +5285,19 @@
       const targetSortValue = targetDisplay || '';
       const consumedSortValue = consumedDisplay || '';
       const remainingSortValue = remainingDisplay || '';
+      const isVoid = status === 'void';
+      const actionsMenuHtml = isVoid
+        ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-details" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-eye me-1"></i>Details</button>`
+        : `
+                <button type="button" class="btn btn-outline-primary btn-sm btn-row-edit" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+                ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-manage-sessions" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-calendar-week me-1"></i>Manage enrollment sessions</button>` : ''}
+                ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-success btn-sm btn-row-extension" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-plus-circle me-1"></i>Extension enrollment</button>` : ''}
+                ${canReviewDraft ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-review-draft" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-text me-1"></i>Review Draft</button>` : ''}
+                ${canReenter ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>` : ''}
+                ${canClose ? `<button type="button" class="btn btn-outline-danger btn-sm btn-row-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-x-circle me-1"></i>Close</button>` : ''}
+                ${canArchive ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-archive" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-archive me-1"></i>Archive</button>` : ''}
+                ${canSyncAcademicLedger ? `<button type="button" class="btn btn-outline-info btn-sm btn-row-sync-ledger" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-bookmark me-1"></i>Sync academic ledger</button>` : ''}
+                <button type="button" class="btn btn-outline-danger btn-sm btn-row-remove" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-trash me-1"></i>${removeLabel}</button>`;
       return `
         <tr>
           <td class="ps-4" data-sort-value="${htmlEscape(studentSortValue)}">
@@ -5048,13 +5321,7 @@
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
               <div class="rolling-row-actions-menu d-none" data-period-id="${htmlEscape(String(row?.id || ''))}">
-                <button type="button" class="btn btn-outline-primary btn-sm btn-row-edit" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
-                ${canReviewDraft ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-review-draft" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-text me-1"></i>Review Draft</button>` : ''}
-                ${canReenter ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>` : ''}
-                ${canClose ? `<button type="button" class="btn btn-outline-danger btn-sm btn-row-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-x-circle me-1"></i>Close</button>` : ''}
-                ${canArchive ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-archive" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-archive me-1"></i>Archive</button>` : ''}
-                ${canSyncAcademicLedger ? `<button type="button" class="btn btn-outline-info btn-sm btn-row-sync-ledger" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-bookmark me-1"></i>Sync academic ledger</button>` : ''}
-                <button type="button" class="btn btn-outline-danger btn-sm btn-row-remove" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-trash me-1"></i>${removeLabel}</button>
+                ${actionsMenuHtml}
               </div>
             </div>
           </td>
@@ -5164,18 +5431,6 @@
         return;
       }
       const alignmentGate = await ensureEnrollmentSessionAlignment();
-      if (alignmentGate.nextStep === 'addSessions') {
-        enrollWizardPath = 'planA';
-        enrollWizardSkippedAddSessions = false;
-        enrollWizardStep = 'addSessions';
-        prepareAddSessionsStep(alignmentGate.alignment);
-        setEnrollmentWizardStepVisibility();
-        return;
-      }
-      if (alignmentGate.nextStep === 'markNa') {
-        goEnrollmentMarkNaStep(alignmentGate.alignment, { skippedAddSessions: true });
-        return;
-      }
       if (alignmentGate.nextStep === 'conflicts') {
         enrollWizardPath = 'planA';
         const loaded = await loadConflictReviewStep();
@@ -5184,7 +5439,6 @@
         setEnrollmentWizardStepVisibility();
         return;
       }
-      if (!alignmentGate.ok) return;
       await proceedWithEnrollmentAfterAlignment();
       return;
     }
@@ -5666,6 +5920,135 @@
   window.addEventListener('resize', repositionOpenRowActionMenu);
   document.querySelector('.rolling-enrollment-page .table-scroll-wrapper')?.addEventListener('scroll', repositionOpenRowActionMenu, { passive: true });
 
+  async function openEnrollmentSessionManagerModal(periodId) {
+    if (!canManageEnrollmentOffice) return;
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    if (window.SessionEnrollmentCalendarModal && window.SessionCalendarCore) {
+      window.SessionEnrollmentCalendarModal.open({
+        mode: 'manageEnrollmentSessions',
+        periodId: String(periodId || ''),
+        classId,
+        studentId: String(row?.studentId || '').trim(),
+        studentLabel: String(row?.studentLabel || row?.studentId || '').trim(),
+        classLabel: String(classId || '').trim(),
+        startDate: String(row?.startDate || '').trim(),
+        endDate: String(row?.endDate || '').trim(),
+        requestJson,
+        onMarksChanged: async () => {
+          await loadRows();
+        }
+      });
+      return;
+    }
+    const modalEl = document.getElementById('enrollmentSessionManagerModal');
+    const bodyEl = document.getElementById('enrollmentSessionManagerBody');
+    const summaryEl = document.getElementById('enrollmentSessionManagerSummary');
+    if (!modalEl || !bodyEl) return;
+    bodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Loading sessions...</td></tr>';
+    if (summaryEl) summaryEl.textContent = '';
+    const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/session-window`);
+    if (!result || result.status !== 'success') return;
+    const data = result.data || {};
+    if (summaryEl) {
+      const summary = data.cycleAttendanceSummary;
+      const parts = [`Enrollment window: ${data.startDate || '-'} to ${data.endDate || 'Open'}`];
+      if (summary) {
+        parts.push(`Consumed ${summary.consumedSessions || 0} session(s); present ${summary.present || 0}, absent ${summary.absent || 0} (${summary.absentExcused || 0} excused), ACF ${summary.acf || 0} (${summary.acfExcused || 0} excused).`);
+      }
+      summaryEl.textContent = parts.join(' · ');
+    }
+    const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    if (!sessions.length) {
+      bodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No sessions in this enrollment window.</td></tr>';
+    } else {
+      bodyEl.innerHTML = sessions.map((row) => {
+        const marked = Boolean(row.mark);
+        const note = marked ? String(row.mark?.note || '') : '';
+        const actionLabel = marked ? 'Unmark N/A' : 'Mark N/A';
+        const action = marked ? 'unmark' : 'mark_na';
+        return `<tr data-session-id="${htmlEscape(String(row.sessionId || ''))}">
+          <td>${htmlEscape(String(row.date || '-'))}</td>
+          <td>${htmlEscape(`${row.startTime || ''} - ${row.endTime || ''}`.trim())}</td>
+          <td>${htmlEscape(String(row.attendance || '-'))}</td>
+          <td>${marked ? '<span class="badge bg-secondary">N/A (locked)</span>' : '<span class="text-muted">Expected</span>'}</td>
+          <td class="small">${htmlEscape(note)}</td>
+          <td class="text-end">
+            ${action === 'mark_na' ? `<input type="text" class="form-control form-control-sm enrollment-session-mark-note mb-1" placeholder="Required note">` : ''}
+            <button type="button" class="btn btn-outline-primary btn-sm js-enrollment-session-mark" data-period-id="${htmlEscape(String(periodId))}" data-session-id="${htmlEscape(String(row.sessionId || ''))}" data-action="${action}">${actionLabel}</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+
+  function syncExtensionEnrollmentFields() {
+    const kind = String(qs('extension_kind')?.value || 'additional_sessions');
+    qs('extension_sessionsWrap')?.classList.toggle('d-none', kind !== 'additional_sessions');
+    qs('extension_hoursWrap')?.classList.toggle('d-none', kind !== 'additional_hours');
+    qs('extension_endDateWrap')?.classList.toggle('d-none', kind !== 'extended_end_date');
+  }
+
+  function openExtensionEnrollmentModal(periodId) {
+    if (!canManageEnrollmentOffice) return;
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    const modalEl = document.getElementById('extensionEnrollmentModal');
+    if (!modalEl) return;
+    qs('extension_sourcePeriodId').value = String(periodId || '');
+    qs('extension_kind').value = (normalizeTargetSessionCountValue(row?.targetSessionCount) > 0)
+      ? 'additional_sessions'
+      : (normalizeTargetHoursValue(row?.targetHours) > 0 ? 'additional_hours' : 'extended_end_date');
+    qs('extension_startDate').value = orgTodayFallback();
+    qs('extension_reason').value = '';
+    syncExtensionEnrollmentFields();
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+
+  async function submitExtensionEnrollment() {
+    const periodId = String(qs('extension_sourcePeriodId')?.value || '').trim();
+    if (!periodId) return;
+    const payload = {
+      extensionKind: String(qs('extension_kind')?.value || '').trim(),
+      additionalSessions: Number(qs('extension_additionalSessions')?.value || 0),
+      additionalHours: Number(qs('extension_additionalHours')?.value || 0),
+      newEndDate: String(qs('extension_newEndDate')?.value || '').trim(),
+      startDate: String(qs('extension_startDate')?.value || '').trim(),
+      reason: String(qs('extension_reason')?.value || '').trim()
+    };
+    const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/extension`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!result || result.status !== 'success') return;
+    bootstrap.Modal.getInstance(document.getElementById('extensionEnrollmentModal'))?.hide();
+    await showMsg('Extension created', 'success', 'Extension enrollment was created successfully.');
+    await loadRows();
+  }
+
+  document.getElementById('enrollmentSessionManagerBody')?.addEventListener('click', async (event) => {
+    const btn = event.target.closest('.js-enrollment-session-mark');
+    if (!btn) return;
+    const periodId = String(btn.getAttribute('data-period-id') || '').trim();
+    const sessionId = String(btn.getAttribute('data-session-id') || '').trim();
+    const action = String(btn.getAttribute('data-action') || '').trim();
+    const row = btn.closest('tr');
+    const note = String(row?.querySelector('.enrollment-session-mark-note')?.value || '').trim();
+    if (action === 'mark_na' && !note) {
+      await showMsg('Note required', 'warning', 'Enter a note explaining why this session is N/A.');
+      return;
+    }
+    const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/session-marks`, {
+      method: 'POST',
+      body: JSON.stringify({ changes: [{ sessionId, action, note }] })
+    });
+    if (!result || result.status !== 'success') return;
+    await openEnrollmentSessionManagerModal(periodId);
+    await loadRows();
+  });
+
+  qs('extension_kind')?.addEventListener('change', syncExtensionEnrollmentFields);
+  qs('btn_confirmExtensionEnrollment')?.addEventListener('click', () => submitExtensionEnrollment());
+
   document.addEventListener('click', (event) => {
     const toggleBtn = event.target.closest('.rolling-row-actions-toggle');
     if (toggleBtn) {
@@ -5704,6 +6087,27 @@
     if (priorCreditRepairBtn) {
       event.preventDefault();
       openPriorCreditRepairModal();
+      return;
+    }
+
+    const manageSessionsBtn = event.target.closest('.btn-row-manage-sessions');
+    if (manageSessionsBtn) {
+      closeAllActionMenus();
+      openEnrollmentSessionManagerModal(manageSessionsBtn.getAttribute('data-period-id'));
+      return;
+    }
+
+    const extensionBtn = event.target.closest('.btn-row-extension');
+    if (extensionBtn) {
+      closeAllActionMenus();
+      openExtensionEnrollmentModal(extensionBtn.getAttribute('data-period-id'));
+      return;
+    }
+
+    const detailsBtn = event.target.closest('.btn-row-details');
+    if (detailsBtn) {
+      closeAllActionMenus();
+      openEnrollmentDetailModal(detailsBtn.getAttribute('data-period-id'));
       return;
     }
 

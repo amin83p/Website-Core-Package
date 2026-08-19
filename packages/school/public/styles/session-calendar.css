@@ -1,6 +1,8 @@
 /* Session enrollment calendar — shared layout for picker modal and schedule views */
 
 #sessionEnrollmentCalendarModal .modal-dialog.session-enrollment-calendar-dialog {
+  width: min(96vw, 1680px);
+  max-width: min(96vw, 1680px);
   height: calc(100vh - 2rem);
   max-height: calc(100vh - 2rem);
   margin: 1rem auto;
@@ -618,6 +620,138 @@
 
 .session-enrollment-block .session-block-hours {
   color: #495057;
+}
+
+.session-enrollment-block.session-manage-block,
+.session-cal-positioned-session .session-enrollment-block.session-manage-block {
+  padding: 4px 6px !important;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 1px;
+  min-height: 36px;
+  text-align: left;
+}
+
+.session-cal-positioned-session .session-enrollment-block.session-manage-block.is-na-saved,
+.session-enrollment-block.session-manage-block.is-na-saved,
+.session-enrollment-block.session-manage-block.is-na-locked {
+  border-color: #f1aeb5 !important;
+  border-style: solid !important;
+  border-width: 2px !important;
+  background-color: #fde8ea !important;
+  background-image: none !important;
+  box-shadow: inset 0 0 0 1px rgba(220, 53, 69, 0.12);
+}
+
+.session-cal-positioned-session .session-enrollment-block.session-manage-block.is-na-pending,
+.session-enrollment-block.session-manage-block.is-na-pending {
+  border-color: #ffda6a !important;
+  border-style: dashed !important;
+  border-width: 2px !important;
+  background-color: #fff8e1 !important;
+  background-image: none !important;
+  box-shadow: inset 0 0 0 1px rgba(245, 159, 0, 0.2);
+}
+
+.session-manage-na-head {
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.session-manage-na-head.is-saved {
+  color: #b02a37;
+}
+
+.session-manage-na-head.is-pending {
+  color: #997404;
+}
+
+.session-enrollment-block.session-manage-block .session-block-time {
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: #212529;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-enrollment-block.session-manage-block .session-block-meta {
+  font-size: 0.64rem;
+  color: #5c636a;
+  line-height: 1.2;
+}
+
+.session-cal-positioned-session .session-enrollment-block.session-manage-block.is-scheduled-open,
+.session-enrollment-block.session-manage-block.is-scheduled-open {
+  border-color: #9ec5fe !important;
+  border-style: solid !important;
+  background-color: #f0f6ff !important;
+  background-image: none !important;
+}
+
+.session-cal-positioned-session .session-enrollment-block.session-manage-block.has-attendance,
+.session-enrollment-block.session-manage-block.has-attendance {
+  border-color: #a3cfbb !important;
+  border-style: solid !important;
+  background-color: #e8f5ee !important;
+  background-image: none !important;
+}
+
+.session-day-card.session-manage-card.is-na-saved,
+.session-day-card.session-manage-card.is-na-locked {
+  border: 2px solid #f1aeb5;
+  background: #fde8ea;
+}
+
+.session-day-card.session-manage-card.is-na-pending {
+  border: 2px dashed #ffda6a;
+  background: #fff8e1;
+}
+
+.session-day-card.session-manage-card.is-scheduled-open {
+  border: 2px solid #9ec5fe;
+  background: #f0f6ff;
+}
+
+.session-day-card.session-manage-card.has-attendance {
+  border: 2px solid #a3cfbb;
+  background: #e8f5ee;
+}
+
+.session-manage-chip {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.session-manage-chip.is-na-saved {
+  color: #842029;
+  background: #f8d7da;
+  border: 1px solid #f1aeb5;
+}
+
+.session-manage-chip.is-na-pending {
+  color: #664d03;
+  background: #ffe69c;
+  border: 1px solid #ffda6a;
+}
+
+.session-manage-chip.has-attendance {
+  color: #0f5132;
+  background: #d1e7dd;
+  border: 1px solid #a3cfbb;
+}
+
+.session-manage-list-time {
+  font-variant-numeric: tabular-nums;
 }
 
 .session-enrollment-block .session-manage-link {

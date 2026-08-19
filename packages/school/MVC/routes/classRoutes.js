@@ -436,6 +436,20 @@ router.post('/api/enrollment-periods/evaluate-reentry',
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.evaluateClassEnrollmentReentry);
 
+router.get('/api/enrollment-periods/:periodId/session-window',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  rollingCtrl.getEnrollmentPeriodSessionWindow);
+
+router.post('/api/enrollment-periods/:periodId/session-marks',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.applyEnrollmentPeriodSessionMarks);
+
+router.post('/api/enrollment-periods/:periodId/extension',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.createExtensionEnrollmentPeriod);
+
 router.post('/api/:classId/cycles/close',
   requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),

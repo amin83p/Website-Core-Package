@@ -223,6 +223,9 @@ async function buildClassEnrollmentDetail({
       notes: String(period?.notes || '').trim(),
       reasonStart: String(period?.reasonStart || '').trim(),
       reasonEnd: String(period?.reasonEnd || '').trim(),
+      voidedAt: String(period?.voidedAt || '').trim(),
+      voidedBy: String(period?.voidedBy || '').trim(),
+      voidReason: String(period?.voidReason || '').trim(),
       pricing: period?.pricing || null,
       sessions: {
         targetSessionCount: progress?.targetSessionCount ?? null,

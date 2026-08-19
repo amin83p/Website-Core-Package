@@ -41,6 +41,8 @@ const rollingEnrollmentFunderService = require('../../services/school/rollingEnr
 const rollingEnrollmentPeriodFilterService = require('../../services/school/rollingEnrollmentPeriodFilterService');
 const rollingEnrollmentExcelExportService = require('../../services/school/rollingEnrollmentExcelExportService');
 const rollingEnrollmentEngineService = require('../../services/school/rollingEnrollmentEngineService');
+const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
+const extensionEnrollmentService = require('../../services/school/extensionEnrollmentService');
 const sessionEnrollmentPickerService = require('../../services/school/sessionEnrollmentPickerService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
@@ -1417,7 +1419,8 @@ async function showRollingEnrollmentPage(req, res) {
       targetTypeOptions: rollingEnrollmentPeriodFilterService.TARGET_TYPE_OPTIONS,
       orgToday: resolveOrgTodayFromRequest(req),
       user: req.user,
-      actionStateId: req.actionStateId
+      actionStateId: req.actionStateId,
+      canManageEnrollmentOffice: isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -4818,6 +4821,69 @@ async function applyClassEnrollmentStatusTransition(req, res) {
   }
 }
 
+async function getEnrollmentPeriodSessionWindow(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+      throw new Error('Office access is required to manage enrollment sessions.');
+    }
+    const payload = await enrollmentSessionMarksService.buildSessionWindowPayload(periodId);
+    return res.json({ status: 'success', data: payload });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function applyEnrollmentPeriodSessionMarks(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+      throw new Error('Office access is required to manage enrollment sessions.');
+    }
+    const changes = Array.isArray(req.body?.changes) ? req.body.changes : [];
+    const updated = await enrollmentSessionMarksService.applySessionMarks(periodId, changes, req.user);
+    return res.json({ status: 'success', message: 'Enrollment session marks updated.', period: updated });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function createExtensionEnrollmentPeriod(req, res) {
+  try {
+    const sourcePeriodId = toPublicId(req.params?.periodId);
+    const source = await schoolDataService.getDataById('classEnrollmentPeriods', sourcePeriodId, req.user);
+    if (!source) throw new Error('Source enrollment period not found.');
+    await getClassByIdWithOrgCheck(source.classId, req.user, buildRouteAccessContext(req));
+    if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+      throw new Error('Office access is required to create extension enrollments.');
+    }
+    const result = await extensionEnrollmentService.createExtensionEnrollment({
+      sourcePeriodId,
+      extensionKind: req.body?.extensionKind,
+      additionalSessions: req.body?.additionalSessions,
+      additionalHours: req.body?.additionalHours,
+      newEndDate: req.body?.newEndDate,
+      startDate: req.body?.startDate,
+      reason: req.body?.reason,
+      requestingUser: req.user
+    });
+    return res.json({
+      status: 'success',
+      message: 'Extension enrollment created.',
+      extensionPeriod: result.extensionPeriod,
+      sourcePeriodId: result.sourcePeriodId
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 module.exports = {
   showRollingEnrollmentPage,
   showCycleRolloverWizard,
@@ -4848,6 +4914,9 @@ module.exports = {
   saveEnrollmentCompletionDecision,
   previewClassEnrollmentStatusTransition,
   applyClassEnrollmentStatusTransition,
+  getEnrollmentPeriodSessionWindow,
+  applyEnrollmentPeriodSessionMarks,
+  createExtensionEnrollmentPeriod,
   postEnrollmentSessionAlignment,
   postRollingEnrollmentWorkspace,
   postRollingEnrollmentPrerequisites,

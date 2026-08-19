@@ -26,6 +26,8 @@ const matrixWindowService = require('../../services/school/matrixWindowService')
 const matrixRollupService = require('../../services/school/matrixRollupService');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
+const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
@@ -291,6 +293,27 @@ async function assertAttendanceEnrollmentWindow({ classData, session, studentPer
     if (enrollmentWindow.withinEnrollmentWindow) return enrollmentWindow;
     const sessionDate = normalizeDateOnly(session?.date) || 'this session date';
     throw new Error(`Attendance cannot be updated because this student was not enrolled in the class on ${sessionDate}.`);
+}
+
+async function assertEnrollmentLockedAttendanceEditable(req, { classData, session, studentPersonId }) {
+    const canOverride = await adminAuthorityService.isAdminForRequestAsync(
+        req.user,
+        SECTIONS.SCHOOL_CLASSES,
+        OPERATIONS.UPDATE,
+        { section: { id: SECTIONS.SCHOOL_CLASSES } }
+    );
+    if (canOverride) return;
+    const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, req.user);
+    const sessionId = toPublicId(session?.sessionId || session?.id);
+    const lock = enrollmentSessionMarksService.findLockedEnrollmentNaMark(
+        periodRows,
+        classData?.id,
+        sessionId,
+        studentPersonId
+    );
+    if (lock) {
+        throw new Error('This session is locked as N/A by enrollment office and cannot be changed in attendance.');
+    }
 }
 
 function isActiveAttendanceClass(row = {}) {
@@ -871,6 +894,11 @@ async function addAttendanceComment(req, res) {
             studentPersonId,
             reqUser: req.user
         });
+        await assertEnrollmentLockedAttendanceEditable(req, {
+            classData,
+            session,
+            studentPersonId
+        });
 
         if (!session.roster) session.roster = [];
         
@@ -1014,6 +1042,11 @@ async function updateAttendanceRosterCell(req, res) {
             session,
             studentPersonId,
             reqUser: req.user
+        });
+        await assertEnrollmentLockedAttendanceEditable(req, {
+            classData,
+            session,
+            studentPersonId
         });
 
         const previousAttendance = session.roster?.find((r) => idsEqual(r.personId, studentPersonId))?.attendance;

@@ -1,6 +1,9 @@
 const schoolRepositories = require('../../repositories/school');
 const classEnrollmentPeriodService = require('./classEnrollmentPeriodService');
 const classEnrollmentPolicyService = require('./classEnrollmentPolicyService');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
+const enrollmentCycleSummaryService = require('./enrollmentCycleSummaryService');
+const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -136,6 +139,93 @@ function evaluateCycleBoundaryPolicy({ currentCycleEndDate, nextCycleStartDate, 
   };
 }
 
+function loadClassSessions(classRow = {}) {
+  return Array.isArray(classRow?.sessions) ? classRow.sessions : [];
+}
+
+async function persistCycleSummaryAndBuildTargetPayload({
+  row,
+  fromClass,
+  toClass,
+  boundaryDate,
+  sessions = [],
+  targetStartDate = '',
+  note = '',
+  requestingUser = null,
+  options = {}
+} = {}) {
+  const actor = resolveActor(requestingUser);
+  const normalizedBoundary = requireDateOnly(boundaryDate, 'boundaryDate');
+  const summary = enrollmentCycleSummaryService.buildPeriodAttendanceSummary({
+    period: row,
+    sessions,
+    studentPersonId: row?.personId,
+    classData: fromClass,
+    boundaryDate: normalizedBoundary,
+    generatedBy: actor
+  });
+
+  await dependencies.repositories.classEnrollmentPeriods.update(row.id, {
+    cycleAttendanceSummary: summary,
+    updatedBy: actor
+  }, options);
+
+  const marks = enrollmentCycleSummaryService.filterEnrollmentMarksFromBoundary(
+    row?.enrollmentSessionMarks || [],
+    sessions,
+    normalizedBoundary
+  );
+  const markSessionIds = marks.map((mark) => toPublicId(mark.sessionId)).filter(Boolean);
+  const isCap = enrollmentCycleSummaryService.isCapEnrollment(row);
+  const createPayload = {
+    orgId: row.orgId,
+    classId: toClass.id,
+    studentId: row.studentId,
+    personId: toPublicId(row.personId),
+    startDate: requireDateOnly(targetStartDate || normalizedBoundary, 'targetStartDate'),
+    endDate: normalizeDateOnly(row.endDate),
+    status: String(row.status || 'active'),
+    programId: toPublicId(row.programId),
+    termId: toPublicId(row.termId),
+    programRegistrationId: toPublicId(row.programRegistrationId),
+    enrollmentSource: String(row.enrollmentSource || '').trim(),
+    feeCategory: String(row.feeCategory || '').trim(),
+    pricing: (row.pricing && typeof row.pricing === 'object') ? { ...row.pricing } : {},
+    funderType: String(row.funderType || '').trim(),
+    funderId: String(row.funderId || '').trim(),
+    authorizationRef: String(row.authorizationRef || '').trim(),
+    enrollmentKind: String(row.enrollmentKind || 'standard').trim() || 'standard',
+    carriedForwardFromPeriodId: toPublicId(row.id),
+    enrollmentSessionMarks: marks,
+    plannedNotApplicableSessionIds: markSessionIds.length
+      ? markSessionIds
+      : rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(row.plannedNotApplicableSessionIds),
+    reasonStart: String(note || `Continuation from ${fromClass.id} at cycle boundary ${normalizedBoundary}.`).trim(),
+    reasonEnd: String(row.reasonEnd || '').trim(),
+    targetSessionCount: 0,
+    targetHours: 0,
+    sessionCountPolicy: '',
+    completionDate: '',
+    completionSessionId: '',
+    completionReason: '',
+    skipCyclePolicyCheck: true
+  };
+
+  if (isCap) {
+    const sessionTarget = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(row.targetSessionCount);
+    const hourTarget = classEnrollmentSessionApplicabilityService.normalizeTargetHours(row.targetHours);
+    if (sessionTarget > 0) {
+      createPayload.targetSessionCount = summary.remainingSessions;
+      createPayload.sessionCountPolicy = String(row.sessionCountPolicy || '').trim()
+        || classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy('');
+    } else if (hourTarget > 0) {
+      createPayload.targetHours = summary.remainingHours;
+    }
+  }
+
+  return { summary, createPayload };
+}
+
 function assertCarryForwardAuthorizationWindow(row, boundaryDate) {
   const periodStart = requireDateOnly(row?.startDate, `period.startDate (${row?.id || 'unknown'})`);
   const periodEnd = normalizeDateOnly(row?.endDate);
@@ -147,7 +237,43 @@ function assertCarryForwardAuthorizationWindow(row, boundaryDate) {
   }
 }
 
-function buildCarryForwardPreview(rows = [], boundaryDate = '') {
+function buildCarryForwardPlan(row = {}, boundaryDate = '', sessions = [], classData = {}) {
+  const normalizedBoundary = requireDateOnly(boundaryDate, 'boundaryDate');
+  const start = normalizeDateOnly(row?.startDate);
+  const end = normalizeDateOnly(row?.endDate);
+  if (!start) return null;
+  const action = start < normalizedBoundary ? 'split' : 'move_whole';
+  const summary = enrollmentCycleSummaryService.buildPeriodAttendanceSummary({
+    period: row,
+    sessions,
+    studentPersonId: row?.personId,
+    classData,
+    boundaryDate: normalizedBoundary
+  });
+  const isCap = enrollmentCycleSummaryService.isCapEnrollment(row);
+  const sessionTarget = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(row.targetSessionCount);
+  const hourTarget = classEnrollmentSessionApplicabilityService.normalizeTargetHours(row.targetHours);
+  return {
+    action,
+    closeEndDate: action === 'split' ? dayBefore(normalizedBoundary) : '',
+    targetStartDate: action === 'split' ? normalizedBoundary : start,
+    targetEndDate: end || '',
+    consumedSessions: summary.consumedSessions,
+    present: summary.present,
+    absent: summary.absent,
+    absentExcused: summary.absentExcused,
+    acf: summary.acf,
+    acfExcused: summary.acfExcused,
+    remainingSessions: summary.remainingSessions,
+    remainingHours: summary.remainingHours,
+    targetSessionCountCarry: isCap && sessionTarget > 0 ? summary.remainingSessions : 0,
+    targetHoursCarry: isCap && hourTarget > 0 ? summary.remainingHours : 0
+  };
+}
+
+function buildCarryForwardPreview(rows = [], boundaryDate = '', options = {}) {
+  const sessions = Array.isArray(options.sessions) ? options.sessions : [];
+  const classData = options.classData || {};
   const normalizedBoundary = requireDateOnly(boundaryDate, 'boundaryDate');
   const openRows = (Array.isArray(rows) ? rows : []).filter((row) => {
     const status = String(row?.status || '').trim().toLowerCase();
@@ -222,6 +348,9 @@ function buildCarryForwardPreview(rows = [], boundaryDate = '') {
       eligible,
       reason
     };
+    if (eligible && sessions.length) {
+      candidateRow.carryForwardPlan = buildCarryForwardPlan(row, normalizedBoundary, sessions, classData);
+    }
     candidates.push(candidateRow);
 
     if (!studentId) return;
@@ -230,12 +359,22 @@ function buildCarryForwardPreview(rows = [], boundaryDate = '') {
       periodCount: 0,
       splitCount: 0,
       moveWholeCount: 0,
-      ineligibleCount: 0
+      ineligibleCount: 0,
+      consumedSessions: 0,
+      remainingSessions: 0,
+      remainingHours: 0,
+      carryPlans: []
     };
     current.periodCount += 1;
     if (action === 'split') current.splitCount += 1;
     if (action === 'move_whole') current.moveWholeCount += 1;
     if (!eligible) current.ineligibleCount += 1;
+    if (candidateRow.carryForwardPlan) {
+      current.carryPlans.push(candidateRow.carryForwardPlan);
+      current.consumedSessions += Number(candidateRow.carryForwardPlan.consumedSessions || 0);
+      current.remainingSessions += Number(candidateRow.carryForwardPlan.remainingSessions || 0);
+      current.remainingHours += Number(candidateRow.carryForwardPlan.remainingHours || 0);
+    }
     byStudent.set(studentId, current);
   });
 
@@ -295,42 +434,45 @@ async function splitPeriodsCrossingCycleBoundary({
   });
 
   const details = [];
+  const sourceSessions = loadClassSessions(fromClass);
   for (const row of crossingRows) {
     assertCarryForwardAuthorizationWindow(row, normalizedBoundary);
     const sourceCloseDate = dayBefore(normalizedBoundary);
+    const carryNote = String(note || `Closed at cycle boundary ${normalizedBoundary}.`).trim();
+    // eslint-disable-next-line no-await-in-loop
+    const { summary, createPayload } = await persistCycleSummaryAndBuildTargetPayload({
+      row,
+      fromClass,
+      toClass,
+      boundaryDate: normalizedBoundary,
+      sessions: sourceSessions,
+      targetStartDate: normalizedBoundary,
+      note: String(note || `Continuation split from ${fromClass.id} at cycle boundary.`).trim(),
+      requestingUser,
+      options
+    });
+
     // eslint-disable-next-line no-await-in-loop
     const closedSource = await dependencies.enrollmentPeriodService.closePeriod(
       row.id,
       {
         endDate: sourceCloseDate,
         status: 'completed',
-        reasonEnd: String(note || `Closed at cycle boundary ${normalizedBoundary}.`).trim()
+        reasonEnd: carryNote
       },
       requestingUser,
       options
     );
 
     // eslint-disable-next-line no-await-in-loop
-    const createdTarget = await dependencies.enrollmentPeriodService.createPeriod({
-      orgId: row.orgId,
-      classId: toClass.id,
-      studentId: row.studentId,
-      startDate: normalizedBoundary,
-      endDate: normalizeDateOnly(row.endDate),
-      status: String(row.status || 'active'),
-      funderType: String(row.funderType || '').trim(),
-      funderId: String(row.funderId || '').trim(),
-      authorizationRef: String(row.authorizationRef || '').trim(),
-      reasonStart: String(note || `Continuation split from ${fromClass.id} at cycle boundary.`).trim(),
-      reasonEnd: String(row.reasonEnd || '').trim(),
-      skipCyclePolicyCheck: true
-    }, requestingUser, options);
+    const createdTarget = await dependencies.enrollmentPeriodService.createPeriod(createPayload, requestingUser, options);
 
     details.push({
       sourcePeriodId: row.id,
       sourceClosedAt: closedSource?.endDate || sourceCloseDate,
       targetPeriodId: createdTarget?.period?.id || '',
-      studentId: row.studentId
+      studentId: row.studentId,
+      cycleAttendanceSummary: summary
     });
   }
 
@@ -358,6 +500,8 @@ async function carryForwardEligibleStudents({
     note: `Carry-forward split at cycle boundary ${normalizedBoundary}.`
   }, requestingUser, options);
 
+  const fromClass = await getClassOrThrow(fromClassId, options);
+  const toClass = await getClassOrThrow(toClassId, options);
   const rows = await dependencies.repositories.classEnrollmentPeriods.findByClassId(fromClassId, options);
   const moveWholeRows = (Array.isArray(rows) ? rows : []).filter((row) => {
     const status = String(row?.status || '').trim().toLowerCase();
@@ -367,35 +511,38 @@ async function carryForwardEligibleStudents({
   });
 
   const movedWhole = [];
+  const sourceSessions = loadClassSessions(fromClass);
   for (const row of moveWholeRows) {
     assertCarryForwardAuthorizationWindow(row, normalizedBoundary);
+    // eslint-disable-next-line no-await-in-loop
+    const { summary, createPayload } = await persistCycleSummaryAndBuildTargetPayload({
+      row,
+      fromClass,
+      toClass,
+      boundaryDate: normalizedBoundary,
+      sessions: sourceSessions,
+      targetStartDate: normalizeDateOnly(row.startDate),
+      note: `Moved whole period from ${fromClassId} during carry-forward.`,
+      requestingUser,
+      options
+    });
+
     // eslint-disable-next-line no-await-in-loop
     await dependencies.repositories.classEnrollmentPeriods.update(row.id, {
       status: 'cancelled',
       reasonEnd: `Moved to cycle ${toClassId} during carry-forward.`,
+      cycleAttendanceSummary: summary,
       updatedBy: resolveActor(requestingUser)
     }, options);
 
     // eslint-disable-next-line no-await-in-loop
-    const createdTarget = await dependencies.enrollmentPeriodService.createPeriod({
-      orgId: row.orgId,
-      classId: toClassId,
-      studentId: row.studentId,
-      startDate: normalizeDateOnly(row.startDate),
-      endDate: normalizeDateOnly(row.endDate),
-      status: String(row.status || 'active'),
-      funderType: String(row.funderType || '').trim(),
-      funderId: String(row.funderId || '').trim(),
-      authorizationRef: String(row.authorizationRef || '').trim(),
-      reasonStart: `Moved whole period from ${fromClassId} during carry-forward.`,
-      reasonEnd: String(row.reasonEnd || '').trim(),
-      skipCyclePolicyCheck: true
-    }, requestingUser, options);
+    const createdTarget = await dependencies.enrollmentPeriodService.createPeriod(createPayload, requestingUser, options);
 
     movedWhole.push({
       sourcePeriodId: row.id,
       targetPeriodId: createdTarget?.period?.id || '',
-      studentId: row.studentId
+      studentId: row.studentId,
+      cycleAttendanceSummary: summary
     });
   }
 
@@ -526,7 +673,11 @@ async function previewNextCycleFromCurrentClassTemplate(currentClassId, input = 
   }
 
   const rows = await dependencies.repositories.classEnrollmentPeriods.findByClassId(currentClass.id, options);
-  const carryForwardPreview = buildCarryForwardPreview(rows, cycleStartDate);
+  const sessions = loadClassSessions(currentClass);
+  const carryForwardPreview = buildCarryForwardPreview(rows, cycleStartDate, {
+    sessions,
+    classData: currentClass
+  });
   const issues = [...carryForwardPreview.issues];
   if (boundaryError) {
     issues.unshift({
@@ -588,6 +739,8 @@ module.exports = {
   previewNextCycleFromCurrentClassTemplate,
   carryForwardEligibleStudents,
   splitPeriodsCrossingCycleBoundary,
+  buildCarryForwardPreview,
+  buildCarryForwardPlan,
   __setDependenciesForTest,
   __resetDependenciesForTest
 };

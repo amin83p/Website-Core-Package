@@ -212,6 +212,9 @@
       const start = mondayOfWeek(anchor);
       return { startDate: start, endDate: addDaysIso(start, 13), preset: key, anchorDate: anchor };
     }
+    if (key === 'thirtyDays') {
+      return { startDate: anchor, endDate: addDaysIso(anchor, 30), preset: key, anchorDate: anchor };
+    }
     if (key === 'month') {
       const start = startOfMonth(anchor);
       return { startDate: start, endDate: endOfMonth(anchor), preset: key, anchorDate: anchor };
@@ -236,6 +239,7 @@
     if (preset === 'day') return computeViewRange(preset, addDaysIso(anchor, dir));
     if (preset === 'week') return computeViewRange(preset, addDaysIso(anchor, dir * 7));
     if (preset === 'twoWeeks') return computeViewRange(preset, addDaysIso(anchor, dir * 14));
+    if (preset === 'thirtyDays') return computeViewRange(preset, addDaysIso(anchor, dir * 31));
     if (preset === 'month') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir));
     if (preset === 'twoMonths') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir * 2));
     if (preset === 'threeMonths') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir * 3));
@@ -1000,7 +1004,7 @@
     return true;
   }
 
-  function renderSingleDayList(eventsByDate, container, selectedSet, displayStartDate = '') {
+  function renderSingleDayList(eventsByDate, container, selectedSet, displayStartDate = '', options = {}) {
     container.innerHTML = '';
     const displayStart = normalizeDateOnly(displayStartDate);
     const dates = Object.keys(eventsByDate || {}).sort().filter((dateStr) => !displayStart || dateStr >= displayStart);
@@ -1008,12 +1012,17 @@
       container.innerHTML = '<div class="alert alert-light text-center border py-4 text-muted">No sessions in this range.</div>';
       return;
     }
+    const buildCard = options?.buildListDayCardHtml;
     let html = '<div class="single-day-list">';
     dates.forEach((dateStr) => {
       const dateObj = new Date(`${dateStr}T00:00:00`);
       const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
       html += `<div class="small fw-semibold text-muted mb-2">${escapeHtml(displayDate)}</div>`;
       (eventsByDate[dateStr] || []).forEach((ev) => {
+        if (typeof buildCard === 'function') {
+          html += buildCard(ev, selectedSet);
+          return;
+        }
         const sessionId = String(ev?.sessionId || '').trim();
         const selectable = ev?.selectable === true;
         const selected = selectedSet && selectedSet.has(sessionId);
@@ -1110,11 +1119,15 @@
       anchorDate: options.anchorDate,
       dayWidth: options.dayWidth,
       holidayDates: options.holidayDates || null,
-      enrollmentStartDate: options.enrollmentStartDate || ''
+      enrollmentStartDate: options.enrollmentStartDate || '',
+      buildPositionedBlockHtml: options.buildPositionedBlockHtml,
+      buildListDayCardHtml: options.buildListDayCardHtml,
+      buildDayHeaderBadgeHtml: options.buildDayHeaderBadgeHtml,
+      buildDayExtraClasses: options.buildDayExtraClasses
     };
 
     if (viewMode === 'singleDay') {
-      renderSingleDayList(eventsByDate, container, selectedSet, gridOptions.enrollmentStartDate);
+      renderSingleDayList(eventsByDate, container, selectedSet, gridOptions.enrollmentStartDate, gridOptions);
       return;
     }
     if (viewMode === 'timeline') {
@@ -1494,6 +1507,7 @@
     formatDayHeaderParts,
     formatClockTime,
     formatClockTimeRange,
+    formatHours,
     parseClockTimeParts,
     renderEnrollmentCalendar,
     renderVerticalWeekGrid,

@@ -1,0 +1,26 @@
+<div id="sessionEnrollmentMarkModal" class="session-enrollment-stage-overlay d-none" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="sessionEnrollmentMarkModalTitle">
+  <div class="session-enrollment-stage-backdrop" data-mark-dismiss="1" aria-hidden="true"></div>
+  <div class="session-enrollment-stage-panel card shadow">
+    <div class="card-header py-2 d-flex align-items-start justify-content-between gap-2">
+      <div>
+        <h5 class="card-title mb-0" id="sessionEnrollmentMarkModalTitle">Enrollment session</h5>
+        <div class="small text-muted" id="sessionEnrollmentMarkContext"></div>
+      </div>
+      <button type="button" class="btn-close" data-mark-dismiss="1" aria-label="Close"></button>
+    </div>
+    <div class="card-body py-2">
+      <div class="small mb-2" id="sessionEnrollmentMarkAttendance"></div>
+      <div class="small mb-2" id="sessionEnrollmentMarkStatus"></div>
+      <div id="sessionEnrollmentMarkNoteWrap" class="mb-2">
+        <label class="form-label small mb-1" for="sessionEnrollmentMarkNote">Note (required for N/A)</label>
+        <input type="text" class="form-control form-control-sm" id="sessionEnrollmentMarkNote" placeholder="Why is this session N/A?">
+      </div>
+      <div class="small text-danger d-none" id="sessionEnrollmentMarkError" role="alert"></div>
+    </div>
+    <div class="card-footer py-2 d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-secondary btn-sm" data-mark-dismiss="1">Cancel</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btn_sessionEnrollmentMarkUnmark">Unmark N/A</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn_sessionEnrollmentMarkApply">Mark N/A</button>
+    </div>
+  </div>
+</div>

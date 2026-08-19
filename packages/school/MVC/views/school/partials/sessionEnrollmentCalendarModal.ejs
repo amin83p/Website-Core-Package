@@ -10,10 +10,11 @@
       </div>
       <div class="modal-body session-enrollment-calendar-body">
         <div class="session-enrollment-toolbar d-flex flex-wrap align-items-center gap-2 mb-2">
-          <div class="btn-group btn-group-sm" role="group" aria-label="Range preset">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Range preset" id="sessionEnrollmentCalendarPresetGroup">
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="day">Day</button>
-            <button type="button" class="btn btn-outline-secondary active" data-session-picker-preset="week">Week</button>
+            <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="week">Week</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="twoWeeks">2 Weeks</button>
+            <button type="button" class="btn btn-outline-secondary d-none" data-session-picker-preset="thirtyDays" id="btn_sessionEnrollmentPresetThirtyDays">30 Days</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="month">Month</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="twoMonths">2 Months</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="threeMonths">3 Months</button>
@@ -40,7 +41,7 @@
         <div class="mt-2 p-2 bg-light border rounded" id="sessionEnrollmentCalendarSummary" role="status">
           Selected: 0 session(s), 0 Hr | Span: —
         </div>
-        <div class="small text-muted mt-1 flex-shrink-0">
+        <div class="small text-muted mt-1 flex-shrink-0" id="sessionEnrollmentCalendarHint">
           Click empty grid space to stage sessions; click sessions to include or exclude.
         </div>
       </div>
@@ -48,8 +49,10 @@
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_sessionEnrollmentCalendarClear">Clear selection</button>
         <button type="button" class="btn btn-primary btn-sm" id="btn_sessionEnrollmentCalendarSave">Save selection</button>
+        <button type="button" class="btn btn-primary btn-sm d-none" id="btn_sessionEnrollmentCalendarDone">Done</button>
       </div>
       <%- include('school/partials/sessionEnrollmentStageModal') %>
+      <%- include('school/partials/sessionEnrollmentMarkModal') %>
     </div>
   </div>
 </div>
