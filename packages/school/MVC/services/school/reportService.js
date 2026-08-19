@@ -119,7 +119,7 @@ const PREFILL_CATALOG = Object.freeze({
   gradebookPeriodClass: Object.freeze([
     Object.freeze({ key: 'class_gradebook_period_sessions_count', label: 'Class Gradebook Period Sessions', description: 'Sessions in the report period (excludes sessions excluded from attendance matrix policy).' }),
     Object.freeze({ key: 'class_gradebook_period_activity_count', label: 'Class Gradebook Period Activities', description: 'Gradebook + quiz + in-session assignment columns in that period.' }),
-    Object.freeze({ key: 'class_gradebook_period_avg_percent', label: 'Class Gradebook Period Avg %', description: 'Mean percentage over all scored, non-absent cells marked include-in-grade.' }),
+    Object.freeze({ key: 'class_gradebook_period_avg_percent', label: 'Class Gradebook Period Avg %', description: 'Weighted average percent: sum of earned points divided by sum of activity total points (included, scored, non-absent cells).' }),
     Object.freeze({ key: 'class_gradebook_period_points_earned', label: 'Class Gradebook Period Points Earned', description: 'Sum of raw scores (non-absent, numeric) for counted activities.' }),
     Object.freeze({ key: 'class_gradebook_period_points_possible', label: 'Class Gradebook Period Points Possible', description: 'Sum of max points for those cells.' })
   ]),
@@ -232,7 +232,7 @@ const PREFILL_CATALOG = Object.freeze({
   ]),
   gradebookPeriodStudent: Object.freeze([
     Object.freeze({ key: 'student_gradebook_period_activity_count', label: 'Student Gradebook Period Activities', description: 'Include-in-grade activities in period where student not absent and has a score.' }),
-    Object.freeze({ key: 'student_gradebook_period_avg_percent', label: 'Student Gradebook Period Avg %', description: 'Average percent on those activities.' }),
+    Object.freeze({ key: 'student_gradebook_period_avg_percent', label: 'Student Gradebook Period Avg %', description: 'Weighted average percent: earned points divided by possible points on included activities (not absent).' }),
     Object.freeze({ key: 'student_gradebook_period_points_earned', label: 'Student Gradebook Period Points Earned', description: 'Sum of raw scores.' }),
     Object.freeze({ key: 'student_gradebook_period_points_possible', label: 'Student Gradebook Period Points Possible', description: 'Sum of activity totals.' })
   ]),
@@ -1017,6 +1017,14 @@ function averageRounded(arr) {
   return Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 100) / 100;
 }
 
+function percentFromEarnedPossible(earned, possible) {
+  const p = Number(possible);
+  if (!Number.isFinite(p) || p <= 0) return 0;
+  const e = Number(earned);
+  if (!Number.isFinite(e)) return 0;
+  return Math.round((e / p) * 1000) / 10;
+}
+
 function minRounded(arr) {
   if (!arr.length) return 0;
   return Math.min(...arr);
@@ -1086,13 +1094,13 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
   skills.forEach((skill) => {
     const bucket = buckets.get(skill.id);
     flatMap[`class_gradebook_skill_${skill.id}_activity_count`] = bucket.classPercents.length;
-    flatMap[`class_gradebook_skill_${skill.id}_avg_percent`] = averageRounded(bucket.classPercents);
+    flatMap[`class_gradebook_skill_${skill.id}_avg_percent`] = percentFromEarnedPossible(bucket.classEarned, bucket.classPossible);
     flatMap[`class_gradebook_skill_${skill.id}_min_percent`] = minRounded(bucket.classPercents);
     flatMap[`class_gradebook_skill_${skill.id}_max_percent`] = maxRounded(bucket.classPercents);
     flatMap[`class_gradebook_skill_${skill.id}_points_earned`] = Math.round(bucket.classEarned * 100) / 100;
     flatMap[`class_gradebook_skill_${skill.id}_points_possible`] = Math.round(bucket.classPossible * 100) / 100;
     flatMap[`student_gradebook_skill_${skill.id}_activity_count`] = bucket.studentActivityCount;
-    flatMap[`student_gradebook_skill_${skill.id}_avg_percent`] = averageRounded(bucket.studentPercents);
+    flatMap[`student_gradebook_skill_${skill.id}_avg_percent`] = percentFromEarnedPossible(bucket.studentEarned, bucket.studentPossible);
     flatMap[`student_gradebook_skill_${skill.id}_min_percent`] = minRounded(bucket.studentPercents);
     flatMap[`student_gradebook_skill_${skill.id}_max_percent`] = maxRounded(bucket.studentPercents);
     flatMap[`student_gradebook_skill_${skill.id}_points_earned`] = Math.round(bucket.studentEarned * 100) / 100;
@@ -1101,7 +1109,7 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
       skill_id: skill.id,
       skill_name: skill.label,
       activity_count: bucket.studentActivityCount,
-      avg_percent: averageRounded(bucket.studentPercents),
+      avg_percent: percentFromEarnedPossible(bucket.studentEarned, bucket.studentPossible),
       min_percent: minRounded(bucket.studentPercents),
       max_percent: maxRounded(bucket.studentPercents),
       points_earned: Math.round(bucket.studentEarned * 100) / 100,
@@ -1159,11 +1167,11 @@ function computeReportPeriodGradebookStats(periodSessions, studentPersonId, stat
   return {
     class_gradebook_period_sessions_count: Array.isArray(periodSessions) ? periodSessions.length : 0,
     class_gradebook_period_activity_count: cols.length,
-    class_gradebook_period_avg_percent: averageRounded(classPercents),
+    class_gradebook_period_avg_percent: percentFromEarnedPossible(classEarned, classPossible),
     class_gradebook_period_points_earned: Math.round(classEarned * 100) / 100,
     class_gradebook_period_points_possible: Math.round(classPossible * 100) / 100,
     student_gradebook_period_activity_count: studentActivitySlots,
-    student_gradebook_period_avg_percent: averageRounded(studentPercents),
+    student_gradebook_period_avg_percent: percentFromEarnedPossible(studentEarned, studentPossible),
     student_gradebook_period_points_earned: Math.round(studentEarned * 100) / 100,
     student_gradebook_period_points_possible: Math.round(studentPossible * 100) / 100
   };

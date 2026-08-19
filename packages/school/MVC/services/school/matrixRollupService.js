@@ -1,19 +1,26 @@
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 
 function assignmentsCategoryAveragePercents(cells, columns) {
-  const percents = [];
+  let earned = 0;
+  let possible = 0;
   for (let i = 0; i < columns.length; i += 1) {
     const col = columns[i];
     const cell = cells[i];
     if (!col || !cell) continue;
     if (!col.includeInGradeCalculation) continue;
     if (!cell.effective) continue;
-    if (cell.percent == null) continue;
-    percents.push(Number(cell.percent));
+    const total = Number(col.totalScore);
+    if (!Number.isFinite(total) || total <= 0) continue;
+    let score = cell.score;
+    if (score == null && cell.percent != null && Number.isFinite(Number(cell.percent))) {
+      score = (Number(cell.percent) / 100) * total;
+    }
+    if (score == null || !Number.isFinite(Number(score))) continue;
+    earned += Number(score);
+    possible += total;
   }
-  if (!percents.length) return null;
-  const sum = percents.reduce((a, b) => a + b, 0);
-  return Math.round((sum / percents.length) * 100) / 100;
+  if (!possible) return null;
+  return Math.round((earned / possible) * 10000) / 100;
 }
 
 function computeFinalPercent(evaluation, attendancePct, assignmentsPct, midtermPct, finalExamPct) {
@@ -158,6 +165,7 @@ function summarizeGradesRollupsForRows(rows = [], columns = [], context = {}) {
 }
 
 module.exports = {
+  assignmentsCategoryAveragePercents,
   rollupRecordsForStudentRow,
   recomputeAttendanceMatrixRollups,
   summarizeAttendanceRollupsForStudents,

@@ -598,6 +598,7 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(matrixView, /processedRadioFields/);
   assert.match(matrixView, /id="btnReportMatrixExpandTable"/);
   assert.match(matrixView, /id="reportMatrixTableModal"/);
+  assert.match(matrixView, /portalReportMatrixModalsToBody/);
   assert.match(matrixView, /id="reportMatrixTableInlineHost"/);
   assert.match(matrixView, /Open expanded view/);
   assert.match(matrixView, /matrix-context-card/);

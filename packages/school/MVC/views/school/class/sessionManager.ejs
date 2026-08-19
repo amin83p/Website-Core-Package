@@ -1040,9 +1040,22 @@
     }
     .session-report-step-actions {
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        width: 100%;
+    }
+    .session-report-step-actions .session-panel-open-btn,
+    .session-report-step-actions a.session-panel-open-btn {
+        display: block;
+        text-align: center;
+        text-decoration: none;
+    }
+    .session-report-conduct-status {
+        display: flex;
         justify-content: center;
-        gap: 1rem;
+        align-items: center;
+        gap: 0.5rem;
         flex-wrap: wrap;
     }
     .session-report-instances-panel {
@@ -1072,15 +1085,32 @@
         white-space: nowrap;
     }
     .student-case-cta-zone {
-        padding: 1.25rem 1.5rem;
+        padding: 1rem 1.5rem;
         border-bottom: 1px solid #e2e8f0;
-        background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+        background: #f8fafc;
     }
     .student-case-open-btn {
-        font-size: 1.05rem;
-        font-weight: 700;
-        padding: 0.9rem 1.5rem;
-        box-shadow: 0 0.35rem 1rem rgba(234, 88, 12, 0.18);
+        font-size: 0.98rem;
+        font-weight: 600;
+        padding: 0.7rem 1.25rem;
+        box-shadow: none;
+    }
+    .session-panel-cta-zone {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+    .session-panel-cta-zone--primary {
+        background: #f8fafc;
+    }
+    .session-panel-open-btn {
+        font-size: 0.98rem;
+        font-weight: 600;
+        padding: 0.7rem 1.25rem;
+        box-shadow: none;
+    }
+    .session-panel-open-btn--primary {
+        box-shadow: none;
     }
     .student-case-student-picker {
         max-height: min(48vh, 420px);
@@ -1486,8 +1516,8 @@
         const smTeacherLabel = String(session.delivery?.deliveredByName || session.delivery?.deliveredBy || '').trim();
         const smCurrentStatusLabel = String(currentSessionStatusMeta?.label || currentSessionStatus || 'Scheduled').trim();
         const canEditSessionMetadataFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true;
-        const canManageClassConductFlag = (typeof canManageClassConduct !== 'undefined' && canManageClassConduct === true)
-            || canEditSessionMetadataFlag;
+        const canManageReportClassConductFlag = typeof canManageClassConduct !== 'undefined' && canManageClassConduct === true;
+        const canViewClassConductPanelFlag = canEditSessionMetadataFlag;
         const canViewSchoolSettingsFlag = typeof canViewSchoolSettings !== 'undefined' && canViewSchoolSettings === true;
         const isTimesheetSessionLock = typeof isSessionLocked !== 'undefined' && isSessionLocked && String(session.lockReason || '') === 'timesheet_approved';
         const canToggleSessionLock = canEditSessionMetadataFlag && !isTimesheetSessionLock;
@@ -1507,7 +1537,9 @@
         const sessionReportRowsInitial = Array.isArray(typeof sessionReportInstanceRows !== 'undefined' ? sessionReportInstanceRows : [])
             ? sessionReportInstanceRows
             : [];
-        const hasSessionReportsAssigned = sessionReportRowsInitial.length > 0;
+        const hasSessionReportsAssignedFlag = typeof hasSessionReportsAssigned !== 'undefined'
+            ? Boolean(hasSessionReportsAssigned)
+            : sessionReportRowsInitial.length > 0;
         const sessionHasConductRequiredReportsResolved = (typeof sessionHasConductRequiredReports !== 'undefined')
             ? Boolean(sessionHasConductRequiredReports)
             : sessionReportRowsInitial.some((row) => row && row.conductRequiredBeforeFill !== false);
@@ -1936,7 +1968,7 @@
                 <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true">
                     <i class="bi bi-people-fill fs-5"></i><span class="session-manager-nav-label">Attendance</span>
                 </button>
-                <% if (canManageClassConductFlag) { %>
+                <% if (canViewClassConductPanelFlag) { %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-emoji-smile fs-5"></i><span class="session-manager-nav-label">Class Conduct</span>
                 </button>
@@ -2112,7 +2144,7 @@
                 </div>
             </div>
 
-            <% if (canManageClassConductFlag) { %>
+            <% if (canViewClassConductPanelFlag) { %>
             <div class="session-panel" id="session-panel-conduct" role="tabpanel">
                 <div class="card border-0 shadow-sm mb-3" id="sessionOptionalConductStep">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -2366,15 +2398,16 @@
 
             <div class="session-panel" id="session-panel-content" role="tabpanel">
                 <div class="card border-0 shadow-sm mb-3">
-                    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                    <div class="card-header bg-white border-bottom py-3">
                         <h5 class="m-0 fw-bold text-primary"><i class="bi bi-folder2-open me-2"></i>Session content</h5>
-                        <% if (!isReadOnly) { %>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddHtmlContent"><i class="bi bi-filetype-html me-1"></i>Add HTML</button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddFileContent"><i class="bi bi-paperclip me-1"></i>Add file</button>
-                        </div>
-                        <% } %>
                     </div>
+                    <% if (!isReadOnly) { %>
+                    <div class="session-panel-cta-zone session-panel-cta-zone--primary">
+                        <button type="button" class="btn btn-outline-secondary session-panel-open-btn w-100" id="btnAddFileContent">
+                            <i class="bi bi-paperclip me-2"></i>Add file
+                        </button>
+                    </div>
+                    <% } %>
                     <div class="card-body">
                         <div class="small text-muted mb-2">Items are delivered in order. Allocated exams are included automatically for this session.</div>
                         <div id="sessionContentList"></div>
@@ -2382,27 +2415,88 @@
                 </div>
             </div>
             <div class="session-panel" id="session-panel-assignments" role="tabpanel">
-                <% if (hasSessionReportsAssigned) { %>
-                <div class="card border-0 shadow-sm mb-3" id="sessionReportWorkflowHeader">
-                    <div class="card-body py-3">
-                        <div class="session-report-workflow-header-row">
-                            <div class="session-report-workflow-progress" id="sessionReportWorkflowProgress" aria-label="Report workflow progress">
-                                <% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %>
-                                <span class="session-report-workflow-step" id="sessionReportWorkflowStep1Label" data-workflow-step="1"><i class="bi bi-1-circle"></i>Class Conduct</span>
-                                <span class="session-report-workflow-divider" aria-hidden="true">→</span>
-                                <% } %>
-                                <span class="session-report-workflow-step" id="sessionReportWorkflowStep2Label" data-workflow-step="2"><i class="bi bi-<%= sessionHasConductRequiredReportsResolved && canManageClassConductFlag ? '2-circle' : 'clipboard-check' %>"></i>Report instances</span>
-                            </div>
-                            <div class="session-report-workflow-actions">
-                                <% if (canAssignSessionReports) { %>
-                                    <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
-                                <% } %>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                <div class="card border-0 shadow-sm mb-3" id="sessionReportsPanelCard">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                        <div>
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-clipboard-check me-2"></i>Session reports</h5>
+                            <div class="small text-muted mt-1">Fill assigned reports for students on this session roster.</div>
+                        </div>
+                        <% if (hasSessionReportsAssignedFlag) { %>
+                        <div class="d-flex flex-wrap gap-2">
+                            <% if (canAssignSessionReports) { %>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
+                            <% } %>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                        </div>
+                        <% } %>
+                    </div>
+
+                    <% if (hasSessionReportsAssignedFlag) { %>
+                        <% if (sessionHasConductRequiredReportsResolved && canManageReportClassConductFlag && !isReadOnly) { %>
+                        <div class="session-panel-cta-zone session-panel-cta-zone--primary" id="sessionReportConductCtaZone">
+                            <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenConductBulkModal">
+                                <i class="bi bi-lightning-charge me-2"></i>Quick rate class conduct
+                            </button>
+                            <div class="session-report-conduct-status mt-2" id="sessionConductStepStatus">
+                                <div id="sessionConductStepStatusPending" class="session-conduct-step-status-pending<%= conductReadyForReports ? ' d-none' : '' %>">
+                                    <span class="badge bg-warning text-dark">Required before reports</span>
+                                </div>
+                                <div id="sessionConductStepStatusComplete" class="session-conduct-step-status-complete<%= conductReadyForReports ? '' : ' d-none' %>">
+                                    <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Class conduct saved</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                        <% } %>
+
+                        <div class="session-panel-cta-zone session-panel-cta-zone--primary d-none" id="sessionReportFillReportsZone">
+                            <div class="session-report-step-actions" id="sessionReportFillReportsActions"></div>
+                        </div>
+
+                        <div class="card-body py-3" id="sessionReportInstancesStep">
+                            <div id="sessionReportConductAdminPendingAlert" class="alert alert-info<%= (sessionHasConductRequiredReportsResolved && !canManageReportClassConductFlag && !conductReadyForReports) ? '' : ' d-none' %>">Class conduct must be completed by a class administrator before reports can be filled.</div>
+                            <div id="sessionReportInstancesStatusSummary" class="small text-muted mb-2"></div>
+                            <div id="sessionReportRosterReconciliationHost" class="mb-2"></div>
+                            <div class="session-report-instances-panel">
+                                <button type="button" class="btn session-report-instances-toggle collapsed w-100 d-flex justify-content-between align-items-center" id="btnToggleSessionReportInstancesTable" data-bs-toggle="collapse" data-bs-target="#sessionReportInstancesCollapse" aria-expanded="false" aria-controls="sessionReportInstancesCollapse">
+                                    <span><i class="bi bi-table me-2"></i>Report instances</span>
+                                    <span class="small text-muted" id="sessionReportInstancesCollapseHint"></span>
+                                </button>
+                                <div class="collapse" id="sessionReportInstancesCollapse">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th class="ps-4">Report</th>
+                                                    <th>Student / target</th>
+                                                    <th>Teacher</th>
+                                                    <th>Status</th>
+                                                    <th class="pe-4 text-end">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="sessionReportInstancesBody">
+                                                <tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% } else { %>
+                        <div class="card-body py-4">
+                            <div class="session-placeholder-card mb-0">
+                                <div class="fw-semibold text-dark mb-1">No reports assigned yet</div>
+                                <div class="small text-muted mb-3">Assign a report to this session to unlock report filling.</div>
+                                <% if (canAssignSessionReports) { %>
+                                <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenSessionReportAssignmentModalEmpty">
+                                    <i class="bi bi-file-earmark-plus me-2"></i>Assign Report
+                                </button>
+                                <% } %>
+                            </div>
+                        </div>
+                    <% } %>
                 </div>
-                <% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %>
+
+                <% if (hasSessionReportsAssignedFlag && sessionHasConductRequiredReportsResolved && canManageReportClassConductFlag) { %>
                 <div class="d-none" id="sessionReportConductDataHost">
                     <table class="table table-hover align-middle mb-0" id="conductTable">
                         <thead class="table-light">
@@ -2440,109 +2534,19 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="card border-0 shadow-sm mb-3" id="sessionReportConductStep">
-                    <div class="card-body py-4">
-                        <div class="conduct-rating-help">Rate every student with <strong>Quick Rate</strong>, then save class conduct to unlock report filling. Use <strong>S</strong>, <strong>Sat</strong>, <strong>NI</strong>, <strong>U</strong>, or <strong>N/A</strong>.</div>
-                        <div class="d-flex flex-wrap gap-2 mt-2">
-                            <% conductPickerLevels.forEach((level) => { %>
-                                <span class="conduct-legend-chip" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>">
-                                    <strong><%= level.displayCode || level.code %></strong>
-                                    <span class="text-muted"><%= level.label %></span>
-                                </span>
-                            <% }) %>
-                        </div>
-                        <div class="session-conduct-step-cta-zone" id="sessionConductStepStatus">
-                            <% if (!isReadOnly && session.roster.length > 0) { %>
-                            <div class="session-conduct-step-actions">
-                                <button type="button" class="btn btn-primary btn-lg" id="btnOpenConductBulkModal"><i class="bi bi-lightning-charge me-2"></i>Quick Rate</button>
-                                <div id="sessionConductStepStatusPending" class="session-conduct-step-status-pending<%= conductReadyForReports ? ' d-none' : '' %>">
-                                    <span class="badge bg-warning text-dark">Required before reports</span>
-                                </div>
-                                <div id="sessionConductStepStatusComplete" class="session-conduct-step-status-complete<%= conductReadyForReports ? '' : ' d-none' %>">
-                                    <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Class conduct saved</span>
-                                </div>
-                            </div>
-                            <% } %>
-                        </div>
-                        <div class="session-conduct-step-footer">
-                            <button type="button" class="btn btn-success<%= conductReadyForReports ? '' : ' d-none' %>" id="btnReportWorkflowNextInline"><i class="bi bi-arrow-right me-1"></i>Continue to reports</button>
-                        </div>
-                    </div>
-                </div>
                 <% } %>
-                <% } %>
-
-                <div class="card border-0 shadow-sm" id="sessionReportInstancesStep">
-                    <div class="card-body py-4">
-                        <% if (hasSessionReportsAssigned) { %>
-                            <div id="sessionReportConductAdminPendingAlert" class="alert alert-info<%= (sessionHasConductRequiredReportsResolved && !canManageClassConductFlag && !conductReadyForReports) ? '' : ' d-none' %>">Class conduct must be completed by a class administrator before reports can be filled.</div>
-                            <div class="conduct-rating-help">Fill reports for this session using the student matrix. Open individual reports from the list below when needed.<% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %> Use <strong>Back to Class Conduct</strong> above or below the report instances list to edit class conduct ratings.<% } %></div>
-                            <div id="sessionReportInstancesStatusSummary" class="small text-muted mt-2"></div>
-                            <div id="sessionReportRosterReconciliationHost" class="mt-2"></div>
-                            <div class="session-report-step-cta-zone" id="sessionReportFillReportsZone">
-                                <div class="session-report-step-actions" id="sessionReportFillReportsActions"></div>
-                            </div>
-                            <% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %>
-                            <div class="session-report-step-nav session-report-step-nav-top">
-                                <button type="button" class="btn btn-primary d-none js-report-workflow-back-to-conduct" id="btnReportWorkflowPrevious"><i class="bi bi-arrow-left me-1"></i>Back to Class Conduct</button>
-                            </div>
-                            <% } %>
-                            <div class="session-report-instances-panel mt-3">
-                                <button type="button" class="btn session-report-instances-toggle collapsed w-100 d-flex justify-content-between align-items-center" id="btnToggleSessionReportInstancesTable" data-bs-toggle="collapse" data-bs-target="#sessionReportInstancesCollapse" aria-expanded="false" aria-controls="sessionReportInstancesCollapse">
-                                    <span><i class="bi bi-table me-2"></i>Report instances</span>
-                                    <span class="small text-muted" id="sessionReportInstancesCollapseHint"></span>
-                                </button>
-                                <div class="collapse" id="sessionReportInstancesCollapse">
-                                    <div class="table-responsive">
-                                        <table class="table table-hover align-middle mb-0">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th class="ps-4">Report</th>
-                                                    <th>Student / target</th>
-                                                    <th>Teacher</th>
-                                                    <th>Status</th>
-                                                    <th class="pe-4 text-end">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="sessionReportInstancesBody">
-                                                <tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %>
-                                    <div class="session-report-step-nav session-report-step-nav-bottom">
-                                        <button type="button" class="btn btn-primary d-none js-report-workflow-back-to-conduct" id="btnReportWorkflowPreviousAfter"><i class="bi bi-arrow-left me-1"></i>Back to Class Conduct</button>
-                                    </div>
-                                    <% } %>
-                                </div>
-                            </div>
-                        <% } else { %>
-                            <div class="conduct-rating-help">Assign a report to this session to unlock class conduct and report filling.</div>
-                            <div class="d-flex flex-wrap gap-2 mt-3">
-                                <% if (canAssignSessionReports) { %>
-                                    <button type="button" class="btn btn-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
-                                <% } %>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
-                            </div>
-                        <% } %>
-                    </div>
-                </div>
             </div>
             <div class="session-panel" id="session-panel-student-cases" role="tabpanel">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
-                        <div>
-                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-folder-check me-2"></i>Student Cases</h5>
-                            <div class="small text-muted mt-1">Open a case when one or more students need extra reflection, support, or office follow-up. Attendance details stay in the attendance panel.</div>
-                        </div>
-                        <span class="badge bg-light text-dark border" id="studentCasesCountBadge">0 Cases</span>
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="m-0 fw-bold text-primary"><i class="bi bi-folder-check me-2"></i>Student Cases</h5>
+                        <div class="small text-muted mt-1">Open a case when one or more students need extra reflection, support, or office follow-up.</div>
                     </div>
                     <% if (!isReadOnly) { %>
                     <div class="student-case-cta-zone">
-                        <button type="button" class="btn btn-warning student-case-open-btn w-100" id="btnOpenStudentCaseWizard">
+                        <button type="button" class="btn btn-outline-secondary student-case-open-btn w-100" id="btnOpenStudentCaseWizard">
                             <i class="bi bi-folder-plus me-2"></i>Open Student Case
                         </button>
-                        <div class="small text-muted text-center mt-2">Report the same issue for one or more students on this session roster.</div>
                     </div>
                     <% } %>
                     <div class="card-body p-0">
@@ -2567,19 +2571,21 @@
                     </div>
                 </div>
             </div>            <div class="session-panel" id="session-panel-gradebook" role="tabpanel">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                    <h5 class="m-0 fw-bold text-primary"><i class="bi bi-journal-bookmark me-2"></i>Session gradebook</h5>
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="m-0 fw-bold text-primary"><i class="bi bi-journal-bookmark me-2"></i>Session gradebook</h5>
+                    </div>
                     <% if (!isReadOnly) { %>
-                    <button type="button" class="btn btn-primary btn-sm" id="btnOpenGradebookModal"><i class="bi bi-plus-lg me-1"></i>Add activity</button>
+                    <div class="session-panel-cta-zone session-panel-cta-zone--primary">
+                        <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenGradebookModal">
+                            <i class="bi bi-journal-plus me-2"></i>Add activity
+                        </button>
+                    </div>
                     <% } %>
+                    <div class="card-body">
+                        <div id="sessionGradebooksList"></div>
+                    </div>
                 </div>
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                    <p class="small text-muted mb-0 flex-grow-1">Add activities (name, skill focus, total points, instructions). Scores follow the <strong>attendance roster</strong>; <strong>absent</strong> and <strong>N/A</strong> show N/A. Save attendance with <strong>Save session</strong> before saving scores if you changed who was present.</p>
-                    <% if (!isReadOnly) { %>
-                    <button type="button" class="btn btn-success btn-sm flex-shrink-0" id="btnSaveGradebooks"><i class="bi bi-check2-circle me-1"></i>Save gradebook</button>
-                    <% } %>
-                </div>
-                <div id="sessionGradebooksList"></div>
             </div>
         </main>
     </div>
@@ -2741,8 +2747,41 @@
                     <div class="form-text">Optional. Select one or more skills this activity targets.</div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold" for="gbModalTotal">Total score (points)</label>
+                    <label class="form-label fw-bold d-flex align-items-center gap-1 mb-1" for="gbModalTotal">
+                        <span>Total score (points)</span>
+                        <button type="button" class="btn btn-link btn-sm p-0 text-primary lh-1 gb-total-score-info" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top"
+                            title="<strong>Weights period averages</strong><br>When several activities fall in a session date range or report period, the average uses <em>earned ÷ possible</em> points—not a simple mean of percentages.<br><br>Example (Feb 1–28):<br>Quiz A: 8/10 (80%) · Quiz B: 15/20 (75%) · Unit test: 30/50 (60%)<br>Equal mean of %: 71.7%<br><strong>Points-weighted: 66.3%</strong> (53÷80)"
+                            aria-label="How total points affect averages">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </label>
                     <input type="number" class="form-control" id="gbModalTotal" min="0.01" step="any" placeholder="e.g. 20">
+                    <div class="form-text">Larger totals count more when averaging multiple activities across a date range.</div>
+                </div>
+                <div class="mb-3">
+                    <div class="form-label fw-bold">Attachments</div>
+                    <div class="small text-muted mb-2">Optional test paper, answer sheet, or other files for this activity.</div>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="btn btn-outline-secondary btn-sm mb-0" for="gbModalAttachTest">
+                                <i class="bi bi-file-earmark-text me-1"></i>Test
+                            </label>
+                            <input type="file" class="d-none" id="gbModalAttachTest" data-gb-attach-role="test" accept="*/*">
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="btn btn-outline-secondary btn-sm mb-0" for="gbModalAttachAnswer">
+                                <i class="bi bi-file-earmark-check me-1"></i>Answer sheet
+                            </label>
+                            <input type="file" class="d-none" id="gbModalAttachAnswer" data-gb-attach-role="answer_sheet" accept="*/*">
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="btn btn-outline-secondary btn-sm mb-0" for="gbModalAttachOther">
+                                <i class="bi bi-paperclip me-1"></i>Add file
+                            </label>
+                            <input type="file" class="d-none" id="gbModalAttachOther" data-gb-attach-role="other" accept="*/*">
+                        </div>
+                    </div>
+                    <ul class="list-group list-group-flush border rounded" id="gbModalAttachmentsList"></ul>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold" for="gbModalContent">Activity content / instructions</label>
@@ -3111,11 +3150,13 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionCoreDirty: false,
         rosterDirty: false,
         instructionalDirty: false,
+        gradebookDirty: false,
         metadataDirty: false
     };
     function markSessionAutosaveCoreDirty() { sessionAutosaveDirty.sessionCoreDirty = true; }
     function markSessionAutosaveRosterDirty() { sessionAutosaveDirty.rosterDirty = true; }
     function markSessionAutosaveInstructionalDirty() { sessionAutosaveDirty.instructionalDirty = true; }
+    function markSessionAutosaveGradebookDirty() { sessionAutosaveDirty.gradebookDirty = true; }
     function markSessionAutosaveMetadataDirty() { sessionAutosaveDirty.metadataDirty = true; }
     const sessionManagerSchoolDashboardHref = <%- jsonForScript(typeof schoolSectionDashboardHref !== 'undefined' ? schoolSectionDashboardHref : '/dashboard/section-nav/SCHOOL') %>;
     const sessionStatusMeta = <%- jsonForScript(displayStatusRows || []) %>;
@@ -3149,7 +3190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
-    const sessionCanManageClassConduct = <%- jsonForScript(Boolean(canManageClassConductFlag)) %>;
+    const sessionCanManageClassConduct = <%- jsonForScript(Boolean(canManageReportClassConductFlag)) %>;
     const sessionCanManageCoTeachers = <%- jsonForScript(Boolean(typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true)) %>;
     const sessionCanToggleCoTeacherEdit = <%- jsonForScript(Boolean(typeof canToggleCoTeacherEdit !== 'undefined' && canToggleCoTeacherEdit === true)) %>;
     let sessionCoTeachersState = <%- jsonForScript(
@@ -3912,14 +3953,13 @@ document.addEventListener('DOMContentLoaded', () => {
         : 'null' %>;
     window.__attendanceThresholdsEnabled = <%= typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved?.thresholdsEnabled === false ? 'false' : 'true' %>;
     window.__conductRatingScale = <%- JSON.stringify(typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved ? conductRatingScaleResolved : { levels: conductScaleDefaultLevels }) %>;
-    const sessionConductReadOnly = <%= JSON.stringify(!!isReadOnly || !canManageClassConductFlag) %>;
+    const sessionConductReadOnly = <%= JSON.stringify(!!isReadOnly || !canViewClassConductPanelFlag) %>;
     const conductDimensionMeta = <%- jsonForScript(conductDimensions) %>;
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
     let sessionConductReadyForReports = <%- jsonForScript(Boolean(conductReadyForReports)) %>;
     const sessionHasConductRequiredReports = <%- jsonForScript(Boolean(sessionHasConductRequiredReportsResolved)) %>;
-    const hasSessionReportsAssigned = <%- jsonForScript(Boolean(hasSessionReportsAssigned)) %>;
-    let currentReportWorkflowStep = (sessionHasConductRequiredReports && sessionCanManageClassConduct && !sessionConductReadyForReports) ? 1 : 2;
+    const hasSessionReportsAssigned = <%- jsonForScript(Boolean(hasSessionReportsAssignedFlag)) %>;
     const REPORT_CONDUCT_TABLE_SELECTOR = '#sessionReportConductDataHost #conductTable';
     const optionalConductRosterSeed = <%- jsonForScript((session.roster || []).map((student) => ({
         personId: String(student.personId || ''),
@@ -4104,64 +4144,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateSessionConductStepStatusUi() {
         const pending = document.getElementById('sessionConductStepStatusPending');
         const complete = document.getElementById('sessionConductStepStatusComplete');
-        const continueBtn = document.getElementById('btnReportWorkflowNextInline');
         if (pending) pending.classList.toggle('d-none', sessionConductReadyForReports);
         if (complete) complete.classList.toggle('d-none', !sessionConductReadyForReports);
-        if (continueBtn) continueBtn.classList.toggle('d-none', !sessionConductReadyForReports);
     }
 
     function setConductReadyUi(ready) {
         sessionConductReadyForReports = !!ready;
         updateSessionConductStepStatusUi();
-        if (!sessionConductReadyForReports && sessionHasConductRequiredReports && sessionCanManageClassConduct) {
-            currentReportWorkflowStep = 1;
-        }
         syncReportWorkflowStepUi();
         renderSessionReportInstances();
     }
 
     function syncReportWorkflowStepUi() {
-        if (!sessionHasConductRequiredReports) return;
-
-        const adminConductWorkflow = sessionHasConductRequiredReports && sessionCanManageClassConduct;
         const teachersAwaitingAdminConduct = sessionHasConductRequiredReports && !sessionCanManageClassConduct && !sessionConductReadyForReports;
-
-        if (adminConductWorkflow && !sessionConductReadyForReports) {
-            currentReportWorkflowStep = 1;
-        } else if (!adminConductWorkflow || sessionConductReadyForReports) {
-            currentReportWorkflowStep = 2;
-        }
-
-        const showStep1 = adminConductWorkflow && currentReportWorkflowStep === 1;
-        const conductStep = document.getElementById('sessionReportConductStep');
-        const instancesStep = document.getElementById('sessionReportInstancesStep');
-        conductStep?.classList.toggle('d-none', !showStep1);
-        instancesStep?.classList.toggle('d-none', showStep1);
-
         document.getElementById('sessionReportConductAdminPendingAlert')?.classList.toggle('d-none', !teachersAwaitingAdminConduct);
-
-        const step1Label = document.getElementById('sessionReportWorkflowStep1Label');
-        const step2Label = document.getElementById('sessionReportWorkflowStep2Label');
-        if (step1Label) {
-            step1Label.classList.toggle('is-active', showStep1);
-            step1Label.classList.toggle('is-complete', sessionConductReadyForReports && !showStep1);
-            step1Label.classList.remove('is-locked');
-        }
-        if (step2Label) {
-            step2Label.classList.toggle('is-active', !showStep1);
-            step2Label.classList.toggle('is-complete', sessionConductReadyForReports && !showStep1);
-            step2Label.classList.toggle('is-locked', !sessionConductReadyForReports);
-        }
-
-        const showPrevious = adminConductWorkflow && sessionConductReadyForReports && !showStep1;
-        document.querySelectorAll('.js-report-workflow-back-to-conduct').forEach((btn) => {
-            btn.classList.toggle('d-none', !showPrevious);
-            btn.disabled = !showPrevious;
-        });
-        const prevBtn = document.getElementById('btnReportWorkflowPrevious');
-        if (prevBtn && showPrevious) {
-            prevBtn.disabled = false;
-        }
     }
 
     function showConductRequiredModal() {
@@ -4378,22 +4374,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderOptionalConductTable();
     }
 
-    document.getElementById('btnReportWorkflowPrevious')?.addEventListener('click', () => {
-        if (!sessionHasConductRequiredReports || !sessionConductReadyForReports) return;
-        currentReportWorkflowStep = 1;
-        syncReportWorkflowStepUi();
-    });
-    document.getElementById('btnReportWorkflowPreviousAfter')?.addEventListener('click', () => {
-        if (!sessionHasConductRequiredReports || !sessionConductReadyForReports) return;
-        currentReportWorkflowStep = 1;
-        syncReportWorkflowStepUi();
-    });
-    document.getElementById('btnReportWorkflowNextInline')?.addEventListener('click', () => {
-        if (!sessionHasConductRequiredReports || !sessionConductReadyForReports) return;
-        currentReportWorkflowStep = 2;
-        syncReportWorkflowStepUi();
-    });
-    syncReportWorkflowStepUi();
     document.getElementById('btnAddOptionalConductStudents')?.addEventListener('click', () => {
         addSelectedOptionalConductStudents();
     });
@@ -4661,10 +4641,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderStudentCases() {
         const body = document.getElementById('studentCasesTableBody');
-        const badge = document.getElementById('studentCasesCountBadge');
         if (!body) return;
         const rows = Array.isArray(studentCasesState) ? studentCasesState : [];
-        if (badge) badge.textContent = `${rows.length} ${rows.length === 1 ? 'Case' : 'Cases'}`;
         if (!rows.length) {
             body.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No student cases for this session.</td></tr>';
             return;
@@ -4754,9 +4732,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!href) return '';
         const locked = isReportMatrixHrefLocked(href);
         if (locked) {
-            return `<button type="button" class="btn btn-primary btn-lg js-report-action-requires-conduct" id="btnSessionFillReports" title="Complete class conduct first"><i class="bi bi-table me-2"></i>Fill Reports</button>`;
+            return `<button type="button" class="btn btn-outline-primary session-panel-open-btn w-100 js-report-action-requires-conduct" id="btnSessionFillReports" title="Complete class conduct first"><i class="bi bi-table me-2"></i>Fill Reports</button>`;
         }
-        return `<a href="${scEscapeHtml(href)}" class="btn btn-primary btn-lg" id="btnSessionFillReports" target="_blank" rel="noopener noreferrer" title="Open Fill Reports in a new tab"><i class="bi bi-table me-2"></i>Fill Reports</a>`;
+        return `<a href="${scEscapeHtml(href)}" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnSessionFillReports" target="_blank" rel="noopener noreferrer" title="Open Fill Reports in a new tab"><i class="bi bi-table me-2"></i>Fill Reports</a>`;
     }
 
     function updateSessionReportInstancesSummaryUi() {
@@ -4788,16 +4766,17 @@ document.addEventListener('DOMContentLoaded', () => {
             : '';
 
         if (!options.length) {
-            actions.innerHTML = `${completeBadge}<span class="text-muted small">No student matrix for these reports. Expand <strong>Report instances</strong> below to open individual reports.</span>`;
+            actions.innerHTML = `<div class="text-center">${completeBadge}<div class="small text-muted mt-2">No student matrix for these reports. Expand <strong>Report instances</strong> below to open individual reports.</div></div>`;
             return;
         }
 
         const primary = options[0];
         const fillBtn = buildSessionFillReportsButtonHtml(primary);
         const moreMatricesNote = options.length > 1
-            ? `<span class="text-muted small">${options.length - 1} more matrix report(s) in the list below.</span>`
+            ? `<div class="text-center text-muted small">${options.length - 1} more matrix report(s) in the list below.</div>`
             : '';
-        actions.innerHTML = `${fillBtn}${completeBadge}${moreMatricesNote}`;
+        const completeRow = completeBadge ? `<div class="session-report-conduct-status">${completeBadge}</div>` : '';
+        actions.innerHTML = `${fillBtn}${completeRow}${moreMatricesNote}`;
     }
 
     function renderSessionRosterReconciliation() {
@@ -5676,6 +5655,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveStudentCase({ resolve: true }).catch((error) => showStudentCaseMessage('Resolve Failed', error.message, 'error'));
     });
     renderStudentCases();
+    syncReportWorkflowStepUi();
     renderSessionReportInstances();
     document.getElementById('btnRefreshSessionReportInstances')?.addEventListener('click', () => {
         refreshSessionReportInstances().catch((error) => showStudentCaseMessage('Refresh Failed', error.message, 'error'));
@@ -5698,6 +5678,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (sessionCanAssignReports) {
         document.getElementById('btnOpenSessionReportAssignmentModal')?.addEventListener('click', openSessionReportAssignmentModal);
+        document.getElementById('btnOpenSessionReportAssignmentModalEmpty')?.addEventListener('click', openSessionReportAssignmentModal);
         document.getElementById('btnPickSessionReportTemplate')?.addEventListener('click', openSessionReportTemplatePicker);
         document.getElementById('btnPickSessionReportStudents')?.addEventListener('click', openSessionReportStudentPicker);
         document.getElementById('sessionReportScope')?.addEventListener('change', syncSessionReportScope);
@@ -6782,7 +6763,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!rows.length) {
             host.innerHTML = `<div class="session-placeholder-card mb-0">
                 <div class="fw-semibold text-dark mb-1">No session content yet</div>
-                <div class="small">Add HTML/files and linked exams will also appear here.</div>
+                <div class="small">Add files and linked exams will also appear here.</div>
             </div>`;
             return;
         }
@@ -6797,7 +6778,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const actions = contentReadOnly ? '' : `
                 <button type="button" class="btn btn-outline-secondary btn-sm content-move-up" data-id="${contentEscapeHtml(id)}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up"></i></button>
                 <button type="button" class="btn btn-outline-secondary btn-sm content-move-down" data-id="${contentEscapeHtml(id)}" ${index === rows.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down"></i></button>
-                ${isExam ? '' : `<button type="button" class="btn btn-outline-primary btn-sm content-edit" data-id="${contentEscapeHtml(id)}"><i class="bi bi-pencil"></i></button>
+                ${isExam ? '' : `<button type="button" class="btn btn-outline-primary btn-sm content-edit" data-id="${contentEscapeHtml(id)}" data-type="${contentEscapeHtml(String(item?.type || 'file'))}"><i class="bi bi-pencil"></i></button>
                 <button type="button" class="btn btn-outline-danger btn-sm content-remove" data-id="${contentEscapeHtml(id)}"><i class="bi bi-trash"></i></button>`}
             `;
 
@@ -6898,12 +6879,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (contentReadOnly || !sessionContentModalEl) return;
         const editId = String(id || '').trim();
         const editing = !!editId;
-        const type = mode === 'file' ? 'file' : 'html';
         const current = editing
             ? (Array.isArray(manualSessionContentState) ? manualSessionContentState.find((row) => String(row?.id || '').trim() === editId) : null)
             : null;
+        if (!editing && mode !== 'file') return;
+        const type = editing ? String(current?.type || 'file') : 'file';
         document.getElementById('contentModalEditId').value = editing ? editId : '';
-        document.getElementById('contentModalType').value = editing ? String(current?.type || type) : type;
+        document.getElementById('contentModalType').value = type;
         document.getElementById('contentModalTitleInput').value = editing ? String(current?.title || '') : '';
         document.getElementById('contentModalTimeInput').value = editing ? String(current?.time || '') : '';
         document.getElementById('contentModalHtmlInput').value = editing ? String(current?.html || '') : '';
@@ -6915,7 +6897,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('contentModalHtmlWrap').classList.toggle('d-none', activeType !== 'html');
         document.getElementById('contentModalFileWrap').classList.toggle('d-none', activeType !== 'file');
         const titleEl = document.getElementById('sessionContentModalTitle');
-        titleEl.innerHTML = editing ? '<i class="bi bi-pencil-square me-2"></i>Edit Content' : `<i class="bi bi-plus-circle me-2"></i>Add ${activeType === 'file' ? 'File' : 'HTML'} Content`;
+        titleEl.innerHTML = editing
+            ? '<i class="bi bi-pencil-square me-2"></i>Edit Content'
+            : '<i class="bi bi-paperclip me-2"></i>Add File';
         if (sessionContentModal) sessionContentModal.show();
     }
 
@@ -7065,7 +7049,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    document.getElementById('btnAddHtmlContent')?.addEventListener('click', () => openSessionContentModal('html'));
     document.getElementById('btnAddFileContent')?.addEventListener('click', () => openSessionContentModal('file'));
     document.getElementById('contentModalSaveBtn')?.addEventListener('click', async () => {
         const button = document.getElementById('contentModalSaveBtn');
@@ -7104,7 +7087,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const down = event.target.closest('.content-move-down');
         if (down) { moveContentItem(down.getAttribute('data-id'), 'down'); return; }
         const edit = event.target.closest('.content-edit');
-        if (edit) { openSessionContentModal('html', edit.getAttribute('data-id')); return; }
+        if (edit) {
+            const editType = String(edit.getAttribute('data-type') || 'file').trim().toLowerCase();
+            openSessionContentModal(editType === 'html' ? 'html' : 'file', edit.getAttribute('data-id'));
+            return;
+        }
         const del = event.target.closest('.content-remove');
         if (del) { removeSessionContentItem(del.getAttribute('data-id')); }
     });
@@ -8084,6 +8071,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
             const skills = gbNormalizeSkillIds(gb.skills || gbMatchSkillIdsFromLegacyText(gb.skillFocus));
+            const attachments = Array.isArray(gb.attachments)
+                ? gb.attachments.map((row) => ({
+                    id: String(row?.id || '').trim() || `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                    name: String(row?.name || row?.originalName || 'File').trim(),
+                    url: String(row?.url || row?.storagePath || row?.path || '').trim(),
+                    role: String(row?.role || 'other').trim().toLowerCase(),
+                    uploadedAt: row?.uploadedAt || null,
+                    uploadedBy: row?.uploadedBy || null
+                })).filter((row) => row.url)
+                : [];
             return {
                 id: String(gb.id || '').trim() || `gb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
                 name: String(gb.name || '').trim(),
@@ -8092,7 +8089,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalScore: Number.isFinite(totalScore) && totalScore > 0 ? totalScore : 10,
                 activityContent: String(gb.activityContent || ''),
                 includeInGradeCalculation: gb.includeInGradeCalculation !== false,
-                scores
+                scores,
+                attachments
             };
         });
     }
@@ -8104,6 +8102,91 @@ document.addEventListener('DOMContentLoaded', () => {
         const t = Number(total);
         if (!Number.isFinite(t) || t <= 0) return '—';
         return `${((Number(score) / t) * 100).toFixed(1)}%`;
+    }
+
+    function gbAttachmentRoleLabel(role) {
+        const r = String(role || 'other').trim().toLowerCase();
+        if (r === 'test') return 'Test';
+        if (r === 'answer_sheet') return 'Answer sheet';
+        return 'File';
+    }
+
+    function gbRenderAttachmentLinks(attachments) {
+        const arr = Array.isArray(attachments) ? attachments : [];
+        if (!arr.length) return '';
+        const links = arr.map((att) => {
+            const href = String(att?.url || '').trim();
+            if (!href) return '';
+            const label = `${gbAttachmentRoleLabel(att.role)}: ${att.name || 'Open'}`;
+            return `<a href="${gbEscapeHtml(href)}" target="_blank" rel="noopener" class="text-decoration-none small me-2"><i class="bi bi-paperclip me-1"></i>${gbEscapeHtml(label)}</a>`;
+        }).filter(Boolean);
+        if (!links.length) return '';
+        return `<span class="d-inline-flex flex-wrap align-items-center gap-1">${links.join('')}</span>`;
+    }
+
+    let gbModalAttachmentsState = [];
+
+    function gbNormalizeModalAttachment(file, role) {
+        if (!file || typeof file !== 'object') return null;
+        const url = String(file.url || file.storagePath || file.path || '').trim();
+        if (!url) return null;
+        return {
+            id: String(file.id || '').trim() || `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            name: String(file.name || file.originalName || 'File').trim(),
+            url,
+            role: String(role || file.role || 'other').trim().toLowerCase(),
+            uploadedAt: file.uploadedAt || null,
+            uploadedBy: file.uploadedBy || null
+        };
+    }
+
+    function gbRenderModalAttachmentsList() {
+        const host = document.getElementById('gbModalAttachmentsList');
+        if (!host) return;
+        if (!gbModalAttachmentsState.length) {
+            host.innerHTML = '<li class="list-group-item small text-muted py-2">No attachments yet.</li>';
+            return;
+        }
+        host.innerHTML = gbModalAttachmentsState.map((att) => {
+            const href = String(att.url || '').trim();
+            const link = href
+                ? `<a href="${gbEscapeHtml(href)}" target="_blank" rel="noopener" class="small text-decoration-none">${gbEscapeHtml(att.name || 'Open file')}</a>`
+                : `<span class="small text-muted">${gbEscapeHtml(att.name || 'File')}</span>`;
+            const removeBtn = gbReadOnly ? '' : `<button type="button" class="btn btn-link btn-sm text-danger p-0 gb-modal-att-remove" data-att-id="${gbEscapeHtml(att.id)}" title="Remove">Remove</button>`;
+            return `<li class="list-group-item d-flex align-items-center justify-content-between gap-2 py-2">
+                <div class="min-w-0"><span class="badge bg-light text-secondary border me-2">${gbEscapeHtml(gbAttachmentRoleLabel(att.role))}</span>${link}</div>
+                ${removeBtn}
+            </li>`;
+        }).join('');
+        host.querySelectorAll('.gb-modal-att-remove').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const attId = btn.getAttribute('data-att-id');
+                gbModalAttachmentsState = gbModalAttachmentsState.filter((row) => row.id !== attId);
+                gbRenderModalAttachmentsList();
+            });
+        });
+    }
+
+    async function gbUploadModalAttachment(inputEl, role) {
+        if (gbReadOnly || !inputEl) return;
+        try {
+            const uploaded = await uploadSchoolSessionFile(inputEl, 'gradebook_attachment');
+            const normalized = gbNormalizeModalAttachment(uploaded, role);
+            if (!normalized) throw new Error('Upload did not return a file URL.');
+            if (role === 'test' || role === 'answer_sheet') {
+                gbModalAttachmentsState = gbModalAttachmentsState.filter((row) => row.role !== role);
+            }
+            gbModalAttachmentsState.push(normalized);
+            gbRenderModalAttachmentsList();
+            inputEl.value = '';
+        } catch (err) {
+            inputEl.value = '';
+            void sessionMessageBox({
+                title: 'Upload failed',
+                icon: 'error',
+                message: err.message || 'Could not upload file.'
+            });
+        }
     }
 
     function gbSyncScoresFromInputs() {
@@ -8131,6 +8214,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (n > total) n = total;
                 gb.scores[pid] = n;
                 if (String(inp.value) !== String(n)) inp.value = n;
+                const pctCell = inp.closest('tr')?.querySelector('.gb-pct');
+                if (pctCell) pctCell.textContent = gbFormatPct(n, total);
+                markSessionAutosaveGradebookDirty();
             });
         });
     }
@@ -8204,6 +8290,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="fw-bold text-primary">${gbEscapeHtml(gb.name || 'Untitled')}</div>
                             <div class="small text-muted mt-1">${gb.skills && gb.skills.length ? `<span class="me-2 d-inline-flex align-items-start gap-1"><i class="bi bi-bullseye me-1 flex-shrink-0 mt-1"></i>${gbRenderSkillChips(gb.skills)}</span>` : ''}
                                 <span class="me-2"><i class="bi bi-calculator me-1"></i>Total: <strong>${total}</strong> pts</span>${incl}
+                                ${gbRenderAttachmentLinks(gb.attachments)}
                             </div>
                         </div>
                         <div class="d-flex gap-1 flex-shrink-0 ms-auto">${headActions}</div>
@@ -8233,6 +8320,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (raw === '') {
                     gb.scores[pid] = null;
                     inp.closest('tr').querySelector('.gb-pct').textContent = '—';
+                    markSessionAutosaveGradebookDirty();
                     return;
                 }
                 let n = Number(raw);
@@ -8242,6 +8330,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gb.scores[pid] = n;
                 if (String(inp.value) !== String(n)) inp.value = n;
                 inp.closest('tr').querySelector('.gb-pct').textContent = gbFormatPct(n, total);
+                markSessionAutosaveGradebookDirty();
             });
         });
 
@@ -8281,93 +8370,21 @@ document.addEventListener('DOMContentLoaded', () => {
         gbApplyCollapseDom(id);
     });
 
-    async function gbPersistGradebooks(options = {}) {
-        const {
-            saveButton = null,
-            successTitle = 'Saved',
-            successMessage = null,
-            showSuccessModal = true
-        } = options;
-        if (gbReadOnly) return { ok: false, error: 'Read-only' };
-        gbSyncScoresFromInputs();
-        const btn = saveButton;
-        const orig = btn ? btn.innerHTML : '';
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
-        }
-        try {
-            const res = await fetch(`/school/classes/${encodeURIComponent(gbClassId)}/sessions/${encodeURIComponent(gbSessionId)}/gradebooks/save`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
-                body: JSON.stringify({ gradebooks: gradebooksState, actionStateId })
-            });
-            let result;
-            try {
-                result = await res.json();
-            } catch (pe) {
-                throw new Error('Invalid server response.');
-            }
-            const guarded = typeof window.applyGuardedApiResult === 'function'
-                ? await window.applyGuardedApiResult(result, { busyTitle: 'Save Gradebook In Progress', replayTitle: 'Gradebook Already Saved' })
-                : { stop: false };
-            if (guarded.stop) return { ok: false, error: 'stopped' };
-            if (result.status !== 'success') throw new Error(result.message || 'Save failed');
-            if (result.gradebooks) gradebooksState = gbNormalizeIncoming(result.gradebooks);
-            gbRenderList();
-            if (showSuccessModal) {
-                const msg = successMessage != null ? successMessage : (result.message || 'Gradebook activities saved.');
-                await sessionMessageBox({
-                    title: successTitle,
-                    icon: 'success',
-                    message: msg,
-                    okClass: 'btn-success'
-                });
-            }
-            return { ok: true };
-        } catch (err) {
-            await sessionMessageBox({
-                title: 'Error',
-                icon: 'error',
-                message: err.message,
-                okText: 'Close',
-                okClass: 'btn-secondary'
-            });
-            return { ok: false, error: err.message };
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = orig;
-            }
-        }
-    }
-
     function gbDeleteActivity(id) {
         if (gbReadOnly) return;
-        const run = async () => {
-            const prev = JSON.parse(JSON.stringify(gradebooksState));
-            gradebooksState = gradebooksState.filter((g) => g.id !== id);
-            gbCollapsedIds.delete(id);
-            gbRenderList();
-            const out = await gbPersistGradebooks({
-                showSuccessModal: true,
-                successTitle: 'Removed',
-                successMessage: 'The activity was removed and saved.'
-            });
-            if (!out.ok) {
-                gradebooksState = gbNormalizeIncoming(prev);
-                gbRenderList();
-            }
-        };
         void sessionConfirmBox({
             title: 'Remove activity?',
             icon: 'warning',
-            message: '<p class="mb-0">Remove this activity from the gradebook? The list will be saved immediately.</p>',
+            message: '<p class="mb-0">Remove this activity from the gradebook? It will be removed when you save the session.</p>',
             confirmText: 'Remove',
             confirmClass: 'btn-danger',
             html: true
         }).then((confirmed) => {
-            if (confirmed) void run();
+            if (!confirmed) return;
+            gradebooksState = gradebooksState.filter((g) => g.id !== id);
+            gbCollapsedIds.delete(id);
+            gbRenderList();
+            markSessionAutosaveGradebookDirty();
         });
     }
 
@@ -8391,14 +8408,35 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('gbModalTotal').value = gb.totalScore || '';
             document.getElementById('gbModalContent').value = gb.activityContent || '';
             document.getElementById('gbModalInclude').checked = gb.includeInGradeCalculation !== false;
+            gbModalAttachmentsState = Array.isArray(gb.attachments)
+                ? gb.attachments.map((row) => gbNormalizeModalAttachment(row, row.role))
+                    .filter(Boolean)
+                : [];
         } else {
             document.getElementById('gbModalName').value = '';
             gbSetModalSkills([]);
             document.getElementById('gbModalTotal').value = '';
             document.getElementById('gbModalContent').value = '';
             document.getElementById('gbModalInclude').checked = true;
+            gbModalAttachmentsState = [];
         }
+        gbRenderModalAttachmentsList();
         if (gradebookModalInstance) gradebookModalInstance.show();
+    }
+
+    if (gbModalEl) {
+        gbModalEl.addEventListener('shown.bs.modal', () => {
+            if (typeof bootstrap === 'undefined') return;
+            gbModalEl.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                bootstrap.Tooltip.getOrCreateInstance(el);
+            });
+        });
+        document.querySelectorAll('#gradebookActivityModal input[data-gb-attach-role]').forEach((inputEl) => {
+            inputEl.addEventListener('change', () => {
+                const role = inputEl.getAttribute('data-gb-attach-role') || 'other';
+                void gbUploadModalAttachment(inputEl, role);
+            });
+        });
     }
 
     function gbApplyModalSave() {
@@ -8439,6 +8477,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gb.totalScore = totalScore;
             gb.activityContent = activityContent;
             gb.includeInGradeCalculation = includeInGradeCalculation;
+            gb.attachments = gbModalAttachmentsState.map((row) => ({ ...row }));
             if (oldTotal !== totalScore) {
                 gradebookRoster.forEach(({ personId }) => {
                     const pid = String(personId);
@@ -8459,11 +8498,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalScore,
                 activityContent,
                 includeInGradeCalculation,
-                scores
+                scores,
+                attachments: gbModalAttachmentsState.map((row) => ({ ...row }))
             });
         }
         if (gradebookModalInstance) gradebookModalInstance.hide();
         gbRenderList();
+        markSessionAutosaveGradebookDirty();
     }
 
     const btnOpenGradebookModal = document.getElementById('btnOpenGradebookModal');
@@ -8482,6 +8523,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         gbRenderList();
+        markSessionAutosaveGradebookDirty();
     }
 
     const attendanceTableEl = document.getElementById('attendanceTable');
@@ -8535,19 +8577,6 @@ document.addEventListener('DOMContentLoaded', () => {
         markSessionAutosaveRosterDirty();
     });
 
-    const btnSaveGradebooks = document.getElementById('btnSaveGradebooks');
-    if (btnSaveGradebooks) {
-        btnSaveGradebooks.addEventListener('click', async () => {
-            if (gbReadOnly) return;
-            await gbPersistGradebooks({
-                saveButton: btnSaveGradebooks,
-                successTitle: 'Saved',
-                successMessage: null,
-                showSuccessModal: true
-            });
-        });
-    }
-
     if (gbReadOnly) {
         const gbModalName = document.getElementById('gbModalName');
         const gbModalTotal = document.getElementById('gbModalTotal');
@@ -8559,6 +8588,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gbModalContent) gbModalContent.disabled = true;
         if (gbModalInclude) gbModalInclude.disabled = true;
         if (gbModalSaveBtn) gbModalSaveBtn.disabled = true;
+        document.querySelectorAll('#gradebookActivityModal input[data-gb-attach-role]').forEach((el) => { el.disabled = true; });
+        document.querySelectorAll('#gradebookActivityModal label[for^="gbModalAttach"]').forEach((el) => { el.classList.add('disabled'); });
     }
 
     gbRenderList();
@@ -8598,6 +8629,10 @@ document.addEventListener('DOMContentLoaded', () => {
             payload.contentOrder = JSON.stringify(Array.isArray(sessionContentOrderState) ? sessionContentOrderState : []);
             payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
         }
+        if (shouldSendInstructionalPayload && sessionAutosaveDirty.gradebookDirty) {
+            gbSyncScoresFromInputs();
+            payload.gradebooks = JSON.stringify(gradebooksState);
+        }
         return payload;
     }
 
@@ -8605,6 +8640,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return sessionAutosaveDirty.sessionCoreDirty
             || sessionAutosaveDirty.rosterDirty
             || sessionAutosaveDirty.instructionalDirty
+            || sessionAutosaveDirty.gradebookDirty
             || sessionAutosaveDirty.metadataDirty;
     }
 
@@ -8612,6 +8648,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionAutosaveDirty.sessionCoreDirty = false;
         sessionAutosaveDirty.rosterDirty = false;
         sessionAutosaveDirty.instructionalDirty = false;
+        sessionAutosaveDirty.gradebookDirty = false;
         sessionAutosaveDirty.metadataDirty = false;
     }
 
@@ -8701,6 +8738,8 @@ document.addEventListener('DOMContentLoaded', () => {
             payload.contentItems = JSON.stringify(Array.isArray(manualSessionContentState) ? manualSessionContentState : []);
             payload.contentOrder = JSON.stringify(Array.isArray(sessionContentOrderState) ? sessionContentOrderState : []);
             payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
+            gbSyncScoresFromInputs();
+            payload.gradebooks = JSON.stringify(gradebooksState);
         }
         return payload;
     }

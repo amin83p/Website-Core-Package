@@ -79,6 +79,7 @@ const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
+const sessionGradebookService = require('../../services/school/sessionGradebookService');
 const teachingOutlineSuggestionService = require('../../services/school/teachingOutlineSuggestionService');
 const teachingOutlineCatalogService = require('../../services/school/teachingOutlineCatalogService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
@@ -3967,14 +3968,34 @@ async function manageSession(req, res) {
             sessionRoster: session.roster,
             reqUser: req.user
         });
-        const sessionHasConductRequiredReports = [...new Set(
-            (Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : [])
-                .map((row) => toPublicId(row?.assignmentId))
-                .filter(Boolean)
-        )].some((assignmentId) => {
-            const assignment = sessionReportViewerContext.assignmentMap.get(assignmentId);
-            return sessionConductService.assignmentRequiresConductBeforeFill(assignment);
-        });
+        const sessionContext = {
+            classId,
+            sessionId,
+            sessionDate: session?.date
+        };
+        const sessionMatchedAssignments = [...sessionReportViewerContext.assignmentMap.values()]
+            .filter((assignment) => reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext));
+        const hasSessionReportsAssigned = (Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : []).length > 0
+            || sessionMatchedAssignments.length > 0;
+        const sessionHasConductRequiredReports = (Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : [])
+            .some((row) => row?.conductRequiredBeforeFill)
+            || sessionMatchedAssignments.some((assignment) => {
+                const activeRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
+                    .filter((row) => String(row?.status || 'active').trim().toLowerCase() === 'active');
+                if (!activeRows.length) {
+                    return sessionConductService.assignmentRequiresConductBeforeFill(assignment);
+                }
+                return activeRows.some((targetRow) => {
+                    const rowAssignment = reportAssignmentSessionUtils.applyTargetRow(assignment, targetRow);
+                    if (!reportAssignmentSessionUtils.reportAssignmentMatchesSession(rowAssignment, sessionContext)) {
+                        return false;
+                    }
+                    return sessionConductService.assignmentRequiresConductBeforeFill(
+                        assignment,
+                        { assignmentRowId: targetRow?.rowId }
+                    );
+                });
+            });
         const reportAssignmentCreateAccess = await accessService.evaluateAccess({
             user: req.user,
             sectionId: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
@@ -4073,6 +4094,7 @@ async function manageSession(req, res) {
             combinedSessionContent,
             sessionReportInstanceRows,
             sessionRosterReconciliation,
+            hasSessionReportsAssigned,
             sessionHasConductRequiredReports,
             canAssignSessionReports: Boolean(reportAssignmentCreateAccess?.allowed),
             conductPrefillByPersonId,
@@ -4089,7 +4111,7 @@ async function manageSession(req, res) {
             isSessionLocked, 
             isReadOnly,
             canEditSessionMetadata: canOverride,
-            canManageClassConduct: Boolean(canOverride),
+            canManageClassConduct: Boolean(canOverride) || Boolean(canEditSession),
             canOverrideMakeupDuration,
             canCreateMakeupWhileLocked,
             canDeleteMakeupSessions: Boolean(canEditSession && !isReadOnly),
@@ -5031,6 +5053,19 @@ async function saveSession(req, res) {
             }).filter(Boolean);
         }
 
+        if (!shouldSkipInstructionalPayload && req.body?.gradebooks !== undefined) {
+            let rawGradebooks = req.body.gradebooks;
+            if (typeof rawGradebooks === 'string') {
+                rawGradebooks = JSON.parse(rawGradebooks || '[]');
+            }
+            originalSession.gradebooks = await normalizeSessionGradebooksForSave(
+                classData,
+                originalSession,
+                rawGradebooks,
+                req.user
+            );
+        }
+
         const normalizedMetadataBody = await normalizeSessionMetadataTeacherInput(req.body || {}, {
             activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
             reqUser: req.user
@@ -5118,6 +5153,41 @@ async function saveSession(req, res) {
     }
 }
 
+async function normalizeSessionGradebooksForSave(classData, session, rawList, reqUser) {
+    const sessionSkillPolicy = await loadSessionSkillPolicy(classData, session, reqUser);
+    const existingGradebookById = new Map(
+        (Array.isArray(session?.gradebooks) ? session.gradebooks : [])
+            .map((row) => [String(row?.id || '').trim(), row])
+            .filter(([id]) => id)
+    );
+    const enrichedRoster = await buildEnrichedSessionRosterForMutation({
+        classData,
+        session,
+        reqUser
+    });
+    const personIds = [...new Set(enrichedRoster.map((r) => cleanPersonId(r.personId)).filter(Boolean))];
+    const attendanceByPerson = new Map();
+    enrichedRoster.forEach((r) => {
+        const pid = cleanPersonId(r.personId);
+        if (pid) {
+            attendanceByPerson.set(
+                pid,
+                attendanceMatrixMetricsService.normalizeStatus(
+                    r.attendance,
+                    attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+                )
+            );
+        }
+    });
+    return sessionGradebookService.normalizeSessionGradebooksFromRequest(rawList, {
+        personIds,
+        attendanceByPerson,
+        existingGradebookById,
+        sessionSkillPolicy,
+        mergeHistoricalGradebookSkills
+    });
+}
+
 async function saveSessionGradebooks(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -5153,87 +5223,13 @@ async function saveSessionGradebooks(req, res) {
         if (typeof rawList === 'string') {
             rawList = JSON.parse(rawList);
         }
-        if (!Array.isArray(rawList)) {
-            throw new Error('gradebooks must be an array.');
-        }
-        const sessionSkillPolicy = await loadSessionSkillPolicy(classData, sessions[sessionIndex], req.user);
-        const existingGradebookById = new Map(
-            (Array.isArray(sessions[sessionIndex]?.gradebooks) ? sessions[sessionIndex].gradebooks : [])
-                .map((row) => [String(row?.id || '').trim(), row])
-                .filter(([id]) => id)
-        );
 
-        const enrichedRoster = await buildEnrichedSessionRosterForMutation({
+        const normalized = await normalizeSessionGradebooksForSave(
             classData,
-            session: sessions[sessionIndex],
-            reqUser: req.user
-        });
-        const personIds = [...new Set(enrichedRoster.map((r) => cleanPersonId(r.personId)).filter(Boolean))];
-        const attendanceByPerson = new Map();
-        enrichedRoster.forEach((r) => {
-            const pid = cleanPersonId(r.personId);
-            if (pid) {
-                attendanceByPerson.set(pid, attendanceMatrixMetricsService.normalizeStatus(r.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT));
-            }
-        });
-
-        const normalized = [];
-        for (const gb of rawList) {
-            const totalScore = Number(gb.totalScore);
-            if (!Number.isFinite(totalScore) || totalScore <= 0) {
-                throw new Error('Each activity must have a positive total score.');
-            }
-            const name = String(gb.name || '').trim();
-            if (!name) {
-                throw new Error('Each gradebook activity must have a name.');
-            }
-
-            const gbId = String(gb.id || '').trim() || `gb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-            const rawScores = gb.scores && typeof gb.scores === 'object' ? gb.scores : {};
-            const scores = {};
-
-            for (const pid of personIds) {
-                const att = attendanceByPerson.get(pid) || 'absent';
-                const isAbsent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
-                    || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
-                let v = rawScores[pid];
-                if (v === undefined) v = rawScores[String(pid)];
-                if (v === '' || v === undefined) v = null;
-                if (v !== null && v !== undefined) v = Number(v);
-
-                if (isAbsent) {
-                    scores[pid] = null;
-                } else if (v === null || Number.isNaN(v)) {
-                    scores[pid] = null;
-                } else if (v < 0 || v > totalScore) {
-                    throw new Error(`Scores must be between 0 and ${totalScore} (${name}).`);
-                } else {
-                    scores[pid] = v;
-                }
-            }
-
-            const mergedSkillIds = mergeHistoricalGradebookSkills(
-                gb,
-                existingGradebookById.get(gbId),
-                sessionSkillPolicy.selectableIds
-            );
-            const { skills, skillFocus } = gradebookSkillCatalogService.normalizeGradebookActivitySkills({
-                ...gb,
-                skills: mergedSkillIds
-            }, {
-                skillCatalog: sessionSkillPolicy.catalog
-            });
-            normalized.push({
-                id: gbId,
-                name: name.slice(0, 200),
-                skills,
-                skillFocus,
-                totalScore,
-                activityContent: String(gb.activityContent || ''),
-                includeInGradeCalculation: Boolean(gb.includeInGradeCalculation),
-                scores
-            });
-        }
+            sessions[sessionIndex],
+            rawList,
+            req.user
+        );
 
         sessions[sessionIndex].gradebooks = normalized;
         await schoolDataService.saveClassSessions(classId, sessions, req.user);
@@ -5336,8 +5332,21 @@ async function saveSessionConduct(req, res) {
             OPERATIONS.UPDATE,
             { section: { id: SECTIONS.SCHOOL_CLASSES } }
         );
-        if (!canOverride) {
-            return res.status(403).json({ status: 'error', message: 'Only class administrators can manage class conduct.' });
+        const sessionAccess = schoolRecordAccessService.resolveAccessFromRequest(req);
+        let canEditSessionForConduct = false;
+        try {
+            schoolRecordAccessService.assertSessionAccessible({
+                classRow: classData,
+                session,
+                access: sessionAccess,
+                context: 'manageSession'
+            });
+            canEditSessionForConduct = true;
+        } catch (_accessError) {
+            canEditSessionForConduct = false;
+        }
+        if (!canOverride && !canEditSessionForConduct) {
+            return res.status(403).json({ status: 'error', message: 'You do not have permission to manage class conduct for this session.' });
         }
         if (isLocked && !canOverride) {
             return res.status(403).json({ status: 'error', message: 'This session is locked. Class conduct cannot be changed.' });

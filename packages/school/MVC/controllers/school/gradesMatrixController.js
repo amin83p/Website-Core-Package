@@ -200,21 +200,7 @@ function computeFinalPercent(evaluation, attendancePct, assignmentsPct, midtermP
   return { finalPercent: Math.round(finalPercent * 100) / 100, parts };
 }
 
-function assignmentsCategoryAveragePercents(cells, columns) {
-  const percents = [];
-  for (let i = 0; i < columns.length; i += 1) {
-    const col = columns[i];
-    const cell = cells[i];
-    if (!col || !cell) continue;
-    if (!col.includeInGradeCalculation) continue;
-    if (!cell.effective) continue;
-    if (cell.percent == null) continue;
-    percents.push(Number(cell.percent));
-  }
-  if (!percents.length) return null;
-  const sum = percents.reduce((a, b) => a + b, 0);
-  return Math.round((sum / percents.length) * 100) / 100;
-}
+const { assignmentsCategoryAveragePercents } = matrixRollupService;
 
 function buildGradesAttendanceRecord(stu, ses, ctx, rosterRecord) {
   const {

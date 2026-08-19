@@ -563,8 +563,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const blurbMain = document.getElementById('gm_matrixBlurbMain');
       if (blurbMain) {
         blurbMain.innerHTML = isRollingClass
-          ? '<strong>Final</strong> uses only <strong>attendance</strong> and <strong>assignments</strong> weights (rolling classes). Assignments = average of <em>included</em> session items (gradebooks, quizzes, assignments). Midterm and final exam weights do not apply.'
-          : '<strong>Final</strong> blends weights using attendance % and the average of <em>included</em> assignment-category items (gradebooks, quizzes, assignments). Session items map to the assignments bucket; midterm/final exam weights on the class apply when those components are wired into this view.';
+          ? '<strong>Final</strong> uses only <strong>attendance</strong> and <strong>assignments</strong> weights (rolling classes). Assignments = points-weighted average of <em>included</em> session items (gradebooks, quizzes, assignments). Midterm and final exam weights do not apply.'
+          : '<strong>Final</strong> blends weights using attendance % and a points-weighted average of <em>included</em> assignment-category items (gradebooks, quizzes, assignments). Session items map to the assignments bucket; midterm/final exam weights on the class apply when those components are wired into this view.';
       }
       document.getElementById('gm_evalCard').classList.remove('d-none');
 
