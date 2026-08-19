@@ -5013,6 +5013,7 @@ async function saveSession(req, res) {
                     ? normalizeDateOnlyValue(req.body.date)
                     : originalSession.date
             };
+            const existingRoster = originalSession.roster || [];
             await assertSessionRosterEnrollmentWindows({
                 classData,
                 session: sessionForAttendanceWindow,
@@ -5020,7 +5021,6 @@ async function saveSession(req, res) {
                 reqUser: req.user,
                 existingRoster: existingRoster
             });
-            const existingRoster = originalSession.roster || [];
             const orgPolicyCatalogSave = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
                 classData?.orgId || getActiveOrgIdOrThrow(req.user)
             );
