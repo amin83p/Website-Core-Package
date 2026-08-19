@@ -493,13 +493,26 @@
           </div>
           <div class="alert alert-light border small mb-0 mt-3 text-secondary">
             <div class="fw-semibold text-dark mb-1">Tips</div>
-            <p class="mb-1">When session or hour targets are set, use Next to manage sessions (add, remove, or mark N/A) before saving.</p>
+            <p class="mb-1">When session or hour targets are set, use <strong>Next</strong> to review the enrollment. You can finalize immediately or optionally add sessions or mark sessions N/A on the review step.</p>
             <p class="mb-0"><kbd>Alt</kbd>+<kbd>S</kbd> pick student, <kbd>Alt</kbd>+<kbd>A</kbd> primary action, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> from notes.</p>
           </div>
         </div>
 
         <div id="enrollWizardStepAddSessions" class="d-none">
-          <div class="d-flex flex-wrap align-items-center gap-2 mb-3" id="gapSessionsNoticesHost">
+          <div class="card border-0 shadow-sm mb-3 bg-light-subtle" id="enrollCapReviewSummary">
+            <div class="card-body py-3" id="enrollCapReviewSummaryBody"></div>
+          </div>
+          <div class="alert alert-info border-0 small mb-3" id="enrollCapReviewContext" role="status"></div>
+          <div class="border rounded enroll-step-panel mb-0" id="enrollCapOptionalSessionsPanel">
+            <button type="button" class="enroll-step-panel-toggle" id="btn_enrollCapOptionalSessionsToggle" data-bs-toggle="collapse" data-bs-target="#enrollCapOptionalSessionsCollapse" aria-expanded="false" aria-controls="enrollCapOptionalSessionsCollapse">
+              <span class="d-flex flex-column align-items-start gap-1">
+                <span class="fw-semibold">Manage sessions (optional)</span>
+                <span class="small text-muted">Add sessions, stage a batch, or mark N/A — not required for cap enrollment</span>
+              </span>
+              <i class="bi bi-chevron-down collapse-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="collapse enroll-step-panel-body" id="enrollCapOptionalSessionsCollapse">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-3 d-none" id="gapSessionsNoticesHost">
             <div class="gap-step-notice gap-step-notice-warning d-none" id="gapSummaryNotice" data-gap-notice="1" role="button" tabindex="0" aria-label="Session alignment details">
               <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
               <span class="gap-step-notice-title" id="gapSummaryTitle">Session alignment</span>
@@ -522,7 +535,7 @@
             <button type="button" class="btn btn-primary btn-sm gap-calendar-picker-btn" id="btn_gapOpenCalendarPicker">
               <i class="bi bi-calendar3-week me-2" aria-hidden="true"></i>Open calendar picker
             </button>
-            <div class="small text-muted fw-semibold" id="gapEnrollmentPickCounter">Included 0 for enrollment</div>
+            <div class="small text-muted" id="gapEnrollmentPickCounter">No sessions staged</div>
           </div>
           <div class="border rounded mb-3 enroll-step-panel">
             <button type="button" class="enroll-step-panel-toggle" id="btn_gapSessionsCollapseToggle" data-bs-toggle="collapse" data-bs-target="#gapSessionsWindowCollapse" aria-expanded="false" aria-controls="gapSessionsWindowCollapse">
@@ -596,6 +609,8 @@
               <button type="button" class="btn btn-outline-danger btn-sm d-none" id="btn_gapClearStaged"><i class="bi bi-x-circle me-1"></i>Clear Staged</button>
               <a class="btn btn-outline-secondary btn-sm" id="gap_classFormLink" href="/school/classes/edit/<%= encodeURIComponent(c.id || '') %>" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>Open Class Session Builder</a>
             </div>
+            </div>
+          </div>
             </div>
           </div>
         </div>
@@ -3276,6 +3291,9 @@
     if (alignment) {
       lastAlignmentResult = alignment;
       updateSessionCountHint(alignment);
+      if (enrollWizardStep === 'addSessions' && hasEnrollmentCap()) {
+        renderEnrollCapReviewContext(alignment);
+      }
       if (hasTargetSessionCount() && alignment.alignmentStatus !== 'insufficient_sessions') {
         const targetInput = qs('inp_targetSessionCount');
         if (targetInput && !String(targetInput.dataset.userEdited || '').trim()) {
@@ -3422,6 +3440,11 @@
     const btn = qs('btn_viewEnrollmentSessions');
     const listBtn = qs('btn_viewEnrollmentSessionsList');
     if (!btn) return;
+    if (hasEnrollmentCap() && enrollWizardStep === 'form') {
+      btn.classList.add('d-none');
+      listBtn?.classList.add('d-none');
+      return;
+    }
     const endDate = String(qs('inp_endDate')?.value || '').trim();
     const capSet = hasEnrollmentCap();
     const previewRows = buildGapModalSessionRows();
@@ -3550,6 +3573,16 @@
     const sessionTargetSet = hasTargetSessionCount();
     const hourTargetSet = hasTargetHours();
     const capSet = sessionTargetSet || hourTargetSet;
+    if (capSet && enrollWizardStep === 'form') {
+      hint.className = 'form-text compact-help text-muted mb-0';
+      hint.textContent = 'Recorded attendance after the start date counts toward the cap. Use Next to review and optionally manage sessions.';
+      updateViewSessionsButton(null);
+      syncEnrollmentWizardPathFromCap();
+      renderFormStepSessionTable();
+      renderEnrollmentWizardStepIndicator();
+      syncEnrollmentWizardPrimaryButton();
+      return;
+    }
     if (!alignment || alignment.alignmentStatus === 'no_end_date') {
       hint.className = 'form-text compact-help text-muted mb-0';
       hint.textContent = capSet
@@ -3639,7 +3672,7 @@
     if (enrollWizardPath === 'planA') {
       const steps = [
         { id: 'form', label: 'Enrollment' },
-        { id: 'addSessions', label: 'Sessions' },
+        { id: 'addSessions', label: 'Review' },
         { id: 'conflicts', label: 'Conflicts' }
       ];
       return steps;
@@ -3703,8 +3736,8 @@
       return;
     }
     if (enrollWizardStep === 'addSessions') {
-      btn.innerHTML = `${iconNext}Next`;
-      btn.disabled = !canContinueFromAddSessionsStep();
+      btn.innerHTML = `${iconPlus}Add Enrollment Period`;
+      btn.disabled = false;
       return;
     }
     if (enrollWizardStep === 'markNa') {
@@ -3738,35 +3771,77 @@
     setEnrollmentWizardStepVisibility();
   }
 
-  function prepareAddSessionsStep(alignment) {
+  function renderEnrollCapReviewSummary() {
+    const host = qs('enrollCapReviewSummaryBody');
+    if (!host) return;
+    const student = String(qs('inp_studentLabel')?.value || '').trim() || '—';
+    const startDate = String(qs('inp_startDate')?.value || '').trim() || '—';
+    const status = String(qs('inp_status')?.value || 'active').trim();
+    const funderSelect = qs('inp_funder');
+    const funderLabel = String(funderSelect?.options?.[funderSelect.selectedIndex]?.text || '').trim() || '—';
+    const hourMode = hasTargetHours();
+    const capType = hourMode ? 'Hour cap' : 'Session cap';
+    const capValue = hourMode
+      ? `${normalizeTargetHoursValue(qs('inp_targetHours')?.value)} hr`
+      : `${normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value)} session(s)`;
+    host.innerHTML = `
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+        <div>
+          <div class="text-uppercase small text-muted fw-semibold mb-1">Review enrollment</div>
+          <h6 class="mb-0">${htmlEscape(student)}</h6>
+        </div>
+        <span class="badge text-bg-light border text-capitalize">${htmlEscape(status)}</span>
+      </div>
+      <div class="row g-2 small">
+        <div class="col-sm-6 col-md-4"><span class="text-muted">Start date</span><div class="fw-semibold">${htmlEscape(startDate)}</div></div>
+        <div class="col-sm-6 col-md-4"><span class="text-muted">${htmlEscape(capType)}</span><div class="fw-semibold">${htmlEscape(capValue)}</div></div>
+        <div class="col-sm-6 col-md-4"><span class="text-muted">Funder</span><div class="fw-semibold">${htmlEscape(funderLabel)}</div></div>
+      </div>`;
+  }
+
+  function renderEnrollCapReviewContext(alignment = lastAlignmentResult) {
+    const host = qs('enrollCapReviewContext');
+    if (!host) return;
+    const hourMode = hasTargetHours();
+    const target = hourMode
+      ? normalizeTargetHoursValue(qs('inp_targetHours')?.value)
+      : normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value);
+    const capLabel = hourMode ? `${target} hour(s)` : `${target} session(s)`;
+    const scheduled = hourMode
+      ? Number(alignment?.availableHours || 0)
+      : Number(alignment?.availableCount || 0);
+    const scheduledLabel = hourMode
+      ? `${scheduled} hr scheduled from the start date`
+      : `${scheduled} session(s) scheduled from the start date`;
+    const startDate = String(qs('inp_startDate')?.value || '').trim() || 'the start date';
+    host.innerHTML = `<strong>Ongoing cap enrollment.</strong> Attendance recorded after <strong>${htmlEscape(startDate)}</strong> counts toward <strong>${htmlEscape(capLabel)}</strong>. You can finalize now without pre-selecting sessions. ${htmlEscape(scheduledLabel)} so far; consumption continues as the student attends.`;
+  }
+
+  function prepareEnrollmentReviewStep(alignment) {
     lastAlignmentResult = alignment || lastAlignmentResult;
-    const status = String(alignment?.alignmentStatus || '').trim();
     const summaryNotice = qs('gapSummaryNotice');
     if (summaryNotice) {
-      const tone = status === 'overage_requires_na' || status === 'insufficient_sessions' || status === 'insufficient_hours'
-        ? 'warning'
-        : 'info';
-      setGapStepNotice(summaryNotice, {
-        title: getGapSummaryTitle(alignment, status),
-        detail: buildGapSummaryDetail(alignment),
-        visible: true,
-        tone
-      });
+      setGapStepNotice(summaryNotice, { title: '', detail: '', visible: false, tone: 'info' });
     }
+    renderEnrollCapReviewSummary();
+    renderEnrollCapReviewContext(alignment);
     if (gapFormDraft) {
       applyGapFormDraft(gapFormDraft);
     } else {
       applyScheduleDefaultsToGapForm(alignment?.scheduleDefaults || {});
     }
-    if (!pendingIncludedSessionIds.length) {
-      pendingIncludedSessionIds = buildDefaultIncludedSessionIds(alignment);
-    }
-    syncPlannedNaFromIncludedSelection();
+    pendingIncludedSessionIds = [];
+    pendingPlannedNaSessionIds = [];
     renderGapSessionTable();
     updateGapCycleExtendWarning();
     updateGapStagedBadge();
     updateGapSessionsCollapseMeta();
+    updateEnrollmentPickCounter();
     initGapStepTooltips();
+  }
+
+  function prepareAddSessionsStep(alignment) {
+    prepareEnrollmentReviewStep(alignment);
   }
 
   function prepareMarkNaStep(alignment) {
@@ -4150,6 +4225,7 @@
   }
 
   function canContinueFromAddSessionsStep() {
+    if (hasEnrollmentCap()) return true;
     const alignment = lastAlignmentResult;
     if (!alignment) return false;
     const status = String(alignment.alignmentStatus || '');
@@ -4176,6 +4252,7 @@
   }
 
   async function validateEnrollmentPickForContinue() {
+    if (hasEnrollmentCap()) return true;
     const alignment = lastAlignmentResult;
     if (!alignment) return false;
     const status = String(alignment.alignmentStatus || '');
@@ -4219,15 +4296,19 @@
     const countable = getCountableSessionsFromAlignment(alignment);
     const includedIds = readIncludedEnrollmentSessionIds();
     if (hasTargetHours() || Number(alignment.effectiveTargetHours || alignment.targetHours || 0) > 0) {
-      const target = Number(alignment.effectiveTargetHours || alignment.targetHours || normalizeTargetHoursValue(qs('inp_targetHours')?.value));
       const includedHours = readIncludedScheduledHours(countable, includedIds);
       const stagedHours = readStagedEnrollmentHours();
-      counter.textContent = `Included ${includedHours} hr + staged ${stagedHours} hr · target ${target} hr`;
+      const parts = [];
+      if (includedHours > 0) parts.push(`${includedHours} hr included`);
+      if (stagedHours > 0) parts.push(`${stagedHours} hr staged`);
+      counter.textContent = parts.length ? parts.join(' · ') : 'No sessions staged';
       return;
     }
-    const target = Number(alignment.effectiveTarget || alignment.targetSessionCount || normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value));
     const includedCount = readIncludedEnrollmentSessionCount(countable, includedIds);
-    counter.textContent = `Included ${includedCount} + staged ${pendingStagedSessions.length} session(s) · target ${target}`;
+    const parts = [];
+    if (includedCount > 0) parts.push(`${includedCount} included`);
+    if (pendingStagedSessions.length > 0) parts.push(`${pendingStagedSessions.length} staged`);
+    counter.textContent = parts.length ? `${parts.join(' · ')} session(s)` : 'No sessions staged';
   }
 
   function toggleEnrollmentSessionPick(btn) {
@@ -5431,6 +5512,7 @@
         return;
       }
       const alignmentGate = await ensureEnrollmentSessionAlignment();
+      if (!alignmentGate.ok) return;
       if (alignmentGate.nextStep === 'conflicts') {
         enrollWizardPath = 'planA';
         const loaded = await loadConflictReviewStep();
@@ -5439,12 +5521,15 @@
         setEnrollmentWizardStepVisibility();
         return;
       }
-      await proceedWithEnrollmentAfterAlignment();
+      enrollWizardPath = 'planA';
+      prepareEnrollmentReviewStep(alignmentGate.alignment);
+      enrollWizardStep = 'addSessions';
+      setEnrollmentWizardStepVisibility();
       return;
     }
 
     if (enrollWizardStep === 'addSessions') {
-      const alignment = await refreshAlignmentWithStagedSessions();
+      await refreshAlignmentWithStagedSessions();
       if (!await validateEnrollmentPickForContinue()) {
         syncEnrollmentWizardPrimaryButton();
         return;

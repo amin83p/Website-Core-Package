@@ -103,37 +103,130 @@ test('print sorting and date labels follow schedule precedence', () => {
   assert.equal(printService.formatDateKey('2026-07-15', { month: 'long', day: 'numeric' }), 'July 15');
 });
 
+test('department one-on-one classifier uses max capacity of 1 or single-student enrollment', () => {
+  assert.equal(printService.isDepartmentOneOnOneEntry({ classId: 'C-1', classMaxCapacity: 1 }), true);
+  assert.equal(printService.isDepartmentOneOnOneEntry({ classId: 'C-2', classMaxCapacity: 30 }), false);
+  assert.equal(printService.isDepartmentOneOnOneEntry({ classId: 'C-2b', classMaxCapacity: 30, isOneOnOne: true }), true);
+  assert.equal(printService.isDepartmentOneOnOneEntry(
+    { classId: 'C-3' },
+    { enrollment: { maxCapacity: 1 } }
+  ), true);
+  assert.equal(printService.isDepartmentOneOnOneEntry({ activityId: 'ACT-1', sessionId: 'act-1' }), false);
+});
+
+test('department optional hours require one-on-one classification and Optional badge', () => {
+  const lookups = {
+    classMap: new Map([['CLASS-30', { id: 'CLASS-30', enrollment: { maxCapacity: 30 } }]]),
+    departmentMap: new Map()
+  };
+  const optionalAbsent = printService.shapePrintEntry({
+    sessionId: 'optional-absent',
+    classId: 'CLASS-30',
+    classMaxCapacity: 30,
+    deliveryDepartmentName: 'EAL',
+    durationHours: 1.5,
+    timesheetHours: 0,
+    showOptionalBadge: true,
+    isOneOnOne: true
+  }, lookups);
+  const totals = printService.buildDepartmentTotals([optionalAbsent], lookups);
+
+  assert.equal(printService.isDepartmentOneOnOneEntry(optionalAbsent, lookups.classMap.get('CLASS-30')), true);
+  assert.equal(printService.resolveDepartmentOptionalHours(optionalAbsent, lookups.classMap.get('CLASS-30')), 1.5);
+  assert.equal(totals.rows[0].groupHours, 0);
+  assert.equal(totals.rows[0].oneOnOneHours, 0);
+  assert.equal(totals.rows[0].oneOnOneOptionalHours, 1.5);
+  assert.equal(totals.totals.oneOnOneOptionalHours, 1.5);
+
+  const groupOptional = printService.shapePrintEntry({
+    sessionId: 'group-optional',
+    classId: 'CLASS-30',
+    classMaxCapacity: 30,
+    deliveryDepartmentName: 'EAL',
+    durationHours: 2,
+    timesheetHours: 0,
+    showOptionalBadge: true,
+    isOneOnOne: false
+  }, lookups);
+  assert.equal(printService.resolveDepartmentOptionalHours(groupOptional, lookups.classMap.get('CLASS-30')), 0);
+});
+
+test('department optional hours apply makeup duration percent for make-up required sessions', () => {
+  const lookups = {
+    classMap: new Map([['CLASS-30', { id: 'CLASS-30', enrollment: { maxCapacity: 30 } }]]),
+    departmentMap: new Map()
+  };
+  const makeupOptional = printService.shapePrintEntry({
+    sessionId: 'makeup-optional',
+    classId: 'CLASS-30',
+    classMaxCapacity: 30,
+    deliveryDepartmentName: 'LINC',
+    durationHours: 3,
+    timesheetHours: 0,
+    showOptionalBadge: true,
+    isOneOnOne: true,
+    makeUpRequired: true,
+    makeupDurationPercent: 50,
+    allowedDurationHours: 1.5
+  }, lookups);
+  const regularOptional = printService.shapePrintEntry({
+    sessionId: 'regular-optional',
+    classId: 'CLASS-30',
+    classMaxCapacity: 30,
+    deliveryDepartmentName: 'LINC',
+    durationHours: 3,
+    timesheetHours: 0,
+    showOptionalBadge: true,
+    isOneOnOne: true,
+    makeUpRequired: false
+  }, lookups);
+  const totals = printService.buildDepartmentTotals([makeupOptional, regularOptional], lookups);
+
+  assert.equal(printService.resolveOptionalHours(makeupOptional), 1.5);
+  assert.equal(printService.resolveOptionalHours(regularOptional), 3);
+  assert.equal(totals.rows[0].oneOnOneOptionalHours, 4.5);
+});
+
 test('Optional Hours remain informational and are listed separately by department', () => {
+  const lookups = {
+    classMap: new Map([['CLASS-1', { id: 'CLASS-1', enrollment: { maxCapacity: 1 } }]]),
+    departmentMap: new Map()
+  };
   const optionalPaid = printService.shapePrintEntry({
     sessionId: 'paid',
+    classId: 'CLASS-1',
+    classMaxCapacity: 1,
     deliveryDepartmentName: 'English',
     durationHours: 1,
     timesheetHours: 1,
     showOptionalBadge: true
-  }, { classMap: new Map(), departmentMap: new Map() });
+  }, lookups);
   const pending = printService.shapePrintEntry({
     sessionId: 'pending',
     deliveryDepartmentName: 'English',
     isManual: true,
     approvalStatus: 'pending_approval',
     requestedHours: 3
-  }, { classMap: new Map(), departmentMap: new Map() });
+  }, lookups);
   const optionalUnpaid = printService.shapePrintEntry({
     sessionId: 'optional-unpaid',
+    classId: 'CLASS-1',
+    classMaxCapacity: 1,
     deliveryDepartmentName: 'English',
     durationHours: 2,
     timesheetHours: 0,
     showOptionalBadge: true
-  }, { classMap: new Map(), departmentMap: new Map() });
-  const totals = printService.buildDepartmentTotals([optionalPaid, pending, optionalUnpaid]);
+  }, lookups);
+  const totals = printService.buildDepartmentTotals([optionalPaid, pending, optionalUnpaid], lookups);
 
   assert.equal(optionalPaid.payableHours, 1);
   assert.equal(optionalUnpaid.payableHours, 0);
-  assert.equal(totals.rows[0].payableHours, 1);
-  assert.equal(totals.rows[0].pendingHours, 3);
+  assert.equal(totals.rows[0].groupHours, 0);
+  assert.equal(totals.rows[0].oneOnOneHours, 1);
+  assert.equal(totals.rows[0].groupPendingHours, 3);
   assert.equal(totals.rows[0].totalHours, 4);
-  assert.equal(totals.rows[0].optionalHours, 3);
-  assert.equal(totals.totals.optionalHours, 3);
+  assert.equal(totals.rows[0].oneOnOneOptionalHours, 3);
+  assert.equal(totals.totals.oneOnOneOptionalHours, 3);
   assert.equal(
     printService.resolvePayableHours({ timesheetHours: 1.5, showOptionalBadge: true }),
     printService.resolvePayableHours({ timesheetHours: 1.5, showOptionalBadge: false })
@@ -204,8 +297,23 @@ function sampleDocument(name, overrides = {}) {
       }]
     }],
     departmentTotals: {
-      rows: [{ departmentName: 'English', payableHours: 1.5, pendingHours: 0, totalHours: 1.5, optionalHours: 1.5 }],
-      totals: { payableHours: 1.5, pendingHours: 0, totalHours: 1.5, optionalHours: 1.5 }
+      rows: [{
+        departmentName: 'English',
+        groupHours: 0,
+        oneOnOneHours: 1.5,
+        oneOnOneOptionalHours: 1.5,
+        groupPendingHours: 0,
+        oneOnOnePendingHours: 0,
+        totalHours: 1.5
+      }],
+      totals: {
+        groupHours: 0,
+        oneOnOneHours: 1.5,
+        oneOnOneOptionalHours: 1.5,
+        groupPendingHours: 0,
+        oneOnOnePendingHours: 0,
+        totalHours: 1.5
+      }
     },
     ...overrides
   };
@@ -283,7 +391,14 @@ test('standalone print view renders safe single and batch documents with print C
   assert.doesNotMatch(html, /Provisional - Scheduled/);
   assert.doesNotMatch(html, /Completed - Recheck/);
   assert.match(html, /Hours by Department/);
-  assert.match(html, /Total Optional Hours/);
+  assert.match(html, /class="department-name-row"/);
+  assert.match(html, /class="department-hours-row"/);
+  assert.match(html, /class="department-optional-row optional-row"/);
+  assert.match(html, /Optional \(1:1\)/);
+  assert.match(html, /<th scope="col">English<\/th>/);
+  assert.match(html, /<th scope="col" class="department-total-col">Total<\/th>/);
+  assert.doesNotMatch(html, /Total Optional Hours/);
+  assert.doesNotMatch(html, /<th>Payable Hours<\/th>/);
   assert.match(html, /body \{ font-size: 8px; line-height: 1\.15; \}/);
   assert.match(html, /th, td \{ padding: 2px 3px; \}/);
   assert.doesNotMatch(html, /class="meta-grid"/);
@@ -293,6 +408,68 @@ test('standalone print view renders safe single and batch documents with print C
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, />Act</);
+});
+
+test('print department summary uses compact columns with totals on the right', () => {
+  const viewPath = path.join(ROOT_DIR, 'packages/school/MVC/views/school/timesheet/timesheetPrint.ejs');
+  const source = fs.readFileSync(viewPath, 'utf8');
+  const html = ejs.render(source, {
+    title: 'Timesheet Print',
+    appBrand: { appName: 'Example Website' },
+    printContext: {
+      organizationName: 'Example School',
+      printedByName: 'Printer User',
+      printedAtLabel: 'Jul 15, 2026, 09:00 a.m.',
+      period: { name: '2026-JULY-02', startDateLabel: 'July 15, 2026', endDateLabel: 'July 31, 2026', deadlineLabel: '2026-07-30 23:59' },
+      documents: [sampleDocument('Person One', {
+        departmentTotals: {
+          rows: [
+            {
+              departmentName: 'EAL',
+              groupHours: 33,
+              oneOnOneHours: 10,
+              oneOnOneOptionalHours: 1.5,
+              groupPendingHours: 0,
+              oneOnOnePendingHours: 0,
+              totalHours: 43
+            },
+            {
+              departmentName: 'LINC',
+              groupHours: 6,
+              oneOnOneHours: 0,
+              oneOnOneOptionalHours: 0,
+              groupPendingHours: 2,
+              oneOnOnePendingHours: 0,
+              totalHours: 8
+            },
+            {
+              departmentName: 'Settlement',
+              groupHours: 4,
+              oneOnOneHours: 0,
+              oneOnOneOptionalHours: 0.5,
+              groupPendingHours: 0,
+              oneOnOnePendingHours: 0,
+              totalHours: 4
+            }
+          ],
+          totals: {
+            groupHours: 43,
+            oneOnOneHours: 10,
+            oneOnOneOptionalHours: 2,
+            groupPendingHours: 2,
+            oneOnOnePendingHours: 0,
+            totalHours: 55
+          }
+        }
+      })]
+    },
+    printSettings: { orientation: 'landscape', density: 'compact' }
+  }, { filename: viewPath });
+
+  assert.match(html, /<th scope="col">EAL<\/th>[\s\S]*<th scope="col">LINC<\/th>[\s\S]*<th scope="col">Settlement<\/th>[\s\S]*<th scope="col" class="department-total-col">Total<\/th>/);
+  assert.match(html, /<th scope="row" class="department-metric-label">Group<\/th>[\s\S]*<td>33\.00<\/td>[\s\S]*<td>6\.00<\/td>[\s\S]*<td>4\.00<\/td>[\s\S]*<td class="department-total-col">43\.00<\/td>/);
+  assert.match(html, /<th scope="row" class="department-metric-label">One-on-One<\/th>[\s\S]*<td>10\.00<\/td>[\s\S]*<td>0\.00<\/td>[\s\S]*<td>0\.00<\/td>[\s\S]*<td class="department-total-col">10\.00<\/td>/);
+  assert.match(html, /class="department-optional-row optional-row">[\s\S]*<td>1\.50<\/td>[\s\S]*<td>—<\/td>[\s\S]*<td>0\.50<\/td>[\s\S]*<td class="department-total-col">2\.00<\/td>/);
 });
 
 test('timesheet editor always exposes Print and blocks dirty drafts', () => {
@@ -341,5 +518,7 @@ test('managed print rejects non-printable timesheet statuses', () => {
   const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
   assert.match(controller, /exports\.printManagedTimesheets[\s\S]*?timesheetByPersonId/);
   assert.match(controller, /Only submitted or processed timesheets can be printed/);
+  assert.match(controller, /function isEditorTimesheetPrintRequest/);
+  assert.match(controller, /allowDraftEditorPrint/);
   assert.match(controller, /normalizeTimesheetLifecycle\(row\)/);
 });

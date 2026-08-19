@@ -71,6 +71,12 @@ function resolveDepartmentCode(classData = {}, departmentCodeById = new Map()) {
   return String(departmentCodeById.get(departmentId) || '').trim();
 }
 
+function resolveClassMaxCapacity(classData = {}) {
+  const raw = classData?.enrollment?.maxCapacity ?? classData?.maxCapacity ?? 0;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function buildPeriodStudentContext(studentIds, {
   studentToPersonMap = new Map(),
   personNameMap = new Map()
@@ -326,15 +332,30 @@ async function enrichClassLiveSessions({
       const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRow?.status, sessionRow?.notes);
       const statusDefinition = statusMap instanceof Map ? statusMap.get(normalizedStatus) : null;
       const makeUpRequired = statusDefinition?.makeUpRequired === true;
+      const makeupDurationPercent = sessionStatusPolicyService.normalizeMakeupDurationPercent(
+        statusDefinition?.makeupDurationPercent,
+        100
+      );
+      const classMaxCapacity = resolveClassMaxCapacity(classData);
+      const isOneOnOne = context.isOneOnOne === true || classMaxCapacity === 1;
       payload.deliveryDepartmentCode = resolveDepartmentCode(classData, departmentCodeById);
-      payload.isOneOnOne = context.isOneOnOne === true;
+      payload.classMaxCapacity = classMaxCapacity;
+      payload.isOneOnOne = isOneOnOne;
       payload.singleStudentId = context.singleStudentId || '';
       payload.singleStudentPersonId = context.singleStudentPersonId || '';
       payload.singleStudentName = context.singleStudentName || '';
       payload.singleStudentAttendance = singleStudentAttendance;
       payload.makeUpRequired = makeUpRequired;
+      payload.makeupDurationPercent = makeupDurationPercent;
+      if (makeUpRequired) {
+        const baseDuration = Number(payload.durationHours ?? item?.payload?.durationHours ?? 0);
+        payload.allowedDurationHours = sessionStatusPolicyService.calculateMakeupSessionDurationHours(
+          baseDuration,
+          makeupDurationPercent
+        );
+      }
       payload.showOptionalBadge = shouldShowOptionalBadge({
-        isOneOnOne: context.isOneOnOne,
+        isOneOnOne,
         attendance: singleStudentAttendance,
         makeUpRequired
       });
@@ -352,6 +373,7 @@ module.exports = {
   normalizeAttendance,
   buildDepartmentCodeMap,
   resolveDepartmentCode,
+  resolveClassMaxCapacity,
   buildPeriodStudentContext,
   buildPeriodClassStudentContextById,
   resolveSingleStudentAttendance,

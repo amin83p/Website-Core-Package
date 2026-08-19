@@ -23,6 +23,7 @@
   const deadlineLabel = deadlineDate === '-' ? '-' : `${deadlineDate} ${deadlineTime}`;
   const personDisplayName = typeof personName !== 'undefined' ? String(personName || '').trim() : '';
   const timesheetStatus = currentTimesheetStatus;
+  const reviewHistoryRows = Array.isArray(reviewHistory) ? reviewHistory : [];
   const viewingOther = typeof viewingOtherPerson !== 'undefined' && viewingOtherPerson;
   const canPrintFlag = typeof canPrintTimesheet !== 'undefined' && canPrintTimesheet === true;
   const printMode = typeof timesheetPrintMode !== 'undefined' ? String(timesheetPrintMode || '') : '';
@@ -92,82 +93,32 @@
   #timesheetReviewHistoryToggle[aria-expanded="false"] .review-history-chevron {
     transform: rotate(0deg);
   }
-  .ts-notice-hub {
-    margin-bottom: 1.25rem;
-  }
-  .ts-notice-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 0.85rem;
-  }
-  .ts-notice-tile {
+  .ts-guidance-launcher {
     position: relative;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.85rem;
-    min-width: 0;
-    min-height: 132px;
-    padding: 1rem;
+    flex-shrink: 0;
+  }
+  .ts-guidance-launcher__badge {
+    position: absolute;
+    top: -0.35rem;
+    right: -0.35rem;
+    min-width: 1.1rem;
+    height: 1.1rem;
+    padding: 0 0.25rem;
+    font-size: 0.65rem;
+    line-height: 1.1rem;
+  }
+  .ts-guidance-step {
     color: #1f2937;
-    background: #ffffff;
-    border: 1px solid #dbe4ee;
-    border-left: 4px solid #6c757d;
-    border-radius: 0.75rem;
-    box-shadow: 0 0.2rem 0.65rem rgba(15, 23, 42, 0.06);
   }
-  button.ts-notice-tile {
-    width: 100%;
-    font: inherit;
-    text-align: left;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-  }
-  button.ts-notice-tile:hover,
-  button.ts-notice-tile:focus-visible {
-    border-color: #86b7fe;
-    box-shadow: 0 0.35rem 0.9rem rgba(13, 110, 253, 0.12);
-    transform: translateY(-1px);
-  }
-  button.ts-notice-tile:focus-visible {
-    outline: 2px solid #0d6efd;
-    outline-offset: 2px;
-  }
-  .ts-notice-tile--instructions {
-    border-left-color: #0d6efd;
-    background: linear-gradient(135deg, #f4f8ff 0%, #ffffff 70%);
-  }
-  .ts-notice-tile--revision {
-    border-left-color: #f59f00;
-    background: linear-gradient(135deg, #fff8e6 0%, #ffffff 70%);
-  }
-  .ts-notice-tile--locked {
-    border-left-color: #198754;
-    background: linear-gradient(135deg, #eefaf3 0%, #ffffff 70%);
-  }
-  .ts-notice-tile--history {
-    border-left-color: #6f42c1;
-    background: linear-gradient(135deg, #f7f3ff 0%, #ffffff 70%);
-  }
-  .ts-notice-tile__icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 2.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
-    color: #0d6efd;
-    background: #e7f1ff;
-    border-radius: 0.7rem;
-    font-size: 1.15rem;
-  }
-  .ts-notice-tile--revision .ts-notice-tile__icon { color: #8a5700; background: #ffe69c; }
-  .ts-notice-tile--locked .ts-notice-tile__icon { color: #146c43; background: #d1e7dd; }
-  .ts-notice-tile--history .ts-notice-tile__icon { color: #59359a; background: #e9ddff; }
-  .ts-notice-tile__content {
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-  .ts-notice-tile__eyebrow {
-    margin-bottom: 0.2rem;
+  .ts-guidance-step--revision { border-left: 4px solid #f59f00; padding-left: 0.85rem; }
+  .ts-guidance-step--locked { border-left: 4px solid #198754; padding-left: 0.85rem; }
+  .ts-guidance-step--instructions { border-left: 4px solid #0d6efd; padding-left: 0.85rem; }
+  .ts-guidance-step--reconciliation { border-left: 4px solid #0d6efd; padding-left: 0.85rem; }
+  .ts-guidance-step--warning { border-left: 4px solid #ffc107; padding-left: 0.85rem; }
+  .ts-guidance-step--payroll { border-left: 4px solid #fd7e14; padding-left: 0.85rem; }
+  .ts-guidance-step--history { border-left: 4px solid #6f42c1; padding-left: 0.85rem; }
+  .ts-guidance-eyebrow {
+    margin-bottom: 0.25rem;
     color: #6c757d;
     font-size: 0.68rem;
     font-weight: 800;
@@ -175,77 +126,40 @@
     line-height: 1.2;
     text-transform: uppercase;
   }
-  .ts-notice-tile__title {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0;
+  .ts-guidance-title {
+    margin: 0 0 0.65rem;
     color: #212529;
-    font-size: 0.98rem;
+    font-size: 1.05rem;
     font-weight: 750;
-    line-height: 1.3;
+    line-height: 1.35;
   }
-  .ts-notice-tile__body {
-    margin-top: 0.35rem;
+  .ts-guidance-body {
     color: #5b6470;
-    font-size: 0.82rem;
-    line-height: 1.45;
+    font-size: 0.9rem;
+    line-height: 1.55;
   }
-  .ts-notice-tile__reason {
-    margin-top: 0.45rem;
-    padding: 0.45rem 0.55rem;
+  .ts-guidance-body p:last-child { margin-bottom: 0; }
+  .ts-guidance-reason {
+    margin-top: 0.5rem;
+    padding: 0.55rem 0.65rem;
     color: #664d03;
     background: rgba(255, 243, 205, 0.75);
     border-radius: 0.45rem;
-    font-size: 0.82rem;
-    line-height: 1.4;
-  }
-  .ts-notice-tile__chevron {
-    align-self: center;
-    flex-shrink: 0;
-    color: #6f42c1;
-  }
-  .ts-review-history-panel {
-    margin-top: 0.85rem;
-    overflow: hidden;
-    background: #ffffff;
-    border: 1px solid #ded5ef;
-    border-radius: 0.75rem;
-    box-shadow: 0 0.2rem 0.65rem rgba(15, 23, 42, 0.06);
-  }
-  .ts-reconciliation-note {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.8rem;
-    padding: 0.9rem 1rem;
-    color: #084298;
-    background: linear-gradient(135deg, #eef5ff 0%, #ffffff 80%);
-    border: 1px solid #9ec5fe;
-    border-left: 4px solid #0d6efd;
-    border-radius: 0.75rem;
-    box-shadow: 0 0.2rem 0.65rem rgba(13, 110, 253, 0.08);
-  }
-  .ts-reconciliation-note__icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 2.25rem;
-    width: 2.25rem;
-    height: 2.25rem;
-    background: #cfe2ff;
-    border-radius: 50%;
-    font-size: 1rem;
-  }
-  .ts-reconciliation-note__title {
-    font-weight: 750;
-    line-height: 1.3;
-  }
-  .ts-reconciliation-note__body {
-    margin-top: 0.25rem;
-    color: #315a87;
-    font-size: 0.82rem;
+    font-size: 0.88rem;
     line-height: 1.45;
+  }
+  .ts-guidance-list {
+    margin: 0.5rem 0 0;
+    padding-left: 1.15rem;
+  }
+  .ts-guidance-progress {
+    height: 0.35rem;
+  }
+  #timesheetGuidanceModal .modal-header {
+    border-bottom: 1px solid #e9ecef;
+  }
+  #timesheetGuidanceModal .modal-footer {
+    border-top: 1px solid #e9ecef;
   }
 
   .ts-page-header {
@@ -665,12 +579,6 @@
     .ts-meta-line {
       grid-template-columns: 1fr;
     }
-    .ts-notice-grid {
-      grid-template-columns: 1fr;
-    }
-    .ts-notice-tile {
-      min-height: 0;
-    }
   }
 </style>
 
@@ -734,7 +642,7 @@
         </div>
     </div>
 
-    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div class="d-flex align-items-center flex-wrap">
             <button
                 type="button"
@@ -744,110 +652,19 @@
                 title="<%= canPrintFlag ? 'Print this timesheet' : 'EXPORT access is required to print this timesheet.' %>"
             >🖨 Print</button>
         </div>
+        <div class="d-flex align-items-center flex-wrap">
+            <button
+                type="button"
+                class="btn btn-filled btn-edit btn-md mb-2 ts-guidance-launcher"
+                id="btnTimesheetGuidance"
+                title="Guidance and alerts"
+                aria-label="Timesheet guidance and alerts"
+            >
+                📋 Guidance &amp; Alerts
+                <span class="badge rounded-pill text-bg-warning ts-guidance-launcher__badge d-none" id="timesheetGuidanceBadge">0</span>
+            </button>
+        </div>
     </div>
-
-    <% const reviewHistoryRows = Array.isArray(reviewHistory) ? reviewHistory : []; %>
-    <section class="ts-notice-hub" aria-label="Timesheet guidance and review information">
-        <div class="ts-notice-grid">
-            <% if (timesheetStatus === 'draft' && timesheet.returnReason) { %>
-                <article class="ts-notice-tile ts-notice-tile--revision">
-                    <span class="ts-notice-tile__icon" aria-hidden="true"><i class="bi bi-reply-fill"></i></span>
-                    <div class="ts-notice-tile__content">
-                        <div class="ts-notice-tile__eyebrow">Action required</div>
-                        <h2 class="ts-notice-tile__title">Returned for Revision</h2>
-                        <div class="ts-notice-tile__reason"><%= timesheet.returnReason %></div>
-                    </div>
-                </article>
-            <% } %>
-
-            <% if (pageIsReadOnly) { %>
-                <article class="ts-notice-tile ts-notice-tile--locked">
-                    <span class="ts-notice-tile__icon" aria-hidden="true"><i class="bi bi-lock-fill"></i></span>
-                    <div class="ts-notice-tile__content">
-                        <div class="ts-notice-tile__eyebrow">Editing unavailable</div>
-                        <h2 class="ts-notice-tile__title">Timesheet Locked</h2>
-                        <div class="ts-notice-tile__body">This timesheet is marked as <strong><%= timesheet.status.toUpperCase() %></strong> and cannot be modified.</div>
-                    </div>
-                </article>
-            <% } else { %>
-                <article class="ts-notice-tile ts-notice-tile--instructions">
-                    <span class="ts-notice-tile__icon" aria-hidden="true"><i class="bi bi-info-circle-fill"></i></span>
-                    <div class="ts-notice-tile__content">
-                        <div class="ts-notice-tile__eyebrow">Before you submit</div>
-                        <h2 class="ts-notice-tile__title">Instructions</h2>
-                        <div class="ts-notice-tile__body">
-                            Review auto-pulled sessions and add manual entries only when required.
-                            <div class="mt-1">Sessions before the deadline window must be final. Later non-final sessions are included provisionally and reconciled in the next timesheet.</div>
-                        </div>
-                    </div>
-                </article>
-            <% } %>
-
-            <% if (reviewHistoryRows.length) { %>
-                <button type="button" class="ts-notice-tile ts-notice-tile--history collapsed" data-bs-toggle="collapse" data-bs-target="#timesheetReviewHistoryCollapse" aria-expanded="false" aria-controls="timesheetReviewHistoryCollapse" id="timesheetReviewHistoryToggle">
-                    <span class="ts-notice-tile__icon" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
-                    <span class="ts-notice-tile__content">
-                        <span class="ts-notice-tile__eyebrow d-block">Audit trail</span>
-                        <span class="ts-notice-tile__title">
-                            Review History
-                            <span class="badge bg-secondary-subtle text-secondary-emphasis border"><%= reviewHistoryRows.length %></span>
-                        </span>
-                        <span class="ts-notice-tile__body d-block">Open submission, return, approval, and processing events.</span>
-                    </span>
-                    <i class="bi bi-chevron-down review-history-chevron ts-notice-tile__chevron" aria-hidden="true"></i>
-                </button>
-            <% } %>
-        </div>
-
-        <% if (reviewHistoryRows.length) { %>
-            <div id="timesheetReviewHistoryPanel">
-                <div id="timesheetReviewHistoryCollapse" class="collapse ts-review-history-panel">
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th class="ps-4">When</th>
-                                        <th>Event</th>
-                                        <th>By</th>
-                                        <th>Status</th>
-                                        <th class="text-end">Hours</th>
-                                        <th class="pe-4">Note</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <% reviewHistoryRows.slice().reverse().forEach((row) => { %>
-                                        <tr>
-                                            <td class="ps-4 small text-muted"><%= row.at ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.at) : row.at) : '-' %></td>
-                                            <td><span class="badge bg-light text-dark border text-uppercase"><%= row.event || '-' %></span></td>
-                                            <td class="small"><%= row.byName || row.by || '-' %></td>
-                                            <td class="small text-muted"><%= row.statusBefore ? row.statusBefore + ' → ' + (row.statusAfter || '-') : (row.statusAfter || '-') %></td>
-                                            <td class="text-end small fw-semibold"><%= Number(row.totalHours || 0).toFixed(2) %></td>
-                                            <td class="pe-4 small"><%= row.note || '-' %></td>
-                                        </tr>
-                                    <% }) %>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <% } %>
-    </section>
-
-    <% if (typeof payrollWarnings !== 'undefined' && Array.isArray(payrollWarnings) && payrollWarnings.length) { %>
-        <div class="alert alert-warning border-warning shadow-sm mb-4">
-            <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> Payroll setup warnings</div>
-            <ul class="small mb-0 ps-3">
-                <% payrollWarnings.forEach((warning) => { %>
-                    <li><%= warning %></li>
-                <% }); %>
-            </ul>
-        </div>
-    <% } %>
-
-    <div id="provisionalSessionsSummary" class="ts-reconciliation-note mb-4 d-none" role="status" aria-live="polite"></div>
-    <div id="openMakeupChainSummary" class="alert alert-warning border mb-4 d-none" role="status" aria-live="polite"></div>
 
     <div id="incompleteSessionsPanel" class="card border-warning shadow-sm mb-4 d-none">
         <button type="button" class="card-header bg-warning-subtle border-warning d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#incompleteSessionsCollapse" aria-expanded="false" aria-controls="incompleteSessionsCollapse" id="incompleteSessionsToggle">
@@ -914,7 +731,7 @@
     <div class="card border-0 shadow-sm mb-4" id="tsDepartmentTotals">
         <div class="card-header bg-light border-bottom py-3">
             <div class="fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Hours by Department</div>
-            <div class="small text-muted mt-1">Optional Hours show the scheduled duration of Optional sessions and do not affect payroll totals.</div>
+            <div class="small text-muted mt-1">Group and one-on-one hours are split when a class has max capacity of 1 or only one student is enrolled in the timesheet period. One-on-one optional hours are informational only and do not affect payroll totals.</div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -922,14 +739,16 @@
                     <thead class="table-light">
                         <tr>
                             <th class="ps-4">Department</th>
-                            <th class="text-end pe-4" style="width: 140px;">Session Hours</th>
-                            <th class="text-end pe-4" style="width: 140px;">Pending Hours</th>
-                            <th class="text-end pe-4" style="width: 140px;">Total</th>
+                            <th class="text-end pe-4" style="width: 120px;">Group Hours</th>
+                            <th class="text-end pe-4" style="width: 120px;">One-on-One Hours</th>
+                            <th class="text-end pe-4" style="width: 120px;">One-on-One Optional</th>
+                            <th class="text-end pe-4" style="width: 120px;">Pending</th>
+                            <th class="text-end pe-4" style="width: 120px;">Total</th>
                         </tr>
                     </thead>
                     <tbody id="tsDepartmentTotalsBody">
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-3">No department hours yet.</td>
+                            <td colspan="6" class="text-center text-muted py-3">No department hours yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1188,6 +1007,32 @@
   </div>
 </div>
 
+<div class="modal" id="timesheetGuidanceModal" tabindex="-1" aria-hidden="true" aria-labelledby="timesheetGuidanceModalTitle" data-bs-focus="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <div class="w-100">
+          <h5 class="modal-title fw-bold mb-1" id="timesheetGuidanceModalTitle"><i class="bi bi-journal-text me-2 text-primary"></i>Timesheet guidance</h5>
+          <div class="d-flex align-items-center justify-content-between gap-2 small text-muted">
+            <span id="timesheetGuidanceStepLabel">Step 1 of 1</span>
+            <span id="timesheetGuidanceStepEyebrow"></span>
+          </div>
+          <div class="progress ts-guidance-progress mt-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="progress-bar bg-primary" id="timesheetGuidanceProgressBar" style="width: 0%"></div>
+          </div>
+        </div>
+        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-4" id="timesheetGuidanceBody"></div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-outline-secondary" id="btnTimesheetGuidanceBack" disabled>Back</button>
+        <button type="button" class="btn btn-primary" id="btnTimesheetGuidanceNext">Next</button>
+        <button type="button" class="btn btn-outline-secondary d-none" id="btnTimesheetGuidanceClose" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="priorAdjustmentModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content border-0 shadow">
@@ -1266,8 +1111,18 @@
     const PAYROLL_ROLES = <%- JSON.stringify(typeof payrollRoles !== 'undefined' ? payrollRoles : []) %>;
     const PAYROLL_DEFAULT_ROLE = "<%= typeof payrollDefaultRole !== 'undefined' ? payrollDefaultRole : 'teacher' %>";
     const PAYROLL_WARNINGS = <%- JSON.stringify(typeof payrollWarnings !== 'undefined' ? payrollWarnings : []) %>;
+    const TIMESHEET_GUIDANCE_BOOT = <%- JSON.stringify({
+      isReadOnly: pageIsReadOnly,
+      status: timesheetStatus,
+      returnReason: String(timesheet.returnReason || '').trim(),
+      payrollWarnings: (typeof payrollWarnings !== 'undefined' && Array.isArray(payrollWarnings)) ? payrollWarnings : [],
+      reviewHistory: reviewHistoryRows
+    }) %>;
     let actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     let priorReviewHasOpenMakeupChains = false;
+    let timesheetGuidanceSteps = [];
+    let timesheetGuidanceStepIndex = 0;
+    let timesheetGuidanceModal = null;
 
     const liveSessionById = new Map();
     const liveDepartmentByClassId = new Map();
@@ -1283,6 +1138,7 @@
                 deliveryDepartmentId: deptId,
                 deliveryDepartmentName: deptName || deptId,
                 deliveryDepartmentCode: deptCode,
+                classMaxCapacity: Number.isFinite(Number(ls?.classMaxCapacity)) ? Number(ls.classMaxCapacity) : 0,
                 isOneOnOne: ls?.isOneOnOne === true,
                 singleStudentId: String(ls?.singleStudentId || '').trim(),
                 singleStudentPersonId: String(ls?.singleStudentPersonId || '').trim(),
@@ -1941,6 +1797,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let provisionalHours = 0;
     let reconciliationSessionCount = 0;
     let reconciliationHours = 0;
+    let guidanceReconciliationEntries = [];
+    let guidanceProvisionalEntries = [];
     let hasUncompletedSessions = Array.isArray(INCOMPLETE_SESSIONS) && INCOMPLETE_SESSIONS.length > 0;
     let hasPendingApprovals = false;
     
@@ -2089,6 +1947,361 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function getTimesheetGuidanceDynamicState() {
+        const receiptChains = Array.isArray(PRIOR_RECONCILIATION_RECEIPT?.makeupChains)
+            ? PRIOR_RECONCILIATION_RECEIPT.makeupChains
+            : [];
+        const openChains = receiptChains.filter((chain) => chain?.state === 'open');
+        const openNodes = openChains.flatMap((chain) => Array.isArray(chain?.nodes) ? chain.nodes : [])
+            .filter((node) => Array.isArray(node?.openReasons) && node.openReasons.length > 0);
+        const incompleteRows = Array.isArray(INCOMPLETE_SESSIONS) ? INCOMPLETE_SESSIONS : [];
+        return {
+            reconciliationSessionCount,
+            reconciliationHours,
+            provisionalSessionCount,
+            provisionalHours,
+            reconciliationEntries: guidanceReconciliationEntries.slice(),
+            provisionalEntries: guidanceProvisionalEntries.slice(),
+            openChains,
+            openNodeCount: openNodes.length,
+            incompleteCount: incompleteRows.length,
+            incompleteClassCount: incompleteRows.filter((row) => String(row?.sessionType || 'class') === 'class').length,
+            incompleteActivityCount: incompleteRows.filter((row) => row?.sessionType === 'activity').length
+        };
+    }
+
+    function buildReviewHistoryGuidanceHtml(rows = []) {
+        const list = Array.isArray(rows) ? rows : [];
+        if (!list.length) return '';
+        const bodyRows = list.slice().reverse().map((row) => {
+            const when = escapeHtml(row?.at || '-');
+            const event = escapeHtml(String(row?.event || '-').toUpperCase());
+            const by = escapeHtml(row?.byName || row?.by || '-');
+            const status = row?.statusBefore
+                ? escapeHtml(`${row.statusBefore} → ${row.statusAfter || '-'}`)
+                : escapeHtml(row?.statusAfter || '-');
+            const hours = Number(row?.totalHours || 0).toFixed(2);
+            const note = escapeHtml(row?.note || '-');
+            return `<tr>
+                <td class="small text-muted">${when}</td>
+                <td><span class="badge bg-light text-dark border text-uppercase">${event}</span></td>
+                <td class="small">${by}</td>
+                <td class="small text-muted">${status}</td>
+                <td class="text-end small fw-semibold">${hours}</td>
+                <td class="small">${note}</td>
+            </tr>`;
+        }).join('');
+        return `<div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>When</th>
+                        <th>Event</th>
+                        <th>By</th>
+                        <th>Status</th>
+                        <th class="text-end">Hours</th>
+                        <th>Note</th>
+                    </tr>
+                </thead>
+                <tbody>${bodyRows}</tbody>
+            </table>
+        </div>`;
+    }
+
+    function buildTimesheetGuidanceEntryTitle(entry) {
+        if (isTimesheetActivityEntry(entry)) {
+            return String(entry?.activityName || entry?.description || 'Activity work session').trim() || 'Activity work session';
+        }
+        const departmentCode = String(entry?.deliveryDepartmentCode || entry?.departmentCode || '').trim();
+        const className = String(entry?.className || entry?.description || 'Class session').trim() || 'Class session';
+        return departmentCode ? `${departmentCode} · ${className}` : className;
+    }
+
+    function buildTimesheetGuidanceEntryTime(entry) {
+        const start = String(entry?.startTime || '').trim();
+        const end = String(entry?.endTime || '').trim();
+        if (!start) return '—';
+        return end ? `${start} – ${end}` : start;
+    }
+
+    function buildGuidanceSessionSummaryTableHtml(entries = [], { title = '' } = {}) {
+        const rows = Array.isArray(entries) ? entries : [];
+        if (!rows.length) return '';
+        const bodyRows = rows.map((entry) => {
+            const date = escapeHtml(formatTimesheetDateLabel(String(entry?.date || '').trim()) || entry?.date || '—');
+            const name = escapeHtml(buildTimesheetGuidanceEntryTitle(entry));
+            const kind = isTimesheetActivityEntry(entry) ? 'Activity' : 'Class';
+            const time = escapeHtml(buildTimesheetGuidanceEntryTime(entry));
+            const hours = resolveEntryHours(entry).toFixed(2);
+            const status = escapeHtml(resolveTimesheetEntryStatusLabel(entry) || '—');
+            const href = buildTimesheetEntryManagerHref(entry);
+            const nameCell = href
+                ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${name}</a>`
+                : name;
+            return `<tr>
+                <td class="small text-nowrap">${date}</td>
+                <td class="small"><span class="badge bg-light text-dark border me-1">${kind}</span>${nameCell}</td>
+                <td class="small text-nowrap">${time}</td>
+                <td class="text-end small fw-semibold">${hours}</td>
+                <td class="small">${status}</td>
+            </tr>`;
+        }).join('');
+        return `<div class="mt-3">
+            ${title ? `<div class="small fw-semibold text-secondary mb-2">${escapeHtml(title)}</div>` : ''}
+            <div class="table-responsive border rounded">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Session</th>
+                            <th>Time</th>
+                            <th class="text-end">Hours</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>${bodyRows}</tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    function buildMakeupChainSummaryHtml(openChains = []) {
+        const chains = Array.isArray(openChains) ? openChains : [];
+        if (!chains.length) return '';
+        const rows = chains.flatMap((chain) => {
+            const nodes = Array.isArray(chain?.nodes) ? chain.nodes : [];
+            return nodes
+                .filter((node) => Array.isArray(node?.openReasons) && node.openReasons.length > 0)
+                .map((node) => {
+                    const name = escapeHtml(String(node?.className || 'Session').trim() || 'Session');
+                    const date = escapeHtml(String(node?.date || '—').trim() || '—');
+                    const status = escapeHtml(String(node?.statusLabel || node?.status || '—').trim() || '—');
+                    const hours = Number(node?.hours || 0).toFixed(2);
+                    const reasons = (node.openReasons || []).map((reason) => escapeHtml(String(reason || '').trim())).filter(Boolean).join(' · ');
+                    const href = node?.manageUrl ? escapeHtml(String(node.manageUrl)) : '';
+                    const nameCell = href
+                        ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${name}</a>`
+                        : name;
+                    return `<tr>
+                        <td class="small text-nowrap">${date}</td>
+                        <td class="small">${nameCell}</td>
+                        <td class="small">${status}</td>
+                        <td class="text-end small fw-semibold">${hours}</td>
+                        <td class="small text-muted">${reasons || '—'}</td>
+                    </tr>`;
+                });
+        });
+        if (!rows.length) return '';
+        return `<div class="mt-3">
+            <div class="small fw-semibold text-secondary mb-2">Open make-up obligations</div>
+            <div class="table-responsive border rounded">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Session</th>
+                            <th>Status</th>
+                            <th class="text-end">Hours</th>
+                            <th>Open reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows.join('')}</tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    function buildTimesheetGuidanceSteps() {
+        const boot = TIMESHEET_GUIDANCE_BOOT && typeof TIMESHEET_GUIDANCE_BOOT === 'object'
+            ? TIMESHEET_GUIDANCE_BOOT
+            : {};
+        const dynamic = getTimesheetGuidanceDynamicState();
+        const steps = [];
+
+        if (boot.status === 'draft' && String(boot.returnReason || '').trim()) {
+            steps.push({
+                id: 'revision',
+                tone: 'revision',
+                eyebrow: 'Action required',
+                title: 'Returned for Revision',
+                html: `<div class="ts-guidance-body"><p>Your timesheet was returned. Address the note below, then resubmit.</p><div class="ts-guidance-reason">${escapeHtml(boot.returnReason)}</div></div>`
+            });
+        }
+
+        if (boot.isReadOnly === true) {
+            steps.push({
+                id: 'locked',
+                tone: 'locked',
+                eyebrow: 'Editing unavailable',
+                title: 'Timesheet Locked',
+                html: `<div class="ts-guidance-body"><p>This timesheet is marked as <strong>${escapeHtml(String(boot.status || '').toUpperCase())}</strong> and cannot be modified.</p></div>`
+            });
+        } else {
+            steps.push({
+                id: 'instructions',
+                tone: 'instructions',
+                eyebrow: 'Before you submit',
+                title: 'Instructions',
+                html: `<div class="ts-guidance-body">
+                    <p>Review auto-pulled sessions and add manual entries only when required.</p>
+                    <p>Sessions before the deadline window must be final. Later non-final sessions are included provisionally and reconciled in the next timesheet.</p>
+                </div>`
+            });
+        }
+
+        if (dynamic.reconciliationHours > 0 || dynamic.openChains.length > 0) {
+            const provisionalDetail = dynamic.provisionalSessionCount > 0
+                ? `<strong>${dynamic.provisionalSessionCount}</strong> provisional session(s), totaling <strong>${dynamic.provisionalHours.toFixed(2)} hours</strong>, use their current status formula.`
+                : 'All qualifying sessions currently have final statuses.';
+            const reconciliationHtml = dynamic.reconciliationHours > 0
+                ? `<p><strong>${dynamic.reconciliationHours.toFixed(2)} hours</strong> across <strong>${dynamic.reconciliationSessionCount}</strong> deadline-window session(s) qualify for reconciliation. ${provisionalDetail} Finalized differences will be applied in the next timesheet.</p>${buildGuidanceSessionSummaryTableHtml(dynamic.reconciliationEntries, { title: 'Deadline-window sessions' })}`
+                : '';
+            const provisionalOnlyEntries = (dynamic.provisionalEntries || []).filter((entry) => entry?.reconciliationRequired !== true);
+            const provisionalSummaryHtml = provisionalOnlyEntries.length
+                ? buildGuidanceSessionSummaryTableHtml(provisionalOnlyEntries, { title: 'Provisional sessions (current formula)' })
+                : '';
+            const makeupHtml = dynamic.openChains.length > 0
+                ? `<p><strong>Open make-up reconciliation:</strong> ${dynamic.openChains.length} confirmed chain(s) with ${dynamic.openNodeCount} open session or scheduling obligation(s) will be checked again in a later timesheet. Payable hours remain based on each session's configured status formula.</p>${buildMakeupChainSummaryHtml(dynamic.openChains)}`
+                : '';
+            steps.push({
+                id: 'reconciliation',
+                tone: 'reconciliation',
+                eyebrow: 'Next-period review',
+                title: 'Deadline-window reconciliation',
+                html: `<div class="ts-guidance-body">${reconciliationHtml}${provisionalSummaryHtml}${makeupHtml}</div>`
+            });
+        }
+
+        if (dynamic.incompleteCount > 0) {
+            const breakdownParts = [];
+            if (dynamic.incompleteClassCount) breakdownParts.push(`<strong>${dynamic.incompleteClassCount}</strong> class`);
+            if (dynamic.incompleteActivityCount) breakdownParts.push(`<strong>${dynamic.incompleteActivityCount}</strong> activity work`);
+            const breakdownText = breakdownParts.length
+                ? ` (${breakdownParts.join(', ')} session${dynamic.incompleteCount === 1 ? '' : 's'})`
+                : '';
+            steps.push({
+                id: 'incomplete',
+                tone: 'warning',
+                eyebrow: 'Before submission',
+                title: 'Sessions not finalized',
+                html: `<div class="ts-guidance-body">
+                    <p>You have <strong>${dynamic.incompleteCount}</strong> incomplete session(s) in this period${breakdownText}.</p>
+                    <p>Finalize class session statuses and complete activity work sessions before submission.</p>
+                    <p class="small text-muted mb-0">Use the <strong>Incomplete Sessions</strong> panel on the page for the full list and links.</p>
+                </div>`
+            });
+        }
+
+        const payrollWarnings = Array.isArray(boot.payrollWarnings) ? boot.payrollWarnings : [];
+        if (payrollWarnings.length) {
+            steps.push({
+                id: 'payroll',
+                tone: 'payroll',
+                eyebrow: 'Payroll setup',
+                title: 'Payroll setup warnings',
+                html: `<div class="ts-guidance-body"><ul class="ts-guidance-list mb-0">${payrollWarnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul></div>`
+            });
+        }
+
+        const reviewHistory = Array.isArray(boot.reviewHistory) ? boot.reviewHistory : [];
+        if (reviewHistory.length) {
+            steps.push({
+                id: 'history',
+                tone: 'history',
+                eyebrow: 'Audit trail',
+                title: 'Review History',
+                html: `<div class="ts-guidance-body"><p class="mb-3">Submission, return, approval, and processing events for this timesheet.</p>${buildReviewHistoryGuidanceHtml(reviewHistory)}</div>`
+            });
+        }
+
+        return steps;
+    }
+
+    function renderTimesheetGuidanceStep(index = 0) {
+        const steps = Array.isArray(timesheetGuidanceSteps) ? timesheetGuidanceSteps : [];
+        const body = document.getElementById('timesheetGuidanceBody');
+        const stepLabel = document.getElementById('timesheetGuidanceStepLabel');
+        const stepEyebrow = document.getElementById('timesheetGuidanceStepEyebrow');
+        const progressBar = document.getElementById('timesheetGuidanceProgressBar');
+        const backBtn = document.getElementById('btnTimesheetGuidanceBack');
+        const nextBtn = document.getElementById('btnTimesheetGuidanceNext');
+        const closeBtn = document.getElementById('btnTimesheetGuidanceClose');
+        if (!body || !steps.length) return;
+        const safeIndex = Math.max(0, Math.min(index, steps.length - 1));
+        timesheetGuidanceStepIndex = safeIndex;
+        const step = steps[safeIndex];
+        const progress = ((safeIndex + 1) / steps.length) * 100;
+        body.innerHTML = `<article class="ts-guidance-step ts-guidance-step--${escapeHtml(step.tone || 'instructions')}">
+            <div class="ts-guidance-eyebrow">${escapeHtml(step.eyebrow || '')}</div>
+            <h2 class="ts-guidance-title">${escapeHtml(step.title || '')}</h2>
+            ${step.html || ''}
+        </article>`;
+        if (stepLabel) stepLabel.textContent = `Step ${safeIndex + 1} of ${steps.length}`;
+        if (stepEyebrow) stepEyebrow.textContent = step.eyebrow || '';
+        if (progressBar) {
+            progressBar.style.width = `${progress.toFixed(2)}%`;
+            progressBar.setAttribute('aria-valuenow', String(Math.round(progress)));
+        }
+        if (backBtn) backBtn.disabled = safeIndex <= 0;
+        const isLast = safeIndex >= steps.length - 1;
+        if (nextBtn) {
+            nextBtn.classList.toggle('d-none', isLast);
+            nextBtn.textContent = 'Next';
+        }
+        if (closeBtn) {
+            closeBtn.classList.toggle('d-none', !isLast);
+            closeBtn.textContent = 'Got it';
+        }
+    }
+
+    function renderTimesheetGuidanceLauncher() {
+        timesheetGuidanceSteps = buildTimesheetGuidanceSteps();
+        const badge = document.getElementById('timesheetGuidanceBadge');
+        const launcher = document.getElementById('btnTimesheetGuidance');
+        const count = timesheetGuidanceSteps.length;
+        if (badge) {
+            badge.textContent = String(count);
+            badge.classList.toggle('d-none', count <= 0);
+        }
+        if (launcher) {
+            launcher.title = count > 0 ? `Guidance and alerts (${count})` : 'Timesheet guidance';
+        }
+    }
+
+    function openTimesheetGuidanceModal(startIndex = 0) {
+        renderTimesheetGuidanceLauncher();
+        if (!timesheetGuidanceSteps.length) return;
+        const modalEl = document.getElementById('timesheetGuidanceModal');
+        if (!modalEl || !window.bootstrap) return;
+        if (!timesheetGuidanceModal) {
+            timesheetGuidanceModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: true });
+        }
+        renderTimesheetGuidanceStep(startIndex);
+        timesheetGuidanceModal.show();
+    }
+
+    function initializeTimesheetGuidance() {
+        renderTimesheetGuidanceLauncher();
+        if (timesheetGuidanceSteps.length > 0) {
+            openTimesheetGuidanceModal(0);
+        }
+    }
+
+    function bindTimesheetGuidanceControls() {
+        const launcher = document.getElementById('btnTimesheetGuidance');
+        const backBtn = document.getElementById('btnTimesheetGuidanceBack');
+        const nextBtn = document.getElementById('btnTimesheetGuidanceNext');
+        launcher?.addEventListener('click', () => openTimesheetGuidanceModal(0));
+        backBtn?.addEventListener('click', () => {
+            if (timesheetGuidanceStepIndex > 0) renderTimesheetGuidanceStep(timesheetGuidanceStepIndex - 1);
+        });
+        nextBtn?.addEventListener('click', () => {
+            if (timesheetGuidanceStepIndex < timesheetGuidanceSteps.length - 1) {
+                renderTimesheetGuidanceStep(timesheetGuidanceStepIndex + 1);
+            }
+        });
     }
 
     function buildCommentCellHtml(ses) {
@@ -2346,7 +2559,7 @@ document.addEventListener('DOMContentLoaded', () => {
             || entry?.classId
             || ''
         ).trim();
-        const oneOnOneBadge = entry?.isOneOnOne === true
+        const oneOnOneBadge = isDepartmentOneOnOneEntry(entry)
             ? '<span class="badge rounded-pill ts-one-on-one-badge">One on One</span>'
             : '';
         const primaryContent = departmentCode
@@ -2441,9 +2654,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'No Department';
     }
 
-    function resolveOptionalReportingHours(entry) {
-        if (entry?.showOptionalBadge !== true) return 0;
-
+    function resolveOptionalScheduledBaseHours(entry) {
         const durationHours = Number.parseFloat(entry?.durationHours);
         if (Number.isFinite(durationHours) && durationHours > 0) {
             return Number(durationHours.toFixed(2));
@@ -2460,6 +2671,43 @@ document.addEventListener('DOMContentLoaded', () => {
             : 0;
     }
 
+    function applyMakeupOptionalHours(entry, baseHours) {
+        if (entry?.makeUpRequired !== true) {
+            return Number(baseHours.toFixed(2));
+        }
+        const allowed = Number(entry?.allowedDurationHours);
+        if (Number.isFinite(allowed) && allowed > 0) {
+            return Number(allowed.toFixed(2));
+        }
+        const percent = Number(entry?.makeupDurationPercent);
+        const effectivePercent = Number.isFinite(percent) && percent > 0
+            ? Math.min(100, Math.max(1, percent))
+            : 100;
+        return Number((baseHours * (effectivePercent / 100)).toFixed(2));
+    }
+
+    function resolveOptionalReportingHours(entry) {
+        if (entry?.showOptionalBadge !== true) return 0;
+        const baseHours = resolveOptionalScheduledBaseHours(entry);
+        if (baseHours <= 0) return 0;
+        return applyMakeupOptionalHours(entry, baseHours);
+    }
+
+    function isDepartmentOneOnOneEntry(entry) {
+        if (isTimesheetActivityEntry(entry)) return false;
+        const displayEntry = resolveDisplayEntry(entry);
+        if (Number(displayEntry?.classMaxCapacity) === 1) return true;
+        return displayEntry?.isOneOnOne === true;
+    }
+
+    function resolveDepartmentOptionalHours(entry) {
+        if (!isDepartmentOneOnOneEntry(entry)) return 0;
+        if (isTimesheetActivityEntry(entry)) return 0;
+        const displayEntry = resolveDisplayEntry(entry);
+        if (displayEntry?.showOptionalBadge !== true) return 0;
+        return resolveOptionalReportingHours(displayEntry);
+    }
+
     function renderDepartmentTotals() {
         const totalsBody = document.getElementById('tsDepartmentTotalsBody');
         if (!totalsBody) return;
@@ -2469,58 +2717,69 @@ document.addEventListener('DOMContentLoaded', () => {
             const displayEntry = resolveDisplayEntry(entry);
             const sessionHours = Number(resolveEntryHours(entry) || 0);
             const pendingHours = isPendingApprovalEntry(entry) ? Number(resolveRequestedHours(entry) || 0) : 0;
-            const optionalHours = resolveOptionalReportingHours(displayEntry);
+            const optionalHours = resolveDepartmentOptionalHours(entry);
             if ((!Number.isFinite(sessionHours) || sessionHours === 0)
                 && (!Number.isFinite(pendingHours) || pendingHours === 0)
                 && (!Number.isFinite(optionalHours) || optionalHours === 0)) {
                 return;
             }
             const dept = resolveDepartmentLabel(displayEntry);
-            const current = buckets.get(dept) || { sessionHours: 0, optionalHours: 0, pendingHours: 0 };
-            current.sessionHours = Number((current.sessionHours + (Number.isFinite(sessionHours) ? sessionHours : 0)).toFixed(2));
-            current.optionalHours = Number((current.optionalHours + optionalHours).toFixed(2));
-            current.pendingHours = Number((current.pendingHours + (Number.isFinite(pendingHours) ? pendingHours : 0)).toFixed(2));
+            const isOneOnOne = isDepartmentOneOnOneEntry(entry);
+            const current = buckets.get(dept) || {
+                groupHours: 0,
+                oneOnOneHours: 0,
+                oneOnOneOptionalHours: 0,
+                groupPendingHours: 0,
+                oneOnOnePendingHours: 0
+            };
+            if (isOneOnOne) {
+                current.oneOnOneHours = Number((current.oneOnOneHours + (Number.isFinite(sessionHours) ? sessionHours : 0)).toFixed(2));
+                current.oneOnOnePendingHours = Number((current.oneOnOnePendingHours + (Number.isFinite(pendingHours) ? pendingHours : 0)).toFixed(2));
+            } else {
+                current.groupHours = Number((current.groupHours + (Number.isFinite(sessionHours) ? sessionHours : 0)).toFixed(2));
+                current.groupPendingHours = Number((current.groupPendingHours + (Number.isFinite(pendingHours) ? pendingHours : 0)).toFixed(2));
+            }
+            if (optionalHours > 0) {
+                current.oneOnOneOptionalHours = Number((current.oneOnOneOptionalHours + optionalHours).toFixed(2));
+            }
             buckets.set(dept, current);
         });
         const rows = Array.from(buckets.entries()).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
         if (!rows.length) {
-            totalsBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No department hours yet.</td></tr>';
+            totalsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No department hours yet.</td></tr>';
             return;
         }
-        let totalSession = 0;
-        let totalOptional = 0;
+        let totalGroup = 0;
+        let totalOneOnOne = 0;
+        let totalOneOnOneOptional = 0;
         let totalPending = 0;
         const html = rows.map(([dept, hrs]) => {
-            const sessionHours = Number(hrs.sessionHours || 0);
-            const optionalHours = Number(hrs.optionalHours || 0);
-            const pendingHours = Number(hrs.pendingHours || 0);
-            const rowTotal = Number((sessionHours + pendingHours).toFixed(2));
-            totalSession += sessionHours;
-            totalOptional += optionalHours;
+            const groupHours = Number(hrs.groupHours || 0);
+            const oneOnOneHours = Number(hrs.oneOnOneHours || 0);
+            const oneOnOneOptionalHours = Number(hrs.oneOnOneOptionalHours || 0);
+            const pendingHours = Number((hrs.groupPendingHours || 0) + (hrs.oneOnOnePendingHours || 0));
+            const rowTotal = Number((groupHours + oneOnOneHours + pendingHours).toFixed(2));
+            totalGroup += groupHours;
+            totalOneOnOne += oneOnOneHours;
+            totalOneOnOneOptional += oneOnOneOptionalHours;
             totalPending += pendingHours;
-            const optionalRow = `<tr class="table-info-subtle">
-                <td colspan="3" class="ps-5 text-info-emphasis">
-                    <i class="bi bi-arrow-return-right me-2" aria-hidden="true"></i><span class="fw-semibold">Optional Hours</span>
-                    <span class="small text-muted ms-1">(scheduled duration, informational only)</span>
-                </td>
-                <td class="text-end pe-4 fw-bold text-info-emphasis">${optionalHours.toFixed(2)}</td>
-            </tr>`;
             return `<tr>
                 <td class="ps-4">${dept}</td>
-                <td class="text-end pe-4 fw-semibold">${sessionHours.toFixed(2)}</td>
-                <td class="text-end pe-4 fw-semibold">${pendingHours.toFixed(2)}</td>
-                <td class="text-end pe-4 fw-semibold">${rowTotal.toFixed(2)}</td>
-            </tr>${optionalRow}`;
+                <td class="text-end pe-4 fw-semibold">${groupHours.toFixed(2)}</td>
+                <td class="text-end pe-4 fw-semibold">${oneOnOneHours.toFixed(2)}</td>
+                <td class="text-end pe-4 fw-semibold text-info-emphasis">${oneOnOneOptionalHours.toFixed(2)}</td>
+                <td class="text-end pe-4 fw-semibold text-warning">${pendingHours.toFixed(2)}</td>
+                <td class="text-end pe-4 fw-semibold text-success">${rowTotal.toFixed(2)}</td>
+            </tr>`;
         }).join('');
-        const grandTotal = Number((totalSession + totalPending).toFixed(2));
+        const grandTotal = Number((totalGroup + totalOneOnOne + totalPending).toFixed(2));
         totalsBody.innerHTML = `${html}<tr class="table-light">
             <td class="ps-4 fw-bold">Total</td>
-            <td class="text-end pe-4 fw-bold text-success">${totalSession.toFixed(2)}</td>
+            <td class="text-end pe-4 fw-bold text-success">${totalGroup.toFixed(2)}</td>
+            <td class="text-end pe-4 fw-bold text-success">${totalOneOnOne.toFixed(2)}</td>
+            <td class="text-end pe-4 fw-bold text-info-emphasis">${totalOneOnOneOptional.toFixed(2)}</td>
             <td class="text-end pe-4 fw-bold text-warning">${totalPending.toFixed(2)}</td>
             <td class="text-end pe-4 fw-bold text-success">${grandTotal.toFixed(2)}</td>
-        </tr><tr class="table-info-subtle">
-            <td colspan="3" class="ps-4 fw-bold text-info-emphasis">Total Optional Hours <span class="small fw-normal text-muted">(informational only)</span></td>
-            <td class="text-end pe-4 fw-bold text-info-emphasis">${totalOptional.toFixed(2)}</td>
         </tr>`;
     }
 
@@ -2531,6 +2790,8 @@ document.addEventListener('DOMContentLoaded', () => {
         provisionalHours = 0;
         reconciliationSessionCount = 0;
         reconciliationHours = 0;
+        guidanceReconciliationEntries = [];
+        guidanceProvisionalEntries = [];
         hasUncompletedSessions = Array.isArray(INCOMPLETE_SESSIONS) && INCOMPLETE_SESSIONS.length > 0;
         hasPendingApprovals = false;
 
@@ -2577,10 +2838,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (ses.reconciliationRequired === true) {
                         reconciliationSessionCount += 1;
                         reconciliationHours += Math.max(0, hrs);
+                        guidanceReconciliationEntries.push(ses);
                     }
                     if (ses.isProvisional === true) {
                         provisionalSessionCount += 1;
                         provisionalHours += hrs;
+                        guidanceProvisionalEntries.push(ses);
                     }
 
                     const statusBadge = buildStatusBadgeHtml(displaySes);
@@ -2656,44 +2919,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.getElementById('lbl_grandTotal').innerText = grandTotalHours.toFixed(2);
-        const provisionalSummary = document.getElementById('provisionalSessionsSummary');
-        if (provisionalSummary) {
-            if (reconciliationHours > 0) {
-                const provisionalDetail = provisionalSessionCount > 0
-                    ? `<strong>${provisionalSessionCount}</strong> provisional session(s), totaling <strong>${provisionalHours.toFixed(2)} hours</strong>, use their current status formula.`
-                    : 'All qualifying sessions currently have final statuses.';
-                provisionalSummary.classList.remove('d-none');
-                provisionalSummary.innerHTML = `<span class="ts-reconciliation-note__icon" aria-hidden="true"><i class="bi bi-arrow-repeat"></i></span>
-                    <div>
-                        <div class="ts-notice-tile__eyebrow">Next-period review</div>
-                        <div class="ts-reconciliation-note__title">Deadline-window reconciliation</div>
-                        <div class="ts-reconciliation-note__body"><strong>${reconciliationHours.toFixed(2)} hours</strong> across <strong>${reconciliationSessionCount}</strong> deadline-window session(s) qualify for reconciliation. ${provisionalDetail} Finalized differences will be applied in the next timesheet.</div>
-                    </div>`;
-            } else {
-                provisionalSummary.classList.add('d-none');
-                provisionalSummary.innerHTML = '';
-            }
-        }
-        const openMakeupSummary = document.getElementById('openMakeupChainSummary');
-        if (openMakeupSummary) {
-            const receiptChains = Array.isArray(PRIOR_RECONCILIATION_RECEIPT?.makeupChains)
-                ? PRIOR_RECONCILIATION_RECEIPT.makeupChains
-                : [];
-            const openChains = receiptChains.filter((chain) => chain?.state === 'open');
-            const openNodes = openChains.flatMap((chain) => Array.isArray(chain?.nodes) ? chain.nodes : [])
-                .filter((node) => Array.isArray(node?.openReasons) && node.openReasons.length > 0);
-            if (openChains.length > 0) {
-                openMakeupSummary.classList.remove('d-none');
-                openMakeupSummary.innerHTML = `<div class="d-flex gap-3 align-items-start">
-                    <i class="bi bi-diagram-3 fs-4" aria-hidden="true"></i>
-                    <div><div class="fw-bold">Open make-up reconciliation</div>
-                    <div class="small">${openChains.length} confirmed chain(s) with ${openNodes.length} open session or scheduling obligation(s) will be checked again in a later timesheet. Payable hours remain based on each session's configured status formula.</div></div>
-                </div>`;
-            } else {
-                openMakeupSummary.classList.add('d-none');
-                openMakeupSummary.innerHTML = '';
-            }
-        }
+        renderTimesheetGuidanceLauncher();
+
         renderDepartmentTotals();
 
         const btnSubmit = document.getElementById('btnSubmit');
@@ -3752,6 +3979,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (TIMESHEET_PRINT_MODE === 'management') {
                 params.set('periodId', PERIOD_ID);
                 params.set('personIds', TARGET_TEACHER_ID);
+                params.set('printSource', 'editor');
             }
             if (window.AppPrintManager?.appendSettingsToSearchParams) {
                 window.AppPrintManager.appendSettingsToSearchParams(params, printSettings || {});
@@ -4427,35 +4655,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function showIncompleteSessionWarningOnLoad() {
-        const rows = Array.isArray(INCOMPLETE_SESSIONS) ? INCOMPLETE_SESSIONS : [];
-        if (!rows.length) return;
-        const classCount = rows.filter((row) => String(row?.sessionType || 'class') === 'class').length;
-        const activityCount = rows.filter((row) => row?.sessionType === 'activity').length;
-        const breakdownParts = [];
-        if (classCount) breakdownParts.push(`<strong>${classCount}</strong> class`);
-        if (activityCount) breakdownParts.push(`<strong>${activityCount}</strong> activity work`);
-        const breakdownText = breakdownParts.length
-            ? ` (${breakdownParts.join(', ')} session${rows.length === 1 ? '' : 's'})`
-            : '';
-        const summaryHtml = `
-            <p class="mb-2">You have <strong>${rows.length}</strong> incomplete session(s) in this period${breakdownText}.</p>
-            <p class="mb-2">Finalize class session statuses and complete activity work sessions before submission.</p>
-            <p class="small text-muted mb-0">Use the collapsible <strong>Incomplete Sessions</strong> panel below for the full list.</p>`;
-        if (typeof showMessageModal === 'function') {
-            await showMessageModal({
-                title: 'Incomplete Sessions Detected',
-                icon: 'warning',
-                message: summaryHtml,
-                buttons: [{ text: 'OK', class: 'btn-warning' }]
-            });
+    async function initializeTimesheetLoadWarnings() {
+        await waitForTimesheetPageLoad();
+        await loadPriorAdjustmentsReview();
+        const priorModalEl = document.getElementById('priorAdjustmentModal');
+        const priorVisible = priorModalEl?.classList.contains('show');
+        if (!priorVisible) {
+            initializeTimesheetGuidance();
             return;
         }
-        await messageBox({
-            title: 'Incomplete Sessions Detected',
-            icon: 'warning',
-            message: `You have ${rows.length} incomplete session(s) in this period. Review the list below before submitting.`
-        });
+        priorModalEl.addEventListener('hidden.bs.modal', () => initializeTimesheetGuidance(), { once: true });
     }
 
     function normalizeIncompleteStatusCode(value) {
@@ -4577,12 +4786,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function initializeTimesheetLoadWarnings() {
-        await showIncompleteSessionWarningOnLoad();
-        await waitForTimesheetPageLoad();
-        await loadPriorAdjustmentsReview();
-    }
-
     const incompleteSessionsCollapse = document.getElementById('incompleteSessionsCollapse');
     const incompleteSessionsToggle = document.getElementById('incompleteSessionsToggle');
     if (incompleteSessionsCollapse && incompleteSessionsToggle) {
@@ -4596,6 +4799,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    bindTimesheetGuidanceControls();
     renderIncompleteSessionsPanel();
     renderTable();
     void initializeTimesheetLoadWarnings();

@@ -189,11 +189,21 @@ function applyClassSessionDisplayFields(row, entry) {
     if (deliveryDepartmentName) row.deliveryDepartmentName = deliveryDepartmentName;
     if (deliveryDepartmentCode) row.deliveryDepartmentCode = deliveryDepartmentCode;
     if (typeof entry?.isOneOnOne === 'boolean') row.isOneOnOne = entry.isOneOnOne === true;
+    const classMaxCapacity = Number(entry?.classMaxCapacity);
+    if (Number.isFinite(classMaxCapacity) && classMaxCapacity >= 0) row.classMaxCapacity = Math.round(classMaxCapacity);
     if (singleStudentId) row.singleStudentId = singleStudentId;
     if (singleStudentPersonId) row.singleStudentPersonId = singleStudentPersonId;
     if (singleStudentName) row.singleStudentName = singleStudentName;
     if (singleStudentAttendance) row.singleStudentAttendance = singleStudentAttendance;
     if (typeof entry?.makeUpRequired === 'boolean') row.makeUpRequired = entry.makeUpRequired === true;
+    const makeupDurationPercent = Number(entry?.makeupDurationPercent);
+    if (Number.isFinite(makeupDurationPercent) && makeupDurationPercent > 0) {
+        row.makeupDurationPercent = Math.round(makeupDurationPercent);
+    }
+    const allowedDurationHours = Number(entry?.allowedDurationHours);
+    if (Number.isFinite(allowedDurationHours) && allowedDurationHours >= 0) {
+        row.allowedDurationHours = Number(allowedDurationHours.toFixed(2));
+    }
     if (typeof entry?.showOptionalBadge === 'boolean') row.showOptionalBadge = entry.showOptionalBadge === true;
     return row;
 }

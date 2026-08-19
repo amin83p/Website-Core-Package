@@ -690,6 +690,12 @@ function buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId = null
     };
 }
 
+function isEditorTimesheetPrintRequest(req, personIds = []) {
+    return String(req.body?.printSource || '').trim().toLowerCase() === 'editor'
+        && Array.isArray(personIds)
+        && personIds.length === 1;
+}
+
 function parsePrintPersonIds(value) {
     const source = Array.isArray(value) ? value : [value];
     const flattened = source.flatMap((item) => {
@@ -767,11 +773,20 @@ function buildTrustedClassSessionDisplayFields(sessionRef = {}) {
         startTime: String(sessionRef?.startTime || ''),
         endTime: String(sessionRef?.endTime || ''),
         isOneOnOne: sessionRef?.isOneOnOne === true,
+        classMaxCapacity: Number.isFinite(Number(sessionRef?.classMaxCapacity))
+            ? Number(sessionRef.classMaxCapacity)
+            : 0,
         singleStudentId: String(sessionRef?.singleStudentId || ''),
         singleStudentPersonId: String(sessionRef?.singleStudentPersonId || ''),
         singleStudentName: String(sessionRef?.singleStudentName || ''),
         singleStudentAttendance: String(sessionRef?.singleStudentAttendance || ''),
         makeUpRequired: sessionRef?.makeUpRequired === true,
+        makeupDurationPercent: Number.isFinite(Number(sessionRef?.makeupDurationPercent))
+            ? Number(sessionRef.makeupDurationPercent)
+            : 0,
+        allowedDurationHours: Number.isFinite(Number(sessionRef?.allowedDurationHours))
+            ? Number(sessionRef.allowedDurationHours)
+            : 0,
         showOptionalBadge: sessionRef?.showOptionalBadge === true,
         isMakeupSession: sessionRef?.isMakeupSession === true,
         makeupOriginalSessionId: String(sessionRef?.makeupOriginalSessionId || ''),
@@ -1468,12 +1483,13 @@ exports.printManagedTimesheets = async (req, res) => {
         const eligibleById = new Map((Array.isArray(eligiblePeople) ? eligiblePeople : [])
             .map((row) => [String(row?.personId || row?.id || '').trim(), row])
             .filter(([id]) => Boolean(id)));
+        const allowDraftEditorPrint = isEditorTimesheetPrintRequest(req, personIds);
         const people = personIds.map((personId) => {
             const row = eligibleById.get(personId);
             if (!row) return null;
             const timesheet = timesheetByPersonId.get(personId) || null;
             const status = String(timesheet?.status || 'not_started').toLowerCase();
-            if (!['submitted', 'processed'].includes(status)) {
+            if (!allowDraftEditorPrint && !['submitted', 'processed'].includes(status)) {
                 throw new Error('Only submitted or processed timesheets can be printed.');
             }
             return { id: personId, name: String(row.name || row.displayName || personId) };

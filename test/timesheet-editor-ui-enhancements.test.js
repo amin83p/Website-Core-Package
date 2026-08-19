@@ -467,29 +467,23 @@ test('timesheet sessions are ordered chronologically within each day', () => {
   assert.match(editor, /const dayEntries = sortTimesheetEntriesBySchedule\([\s\S]*?activeEntries\.filter\(e => e\.date === dateStr\)/);
 });
 
-test('Hours by Department lists Optional Hours without double-counting totals', () => {
+test('Hours by Department splits group and one-on-one hours by capacity or single-student enrollment', () => {
   const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
 
-  assert.doesNotMatch(editor, />Optional Hours<\/th>/);
-  assert.match(editor, /Optional Hours show the scheduled duration of Optional sessions and do not affect payroll totals\./);
-  assert.match(editor, /colspan="4" class="text-center text-muted py-3">No department hours yet\./);
-  assert.match(editor, /const optionalRow = `<tr class="table-info-subtle">/);
-  assert.match(editor, /<span class="fw-semibold">Optional Hours<\/span>/);
-  assert.match(editor, /scheduled duration, informational only/);
-  assert.match(editor, /<\/tr>\$\{optionalRow\}`/);
-  assert.match(editor, /Total Optional Hours/);
+  assert.match(editor, />Group Hours</);
+  assert.match(editor, />One-on-One Hours</);
+  assert.match(editor, />One-on-One Optional</);
+  assert.match(editor, /max capacity of 1 or only one student is enrolled/);
+  assert.match(editor, /colspan="6" class="text-center text-muted py-3">No department hours yet\./);
+  assert.match(editor, /function resolveDepartmentOptionalHours\(entry\)/);
+  assert.match(editor, /showOptionalBadge !== true/);
+  assert.match(editor, /oneOnOneOptionalHours/);
   assert.match(editor, /function resolveOptionalReportingHours\(entry\)/);
-  assert.match(editor, /const displayEntry = resolveDisplayEntry\(entry\)/);
-  assert.match(editor, /const optionalHours = resolveOptionalReportingHours\(displayEntry\)/);
-  assert.match(editor, /optionalHours === 0/);
-  assert.match(editor, /optionalHours: 0/);
-  assert.match(editor, /current\.optionalHours = Number\(\(current\.optionalHours \+ optionalHours\)\.toFixed\(2\)\)/);
-  assert.match(editor, /const rowTotal = Number\(\(sessionHours \+ pendingHours\)\.toFixed\(2\)\)/);
-  assert.match(editor, /const grandTotal = Number\(\(totalSession \+ totalPending\)\.toFixed\(2\)\)/);
-  assert.doesNotMatch(editor, /sessionHours \+ optionalHours \+ pendingHours/);
+  assert.doesNotMatch(editor, /Total Optional Hours/);
+  assert.doesNotMatch(editor, /const optionalRow = `<tr class="table-info-subtle">/);
 
-  const helperStart = editor.indexOf('function resolveOptionalReportingHours(entry)');
-  const helperEnd = editor.indexOf('function renderDepartmentTotals()');
+  const helperStart = editor.indexOf('function resolveOptionalScheduledBaseHours(entry)');
+  const helperEnd = editor.indexOf('function isDepartmentOneOnOneEntry(entry)');
   assert.ok(helperStart >= 0 && helperEnd > helperStart);
   const helperSource = editor.slice(helperStart, helperEnd);
   const resolveOptionalHours = new Function(
@@ -505,6 +499,13 @@ test('Hours by Department lists Optional Hours without double-counting totals', 
   assert.equal(resolveOptionalHours({ showOptionalBadge: true, startTime: '09:00', endTime: '10:30', timesheetHours: 0 }), 1.5);
   assert.equal(resolveOptionalHours({ showOptionalBadge: true, timesheetHours: 0.75 }), 0.75);
   assert.equal(resolveOptionalHours({ showOptionalBadge: false, durationHours: 2 }), 0);
+  assert.equal(resolveOptionalHours({
+    showOptionalBadge: true,
+    durationHours: 3,
+    makeUpRequired: true,
+    makeupDurationPercent: 50,
+    allowedDurationHours: 1.5
+  }), 1.5);
 });
 
 test('timesheet Class and Description items expose badges, manager links, and operational tooltips', () => {
@@ -641,18 +642,26 @@ test('timesheet editor template compiles after interaction polish', () => {
   });
 });
 
-test('timesheet guidance uses a responsive notice hub with expandable review history', () => {
+test('timesheet guidance uses a stepped modal with header launcher', () => {
   const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
 
-  assert.match(editor, /class="ts-notice-hub" aria-label="Timesheet guidance and review information"/);
-  assert.match(editor, /\.ts-notice-grid \{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(260px, 1fr\)\);/);
-  assert.match(editor, /ts-notice-tile--revision/);
-  assert.match(editor, /ts-notice-tile--instructions/);
-  assert.match(editor, /ts-notice-tile--locked/);
-  assert.match(editor, /ts-notice-tile--history collapsed/);
-  assert.match(editor, /id="timesheetReviewHistoryCollapse" class="collapse ts-review-history-panel"/);
-  assert.match(editor, /@media \(max-width: 767\.98px\)[\s\S]*?\.ts-notice-grid \{\s*grid-template-columns: 1fr;/);
-  assert.doesNotMatch(editor, /<strong>Instructions:<\/strong>/);
+  assert.match(editor, /id="timesheetGuidanceModal"/);
+  assert.match(editor, /id="btnTimesheetGuidance"/);
+  assert.match(editor, /id="btnPrintTimesheet"/);
+  assert.match(editor, /btnPrintTimesheet[\s\S]*btnTimesheetGuidance|btnTimesheetGuidance[\s\S]*btnPrintTimesheet/);
+  assert.match(editor, /btn btn-filled btn-edit btn-md mb-2 ts-guidance-launcher/);
+  assert.match(editor, /id="timesheetGuidanceBadge"/);
+  assert.match(editor, /function buildTimesheetGuidanceSteps\(/);
+  assert.match(editor, /function buildGuidanceSessionSummaryTableHtml\(/);
+  assert.match(editor, /Incomplete Sessions<\/strong> panel on the page for the full list and links/);
+  assert.match(editor, /function initializeTimesheetGuidance\(/);
+  assert.match(editor, /function renderTimesheetGuidanceLauncher\(/);
+  assert.match(editor, /TIMESHEET_GUIDANCE_BOOT/);
+  assert.match(editor, /id="incompleteSessionsPanel"/);
+  assert.doesNotMatch(editor, /class="ts-notice-hub"/);
+  assert.doesNotMatch(editor, /id="provisionalSessionsSummary"/);
+  assert.doesNotMatch(editor, /showIncompleteSessionWarningOnLoad/);
+  assert.match(editor, /initializeTimesheetGuidance\(\)/);
 });
 
 test('timesheet editor and controller expose makeup session status metadata', () => {

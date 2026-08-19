@@ -2,6 +2,7 @@
 
 const schoolDataService = require('./schoolDataService');
 const timesheetEffectiveEntryService = require('./timesheetEffectiveEntryService');
+const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const coreDataService = requireCoreModule('MVC/services/dataService');
 
@@ -19,11 +20,14 @@ const LEGACY_DISPLAY_FIELDS = Object.freeze([
   'departmentName',
   'departmentCode',
   'isOneOnOne',
+  'classMaxCapacity',
   'singleStudentId',
   'singleStudentPersonId',
   'singleStudentName',
   'singleStudentAttendance',
   'makeUpRequired',
+  'makeupDurationPercent',
+  'allowedDurationHours',
   'showOptionalBadge',
   'room',
   'personRole',
@@ -116,14 +120,28 @@ function resolvePayableHours(entry = {}) {
   return roundHours(entry.durationHours ?? entry.hours ?? 0);
 }
 
-function resolveOptionalHours(entry = {}) {
-  if (entry.showOptionalBadge !== true) return 0;
+function resolveOptionalScheduledBaseHours(entry = {}) {
   const duration = numberOrZero(entry.durationHours);
-  if (duration > 0) return roundHours(duration);
+  if (duration > 0) return duration;
   const scheduled = calculateHoursFromRange(entry.startTime, entry.endTime);
   if (scheduled > 0) return scheduled;
   const payable = resolvePayableHours(entry);
   return payable > 0 ? payable : 0;
+}
+
+function resolveOptionalHours(entry = {}) {
+  if (entry.showOptionalBadge !== true) return 0;
+  const baseHours = resolveOptionalScheduledBaseHours(entry);
+  if (baseHours <= 0) return 0;
+  if (entry.makeUpRequired === true) {
+    const allowed = numberOrZero(entry.allowedDurationHours);
+    if (allowed > 0) return roundHours(allowed);
+    return roundHours(sessionStatusPolicyService.calculateMakeupSessionDurationHours(
+      baseHours,
+      entry.makeupDurationPercent ?? 100
+    ));
+  }
+  return roundHours(baseHours);
 }
 
 function fillLegacyDisplayMetadata(snapshotEntry = {}, liveEntry = {}) {
@@ -313,29 +331,84 @@ function shapePrintEntry(entry = {}, lookups = {}) {
   };
 }
 
-function buildDepartmentTotals(entries = []) {
+function resolveClassMaxCapacity(classRow = {}) {
+  const raw = classRow?.enrollment?.maxCapacity ?? classRow?.maxCapacity ?? 0;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isDepartmentOneOnOneEntry(entry = {}, classRow = {}) {
+  if (entry?.isSchoolActivity === true || entry?.isActivity === true || cleanText(entry?.activityId)) return false;
+  const sessionId = cleanText(entry?.sessionId).toLowerCase();
+  if (sessionId.startsWith('act-')) return false;
+  const capacity = Number(entry?.classMaxCapacity ?? resolveClassMaxCapacity(classRow));
+  if (capacity === 1) return true;
+  return entry.isOneOnOne === true;
+}
+
+function isDepartmentOptionalClassEntry(entry = {}, classRow = {}) {
+  if (!isDepartmentOneOnOneEntry(entry, classRow)) return false;
+  return entry.showOptionalBadge === true;
+}
+
+function resolveDepartmentOptionalHours(entry = {}, classRow = {}) {
+  if (!isDepartmentOptionalClassEntry(entry, classRow)) return 0;
+  return resolveOptionalHours(entry);
+}
+
+function buildDepartmentTotals(entries = [], lookups = {}) {
   const buckets = new Map();
   entries.forEach((entry) => {
     const pendingHours = cleanText(entry.approvalStatus).toLowerCase() === 'pending_approval'
       ? entry.requestedHours
       : 0;
-    if (entry.payableHours === 0 && pendingHours === 0 && entry.optionalHours === 0) return;
+    const payableHours = entry.payableHours || 0;
+    const classRow = lookups.classMap?.get(cleanText(entry.classId)) || {};
+    const departmentOptionalHours = resolveDepartmentOptionalHours(entry, classRow);
+    if (payableHours === 0 && pendingHours === 0 && departmentOptionalHours === 0) return;
     const key = entry.department?.name || 'No Department';
-    const bucket = buckets.get(key) || { departmentName: key, payableHours: 0, pendingHours: 0, optionalHours: 0 };
-    bucket.payableHours = roundHours(bucket.payableHours + entry.payableHours);
-    bucket.pendingHours = roundHours(bucket.pendingHours + pendingHours);
-    bucket.optionalHours = roundHours(bucket.optionalHours + entry.optionalHours);
+    const isOneOnOne = isDepartmentOneOnOneEntry(entry, classRow);
+    const bucket = buckets.get(key) || {
+      departmentName: key,
+      groupHours: 0,
+      oneOnOneHours: 0,
+      oneOnOneOptionalHours: 0,
+      groupPendingHours: 0,
+      oneOnOnePendingHours: 0
+    };
+    if (isOneOnOne) {
+      bucket.oneOnOneHours = roundHours(bucket.oneOnOneHours + payableHours);
+      bucket.oneOnOnePendingHours = roundHours(bucket.oneOnOnePendingHours + pendingHours);
+    } else {
+      bucket.groupHours = roundHours(bucket.groupHours + payableHours);
+      bucket.groupPendingHours = roundHours(bucket.groupPendingHours + pendingHours);
+    }
+    if (departmentOptionalHours > 0) {
+      bucket.oneOnOneOptionalHours = roundHours(bucket.oneOnOneOptionalHours + departmentOptionalHours);
+    }
     buckets.set(key, bucket);
   });
   const rows = [...buckets.values()]
-    .map((row) => ({ ...row, totalHours: roundHours(row.payableHours + row.pendingHours) }))
+    .map((row) => ({
+      ...row,
+      totalHours: roundHours(row.groupHours + row.oneOnOneHours + row.groupPendingHours + row.oneOnOnePendingHours)
+    }))
     .sort((a, b) => a.departmentName.localeCompare(b.departmentName));
   const totals = rows.reduce((sum, row) => ({
-    payableHours: roundHours(sum.payableHours + row.payableHours),
-    pendingHours: roundHours(sum.pendingHours + row.pendingHours),
-    optionalHours: roundHours(sum.optionalHours + row.optionalHours),
+    groupHours: roundHours(sum.groupHours + row.groupHours),
+    oneOnOneHours: roundHours(sum.oneOnOneHours + row.oneOnOneHours),
+    oneOnOneOptionalHours: roundHours(sum.oneOnOneOptionalHours + row.oneOnOneOptionalHours),
+    groupPendingHours: roundHours(sum.groupPendingHours + row.groupPendingHours),
+    oneOnOnePendingHours: roundHours(sum.oneOnOnePendingHours + row.oneOnOnePendingHours),
     totalHours: roundHours(sum.totalHours + row.totalHours)
-  }), { payableHours: 0, pendingHours: 0, optionalHours: 0, totalHours: 0 });
+  }), {
+    groupHours: 0,
+    oneOnOneHours: 0,
+    oneOnOneOptionalHours: 0,
+    groupPendingHours: 0,
+    oneOnOnePendingHours: 0,
+    totalHours: 0
+  });
   return { rows, totals };
 }
 
@@ -371,7 +444,7 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
     entries: entriesByDate.get(date) || []
   }));
   const timesheet = effective.timesheet || {};
-  const departmentTotals = buildDepartmentTotals(entries);
+  const departmentTotals = buildDepartmentTotals(entries, lookups);
   const reconciliationEntries = entries.filter((entry) => entry.reconciliationRequired === true);
   const provisionalEntries = reconciliationEntries.filter((entry) => entry.isProvisional === true);
   const makeupChains = Array.isArray(timesheet?.priorPeriodReconciliation?.makeupChains)
@@ -496,7 +569,11 @@ module.exports = {
   calculateHoursFromRange,
   fillLegacyDisplayMetadata,
   formatDateKey,
+  isDepartmentOneOnOneEntry,
+  isDepartmentOptionalClassEntry,
   resolveAuthoritativeEntries,
+  resolveClassMaxCapacity,
+  resolveDepartmentOptionalHours,
   resolveOptionalHours,
   resolveOrganizationNameFromContext,
   resolvePayableHours,
