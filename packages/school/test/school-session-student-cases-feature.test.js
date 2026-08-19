@@ -44,7 +44,9 @@ test('session manager renders student cases tab, modal, and avoids attendance du
   assert.match(src, /data-session-panel="student-cases"/);
   assert.match(src, /id="session-panel-student-cases"/);
   assert.match(src, /id="studentCaseModal"/);
-  assert.match(src, /btn-open-student-case/);
+  assert.match(src, /id="btnOpenStudentCaseWizard"/);
+  assert.match(src, /id="btnStudentCaseNext"/);
+  assert.match(src, /id="btnSaveStudentCaseSessionWide"/);
   assert.match(src, /id="btnResolveStudentCase"/);
   assert.match(src, /saveStudentCase\(\{ resolve: true \}\)/);
   assert.match(src, /payload\.status = 'resolved'/);
@@ -298,7 +300,7 @@ test('session student case save accepts enrolled students missing from persisted
     });
     assert.equal(fromGradebook.studentPersonId, 'STU-4');
 
-    // Empty person id is still rejected.
+    // Empty person id is rejected for student-specific categories.
     await assert.rejects(
       () => sessionStudentCaseService.saveCase({
         classId: 'CLS-1',
@@ -306,8 +308,17 @@ test('session student case save accepts enrolled students missing from persisted
         input: { studentPersonId: '', category: 'learning', details: 'Missing student' },
         reqUser: user
       }),
-      /Selected student is not on this session roster/
+      /Select at least one student for this case category/
     );
+
+    const sessionWide = await sessionStudentCaseService.saveCase({
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      input: { studentPersonId: '', category: 'technology', details: 'Projector would not connect.' },
+      reqUser: user
+    });
+    assert.equal(sessionWide.studentPersonId, '');
+    assert.match(sessionWide.summary, /Technology:/);
   } finally {
     schoolDataService.getDataById = originals.getDataById;
     schoolDataService.getClassSessions = originals.getClassSessions;
@@ -316,5 +327,19 @@ test('session student case save accepts enrolled students missing from persisted
     schoolRepositories.sessionStudentCases.create = originals.create;
     taskService.upsertSourceTask = originals.upsertSourceTask;
   }
+});
+
+test('session student case presets mark session-wide categories as student-optional', () => {
+  const presetService = require('../MVC/services/school/sessionStudentCasePresetService');
+  assert.equal(presetService.categoryRequiresStudent('learning'), true);
+  assert.equal(presetService.categoryRequiresStudent('behavior'), true);
+  assert.equal(presetService.categoryRequiresStudent('technology'), false);
+  assert.equal(presetService.categoryRequiresStudent('lesson_delivery'), false);
+  assert.deepEqual(presetService.getPresetConfig().studentOptionalCategories, [
+    'technology',
+    'resources',
+    'lesson_delivery',
+    'other'
+  ]);
 });
 

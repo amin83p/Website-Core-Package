@@ -36,12 +36,19 @@ test('class routes expose session student case endpoints under SCHOOL_SESSIONS',
   assert.match(controller, /sessionStudentCaseService\.deleteCase/);
 });
 
-test('session manager renders student cases tab, modal, and avoids attendance duplicate fields', () => {
+test('session manager renders student cases tab, modal wizard, and avoids attendance duplicate fields', () => {
   const src = read('packages/school/MVC/views/school/class/sessionManager.ejs');
   assert.match(src, /data-session-panel="student-cases"/);
   assert.match(src, /id="session-panel-student-cases"/);
   assert.match(src, /id="studentCaseModal"/);
-  assert.match(src, /btn-open-student-case/);
+  assert.match(src, /id="btnOpenStudentCaseWizard"/);
+  assert.match(src, /id="studentCaseStepStudents"/);
+  assert.match(src, /id="studentCaseStepDetails"/);
+  assert.match(src, /id="btnStudentCaseNext"/);
+  assert.match(src, /id="btnSaveStudentCaseSessionWide"/);
+  assert.match(src, /advanceStudentCaseWizard/);
+  assert.doesNotMatch(src, /btn-open-student-case/);
+  assert.match(src, /canManageClassConductFlag/);
   assert.match(src, /id="btnResolveStudentCase"/);
   assert.match(src, /saveStudentCase\(\{ resolve: true \}\)/);
   assert.match(src, /payload\.status = 'resolved'/);
@@ -295,7 +302,7 @@ test('session student case save accepts enrolled students missing from persisted
     });
     assert.equal(fromGradebook.studentPersonId, 'STU-4');
 
-    // Empty person id is still rejected.
+    // Empty person id is rejected for student-specific categories.
     await assert.rejects(
       () => sessionStudentCaseService.saveCase({
         classId: 'CLS-1',
@@ -303,8 +310,17 @@ test('session student case save accepts enrolled students missing from persisted
         input: { studentPersonId: '', category: 'learning', details: 'Missing student' },
         reqUser: user
       }),
-      /Selected student is not on this session roster/
+      /Select at least one student for this case category/
     );
+
+    const sessionWide = await sessionStudentCaseService.saveCase({
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      input: { studentPersonId: '', category: 'technology', details: 'Projector would not connect.' },
+      reqUser: user
+    });
+    assert.equal(sessionWide.studentPersonId, '');
+    assert.match(sessionWide.summary, /Technology:/);
   } finally {
     schoolDataService.getDataById = originals.getDataById;
     schoolDataService.getClassSessions = originals.getClassSessions;
@@ -313,4 +329,110 @@ test('session student case save accepts enrolled students missing from persisted
     schoolRepositories.sessionStudentCases.create = originals.create;
     taskService.upsertSourceTask = originals.upsertSourceTask;
   }
+});
+
+test('saveCasesBulk creates one case per selected student with shared details', async () => {
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    create: schoolRepositories.sessionStudentCases.create,
+    getById: schoolRepositories.sessionStudentCases.getById,
+    upsertSourceTask: taskService.upsertSourceTask
+  };
+  const user = { id: 'USR-1', personId: 'TCH-1', activeOrgId: '900000', username: 'teacher' };
+  const created = [];
+  try {
+    schoolDataService.getDataById = async (entityType) => {
+      if (entityType === 'classes') {
+        return {
+          id: 'CLS-1',
+          orgId: '900000',
+          title: 'Class A',
+          instructors: [{ personId: 'TCH-1', name: 'Teacher One' }]
+        };
+      }
+      return null;
+    };
+    schoolDataService.getClassSessions = async () => ([{
+      sessionId: 'SES-1',
+      date: '2026-06-23',
+      roster: [
+        { personId: 'STU-1', name: 'Alice' },
+        { personId: 'STU-2', name: 'Bob' }
+      ]
+    }]);
+    schoolRepositories.sessionStudentCases.create = async (payload) => {
+      const row = { id: `SSC-${created.length + 1}`, ...payload };
+      created.push(row);
+      return row;
+    };
+    schoolRepositories.sessionStudentCases.getById = async () => null;
+    taskService.upsertSourceTask = async (payload) => ({ id: `TSK-${created.length}`, ...payload });
+
+    const result = await sessionStudentCaseService.saveCasesBulk({
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      input: {
+        studentPersonIds: ['STU-1', 'STU-2'],
+        category: 'engagement',
+        details: 'Shared distraction issue.'
+      },
+      reqUser: user
+    });
+
+    assert.equal(result.createdCount, 2);
+    assert.equal(created.length, 2);
+    assert.deepEqual(created.map((row) => row.studentPersonId).sort(), ['STU-1', 'STU-2']);
+    assert.ok(created.every((row) => row.details === 'Shared distraction issue.'));
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolRepositories.sessionStudentCases.create = originals.create;
+    schoolRepositories.sessionStudentCases.getById = originals.getById;
+    taskService.upsertSourceTask = originals.upsertSourceTask;
+  }
+});
+
+test('saveCasesBulk rejects students not on session roster', async () => {
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions
+  };
+  const user = { id: 'USR-1', personId: 'TCH-1', activeOrgId: '900000' };
+  try {
+    schoolDataService.getDataById = async () => ({
+      id: 'CLS-1',
+      orgId: '900000',
+      title: 'Class A'
+    });
+    schoolDataService.getClassSessions = async () => ([{
+      sessionId: 'SES-1',
+      date: '2026-06-23',
+      roster: [{ personId: 'STU-1', name: 'Alice' }]
+    }]);
+    await assert.rejects(
+      () => sessionStudentCaseService.saveCasesBulk({
+        classId: 'CLS-1',
+        sessionId: 'SES-1',
+        input: {
+          studentPersonIds: ['STU-1', 'STU-9'],
+          category: 'learning',
+          details: 'Issue'
+        },
+        reqUser: user
+      }),
+      /not on this session roster/
+    );
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+  }
+});
+
+test('session manager gates class conduct UI to class administrators', () => {
+  const src = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(src, /canManageClassConductFlag/);
+  assert.match(src, /sessionCanManageClassConduct/);
+  assert.match(src, /sessionReportConductAdminPendingAlert/);
+  assert.match(src, /Only class administrators can manage class conduct/);
 });

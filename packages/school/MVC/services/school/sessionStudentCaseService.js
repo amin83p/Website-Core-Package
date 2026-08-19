@@ -3,7 +3,7 @@ const schoolDataService = require('./schoolDataService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
-const { deriveCaseSummary } = require('./sessionStudentCasePresetService');
+const { deriveCaseSummary, categoryRequiresStudent } = require('./sessionStudentCasePresetService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -299,15 +299,19 @@ function buildLifecycleEvent({ action, reqUser, oldStatus = '', newStatus = '', 
 }
 
 function caseTaskPayload(row = {}) {
-  const studentName = cleanString(row.studentName || row.studentPersonId || 'Student', 180);
+  const studentPersonId = cleanString(row.studentPersonId || '', 120);
+  const studentName = cleanString(row.studentName || row.studentPersonId || '', 180);
   const classTitle = cleanString(row.classTitle || row.classId || 'Class', 220);
   const summary = cleanString(row.summary || 'Student session case', 260);
+  const caseLabel = studentPersonId
+    ? (studentName || studentPersonId)
+    : 'Session-wide';
   return {
     orgId: row.orgId,
     sourceType: 'student_session_case',
     sourceId: row.id,
     sourceUrl: `/school/classes/${encodeURIComponent(row.classId)}/sessions/${encodeURIComponent(row.sessionId)}?caseId=${encodeURIComponent(row.id)}`,
-    title: `Student case: ${studentName}`,
+    title: studentPersonId ? `Student case: ${caseLabel}` : `Session case: ${summary}`,
     message: `${summary}\n\nClass: ${classTitle}\nSession: ${row.sessionDate || row.sessionId}`,
     severity: row.severity === 'urgent' ? 'urgent' : (row.severity === 'warning' ? 'warning' : 'info'),
     metadata: {
@@ -371,17 +375,23 @@ async function listSessionCaseSummaries({ sessionRefs = [], reqUser }) {
 
 async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }) {
   const { classData, session } = await getClassAndSession({ classId, sessionId, reqUser });
-  const studentPersonId = toPublicId(input.studentPersonId || input.personId || '');
-  const rosterRow = await assertStudentOnSessionRoster({
-    classData,
-    session,
-    studentPersonId,
-    reqUser
-  });
-
   const existing = caseId
     ? await schoolRepositories.sessionStudentCases.getById(caseId, normalizeScope(reqUser))
     : null;
+  const category = cleanString(input.category || existing?.category || 'other', 80).toLowerCase() || 'other';
+  const studentPersonId = toPublicId(input.studentPersonId || input.personId || existing?.studentPersonId || '');
+  if (categoryRequiresStudent(category) && !studentPersonId) {
+    throw new Error('Select at least one student for this case category.');
+  }
+  const rosterRow = studentPersonId
+    ? await assertStudentOnSessionRoster({
+      classData,
+      session,
+      studentPersonId,
+      reqUser
+    })
+    : {};
+
   if (existing && (!idsEqual(existing.classId, classId) || !idsEqual(existing.sessionId, sessionId))) {
     throw new Error('Student case does not belong to this session.');
   }
@@ -403,7 +413,6 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
     note: input.details || input.summary || ''
   }), reqUser);
 
-  const category = cleanString(input.category || existing?.category || 'other', 80).toLowerCase() || 'other';
   const details = cleanString(input.details || existing?.details || '', 5000);
   const summary = cleanString(input.summary || existing?.summary || deriveCaseSummary(category, details), 260);
 
@@ -421,7 +430,7 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
     sessionStartTime: cleanString(session.startTime || '', 5),
     sessionEndTime: cleanString(session.endTime || '', 5),
     studentPersonId,
-    studentName: await resolveStudentName(rosterRow, studentPersonId),
+    studentName: studentPersonId ? await resolveStudentName(rosterRow, studentPersonId) : '',
     teacherPersonId: toPublicId(session?.delivery?.deliveredBy || classData?.instructors?.[0]?.personId || getActorPersonId(reqUser)),
     teacherName: cleanString(session?.delivery?.deliveredByName || classData?.instructors?.[0]?.name || await resolveActorName(reqUser), 180),
     status,
@@ -493,6 +502,68 @@ async function updateStatus({ classId, sessionId, caseId, status, note = '', req
   return saved;
 }
 
+async function saveCasesBulk({ classId, sessionId, input = {}, reqUser }) {
+  const studentPersonIds = [...new Set(
+    (Array.isArray(input?.studentPersonIds) ? input.studentPersonIds : [])
+      .map((id) => toPublicId(id))
+      .filter(Boolean)
+  )];
+  const category = cleanString(input?.category || 'other', 80).toLowerCase() || 'other';
+  if (!studentPersonIds.length) {
+    if (categoryRequiresStudent(category)) {
+      throw new Error('Select at least one student for this case category.');
+    }
+    const saved = await saveCase({
+      classId,
+      sessionId,
+      caseId: '',
+      input: {
+        ...input,
+        studentPersonId: '',
+        personId: ''
+      },
+      reqUser
+    });
+    return {
+      cases: [saved],
+      createdCount: 1
+    };
+  }
+
+  const { session } = await getClassAndSession({ classId, sessionId, reqUser });
+  const rosterPersonIds = new Set(
+    (Array.isArray(session?.roster) ? session.roster : [])
+      .map((row) => toPublicId(row?.personId))
+      .filter(Boolean)
+  );
+  const invalidIds = studentPersonIds.filter((studentPersonId) => !rosterPersonIds.has(toPublicId(studentPersonId)));
+  if (invalidIds.length) {
+    throw new Error('One or more selected students are not on this session roster.');
+  }
+
+  const cases = [];
+  for (const studentPersonId of studentPersonIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const saved = await saveCase({
+      classId,
+      sessionId,
+      caseId: '',
+      input: {
+        ...input,
+        studentPersonId,
+        personId: studentPersonId
+      },
+      reqUser
+    });
+    cases.push(saved);
+  }
+
+  return {
+    cases,
+    createdCount: cases.length
+  };
+}
+
 async function deleteCase({ classId, sessionId, caseId, reqUser }) {
   const existing = await schoolRepositories.sessionStudentCases.getById(caseId, normalizeScope(reqUser));
   if (!existing) {
@@ -526,6 +597,7 @@ module.exports = {
   getSessionCaseSummaryKey,
   summarizeSessionCases,
   saveCase,
+  saveCasesBulk,
   updateStatus,
   deleteCase,
   _private: {

@@ -1071,6 +1071,95 @@
     .session-report-roster-alert .orphan-delete-btn {
         white-space: nowrap;
     }
+    .student-case-cta-zone {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #e2e8f0;
+        background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+    }
+    .student-case-open-btn {
+        font-size: 1.05rem;
+        font-weight: 700;
+        padding: 0.9rem 1.5rem;
+        box-shadow: 0 0.35rem 1rem rgba(234, 88, 12, 0.18);
+    }
+    .student-case-student-picker {
+        max-height: min(48vh, 420px);
+        overflow-y: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.65rem;
+        padding: 0.85rem;
+        background: #f8fafc;
+    }
+    .student-case-student-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 0.65rem;
+    }
+    .student-case-student-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        margin: 0;
+        padding: 0.85rem 0.9rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 0.75rem;
+        background: #fff;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .student-case-student-card:hover {
+        border-color: #93c5fd;
+        box-shadow: 0 0.15rem 0.45rem rgba(37, 99, 235, 0.08);
+    }
+    .student-case-student-card:has(.student-case-student-checkbox:checked) {
+        border-color: #2563eb;
+        background: #eff6ff;
+        box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.12);
+    }
+    .student-case-student-card .form-check-input {
+        margin-top: 0.35rem;
+        flex-shrink: 0;
+    }
+    .student-case-student-card-body {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        min-width: 0;
+    }
+    .student-case-student-initial {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.35rem;
+        height: 2.35rem;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 0.82rem;
+        font-weight: 800;
+        flex-shrink: 0;
+    }
+    .student-case-student-name {
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.25;
+        word-break: break-word;
+    }
+    .student-case-pending-summary {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        background: #fff;
+    }
+    .student-case-student-option {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.45rem 0.35rem;
+        border-bottom: 1px solid #edf2f7;
+    }
+    .student-case-student-option:last-child {
+        border-bottom: 0;
+    }
     .session-report-step-nav {
         display: flex;
         justify-content: flex-start;
@@ -1397,6 +1486,8 @@
         const smTeacherLabel = String(session.delivery?.deliveredByName || session.delivery?.deliveredBy || '').trim();
         const smCurrentStatusLabel = String(currentSessionStatusMeta?.label || currentSessionStatus || 'Scheduled').trim();
         const canEditSessionMetadataFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true;
+        const canManageClassConductFlag = (typeof canManageClassConduct !== 'undefined' && canManageClassConduct === true)
+            || canEditSessionMetadataFlag;
         const canViewSchoolSettingsFlag = typeof canViewSchoolSettings !== 'undefined' && canViewSchoolSettings === true;
         const isTimesheetSessionLock = typeof isSessionLocked !== 'undefined' && isSessionLocked && String(session.lockReason || '') === 'timesheet_approved';
         const canToggleSessionLock = canEditSessionMetadataFlag && !isTimesheetSessionLock;
@@ -1845,9 +1936,11 @@
                 <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true">
                     <i class="bi bi-people-fill fs-5"></i><span class="session-manager-nav-label">Attendance</span>
                 </button>
+                <% if (canManageClassConductFlag) { %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-emoji-smile fs-5"></i><span class="session-manager-nav-label">Class Conduct</span>
                 </button>
+                <% } %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-journal-text fs-5"></i><span class="session-manager-nav-label">Session &amp; notes</span>
                     <% const hasSessionNotes = String(session.notes || '').trim().length > 0; %>
@@ -1993,11 +2086,6 @@
                                                             <% } %>
                                                         </div>
                                                         <% const hasDetails = student.lateMinutes || student.earlyLeaveMinutes || student.excuseRef || student.excuseAttachment || (student.comments && student.comments.length > 0); %>
-                                                        <% if (!isReadOnly) { %>
-                                                        <button type="button" class="btn btn-sm btn-outline-primary btn-open-student-case" title="Open student case" data-person-id="<%= student.personId %>" data-student-name="<%= student.name.replace(/'/g, "\\'") %>">
-                                                            <i class="bi bi-folder-plus"></i>
-                                                        </button>
-                                                        <% } %>
                                                         <button type="button"
                                                                 class="btn btn-sm btn-details <%= hasDetails ? 'btn-warning text-dark' : 'btn-outline-secondary' %>"
                                                                 title="Notes / Excuses / Mentions"
@@ -2024,6 +2112,7 @@
                 </div>
             </div>
 
+            <% if (canManageClassConductFlag) { %>
             <div class="session-panel" id="session-panel-conduct" role="tabpanel">
                 <div class="card border-0 shadow-sm mb-3" id="sessionOptionalConductStep">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -2087,6 +2176,7 @@
                     </div>
                 </div>
             </div>
+            <% } %>
 
             <div class="session-panel" id="session-panel-session" role="tabpanel">
                 <div class="card border-0 shadow-sm">
@@ -2297,11 +2387,11 @@
                     <div class="card-body py-3">
                         <div class="session-report-workflow-header-row">
                             <div class="session-report-workflow-progress" id="sessionReportWorkflowProgress" aria-label="Report workflow progress">
-                                <% if (sessionHasConductRequiredReportsResolved) { %>
+                                <% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %>
                                 <span class="session-report-workflow-step" id="sessionReportWorkflowStep1Label" data-workflow-step="1"><i class="bi bi-1-circle"></i>Class Conduct</span>
                                 <span class="session-report-workflow-divider" aria-hidden="true">→</span>
                                 <% } %>
-                                <span class="session-report-workflow-step" id="sessionReportWorkflowStep2Label" data-workflow-step="2"><i class="bi bi-<%= sessionHasConductRequiredReportsResolved ? '2-circle' : 'clipboard-check' %>"></i>Report instances</span>
+                                <span class="session-report-workflow-step" id="sessionReportWorkflowStep2Label" data-workflow-step="2"><i class="bi bi-<%= sessionHasConductRequiredReportsResolved && canManageClassConductFlag ? '2-circle' : 'clipboard-check' %>"></i>Report instances</span>
                             </div>
                             <div class="session-report-workflow-actions">
                                 <% if (canAssignSessionReports) { %>
@@ -2312,7 +2402,7 @@
                         </div>
                     </div>
                 </div>
-                <% if (sessionHasConductRequiredReportsResolved) { %>
+                <% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %>
                 <div class="d-none" id="sessionReportConductDataHost">
                     <table class="table table-hover align-middle mb-0" id="conductTable">
                         <thead class="table-light">
@@ -2385,13 +2475,14 @@
                 <div class="card border-0 shadow-sm" id="sessionReportInstancesStep">
                     <div class="card-body py-4">
                         <% if (hasSessionReportsAssigned) { %>
-                            <div class="conduct-rating-help">Fill reports for this session using the student matrix. Open individual reports from the list below when needed.<% if (sessionHasConductRequiredReportsResolved) { %> Use <strong>Back to Class Conduct</strong> above or below the report instances list to edit class conduct ratings.<% } %></div>
+                            <div id="sessionReportConductAdminPendingAlert" class="alert alert-info<%= (sessionHasConductRequiredReportsResolved && !canManageClassConductFlag && !conductReadyForReports) ? '' : ' d-none' %>">Class conduct must be completed by a class administrator before reports can be filled.</div>
+                            <div class="conduct-rating-help">Fill reports for this session using the student matrix. Open individual reports from the list below when needed.<% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %> Use <strong>Back to Class Conduct</strong> above or below the report instances list to edit class conduct ratings.<% } %></div>
                             <div id="sessionReportInstancesStatusSummary" class="small text-muted mt-2"></div>
                             <div id="sessionReportRosterReconciliationHost" class="mt-2"></div>
                             <div class="session-report-step-cta-zone" id="sessionReportFillReportsZone">
                                 <div class="session-report-step-actions" id="sessionReportFillReportsActions"></div>
                             </div>
-                            <% if (sessionHasConductRequiredReportsResolved) { %>
+                            <% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %>
                             <div class="session-report-step-nav session-report-step-nav-top">
                                 <button type="button" class="btn btn-primary d-none js-report-workflow-back-to-conduct" id="btnReportWorkflowPrevious"><i class="bi bi-arrow-left me-1"></i>Back to Class Conduct</button>
                             </div>
@@ -2418,7 +2509,7 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    <% if (sessionHasConductRequiredReportsResolved) { %>
+                                    <% if (sessionHasConductRequiredReportsResolved && canManageClassConductFlag) { %>
                                     <div class="session-report-step-nav session-report-step-nav-bottom">
                                         <button type="button" class="btn btn-primary d-none js-report-workflow-back-to-conduct" id="btnReportWorkflowPreviousAfter"><i class="bi bi-arrow-left me-1"></i>Back to Class Conduct</button>
                                     </div>
@@ -2442,10 +2533,18 @@
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-folder-check me-2"></i>Student Cases</h5>
-                            <div class="small text-muted mt-1">Open a case only when a student needs extra reflection, support, or office follow-up. Attendance details stay in the attendance panel.</div>
+                            <div class="small text-muted mt-1">Open a case when one or more students need extra reflection, support, or office follow-up. Attendance details stay in the attendance panel.</div>
                         </div>
                         <span class="badge bg-light text-dark border" id="studentCasesCountBadge">0 Cases</span>
                     </div>
+                    <% if (!isReadOnly) { %>
+                    <div class="student-case-cta-zone">
+                        <button type="button" class="btn btn-warning student-case-open-btn w-100" id="btnOpenStudentCaseWizard">
+                            <i class="bi bi-folder-plus me-2"></i>Open Student Case
+                        </button>
+                        <div class="small text-muted text-center mt-2">Report the same issue for one or more students on this session roster.</div>
+                    </div>
+                    <% } %>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
@@ -2715,43 +2814,69 @@
             <div class="modal-body">
                 <input type="hidden" id="studentCaseId">
                 <input type="hidden" id="studentCasePersonId">
-                <div class="alert alert-light border small mb-3" id="studentCaseContext"></div>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold" for="studentCaseCategory">Category</label>
-                        <select class="form-select" id="studentCaseCategory">
-                            <option value="learning">Learning</option>
-                            <option value="technology">Technology</option>
-                            <option value="engagement">Engagement</option>
-                            <option value="behavior">Behavior</option>
-                            <option value="support">Additional Support</option>
-                            <option value="resources">Resources</option>
-                            <option value="lesson_delivery">Lesson Delivery</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="col-md-8">
-                        <div class="form-label fw-bold">Severity</div>
-                        <div class="student-case-severity-group" role="group" aria-label="Case severity">
-                            <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityInfo" value="info" checked>
-                            <label class="btn btn-sm btn-outline-primary student-case-severity-label student-case-severity-label--info" for="studentCaseSeverityInfo">Info</label>
-                            <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityWarning" value="warning">
-                            <label class="btn btn-sm btn-outline-warning student-case-severity-label student-case-severity-label--warning" for="studentCaseSeverityWarning">Warning</label>
-                            <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityUrgent" value="urgent">
-                            <label class="btn btn-sm btn-outline-danger student-case-severity-label student-case-severity-label--urgent" for="studentCaseSeverityUrgent">Urgent</label>
+                <div id="studentCaseStepDetails">
+                    <div class="alert alert-light border small mb-3" id="studentCaseContext"></div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold" for="studentCaseCategory">Category</label>
+                            <select class="form-select" id="studentCaseCategory">
+                                <option value="learning">Learning</option>
+                                <option value="technology">Technology</option>
+                                <option value="engagement">Engagement</option>
+                                <option value="behavior">Behavior</option>
+                                <option value="support">Additional Support</option>
+                                <option value="resources">Resources</option>
+                                <option value="lesson_delivery">Lesson Delivery</option>
+                                <option value="other">Other</option>
+                            </select>
                         </div>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label>
-                        <div id="studentCaseDetailPresetsWrap">
-                            <div id="studentCaseDetailPresets" class="student-case-detail-presets"></div>
+                        <div class="col-md-8">
+                            <div class="form-label fw-bold">Severity</div>
+                            <div class="student-case-severity-group" role="group" aria-label="Case severity">
+                                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityInfo" value="info" checked>
+                                <label class="btn btn-sm btn-outline-primary student-case-severity-label student-case-severity-label--info" for="studentCaseSeverityInfo">Info</label>
+                                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityWarning" value="warning">
+                                <label class="btn btn-sm btn-outline-warning student-case-severity-label student-case-severity-label--warning" for="studentCaseSeverityWarning">Warning</label>
+                                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityUrgent" value="urgent">
+                                <label class="btn btn-sm btn-outline-danger student-case-severity-label student-case-severity-label--urgent" for="studentCaseSeverityUrgent">Urgent</label>
+                            </div>
                         </div>
-                        <textarea class="form-control student-case-details-textarea" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea>
-                        <div class="form-text">Pick a common issue below, then adjust the detail text if needed.</div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label>
+                            <div id="studentCaseDetailPresetsWrap">
+                                <div id="studentCaseDetailPresets" class="student-case-detail-presets"></div>
+                            </div>
+                            <textarea class="form-control student-case-details-textarea" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea>
+                            <div class="form-text">Pick a common issue below, then adjust the detail text if needed.</div>
+                        </div>
                     </div>
                 </div>
+                <div id="studentCaseStepStudents" class="d-none">
+                    <div class="alert alert-primary border-0 mb-3" style="background: #eff6ff;">
+                        <h6 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i>Assign students</h6>
+                        <p class="small mb-0 text-muted" id="studentCaseStudentStepIntro">Select students if this case applies to specific learners.</p>
+                    </div>
+                    <div class="student-case-pending-summary card mb-3">
+                        <div class="card-body py-3" id="studentCasePendingSummary"></div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
+                        <input type="search" class="form-control form-control-sm flex-grow-1" id="studentCaseStudentSearch" placeholder="Search students by name..." style="min-width: 14rem;">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnStudentCaseSelectAll">Select all</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnStudentCaseClearAll">Clear</button>
+                    </div>
+                    <div id="studentCaseStudentPicker" class="student-case-student-picker"></div>
+                </div>
             </div>
-            <div class="modal-footer bg-light d-flex justify-content-between flex-wrap gap-2"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-success fw-bold" id="btnResolveStudentCase"><i class="bi bi-check2-circle me-1"></i>Save &amp; Resolve</button><button type="button" class="btn btn-primary fw-bold" id="btnSaveStudentCase"><i class="bi bi-save me-1"></i>Save Case</button></div></div>
+            <div class="modal-footer bg-light d-flex justify-content-between flex-wrap gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-secondary d-none" id="btnStudentCaseBack"><i class="bi bi-arrow-left me-1"></i>Back to details</button>
+                    <button type="button" class="btn btn-outline-primary d-none" id="btnSaveStudentCaseSessionWide"><i class="bi bi-globe2 me-1"></i>Save session-wide</button>
+                    <button type="button" class="btn btn-primary fw-bold d-none" id="btnStudentCaseNext"><i class="bi bi-people me-1"></i>Assign students</button>
+                    <button type="button" class="btn btn-outline-success fw-bold d-none" id="btnResolveStudentCase"><i class="bi bi-check2-circle me-1"></i>Save &amp; Resolve</button>
+                    <button type="button" class="btn btn-primary fw-bold d-none" id="btnSaveStudentCase"><i class="bi bi-save me-1"></i>Save Case</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -3024,6 +3149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
+    const sessionCanManageClassConduct = <%- jsonForScript(Boolean(canManageClassConductFlag)) %>;
     const sessionCanManageCoTeachers = <%- jsonForScript(Boolean(typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true)) %>;
     const sessionCanToggleCoTeacherEdit = <%- jsonForScript(Boolean(typeof canToggleCoTeacherEdit !== 'undefined' && canToggleCoTeacherEdit === true)) %>;
     let sessionCoTeachersState = <%- jsonForScript(
@@ -3786,14 +3912,14 @@ document.addEventListener('DOMContentLoaded', () => {
         : 'null' %>;
     window.__attendanceThresholdsEnabled = <%= typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved?.thresholdsEnabled === false ? 'false' : 'true' %>;
     window.__conductRatingScale = <%- JSON.stringify(typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved ? conductRatingScaleResolved : { levels: conductScaleDefaultLevels }) %>;
-    const sessionConductReadOnly = <%= JSON.stringify(!!isReadOnly) %>;
+    const sessionConductReadOnly = <%= JSON.stringify(!!isReadOnly || !canManageClassConductFlag) %>;
     const conductDimensionMeta = <%- jsonForScript(conductDimensions) %>;
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
     let sessionConductReadyForReports = <%- jsonForScript(Boolean(conductReadyForReports)) %>;
     const sessionHasConductRequiredReports = <%- jsonForScript(Boolean(sessionHasConductRequiredReportsResolved)) %>;
     const hasSessionReportsAssigned = <%- jsonForScript(Boolean(hasSessionReportsAssigned)) %>;
-    let currentReportWorkflowStep = (sessionHasConductRequiredReports && !sessionConductReadyForReports) ? 1 : 2;
+    let currentReportWorkflowStep = (sessionHasConductRequiredReports && sessionCanManageClassConduct && !sessionConductReadyForReports) ? 1 : 2;
     const REPORT_CONDUCT_TABLE_SELECTOR = '#sessionReportConductDataHost #conductTable';
     const optionalConductRosterSeed = <%- jsonForScript((session.roster || []).map((student) => ({
         personId: String(student.personId || ''),
@@ -3987,7 +4113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setConductReadyUi(ready) {
         sessionConductReadyForReports = !!ready;
         updateSessionConductStepStatusUi();
-        if (!sessionConductReadyForReports && sessionHasConductRequiredReports) {
+        if (!sessionConductReadyForReports && sessionHasConductRequiredReports && sessionCanManageClassConduct) {
             currentReportWorkflowStep = 1;
         }
         syncReportWorkflowStepUi();
@@ -3997,17 +4123,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function syncReportWorkflowStepUi() {
         if (!sessionHasConductRequiredReports) return;
 
-        if (!sessionConductReadyForReports) {
+        const adminConductWorkflow = sessionHasConductRequiredReports && sessionCanManageClassConduct;
+        const teachersAwaitingAdminConduct = sessionHasConductRequiredReports && !sessionCanManageClassConduct && !sessionConductReadyForReports;
+
+        if (adminConductWorkflow && !sessionConductReadyForReports) {
             currentReportWorkflowStep = 1;
-        } else if (currentReportWorkflowStep !== 1 && currentReportWorkflowStep !== 2) {
+        } else if (!adminConductWorkflow || sessionConductReadyForReports) {
             currentReportWorkflowStep = 2;
         }
 
-        const showStep1 = currentReportWorkflowStep === 1;
+        const showStep1 = adminConductWorkflow && currentReportWorkflowStep === 1;
         const conductStep = document.getElementById('sessionReportConductStep');
         const instancesStep = document.getElementById('sessionReportInstancesStep');
         conductStep?.classList.toggle('d-none', !showStep1);
         instancesStep?.classList.toggle('d-none', showStep1);
+
+        document.getElementById('sessionReportConductAdminPendingAlert')?.classList.toggle('d-none', !teachersAwaitingAdminConduct);
 
         const step1Label = document.getElementById('sessionReportWorkflowStep1Label');
         const step2Label = document.getElementById('sessionReportWorkflowStep2Label');
@@ -4022,18 +4153,26 @@ document.addEventListener('DOMContentLoaded', () => {
             step2Label.classList.toggle('is-locked', !sessionConductReadyForReports);
         }
 
-        const prevBtn = document.getElementById('btnReportWorkflowPrevious');
-        const showPrevious = sessionConductReadyForReports && !showStep1;
+        const showPrevious = adminConductWorkflow && sessionConductReadyForReports && !showStep1;
         document.querySelectorAll('.js-report-workflow-back-to-conduct').forEach((btn) => {
             btn.classList.toggle('d-none', !showPrevious);
             btn.disabled = !showPrevious;
         });
+        const prevBtn = document.getElementById('btnReportWorkflowPrevious');
         if (prevBtn && showPrevious) {
             prevBtn.disabled = false;
         }
     }
 
     function showConductRequiredModal() {
+        if (!sessionCanManageClassConduct) {
+            return sessionMessageBox({
+                title: 'Class conduct pending',
+                icon: 'info',
+                message: '<p class="mb-0">A class administrator must complete <strong>class conduct</strong> before reports can be filled for this session.</p>',
+                html: true
+            });
+        }
         return sessionMessageBox({
             title: 'Class conduct required',
             icon: 'warning',
@@ -4077,6 +4216,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveSessionConductForReports(options = {}) {
+        if (!sessionCanManageClassConduct) {
+            return showStudentCaseMessage('Not Allowed', 'Only class administrators can manage class conduct.', 'error');
+        }
         if (sessionConductReadOnly) return false;
         const fromModal = options.fromModal === true;
         const btn = fromModal ? document.getElementById('btnSaveConductFromModal') : null;
@@ -4532,9 +4674,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const severity = String(row.severity || 'info').toLowerCase();
             const updated = row?.audit?.lastUpdateDateTime || row?.audit?.createDateTime || '';
             const canResolve = !['resolved', 'cancelled'].includes(status);
+            const studentPersonId = String(row.studentPersonId || '').trim();
+            const studentLabel = studentPersonId
+                ? (row.studentName || studentPersonId)
+                : 'Session-wide';
+            const studentCell = studentPersonId
+                ? `${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(studentLabel, row.studentRecordId, { className: 'text-decoration-none fw-semibold' }) : scEscapeHtml(studentLabel))}<div class="small text-muted font-monospace">${scEscapeHtml(studentPersonId)}</div>`
+                : `<span class="text-muted fst-italic">${scEscapeHtml(studentLabel)}</span>`;
             return `
                 <tr data-case-id="${scEscapeHtml(row.id)}">
-                    <td class="ps-4 fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.studentName || row.studentPersonId, row.studentRecordId, { className: 'text-decoration-none fw-semibold' }) : scEscapeHtml(row.studentName || row.studentPersonId))}<div class="small text-muted font-monospace">${scEscapeHtml(row.studentPersonId)}</div></td>
+                    <td class="ps-4 fw-semibold">${studentCell}</td>
                     <td class="text-capitalize">${scEscapeHtml(String(row.category || 'other').replace(/_/g, ' '))}</td>
                     <td><span class="badge ${studentCaseBadgeClass(severity, 'severity')}">${scEscapeHtml(severity.toUpperCase())}</span></td>
                     <td><span class="badge ${studentCaseBadgeClass(status, 'status')}">${scEscapeHtml(status.replace(/_/g, ' ').toUpperCase())}</span></td>
@@ -5081,6 +5230,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (input) input.checked = true;
     }
 
+    function studentCaseCategoryRequiresStudent(category) {
+        const key = String(category || 'learning').trim().toLowerCase();
+        const optional = getStudentCasePresetConfig().studentOptionalCategories;
+        if (Array.isArray(optional)) return !optional.includes(key);
+        return ['learning', 'engagement', 'behavior', 'support'].includes(key);
+    }
+
     function studentCasePresetList(category) {
         const key = String(category || 'learning').trim().toLowerCase();
         const presets = getStudentCasePresetConfig().presets?.[key];
@@ -5117,52 +5273,214 @@ document.addEventListener('DOMContentLoaded', () => {
         return document.getElementById('studentCaseDetails')?.value || '';
     }
 
+    const sessionCaseRoster = <%- jsonForScript((session.roster || []).map((student) => ({
+        personId: String(student.personId || '').trim(),
+        name: String(student.name || '').trim()
+    })).filter((student) => student.personId)) %>;
+    let studentCaseSelectedPersonIds = new Set();
+
+    function getSessionCaseRosterRows() {
+        return (Array.isArray(sessionCaseRoster) ? sessionCaseRoster : []).filter((row) => String(row?.personId || '').trim());
+    }
+
+    function studentCaseStudentInitials(name = '') {
+        const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+        if (!parts.length) return '?';
+        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+        return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+    }
+
+    function renderStudentCaseStudentPicker(filterText = '') {
+        const host = document.getElementById('studentCaseStudentPicker');
+        if (!host) return;
+        const query = String(filterText || '').trim().toLowerCase();
+        const rows = getSessionCaseRosterRows().filter((row) => {
+            if (!query) return true;
+            return String(row.name || '').toLowerCase().includes(query) || String(row.personId || '').toLowerCase().includes(query);
+        });
+        if (!rows.length) {
+            host.innerHTML = '<div class="text-muted small text-center py-3">No students match this search.</div>';
+            return;
+        }
+        host.innerHTML = `<div class="student-case-student-grid">${rows.map((row) => {
+            const personId = String(row.personId || '').trim();
+            const displayName = String(row.name || personId).trim();
+            const checked = studentCaseSelectedPersonIds.has(personId) ? ' checked' : '';
+            return `<label class="student-case-student-card">
+                <input type="checkbox" class="form-check-input student-case-student-checkbox" value="${scEscapeHtml(personId)}"${checked}>
+                <span class="student-case-student-card-body">
+                    <span class="student-case-student-initial" aria-hidden="true">${scEscapeHtml(studentCaseStudentInitials(displayName))}</span>
+                    <span class="student-case-student-name">${scEscapeHtml(displayName)}</span>
+                </span>
+            </label>`;
+        }).join('')}</div>`;
+    }
+
+    function getSelectedStudentCasePersonIds() {
+        return [...studentCaseSelectedPersonIds].map((id) => String(id || '').trim()).filter(Boolean);
+    }
+
+    function isStudentCaseEditMode() {
+        return Boolean(String(document.getElementById('studentCaseId')?.value || '').trim());
+    }
+
+    function isStudentCaseStudentStepVisible() {
+        return !document.getElementById('studentCaseStepStudents')?.classList.contains('d-none');
+    }
+
+    function updateStudentCaseStudentStepIntro(category = '') {
+        const intro = document.getElementById('studentCaseStudentStepIntro');
+        if (!intro) return;
+        const key = String(category || document.getElementById('studentCaseCategory')?.value || 'other').trim().toLowerCase();
+        if (studentCaseCategoryRequiresStudent(key)) {
+            intro.textContent = 'This case type requires at least one student. Select everyone the issue applies to, then save.';
+        } else {
+            intro.textContent = 'You can assign specific students even for session-wide issues such as technology or lesson delivery. Leave everyone unselected to save as a session-wide case.';
+        }
+    }
+
+    function syncStudentCaseFooter(step = 'details') {
+        const isEdit = isStudentCaseEditMode();
+        const onStudents = step === 'students';
+        const onDetails = !onStudents;
+        const category = document.getElementById('studentCaseCategory')?.value || 'other';
+        const studentOptional = !studentCaseCategoryRequiresStudent(category);
+
+        document.getElementById('btnStudentCaseBack')?.classList.toggle('d-none', !onStudents || isEdit);
+        document.getElementById('btnStudentCaseNext')?.classList.toggle('d-none', !onDetails || isEdit);
+        document.getElementById('btnSaveStudentCaseSessionWide')?.classList.toggle('d-none', !onDetails || isEdit || !studentOptional);
+        document.getElementById('btnResolveStudentCase')?.classList.toggle('d-none', onDetails && !isEdit);
+        document.getElementById('btnSaveStudentCase')?.classList.toggle('d-none', onDetails && !isEdit);
+    }
+
+    function setStudentCaseWizardStep(step) {
+        const showStudents = step === 'students';
+        document.getElementById('studentCaseStepStudents')?.classList.toggle('d-none', !showStudents);
+        document.getElementById('studentCaseStepDetails')?.classList.toggle('d-none', showStudents);
+        syncStudentCaseFooter(step);
+        const modalTitle = document.getElementById('studentCaseModalTitle');
+        if (modalTitle && !isStudentCaseEditMode()) {
+            modalTitle.textContent = showStudents ? 'Assign Students' : 'Open Student Case';
+        }
+    }
+
+    function updateStudentCaseContextBanner(names = [], { sessionWide = false } = {}) {
+        const list = (Array.isArray(names) ? names : []).map((name) => String(name || '').trim()).filter(Boolean);
+        const classTitle = <%- jsonForScript(classData.title || classData.id) %>;
+        const sessionLabel = <%- jsonForScript(session.date || session.sessionId) %>;
+        let body = `Case for <strong>${scEscapeHtml(classTitle)}</strong> on <strong>${scEscapeHtml(sessionLabel)}</strong>.`;
+        if (sessionWide) {
+            body += ' This will be saved as a <strong>session-wide</strong> case.';
+        } else if (list.length === 1) {
+            body += ` Student: <strong>${scEscapeHtml(list[0])}</strong>.`;
+        } else if (list.length > 1) {
+            body += ` Students: <strong>${list.length} selected</strong>.`;
+        } else {
+            body += ' Use <strong>Assign students</strong> to link specific learners, or save as session-wide when this case type allows it.';
+        }
+        document.getElementById('studentCaseContext').innerHTML = body;
+    }
+
+    function renderStudentCasePendingSummary(payload = {}) {
+        const host = document.getElementById('studentCasePendingSummary');
+        if (!host) return;
+        const category = String(payload.category || document.getElementById('studentCaseCategory')?.value || 'other').trim();
+        const labels = getStudentCasePresetConfig().labels || {};
+        const categoryLabel = labels[category] || category.replace(/_/g, ' ');
+        const severity = String(payload.severity || getSelectedStudentCaseSeverity() || 'info').trim().toUpperCase();
+        const details = String(payload.details || collectStudentCaseDetailsValue() || '').trim();
+        const preview = details.length > 180 ? `${details.slice(0, 177)}...` : details;
+        host.innerHTML = `
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">${scEscapeHtml(categoryLabel)}</span>
+                <span class="badge bg-light text-dark border">${scEscapeHtml(severity)}</span>
+            </div>
+            <div class="small text-muted mb-1">Issue details</div>
+            <div>${scEscapeHtml(preview || '-')}</div>
+        `;
+    }
+
+    function showStudentCaseStudentStep(payload = {}) {
+        const category = payload.category || document.getElementById('studentCaseCategory')?.value || 'other';
+        renderStudentCasePendingSummary(payload);
+        updateStudentCaseStudentStepIntro(category);
+        renderStudentCaseStudentPicker(document.getElementById('studentCaseStudentSearch')?.value || '');
+        setStudentCaseWizardStep('students');
+        document.getElementById('studentCaseStudentSearch')?.focus();
+    }
+
+    function advanceStudentCaseWizard() {
+        const payload = {
+            category: document.getElementById('studentCaseCategory')?.value,
+            severity: getSelectedStudentCaseSeverity(),
+            details: collectStudentCaseDetailsValue()
+        };
+        if (!String(payload.details || '').trim()) {
+            return showStudentCaseMessage('Issue Required', 'Enter issue details before assigning students.', 'error');
+        }
+        showStudentCaseStudentStep(payload);
+    }
+
     function resetStudentCaseModal() {
         document.getElementById('studentCaseId').value = '';
         document.getElementById('studentCasePersonId').value = '';
         document.getElementById('studentCaseCategory').value = 'learning';
         setSelectedStudentCaseSeverity('info');
         document.getElementById('studentCaseDetails').value = '';
+        document.getElementById('studentCaseStudentSearch').value = '';
+        studentCaseSelectedPersonIds = new Set();
         renderStudentCaseDetailOptions('learning', '');
         setStudentCaseResolveButtonVisible(true);
+        renderStudentCaseStudentPicker('');
+        setStudentCaseWizardStep('details');
+        updateStudentCaseContextBanner();
     }
 
-    function openStudentCaseModal({ personId, studentName, caseRow = null }) {
+    function openStudentCaseModal({ personId, studentName, caseRow = null } = {}) {
         resetStudentCaseModal();
         const row = caseRow || {};
         const pid = String(row.studentPersonId || personId || '').trim();
         const name = String(row.studentName || studentName || pid || 'Student').trim();
-        document.getElementById('studentCaseId').value = row.id || '';
-        document.getElementById('studentCasePersonId').value = pid;
-        document.getElementById('studentCaseModalTitle').textContent = row.id ? `Edit Case - ${name}` : `Open Case - ${name}`;
-        document.getElementById('studentCaseContext').innerHTML = `<strong>${scEscapeHtml(name)}</strong> in <strong>${scEscapeHtml(<%- jsonForScript(classData.title || classData.id) %>)}</strong> on <strong>${scEscapeHtml(<%- jsonForScript(session.date || session.sessionId) %>)}</strong>.`;
-        const category = row.category || 'learning';
-        document.getElementById('studentCaseCategory').value = category;
-        setSelectedStudentCaseSeverity(row.severity || 'info');
-        renderStudentCaseDetailOptions(category, row.details || '');
-        const status = String(row.status || '').trim().toLowerCase();
-        setStudentCaseResolveButtonVisible(!['resolved', 'cancelled'].includes(status));
+        if (pid) studentCaseSelectedPersonIds.add(pid);
+        if (row.id) {
+            document.getElementById('studentCaseId').value = row.id;
+            document.getElementById('studentCasePersonId').value = pid;
+            const editLabel = pid ? name : 'Session-wide';
+            document.getElementById('studentCaseModalTitle').textContent = `Edit Case - ${editLabel}`;
+            updateStudentCaseContextBanner(pid ? [name] : [], { sessionWide: !pid });
+            const category = row.category || 'learning';
+            document.getElementById('studentCaseCategory').value = category;
+            setSelectedStudentCaseSeverity(row.severity || 'info');
+            renderStudentCaseDetailOptions(category, row.details || '');
+            const status = String(row.status || '').trim().toLowerCase();
+            setStudentCaseResolveButtonVisible(!['resolved', 'cancelled'].includes(status));
+            setStudentCaseWizardStep('details');
+        } else {
+            document.getElementById('studentCaseModalTitle').textContent = 'Open Student Case';
+            if (pid) updateStudentCaseContextBanner([name]);
+            else updateStudentCaseContextBanner();
+            setStudentCaseWizardStep('details');
+        }
         if (studentCaseModalInstance) studentCaseModalInstance.show();
     }
 
     function collectStudentCasePayload() {
-        return {
+        const caseId = String(document.getElementById('studentCaseId').value || '').trim();
+        const selectedIds = getSelectedStudentCasePersonIds();
+        const payload = {
             actionStateId,
-            studentPersonId: document.getElementById('studentCasePersonId').value,
             category: document.getElementById('studentCaseCategory').value,
             severity: getSelectedStudentCaseSeverity(),
             details: collectStudentCaseDetailsValue()
         };
-    }
-
-    async function refreshStudentCases() {
-        const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases`, {
-            headers: { 'x-ajax-request': 'true', 'Accept': 'application/json' }
-        });
-        const result = await res.json().catch(() => ({}));
-        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to load student cases.');
-        studentCasesState = result.cases || [];
-        renderStudentCases();
+        if (caseId) {
+            payload.studentPersonId = document.getElementById('studentCasePersonId').value;
+        } else if (selectedIds.length > 1) {
+            payload.studentPersonIds = selectedIds;
+        } else {
+            payload.studentPersonId = selectedIds[0] || '';
+        }
+        return payload;
     }
 
     async function saveStudentCase(options = {}) {
@@ -5170,12 +5488,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const shouldResolve = options && options.resolve === true;
         const payload = collectStudentCasePayload();
         if (shouldResolve) payload.status = 'resolved';
-        if (!payload.studentPersonId) return showStudentCaseMessage('Student Required', 'Select a student before saving this case.', 'error');
         if (!String(payload.details || '').trim()) return showStudentCaseMessage('Issue Required', 'Select an issue detail before saving this case.', 'error');
+
+        const hasStudent = Boolean(
+            caseId
+                ? String(payload.studentPersonId || '').trim()
+                : (Array.isArray(payload.studentPersonIds) ? payload.studentPersonIds.length : String(payload.studentPersonId || '').trim())
+        );
+        if (!caseId && studentCaseCategoryRequiresStudent(payload.category) && !hasStudent) {
+            if (!isStudentCaseStudentStepVisible()) {
+                showStudentCaseStudentStep(payload);
+                return;
+            }
+            return showStudentCaseMessage('Student Required', 'Select at least one student for this case category.', 'error');
+        }
+
         const url = caseId
             ? `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases/${encodeURIComponent(caseId)}`
             : `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases`;
-        showStudentCaseBusy(shouldResolve ? 'Resolving Case' : (caseId ? 'Updating Case' : 'Saving Case'), shouldResolve ? 'Saving changes and resolving the student case...' : (caseId ? 'Updating the student case...' : 'Saving the student case...'));
+        const selectedCount = Array.isArray(payload.studentPersonIds)
+            ? payload.studentPersonIds.length
+            : (String(payload.studentPersonId || '').trim() ? 1 : 0);
+        const savingCount = selectedCount || 1;
+        showStudentCaseBusy(
+            shouldResolve ? 'Resolving Case' : (caseId ? 'Updating Case' : 'Saving Case'),
+            shouldResolve
+                ? 'Saving changes and resolving the student case...'
+                : (caseId ? 'Updating the student case...' : `Saving ${savingCount} student case${savingCount === 1 ? '' : 's'}...`)
+        );
         try {
             const res = await fetch(url, {
                 method: 'POST',
@@ -5192,6 +5532,16 @@ document.addEventListener('DOMContentLoaded', () => {
             hideStudentCaseBusy();
             throw error;
         }
+    }
+
+    async function refreshStudentCases() {
+        const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases`, {
+            headers: { 'x-ajax-request': 'true', 'Accept': 'application/json' }
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to load student cases.');
+        studentCasesState = result.cases || [];
+        renderStudentCases();
     }
 
     async function updateStudentCaseStatus(caseId, status) {
@@ -5215,7 +5565,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function confirmStudentCaseDelete(row) {
-        const studentName = String(row?.studentName || row?.studentPersonId || 'this student').trim();
+        const studentName = String(row?.studentName || row?.studentPersonId || '').trim() || 'this session-wide case';
         return sessionConfirmBox({
             title: 'Delete Student Case',
             icon: 'warning',
@@ -5248,7 +5598,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('studentCaseCategory')?.addEventListener('change', (event) => {
-        renderStudentCaseDetailOptions(event.target.value, '');
+        const category = event.target.value;
+        renderStudentCaseDetailOptions(category, '');
+        updateStudentCaseStudentStepIntro(category);
+        if (!isStudentCaseStudentStepVisible() && !isStudentCaseEditMode()) {
+            const selected = getSelectedStudentCasePersonIds();
+            if (selected.length) {
+                const names = getSessionCaseRosterRows()
+                    .filter((row) => selected.includes(String(row.personId || '').trim()))
+                    .map((row) => row.name || row.personId);
+                updateStudentCaseContextBanner(names);
+            } else {
+                updateStudentCaseContextBanner([], { sessionWide: !studentCaseCategoryRequiresStudent(category) });
+            }
+            syncStudentCaseFooter('details');
+        }
     });
     document.getElementById('studentCaseDetailPresets')?.addEventListener('change', (event) => {
         const radio = event.target.closest('.student-case-preset-radio');
@@ -5256,12 +5620,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const detailsInput = document.getElementById('studentCaseDetails');
         if (detailsInput) detailsInput.value = radio.value;
     });
+    document.getElementById('studentCaseStudentPicker')?.addEventListener('change', (event) => {
+        const checkbox = event.target.closest('.student-case-student-checkbox');
+        if (!checkbox) return;
+        const personId = String(checkbox.value || '').trim();
+        if (!personId) return;
+        if (checkbox.checked) studentCaseSelectedPersonIds.add(personId);
+        else studentCaseSelectedPersonIds.delete(personId);
+    });
+    document.getElementById('studentCaseStudentSearch')?.addEventListener('input', (event) => {
+        renderStudentCaseStudentPicker(event.target.value || '');
+    });
+    document.getElementById('btnStudentCaseSelectAll')?.addEventListener('click', () => {
+        getSessionCaseRosterRows().forEach((row) => {
+            const personId = String(row.personId || '').trim();
+            if (personId) studentCaseSelectedPersonIds.add(personId);
+        });
+        renderStudentCaseStudentPicker(document.getElementById('studentCaseStudentSearch')?.value || '');
+    });
+    document.getElementById('btnStudentCaseClearAll')?.addEventListener('click', () => {
+        studentCaseSelectedPersonIds = new Set();
+        renderStudentCaseStudentPicker(document.getElementById('studentCaseStudentSearch')?.value || '');
+    });
+    document.getElementById('btnOpenStudentCaseWizard')?.addEventListener('click', () => openStudentCaseModal());
+    document.getElementById('btnStudentCaseNext')?.addEventListener('click', () => advanceStudentCaseWizard());
+    document.getElementById('btnStudentCaseBack')?.addEventListener('click', () => setStudentCaseWizardStep('details'));
+    document.getElementById('btnSaveStudentCaseSessionWide')?.addEventListener('click', () => {
+        saveStudentCase().catch((error) => showStudentCaseMessage('Save Failed', error.message, 'error'));
+    });
     document.addEventListener('click', (event) => {
-        const openBtn = event.target.closest('.btn-open-student-case');
-        if (openBtn) {
-            openStudentCaseModal({ personId: openBtn.dataset.personId, studentName: openBtn.dataset.studentName });
-            return;
-        }
         const editBtn = event.target.closest('.btn-edit-student-case');
         if (editBtn) {
             const row = getStudentCaseById(editBtn.dataset.caseId);
@@ -8231,15 +8618,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function buildSessionSaveRosterRows() {
         const roster = [];
         const conductRowsByPersonId = new Map();
-        document.querySelectorAll('#conductTable .conduct-row, #optionalConductTable .conduct-row').forEach((row) => {
-            const personId = row.getAttribute('data-personid');
-            if (!personId || conductRowsByPersonId.has(personId)) return;
-            conductRowsByPersonId.set(personId, row);
-        });
-        document.querySelectorAll('#conductTable .conduct-row').forEach((row) => {
-            const personId = row.getAttribute('data-personid');
-            if (personId) conductRowsByPersonId.set(personId, row);
-        });
+        if (sessionCanManageClassConduct) {
+            document.querySelectorAll('#conductTable .conduct-row, #optionalConductTable .conduct-row').forEach((row) => {
+                const personId = row.getAttribute('data-personid');
+                if (!personId || conductRowsByPersonId.has(personId)) return;
+                conductRowsByPersonId.set(personId, row);
+            });
+            document.querySelectorAll('#conductTable .conduct-row').forEach((row) => {
+                const personId = row.getAttribute('data-personid');
+                if (personId) conductRowsByPersonId.set(personId, row);
+            });
+        }
         const readConductRating = (conductRow, selector) => {
             if (!conductRow) return undefined;
             const input = conductRow.querySelector(selector);

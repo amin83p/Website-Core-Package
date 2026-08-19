@@ -4089,6 +4089,7 @@ async function manageSession(req, res) {
             isSessionLocked, 
             isReadOnly,
             canEditSessionMetadata: canOverride,
+            canManageClassConduct: Boolean(canOverride),
             canOverrideMakeupDuration,
             canCreateMakeupWhileLocked,
             canDeleteMakeupSessions: Boolean(canEditSession && !isReadOnly),
@@ -4231,11 +4232,53 @@ async function saveSessionStudentCase(req, res) {
     try {
         const { id: classId, sessionId, caseId = '' } = req.params;
         await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
+        const body = req.body || {};
+        if (caseId) {
+            const saved = await sessionStudentCaseService.saveCase({
+                classId,
+                sessionId,
+                caseId,
+                input: body,
+                reqUser: req.user
+            });
+            const message = String(saved?.status || '').toLowerCase() === 'resolved'
+                ? 'Student case saved and resolved.'
+                : 'Student case saved.';
+            return res.json({ status: 'success', message, case: saved });
+        }
+
+        const studentPersonIds = [...new Set(
+            (Array.isArray(body.studentPersonIds) ? body.studentPersonIds : [])
+                .map((id) => toPublicId(id))
+                .filter(Boolean)
+        )];
+        if (studentPersonIds.length > 1) {
+            const result = await sessionStudentCaseService.saveCasesBulk({
+                classId,
+                sessionId,
+                input: body,
+                reqUser: req.user
+            });
+            const count = Number(result?.createdCount || 0);
+            const message = count === 1
+                ? 'Student case saved.'
+                : `${count} student cases saved.`;
+            return res.json({
+                status: 'success',
+                message,
+                cases: result.cases,
+                createdCount: count
+            });
+        }
+
         const saved = await sessionStudentCaseService.saveCase({
             classId,
             sessionId,
-            caseId,
-            input: req.body || {},
+            caseId: '',
+            input: {
+                ...body,
+                studentPersonId: studentPersonIds[0] || body.studentPersonId || body.personId || ''
+            },
             reqUser: req.user
         });
         const message = String(saved?.status || '').toLowerCase() === 'resolved'
@@ -4947,19 +4990,29 @@ async function saveSession(req, res) {
                     absenceExcused: incRec.absenceExcused === undefined ? existRec.absenceExcused : incRec.absenceExcused,
                     excuseRef: incRec.excuseRef,
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
-                    classEffortPercent: incRec.classEffortPercent === undefined
-                        ? existingClassEffort
-                        : normalizeSessionRatingPercent(incRec.classEffortPercent, null),
-                    classParticipationPercent: incRec.classParticipationPercent === undefined
-                        ? existingClassParticipation
-                        : normalizeSessionRatingPercent(incRec.classParticipationPercent, null),
-                    respectsTeachersPercent: incRec.respectsTeachersPercent === undefined
-                        ? existingRespectsTeachers
-                        : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null),
-                    respectsStudentsPercent: incRec.respectsStudentsPercent === undefined
-                        ? existingRespectsStudents
-                        : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null),
-                    conductSavedAt: resolveConductSavedAtForRosterMerge(incRec, existRec),
+                    classEffortPercent: canOverride
+                        ? (incRec.classEffortPercent === undefined
+                            ? existingClassEffort
+                            : normalizeSessionRatingPercent(incRec.classEffortPercent, null))
+                        : existingClassEffort,
+                    classParticipationPercent: canOverride
+                        ? (incRec.classParticipationPercent === undefined
+                            ? existingClassParticipation
+                            : normalizeSessionRatingPercent(incRec.classParticipationPercent, null))
+                        : existingClassParticipation,
+                    respectsTeachersPercent: canOverride
+                        ? (incRec.respectsTeachersPercent === undefined
+                            ? existingRespectsTeachers
+                            : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null))
+                        : existingRespectsTeachers,
+                    respectsStudentsPercent: canOverride
+                        ? (incRec.respectsStudentsPercent === undefined
+                            ? existingRespectsStudents
+                            : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null))
+                        : existingRespectsStudents,
+                    conductSavedAt: canOverride
+                        ? resolveConductSavedAtForRosterMerge(incRec, existRec)
+                        : (existRec.conductSavedAt || null),
                     notes: existRec.notes || '',
                     comments: existRec.comments || []
                 };
@@ -5283,6 +5336,9 @@ async function saveSessionConduct(req, res) {
             OPERATIONS.UPDATE,
             { section: { id: SECTIONS.SCHOOL_CLASSES } }
         );
+        if (!canOverride) {
+            return res.status(403).json({ status: 'error', message: 'Only class administrators can manage class conduct.' });
+        }
         if (isLocked && !canOverride) {
             return res.status(403).json({ status: 'error', message: 'This session is locked. Class conduct cannot be changed.' });
         }

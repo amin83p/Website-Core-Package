@@ -135,7 +135,6 @@ function sanitizeCaseInput(input = {}, { isUpdate = false } = {}) {
     if (!out.orgId) throw new Error('Organization is required.');
     if (!out.classId) throw new Error('Class is required.');
     if (!out.sessionId) throw new Error('Session is required.');
-    if (!out.studentPersonId) throw new Error('Student is required.');
   }
   if (!out.details) throw new Error('Case issue details are required.');
   if (!out.summary) {

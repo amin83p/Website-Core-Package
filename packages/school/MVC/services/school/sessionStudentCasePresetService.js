@@ -9,6 +9,13 @@ const CASE_CATEGORY_LABELS = Object.freeze({
   other: 'Other'
 });
 
+const CASE_CATEGORIES_STUDENT_OPTIONAL = Object.freeze([
+  'technology',
+  'resources',
+  'lesson_delivery',
+  'other'
+]);
+
 const CASE_CATEGORY_DETAIL_PRESETS = Object.freeze({
   learning: Object.freeze([
     'Struggled with today\'s material',
@@ -91,22 +98,29 @@ function deriveCaseSummary(category, details, maxLength = 260) {
   return summary.length > maxLength ? summary.slice(0, maxLength) : summary;
 }
 
+function categoryRequiresStudent(category) {
+  return !CASE_CATEGORIES_STUDENT_OPTIONAL.includes(normalizeCategory(category));
+}
+
 function getPresetConfig() {
   return {
     labels: { ...CASE_CATEGORY_LABELS },
     presets: Object.fromEntries(
       Object.entries(CASE_CATEGORY_DETAIL_PRESETS).map(([key, rows]) => [key, [...rows]])
-    )
+    ),
+    studentOptionalCategories: [...CASE_CATEGORIES_STUDENT_OPTIONAL]
   };
 }
 
 module.exports = {
   CASE_CATEGORY_LABELS,
+  CASE_CATEGORIES_STUDENT_OPTIONAL,
   CASE_CATEGORY_DETAIL_PRESETS,
   normalizeCategory,
   getCategoryLabel,
   getPresetsForCategory,
   isPresetDetail,
   deriveCaseSummary,
+  categoryRequiresStudent,
   getPresetConfig
 };
