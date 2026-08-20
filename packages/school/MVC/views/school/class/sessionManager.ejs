@@ -9365,10 +9365,10 @@ document.addEventListener('DOMContentLoaded', () => {
             sectionTitle: 'Manage Session',
             orgId: sessionManagerOrgId,
             policy: sessionAutosavePolicy,
-            readOnly: sessionConductReadOnly,
+            readOnly: contentReadOnly,
             isDirty: () => isSessionFormDirty(),
             canAutosave: () => {
-                if (sessionConductReadOnly) return false;
+                if (contentReadOnly) return false;
                 if (isDetailsModalDirty()) return false;
                 const status = getSelectedSessionStatus();
                 if (!isSessionCompletionStatus(sessionInitialStatusCode) && isSessionCompletionStatus(status)) {
