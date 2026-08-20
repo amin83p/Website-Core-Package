@@ -428,6 +428,7 @@
     ieltsApiProvider: (overrides) => byName('ieltsApiProvider', overrides),
     pteApiProvider: (overrides) => byName('pteApiProvider', overrides),
     normalizeConfig,
+    inferName,
     contexts
   };
 

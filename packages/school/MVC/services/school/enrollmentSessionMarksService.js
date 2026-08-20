@@ -2,6 +2,7 @@ const schoolRepositories = require('../../repositories/school');
 const classEnrollmentPeriodService = require('./classEnrollmentPeriodService');
 const enrollmentCycleSummaryService = require('./enrollmentCycleSummaryService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -162,6 +163,38 @@ async function applySessionMarks(periodId, changes = [], requestingUser = null, 
 
   const marks = marksArrayFromMap(marksMap);
   const plannedIds = syncPlannedNaIds(marks);
+
+  const windowSessions = enrollmentCycleSummaryService.listSessionsInEnrollmentWindow(period, sessions);
+  const countableSessions = windowSessions.map((session) => {
+    const sessionId = getSessionId(session);
+    return {
+      sessionId,
+      durationHours: classEnrollmentSessionApplicabilityService.resolveSessionDurationHours(session),
+      startTime: String(session.startTime || session.start || '').trim(),
+      endTime: String(session.endTime || session.end || '').trim(),
+      date: normalizeDateOnly(session.date || session.sessionDate)
+    };
+  }).filter((row) => row.sessionId);
+  const sessionsById = new Map(
+    windowSessions
+      .map((session) => [getSessionId(session), session])
+      .filter(([sessionId]) => Boolean(sessionId))
+  );
+  const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(period.targetSessionCount);
+  const targetHours = classEnrollmentSessionApplicabilityService.normalizeTargetHours(period.targetHours);
+  if (targetSessionCount > 0 || targetHours > 0) {
+    const validation = rollingEnrollmentSessionAlignmentService.validatePlannedNaSelection({
+      countableSessions,
+      targetSessionCount,
+      targetHours,
+      plannedNaSessionIds: plannedIds,
+      sessionsById
+    });
+    if (!validation.valid) {
+      throw new Error(validation.message || 'Enrollment session marks do not match the target.');
+    }
+  }
+
   const updated = await dependencies.repositories.classEnrollmentPeriods.update(period.id, {
     enrollmentSessionMarks: marks,
     plannedNotApplicableSessionIds: plannedIds,
@@ -170,11 +203,12 @@ async function applySessionMarks(periodId, changes = [], requestingUser = null, 
 
   const personId = toPublicId(period.personId);
   if (personId && plannedIds.length) {
-    await rollingEnrollmentSessionAlignmentService.materializePlannedNaAttendance({
+    await removePersonFromExcludedSessions({
       classId: period.classId,
       personId,
       sessionIds: plannedIds,
-      reqUser: requestingUser
+      requestingUser,
+      options
     });
   }
 
@@ -193,6 +227,32 @@ async function applySessionMarks(periodId, changes = [], requestingUser = null, 
   }
 
   return updated;
+}
+
+async function removePersonFromExcludedSessions({
+  classId,
+  personId,
+  sessionIds = [],
+  requestingUser = null,
+  options = {}
+} = {}) {
+  const normalizedClassId = toPublicId(classId);
+  const targetPersonId = toPublicId(personId);
+  const ids = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(sessionIds);
+  if (!normalizedClassId || !targetPersonId || !ids.length) return { updatedCount: 0 };
+
+  const classRow = await dependencies.repositories.classes.getById(normalizedClassId, options);
+  if (!classRow) throw new Error('Class not found.');
+  const sessions = Array.isArray(classRow.sessions) ? classRow.sessions : [];
+  const { nextSessions, updatedCount } = rollingEnrollmentSessionAlignmentService
+    .removePersonFromExcludedSessionRosters(sessions, targetPersonId, ids);
+  if (!updatedCount) return { updatedCount: 0 };
+
+  await dependencies.repositories.classes.update(normalizedClassId, {
+    sessions: nextSessions,
+    updatedBy: resolveActor(requestingUser)
+  }, options);
+  return { updatedCount };
 }
 
 async function clearRosterNaForSessions({

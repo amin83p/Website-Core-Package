@@ -967,6 +967,196 @@
   flex-shrink: 0;
 }
 
+.session-enrollment-legend-icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.session-enrollment-legend-icon-btn .bi {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.session-enrollment-student-banner {
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid #d7e3f4;
+  background: linear-gradient(135deg, #f5f9ff 0%, #eef5ff 55%, #f8fbff 100%);
+}
+
+.session-enrollment-student-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #17324d;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+.session-enrollment-student-meta {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: #5c6b7a;
+  line-height: 1.35;
+}
+
+.session-enrollment-summary {
+  border: 1px solid #dde5ef;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  padding: 0.45rem 0.7rem;
+  line-height: 1.35;
+}
+
+.session-enrollment-summary.is-plain {
+  font-size: 0.85rem;
+  color: #495057;
+}
+
+.session-enrollment-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0;
+  font-size: 0.8rem;
+  color: #495057;
+}
+
+.session-enrollment-summary-line .ses-sum-sep {
+  margin: 0 0.45rem;
+  color: #c0c8d1;
+  font-weight: 400;
+}
+
+.session-enrollment-summary-line .ses-sum-k {
+  color: #6c7a89;
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+.session-enrollment-summary-line .ses-sum-v {
+  color: #17324d;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-enrollment-summary-line .ses-sum-v.is-warn {
+  color: #997404;
+}
+
+.session-enrollment-summary-line .ses-sum-v.is-ok {
+  color: #0f5132;
+}
+
+.session-enrollment-cap-summary-table {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.84rem;
+}
+
+.session-enrollment-cap-summary-table td {
+  vertical-align: middle;
+  padding: 0.15rem 0.5rem;
+  white-space: nowrap;
+}
+
+.session-enrollment-cap-summary-table td:not(:last-child) {
+  border-right: 1px solid #e3e9f0;
+}
+
+.session-enrollment-cap-summary-table .ses-sum-k {
+  color: #6c7a89;
+  font-weight: 600;
+  margin-right: 0.2rem;
+}
+
+.session-enrollment-cap-summary-table .ses-sum-v {
+  color: #17324d;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-enrollment-cap-summary-table .ses-sum-v.is-warn {
+  color: #997404;
+}
+
+.session-enrollment-cap-summary-table .ses-sum-v.is-ok {
+  color: #0f5132;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-items {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: #243447;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-item > span:last-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-hint {
+  margin-top: 0.15rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #e9ecef;
+  font-size: 0.84rem;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-hint .bi {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.session-enrollment-legend-swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.25rem;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.session-enrollment-legend-swatch.is-open {
+  background: #f0f6ff;
+  border-color: #9ec5fe;
+}
+
+.session-enrollment-legend-swatch.is-attendance {
+  background: #e8f5ee;
+  border-color: #a3cfbb;
+}
+
+.session-enrollment-legend-swatch.is-na-saved {
+  background: #fde8ea;
+  border-color: #f1aeb5;
+}
+
+.session-enrollment-legend-swatch.is-na-pending {
+  background: #fff8e1;
+  border-color: #ffda6a;
+  border-style: dashed;
+}
+
+#sessionEnrollmentCalendarLegendModal {
+  z-index: 1065;
+}
+
 #sessionEnrollmentDayWidth {
   width: 120px;
 }

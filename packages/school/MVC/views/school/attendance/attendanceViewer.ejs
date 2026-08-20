@@ -22,6 +22,31 @@
     .attendance-timing-excuse-right::before { clip-path: inset(0 0 0 50%); }
     .attendance-timing-excuse-full::before { clip-path: none; }
     .attendance-timing-excuse-icon > i { position: relative; z-index: 1; }
+    .attendance-legend-icon-btn {
+      width: 2.25rem;
+      height: 2.25rem;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .attendance-legend-icon-btn .bi {
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+    .attendance-legend-modal-body .attendance-legend-items {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.65rem;
+    }
+    .attendance-legend-modal-body .attendance-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-right: 0 !important;
+    }
     .attendance-status-picker {
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -152,12 +177,13 @@
   const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
     ? schoolSectionDashboardHref
     : '/dashboard/section-nav/SCHOOL';
-  const attManageBtns = [
+  const showAttendanceManageBtns = typeof isAttendanceAdminViewer !== 'undefined' && isAttendanceAdminViewer === true;
+  const attManageBtns = showAttendanceManageBtns ? [
     '<a href="/school/attendances/report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-person-lines-fill me-1"></i> Student Attendance Report</a>',
     '<a href="/school/settings" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> School Settings</a>',
     '<button type="button" id="btn_copyLink" class="btn btn-outline-primary btn-md mb-2" onclick="navigator.clipboard.writeText(window.location.href); alert(\'Link copied\');"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>',
     '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>'
-  ];
+  ] : [];
 %>
 
 <%- include('partials/tablePages-start', {
@@ -247,7 +273,14 @@
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h5 class="m-0 fw-bold text-primary" id="lbl_displayClassName">Class Name</h5>
-            <div class="small text-muted text-md-end" id="attendanceMatrixLegend"></div>
+            <button type="button"
+                class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                id="btn_attendanceMatrixLegend"
+                data-attendance-open-legend
+                aria-label="Legend"
+                title="Legend">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+            </button>
         </div>
         <div class="card-body p-0">
             <div class="matrix-wrapper">
@@ -255,6 +288,20 @@
                     <thead><tr id="matrixHeaders"></tr></thead>
                     <tbody id="matrixBody"></tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="attendanceMatrixLegendModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2 px-3">
+                <h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-info-circle me-1"></i>Attendance Legend</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="attendanceMatrixLegendModalBody" class="attendance-legend-modal-body"></div>
             </div>
         </div>
     </div>
@@ -454,11 +501,35 @@ function buildAttendanceLegendText(enabledStatuses) {
 }
 
 function renderAttendanceMatrixLegend() {
-    if (!window.AttendanceMarkAppearance?.renderAttendanceLegend) return;
-    window.AttendanceMarkAppearance.renderAttendanceLegend('attendanceMatrixLegend', {
-        includeRollup: true,
-        includeNotes: true
+    const modalBody = document.getElementById('attendanceMatrixLegendModalBody');
+    if (!modalBody || !window.AttendanceMarkAppearance?.buildLegendEntries) return;
+    const escapeLegend = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    const items = window.AttendanceMarkAppearance.buildLegendEntries().map((entry) => {
+        if (window.AttendanceMarkAppearance.buildLegendItemHtml) {
+            return window.AttendanceMarkAppearance.buildLegendItemHtml(entry);
+        }
+        return `<span class="attendance-legend-item">${escapeLegend(entry.label || entry.key || '')}</span>`;
     });
+    items.push('<span class="attendance-legend-item"><i class="bi bi-percent text-secondary"></i> Rollup % = time-based credit</span>');
+    const notesMark = window.AttendanceMarkAppearance.getMark?.('notes');
+    const notesIcon = window.AttendanceMarkAppearance.buildMarkIconHtml
+        ? window.AttendanceMarkAppearance.buildMarkIconHtml('notes')
+        : '<i class="bi bi-chat-dots-fill status-notes"></i>';
+    items.push(`<span class="attendance-legend-item">${notesIcon} ${escapeLegend(notesMark?.label || 'Notes exist')}</span>`);
+    items.push('<span class="attendance-legend-item text-muted small">minutes as late\'/early\' (e.g. L 12\', L /5\', or L 12\'/5\')</span>');
+    modalBody.innerHTML = `<div class="attendance-legend-items">${items.join('')}</div>`;
+}
+
+function openAttendanceMatrixLegendModal() {
+    const modalEl = document.getElementById('attendanceMatrixLegendModal');
+    if (!modalEl || !window.bootstrap?.Modal) return;
+    renderAttendanceMatrixLegend();
+    window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
 }
 
 function resetAttendanceStudentVisibility(matrixRows) {
@@ -1485,6 +1556,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn_loadData').addEventListener('click', () => loadAttendanceMatrixData());
+    document.getElementById('btn_attendanceMatrixLegend')?.addEventListener('click', () => {
+        openAttendanceMatrixLegendModal();
+    });
 
     // --- 3b. Attendance Matrix Print ---
     const ATT_PRINT_STATUS_LETTER = {

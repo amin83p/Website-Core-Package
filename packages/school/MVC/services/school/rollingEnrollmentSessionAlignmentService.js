@@ -820,6 +820,29 @@ async function appendBatchSessions({ classData, batchSpec = {}, reqUser, extendC
   };
 }
 
+/**
+ * Remove a person from session rosters for enrollment-excluded sessions
+ * (Manage enrollment sessions / rolling planned N/A). Does not write teacher N/A rows.
+ */
+function removePersonFromExcludedSessionRosters(sessions = [], personId = '', sessionIds = []) {
+  const personToken = toPublicId(personId);
+  const idSet = new Set(sanitizePlannedNaSessionIds(sessionIds));
+  let updatedCount = 0;
+  if (!personToken || !idSet.size) {
+    return { nextSessions: Array.isArray(sessions) ? sessions : [], updatedCount: 0 };
+  }
+  const nextSessions = (Array.isArray(sessions) ? sessions : []).map((session) => {
+    const sessionId = getSessionId(session);
+    if (!idSet.has(sessionId)) return session;
+    const roster = Array.isArray(session.roster) ? session.roster : [];
+    const filtered = roster.filter((row) => !idsEqual(row?.personId, personToken));
+    if (filtered.length === roster.length) return session;
+    updatedCount += 1;
+    return { ...session, roster: filtered };
+  });
+  return { nextSessions, updatedCount };
+}
+
 async function materializePlannedNaAttendance({ classId, personId, sessionIds = [], reqUser } = {}) {
   const classToken = toPublicId(classId);
   const personToken = toPublicId(personId);
@@ -830,31 +853,11 @@ async function materializePlannedNaAttendance({ classId, personId, sessionIds = 
 
   const schoolDataService = resolveSchoolDataService();
   const sessions = await schoolDataService.getClassSessions(classToken, reqUser);
-  const idSet = new Set(targetIds);
-  let updatedCount = 0;
-
-  const nextSessions = (Array.isArray(sessions) ? sessions : []).map((session) => {
-    const sessionId = getSessionId(session);
-    if (!idSet.has(sessionId)) return session;
-    const roster = Array.isArray(session.roster) ? [...session.roster] : [];
-    const index = roster.findIndex((row) => idsEqual(row?.personId, personToken));
-    const naStatus = attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
-    if (index >= 0) {
-      if (roster[index].attendance !== naStatus) {
-        roster[index] = { ...roster[index], personId: personToken, attendance: naStatus };
-        updatedCount += 1;
-      }
-    } else {
-      roster.push({
-        personId: personToken,
-        attendance: naStatus,
-        notes: '',
-        comments: []
-      });
-      updatedCount += 1;
-    }
-    return { ...session, roster };
-  });
+  const { nextSessions, updatedCount } = removePersonFromExcludedSessionRosters(
+    sessions,
+    personToken,
+    targetIds
+  );
 
   if (updatedCount > 0) {
     await schoolDataService.saveClassSessions(classToken, nextSessions, reqUser);
@@ -1130,6 +1133,7 @@ module.exports = {
   commitStagedSessions,
   appendBatchSessions,
   materializePlannedNaAttendance,
+  removePersonFromExcludedSessionRosters,
   sanitizePlannedNaSessionIds,
   parsePlannedNaSessionIdsFromBody,
   assertRollingSessionsWithinCycleWindowOrThrow,

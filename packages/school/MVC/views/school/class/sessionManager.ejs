@@ -335,118 +335,28 @@
         font-weight: 600;
     }
 
-    .session-manager-class-nav {
-        display: inline-flex;
-        flex-direction: column;
-        align-items: stretch;
-        min-width: min(100%, 280px);
-        max-width: 100%;
-        flex: 0 1 280px;
-    }
-    .session-manager-class-nav-toggle {
+    .session-panel-matrix-link {
         display: inline-flex;
         align-items: center;
-        gap: 0.7rem;
-        width: 100%;
-        padding: 0.62rem 0.95rem;
-        border: 1px solid #a5b4fc;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #ffffff 0%, #eef2ff 55%, #e0e7ff 100%);
-        color: #312e81;
-        font-weight: 700;
-        text-align: left;
-        box-shadow: 0 6px 18px rgba(79, 70, 229, 0.14);
-        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-    }
-    .session-manager-class-nav-toggle:hover:not(:disabled) {
-        border-color: #818cf8;
-        box-shadow: 0 8px 22px rgba(79, 70, 229, 0.2);
-        transform: translateY(-1px);
-        color: #1e1b4b;
-    }
-    .session-manager-class-nav-toggle[aria-expanded="true"] {
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-        border-bottom-color: #c7d2fe;
-        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
-    }
-    .session-manager-class-nav-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 2rem;
-        height: 2rem;
-        border-radius: 9px;
-        background: rgba(99, 102, 241, 0.14);
-        color: #4338ca;
-        flex-shrink: 0;
-    }
-    .session-manager-class-nav-copy {
-        display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
-        min-width: 0;
-        flex: 1;
-    }
-    .session-manager-class-nav-title {
-        font-size: 0.92rem;
-        line-height: 1.2;
-    }
-    .session-manager-class-nav-sub {
-        font-size: 0.72rem;
-        font-weight: 600;
-        color: #6366f1;
-        letter-spacing: 0.02em;
-    }
-    .session-class-nav-chevron {
-        transition: transform 0.2s ease;
-        font-size: 0.9em;
-        color: #6366f1;
-        flex-shrink: 0;
-    }
-    .session-manager-class-nav-toggle[aria-expanded="true"] .session-class-nav-chevron {
-        transform: rotate(180deg);
-    }
-    .session-manager-class-nav-links {
-        display: flex;
-        flex-direction: column;
         gap: 0.35rem;
-        padding: 0.55rem;
-        border: 1px solid #a5b4fc;
-        border-top: 1px solid #c7d2fe;
-        border-radius: 0 0 12px 12px;
+        padding: 0.35rem 0.7rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
         background: #fff;
-        box-shadow: 0 10px 24px rgba(79, 70, 229, 0.1);
-    }
-    .session-manager-class-nav-link {
-        display: flex;
-        align-items: center;
-        gap: 0.55rem;
-        padding: 0.55rem 0.7rem;
-        border-radius: 9px;
-        text-decoration: none;
+        color: #334155;
+        font-size: 0.8125rem;
         font-weight: 600;
-        font-size: 0.9rem;
-        color: #1e293b;
-        border: 1px solid transparent;
-        transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
     }
-    .session-manager-class-nav-link:hover {
-        background: #f8fafc;
-        border-color: #e2e8f0;
+    .session-panel-matrix-link:hover {
+        border-color: #93c5fd;
+        background: #eff6ff;
         color: #1d4ed8;
     }
-    .session-manager-class-nav-link i {
-        font-size: 1rem;
-        opacity: 0.9;
-    }
-    .session-manager-class-nav-link--outcomes {
-        color: #166534;
-    }
-    .session-manager-class-nav-link--outcomes:hover {
-        background: #f0fdf4;
-        border-color: #bbf7d0;
-        color: #15803d;
+    .session-panel-matrix-link i {
+        font-size: 0.95rem;
     }
 
     /* Info card: collapsible header + expandable detail tiles */
@@ -1477,7 +1387,7 @@
         const originalSessionReferenceId = String(originalSessionReference?.sessionId || session?.makeup?.originalSessionId || '').trim();
         const canDeleteMakeupSessionsFlag = typeof canDeleteMakeupSessions !== 'undefined' && canDeleteMakeupSessions === true;
         const workDisabledAttr = (isReadOnly || isMakeupRequiredInactive) ? 'disabled' : '';
-        const attendanceMatrixHref = '/school/attendances?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
+        const attendanceMatrixHref = '/school/attendances?classId=' + encodeURIComponent(classData.id) + '&range=thisMonth';
         const gradesMatrixHref = '/school/grades-matrix?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
         const smRegMode = String(classData.registrationMode || 'term_based').trim().toLowerCase();
         const smIsRolling = smRegMode === 'rolling';
@@ -1490,10 +1400,6 @@
         const smSessionOutsideCycle = smIsRolling
             && smCycleStart
             && (smSessionDate < smCycleStart || (smCycleEnd && smSessionDate > smCycleEnd));
-        const finalGradesNavHref = smIsRolling
-            ? '/school/classes/' + encodeURIComponent(classData.id) + '/enrollment-outcomes'
-            : '/school/classes/' + encodeURIComponent(classData.id) + '/final-grades';
-        const finalGradesNavLabel = smIsRolling ? 'Enrollment outcomes' : 'Final Grades';
         const smCycleTooltipText = smIsRolling
             ? (smSessionOutsideCycle
                 ? 'This session date is outside the rolling cycle window. Update the class cycle dates or rebuild the session ledger before saving session changes.'
@@ -1581,32 +1487,6 @@
     </div>
 
     <div class="session-manager-toolbar-row">
-        <div class="session-manager-class-nav">
-            <button
-                type="button"
-                class="session-manager-class-nav-toggle"
-                id="btnToggleSessionClassNav"
-                data-bs-toggle="collapse"
-                data-bs-target="#sessionManagerClassNavCollapse"
-                aria-expanded="false"
-                aria-controls="sessionManagerClassNavCollapse">
-                <span class="session-manager-class-nav-icon" aria-hidden="true"><i class="bi bi-box-arrow-up-right"></i></span>
-                <span class="session-manager-class-nav-copy">
-                    <span class="session-manager-class-nav-title">Class navigation</span>
-                    <span class="session-manager-class-nav-sub">Outcomes &amp; matrices</span>
-                </span>
-                <i class="bi bi-chevron-down session-class-nav-chevron" aria-hidden="true"></i>
-            </button>
-            <div class="collapse" id="sessionManagerClassNavCollapse">
-                <div class="session-manager-class-nav-links">
-                    <a href="<%= finalGradesNavHref %>" class="session-manager-class-nav-link session-manager-class-nav-link--outcomes session-manager-nav-away" id="linkFinalGradesNav" data-confirm-title="Leave session manager?" data-confirm-message="Open <%= finalGradesNavLabel %>? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-award"></i><%= finalGradesNavLabel %></a>
-                    <% if (typeof canOpenAttendanceMatrix !== 'undefined' && canOpenAttendanceMatrix) { %>
-                    <a href="<%= attendanceMatrixHref %>" class="session-manager-class-nav-link session-manager-nav-away" id="linkAttendanceMatrix" data-matrix-href="<%= attendanceMatrixHref %>" data-confirm-title="Open attendance matrix?" data-confirm-message="Open the attendance matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-grid-3x3"></i>Attendance matrix</a>
-                    <% } %>
-                    <a href="<%= gradesMatrixHref %>" class="session-manager-class-nav-link session-manager-nav-away" id="linkGradesMatrix" data-matrix-href="<%= gradesMatrixHref %>" data-confirm-title="Open grades matrix?" data-confirm-message="Open the grades matrix? Unsaved changes on this page will be lost unless you save first."><i class="bi bi-table"></i>Grades matrix</a>
-                </div>
-            </div>
-        </div>
         <div class="session-manager-toolbar-actions">
             <div class="btn-group shadow-sm">
                 <% if (prevSessionHref) { %>
@@ -1998,45 +1878,51 @@
                 </div>
             <% } %>
             <div class="session-panel active" id="session-panel-attendance" role="tabpanel">
-                <div class="row g-2 mb-3">
+                <div class="row g-2 mb-3" id="attendanceStatusSummary">
+                    <div class="col-6 col-md">
+                        <div class="session-summary-card h-100">
+                            <div class="session-summary-label">Students</div>
+                            <div class="session-summary-value" id="attendanceSummaryTotal"><%= (session.roster || []).length %></div>
+                        </div>
+                    </div>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Present</div>
-                            <div class="session-summary-value text-success"><%= attendanceSummary.present %></div>
+                            <div class="session-summary-value text-success" id="attendanceSummaryPresent"><%= attendanceSummary.present %></div>
                         </div>
                     </div>
                     <% if (enabledAttendanceSet.has('late')) { %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Late</div>
-                            <div class="session-summary-value text-warning"><%= attendanceSummary.late %></div>
+                            <div class="session-summary-value text-warning" id="attendanceSummaryLate"><%= attendanceSummary.late %></div>
                         </div>
                     </div>
                     <% } %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Excused</div>
-                            <div class="session-summary-value text-info"><%= attendanceSummary.excused %></div>
+                            <div class="session-summary-value text-info" id="attendanceSummaryExcused"><%= attendanceSummary.excused %></div>
                         </div>
                     </div>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">Absent</div>
-                            <div class="session-summary-value text-danger"><%= attendanceSummary.absent %></div>
+                            <div class="session-summary-value text-danger" id="attendanceSummaryAbsent"><%= attendanceSummary.absent %></div>
                         </div>
                     </div>
                     <% if (enabledAttendanceSet.has('acf')) { %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">ACF</div>
-                            <div class="session-summary-value" style="color:#b02a37;"><%= attendanceSummary.acf %></div>
+                            <div class="session-summary-value" style="color:#b02a37;" id="attendanceSummaryAcf"><%= attendanceSummary.acf %></div>
                         </div>
                     </div>
                     <% } %>
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
                             <div class="session-summary-label">N/A</div>
-                            <div class="session-summary-value text-secondary"><%= attendanceSummary.not_applicable %></div>
+                            <div class="session-summary-value text-secondary" id="attendanceSummaryNotApplicable"><%= attendanceSummary.not_applicable %></div>
                         </div>
                     </div>
                 </div>
@@ -2045,6 +1931,16 @@
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h5 class="m-0 fw-bold text-primary"><i class="bi bi-people-fill me-2"></i>Attendance roster</h5>
                         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                            <% if (typeof canOpenAttendanceMatrix !== 'undefined' && canOpenAttendanceMatrix) { %>
+                            <a href="<%= attendanceMatrixHref %>"
+                               class="session-panel-matrix-link session-manager-nav-away"
+                               id="linkAttendanceMatrix"
+                               data-matrix-href="<%= attendanceMatrixHref %>"
+                               data-confirm-title="Open attendance matrix?"
+                               data-confirm-message="Open the attendance matrix? Unsaved changes on this page will be lost unless you save first.">
+                                <i class="bi bi-grid-3x3" aria-hidden="true"></i>Attendance matrix
+                            </a>
+                            <% } %>
                             <% if (!isReadOnly && session.roster.length > 0) { %>
                                 <div class="btn-group btn-group-sm" role="group" aria-label="Bulk attendance">
                                     <button type="button" class="btn btn-outline-success" id="btnAllPresent">All Present</button>
@@ -2056,7 +1952,6 @@
                                     <button type="button" class="btn btn-outline-dark" id="btnAllResetAttendance" title="Clear attendance back to unmarked">Reset</button>
                                 </div>
                             <% } %>
-                            <span class="badge bg-light text-dark border"><%= session.roster.length %> Students</span>
                         </div>
                     </div>
                     <div class="card-body p-0">
@@ -2563,8 +2458,16 @@
                 </div>
             </div>            <div class="session-panel" id="session-panel-gradebook" role="tabpanel">
                 <div class="card border-0 shadow-sm mb-3">
-                    <div class="card-header bg-white border-bottom py-3">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h5 class="m-0 fw-bold text-primary"><i class="bi bi-journal-bookmark me-2"></i>Session gradebook</h5>
+                        <a href="<%= gradesMatrixHref %>"
+                           class="session-panel-matrix-link session-manager-nav-away"
+                           id="linkGradesMatrix"
+                           data-matrix-href="<%= gradesMatrixHref %>"
+                           data-confirm-title="Open grades matrix?"
+                           data-confirm-message="Open the grades matrix? Unsaved changes on this page will be lost unless you save first.">
+                            <i class="bi bi-table" aria-hidden="true"></i>Grades matrix
+                        </a>
                     </div>
                     <% if (!isReadOnly) { %>
                     <div class="session-panel-cta-zone session-panel-cta-zone--primary">
@@ -2626,7 +2529,7 @@
 </div>
 
 <div class="modal fade" id="attendanceDetailsModal" tabindex="-1" aria-hidden="true" data-session-start="<%= session.startTime || '' %>" data-session-end="<%= session.endTime || '' %>">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold">
@@ -2686,16 +2589,11 @@
 
                 <div class="row g-3 mb-2">
                     <div class="col-12">
-                        <label class="form-label fw-bold small">Excuse / reference notes</label>
-                        <div class="row g-2 align-items-start">
-                            <div class="col-md-8">
-                                <textarea class="form-control" id="modalExcuseRef" rows="3" placeholder="Add details..." <%- disabledAttr %>></textarea>
-                            </div>
-                            <div class="col-md-4">
-                                <input type="file" class="form-control form-control-sm" id="modalExcuseFile" <%- disabledAttr %>>
-                                <div class="small text-muted mt-1">Attach supporting file if needed.</div>
-                            </div>
-                        </div>
+                        <label class="form-label fw-bold small" for="modalExcuseRef">Excuse / reference notes</label>
+                        <textarea class="form-control" id="modalExcuseRef" rows="3" placeholder="Add details..." <%- disabledAttr %>></textarea>
+                        <label class="form-label fw-bold small mt-2" for="modalExcuseFile">Attach supporting file</label>
+                        <input type="file" class="form-control form-control-sm" id="modalExcuseFile" <%- disabledAttr %>>
+                        <div class="small text-muted mt-1">Browse, or paste a screenshot / file (Ctrl+V / Cmd+V).</div>
                         <div class="small mt-2" id="modalExcuseAttachmentPreview"></div>
                     </div>
                 </div>
@@ -2708,7 +2606,6 @@
                     <div class="border rounded p-2 bg-white shadow-sm">
                         <div class="d-flex flex-wrap gap-1 mb-2" id="pendingMentionsArea"></div>
                         <textarea class="form-control border-0 bg-transparent p-0 mb-2" id="inp_newComment" rows="2" placeholder="Write a note or tag someone..."></textarea>
-                        <input type="file" class="form-control form-control-sm mb-2" id="inp_newCommentFile" <%- disabledAttr %>>
                         <div class="d-flex justify-content-between align-items-center border-top pt-2">
                             <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser"><i class="bi bi-at"></i> Tag User</button>
                             <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Send Note</button>
@@ -3033,6 +2930,8 @@ let detailsModalInstance = null;
 let detailsModalAllowClose = false;
 let detailsModalSnapshot = null;
 let currentMentions = [];
+let lastAtMentionTokenHandled = '';
+let pendingAtMentionReplace = null;
 let modalLateExcused = false;
 let modalEarlyLeaveExcused = false;
 let modalAbsenceExcused = false;
@@ -3290,7 +3189,6 @@ function captureDetailsModalFormSnapshot() {
         excuse: String(document.getElementById('modalExcuseRef')?.value || '').trim(),
         excuseFileSelected: Boolean(document.getElementById('modalExcuseFile')?.files?.length),
         commentDraft: String(document.getElementById('inp_newComment')?.value || '').trim(),
-        commentFileSelected: Boolean(document.getElementById('inp_newCommentFile')?.files?.length),
         mentionCount: Array.isArray(currentMentions) ? currentMentions.length : 0
     };
 }
@@ -3307,7 +3205,6 @@ function isDetailsModalDirty() {
         current.excuse !== detailsModalSnapshot.excuse ||
         current.excuseFileSelected !== detailsModalSnapshot.excuseFileSelected ||
         current.commentDraft !== detailsModalSnapshot.commentDraft ||
-        current.commentFileSelected !== detailsModalSnapshot.commentFileSelected ||
         current.mentionCount !== detailsModalSnapshot.mentionCount
     );
 }
@@ -3424,6 +3321,67 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error(result?.message || 'File upload failed.');
         }
         return result.file || null;
+    }
+
+    function buildAttendanceScreenshotFileName(mimeType = 'image/png') {
+        const now = new Date();
+        const pad = (value) => String(value).padStart(2, '0');
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        const subtype = String(mimeType || '').split('/')[1] || 'png';
+        const ext = subtype === 'jpeg' ? 'jpg' : subtype.replace(/[^a-z0-9]/gi, '') || 'png';
+        return `screenshot-${stamp}.${ext}`;
+    }
+
+    function normalizeClipboardPasteFile(file, mimeType = '') {
+        if (!file) return null;
+        const type = file.type || mimeType || 'application/octet-stream';
+        const rawName = String(file.name || '').trim();
+        const isGenericImageName = !rawName
+            || /^image\.(png|jpe?g|gif|webp|bmp)$/i.test(rawName)
+            || rawName === 'image';
+        if (type.startsWith('image/') && isGenericImageName) {
+            return new File([file], buildAttendanceScreenshotFileName(type), { type });
+        }
+        if (!rawName) {
+            return new File([file], `pasted-file-${Date.now()}`, { type });
+        }
+        return file;
+    }
+
+    function filesFromAttendanceClipboard(clipboardData) {
+        if (!clipboardData) return [];
+        const directFiles = Array.from(clipboardData.files || [])
+            .map((file) => normalizeClipboardPasteFile(file))
+            .filter(Boolean);
+        if (directFiles.length) return directFiles;
+
+        const files = [];
+        Array.from(clipboardData.items || []).forEach((item) => {
+            if (!item || item.kind !== 'file') return;
+            const blob = item.getAsFile();
+            const normalized = normalizeClipboardPasteFile(blob, item.type);
+            if (normalized) files.push(normalized);
+        });
+        return files;
+    }
+
+    function assignAttendanceFileInput(input, file) {
+        if (!input || !file || input.disabled) return false;
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+    }
+
+    function resolveAttendancePasteFileInput(_activeEl) {
+        return document.getElementById('modalExcuseFile');
+    }
+
+    function updateModalExcusePastePreview(file) {
+        const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
+        if (!excusePreview || !file) return;
+        excusePreview.innerHTML = `<span class="text-success"><i class="bi bi-paperclip me-1"></i>${attendanceAttachmentEscape(file.name)} (ready to apply)</span>`;
     }
     function renderAttendanceAttachmentLink(attachment, emptyText = '') {
         const att = parseAttendanceAttachment(attachment);
@@ -6066,6 +6024,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (detailsModalInstance) detailsModalInstance.hide();
             })();
         });
+
+        attendanceDetailsModalEl.addEventListener('paste', (event) => {
+            const pastedFiles = filesFromAttendanceClipboard(event.clipboardData);
+            if (!pastedFiles.length) return;
+
+            const targetInput = resolveAttendancePasteFileInput(event.target);
+            if (!targetInput || targetInput.disabled) return;
+
+            event.preventDefault();
+            const file = pastedFiles[0];
+            if (!assignAttendanceFileInput(targetInput, file)) return;
+            if (targetInput.id === 'modalExcuseFile') updateModalExcusePastePreview(file);
+        });
     }
 
     const SIDEBAR_KEY = 'sessionManagerSidebarCollapsed';
@@ -6653,27 +6624,82 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function addAttendanceMentionFromPicker(item) {
+        const mentionId = item.userId || item.id;
+        const name = item.displayName || item.name || item.email || mentionId;
+        if (mentionId && mentionId !== 'undefined' && !currentMentions.find(m => m.id === mentionId)) {
+            currentMentions.push({
+                id: mentionId,
+                name: name,
+                email: item.email || ''
+            });
+            renderMentions();
+        }
+    }
+
+    function applyPendingAtMentionReplace() {
+        const textarea = document.getElementById('inp_newComment');
+        if (!textarea || !pendingAtMentionReplace) {
+            pendingAtMentionReplace = null;
+            return;
+        }
+        const { start, end } = pendingAtMentionReplace;
+        const value = String(textarea.value || '');
+        if (start < 0 || end > value.length || start > end) {
+            pendingAtMentionReplace = null;
+            return;
+        }
+        textarea.value = value.slice(0, start) + value.slice(end);
+        const caret = start;
+        try { textarea.setSelectionRange(caret, caret); } catch (_error) { /* ignore */ }
+        pendingAtMentionReplace = null;
+    }
+
+    function openAttendanceTagUserPicker({ initialSearchTerm = '', replaceRange = null } = {}) {
+        if (typeof GenericPicker === 'undefined' || !GenericPickerPresets?.user) return;
+        pendingAtMentionReplace = replaceRange;
+        GenericPicker.open(GenericPickerPresets.user({
+            title: 'Tag User',
+            icon: 'bi-at',
+            apiEndpoint: '/school/identity/api/taggable-users',
+            placeholder: 'Search for a user...',
+            initialSearchTerm: String(initialSearchTerm || '').trim(),
+            onSelect: (item) => {
+                addAttendanceMentionFromPicker(item);
+                applyPendingAtMentionReplace();
+            }
+        }));
+    }
+
+    function maybeOpenAtMentionPicker(textarea) {
+        if (!textarea) return;
+        const caret = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : String(textarea.value || '').length;
+        const before = String(textarea.value || '').slice(0, caret);
+        const match = before.match(/@([^\s@]{2,})\s$/);
+        if (!match) return;
+        const token = match[1];
+        const start = caret - match[0].length;
+        const end = caret;
+        const guardKey = `${start}:${token}`;
+        if (lastAtMentionTokenHandled === guardKey) return;
+        lastAtMentionTokenHandled = guardKey;
+        openAttendanceTagUserPicker({
+            initialSearchTerm: token,
+            replaceRange: { start, end }
+        });
+    }
+
     const btnMentionUser = document.getElementById('btn_mentionUser');
     if (btnMentionUser) {
         btnMentionUser.addEventListener('click', () => {
-            GenericPicker.open(GenericPickerPresets.user({
-                title: 'Tag User',
-                icon: 'bi-at',
-                apiEndpoint: '/school/identity/api/taggable-users',
-                placeholder: 'Search for a user...',
-                onSelect: (item) => {
-                    const mentionId = item.userId || item.id;
-                    const name = item.displayName || item.name || item.email || mentionId;
-                    if (mentionId && mentionId !== 'undefined' && !currentMentions.find(m => m.id === mentionId)) {
-                        currentMentions.push({
-                            id: mentionId,
-                            name: name,
-                            email: item.email || ''
-                        });
-                        renderMentions();
-                    }
-                }
-            }));
+            openAttendanceTagUserPicker();
+        });
+    }
+
+    const inpNewComment = document.getElementById('inp_newComment');
+    if (inpNewComment) {
+        inpNewComment.addEventListener('input', () => {
+            maybeOpenAtMentionPicker(inpNewComment);
         });
     }
 
@@ -6709,7 +6735,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     studentPersonId: studentId,
                     text: text,
                     mentions: currentMentions,
-                    attachment: await uploadSchoolSessionFile(document.getElementById('inp_newCommentFile'), 'comment', studentId),
+                    attachment: null,
                     actionStateId
                 };
 
@@ -6748,9 +6774,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 thread.scrollTop = thread.scrollHeight;
 
                 document.getElementById('inp_newComment').value = '';
-                const commentFileInput = document.getElementById('inp_newCommentFile');
-                if (commentFileInput) commentFileInput.value = '';
                 currentMentions = [];
+                lastAtMentionTokenHandled = '';
+                pendingAtMentionReplace = null;
                 const area = document.getElementById('pendingMentionsArea');
                 if(area) area.innerHTML = '';
 
@@ -6867,6 +6893,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     applyAttendanceRulesToRow(row);
                     updateLateMissingMinuteState(row);
+                    if (typeof refreshAttendanceStatusSummary === 'function') refreshAttendanceStatusSummary();
                     if (typeof gbOnAttendanceChanged === 'function') gbOnAttendanceChanged();
                     markSessionAutosaveRosterDirty();
 
@@ -8773,6 +8800,44 @@ document.addEventListener('DOMContentLoaded', () => {
         markSessionAutosaveGradebookDirty();
     }
 
+    function refreshAttendanceStatusSummary() {
+        const counts = {
+            present: 0,
+            late: 0,
+            excused: 0,
+            absent: 0,
+            acf: 0,
+            not_applicable: 0
+        };
+        const rows = document.querySelectorAll('#attendanceTable .roster-row');
+        rows.forEach((row) => {
+            const key = String(row.querySelector('.att-radio:checked')?.value || '').trim().toLowerCase();
+            if (!key) return;
+            const absenceExcused = String(row.querySelector('.att-absence-excused')?.value || '').trim().toLowerCase() === 'true';
+            if (key === 'excused') {
+                counts.excused += 1;
+                return;
+            }
+            if ((key === 'absent' || key === 'acf') && absenceExcused) {
+                counts.excused += 1;
+                return;
+            }
+            if (Object.prototype.hasOwnProperty.call(counts, key)) counts[key] += 1;
+        });
+
+        const setVal = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = String(value);
+        };
+        setVal('attendanceSummaryTotal', rows.length);
+        setVal('attendanceSummaryPresent', counts.present);
+        setVal('attendanceSummaryLate', counts.late);
+        setVal('attendanceSummaryExcused', counts.excused);
+        setVal('attendanceSummaryAbsent', counts.absent);
+        setVal('attendanceSummaryAcf', counts.acf);
+        setVal('attendanceSummaryNotApplicable', counts.not_applicable);
+    }
+
     const attendanceTableEl = document.getElementById('attendanceTable');
     if (attendanceTableEl) {
         attendanceTableEl.addEventListener('change', (e) => {
@@ -8786,6 +8851,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     openLateDetailsForRow(row);
                 }
             }
+            refreshAttendanceStatusSummary();
             gbOnAttendanceChanged();
             markSessionAutosaveRosterDirty();
         });
@@ -8794,6 +8860,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAllPresentGb = document.getElementById('btnAllPresent');
     if (btnAllPresentGb) btnAllPresentGb.addEventListener('click', () => {
         applyBulkAttendance('present');
+        refreshAttendanceStatusSummary();
         gbOnAttendanceChanged();
         markSessionAutosaveRosterDirty();
     });
@@ -8801,6 +8868,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnAllLateGb) btnAllLateGb.addEventListener('click', async () => {
         applyBulkAttendance('late');
         document.querySelectorAll('.roster-row').forEach((row) => updateLateMissingMinuteState(row));
+        refreshAttendanceStatusSummary();
         gbOnAttendanceChanged();
         markSessionAutosaveRosterDirty();
         await showLateMinutesRequiredWarning(getLateMissingMinuteRows(), { openFirst: false });
@@ -8808,18 +8876,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAllAbsentGb = document.getElementById('btnAllAbsent');
     if (btnAllAbsentGb) btnAllAbsentGb.addEventListener('click', () => {
         applyBulkAttendance('absent');
+        refreshAttendanceStatusSummary();
         gbOnAttendanceChanged();
         markSessionAutosaveRosterDirty();
     });
     const btnAllNotApplicableGb = document.getElementById('btnAllNotApplicable');
     if (btnAllNotApplicableGb) btnAllNotApplicableGb.addEventListener('click', () => {
         applyBulkAttendance('not_applicable');
+        refreshAttendanceStatusSummary();
         gbOnAttendanceChanged();
         markSessionAutosaveRosterDirty();
     });
     const btnAllResetAttendanceGb = document.getElementById('btnAllResetAttendance');
     if (btnAllResetAttendanceGb) btnAllResetAttendanceGb.addEventListener('click', () => {
         resetBulkAttendance();
+        refreshAttendanceStatusSummary();
         gbOnAttendanceChanged();
         markSessionAutosaveRosterDirty();
     });
@@ -9289,10 +9360,10 @@ function openDetailsModal(personId, name) {
 
     document.getElementById('inp_newComment').value = '';
     currentMentions = [];
+    lastAtMentionTokenHandled = '';
+    pendingAtMentionReplace = null;
     const area = document.getElementById('pendingMentionsArea');
     if(area) area.innerHTML = '';
-    const commentFileInput = document.getElementById('inp_newCommentFile');
-    if (commentFileInput) commentFileInput.value = '';
 
     detailsModalSnapshot = captureDetailsModalFormSnapshot();
     detailsModalAllowClose = false;

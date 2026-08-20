@@ -24,6 +24,11 @@
                 </div>
             </div>
 
+            <div id="gp-recent-section" class="mb-3 d-none">
+                <div class="small text-muted mb-1">Recent</div>
+                <div id="gp-recent-chips" class="d-flex flex-wrap gap-2"></div>
+            </div>
+
             <div class="d-flex gap-2 align-items-center">
                 <div class="position-relative flex-grow-1">
                     <i class="bi bi-search position-absolute text-muted" style="left: 14px; top: 50%; transform: translateY(-50%);"></i>
@@ -97,11 +102,15 @@ window.GenericPicker = (function() {
     const contextIcon = document.getElementById('gp-context-icon');
     const contextLabel = document.getElementById('gp-context-label');
     const contextValue = document.getElementById('gp-context-value');
+    const recentSection = document.getElementById('gp-recent-section');
+    const recentChipsEl = document.getElementById('gp-recent-chips');
 
     let currentConfig = {};
+    let currentRecentResourceKey = '';
     let debounceTimer;
     const SHOW_ALL_KEYWORDS = new Set(['aaa', '---']);
     const DEFAULT_SEARCH_DEBOUNCE_MS = 400;
+    const RECENT_PICKS_LIMIT = 5;
     const pickerState = {
       term: '',
       forceShowAll: false,
@@ -115,6 +124,160 @@ window.GenericPicker = (function() {
       selectedItemsMap: new Map(),
       renderedItemIds: new Set()
     };
+
+    function escapeRecentLabel(value) {
+        if (pickerCore?.escapeHtml) return pickerCore.escapeHtml(value);
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function getPickerUser() {
+        const fromWindow = (window.__GENERIC_PICKER_USER__ && typeof window.__GENERIC_PICKER_USER__ === 'object')
+            ? window.__GENERIC_PICKER_USER__
+            : null;
+        if (fromWindow) return fromWindow;
+        return null;
+    }
+
+    function getPickerUserId() {
+        const user = getPickerUser();
+        const fromUser = String(user?.id || user?.userId || '').trim();
+        if (fromUser) return fromUser;
+        return String(document.getElementById('user-id')?.dataset?.id || '').trim();
+    }
+
+    function getPickerOrgId() {
+        const user = getPickerUser();
+        return String(
+            user?.activeOrgId
+            || user?.organizationId
+            || user?.orgId
+            || user?.primaryOrgId
+            || currentConfig?.context?.orgId
+            || '_'
+        ).trim() || '_';
+    }
+
+    function resolveRecentResourceKey(rawConfig, normalizedConfig) {
+        const presetHint = String(rawConfig?.preset || '').trim();
+        if (presetHint) return presetHint.toLowerCase();
+        const infer = window.GenericPickerPresets?.inferName;
+        if (typeof infer === 'function') {
+            const fromRaw = infer(rawConfig || {});
+            if (fromRaw) return String(fromRaw).trim().toLowerCase();
+            const fromNormalized = infer(normalizedConfig || {});
+            if (fromNormalized) return String(fromNormalized).trim().toLowerCase();
+        }
+        const fromEndpoint = getResourceNameFromEndpoint(normalizedConfig?.apiEndpoint || rawConfig?.apiEndpoint);
+        return String(fromEndpoint || 'item').trim().toLowerCase() || 'item';
+    }
+
+    function recentPicksStorageKey(resourceKey) {
+        const userId = getPickerUserId() || '_anon';
+        const orgId = getPickerOrgId();
+        const key = String(resourceKey || 'item').trim().toLowerCase() || 'item';
+        return `genericPicker.recent:${userId}:${orgId}:${key}`;
+    }
+
+    function toSerializablePick(item) {
+        if (!item || typeof item !== 'object') return null;
+        try {
+            return JSON.parse(JSON.stringify(item));
+        } catch (_error) {
+            const id = String(item.id || item.personId || item.userId || '').trim();
+            if (!id) return null;
+            return {
+                id,
+                displayName: item.displayName || item.name || item.title || item.username || id,
+                name: item.name || item.displayName || item.title || id
+            };
+        }
+    }
+
+    function recentPickLabel(item) {
+        return String(
+            item?.displayName
+            || (typeof item?.name === 'string' ? item.name : '')
+            || item?.title
+            || item?.username
+            || item?.label
+            || item?.identity?.displayName
+            || item?.id
+            || 'Item'
+        ).trim() || 'Item';
+    }
+
+    function readRecentPicks(resourceKey, limit = RECENT_PICKS_LIMIT) {
+        try {
+            const raw = localStorage.getItem(recentPicksStorageKey(resourceKey));
+            const list = JSON.parse(raw || '[]');
+            if (!Array.isArray(list)) return [];
+            return list
+                .map((entry) => (entry && typeof entry === 'object' ? entry : null))
+                .filter(Boolean)
+                .filter((entry) => String(entry.id || entry.personId || entry.userId || '').trim())
+                .slice(0, Math.max(1, Number(limit) || RECENT_PICKS_LIMIT));
+        } catch (_error) {
+            return [];
+        }
+    }
+
+    function rememberRecentPick(resourceKey, item, limit = RECENT_PICKS_LIMIT) {
+        const snapshot = toSerializablePick(item);
+        if (!snapshot) return;
+        const id = String(snapshot.id || snapshot.personId || snapshot.userId || '').trim();
+        if (!id) return;
+        snapshot.id = id;
+        const max = Math.max(1, Number(limit) || RECENT_PICKS_LIMIT);
+        const next = [
+            snapshot,
+            ...readRecentPicks(resourceKey, max).filter((entry) => String(entry.id || '').trim() !== id)
+        ].slice(0, max);
+        try {
+            localStorage.setItem(recentPicksStorageKey(resourceKey), JSON.stringify(next));
+        } catch (_error) {
+            /* privacy / quota */
+        }
+    }
+
+    function selectRecentPick(item) {
+        if (!item) return;
+        const isMulti = currentConfig.multiselect === true;
+        if (isMulti) {
+            upsertSelectedItem(item);
+            updateAddSelectedUI();
+            return;
+        }
+        rememberRecentPick(currentRecentResourceKey, item);
+        if (typeof currentConfig.onSelect === 'function') {
+            currentConfig.onSelect(item);
+        }
+        if (bsModal) bsModal.hide();
+    }
+
+    function renderRecentChips() {
+        if (!recentSection || !recentChipsEl) return;
+        const items = readRecentPicks(currentRecentResourceKey, RECENT_PICKS_LIMIT);
+        recentChipsEl.innerHTML = '';
+        if (!items.length) {
+            recentSection.classList.add('d-none');
+            return;
+        }
+        recentSection.classList.remove('d-none');
+        items.forEach((item) => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'btn btn-sm btn-outline-secondary rounded-pill';
+            chip.innerHTML = `<i class="bi bi-clock-history me-1"></i>${escapeRecentLabel(recentPickLabel(item))}`;
+            chip.title = recentPickLabel(item);
+            chip.addEventListener('click', () => selectRecentPick(item));
+            recentChipsEl.appendChild(chip);
+        });
+    }
 
     function getResourceNameFromEndpoint(endpoint) {
       if (!endpoint || typeof endpoint !== 'string') return '';
@@ -256,8 +419,11 @@ window.GenericPicker = (function() {
         if (addSelectedBtn) {
             addSelectedBtn.addEventListener('click', () => {
                 const selected = Array.from(pickerState.selectedItemsMap.values());
-                if (selected.length > 0 && typeof currentConfig.onSelect === 'function') {
-                    currentConfig.onSelect(selected);
+                if (selected.length > 0) {
+                    selected.forEach((item) => rememberRecentPick(currentRecentResourceKey, item));
+                    if (typeof currentConfig.onSelect === 'function') {
+                        currentConfig.onSelect(selected);
+                    }
                 }
                 if (bsModal) bsModal.hide();
             });
@@ -696,6 +862,7 @@ window.GenericPicker = (function() {
         } else {
             btn.appendChild(content);
             btn.addEventListener('click', () => {
+                rememberRecentPick(currentRecentResourceKey, item);
                 if (typeof currentConfig.onSelect === 'function') {
                     currentConfig.onSelect(item);
                 }
@@ -754,9 +921,11 @@ window.GenericPicker = (function() {
     return {
         open: function(config) {
             clearSearchDebounce();
+            const rawConfig = config || {};
             currentConfig = window.GenericPickerPresets?.normalizeConfig
-              ? window.GenericPickerPresets.normalizeConfig(config || {})
-              : (config || {});
+              ? window.GenericPickerPresets.normalizeConfig(rawConfig)
+              : rawConfig;
+            currentRecentResourceKey = resolveRecentResourceKey(rawConfig, currentConfig);
             resetPickerState();
             if (currentConfig.multiselect === true && Array.isArray(currentConfig.selectedItems)) {
                 currentConfig.selectedItems.forEach((item) => {
@@ -788,6 +957,8 @@ window.GenericPicker = (function() {
                 if (selectedCountEl) selectedCountEl.textContent = `(${pickerState.selectedItemsMap.size})`;
                 addSelectedBtn.disabled = pickerState.selectedItemsMap.size === 0;
             }
+
+            renderRecentChips();
 
             // Context Setup
             if (currentConfig.context) {

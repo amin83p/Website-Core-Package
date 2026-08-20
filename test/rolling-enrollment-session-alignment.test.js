@@ -104,13 +104,13 @@ test('validatePlannedNaSelection enforces exact N/A count', () => {
   assert.deepEqual(good.plannedNaSessionIds, ['SES-4']);
 });
 
-test('materializePlannedNaAttendance writes roster N/A records', async () => {
+test('materializePlannedNaAttendance removes person from excluded session rosters', async () => {
   const originals = {
     getClassSessions: schoolDataService.getClassSessions,
     saveClassSessions: schoolDataService.saveClassSessions
   };
   const sessions = [
-    { sessionId: 'SES-A', date: '2026-07-01', roster: [] },
+    { sessionId: 'SES-A', date: '2026-07-01', roster: [{ personId: 'PER-1', attendance: 'present' }, { personId: 'PER-2', attendance: 'present' }] },
     { sessionId: 'SES-B', date: '2026-07-08', roster: [{ personId: 'PER-1', attendance: 'present' }] }
   ];
   let saved = null;
@@ -132,8 +132,8 @@ test('materializePlannedNaAttendance writes roster N/A records', async () => {
     assert.ok(saved);
     const rowA = saved.find((row) => row.sessionId === 'SES-A');
     const rowB = saved.find((row) => row.sessionId === 'SES-B');
-    assert.equal(rowA.roster[0].attendance, 'not_applicable');
-    assert.equal(rowB.roster[0].attendance, 'not_applicable');
+    assert.deepEqual(rowA.roster.map((row) => row.personId), ['PER-2']);
+    assert.equal(rowB.roster.length, 0);
   } finally {
     schoolDataService.getClassSessions = originals.getClassSessions;
     schoolDataService.saveClassSessions = originals.saveClassSessions;
@@ -155,7 +155,7 @@ test('materializePlannedNaAttendance resolves schoolDataService after circular m
   };
   let saved = null;
   schoolDataServiceAfterCycle.getClassSessions = async () => ([
-    { sessionId: 'SES-CYCLE', date: '2026-07-01', roster: [] }
+    { sessionId: 'SES-CYCLE', date: '2026-07-01', roster: [{ personId: 'PER-CYCLE', attendance: 'present' }] }
   ]);
   schoolDataServiceAfterCycle.saveClassSessions = async (_classId, nextSessions) => {
     saved = nextSessions;
@@ -171,7 +171,7 @@ test('materializePlannedNaAttendance resolves schoolDataService after circular m
     });
     assert.equal(result.updatedCount, 1);
     assert.ok(saved);
-    assert.equal(saved[0].roster[0].attendance, 'not_applicable');
+    assert.equal(saved[0].roster.length, 0);
   } finally {
     schoolDataServiceAfterCycle.getClassSessions = originals.getClassSessions;
     schoolDataServiceAfterCycle.saveClassSessions = originals.saveClassSessions;

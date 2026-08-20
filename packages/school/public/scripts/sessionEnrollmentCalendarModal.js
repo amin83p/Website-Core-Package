@@ -72,7 +72,149 @@
     const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
     if (!doneBtn || !isManageMode()) return;
     const pendingCount = state?.pendingMarkChanges?.size || 0;
+    const balance = getManageCapBalance();
+    if (!balance.enforced) {
+      doneBtn.disabled = false;
+      doneBtn.textContent = pendingCount ? `Save & close (${pendingCount})` : 'Done';
+      return;
+    }
+    doneBtn.disabled = !balance.balanced;
+    if (!balance.balanced) {
+      doneBtn.textContent = balance.needLabel || 'Mark N/A to match target';
+      return;
+    }
     doneBtn.textContent = pendingCount ? `Save & close (${pendingCount})` : 'Done';
+  }
+
+  function roundHours(value) {
+    return Math.round((Number(value) || 0) * 100) / 100;
+  }
+
+  function getEffectiveNaSessionIds(overrideAction = null, overrideSessionId = '') {
+    const ids = new Set();
+    (Array.isArray(allEvents) ? allEvents : []).forEach((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      if (!sessionId) return;
+      if (resolveManageNaState(ev) !== 'normal') ids.add(sessionId);
+    });
+    const targetId = String(overrideSessionId || '').trim();
+    if (targetId && overrideAction === 'unmark') ids.delete(targetId);
+    if (targetId && overrideAction === 'mark_na') ids.add(targetId);
+    return ids;
+  }
+
+  function getManageCapBalance(overrideAction = null, overrideSessionId = '') {
+    const targetSessions = Math.max(0, Math.floor(Number(state?.targetSessionCount) || 0));
+    const targetHours = roundHours(state?.targetHours || 0);
+    const enforcedSessions = targetSessions > 0;
+    const enforcedHours = !enforcedSessions && targetHours > 0;
+    const enforced = enforcedSessions || enforcedHours;
+    const events = Array.isArray(allEvents) ? allEvents : [];
+    const availableCount = events.length;
+    const availableHours = roundHours(events.reduce((sum, row) => sum + (Number(row?.durationHours) || 0), 0));
+    const naIds = getEffectiveNaSessionIds(overrideAction, overrideSessionId);
+    const naCount = naIds.size;
+    let naHours = 0;
+    events.forEach((row) => {
+      if (!naIds.has(String(row?.sessionId || '').trim())) return;
+      naHours = roundHours(naHours + (Number(row?.durationHours) || 0));
+    });
+    const expectedCount = Math.max(0, availableCount - naCount);
+    const expectedHours = roundHours(Math.max(0, availableHours - naHours));
+    const requiredNaCount = enforcedSessions && availableCount > targetSessions
+      ? availableCount - targetSessions
+      : 0;
+    const requiredNaHours = enforcedHours && availableHours > targetHours
+      ? roundHours(availableHours - targetHours)
+      : 0;
+
+    let balanced = true;
+    let message = '';
+    let needLabel = '';
+    if (enforcedSessions) {
+      balanced = expectedCount === targetSessions;
+      if (!balanced) {
+        if (expectedCount > targetSessions) {
+          const need = expectedCount - targetSessions;
+          message = `Select exactly ${requiredNaCount} session(s) to mark N/A (currently ${naCount}).`;
+          needLabel = `Need ${need} more N/A`;
+        } else {
+          message = `Too many N/A marks: expected sessions would be ${expectedCount}, target is ${targetSessions}.`;
+          needLabel = `Unmark ${targetSessions - expectedCount} N/A`;
+        }
+      }
+    } else if (enforcedHours) {
+      balanced = expectedHours <= targetHours && (requiredNaHours <= 0 || naHours >= requiredNaHours);
+      if (expectedHours > targetHours) {
+        balanced = false;
+        const need = roundHours(expectedHours - targetHours);
+        message = `Select sessions totaling at least ${requiredNaHours} hour(s) to mark N/A (selected ${naHours} hr).`;
+        needLabel = `Need ${need}h more N/A`;
+      } else if (requiredNaHours > 0 && naHours < requiredNaHours) {
+        balanced = false;
+        message = `Select sessions totaling at least ${requiredNaHours} hour(s) to mark N/A (selected ${naHours} hr).`;
+        needLabel = `Need ${roundHours(requiredNaHours - naHours)}h more N/A`;
+      }
+    }
+
+    return {
+      enforced,
+      enforcedSessions,
+      enforcedHours,
+      balanced,
+      message,
+      needLabel: balanced ? 'Balanced' : needLabel,
+      targetSessions,
+      targetHours,
+      availableCount,
+      availableHours,
+      expectedCount,
+      expectedHours,
+      naCount,
+      naHours,
+      requiredNaCount,
+      requiredNaHours
+    };
+  }
+
+  function formatCapSummaryAmount(value, unit) {
+    const amount = unit === 'Hrs'
+      ? `${roundHours(value)} Hrs`
+      : `${Math.max(0, Math.floor(Number(value) || 0))} Sessions`;
+    return amount;
+  }
+
+  function buildManageCapSummaryTable(balance) {
+    const targetValue = balance.enforcedHours
+      ? formatCapSummaryAmount(balance.targetHours, 'Hrs')
+      : formatCapSummaryAmount(balance.targetSessions, 'Sessions');
+    const expectedValue = balance.enforcedHours
+      ? formatCapSummaryAmount(balance.expectedHours, 'Hrs')
+      : formatCapSummaryAmount(balance.expectedCount, 'Sessions');
+    const capClass = balance.balanced ? 'is-ok' : 'is-warn';
+    return ''
+      + '<table class="session-enrollment-cap-summary-table table table-sm table-borderless mb-0">'
+      +   '<tbody><tr>'
+      +     `<td><span class="ses-sum-k">Target:</span> <strong class="ses-sum-v">${core.escapeHtml(targetValue)}</strong></td>`
+      +     `<td><span class="ses-sum-k">Expected (Selected):</span> <strong class="ses-sum-v">${core.escapeHtml(expectedValue)}</strong></td>`
+      +     `<td><span class="ses-sum-k">Cap:</span> <strong class="ses-sum-v ${capClass}">${core.escapeHtml(balance.needLabel)}</strong></td>`
+      +   '</tr></tbody>'
+      + '</table>';
+  }
+
+  function updateManageSummary() {
+    summaryEl = qs('sessionEnrollmentCalendarSummary');
+    if (!summaryEl || !state) return;
+    const balance = getManageCapBalance();
+    if (!balance.enforced) {
+      summaryEl.classList.add('d-none');
+      summaryEl.innerHTML = '';
+      syncDoneButtonLabel();
+      return;
+    }
+    summaryEl.classList.remove('is-plain', 'd-none');
+    summaryEl.innerHTML = buildManageCapSummaryTable(balance);
+    syncDoneButtonLabel();
   }
 
   function initManageModeViewRange() {
@@ -100,23 +242,82 @@
     const saveBtn = qs('btn_sessionEnrollmentCalendarSave');
     const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
     const thirtyDaysBtn = qs('btn_sessionEnrollmentPresetThirtyDays');
+    const legendBtn = qs('btn_sessionEnrollmentCalendarLegend');
+    const studentBanner = qs('sessionEnrollmentCalendarStudentBanner');
     const dialogEl = modalEl?.querySelector('.modal-dialog') || qs('sessionEnrollmentCalendarModal')?.querySelector('.modal-dialog');
     const manage = isManageMode();
     if (titleEl) {
       titleEl.textContent = manage ? 'Manage enrollment sessions' : 'Select sessions';
     }
     if (hintEl) {
-      hintEl.textContent = manage
-        ? 'Blue = open session, green = attendance recorded, light red = saved N/A, light amber = pending N/A. Click a session to mark or unmark, then Save & close.'
-        : 'Click empty grid space to stage sessions; click sessions to include or exclude.';
+      hintEl.classList.toggle('d-none', manage);
+      if (!manage) {
+        hintEl.textContent = 'Click empty grid space to stage sessions; click sessions to include or exclude.';
+      }
     }
     clearBtn?.classList.toggle('d-none', manage);
     saveBtn?.classList.toggle('d-none', manage);
     doneBtn?.classList.toggle('d-none', !manage);
     thirtyDaysBtn?.classList.toggle('d-none', !manage);
+    legendBtn?.classList.toggle('d-none', !manage);
+    studentBanner?.classList.toggle('d-none', !manage);
     if (dialogEl) dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage);
     syncDoneButtonLabel();
     syncPresetButtons();
+    if (manage) renderEnrollmentSessionsLegend();
+  }
+
+  function renderEnrollmentSessionsLegend() {
+    const modalBody = qs('sessionEnrollmentCalendarLegendModalBody');
+    if (!modalBody) return;
+    modalBody.innerHTML = ''
+      + '<div class="session-enrollment-legend-items">'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Open session (no attendance yet)</span></div>'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-attendance" aria-hidden="true"></span><span>Attendance recorded</span></div>'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-na-saved" aria-hidden="true"></span><span>Saved enrollment N/A (excluded)</span></div>'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-na-pending" aria-hidden="true"></span><span>Pending N/A (not saved yet)</span></div>'
+      +   '<div class="session-enrollment-legend-item session-enrollment-legend-hint text-muted"><i class="bi bi-hand-index-thumb" aria-hidden="true"></i><span>Click a session to mark or unmark N/A</span></div>'
+      + '</div>';
+  }
+
+  function openEnrollmentSessionsLegendModal() {
+    const legendModalEl = qs('sessionEnrollmentCalendarLegendModal');
+    if (!legendModalEl || !global.bootstrap?.Modal) return;
+    renderEnrollmentSessionsLegend();
+    global.bootstrap.Modal.getOrCreateInstance(legendModalEl).show();
+  }
+
+  function syncStudentBanner(options = {}) {
+    const banner = qs('sessionEnrollmentCalendarStudentBanner');
+    const nameEl = qs('sessionEnrollmentCalendarStudentName');
+    const metaEl = qs('sessionEnrollmentCalendarStudentMeta');
+    const contextEl = qs('sessionEnrollmentCalendarContext');
+    const student = String(options.studentLabel || options.studentName || options.studentId || '').trim();
+    const classLabel = String(options.classLabel || options.classId || '').trim();
+    const windowStart = String(options.startDate || '').trim();
+    const windowEnd = String(options.endDate || '').trim();
+    const manage = String(options.mode || '').trim() === 'manageEnrollmentSessions';
+
+    if (contextEl) {
+      contextEl.classList.toggle('d-none', manage);
+      if (!manage) {
+        contextEl.textContent = [student, classLabel].filter(Boolean).join(' · ') || String(options.classId || '');
+      }
+    }
+    if (!banner || !nameEl || !metaEl) return;
+    banner.classList.toggle('d-none', !manage);
+    if (!manage) {
+      nameEl.textContent = '';
+      metaEl.textContent = '';
+      return;
+    }
+    nameEl.textContent = student || 'Student';
+    const metaParts = [];
+    if (classLabel) metaParts.push(classLabel);
+    if (windowStart || windowEnd) {
+      metaParts.push(`Enrollment window: ${windowStart || '—'} → ${windowEnd || 'Open'}`);
+    }
+    metaEl.textContent = metaParts.join(' · ');
   }
 
   function mapSessionWindowRowToEvent(row = {}) {
@@ -172,6 +373,23 @@
     };
     if (data?.startDate) state.startDate = String(data.startDate).trim();
     if (data?.endDate !== undefined) state.endDate = String(data.endDate || '').trim();
+    if (data?.targetSessionCount !== undefined) {
+      state.targetSessionCount = Number(data.targetSessionCount) || 0;
+    }
+    if (data?.targetHours !== undefined) {
+      state.targetHours = Number(data.targetHours) || 0;
+    }
+    if (isManageMode()) {
+      syncStudentBanner({
+        mode: state.mode,
+        studentLabel: state.studentLabel,
+        studentId: state.studentId,
+        classLabel: state.classLabel,
+        classId: state.classId,
+        startDate: state.startDate,
+        endDate: state.endDate
+      });
+    }
     allEvents = (Array.isArray(data?.sessions) ? data.sessions : [])
       .map((row) => mapSessionWindowRowToEvent(row))
       .filter((row) => row.sessionId && row.date);
@@ -349,27 +567,6 @@
     `;
   }
 
-  function updateManageSummary() {
-    summaryEl = qs('sessionEnrollmentCalendarSummary');
-    if (!summaryEl || !state) return;
-    const savedNa = allEvents.filter((row) => resolveManageNaState(row) === 'saved').length;
-    const pendingNa = allEvents.filter((row) => resolveManageNaState(row) === 'pending').length;
-    const visible = getVisibleEvents().length;
-    const viewStart = state.viewRange?.startDate || '—';
-    const viewEnd = state.viewRange?.endDate || '—';
-    const consumed = allEvents.filter((row) => {
-      const status = String(row?.attendance || '').trim().toLowerCase();
-      return status === 'present' || status === 'late' || status === 'absent' || status === 'acf';
-    }).length;
-    const summary = manageSummaryMeta?.cycleAttendanceSummary;
-    let text = `View: ${viewStart} → ${viewEnd} · showing ${visible} session(s) · ${savedNa} saved N/A · ${pendingNa} unsaved N/A · ${consumed} with attendance`;
-    if (summary) {
-      text += ` · Consumed ${summary.consumedSessions || 0}, remaining cap ${summary.remainingSessions || summary.remainingHours || 0}`;
-    }
-    summaryEl.textContent = text;
-    syncDoneButtonLabel();
-  }
-
   function resolveMarkOverlayEl() {
     const calendarModal = qs('sessionEnrollmentCalendarModal');
     return calendarModal?.querySelector('#sessionEnrollmentMarkModal')
@@ -466,6 +663,15 @@
     if (!state.pendingMarkChanges) state.pendingMarkChanges = new Map();
     const ev = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
     if (action === 'unmark') {
+      const preview = getManageCapBalance('unmark', sessionId);
+      if (preview.enforcedSessions && preview.expectedCount > preview.targetSessions) {
+        showMarkFormError(preview.message || 'Unmarking would exceed the enrollment session target.');
+        return;
+      }
+      if (preview.enforcedHours && preview.expectedHours > preview.targetHours) {
+        showMarkFormError(preview.message || 'Unmarking would exceed the enrollment hour target.');
+        return;
+      }
       if (ev?.savedMarked || ev?.savedRosterNa) {
         state.pendingMarkChanges.set(sessionId, { action: 'unmark', note: '' });
       } else {
@@ -1250,6 +1456,7 @@
     const start = String(summary?.selectionStartDate || '').trim();
     const end = String(summary?.selectionEndDate || '').trim();
     const span = start && end ? `${start} – ${end}` : (start || end || '—');
+    summaryEl.classList.add('is-plain');
     summaryEl.textContent = `Selected: ${count} session(s), ${core.formatHours(hours)} | Span: ${span}`;
     if (state.onSelectionChange) {
       state.onSelectionChange({
@@ -1342,6 +1549,10 @@
     hostEl = qs('sessionEnrollmentCalendarHost');
     if (hostEl) hostEl.addEventListener('click', handleHostClick);
 
+    qs('btn_sessionEnrollmentCalendarLegend')?.addEventListener('click', () => {
+      openEnrollmentSessionsLegendModal();
+    });
+
     document.querySelectorAll('[data-session-picker-preset]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const preset = String(btn.getAttribute('data-session-picker-preset') || '').trim();
@@ -1425,6 +1636,11 @@
       const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
       const summaryEl = qs('sessionEnrollmentCalendarSummary');
       const onMarksChanged = state.onMarksChanged;
+      const balance = getManageCapBalance();
+      if (balance.enforced && !balance.balanced) {
+        updateManageSummary();
+        return;
+      }
       if (doneBtn) doneBtn.disabled = true;
       let saveResult = null;
       try {
@@ -1440,10 +1656,11 @@
         getModal()?.hide();
       } catch (err) {
         if (summaryEl) {
+          summaryEl.classList.add('is-plain');
           summaryEl.textContent = `Unable to save N/A marks: ${err?.message || 'Request failed.'}`;
         }
       } finally {
-        if (doneBtn) doneBtn.disabled = false;
+        syncDoneButtonLabel();
       }
     });
 
@@ -1488,12 +1705,16 @@
     modalEl = qs('sessionEnrollmentCalendarModal');
     allEvents = [];
     manageSummaryMeta = null;
-    contextLabelEl = qs('sessionEnrollmentCalendarContext');
-    if (contextLabelEl) {
-      const student = String(options.studentLabel || options.studentName || options.studentId || '').trim();
-      const classLabel = String(options.classLabel || '').trim();
-      contextLabelEl.textContent = [student, classLabel].filter(Boolean).join(' · ') || classId;
-    }
+    syncStudentBanner({
+      mode,
+      studentLabel: options.studentLabel,
+      studentName: options.studentName,
+      studentId: options.studentId,
+      classLabel: options.classLabel,
+      classId,
+      startDate: options.startDate,
+      endDate: options.endDate
+    });
 
     const viewPreset = mode === 'manageEnrollmentSessions'
       ? 'thirtyDays'
@@ -1509,6 +1730,8 @@
       periodId,
       classId,
       studentId: String(options.studentId || '').trim(),
+      studentLabel: String(options.studentLabel || options.studentName || options.studentId || '').trim(),
+      classLabel: String(options.classLabel || '').trim(),
       startDate: String(options.startDate || '').trim(),
       endDate: String(options.endDate || '').trim(),
       targetSessionCount: Number(options.targetSessionCount || 0),

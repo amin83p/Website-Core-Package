@@ -29,6 +29,17 @@ test('attendance viewer contains no settings link or threshold tooltip', () => {
   assert.doesNotMatch(viewer, /Matrix Thresholds/);
 });
 
+test('attendance viewer hides manage buttons for limited access like master schedule', () => {
+  const viewer = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
+  const controller = read('packages/school/MVC/controllers/school/attendanceController.js');
+  assert.match(controller, /isAttendanceAdminViewer/);
+  assert.match(controller, /isAttendancesAdminViewerAsync/);
+  assert.match(controller, /OPERATIONS\.READ_ALL/);
+  assert.match(viewer, /showAttendanceManageBtns/);
+  assert.match(viewer, /manageBtns:\s*attManageBtns/);
+  assert.match(viewer, /showAttendanceManageBtns\s*\?\s*\[/);
+});
+
 test('session manager shows Attendance matrix link for page access, not only policy admins', () => {
   const classCtrl = read('packages/school/MVC/controllers/school/classController.js');
   assert.match(classCtrl, /userCanOpenAttendanceMatrix/);
@@ -37,6 +48,12 @@ test('session manager shows Attendance matrix link for page access, not only pol
   const sessionManager = read('packages/school/MVC/views/school/class/sessionManager.ejs');
   assert.match(sessionManager, /canOpenAttendanceMatrix/);
   assert.match(sessionManager, /id="linkAttendanceMatrix"/);
+  assert.match(sessionManager, /session-panel-attendance[\s\S]*id="linkAttendanceMatrix"/);
+  assert.match(sessionManager, /range=thisMonth/);
+  assert.match(sessionManager, /session-panel-gradebook[\s\S]*id="linkGradesMatrix"/);
+  assert.doesNotMatch(sessionManager, /session-manager-class-nav-toggle/);
+  assert.doesNotMatch(sessionManager, /id="linkFinalGradesNav"/);
+  assert.doesNotMatch(sessionManager, /Enrollment outcomes/);
   assert.doesNotMatch(
     sessionManager,
     /canViewSchoolSettings[\s\S]{0,80}linkAttendanceMatrix/

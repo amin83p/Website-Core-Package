@@ -21,6 +21,7 @@ const schoolFileService = require('../../services/school/schoolFileService');
 const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
 const matrixRollupService = require('../../services/school/matrixRollupService');
@@ -346,6 +347,10 @@ async function showAttendancePage(req, res) {
             ipAddress: req.ip
         });
         const canEditAttendanceRoster = Boolean(editEval?.allowed);
+        const isAttendanceAdminViewer = await schoolAdminAccessService.isAttendancesAdminViewerAsync(
+            req.user,
+            OPERATIONS.READ_ALL
+        );
         let canOverrideSessionLock = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_ATTENDANCES,
@@ -385,6 +390,7 @@ async function showAttendancePage(req, res) {
             actionStateId: req.actionStateId,
             tableName: 'Attendance_Matrix',
             canEditAttendanceRoster,
+            isAttendanceAdminViewer,
             canOverrideSessionLock,
             attendanceMarkAppearanceResolved,
             initialClassId,

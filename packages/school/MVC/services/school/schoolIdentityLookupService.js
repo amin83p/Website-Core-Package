@@ -121,6 +121,14 @@ function formatPersonName(person = {}, fallback = '') {
     || normalizeText(fallback);
 }
 
+function readPersonNameParts(person = {}) {
+  const preferredName = normalizeText(person.preferredName || person.name?.preferred);
+  const firstName = normalizeText(person.firstName || person.name?.first);
+  const lastName = normalizeText(person.lastName || person.name?.last);
+  const fullLegalName = [firstName, lastName].filter(Boolean).join(' ');
+  return { preferredName, firstName, lastName, fullLegalName };
+}
+
 function readPersonEmail(person = {}) {
   const emails = Array.isArray(person.contact?.emails) ? person.contact.emails : [];
   return normalizeText(person.contact?.email || person.contact?.primaryEmail || person.email || emails[0]?.email);
@@ -139,6 +147,10 @@ function userDisplayName(user = {}, linkedPerson = null) {
 function rowMatchesQuery(row = {}, q = '') {
   const query = normalizeText(q).toLowerCase();
   if (!query) return true;
+  const firstName = normalizeText(row.firstName);
+  const lastName = normalizeText(row.lastName);
+  const preferredName = normalizeText(row.preferredName);
+  const fullLegalName = [firstName, lastName].filter(Boolean).join(' ');
   return [
     row.id,
     row.personId,
@@ -146,6 +158,10 @@ function rowMatchesQuery(row = {}, q = '') {
     row.username,
     row.displayName,
     row.name,
+    preferredName,
+    firstName,
+    lastName,
+    fullLegalName,
     row.email,
     ...(Array.isArray(row.roles) ? row.roles : [])
   ].join(' ').toLowerCase().includes(query);
@@ -156,9 +172,14 @@ function personMatchesQuery(person = {}, q = '', activeOrgId = '') {
   if (!query) return true;
   const personId = normalizeId(person.id || person.personId);
   const roles = extractSchoolRoles(person, activeOrgId);
+  const { preferredName, firstName, lastName, fullLegalName } = readPersonNameParts(person);
   const searchBlob = [
     personId,
     formatPersonName(person, personId),
+    preferredName,
+    firstName,
+    lastName,
+    fullLegalName,
     readPersonEmail(person),
     person?.organizationProfile?.legalName,
     person?.organizationLegalName,
@@ -274,12 +295,16 @@ async function listSchoolUsers({ reqUser, q = '', query = {}, requireSchoolPerso
       const personId = normalizeId(user.personId || user.identity?.personId || user.profile?.personId);
       const person = personId ? personById.get(personId) : null;
       const roles = person ? extractSchoolRoles(person, activeOrgId) : [];
+      const nameParts = person ? readPersonNameParts(person) : readPersonNameParts({});
       return {
         id: userId,
         userId,
         personId,
         displayName: userDisplayName(user, person),
         name: userDisplayName(user, person),
+        firstName: nameParts.firstName,
+        lastName: nameParts.lastName,
+        preferredName: nameParts.preferredName,
         username: normalizeText(user.username),
         email: readUserEmail(user) || (person ? readPersonEmail(person) : ''),
         roles,
@@ -303,5 +328,8 @@ module.exports = {
   listSchoolPersonRecords,
   listSchoolPersons,
   listSchoolUsers,
-  listTaggableUsers
+  listTaggableUsers,
+  personMatchesQuery,
+  rowMatchesQuery,
+  formatPersonName
 };

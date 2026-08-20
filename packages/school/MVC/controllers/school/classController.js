@@ -1260,7 +1260,10 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
                 session?.sessionId || session?.id
             );
             if (!state) return;
-            if (state.expected || state.reason === 'approved_leave' || state.reason === 'manual_not_applicable' || state.reason === 'makeup_required') {
+            if (state.expected
+                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.APPROVED_LEAVE
+                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.MANUAL_NOT_APPLICABLE
+                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.MAKEUP_REQUIRED) {
                 const normalizedPersonId = cleanPersonId(personId);
                 personIds.add(normalizedPersonId);
                 applicabilityByPersonId.set(normalizedPersonId, state);

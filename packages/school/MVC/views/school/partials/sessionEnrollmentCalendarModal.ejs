@@ -1,12 +1,28 @@
 <div class="modal fade" id="sessionEnrollmentCalendarModal" tabindex="-1" aria-hidden="true" aria-labelledby="sessionEnrollmentCalendarModalTitle">
   <div class="modal-dialog modal-xl modal-dialog-scrollable session-enrollment-calendar-dialog">
     <div class="modal-content">
-      <div class="modal-header py-2">
-        <div>
-          <h5 class="modal-title" id="sessionEnrollmentCalendarModalTitle">Select sessions</h5>
-          <div class="small text-muted" id="sessionEnrollmentCalendarContext"></div>
+      <div class="modal-header py-2 align-items-start">
+        <div class="session-enrollment-modal-heading flex-grow-1 me-2 pe-1">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div class="min-w-0">
+              <h5 class="modal-title mb-0" id="sessionEnrollmentCalendarModalTitle">Select sessions</h5>
+              <div class="small text-muted mt-1" id="sessionEnrollmentCalendarContext"></div>
+              <div class="session-enrollment-student-banner d-none mt-2" id="sessionEnrollmentCalendarStudentBanner">
+                <div class="session-enrollment-student-name" id="sessionEnrollmentCalendarStudentName"></div>
+                <div class="session-enrollment-student-meta" id="sessionEnrollmentCalendarStudentMeta"></div>
+              </div>
+            </div>
+            <button type="button"
+              class="btn btn-sm btn-outline-secondary session-enrollment-legend-icon-btn d-none"
+              id="btn_sessionEnrollmentCalendarLegend"
+              data-session-enrollment-open-legend
+              aria-label="Legend"
+              title="Legend">
+              <i class="bi bi-info-circle" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close mt-1" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body session-enrollment-calendar-body">
         <div class="session-enrollment-toolbar d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -38,7 +54,7 @@
           </div>
         </div>
         <div id="sessionEnrollmentCalendarHost" class="session-enrollment-calendar-host border rounded p-2 bg-white"></div>
-        <div class="mt-2 p-2 bg-light border rounded" id="sessionEnrollmentCalendarSummary" role="status">
+        <div class="mt-2 session-enrollment-summary" id="sessionEnrollmentCalendarSummary" role="status">
           Selected: 0 session(s), 0 Hr | Span: —
         </div>
         <div class="small text-muted mt-1 flex-shrink-0" id="sessionEnrollmentCalendarHint">
@@ -53,6 +69,20 @@
       </div>
       <%- include('school/partials/sessionEnrollmentStageModal') %>
       <%- include('school/partials/sessionEnrollmentMarkModal') %>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="sessionEnrollmentCalendarLegendModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2 px-3">
+        <h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-info-circle me-1"></i>Enrollment Sessions Legend</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="sessionEnrollmentCalendarLegendModalBody" class="session-enrollment-legend-modal-body"></div>
+      </div>
     </div>
   </div>
 </div>

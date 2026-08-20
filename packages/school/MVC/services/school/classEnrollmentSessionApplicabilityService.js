@@ -265,6 +265,35 @@ function mergeState(existing, next) {
   return existing;
 }
 
+const APPLICABILITY_REASON = Object.freeze({
+  ENROLLMENT_EXCLUDED: 'enrollment_excluded',
+  MANUAL_NOT_APPLICABLE: 'manual_not_applicable',
+  APPROVED_LEAVE: 'approved_leave',
+  MAKEUP_REQUIRED: 'makeup_required',
+  HOUR_CAP_REACHED: 'hour_cap_reached',
+  SESSION_CAP_REACHED: 'session_cap_reached'
+});
+
+function getEnrollmentExcludedSessionIds(period = {}) {
+  const ids = new Set();
+  const planned = Array.isArray(period?.plannedNotApplicableSessionIds)
+    ? period.plannedNotApplicableSessionIds
+    : [];
+  planned.forEach((value) => {
+    const sessionId = toPublicId(value);
+    if (sessionId) ids.add(sessionId);
+  });
+  const marks = Array.isArray(period?.enrollmentSessionMarks)
+    ? period.enrollmentSessionMarks
+    : [];
+  marks.forEach((mark) => {
+    if (String(mark?.status || '').trim().toLowerCase() !== 'not_applicable') return;
+    const sessionId = toPublicId(mark?.sessionId);
+    if (sessionId) ids.add(sessionId);
+  });
+  return ids;
+}
+
 function resolveRollingEnrollmentApplicability({
   sessions = [],
   periodRows = [],
@@ -302,6 +331,7 @@ function resolveRollingEnrollmentApplicability({
       const targetHours = normalizeTargetHours(period.targetHours);
       const hourCap = targetHours > 0;
       const sessionCap = targetSessionCount > 0;
+      const enrollmentExcludedIds = getEnrollmentExcludedSessionIds(period);
       let consumedCount = 0;
       let consumedHours = 0;
       let reservedCount = 0;
@@ -321,12 +351,36 @@ function resolveRollingEnrollmentApplicability({
           : '';
         const hasApprovedLeave = approvedLeaveKeys.has(key);
         const forceNotApplicable = forceNotApplicableSessionKeys.has(sessionId) || forceNotApplicableSessionKeys.has(date);
-        const notApplicable = forceNotApplicable || hasApprovedLeave || attendance === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+        const enrollmentExcluded = enrollmentExcludedIds.has(sessionId);
+
+        if (enrollmentExcluded) {
+          const next = {
+            expected: false,
+            reason: APPLICABILITY_REASON.ENROLLMENT_EXCLUDED,
+            periodId,
+            targetSessionCount,
+            targetHours,
+            consumedCount,
+            consumedHours,
+            reservedCount,
+            reservedHours
+          };
+          stateByKey.set(key, mergeState(stateByKey.get(key), next));
+          return;
+        }
+
+        const notApplicable = forceNotApplicable
+          || hasApprovedLeave
+          || attendance === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
 
         if (notApplicable) {
           const next = {
             expected: false,
-            reason: forceNotApplicable ? 'makeup_required' : (hasApprovedLeave ? 'approved_leave' : 'manual_not_applicable'),
+            reason: forceNotApplicable
+              ? APPLICABILITY_REASON.MAKEUP_REQUIRED
+              : (hasApprovedLeave
+                ? APPLICABILITY_REASON.APPROVED_LEAVE
+                : APPLICABILITY_REASON.MANUAL_NOT_APPLICABLE),
             periodId,
             targetSessionCount,
             targetHours,
@@ -342,7 +396,7 @@ function resolveRollingEnrollmentApplicability({
         if (hourCap && consumedHours >= targetHours) {
           const next = {
             expected: false,
-            reason: 'hour_cap_reached',
+            reason: APPLICABILITY_REASON.HOUR_CAP_REACHED,
             periodId,
             targetSessionCount,
             targetHours,
@@ -358,7 +412,7 @@ function resolveRollingEnrollmentApplicability({
         if (sessionCap && consumedCount >= targetSessionCount) {
           const next = {
             expected: false,
-            reason: 'session_cap_reached',
+            reason: APPLICABILITY_REASON.SESSION_CAP_REACHED,
             periodId,
             targetSessionCount,
             targetHours,
@@ -604,5 +658,7 @@ module.exports = {
   resolveRollingEnrollmentApplicabilityWithLeaves,
   getApplicabilityState,
   buildSessionCappedEnrollmentCompletionPatch,
-  recomputeSessionCappedEnrollmentCompletionsForClass
+  recomputeSessionCappedEnrollmentCompletionsForClass,
+  getEnrollmentExcludedSessionIds,
+  APPLICABILITY_REASON
 };

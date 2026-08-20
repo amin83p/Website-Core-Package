@@ -2136,8 +2136,10 @@
     await showMsg(title, shortcutOutcomeIcon(style), text);
   }
 
-  function isProgramRegistrationShortcutPreviewReady() {
-    const rows = Array.isArray(programShortcutPreview?.rows) ? programShortcutPreview.rows : [];
+  function isProgramRegistrationShortcutPreviewReady(rowsOverride = null) {
+    const rows = Array.isArray(rowsOverride)
+      ? rowsOverride
+      : (Array.isArray(programShortcutPreview?.rows) ? programShortcutPreview.rows : []);
     const status = String(rows[0]?.status || '').trim().toLowerCase();
     return rows.length === 1 && ['ready', 'warning'].includes(status);
   }
@@ -2254,17 +2256,24 @@
       if (!result) return;
       const rows = Array.isArray(result.preview) ? result.preview : (Array.isArray(result.previews) ? result.previews : []);
       if (qs('shortcut_previewPanel')) qs('shortcut_previewPanel').innerHTML = renderShortcutPreviewHtml(rows, result.message);
-      if (!isProgramRegistrationShortcutPreviewReady()) {
-        await notifyProgramRegistrationShortcutOutcome(
-          'warning',
-          'This registration cannot be saved until the preview issues are resolved. Return to details, make corrections, and preview again.'
-        );
-        return;
-      }
+      const readyFromFreshRows = isProgramRegistrationShortcutPreviewReady(rows);
+      const firstStatus = String(rows[0]?.status || '').trim().toLowerCase();
+      // Always store and advance so fee/validation details are visible on Step 2.
       programShortcutPreview = { payload, rows };
       renderProgramRegistrationShortcutReview(payload);
       setProgramRegistrationShortcutStep('preview');
-      const previewHasWarning = String(rows[0]?.status || '').trim().toLowerCase() === 'warning';
+      if (!readyFromFreshRows) {
+        const issues = Array.isArray(rows[0]?.issues) ? rows[0].issues : [];
+        const detail = issues.length
+          ? issues.join(' ')
+          : (String(rows[0]?.message || result.message || '').trim() || 'Preview validation failed.');
+        await notifyProgramRegistrationShortcutOutcome(
+          'warning',
+          detail + ' Return to details, make corrections, and preview again.'
+        );
+        return;
+      }
+      const previewHasWarning = firstStatus === 'warning';
       await notifyProgramRegistrationShortcutOutcome(
         previewHasWarning ? 'warning' : 'success',
         previewHasWarning
@@ -6018,6 +6027,8 @@
         classLabel: String(classId || '').trim(),
         startDate: String(row?.startDate || '').trim(),
         endDate: String(row?.endDate || '').trim(),
+        targetSessionCount: Number(row?.targetSessionCount || 0),
+        targetHours: Number(row?.targetHours || 0),
         requestJson,
         onMarksChanged: async () => {
           await loadRows();
