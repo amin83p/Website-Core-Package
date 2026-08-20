@@ -107,19 +107,19 @@
       "operations": [],
       "subsections": [
         {
-          "id": "330563"
+          "id": "938980"
         },
         {
           "id": "225382"
+        },
+        {
+          "id": "330563"
         },
         {
           "id": "139382"
         },
         {
           "id": "445571"
-        },
-        {
-          "id": "938980"
         },
         {
           "id": "445577"
@@ -175,9 +175,6 @@
           "id": "358609"
         },
         {
-          "id": "332224"
-        },
-        {
           "id": "445564"
         },
         {
@@ -217,9 +214,6 @@
           "id": "445580"
         },
         {
-          "id": "555012"
-        },
-        {
           "id": "445561"
         },
         {
@@ -230,6 +224,9 @@
         },
         {
           "id": "778770"
+        },
+        {
+          "id": "555012"
         }
       ],
       "related": [],
@@ -402,13 +399,13 @@
         },
         {
           "id": "OP1002",
-          "sessionAttempts": 5,
+          "sessionAttempts": 50,
           "sessionTime": 15,
           "active": true
         },
         {
           "id": "OP1003",
-          "sessionAttempts": 5,
+          "sessionAttempts": 50,
           "sessionTime": 15,
           "active": true
         },
@@ -420,7 +417,7 @@
         },
         {
           "id": "OP1005",
-          "sessionAttempts": 5,
+          "sessionAttempts": 50,
           "sessionTime": 15,
           "active": true
         },
@@ -2757,14 +2754,14 @@
         },
         {
           "id": "OP1002",
-          "sessionAttempts": 5,
-          "sessionTime": 15,
+          "sessionAttempts": 50,
+          "sessionTime": 60,
           "active": true
         },
         {
           "id": "OP1003",
-          "sessionAttempts": 5,
-          "sessionTime": 15,
+          "sessionAttempts": 50,
+          "sessionTime": 60,
           "active": true
         },
         {
@@ -2775,14 +2772,14 @@
         },
         {
           "id": "OP1005",
-          "sessionAttempts": 5,
-          "sessionTime": 15,
+          "sessionAttempts": 50,
+          "sessionTime": 60,
           "active": true
         },
         {
           "id": "OP1006",
-          "sessionAttempts": 5,
-          "sessionTime": 15,
+          "sessionAttempts": 50,
+          "sessionTime": 60,
           "active": true
         },
         {
@@ -9477,7 +9474,9 @@
       "run": "seeders/school-activities-section-run.js",
       "revert": "seeders/school-activities-section-revert.js",
       "mode": "upsert",
-      "backendModes": ["mongo"],
+      "backendModes": [
+        "mongo"
+      ],
       "idempotencyKey": "school:section:school-activities"
     }
   ],

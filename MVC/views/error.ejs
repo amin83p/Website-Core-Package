@@ -24,6 +24,16 @@
     ? String(deleteBlockedPreview.label || deleteBlockedPreview.id || 'This record').trim()
     : '';
   const deleteBlockedStatusCode = isDeleteBlocked ? 409 : pageStatusCode;
+  const actionStateCtx = (typeof actionStateContext !== 'undefined' && actionStateContext && typeof actionStateContext === 'object')
+    ? actionStateContext
+    : null;
+  const hasActionStateContext = actionStateCtx && (
+    actionStateCtx.sectionName ||
+    actionStateCtx.sectionId ||
+    actionStateCtx.operationName ||
+    actionStateCtx.operationId ||
+    actionStateCtx.routePath
+  );
   const requestedPath = String(accessData.path || '').trim();
   const requestedSection = String(accessData.sectionId || (Array.isArray(accessData.sectionIds) ? accessData.sectionIds.join(', ') : '') || '').trim();
   const requestedOperation = String(accessData.operationId || '').trim();
@@ -827,6 +837,61 @@
           <i class="bi bi-info-circle-fill me-2"></i>
           <strong><%- pageMessage %></strong>
         </div>
+
+        <% if (hasActionStateContext) { %>
+        <div class="p-3 border rounded bg-light mb-4">
+          <h6 class="fw-bold mb-2">Action context</h6>
+          <p class="small text-muted mb-3">Use these details to find the route, section, and operation that triggered this block.</p>
+          <div class="row g-2">
+            <% if (actionStateCtx.sectionName || actionStateCtx.sectionId) { %>
+            <div class="col-md-6">
+              <div class="p-2 border rounded bg-white h-100">
+                <div class="small text-muted fw-bold text-uppercase">Section</div>
+                <code class="d-block"><%= actionStateCtx.sectionName || actionStateCtx.sectionId %></code>
+                <% if (actionStateCtx.sectionName && actionStateCtx.sectionId && actionStateCtx.sectionName !== actionStateCtx.sectionId) { %>
+                <div class="small text-muted mt-1">ID: <code><%= actionStateCtx.sectionId %></code></div>
+                <% } %>
+              </div>
+            </div>
+            <% } %>
+            <% if (actionStateCtx.operationName || actionStateCtx.operationId) { %>
+            <div class="col-md-6">
+              <div class="p-2 border rounded bg-white h-100">
+                <div class="small text-muted fw-bold text-uppercase">Operation</div>
+                <code class="d-block"><%= actionStateCtx.operationName || actionStateCtx.operationId %></code>
+                <% if (actionStateCtx.operationName && actionStateCtx.operationId && actionStateCtx.operationName !== actionStateCtx.operationId) { %>
+                <div class="small text-muted mt-1">ID: <code><%= actionStateCtx.operationId %></code></div>
+                <% } %>
+              </div>
+            </div>
+            <% } %>
+            <% if (actionStateCtx.routePath) { %>
+            <div class="col-12">
+              <div class="p-2 border rounded bg-white">
+                <div class="small text-muted fw-bold text-uppercase">Route</div>
+                <code class="d-block"><%= actionStateCtx.method ? `${actionStateCtx.method} ` : '' %><%= actionStateCtx.routePath %></code>
+              </div>
+            </div>
+            <% } %>
+            <% if (actionStateCtx.attemptCount || actionStateCtx.maxAttempts) { %>
+            <div class="col-12">
+              <div class="p-2 border rounded bg-white">
+                <div class="small text-muted fw-bold text-uppercase">Attempts</div>
+                <code class="d-block"><%= actionStateCtx.attemptCount || '?' %> / <%= actionStateCtx.maxAttempts || '?' %></code>
+              </div>
+            </div>
+            <% } %>
+            <% if (actionStateCtx.targetKey) { %>
+            <div class="col-12">
+              <div class="p-2 border rounded bg-white">
+                <div class="small text-muted fw-bold text-uppercase">Target</div>
+                <code class="d-block"><%= actionStateCtx.targetKey %></code>
+              </div>
+            </div>
+            <% } %>
+          </div>
+        </div>
+        <% } %>
 
         <div class="row g-3 mb-4">
           <div class="col-md-6">

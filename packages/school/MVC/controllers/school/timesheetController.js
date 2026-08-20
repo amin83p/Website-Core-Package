@@ -2130,6 +2130,18 @@ exports.saveTimesheet = async (req, res) => {
         const parsedEntries = typeof entries === 'string' ? JSON.parse(entries) : entries;
         const entryRows = Array.isArray(parsedEntries) ? parsedEntries : [];
 
+        if (!teacherContext.isAdmin) {
+            const blockedAutoDeletes = entryRows.filter((entry) => (
+                entry?.isDeleted === true
+                && entry?.isManual !== true
+                && entry?.isPriorPeriodAdjustment !== true
+                && entry?.isReportReflection !== true
+            ));
+            if (blockedAutoDeletes.length) {
+                throw new Error('Auto-pulled sessions cannot be removed from your timesheet.');
+            }
+        }
+
         const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
             orgId: activeOrgId,
             personId: teacherContext.targetTeacherId,

@@ -12,6 +12,21 @@ function activityKey(activity, index = 0) {
   return `activity_${index}`;
 }
 
+function resolveActivityWeightKeys(activities) {
+  const list = Array.isArray(activities) ? activities : [];
+  const baseKeys = list.map((activity, index) => activityKey(activity, index));
+  const baseCounts = new Map();
+  baseKeys.forEach((key) => baseCounts.set(key, (baseCounts.get(key) || 0) + 1));
+  const dupIndices = new Map();
+  return list.map((activity, index) => {
+    const base = activityKey(activity, index);
+    if (baseCounts.get(base) === 1) return base;
+    const occurrence = dupIndices.get(base) || 0;
+    dupIndices.set(base, occurrence + 1);
+    return occurrence === 0 ? base : `${base}__${index}`;
+  });
+}
+
 function isIncludedInCalc(activity) {
   if (activity?.includeInGradeCalculation === false) return false;
   if (activity?.includeInCalc === false) return false;
@@ -21,6 +36,7 @@ function isIncludedInCalc(activity) {
 function buildNormalizedWeightMap(activities, options = {}) {
   const list = Array.isArray(activities) ? activities : [];
   const requireInclude = options.includeInCalc !== false;
+  const weightKeys = resolveActivityWeightKeys(list);
   let sum = 0;
   const entries = [];
 
@@ -28,8 +44,7 @@ function buildNormalizedWeightMap(activities, options = {}) {
     if (requireInclude && !isIncludedInCalc(activity)) return;
     const weight = resolveActivityWeight(activity);
     if (!Number.isFinite(weight) || weight <= 0) return;
-    const key = activityKey(activity, index);
-    entries.push({ key, weight });
+    entries.push({ key: weightKeys[index], weight });
     sum += weight;
   });
 
@@ -56,18 +71,25 @@ function weightedContributionPercent(activityPercentValue, normalizedWeight) {
   return Math.round(pct * weight * 10) / 10;
 }
 
+function gradePercentContribution(activityPercentValue, weightPercentOfGrade) {
+  const pct = Number(activityPercentValue);
+  const weight = Number(weightPercentOfGrade);
+  if (!Number.isFinite(pct) || !Number.isFinite(weight) || weight <= 0) return null;
+  return Math.round(pct * weight / 10) / 10;
+}
+
 function computeWeightedAveragePercent(activities, scoreResolver, options = {}) {
   const list = Array.isArray(activities) ? activities : [];
   const weightMap = buildNormalizedWeightMap(list, options);
   if (!weightMap.size) return null;
+  const weightKeys = resolveActivityWeightKeys(list);
 
   let total = 0;
   let used = 0;
 
   list.forEach((activity, index) => {
     if (options.includeInCalc !== false && !isIncludedInCalc(activity)) return;
-    const key = activityKey(activity, index);
-    const normalizedWeight = weightMap.get(key);
+    const normalizedWeight = weightMap.get(weightKeys[index]);
     if (!normalizedWeight) return;
 
     const resolved = typeof scoreResolver === 'function' ? scoreResolver(activity, index) : null;
@@ -96,8 +118,10 @@ module.exports = {
   buildNormalizedWeightMap,
   activityPercent,
   weightedContributionPercent,
+  gradePercentContribution,
   computeWeightedAveragePercent,
   formatNormalizedWeightPercent,
   activityKey,
+  resolveActivityWeightKeys,
   isIncludedInCalc
 };

@@ -152,6 +152,13 @@ function parsePositiveAttendanceMinute(value) {
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 }
 
+function clampAttendanceMinuteForSession(value, maxMinutes) {
+    const max = Math.max(0, Math.floor(Number(maxMinutes) || 0));
+    const n = Number(String(value ?? '').trim());
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.min(max, Math.floor(n));
+}
+
 function createLateMinutesRequiredError(personId = '') {
     const suffix = personId ? ` for ${personId}` : '';
     const error = new Error(`Late attendance${suffix} requires Late Arrival minutes or Left Early minutes.`);
@@ -171,6 +178,21 @@ function assertLateAttendanceMinutesPresent(record = {}) {
     if (late <= 0 && early <= 0) {
         throw createLateMinutesRequiredError(toPublicId(record.personId || ''));
     }
+}
+
+function resolveAttendanceExcuseFieldsForSave({ canOverride, incoming = {}, existing = {} }) {
+    if (canOverride) {
+        return {
+            lateExcused: incoming.lateExcused === undefined ? existing.lateExcused : incoming.lateExcused,
+            earlyLeaveExcused: incoming.earlyLeaveExcused === undefined ? existing.earlyLeaveExcused : incoming.earlyLeaveExcused,
+            absenceExcused: incoming.absenceExcused === undefined ? existing.absenceExcused : incoming.absenceExcused
+        };
+    }
+    return {
+        lateExcused: existing.lateExcused,
+        earlyLeaveExcused: existing.earlyLeaveExcused,
+        absenceExcused: existing.absenceExcused
+    };
 }
 
 function normalizeSessionRatingPercent(value, fallback = null) {
@@ -2192,6 +2214,24 @@ function resetRosterForMakeup(roster = []) {
         .filter(Boolean);
 }
 
+function sumPeriodGradebookWeightsExcludingSession(sessions, sessionId, startDate, endDate) {
+    let sum = 0;
+    const start = String(startDate || '').trim();
+    const end = String(endDate || '').trim();
+    (Array.isArray(sessions) ? sessions : []).forEach((ses) => {
+        if (idsEqual(ses?.sessionId, sessionId)) return;
+        const date = String(ses?.date || '').trim();
+        if (start && date < start) return;
+        if (end && date > end) return;
+        (Array.isArray(ses?.gradebooks) ? ses.gradebooks : []).forEach((gb) => {
+            if (gb?.includeInGradeCalculation === false) return;
+            const w = gradebookWeightService.resolveActivityWeight(gb);
+            if (Number.isFinite(w) && w > 0) sum += w;
+        });
+    });
+    return sum;
+}
+
 function resetGradebooksForMakeup(gradebooks = []) {
     return (Array.isArray(gradebooks) ? gradebooks : []).map((row, index) => {
         const { skills, skillFocus } = gradebookSkillCatalogService.normalizeGradebookActivitySkills(row);
@@ -3674,14 +3714,19 @@ async function saveSession1(req, res) {
                 const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent, null);
                 const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent, null);
                 const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent, null);
+                const excuseFields = resolveAttendanceExcuseFieldsForSave({
+                    canOverride,
+                    incoming: incRec,
+                    existing: existRec
+                });
                 const merged = {
                     personId: incomingPersonId,
                     attendance,
-                    lateMinutes: incRec.lateMinutes,
-                    earlyLeaveMinutes: incRec.earlyLeaveMinutes,
-                    lateExcused: incRec.lateExcused === undefined ? existRec.lateExcused : incRec.lateExcused,
-                    earlyLeaveExcused: incRec.earlyLeaveExcused === undefined ? existRec.earlyLeaveExcused : incRec.earlyLeaveExcused,
-                    absenceExcused: incRec.absenceExcused === undefined ? existRec.absenceExcused : incRec.absenceExcused,
+                    lateMinutes: clampAttendanceMinuteForSession(incRec.lateMinutes, sessionMinutesSave1),
+                    earlyLeaveMinutes: clampAttendanceMinuteForSession(incRec.earlyLeaveMinutes, sessionMinutesSave1),
+                    lateExcused: excuseFields.lateExcused,
+                    earlyLeaveExcused: excuseFields.earlyLeaveExcused,
+                    absenceExcused: excuseFields.absenceExcused,
                     excuseRef: incRec.excuseRef,
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: incRec.classEffortPercent === undefined
@@ -4055,6 +4100,13 @@ async function manageSession(req, res) {
         );
 
 
+        const periodGradebookOtherWeightTotal = sumPeriodGradebookWeightsExcludingSession(
+            sessions,
+            sessionId,
+            sessionConductReportPeriod.startDate,
+            sessionConductReportPeriod.dueDate
+        );
+
         const orgPolicyCatalogMs = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
@@ -4185,6 +4237,7 @@ async function manageSession(req, res) {
             gradebookSkills: sessionSkillPolicy.renderCatalog,
             teachingOutlineContext,
             enrollmentLockedAttendancePersonIds,
+            periodGradebookOtherWeightTotal,
             includeModal: true,  
             user: req.user,
             actionStateId: req.actionStateId
@@ -5056,14 +5109,19 @@ async function saveSession(req, res) {
                 const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent, null);
                 const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent, null);
                 const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent, null);
+                const excuseFields = resolveAttendanceExcuseFieldsForSave({
+                    canOverride,
+                    incoming: incRec,
+                    existing: existRec
+                });
                 const merged = {
                     personId: incomingPersonId,
                     attendance,
-                    lateMinutes: incRec.lateMinutes,
-                    earlyLeaveMinutes: incRec.earlyLeaveMinutes,
-                    lateExcused: incRec.lateExcused === undefined ? existRec.lateExcused : incRec.lateExcused,
-                    earlyLeaveExcused: incRec.earlyLeaveExcused === undefined ? existRec.earlyLeaveExcused : incRec.earlyLeaveExcused,
-                    absenceExcused: incRec.absenceExcused === undefined ? existRec.absenceExcused : incRec.absenceExcused,
+                    lateMinutes: clampAttendanceMinuteForSession(incRec.lateMinutes, sessionMinutesSave),
+                    earlyLeaveMinutes: clampAttendanceMinuteForSession(incRec.earlyLeaveMinutes, sessionMinutesSave),
+                    lateExcused: excuseFields.lateExcused,
+                    earlyLeaveExcused: excuseFields.earlyLeaveExcused,
+                    absenceExcused: excuseFields.absenceExcused,
                     excuseRef: incRec.excuseRef,
                     excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
                     classEffortPercent: canOverride

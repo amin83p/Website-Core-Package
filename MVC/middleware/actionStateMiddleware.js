@@ -167,15 +167,35 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                 requiresToken = (operation.keepActive === true) || (isMutatingRequest && isCreateOperation);
             }
 
-            const sendError = (statusCode, message) => {
+            const sendError = (statusCode, message, contextExtra = {}) => {
                  if(res.originalEnd) res.end = res.originalEnd; 
                  if(res.originalJson) res.json = res.originalJson;
                  if(res.originalSend) res.send = res.originalSend;
 
+                 const actionStateContext = {
+                     sectionId: String(section?.id || sectionIdOrName || '').trim(),
+                     sectionName: String(section?.name || sectionIdOrName || '').trim(),
+                     operationId: String(operation?.id || operationIdOrName || '').trim(),
+                     operationName: String(operation?.name || operationIdOrName || '').trim(),
+                     routePath: String(req.originalUrl || req.url || '').trim(),
+                     method: String(req.method || '').trim(),
+                     ...contextExtra
+                 };
+
                  if (req.xhr || req.headers['x-ajax-request']) {
-                     return res.status(statusCode).json({status:'error', message});
+                     return res.status(statusCode).json({
+                         status: 'error',
+                         message,
+                         actionStateContext
+                     });
                  }
-                 return res.status(statusCode).render('error', { title: 'Action Blocked', message, statusCode, user: req.user });
+                 return res.status(statusCode).render('error', {
+                     title: 'Action Blocked',
+                     message,
+                     statusCode,
+                     user: req.user,
+                     actionStateContext
+                 });
             };
             // Require a client-provided token for mutating requests when configured.
             if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && requiresToken) {
@@ -401,7 +421,15 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
 
             if (limits.maxAttempts && state.attemptCount > limits.maxAttempts) {
                 await dataService.failActionState(state.id, 0, requestContext);
-                return sendError(429, `<b>Security Violation</b><br>Too many attempts. Limit is ${limits.maxAttempts}.`);
+                return sendError(
+                    429,
+                    `<b>Security Violation</b><br>Too many attempts. Limit is ${limits.maxAttempts}.`,
+                    {
+                        attemptCount: state.attemptCount,
+                        maxAttempts: limits.maxAttempts,
+                        targetKey: String(targetKey || '').trim()
+                    }
+                );
             }
 
             req.actionStateId = state.id;

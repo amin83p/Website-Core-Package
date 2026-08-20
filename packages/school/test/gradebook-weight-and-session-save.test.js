@@ -76,7 +76,32 @@ test('sessionManager saves gradebooks with weight and total points fields', () =
   assert.match(sessionManagerSource, /markSessionAutosaveGradebookDirty/);
   assert.match(sessionManagerSource, /payload\.gradebooks = JSON\.stringify\(gradebooksState\)/);
   assert.match(sessionManagerSource, /gbModalWeight/);
-  assert.match(sessionManagerSource, /gbWeightedContribution/);
-  assert.match(sessionManagerSource, /Wt %/);
+  assert.match(sessionManagerSource, /gbGradePercentContribution/);
+  assert.match(sessionManagerSource, /Worth <strong>/);
+  assert.match(sessionManagerSource, /of grade/);
+  assert.match(sessionManagerSource, /periodGradebookOtherWeightTotal/);
+  assert.doesNotMatch(sessionManagerSource, /gbWeightedContribution/);
   assert.match(sessionManagerSource, /gbModalAttachmentsList/);
+  assert.match(sessionManagerSource, /String\(g\.id\) === String\(editId\)/);
+});
+
+test('normalizeSessionGradebooksFromRequest keeps explicit weight distinct from auto default', () => {
+  const explicit = sessionGradebookService.normalizeSessionGradebooksFromRequest([
+    {
+      id: 'gb1',
+      name: 'Quiz',
+      weight: 25,
+      totalScore: 15,
+      includeInGradeCalculation: true,
+      scores: { p1: 12 }
+    }
+  ], {
+    personIds: ['p1'],
+    attendanceByPerson: new Map([['p1', 'present']]),
+    existingGradebookById: new Map(),
+    sessionSkillPolicy: { selectableIds: [], catalog: [] },
+    mergeHistoricalGradebookSkills: (_incoming, _existing, _ids) => []
+  });
+  assert.equal(explicit[0].weight, 25);
+  assert.notEqual(explicit[0].weight, explicit[0].totalScore);
 });

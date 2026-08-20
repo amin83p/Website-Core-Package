@@ -1408,6 +1408,7 @@
 
 <div class="sections-page session-manager-page">
     <% const disabledAttr = isReadOnly ? 'disabled' : ''; %>
+    <% const canEditSessionMetadataPageFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true; %>
     <% const enrollmentLockedPersonIdSet = new Set((Array.isArray(enrollmentLockedAttendancePersonIds) ? enrollmentLockedAttendancePersonIds : []).map((id) => String(id || '').trim()).filter(Boolean)); %>
     <% function jsonForScript(value) {
         if (value === undefined) return 'undefined';
@@ -2639,7 +2640,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="attendanceDetailsModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="attendanceDetailsModal" tabindex="-1" aria-hidden="true" data-session-start="<%= session.startTime || '' %>" data-session-end="<%= session.endTime || '' %>">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
@@ -2654,32 +2655,51 @@
             <div class="modal-body">
                 <input type="hidden" id="modalPersonId">
 
+                <div class="attendance-timing-panel border rounded bg-light-subtle p-3 mb-3">
+                    <div class="small text-muted mb-3" id="modalAttendanceSessionWindow">Session: —</div>
+                    <div id="modalAttendanceTimingError" class="small text-danger mb-2 d-none" role="alert"></div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="fw-semibold small text-primary mb-2">Late arrival</div>
+                            <label class="form-label fw-bold small" for="modalArrivalTime">Arrived at</label>
+                            <input type="time" class="form-control" id="modalArrivalTime" step="60" <%- disabledAttr %>>
+                            <label class="form-label fw-bold small mt-2" for="modalLateMins">Minutes late</label>
+                            <input type="number" class="form-control" id="modalLateMins" placeholder="0" min="0" step="1" <%- disabledAttr %>>
+                            <% if (canEditSessionMetadataPageFlag) { %>
+                            <div class="mt-2 d-none" id="wrap_modalLateExcused">
+                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalLateExcused" aria-pressed="false" <%- disabledAttr %>>
+                                    <i class="bi bi-shield-plus"></i><span>Mark late excused</span>
+                                </button>
+                            </div>
+                            <% } %>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="fw-semibold small text-primary mb-2">Left early</div>
+                            <label class="form-label fw-bold small" for="modalLeaveTime">Left at</label>
+                            <input type="time" class="form-control" id="modalLeaveTime" step="60" <%- disabledAttr %>>
+                            <label class="form-label fw-bold small mt-2" for="modalLeaveMins">Minutes early</label>
+                            <input type="number" class="form-control" id="modalLeaveMins" placeholder="0" min="0" step="1" <%- disabledAttr %>>
+                            <% if (canEditSessionMetadataPageFlag) { %>
+                            <div class="mt-2 d-none" id="wrap_modalEarlyLeaveExcused">
+                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalEarlyLeaveExcused" aria-pressed="false" <%- disabledAttr %>>
+                                    <i class="bi bi-shield-plus"></i><span>Mark early leave excused</span>
+                                </button>
+                            </div>
+                            <% } %>
+                        </div>
+                        <% if (canEditSessionMetadataPageFlag) { %>
+                        <div class="col-12">
+                            <div class="d-none" id="wrap_modalAbsenceExcused">
+                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalAbsenceExcused" aria-pressed="false" <%- disabledAttr %>>
+                                    <i class="bi bi-shield-plus"></i><span>Mark absence excused</span>
+                                </button>
+                            </div>
+                        </div>
+                        <% } %>
+                    </div>
+                </div>
+
                 <div class="row g-3 mb-2">
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold small">Late Arrival (Mins)</label>
-                        <input type="number" class="form-control" id="modalLateMins" placeholder="e.g. 15" min="0" <%- disabledAttr %>>
-                        <div class="mt-2 d-none" id="wrap_modalLateExcused">
-                            <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalLateExcused" aria-pressed="false" <%- disabledAttr %>>
-                                <i class="bi bi-shield-plus"></i><span>Mark late excused</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold small">Left Early (Mins)</label>
-                        <input type="number" class="form-control" id="modalLeaveMins" placeholder="e.g. 30" min="0" <%- disabledAttr %>>
-                        <div class="mt-2 d-none" id="wrap_modalEarlyLeaveExcused">
-                            <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalEarlyLeaveExcused" aria-pressed="false" <%- disabledAttr %>>
-                                <i class="bi bi-shield-plus"></i><span>Mark early leave excused</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col-12">
-                        <div class="d-none" id="wrap_modalAbsenceExcused">
-                            <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalAbsenceExcused" aria-pressed="false" <%- disabledAttr %>>
-                                <i class="bi bi-shield-plus"></i><span>Mark absence excused</span>
-                            </button>
-                        </div>
-                    </div>
                     <div class="col-12">
                         <label class="form-label fw-bold small">Excuse / reference notes</label>
                         <div class="row g-2 align-items-start">
@@ -2754,15 +2774,16 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold d-flex align-items-center gap-1 mb-1" for="gbModalWeight">
-                            <span>Weight</span>
+                            <span>Weight (% of grade)</span>
                             <button type="button" class="btn btn-link btn-sm p-0 text-primary lh-1 gb-weight-info" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top"
-                                title="How much this activity counts toward period averages. Weights are normalized across included activities in the report period (e.g. weights 20 and 30 become 40% and 60%)."
-                                aria-label="How activity weight affects averages">
+                                title="Percent of the final grade this activity represents (e.g. 10 = up to 10% of the grade at full score). Activity weights in the report period should usually total 100%."
+                                aria-label="How activity weight affects grade percent">
                                 <i class="bi bi-info-circle" aria-hidden="true"></i>
                             </button>
                         </label>
-                        <input type="number" class="form-control" id="gbModalWeight" min="0.01" step="any" placeholder="e.g. 20">
-                        <div class="form-text">Use any positive number; the system normalizes weights to 100% across included activities.</div>
+                        <input type="number" class="form-control" id="gbModalWeight" min="0.01" max="100" step="any" placeholder="e.g. 10">
+                        <div class="form-text">Percent of the final grade at full score (not total points).</div>
+                        <div class="form-text text-primary" id="gbModalWeightPreview"></div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold mb-1" for="gbModalTotal">Total Points</label>
@@ -3043,6 +3064,173 @@ function truthyAttendanceFlag(value) {
 function parseModalAttendanceMinutes(id) {
     const n = Number(document.getElementById(id)?.value || 0);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+let attendanceTimingSyncLock = false;
+
+function parseAttendanceClockToMinutes(clock) {
+    const token = String(clock || '').trim();
+    if (!/^\d{2}:\d{2}$/.test(token)) return null;
+    const [hours, minutes] = token.split(':').map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+    return (hours * 60) + minutes;
+}
+
+function formatAttendanceMinutesToClock(totalMinutes) {
+    const mins = Math.max(0, Math.floor(Number(totalMinutes) || 0));
+    const hours = Math.floor(mins / 60) % 24;
+    const minutes = mins % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function calculateAttendanceClockRangeMinutes(startTime, endTime) {
+    const start = parseAttendanceClockToMinutes(startTime);
+    const end = parseAttendanceClockToMinutes(endTime);
+    if (start == null || end == null || end <= start) return 0;
+    return end - start;
+}
+
+function addMinutesToAttendanceClock(startTime, minutesToAdd) {
+    const start = parseAttendanceClockToMinutes(startTime);
+    if (start == null) return '';
+    const add = Math.max(0, Math.floor(Number(minutesToAdd) || 0));
+    return formatAttendanceMinutesToClock(start + add);
+}
+
+function subtractMinutesFromAttendanceClock(endTime, minutesToSubtract) {
+    const end = parseAttendanceClockToMinutes(endTime);
+    if (end == null) return '';
+    const subtract = Math.max(0, Math.floor(Number(minutesToSubtract) || 0));
+    return formatAttendanceMinutesToClock(end - subtract);
+}
+
+function getSessionClockBounds() {
+    const modal = document.getElementById('attendanceDetailsModal');
+    const startInput = document.getElementById('sessionStartTime');
+    const endInput = document.getElementById('sessionEndTime');
+    const start = String(startInput?.value || modal?.dataset?.sessionStart || '').trim();
+    const end = String(endInput?.value || modal?.dataset?.sessionEnd || '').trim();
+    return { start, end };
+}
+
+function setAttendanceTimingError(message) {
+    const el = document.getElementById('modalAttendanceTimingError');
+    if (!el) return;
+    const msg = String(message || '').trim();
+    el.textContent = msg;
+    el.classList.toggle('d-none', !msg);
+}
+
+function updateAttendanceTimingSessionLabel() {
+    const label = document.getElementById('modalAttendanceSessionWindow');
+    const { start, end } = getSessionClockBounds();
+    if (label) {
+        label.textContent = (start && end) ? `Session: ${start} – ${end}` : 'Session: —';
+    }
+    const arrivalInput = document.getElementById('modalArrivalTime');
+    const leaveInput = document.getElementById('modalLeaveTime');
+    if (arrivalInput && start) arrivalInput.min = start;
+    if (arrivalInput && end) arrivalInput.max = end;
+    if (leaveInput && start) leaveInput.min = start;
+    if (leaveInput && end) leaveInput.max = end;
+}
+
+function validateAttendanceTimingPair(start, end, arrival, leave) {
+    if (!start || !end) {
+        return { valid: false, message: 'Session start and end times are required.' };
+    }
+    const startM = parseAttendanceClockToMinutes(start);
+    const endM = parseAttendanceClockToMinutes(end);
+    const arrivalM = parseAttendanceClockToMinutes(arrival);
+    const leaveM = parseAttendanceClockToMinutes(leave);
+    if (startM == null || endM == null || endM <= startM) {
+        return { valid: false, message: 'Session start and end times are required.' };
+    }
+    if (arrivalM == null || leaveM == null) {
+        return { valid: false, message: 'Enter valid arrival and leave times.' };
+    }
+    if (arrivalM < startM || arrivalM > endM) {
+        return { valid: false, message: 'Arrival must be within the session time.' };
+    }
+    if (leaveM < startM || leaveM > endM) {
+        return { valid: false, message: 'Leave time must be within the session time.' };
+    }
+    if (arrivalM > leaveM) {
+        return { valid: false, message: 'Arrival cannot be after leave time.' };
+    }
+    return { valid: true, message: '' };
+}
+
+function clampAttendanceMinuteValue(minutes, maxMinutes) {
+    const max = Math.max(0, Math.floor(Number(maxMinutes) || 0));
+    const n = Math.floor(Number(minutes) || 0);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.max(0, Math.min(max, n));
+}
+
+function syncAttendanceTimingFromMinutes() {
+    if (attendanceTimingSyncLock) return;
+    attendanceTimingSyncLock = true;
+    try {
+        const { start, end } = getSessionClockBounds();
+        const maxSpan = calculateAttendanceClockRangeMinutes(start, end);
+        const lateInput = document.getElementById('modalLateMins');
+        const leaveInput = document.getElementById('modalLeaveMins');
+        const arrivalInput = document.getElementById('modalArrivalTime');
+        const leaveTimeInput = document.getElementById('modalLeaveTime');
+        const late = clampAttendanceMinuteValue(lateInput?.value, maxSpan);
+        const early = clampAttendanceMinuteValue(leaveInput?.value, maxSpan);
+        if (lateInput) lateInput.value = String(late);
+        if (leaveInput) leaveInput.value = String(early);
+        if (arrivalInput && start) arrivalInput.value = addMinutesToAttendanceClock(start, late);
+        if (leaveTimeInput && end) leaveTimeInput.value = subtractMinutesFromAttendanceClock(end, early);
+        const validation = validateAttendanceTimingPair(start, end, arrivalInput?.value, leaveTimeInput?.value);
+        setAttendanceTimingError(validation.valid ? '' : validation.message);
+    } finally {
+        attendanceTimingSyncLock = false;
+    }
+}
+
+function syncAttendanceTimingFromTimes() {
+    if (attendanceTimingSyncLock) return;
+    attendanceTimingSyncLock = true;
+    try {
+        const { start, end } = getSessionClockBounds();
+        const maxSpan = calculateAttendanceClockRangeMinutes(start, end);
+        const arrivalInput = document.getElementById('modalArrivalTime');
+        const leaveTimeInput = document.getElementById('modalLeaveTime');
+        const lateInput = document.getElementById('modalLateMins');
+        const leaveInput = document.getElementById('modalLeaveMins');
+        const validation = validateAttendanceTimingPair(start, end, arrivalInput?.value, leaveTimeInput?.value);
+        if (!validation.valid) {
+            setAttendanceTimingError(validation.message);
+            return;
+        }
+        setAttendanceTimingError('');
+        const arrivalM = parseAttendanceClockToMinutes(arrivalInput?.value);
+        const leaveM = parseAttendanceClockToMinutes(leaveTimeInput?.value);
+        const startM = parseAttendanceClockToMinutes(start);
+        const endM = parseAttendanceClockToMinutes(end);
+        const late = clampAttendanceMinuteValue(arrivalM - startM, maxSpan);
+        const early = clampAttendanceMinuteValue(endM - leaveM, maxSpan);
+        if (lateInput) lateInput.value = String(late);
+        if (leaveInput) leaveInput.value = String(early);
+        if (arrivalInput && start) arrivalInput.value = addMinutesToAttendanceClock(start, late);
+        if (leaveTimeInput && end) leaveTimeInput.value = subtractMinutesFromAttendanceClock(end, early);
+    } finally {
+        attendanceTimingSyncLock = false;
+    }
+}
+
+function refreshAttendanceTimingUi() {
+    updateAttendanceTimingSessionLabel();
+    syncAttendanceTimingFromMinutes();
+    syncModalTimingExcuseControls();
+}
+
+function hasAttendanceTimingValidationError() {
+    const el = document.getElementById('modalAttendanceTimingError');
+    return el && !el.classList.contains('d-none') && String(el.textContent || '').trim();
 }
 
 function syncModalTimingExcuseButton({ minutesInputId, wrapperId, buttonId, stateKey, inactiveText, activeText }) {
@@ -3641,6 +3829,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const [h, m] = start.split(':').map(Number);
         const totalMinutes = (h * 60) + m + Number(minutesToAdd || 0);
         if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+        const endH = Math.floor(totalMinutes / 60) % 24;
+        const endM = totalMinutes % 60;
+        return String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0');
+    }
+
+    function subtractMinutesFromClockTimeClient(endTime, minutesToSubtract) {
+        const end = String(endTime || '').trim();
+        if (!/^\d{2}:\d{2}$/.test(end)) return '';
+        const [h, m] = end.split(':').map(Number);
+        const totalMinutes = (h * 60) + m - Number(minutesToSubtract || 0);
+        if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return '';
         const endH = Math.floor(totalMinutes / 60) % 24;
         const endM = totalMinutes % 60;
         return String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0');
@@ -6144,6 +6343,14 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryTime.innerHTML = (startTime || endTime)
                 ? `<i class="bi bi-clock" aria-hidden="true"></i>${scEscapeHtml(startTime || '--:--')}–${scEscapeHtml(endTime || '--:--')}`
                 : '<i class="bi bi-clock" aria-hidden="true"></i>—';
+            const detailsModal = document.getElementById('attendanceDetailsModal');
+            if (detailsModal) {
+                detailsModal.dataset.sessionStart = startTime;
+                detailsModal.dataset.sessionEnd = endTime;
+            }
+            if (detailsModal?.classList.contains('show')) {
+                refreshAttendanceTimingUi();
+            }
         }
 
         const teacherNameInput = document.getElementById('sessionTeacherName');
@@ -6595,19 +6802,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const btnSaveDetails = document.getElementById('btnSaveDetails');
+    function onAttendanceMinutesInput() {
+        syncAttendanceTimingFromMinutes();
+        syncModalTimingExcuseControls();
+    }
+    function onAttendanceTimesInput() {
+        syncAttendanceTimingFromTimes();
+        syncModalTimingExcuseControls();
+    }
     ['modalLateMins', 'modalLeaveMins'].forEach((id) => {
-        document.getElementById(id)?.addEventListener('input', syncModalTimingExcuseControls);
-        document.getElementById(id)?.addEventListener('change', syncModalTimingExcuseControls);
+        document.getElementById(id)?.addEventListener('input', onAttendanceMinutesInput);
+        document.getElementById(id)?.addEventListener('change', onAttendanceMinutesInput);
+    });
+    ['modalArrivalTime', 'modalLeaveTime'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('input', onAttendanceTimesInput);
+        document.getElementById(id)?.addEventListener('change', onAttendanceTimesInput);
     });
     document.getElementById('btn_modalLateExcused')?.addEventListener('click', () => {
+        if (!sessionCanEditMetadata) return;
         modalLateExcused = !modalLateExcused;
         syncModalTimingExcuseControls();
     });
     document.getElementById('btn_modalEarlyLeaveExcused')?.addEventListener('click', () => {
+        if (!sessionCanEditMetadata) return;
         modalEarlyLeaveExcused = !modalEarlyLeaveExcused;
         syncModalTimingExcuseControls();
     });
     document.getElementById('btn_modalAbsenceExcused')?.addEventListener('click', () => {
+        if (!sessionCanEditMetadata) return;
         modalAbsenceExcused = !modalAbsenceExcused;
         syncModalAbsenceExcuseControls();
     });
@@ -6623,27 +6845,40 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             try {
+                if (hasAttendanceTimingValidationError()) {
+                    await sessionMessageBox({
+                        title: 'Invalid attendance times',
+                        icon: 'warning',
+                        message: document.getElementById('modalAttendanceTimingError')?.textContent || 'Fix arrival and leave times before saving.',
+                        okText: 'Close',
+                        okClass: 'btn-secondary'
+                    });
+                    return;
+                }
                 if (row) {
-                    const lateVal = document.getElementById('modalLateMins').value;
-                    const leaveVal = document.getElementById('modalLeaveMins').value;
-                    const excuseVal = document.getElementById('modalExcuseRef').value;
                     const details = getAttendanceDetails(personId);
                     const selectedExcuseAttachment = await uploadSchoolSessionFile(document.getElementById('modalExcuseFile'), 'excuse', personId);
                     const excuseAttachment = selectedExcuseAttachment || details.excuseAttachment || null;
                     details.excuseAttachment = excuseAttachment || null;
-
-                    row.querySelector('.att-late').value = lateVal;
-                    row.querySelector('.att-leave').value = leaveVal;
-                    row.querySelector('.att-excuse').value = excuseVal;
                     const lateExcusedInput = row.querySelector('.att-late-excused');
                     const earlyExcusedInput = row.querySelector('.att-early-excused');
                     const absenceExcusedInput = row.querySelector('.att-absence-excused');
-                    if (lateExcusedInput) lateExcusedInput.value = parseModalAttendanceMinutes('modalLateMins') > 0 && modalLateExcused ? 'true' : 'false';
-                    if (earlyExcusedInput) earlyExcusedInput.value = parseModalAttendanceMinutes('modalLeaveMins') > 0 && modalEarlyLeaveExcused ? 'true' : 'false';
-                    if (absenceExcusedInput) {
-                        const attendance = row.querySelector('.att-radio:checked')?.value || '';
-                        absenceExcusedInput.value = isAbsentLikeAttendanceStatus(attendance) && modalAbsenceExcused ? 'true' : 'false';
+                    const lateVal = document.getElementById('modalLateMins').value;
+                    const leaveVal = document.getElementById('modalLeaveMins').value;
+                    row.querySelector('.att-late').value = lateVal;
+                    row.querySelector('.att-leave').value = leaveVal;
+
+                    if (sessionCanEditMetadata) {
+                        if (lateExcusedInput) lateExcusedInput.value = parseModalAttendanceMinutes('modalLateMins') > 0 && modalLateExcused ? 'true' : 'false';
+                        if (earlyExcusedInput) earlyExcusedInput.value = parseModalAttendanceMinutes('modalLeaveMins') > 0 && modalEarlyLeaveExcused ? 'true' : 'false';
+                        if (absenceExcusedInput) {
+                            const attendance = row.querySelector('.att-radio:checked')?.value || '';
+                            absenceExcusedInput.value = isAbsentLikeAttendanceStatus(attendance) && modalAbsenceExcused ? 'true' : 'false';
+                        }
                     }
+
+                    const excuseVal = document.getElementById('modalExcuseRef').value;
+                    row.querySelector('.att-excuse').value = excuseVal;
 
                     applyAttendanceRulesToRow(row);
                     updateLateMissingMinuteState(row);
@@ -7967,6 +8202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gbSessionId = sessionManagerSessionId;
     const gradebookRoster = <%- jsonForScript((session.roster || []).map((r) => ({ personId: String(r.personId), name: r.name || 'Student' }))) %>;
     const gradebookSkillsCatalog = <%- jsonForScript(gradebookSkills || []) %>;
+    const periodGradebookOtherWeightTotal = <%= typeof periodGradebookOtherWeightTotal !== 'undefined' ? Number(periodGradebookOtherWeightTotal) || 0 : 0 %>;
     let gradebooksState = [];
     const gbCollapsedIds = new Set();
 
@@ -8060,28 +8296,102 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span class="gb-skill-chips">${ids.map((id) => `<span class="badge bg-light text-dark border gb-skill-chip">${gbEscapeHtml(gbSkillLabelById.get(id) || id)}</span>`).join('')}</span>`;
     }
 
-    function gbResolveWeight(gb) {
+    function gbExplicitWeight(gb) {
         const explicit = Number(gb?.weight);
         if (Number.isFinite(explicit) && explicit > 0) return explicit;
+        return null;
+    }
+
+    function gbResolveWeight(gb) {
+        const explicit = gbExplicitWeight(gb);
+        if (explicit != null) return explicit;
         const totalScore = Number(gb?.totalScore);
         if (Number.isFinite(totalScore) && totalScore > 0) return totalScore;
         return 0;
     }
 
+    function gbActivityKey(gb, index) {
+        const id = String(gb?.id || gb?.colKey || '').trim();
+        if (id) return id;
+        return `activity_${index}`;
+    }
+
+    function gbResolveActivityWeightKeys(list) {
+        const arr = Array.isArray(list) ? list : [];
+        const baseKeys = arr.map((gb, index) => gbActivityKey(gb, index));
+        const baseCounts = new Map();
+        baseKeys.forEach((key) => baseCounts.set(key, (baseCounts.get(key) || 0) + 1));
+        const dupIndices = new Map();
+        return arr.map((gb, index) => {
+            const base = gbActivityKey(gb, index);
+            if (baseCounts.get(base) === 1) return base;
+            const occurrence = dupIndices.get(base) || 0;
+            dupIndices.set(base, occurrence + 1);
+            return occurrence === 0 ? base : `${base}__${index}`;
+        });
+    }
+
     function gbBuildNormalizedWeightMap(list) {
-        const map = new Map();
+        const entries = [];
         let sum = 0;
-        (Array.isArray(list) ? list : []).forEach((gb) => {
+        const weightKeys = gbResolveActivityWeightKeys(list);
+        (Array.isArray(list) ? list : []).forEach((gb, index) => {
             if (gb?.includeInGradeCalculation === false) return;
             const weight = gbResolveWeight(gb);
             if (!Number.isFinite(weight) || weight <= 0) return;
+            entries.push({ key: weightKeys[index], weight });
             sum += weight;
-            map.set(String(gb.id), weight);
         });
         if (!sum) return new Map();
         const normalized = new Map();
-        map.forEach((weight, id) => normalized.set(id, weight / sum));
+        entries.forEach(({ key, weight }) => normalized.set(key, weight / sum));
         return normalized;
+    }
+
+    function gbPeriodWeightTotal() {
+        let sum = Number(periodGradebookOtherWeightTotal) || 0;
+        gradebooksState.forEach((gb) => {
+            if (gb?.includeInGradeCalculation === false) return;
+            const w = gbExplicitWeight(gb);
+            if (w != null) sum += w;
+        });
+        return sum;
+    }
+
+    function gbRenderWeightBadge(gb) {
+        if (!gb.includeInGradeCalculation) return '';
+        const explicit = gbExplicitWeight(gb);
+        if (explicit != null) {
+            const periodTotal = gbPeriodWeightTotal();
+            const periodNote = periodTotal > 0
+                ? ` · Report period activity weights total ${periodTotal}%`
+                : '';
+            return `<span class="me-2" title="Percent of the final grade this activity can contribute"><i class="bi bi-sliders me-1"></i>Worth <strong>${explicit}%</strong> of grade${periodNote}</span>`;
+        }
+        return `<span class="me-2 text-muted" title="Set weight as percent of grade to enable W% column"><i class="bi bi-sliders me-1"></i>Weight not set</span>`;
+    }
+
+    function gbUpdateModalWeightPreview() {
+        const previewEl = document.getElementById('gbModalWeightPreview');
+        if (!previewEl) return;
+        const weightRaw = String(document.getElementById('gbModalWeight')?.value || '').trim();
+        const includeInGradeCalculation = document.getElementById('gbModalInclude')?.checked !== false;
+        if (!includeInGradeCalculation) {
+            previewEl.textContent = 'Excluded from grade calculation.';
+            return;
+        }
+        if (weightRaw === '') {
+            previewEl.textContent = 'Set weight (% of grade) to preview W% at full score.';
+            return;
+        }
+        const weight = Number(weightRaw);
+        if (!Number.isFinite(weight) || weight <= 0) {
+            previewEl.textContent = '';
+            return;
+        }
+        const periodTotal = gbPeriodWeightTotal();
+        const periodNote = periodTotal > 0 ? ` (period weights total ${periodTotal}%)` : '';
+        previewEl.textContent = `At 100% score, W% = ${weight.toFixed(1)}% of grade${periodNote}`;
     }
 
     function gbFormatNormalizedWeightPercent(value) {
@@ -8090,20 +8400,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${(n * 100).toFixed(1)}%`;
     }
 
-    function gbWeightedContribution(score, total, normalizedWeight) {
+    function gbGradePercentContribution(score, total, weightPercent) {
+        if (weightPercent == null) return '—';
         if (score === null || score === undefined || Number.isNaN(Number(score))) return '—';
         const totalNum = Number(total);
-        const weight = Number(normalizedWeight);
+        const weight = Number(weightPercent);
         if (!Number.isFinite(totalNum) || totalNum <= 0 || !Number.isFinite(weight) || weight <= 0) return '—';
-        const pct = (Number(score) / totalNum) * 100;
-        return `${(pct * weight).toFixed(1)}%`;
+        const activityPct = (Number(score) / totalNum) * 100;
+        const wPct = Math.round(activityPct * weight / 10) / 10;
+        return `${wPct.toFixed(1)}%`;
     }
 
     function gbNormalizeIncoming(list) {
         const arr = Array.isArray(list) ? list : [];
         return arr.map((gb) => {
             const totalScore = Number(gb.totalScore);
-            const weight = gbResolveWeight({ ...gb, totalScore: Number.isFinite(totalScore) && totalScore > 0 ? totalScore : 10 });
+            const weight = gbExplicitWeight(gb);
             const scores = {};
             gradebookRoster.forEach(({ personId }) => {
                 const pid = String(personId);
@@ -8269,9 +8581,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (String(inp.value) !== String(n)) inp.value = n;
                 const pctCell = inp.closest('tr')?.querySelector('.gb-pct');
                 const wtCell = inp.closest('tr')?.querySelector('.gb-wt-pct');
-                const normWeight = gbBuildNormalizedWeightMap(gradebooksState).get(String(gb.id)) || 0;
                 if (pctCell) pctCell.textContent = gbFormatPct(n, total);
-                if (wtCell) wtCell.textContent = gbWeightedContribution(n, total, normWeight);
+                if (wtCell) wtCell.textContent = gbGradePercentContribution(n, total, gbExplicitWeight(gb));
                 markSessionAutosaveGradebookDirty();
             });
         });
@@ -8301,15 +8612,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!validGbIds.has(id)) gbCollapsedIds.delete(id);
         });
 
-        const normalizedWeightMap = gbBuildNormalizedWeightMap(gradebooksState);
-
-        gradebooksState.forEach((gb) => {
+        gradebooksState.forEach((gb, gbIndex) => {
             const total = Number(gb.totalScore);
-            const normalizedWeight = normalizedWeightMap.get(String(gb.id)) || 0;
-            const weightValue = gbResolveWeight(gb);
-            const weightBadge = gb.includeInGradeCalculation
-                ? `<span class="me-2"><i class="bi bi-sliders me-1"></i>Weight: <strong>${weightValue}</strong> (${gbFormatNormalizedWeightPercent(normalizedWeight)})</span>`
-                : '';
+            const explicitWeight = gbExplicitWeight(gb);
+            const weightBadge = gbRenderWeightBadge(gb);
             const collapsed = gbCollapsedIds.has(gb.id);
             const incl = gb.includeInGradeCalculation ? '<span class="badge bg-light text-success border">In grade</span>' : '<span class="badge bg-light text-secondary border">Excluded</span>';
             const gradeHeader = `Grade/${Number.isFinite(total) && total > 0 ? total : '—'}`;
@@ -8341,7 +8647,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             min="0" max="${total}" step="any" ${gbReadOnly ? 'disabled' : ''} value="${gbEscapeHtml(val)}" placeholder="—">
                     </td>
                     <td class="gb-pct small text-nowrap">${gbFormatPct(sc, total)}</td>
-                    <td class="gb-wt-pct small text-nowrap">${gbWeightedContribution(sc, total, normalizedWeight)}</td>
+                    <td class="gb-wt-pct small text-nowrap">${gbGradePercentContribution(sc, total, explicitWeight)}</td>
                 </tr>`;
                 }).join('')
                 : `<tr><td colspan="4" class="text-muted small ps-3 py-2">No students on the attendance roster yet. Add enrollments to enter scores; saved activities and settings are shown below.</td></tr>`;
@@ -8365,7 +8671,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${gb.activityContent ? `<div class="gb-activity-body mb-3">${gbEscapeHtml(gb.activityContent)}</div>` : '<p class="small text-muted mb-3 fst-italic">No activity description.</p>'}
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered align-middle mb-0">
-                                <thead class="table-light"><tr><th class="ps-3">Student</th><th style="min-width:120px;">${gbEscapeHtml(gradeHeader)}</th><th style="min-width:72px;">%</th><th style="min-width:72px;" title="Weighted contribution to the session average">Wt %</th></tr></thead>
+                                <thead class="table-light"><tr><th class="ps-3">Student</th><th style="min-width:120px;">${gbEscapeHtml(gradeHeader)}</th><th style="min-width:72px;" title="Score as percent of this activity's total points">%</th><th style="min-width:72px;" title="Percent of the final grade earned on this activity (activity % × weight % ÷ 100)">W%</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                         </div>
@@ -8379,7 +8685,8 @@ document.addEventListener('DOMContentLoaded', () => {
             inp.addEventListener('input', () => {
                 const gid = inp.getAttribute('data-gb-id');
                 const pid = inp.getAttribute('data-person-id');
-                const gb = gradebooksState.find((g) => g.id === gid);
+                const gbIndex = gradebooksState.findIndex((g) => String(g.id) === String(gid));
+                const gb = gbIndex >= 0 ? gradebooksState[gbIndex] : null;
                 if (!gb) return;
                 const total = Number(gb.totalScore);
                 const raw = String(inp.value || '').trim();
@@ -8402,12 +8709,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 gb.scores[pid] = n;
                 if (String(inp.value) !== String(n)) inp.value = n;
                 const row = inp.closest('tr');
-                const normWeight = gbBuildNormalizedWeightMap(gradebooksState).get(String(gb.id)) || 0;
                 if (row) {
                     const pctCell = row.querySelector('.gb-pct');
                     const wtCell = row.querySelector('.gb-wt-pct');
                     if (pctCell) pctCell.textContent = gbFormatPct(n, total);
-                    if (wtCell) wtCell.textContent = gbWeightedContribution(n, total, normWeight);
+                    if (wtCell) wtCell.textContent = gbGradePercentContribution(n, total, gbExplicitWeight(gb));
                 }
                 markSessionAutosaveGradebookDirty();
             });
@@ -8460,7 +8766,7 @@ document.addEventListener('DOMContentLoaded', () => {
             html: true
         }).then((confirmed) => {
             if (!confirmed) return;
-            gradebooksState = gradebooksState.filter((g) => g.id !== id);
+            gradebooksState = gradebooksState.filter((g) => String(g.id) !== String(id));
             gbCollapsedIds.delete(id);
             gbRenderList();
             markSessionAutosaveGradebookDirty();
@@ -8480,12 +8786,13 @@ document.addEventListener('DOMContentLoaded', () => {
             : '<i class="bi bi-journal-plus me-2"></i>Add activity';
         document.getElementById('gbModalEditId').value = isEdit ? editId : '';
         if (isEdit) {
-            const gb = gradebooksState.find((g) => g.id === editId);
+            const gb = gradebooksState.find((g) => String(g.id) === String(editId));
             if (!gb) return;
             document.getElementById('gbModalName').value = gb.name || '';
             gbSetModalSkills(gb.skills || []);
             document.getElementById('gbModalTotal').value = gb.totalScore || '';
-            document.getElementById('gbModalWeight').value = gb.weight != null ? gb.weight : gbResolveWeight(gb);
+            const explicitWeight = gbExplicitWeight(gb);
+            document.getElementById('gbModalWeight').value = explicitWeight != null ? explicitWeight : '';
             document.getElementById('gbModalContent').value = gb.activityContent || '';
             document.getElementById('gbModalInclude').checked = gb.includeInGradeCalculation !== false;
             gbModalAttachmentsState = Array.isArray(gb.attachments)
@@ -8502,6 +8809,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gbModalAttachmentsState = [];
         }
         gbRenderModalAttachmentsList();
+        gbUpdateModalWeightPreview();
         if (gradebookModalInstance) gradebookModalInstance.show();
     }
 
@@ -8511,6 +8819,10 @@ document.addEventListener('DOMContentLoaded', () => {
             gbModalEl.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
                 bootstrap.Tooltip.getOrCreateInstance(el);
             });
+        });
+        ['gbModalWeight', 'gbModalTotal', 'gbModalInclude'].forEach((id) => {
+            document.getElementById(id)?.addEventListener('input', gbUpdateModalWeightPreview);
+            document.getElementById(id)?.addEventListener('change', gbUpdateModalWeightPreview);
         });
         document.querySelectorAll('#gradebookActivityModal input[data-gb-attach-role]').forEach((inputEl) => {
             inputEl.addEventListener('change', () => {
@@ -8528,7 +8840,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const skills = gbGetModalSkills();
         const skillFocus = gbFormatSkillLabels(skills);
         const totalScore = Number(document.getElementById('gbModalTotal').value);
-        let weight = Number(document.getElementById('gbModalWeight').value);
+        const weightRaw = String(document.getElementById('gbModalWeight').value || '').trim();
+        let weight = null;
+        if (weightRaw !== '') {
+            const parsedWeight = Number(weightRaw);
+            if (Number.isFinite(parsedWeight) && parsedWeight > 0) weight = parsedWeight;
+        }
         const activityContent = document.getElementById('gbModalContent').value;
         const includeInGradeCalculation = document.getElementById('gbModalInclude').checked;
 
@@ -8548,12 +8865,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             return;
         }
-        if (!Number.isFinite(weight) || weight <= 0) {
-            weight = totalScore;
-        }
 
         if (editId) {
-            const gb = gradebooksState.find((g) => g.id === editId);
+            const gb = gradebooksState.find((g) => String(g.id) === String(editId));
             if (!gb) return;
             const oldTotal = Number(gb.totalScore);
             gb.name = name;
@@ -9087,7 +9401,7 @@ function openDetailsModal(personId, name) {
         const rowAttendance = row.querySelector('.att-radio:checked')?.value || '';
         modalAbsenceExcused = isAbsentLikeAttendanceStatus(rowAttendance)
             && truthyAttendanceFlag(row.querySelector('.att-absence-excused')?.value);
-        syncModalTimingExcuseControls();
+        refreshAttendanceTimingUi();
         const details = window.getAttendanceDetails(personId);
         const excuseAttachment = details.excuseAttachment || null;
         const excuseFileInput = document.getElementById('modalExcuseFile');
@@ -9124,7 +9438,7 @@ function openDetailsModal(personId, name) {
         modalLateExcused = false;
         modalEarlyLeaveExcused = false;
         modalAbsenceExcused = false;
-        syncModalTimingExcuseControls();
+        refreshAttendanceTimingUi();
     }
 
     document.getElementById('inp_newComment').value = '';

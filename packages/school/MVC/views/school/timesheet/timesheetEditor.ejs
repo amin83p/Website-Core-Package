@@ -546,7 +546,8 @@
     width: 210px;
     min-width: 210px;
   }
-  #tsTable tbody tr.ts-day-group-end > td {
+  #tsTable tbody tr.ts-day-group-end > td,
+  #tsTable tbody td.ts-day-date-span {
     border-bottom: 3px solid #0d6efd !important;
   }
   .ts-date-add-btn {
@@ -563,6 +564,52 @@
   }
   #tsDepartmentTotals .table {
     margin-bottom: 0;
+  }
+  .copy-manual-days-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    background: #fff;
+  }
+  .copy-manual-day-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    cursor: pointer;
+    user-select: none;
+  }
+  .copy-manual-day-item:last-child {
+    border-bottom: 0;
+  }
+  .copy-manual-day-item:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  .copy-manual-day-item.is-selected {
+    background-color: rgba(13, 110, 253, 0.08);
+  }
+  .copy-manual-day-date {
+    font-weight: 600;
+    color: var(--bs-body-color);
+    min-width: 8.5rem;
+  }
+  .copy-manual-day-weekday {
+    color: var(--bs-secondary-color);
+    font-size: 0.875rem;
+  }
+  .copy-manual-source-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+  }
+  .copy-manual-source-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
   }
   @media (max-width: 767.98px) {
     .ts-page-header {
@@ -728,6 +775,7 @@
         </div>
     </div>
 
+    <% if (isAdmin) { %>
     <div class="card border-0 shadow-sm mb-4" id="tsDepartmentTotals">
         <div class="card-header bg-light border-bottom py-3">
             <div class="fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Hours by Department</div>
@@ -755,6 +803,7 @@
             </div>
         </div>
     </div>
+    <% } %>
 
     <% if (!isEditorLocked || adminCanApprove || adminCanReopen || financeCanProcess || financeCanUnprocess || canAllowLateSubmissionFlag) { %>
         <div class="d-flex justify-content-end gap-2 border-top pt-3 flex-wrap">
@@ -831,7 +880,7 @@
                       data-category="<%= activity.categoryName || '' %>"
                       data-department="<%= activity.departmentName || '' %>"
                       data-visibility-scope="<%= activity.visibilityScope || 'school' %>">
-                      <%= activity.name || activity.id || 'Activity' %><%= activity.visibilityScope === 'individual' ? ' (individual)' : '' %>
+                      <%= activity.name || activity.id || 'Activity' %>
                     </option>
                   <% }) %>
               </select>
@@ -971,21 +1020,40 @@
 </div>
 
 <div class="modal fade" id="copyManualRowModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-scrollable">
     <div class="modal-content border-0 shadow">
       <div class="modal-header bg-light border-0">
-        <h5 class="modal-title fw-bold"><i class="bi bi-copy me-2 text-primary"></i>Copy Manual Row</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title fw-bold"><i class="bi bi-copy me-2 text-primary"></i>Copy to Other Days</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="copyManualSourceSessionId">
-        <p class="small text-muted mb-3" id="copyManualRowSummary">Select days to copy this individual activity row onto. Only days without schedule conflicts are listed.</p>
-        <div id="copyManualDaysEmpty" class="alert alert-warning d-none mb-0">No eligible days are available to copy this row onto.</div>
-        <div id="copyManualDaysList" class="d-flex flex-column gap-2" style="max-height: 320px; overflow-y: auto;"></div>
+        <div class="card border bg-light mb-3" id="copyManualSourceCard">
+          <div class="card-body py-3">
+            <div class="small text-muted mb-1">Row to copy</div>
+            <div class="fw-bold text-body" id="copyManualSourceTitle">—</div>
+            <div class="copy-manual-source-meta mt-2" id="copyManualSourceMeta">
+              <span id="copyManualSourceDate"></span>
+              <span id="copyManualSourceTime"></span>
+              <span id="copyManualSourceHours"></span>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+          <label class="form-label fw-bold mb-0" for="copyManualDaysList">Target days</label>
+          <div class="btn-group btn-group-sm" id="copyManualQuickSelect">
+            <button type="button" class="btn btn-outline-secondary" id="btnCopySelectAll">Select all</button>
+            <button type="button" class="btn btn-outline-secondary" id="btnCopyClearAll">Clear</button>
+          </div>
+        </div>
+        <p class="small text-muted mb-3" id="copyManualRowSummary">Only days without schedule conflicts are listed below.</p>
+        <div id="copyManualDaysEmpty" class="alert alert-warning d-none mb-0">No eligible days are available. Every other day in this period either conflicts with this time range or is unavailable.</div>
+        <div id="copyManualDaysList" class="list-group copy-manual-days-list" role="group" aria-label="Eligible target days"></div>
+        <div class="small text-muted mt-2" id="copyManualSelectionCount" aria-live="polite">Select one or more days above</div>
       </div>
       <div class="modal-footer bg-light border-0">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary fw-bold" id="btnConfirmCopyManualRow" disabled>Copy to Selected Days</button>
+        <button type="button" class="btn btn-primary fw-bold" id="btnConfirmCopyManualRow" disabled>Copy to <span id="copyManualBtnCount">0</span> days</button>
       </div>
     </div>
   </div>
@@ -1809,7 +1877,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedComments = {};
     TIMESHEET_ENTRIES.forEach(e => {
         if (e.isDeleted) {
-            deletedAutoSessionIds.push(e.sessionId);
+            if (IS_ADMIN || e.isManual || e.isPriorPeriodAdjustment) {
+                deletedAutoSessionIds.push(e.sessionId);
+            }
         } else if (e.isManual || e.isPriorPeriodAdjustment) {
             activeEntries.push(e);
         } else {
@@ -2456,6 +2526,13 @@ document.addEventListener('DOMContentLoaded', () => {
             || sessionId.startsWith('act-');
     }
 
+    function isAutoPulledTimesheetEntry(entry) {
+        if (!entry || entry.isManual === true || entry.isPriorPeriodAdjustment === true || entry.isReportReflection === true) {
+            return false;
+        }
+        return true;
+    }
+
     function buildTimesheetEntryManagerHref(entry) {
         if (!entry || entry.isPriorPeriodAdjustment === true || entry.isReportReflection === true) return '';
 
@@ -2709,6 +2786,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderDepartmentTotals() {
+        if (!IS_ADMIN) return;
         const totalsBody = document.getElementById('tsDepartmentTotalsBody');
         if (!totalsBody) return;
         const buckets = new Map();
@@ -2883,6 +2961,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             actBtns = `${reviewBtns}<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit" onclick="openManualModal('${dateStr}', '${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
                                        ${copyBtn}
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" title="Remove" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
+                        } else if (isAutoPulledTimesheetEntry(ses) && !IS_ADMIN) {
+                            actBtns = `<span class="text-muted small ts-tooltip-trigger" data-tip="Auto-pulled sessions are locked and cannot be removed from your timesheet." tabindex="0"><i class="bi bi-lock-fill"></i></span>`;
                         } else {
                             actBtns = `<button class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove Auto-Pulled Session" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
                         }
@@ -2890,7 +2970,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const actHtml = IS_READONLY ? '' : `<td class="ts-col-actions"><div class="ts-action-stack">${actBtns}</div></td>`;
                     const dateCell = sIdx === 0
-                        ? `<td class="ps-4 align-top border-end border-2" rowspan="${dayRowSpan}">
+                        ? `<td class="ps-4 align-top border-end border-2${dayEntries.length > 1 ? ' ts-day-date-span' : ''}" rowspan="${dayRowSpan}">
                             ${buildDateCellHtml(dateStr, dayName, isHoliday, hol)}
                            </td>`
                         : '';
@@ -3117,10 +3197,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncCopyManualConfirmButton() {
-        const btn = document.getElementById('btnConfirmCopyManualRow');
         const checked = document.querySelectorAll('#copyManualDaysList input.js-copy-day:checked');
-        if (btn) btn.disabled = !checked.length;
+        const count = checked.length;
+        const btn = document.getElementById('btnConfirmCopyManualRow');
+        const countEl = document.getElementById('copyManualBtnCount');
+        const summaryCount = document.getElementById('copyManualSelectionCount');
+        if (btn) btn.disabled = !count;
+        if (countEl) countEl.textContent = String(count);
+        if (summaryCount) {
+            summaryCount.textContent = count
+                ? `${count} day${count === 1 ? '' : 's'} selected`
+                : 'Select one or more days above';
+        }
+        document.querySelectorAll('.copy-manual-day-item').forEach((item) => {
+            const input = item.querySelector('input.js-copy-day');
+            item.classList.toggle('is-selected', Boolean(input?.checked));
+        });
     }
+
+    function populateCopyManualSourceCard(source) {
+        const titleEl = document.getElementById('copyManualSourceTitle');
+        const dateEl = document.getElementById('copyManualSourceDate');
+        const timeEl = document.getElementById('copyManualSourceTime');
+        const hoursEl = document.getElementById('copyManualSourceHours');
+        const sourceDate = String(source?.date || '').trim();
+        const name = String(source?.className || source?.activityName || source?.description || 'Manual row').trim();
+        const start = String(source?.startTime || '').trim();
+        const end = String(source?.endTime || '').trim();
+        const hrs = Number(resolveRequestedHours(source) || 0);
+
+        if (titleEl) titleEl.textContent = name;
+        if (dateEl) {
+            const dateLabel = sourceDate
+                ? formatTimesheetDateLabel(sourceDate, { weekday: 'long', month: 'long', day: 'numeric' })
+                : '—';
+            dateEl.innerHTML = `<i class="bi bi-calendar3" aria-hidden="true"></i><span>${escapeHtml(dateLabel)}</span>`;
+        }
+        if (timeEl) {
+            const timeLabel = start && end ? `${start} – ${end}` : (start || end || '');
+            timeEl.innerHTML = timeLabel
+                ? `<i class="bi bi-clock" aria-hidden="true"></i><span>${escapeHtml(timeLabel)}</span>`
+                : '';
+        }
+        if (hoursEl) {
+            hoursEl.innerHTML = `<i class="bi bi-hourglass-split" aria-hidden="true"></i><span>${hrs.toFixed(2)} hrs</span>`;
+        }
+    }
+
+    function buildCopyManualDayOptionHtml(dateStr) {
+        const { dayName } = dateKeyWeekday(dateStr);
+        const hol = holidayMap.get(dateStr);
+        const displayDate = formatTimesheetDateLabel(dateStr, { weekday: 'short', month: 'short', day: 'numeric' });
+        const holidayBadge = hol
+            ? `<span class="badge text-bg-danger-subtle border text-danger ms-2">${escapeHtml(holidayName(hol))}</span>`
+            : '';
+        return `
+            <label class="copy-manual-day-item list-group-item list-group-item-action mb-0 border-0">
+                <input class="form-check-input js-copy-day flex-shrink-0" type="checkbox" value="${escapeHtml(dateStr)}">
+                <span class="copy-manual-day-date">${escapeHtml(displayDate)}</span>
+                <span class="copy-manual-day-weekday">${escapeHtml(dayName)}</span>
+                ${holidayBadge}
+            </label>
+        `;
+    }
+
+    document.getElementById('btnCopySelectAll')?.addEventListener('click', () => {
+        document.querySelectorAll('#copyManualDaysList input.js-copy-day').forEach((input) => {
+            input.checked = true;
+        });
+        syncCopyManualConfirmButton();
+    });
+    document.getElementById('btnCopyClearAll')?.addEventListener('click', () => {
+        document.querySelectorAll('#copyManualDaysList input.js-copy-day').forEach((input) => {
+            input.checked = false;
+        });
+        syncCopyManualConfirmButton();
+    });
 
     window.openCopyManualRowModal = async function(sessionId) {
         const source = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
@@ -3138,14 +3290,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const listEl = document.getElementById('copyManualDaysList');
         const emptyEl = document.getElementById('copyManualDaysEmpty');
         const summaryEl = document.getElementById('copyManualRowSummary');
+        const quickSelectEl = document.getElementById('copyManualQuickSelect');
         const confirmBtn = document.getElementById('btnConfirmCopyManualRow');
         document.getElementById('copyManualSourceSessionId').value = String(sessionId || '');
-        if (listEl) listEl.innerHTML = '<div class="text-muted small">Checking eligible days…</div>';
+        populateCopyManualSourceCard(source);
+        if (listEl) listEl.innerHTML = '<div class="text-center text-muted small py-4"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Checking eligible days…</div>';
         if (emptyEl) emptyEl.classList.add('d-none');
+        if (quickSelectEl) quickSelectEl.classList.add('d-none');
+        if (summaryEl) summaryEl.classList.remove('d-none');
         if (confirmBtn) confirmBtn.disabled = true;
-        if (summaryEl) {
-            summaryEl.textContent = `Copy “${source.className || source.activityName || 'manual row'}” (${source.startTime || ''}–${source.endTime || ''}) to other days without conflicts.`;
-        }
+        syncCopyManualConfirmButton();
 
         const modalEl = document.getElementById('copyManualRowModal');
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -3171,19 +3325,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!eligible.length) {
             listEl.innerHTML = '';
             if (emptyEl) emptyEl.classList.remove('d-none');
+            if (quickSelectEl) quickSelectEl.classList.add('d-none');
+            if (summaryEl) summaryEl.classList.add('d-none');
             if (confirmBtn) confirmBtn.disabled = true;
+            syncCopyManualConfirmButton();
             return;
         }
         if (emptyEl) emptyEl.classList.add('d-none');
-        listEl.innerHTML = eligible.map((dateStr) => {
-            const { dayName } = dateKeyWeekday(dateStr);
-            const hol = holidayMap.get(dateStr);
-            const labelExtra = hol ? ` · Holiday` : '';
-            return `<label class="form-check border rounded px-3 py-2 mb-0">
-                <input class="form-check-input js-copy-day" type="checkbox" value="${escapeHtml(dateStr)}">
-                <span class="form-check-label ms-1">${escapeHtml(dateStr)} <span class="text-muted">(${escapeHtml(dayName)}${labelExtra})</span></span>
-            </label>`;
-        }).join('');
+        if (quickSelectEl) quickSelectEl.classList.remove('d-none');
+        if (summaryEl) {
+            summaryEl.textContent = `${eligible.length} eligible day${eligible.length === 1 ? '' : 's'} without schedule conflicts.`;
+            summaryEl.classList.remove('d-none');
+        }
+        listEl.innerHTML = eligible.map((dateStr) => buildCopyManualDayOptionHtml(dateStr)).join('');
         listEl.querySelectorAll('input.js-copy-day').forEach((input) => {
             input.addEventListener('change', syncCopyManualConfirmButton);
         });
@@ -3380,6 +3534,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (entry?.reconciliationRequired === true) {
             await messageBox({ title: 'Required Entry', icon: 'warning', message: 'Deadline-window sessions must remain in the timesheet for later reconciliation.' });
+            return;
+        }
+        if (!IS_ADMIN && isAutoPulledTimesheetEntry(entry)) {
+            await messageBox({ title: 'Locked Entry', icon: 'warning', message: 'Auto-pulled sessions are locked and cannot be removed from your timesheet.' });
             return;
         }
         const ok = await confirmAction({

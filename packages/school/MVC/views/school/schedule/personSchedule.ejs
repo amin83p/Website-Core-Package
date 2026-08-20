@@ -291,6 +291,208 @@
         justify-content: flex-end;
         gap: 0.5rem;
     }
+    .schedule-toolbar-grid-personal {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: 36rem;
+    }
+    .schedule-date-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .schedule-date-panel-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: end;
+    }
+    .schedule-date-field label {
+        display: block;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 0.4rem;
+    }
+    .schedule-date-input {
+        font-size: 1.05rem;
+        min-height: 2.75rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        border-color: #cbd5e1;
+        background: #fff;
+    }
+    .schedule-date-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+    }
+    .schedule-show-btn {
+        min-height: 2.75rem;
+        padding: 0 1.35rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        white-space: nowrap;
+    }
+    .schedule-quick-dates {
+        padding: 0.9rem 1rem;
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 0.625rem;
+    }
+    .schedule-quick-dates-label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 0.65rem;
+    }
+    .schedule-range-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+        gap: 0.45rem;
+    }
+    .schedule-range-chip.btn-range {
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        color: #334155;
+        font-size: 0.875rem;
+        font-weight: 500;
+        padding: 0.5rem 0.65rem;
+        border-radius: 0.4rem;
+        line-height: 1.25;
+        text-align: center;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .schedule-range-chip.btn-range:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #1e293b;
+    }
+    .schedule-range-chip.btn-range.active {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+        color: #fff;
+        box-shadow: 0 1px 2px rgba(29, 78, 216, 0.25);
+    }
+    .schedule-filter-card .card-header {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    }
+    .schedule-filter-toggle {
+        color: #64748b;
+        border-color: #cbd5e1;
+    }
+    .schedule-filter-toggle:hover {
+        color: #334155;
+        background: #f8fafc;
+        border-color: #94a3b8;
+    }
+    .schedule-filter-admin {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .schedule-filter-admin-row {
+        display: grid;
+        grid-template-columns: minmax(7.5rem, 0.7fr) minmax(11rem, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(9rem, 0.8fr);
+        gap: 1rem;
+        align-items: end;
+    }
+    .schedule-filter-field label {
+        display: block;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 0.4rem;
+    }
+    .schedule-filter-input {
+        font-size: 1.05rem;
+        min-height: 2.75rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        border-color: #cbd5e1;
+        background: #fff;
+    }
+    .schedule-filter-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+    }
+    .schedule-people-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+    .schedule-people-actions .btn {
+        min-height: 2.75rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+    }
+    .schedule-people-actions .btn-outline-primary {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .schedule-cases-switch {
+        min-height: 2.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        background: #fff;
+    }
+    .schedule-cases-switch .form-check-input {
+        width: 2.5rem;
+        height: 1.25rem;
+        margin-top: 0;
+    }
+    .schedule-cases-switch .form-check-label {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #334155;
+    }
+    .schedule-filter-actions {
+        display: flex;
+        gap: 0.65rem;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        padding-top: 0.15rem;
+    }
+    .schedule-filter-actions .btn {
+        min-height: 2.75rem;
+        padding: 0 1.25rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+    }
+    .schedule-filter-actions .btn-primary {
+        min-width: 8.5rem;
+    }
+    .schedule-filter-actions .btn-outline-primary {
+        min-width: 8.5rem;
+    }
+    @media (max-width: 767.98px) {
+        .schedule-date-panel-row {
+            grid-template-columns: 1fr;
+        }
+        .schedule-show-btn {
+            width: 100%;
+        }
+        .schedule-range-group {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .schedule-filter-admin-row {
+            grid-template-columns: 1fr;
+        }
+        .schedule-filter-actions {
+            justify-content: stretch;
+        }
+        .schedule-filter-actions .btn {
+            flex: 1 1 auto;
+        }
+    }
     .schedule-person-tabs {
         display: flex;
         gap: 0.5rem;
@@ -380,6 +582,28 @@
     .schedule-viewbar-row-right.is-controls-row {
         flex-wrap: nowrap;
         flex-shrink: 0;
+    }
+    .schedule-view-icon-btn {
+        width: 2.25rem;
+        height: 2.25rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+    .schedule-view-icon-btn .bi {
+        font-size: 1.05rem;
+        line-height: 1;
+    }
+    .schedule-view-icon-btn.active {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+        color: #fff;
+        box-shadow: 0 1px 2px rgba(29, 78, 216, 0.25);
+    }
+    .schedule-viewbar-actions {
+        gap: 0.35rem;
     }
     .schedule-viewbar-grid-controls {
         display: inline-flex;
@@ -795,103 +1019,137 @@
     '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
   ],
-  manageBtns: [
+  manageBtns: canSelectAnyPerson ? [
     '<a href="/school/schedules/global" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-layers me-1"></i> Global Comparison</a>',
     '<a href="/school/classes" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-collection me-1"></i> Classes</a>'
-  ]
+  ] : []
 }) %>
 
 <div class="schedule-shell">
-  <div class="card border-0 shadow-sm mb-3">
+  <% if (!canSelectAnyPerson) { %>
+    <input type="hidden" id="sch_role" value="<%= defaultRole %>">
+    <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
+    <input type="hidden" id="sch_personName" value="<%= lockedPersonName %>">
+  <% } %>
+  <div class="card border-0 shadow-sm mb-3 schedule-filter-card">
     <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
-      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Schedule</div>
+      <div class="fw-bold text-dark"><i class="bi bi-calendar3 me-2"></i><%= canSelectAnyPerson ? 'Filter Schedule' : 'Choose dates' %></div>
       <button
         id="scheduleFilterToggleBtn"
         type="button"
-        class="btn btn-outline-secondary btn-sm px-2"
+        class="btn btn-outline-secondary btn-sm px-2 schedule-filter-toggle"
         data-bs-toggle="collapse"
         data-bs-target="#scheduleFilterCollapse"
-        aria-expanded="true"
+        aria-expanded="false"
         aria-controls="scheduleFilterCollapse"
-        aria-label="Close filters">
-        <i id="scheduleFilterToggleIcon" class="bi bi-chevron-up"></i>
+        aria-label="Open filters">
+        <i id="scheduleFilterToggleIcon" class="bi bi-chevron-down"></i>
       </button>
     </div>
-    <div class="collapse show" id="scheduleFilterCollapse">
+    <div class="collapse" id="scheduleFilterCollapse">
       <div class="card-body filter-panel p-3" id="scheduleFilterForm">
-        <div class="schedule-toolbar-grid">
-          <div class="schedule-toolbar-role">
-            <label class="form-label fw-bold small mb-1" for="sch_role">Role</label>
-            <select id="sch_role" class="form-select form-select-sm" <%= !canSelectAnyPerson && scheduleRoles.length <= 1 ? 'disabled' : '' %>>
-              <% if (canSelectAnyPerson) { %>
+        <% if (canSelectAnyPerson) { %>
+        <div class="schedule-filter-admin">
+          <div class="schedule-filter-admin-row">
+            <div class="schedule-filter-field">
+              <label for="sch_role">Role</label>
+              <select id="sch_role" class="form-select schedule-filter-input">
                 <option value="teacher" selected>Teacher</option>
                 <option value="student">Student</option>
                 <option value="staff">Staff</option>
-                <option value="">All Roles</option>
-              <% } else { %>
-                <% if (!scheduleRoles.length) { %>
-                  <option value="">No school role found</option>
-                <% } %>
-                <% scheduleRoles.forEach((role) => { %>
-                  <option value="<%= role.key %>" <%= role.key === defaultRole ? 'selected' : '' %>><%= role.label %></option>
-                <% }); %>
-              <% } %>
-            </select>
-          </div>
-          <div class="schedule-toolbar-people">
-            <% if (canSelectAnyPerson) { %>
+                <option value="">All roles</option>
+              </select>
+            </div>
+            <div class="schedule-filter-field schedule-filter-people">
+              <label>People</label>
               <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
               <input type="hidden" id="sch_personName" value="<%= lockedPersonName %>">
-              <button type="button" class="btn btn-outline-primary btn-sm flex-fill" id="btn_openPersonPicker" title="Select people">
-                <i class="bi bi-people-fill me-1"></i>Select People
-              </button>
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_clearPerson" title="Clear people">
-                <i class="bi bi-x-lg"></i>
-              </button>
-            <% } else { %>
-              <label class="form-label fw-bold small mb-1" for="sch_personName">Your Schedule Identity</label>
-              <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
-              <input type="text" id="sch_personName" class="form-control form-control-sm bg-white" value="<%= lockedPersonName %>" readonly>
-            <% } %>
-          </div>
-          <div class="schedule-toolbar-date-start">
-            <label class="form-label fw-bold small mb-1" for="sch_startDate">Start Date</label>
-            <input type="date" id="sch_startDate" class="form-control form-control-sm">
-          </div>
-          <div class="schedule-toolbar-date-end">
-            <label class="form-label fw-bold small mb-1" for="sch_endDate">End Date</label>
-            <input type="date" id="sch_endDate" class="form-control form-control-sm">
-          </div>
-          <div class="schedule-toolbar-cases">
-            <label class="form-label fw-bold small mb-1" for="sch_hasCases">Cases</label>
-            <div class="form-check form-switch pt-1">
-              <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
-              <label class="form-check-label small fw-semibold" for="sch_hasCases">With cases only</label>
+              <div class="schedule-people-actions">
+                <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker" title="Select people">
+                  <i class="bi bi-people-fill me-1"></i>Select people
+                </button>
+                <button type="button" class="btn btn-outline-secondary px-3" id="btn_clearPerson" title="Clear people" aria-label="Clear people">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+            <div class="schedule-filter-field">
+              <label for="sch_startDate">Start date</label>
+              <input type="date" id="sch_startDate" class="form-control schedule-date-input">
+            </div>
+            <div class="schedule-filter-field">
+              <label for="sch_endDate">End date</label>
+              <input type="date" id="sch_endDate" class="form-control schedule-date-input">
+            </div>
+            <div class="schedule-filter-field schedule-filter-cases">
+              <label for="sch_hasCases">Cases</label>
+              <div class="schedule-cases-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
+                <label class="form-check-label" for="sch_hasCases">With cases only</label>
+              </div>
             </div>
           </div>
-          <div class="schedule-toolbar-shortcut">
-            <button type="button" id="btn_openScheduleShortcuts" class="btn btn-outline-secondary btn-sm w-100">
-              <i class="bi bi-calendar-range me-1"></i> Shortcut Dates
-            </button>
+          <div class="schedule-quick-dates">
+            <span class="schedule-quick-dates-label">Quick range</span>
+            <div class="schedule-range-group">
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="day">Today</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="week">This week</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="first15">First 15 days</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="second15">Second 15 days</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="month">This month</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="season">Next 3 months</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="year">This year</button>
+            </div>
           </div>
-          <div class="schedule-toolbar-loads">
-            <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary btn-sm">Reset</button>
-            <button type="button" id="btn_loadSchedule" class="btn btn-primary btn-sm flex-fill">
-              <i class="bi bi-arrow-clockwise me-1"></i> Load Tab
+          <div class="schedule-filter-actions">
+            <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary">Reset</button>
+            <button type="button" id="btn_loadSchedule" class="btn btn-primary">
+              <i class="bi bi-arrow-clockwise me-1"></i> Load tab
             </button>
-            <% if (canSelectAnyPerson) { %>
-            <button type="button" id="btn_loadAllSchedules" class="btn btn-outline-primary btn-sm flex-fill">
-              <i class="bi bi-cloud-arrow-down me-1"></i> Load All
+            <button type="button" id="btn_loadAllSchedules" class="btn btn-outline-primary">
+              <i class="bi bi-cloud-arrow-down me-1"></i> Load all
             </button>
-            <% } %>
           </div>
         </div>
+        <% } else { %>
+        <div class="schedule-date-panel">
+          <div class="schedule-date-panel-row">
+            <div class="schedule-date-field">
+              <label for="sch_startDate">Start date</label>
+              <input type="date" id="sch_startDate" class="form-control schedule-date-input">
+            </div>
+            <div class="schedule-date-field">
+              <label for="sch_endDate">End date</label>
+              <input type="date" id="sch_endDate" class="form-control schedule-date-input">
+            </div>
+            <div class="schedule-date-action">
+              <button type="button" id="btn_loadSchedule" class="btn btn-primary schedule-show-btn">
+                <i class="bi bi-arrow-clockwise me-1"></i> Show schedule
+              </button>
+            </div>
+          </div>
+          <div class="schedule-quick-dates">
+            <span class="schedule-quick-dates-label">Quick range</span>
+            <div class="schedule-range-group">
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="day">Today</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="week">This week</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="first15">First 15 days</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="second15">Second 15 days</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="month">This month</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="season">Next 3 months</button>
+              <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="year">This year</button>
+            </div>
+          </div>
+        </div>
+        <% } %>
 
       </div>
     </div>
   </div>
 
+  <% if (canSelectAnyPerson) { %>
   <div class="schedule-person-tabs" id="schedulePersonTabs"></div>
+  <% } %>
 
   <div id="scheduleContainer" class="d-none">
     <div class="card border-0 shadow-sm">
@@ -900,28 +1158,6 @@
       </div>
       <div class="card-body p-2 p-md-3 schedule-calendar-card-body">
         <div id="visualDisplayArea" class="schedule-visual-area"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="scheduleShortcutsModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-sm modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header py-2 px-3">
-        <h6 class="modal-title mb-0 fw-semibold">Shortcut Dates</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body p-2">
-        <div class="d-grid gap-2">
-          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="day">Today</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="week">This Week</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="first15">First 15 Days</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="second15">Second 15 Days</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="month">This Month</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="season">Next 3 Months</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="year">This Year</button>
-        </div>
       </div>
     </div>
   </div>
@@ -995,7 +1231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function setActiveRangeChip(range) {
-        document.querySelectorAll('.btn-range.range-chip').forEach((btn) => {
+        document.querySelectorAll('.btn-range.range-chip, .schedule-range-chip').forEach((btn) => {
             btn.classList.toggle('active', btn.getAttribute('data-range') === range);
         });
     }
@@ -1594,7 +1830,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateRoleOptionsForActivePerson() {
         const person = activeSchedulePerson();
         const roleEl = document.getElementById('sch_role');
-        if (!roleEl) return;
+        if (!roleEl || roleEl.tagName !== 'SELECT') return;
         if (canSelectAnyPerson) return;
         const roles = Array.isArray(person?.availableRoles) ? person.availableRoles : [];
         if (!roles.length) {
@@ -1724,6 +1960,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if (window.localStorage) window.localStorage.setItem(SCHEDULE_HORIZONTAL_SLIDER_USER_KEY, adjusted ? '1' : '0');
         } catch (error) { /* storage can be unavailable */ }
+    }
+
+    function resetScheduleWeekGridUserSizing() {
+        saveScheduleVerticalDayWidthUserAdjusted(false);
+        saveScheduleHorizontalSliderUserAdjusted(false);
+        const container = document.getElementById('visualDisplayArea');
+        if (container) container.classList.add('session-cal-auto-day-width');
     }
 
     function readScheduleVerticalDayWidth() {
@@ -1962,16 +2205,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function scheduleHideEmptyDaysControlHtml() {
-        const checked = scheduleState.hideEmptyDays ? 'checked' : '';
-        return `
-            <div class="schedule-hide-empty-days-wrap">
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" role="switch" id="scheduleHideEmptyDays" ${checked}>
-                    <label class="form-check-label small" for="scheduleHideEmptyDays">Hide days without sessions</label>
-                </div>
-            </div>
-        `;
+    function scheduleHideEmptyDaysButtonHtml() {
+        const active = scheduleState.hideEmptyDays ? ' active' : '';
+        const pressed = scheduleState.hideEmptyDays ? 'true' : 'false';
+        return `<button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn schedule-hide-empty-btn${active}" data-schedule-hide-empty-days aria-label="Hide days without sessions" title="Hide days without sessions" aria-pressed="${pressed}"><i class="bi bi-calendar2-x" aria-hidden="true"></i></button>`;
     }
 
     function scheduleWidthControlHtml() {
@@ -2028,18 +2265,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!legend) return;
         let switchButtons = '';
         if (mode === 'calendar') {
-            switchButtons = '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-vertical aria-label="Switch to day view" title="Show days as vertical columns with horizontal scrolling"><i class="bi bi-calendar-day me-1"></i>Switch to day view</button>';
+            switchButtons = '<button type="button" class="btn btn-sm btn-outline-primary schedule-view-icon-btn" data-schedule-view-vertical aria-label="Switch to vertical day view" title="Switch to vertical day view"><i class="bi bi-columns-gap" aria-hidden="true"></i></button>';
         } else {
             switchButtons = [
                 mode === 'verticalTimeline'
-                    ? '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-timeline aria-label="Switch to horizontal day view" title="Show the current stacked horizontal day timeline"><i class="bi bi-layout-three-columns me-1"></i>Switch to horizontal view</button>'
-                    : '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-vertical aria-label="Switch to vertical day view" title="Show days as vertical columns with horizontal scrolling"><i class="bi bi-columns-gap me-1"></i>Switch to vertical view</button>',
-                '<button type="button" class="btn btn-sm btn-outline-primary" data-schedule-view-month aria-label="Switch to month view" title="Show the calendar month view"><i class="bi bi-calendar3 me-1"></i>Switch to month view</button>'
+                    ? '<button type="button" class="btn btn-sm btn-outline-primary schedule-view-icon-btn" data-schedule-view-timeline aria-label="Switch to horizontal day view" title="Switch to horizontal day view"><i class="bi bi-layout-three-columns" aria-hidden="true"></i></button>'
+                    : '<button type="button" class="btn btn-sm btn-outline-primary schedule-view-icon-btn" data-schedule-view-vertical aria-label="Switch to vertical day view" title="Switch to vertical day view"><i class="bi bi-columns-gap" aria-hidden="true"></i></button>',
+                '<button type="button" class="btn btn-sm btn-outline-primary schedule-view-icon-btn" data-schedule-view-month aria-label="Switch to month view" title="Switch to month view"><i class="bi bi-calendar3" aria-hidden="true"></i></button>'
             ].join('');
         }
         const showWeekGridControls = mode === 'verticalTimeline' || mode === 'timeline';
+        const hideEmptyDaysButton = showWeekGridControls ? scheduleHideEmptyDaysButtonHtml() : '';
         const row2RightControls = showWeekGridControls
-            ? `<div class="schedule-viewbar-grid-controls">${scheduleWidthControlHtml()}${scheduleHideEmptyDaysControlHtml()}</div>`
+            ? `<div class="schedule-viewbar-grid-controls">${scheduleWidthControlHtml()}</div>`
             : '';
         legend.innerHTML = `
             <div class="schedule-viewbar">
@@ -2047,9 +2285,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="schedule-viewbar-row-left">
                         <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
                     </div>
-                    <div class="schedule-viewbar-row-right">
+                    <div class="schedule-viewbar-row-right schedule-viewbar-actions">
                         ${switchButtons}
-                        <button type="button" class="btn btn-sm btn-outline-secondary" data-schedule-open-legend aria-label="Open schedule legend"><i class="bi bi-info-circle me-1"></i>Legend</button>
+                        ${hideEmptyDaysButton}
+                        <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-open-legend aria-label="Legend" title="Legend"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
                     </div>
                 </div>
                 <div class="schedule-viewbar-row">
@@ -2740,14 +2979,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.btn-range').forEach((btn) => {
         btn.addEventListener('click', (e) => {
             applyScheduleRange(e.currentTarget.getAttribute('data-range') || 'week');
-            const modalEl = document.getElementById('scheduleShortcutsModal');
-            if (modalEl && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         });
-    });
-
-    document.getElementById('btn_openScheduleShortcuts')?.addEventListener('click', () => {
-        const modalEl = document.getElementById('scheduleShortcutsModal');
-        if (modalEl && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
     });
 
     const btnPicker = document.getElementById('btn_openPersonPicker');
@@ -2887,13 +3119,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     document.getElementById('legendContainer')?.addEventListener('change', (event) => {
-        const hideEmptyToggle = event.target.closest('#scheduleHideEmptyDays');
-        if (hideEmptyToggle) {
-            scheduleState.hideEmptyDays = hideEmptyToggle.checked === true;
-            saveScheduleHideEmptyDays(scheduleState.hideEmptyDays);
-            refreshScheduleActiveView();
-            return;
-        }
         const slider = event.target.closest('#scheduleDayWidth');
         if (slider) {
             saveScheduleDayWidth(slider.value);
@@ -2906,6 +3131,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     document.getElementById('legendContainer')?.addEventListener('click', (event) => {
+        const hideEmptyButton = event.target.closest('[data-schedule-hide-empty-days]');
+        if (hideEmptyButton) {
+            scheduleState.hideEmptyDays = !scheduleState.hideEmptyDays;
+            saveScheduleHideEmptyDays(scheduleState.hideEmptyDays);
+            resetScheduleWeekGridUserSizing();
+            refreshScheduleActiveView();
+            return;
+        }
         const legendButton = event.target.closest('[data-schedule-open-legend]');
         if (legendButton) {
             const modalEl = document.getElementById('scheduleLegendModal');
