@@ -2751,17 +2751,24 @@
                     </div>
                     <div class="form-text">Optional. Select one or more skills this activity targets.</div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold d-flex align-items-center gap-1 mb-1" for="gbModalTotal">
-                        <span>Total score (points)</span>
-                        <button type="button" class="btn btn-link btn-sm p-0 text-primary lh-1 gb-total-score-info" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top"
-                            title="<strong>Weights period averages</strong><br>When several activities fall in a session date range or report period, the average uses <em>earned ÷ possible</em> points—not a simple mean of percentages.<br><br>Example (Feb 1–28):<br>Quiz A: 8/10 (80%) · Quiz B: 15/20 (75%) · Unit test: 30/50 (60%)<br>Equal mean of %: 71.7%<br><strong>Points-weighted: 66.3%</strong> (53÷80)"
-                            aria-label="How total points affect averages">
-                            <i class="bi bi-info-circle" aria-hidden="true"></i>
-                        </button>
-                    </label>
-                    <input type="number" class="form-control" id="gbModalTotal" min="0.01" step="any" placeholder="e.g. 20">
-                    <div class="form-text">Larger totals count more when averaging multiple activities across a date range.</div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold d-flex align-items-center gap-1 mb-1" for="gbModalWeight">
+                            <span>Weight</span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-primary lh-1 gb-weight-info" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top"
+                                title="How much this activity counts toward period averages. Weights are normalized across included activities in the report period (e.g. weights 20 and 30 become 40% and 60%)."
+                                aria-label="How activity weight affects averages">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </label>
+                        <input type="number" class="form-control" id="gbModalWeight" min="0.01" step="any" placeholder="e.g. 20">
+                        <div class="form-text">Use any positive number; the system normalizes weights to 100% across included activities.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold mb-1" for="gbModalTotal">Total Points</label>
+                        <input type="number" class="form-control" id="gbModalTotal" min="0.01" step="any" placeholder="e.g. 20">
+                        <div class="form-text">Maximum score for this activity.</div>
+                    </div>
                 </div>
                 <div class="mb-3">
                     <div class="form-label fw-bold">Attachments</div>
@@ -8053,10 +8060,50 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span class="gb-skill-chips">${ids.map((id) => `<span class="badge bg-light text-dark border gb-skill-chip">${gbEscapeHtml(gbSkillLabelById.get(id) || id)}</span>`).join('')}</span>`;
     }
 
+    function gbResolveWeight(gb) {
+        const explicit = Number(gb?.weight);
+        if (Number.isFinite(explicit) && explicit > 0) return explicit;
+        const totalScore = Number(gb?.totalScore);
+        if (Number.isFinite(totalScore) && totalScore > 0) return totalScore;
+        return 0;
+    }
+
+    function gbBuildNormalizedWeightMap(list) {
+        const map = new Map();
+        let sum = 0;
+        (Array.isArray(list) ? list : []).forEach((gb) => {
+            if (gb?.includeInGradeCalculation === false) return;
+            const weight = gbResolveWeight(gb);
+            if (!Number.isFinite(weight) || weight <= 0) return;
+            sum += weight;
+            map.set(String(gb.id), weight);
+        });
+        if (!sum) return new Map();
+        const normalized = new Map();
+        map.forEach((weight, id) => normalized.set(id, weight / sum));
+        return normalized;
+    }
+
+    function gbFormatNormalizedWeightPercent(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return '—';
+        return `${(n * 100).toFixed(1)}%`;
+    }
+
+    function gbWeightedContribution(score, total, normalizedWeight) {
+        if (score === null || score === undefined || Number.isNaN(Number(score))) return '—';
+        const totalNum = Number(total);
+        const weight = Number(normalizedWeight);
+        if (!Number.isFinite(totalNum) || totalNum <= 0 || !Number.isFinite(weight) || weight <= 0) return '—';
+        const pct = (Number(score) / totalNum) * 100;
+        return `${(pct * weight).toFixed(1)}%`;
+    }
+
     function gbNormalizeIncoming(list) {
         const arr = Array.isArray(list) ? list : [];
         return arr.map((gb) => {
             const totalScore = Number(gb.totalScore);
+            const weight = gbResolveWeight({ ...gb, totalScore: Number.isFinite(totalScore) && totalScore > 0 ? totalScore : 10 });
             const scores = {};
             gradebookRoster.forEach(({ personId }) => {
                 const pid = String(personId);
@@ -8091,6 +8138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: String(gb.name || '').trim(),
                 skills,
                 skillFocus: gbFormatSkillLabels(skills) || String(gb.skillFocus || '').trim(),
+                weight,
                 totalScore: Number.isFinite(totalScore) && totalScore > 0 ? totalScore : 10,
                 activityContent: String(gb.activityContent || ''),
                 includeInGradeCalculation: gb.includeInGradeCalculation !== false,
@@ -8220,7 +8268,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 gb.scores[pid] = n;
                 if (String(inp.value) !== String(n)) inp.value = n;
                 const pctCell = inp.closest('tr')?.querySelector('.gb-pct');
+                const wtCell = inp.closest('tr')?.querySelector('.gb-wt-pct');
+                const normWeight = gbBuildNormalizedWeightMap(gradebooksState).get(String(gb.id)) || 0;
                 if (pctCell) pctCell.textContent = gbFormatPct(n, total);
+                if (wtCell) wtCell.textContent = gbWeightedContribution(n, total, normWeight);
                 markSessionAutosaveGradebookDirty();
             });
         });
@@ -8250,10 +8301,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!validGbIds.has(id)) gbCollapsedIds.delete(id);
         });
 
+        const normalizedWeightMap = gbBuildNormalizedWeightMap(gradebooksState);
+
         gradebooksState.forEach((gb) => {
             const total = Number(gb.totalScore);
+            const normalizedWeight = normalizedWeightMap.get(String(gb.id)) || 0;
+            const weightValue = gbResolveWeight(gb);
+            const weightBadge = gb.includeInGradeCalculation
+                ? `<span class="me-2"><i class="bi bi-sliders me-1"></i>Weight: <strong>${weightValue}</strong> (${gbFormatNormalizedWeightPercent(normalizedWeight)})</span>`
+                : '';
             const collapsed = gbCollapsedIds.has(gb.id);
             const incl = gb.includeInGradeCalculation ? '<span class="badge bg-light text-success border">In grade</span>' : '<span class="badge bg-light text-secondary border">Excluded</span>';
+            const gradeHeader = `Grade/${Number.isFinite(total) && total > 0 ? total : '—'}`;
             const headActions = gbReadOnly ? '' : `
                 <button type="button" class="btn btn-outline-primary btn-sm gb-edit" data-gb-id="${gbEscapeHtml(gb.id)}" title="Edit"><i class="bi bi-pencil"></i></button>
                 <button type="button" class="btn btn-outline-danger btn-sm gb-del" data-gb-id="${gbEscapeHtml(gb.id)}" title="Remove"><i class="bi bi-trash"></i></button>`;
@@ -8271,6 +8330,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td class="ps-3">${gbEscapeHtml(name)}</td>
                         <td class="text-muted"><span class="badge bg-light text-muted border">${gbEscapeHtml(blockedLabel)}</span></td>
                         <td class="text-muted">N/A</td>
+                        <td class="text-muted">N/A</td>
                     </tr>`;
                     }
                     const val = sc !== null && sc !== undefined && !Number.isNaN(Number(sc)) ? String(sc) : '';
@@ -8281,9 +8341,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             min="0" max="${total}" step="any" ${gbReadOnly ? 'disabled' : ''} value="${gbEscapeHtml(val)}" placeholder="—">
                     </td>
                     <td class="gb-pct small text-nowrap">${gbFormatPct(sc, total)}</td>
+                    <td class="gb-wt-pct small text-nowrap">${gbWeightedContribution(sc, total, normalizedWeight)}</td>
                 </tr>`;
                 }).join('')
-                : `<tr><td colspan="3" class="text-muted small ps-3 py-2">No students on the attendance roster yet. Add enrollments to enter scores; saved activities and settings are shown below.</td></tr>`;
+                : `<tr><td colspan="4" class="text-muted small ps-3 py-2">No students on the attendance roster yet. Add enrollments to enter scores; saved activities and settings are shown below.</td></tr>`;
 
             parts.push(`
                 <div class="card border shadow-sm session-gradebook-card mb-3" data-gb-id="${gbEscapeHtml(gb.id)}">
@@ -8294,7 +8355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="flex-grow-1 min-w-0">
                             <div class="fw-bold text-primary">${gbEscapeHtml(gb.name || 'Untitled')}</div>
                             <div class="small text-muted mt-1">${gb.skills && gb.skills.length ? `<span class="me-2 d-inline-flex align-items-start gap-1"><i class="bi bi-bullseye me-1 flex-shrink-0 mt-1"></i>${gbRenderSkillChips(gb.skills)}</span>` : ''}
-                                <span class="me-2"><i class="bi bi-calculator me-1"></i>Total: <strong>${total}</strong> pts</span>${incl}
+                                ${weightBadge}<span class="me-2"><i class="bi bi-calculator me-1"></i>Total: <strong>${total}</strong> pts</span>${incl}
                                 ${gbRenderAttachmentLinks(gb.attachments)}
                             </div>
                         </div>
@@ -8304,7 +8365,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${gb.activityContent ? `<div class="gb-activity-body mb-3">${gbEscapeHtml(gb.activityContent)}</div>` : '<p class="small text-muted mb-3 fst-italic">No activity description.</p>'}
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered align-middle mb-0">
-                                <thead class="table-light"><tr><th class="ps-3">Student</th><th style="min-width:120px;">Score</th><th style="min-width:72px;">%</th></tr></thead>
+                                <thead class="table-light"><tr><th class="ps-3">Student</th><th style="min-width:120px;">${gbEscapeHtml(gradeHeader)}</th><th style="min-width:72px;">%</th><th style="min-width:72px;" title="Weighted contribution to the session average">Wt %</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                         </div>
@@ -8324,7 +8385,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const raw = String(inp.value || '').trim();
                 if (raw === '') {
                     gb.scores[pid] = null;
-                    inp.closest('tr').querySelector('.gb-pct').textContent = '—';
+                    const row = inp.closest('tr');
+                    if (row) {
+                        const pctCell = row.querySelector('.gb-pct');
+                        const wtCell = row.querySelector('.gb-wt-pct');
+                        if (pctCell) pctCell.textContent = '—';
+                        if (wtCell) wtCell.textContent = '—';
+                    }
                     markSessionAutosaveGradebookDirty();
                     return;
                 }
@@ -8334,7 +8401,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (n > total) n = total;
                 gb.scores[pid] = n;
                 if (String(inp.value) !== String(n)) inp.value = n;
-                inp.closest('tr').querySelector('.gb-pct').textContent = gbFormatPct(n, total);
+                const row = inp.closest('tr');
+                const normWeight = gbBuildNormalizedWeightMap(gradebooksState).get(String(gb.id)) || 0;
+                if (row) {
+                    const pctCell = row.querySelector('.gb-pct');
+                    const wtCell = row.querySelector('.gb-wt-pct');
+                    if (pctCell) pctCell.textContent = gbFormatPct(n, total);
+                    if (wtCell) wtCell.textContent = gbWeightedContribution(n, total, normWeight);
+                }
                 markSessionAutosaveGradebookDirty();
             });
         });
@@ -8411,6 +8485,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('gbModalName').value = gb.name || '';
             gbSetModalSkills(gb.skills || []);
             document.getElementById('gbModalTotal').value = gb.totalScore || '';
+            document.getElementById('gbModalWeight').value = gb.weight != null ? gb.weight : gbResolveWeight(gb);
             document.getElementById('gbModalContent').value = gb.activityContent || '';
             document.getElementById('gbModalInclude').checked = gb.includeInGradeCalculation !== false;
             gbModalAttachmentsState = Array.isArray(gb.attachments)
@@ -8421,6 +8496,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('gbModalName').value = '';
             gbSetModalSkills([]);
             document.getElementById('gbModalTotal').value = '';
+            document.getElementById('gbModalWeight').value = '';
             document.getElementById('gbModalContent').value = '';
             document.getElementById('gbModalInclude').checked = true;
             gbModalAttachmentsState = [];
@@ -8452,6 +8528,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const skills = gbGetModalSkills();
         const skillFocus = gbFormatSkillLabels(skills);
         const totalScore = Number(document.getElementById('gbModalTotal').value);
+        let weight = Number(document.getElementById('gbModalWeight').value);
         const activityContent = document.getElementById('gbModalContent').value;
         const includeInGradeCalculation = document.getElementById('gbModalInclude').checked;
 
@@ -8467,9 +8544,12 @@ document.addEventListener('DOMContentLoaded', () => {
             void sessionMessageBox({
                 title: 'Invalid total',
                 icon: 'warning',
-                message: 'Total score must be a positive number.'
+                message: 'Total points must be a positive number.'
             });
             return;
+        }
+        if (!Number.isFinite(weight) || weight <= 0) {
+            weight = totalScore;
         }
 
         if (editId) {
@@ -8479,6 +8559,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gb.name = name;
             gb.skills = skills;
             gb.skillFocus = skillFocus;
+            gb.weight = weight;
             gb.totalScore = totalScore;
             gb.activityContent = activityContent;
             gb.includeInGradeCalculation = includeInGradeCalculation;
@@ -8500,6 +8581,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 name,
                 skills,
                 skillFocus,
+                weight,
                 totalScore,
                 activityContent,
                 includeInGradeCalculation,
@@ -8584,11 +8666,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (gbReadOnly) {
         const gbModalName = document.getElementById('gbModalName');
+        const gbModalWeight = document.getElementById('gbModalWeight');
         const gbModalTotal = document.getElementById('gbModalTotal');
         const gbModalContent = document.getElementById('gbModalContent');
         const gbModalInclude = document.getElementById('gbModalInclude');
         if (gbModalName) gbModalName.disabled = true;
         document.querySelectorAll('#gbModalSkillsPicker .gb-skill-checkbox').forEach((el) => { el.disabled = true; });
+        if (gbModalWeight) gbModalWeight.disabled = true;
         if (gbModalTotal) gbModalTotal.disabled = true;
         if (gbModalContent) gbModalContent.disabled = true;
         if (gbModalInclude) gbModalInclude.disabled = true;

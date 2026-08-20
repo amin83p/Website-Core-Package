@@ -100,6 +100,7 @@ function buildGradebookActivities(columns, cells) {
       label: col.label || col.title || col.itemId || '',
       category: col.category || '',
       totalScore: col.totalScore ?? null,
+      weight: col.weight ?? null,
       score: cell.score ?? null,
       percent: cell.percent ?? null,
       attendanceStatus: cell.attendanceStatus || '',

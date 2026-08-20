@@ -14,6 +14,10 @@ router.get('/section/:sectionId', requireAuth, dashboardController.showSectionSu
 
 router.get('/all-sections', requireAuth, dashboardController.getAllAccessibleSections);
 
+router.get('/api/module-order/:dashboardKey', requireAuth, dashboardController.getModuleOrder);
+router.put('/api/module-order/:dashboardKey', requireAuth, dashboardController.saveModuleOrder);
+router.delete('/api/module-order/:dashboardKey', requireAuth, dashboardController.resetModuleOrder);
+
 router.get('/quick-menu', requireAuth,(req, res, next) => {
   res.setHeader('Warning', '299 - "Deprecated API: /dashboard/quick-menu will be removed soon. Use /sections/quick-menu"');
   console.log('[dashboard][warn] Deprecated route accessed:', req.originalUrl);

@@ -1644,6 +1644,7 @@
 
 <script src="/scripts/visibilityInterval.js"></script>
 <script src="/scripts/scheduleCompletionDisplay.js"></script>
+<script src="/scripts/timesheetDepartmentHoursView.js"></script>
 <script>
 (function () {
   function formatHubDateKey(dateValue, options = {}) {
@@ -8047,6 +8048,10 @@
         '</tr>'
       ].join('');
     }).join('');
+    const departmentHoursHtml = (typeof window.TimesheetDepartmentHoursView !== 'undefined'
+      && typeof window.TimesheetDepartmentHoursView.renderTable === 'function')
+      ? window.TimesheetDepartmentHoursView.renderTable(payload.departmentTotals)
+      : '';
     content.innerHTML = [
       warningHtml,
       roleTotalsHtml,
@@ -8056,7 +8061,8 @@
       '<tbody>', body, '</tbody>',
       '<tfoot><tr class="table-light"><th class="ps-3" colspan="3">Total</th><th>' + escapeHtml(formatHubTimesheetHours(totals.autoHours)) + '</th><th>' + escapeHtml(formatHubTimesheetHours(totals.manualHours)) + '</th><th>' + escapeHtml(formatHubTimesheetHours(totals.reportHours)) + '</th><th>' + escapeHtml(formatHubTimesheetHours(totals.activityHours)) + '</th><th>' + escapeHtml(String(totals.entryCount || 0)) + '</th><th>-</th><th class="fw-bold">' + escapeHtml(formatHubTimesheetHours(totals.totalHours)) + '</th><th class="fw-bold pe-3">' + (totals.grossPay !== undefined ? '$' + Number(totals.grossPay || 0).toFixed(2) : 'N/D') + '</th></tr></tfoot>',
       '</table>',
-      '</div>'
+      '</div>',
+      departmentHoursHtml
     ].join('');
   }
 

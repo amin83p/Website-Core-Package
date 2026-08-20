@@ -187,6 +187,31 @@ test('department optional hours apply makeup duration percent for make-up requir
   assert.equal(totals.rows[0].oneOnOneOptionalHours, 4.5);
 });
 
+test('buildDepartmentTotalsFromEffective uses the same shaped print entry pipeline', () => {
+  const effective = {
+    timesheet: { status: 'draft' },
+    entries: [{
+      sessionId: 'SES-1',
+      classId: 'CLASS-1',
+      date: '2026-07-01',
+      deliveryDepartmentName: 'English',
+      classMaxCapacity: 1,
+      timesheetHours: 2,
+      durationHours: 2
+    }],
+    classes: [{ id: 'CLASS-1', enrollment: { maxCapacity: 1 } }],
+    departments: []
+  };
+  const fromEffective = printService.buildDepartmentTotalsFromEffective(effective);
+  const { entries, lookups } = printService.buildShapedPrintEntriesFromEffective(effective);
+  const direct = printService.buildDepartmentTotals(entries, lookups);
+
+  assert.deepEqual(fromEffective, direct);
+  assert.equal(fromEffective.rows[0].departmentName, 'English');
+  assert.equal(fromEffective.rows[0].oneOnOneHours, 2);
+  assert.equal(fromEffective.totals.totalHours, 2);
+});
+
 test('Optional Hours remain informational and are listed separately by department', () => {
   const lookups = {
     classMap: new Map([['CLASS-1', { id: 'CLASS-1', enrollment: { maxCapacity: 1 } }]]),

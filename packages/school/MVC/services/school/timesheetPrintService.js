@@ -412,6 +412,19 @@ function buildDepartmentTotals(entries = [], lookups = {}) {
   return { rows, totals };
 }
 
+function buildShapedPrintEntriesFromEffective(effective = {}) {
+  const authoritative = resolveAuthoritativeEntries(effective);
+  const lookups = buildLookupMaps(effective);
+  const entries = sortEntriesBySchedule(authoritative.entries)
+    .map((entry) => shapePrintEntry(entry, lookups));
+  return { authoritative, lookups, entries };
+}
+
+function buildDepartmentTotalsFromEffective(effective = {}) {
+  const { lookups, entries } = buildShapedPrintEntriesFromEffective(effective);
+  return buildDepartmentTotals(entries, lookups);
+}
+
 async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUser, holidays = null }) {
   const personId = cleanText(person?.id || person?.personId);
   const effective = await timesheetEffectiveEntryService.buildEffectiveTimesheetEntries({
@@ -420,10 +433,7 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
     activeOrgId,
     reqUser
   });
-  const authoritative = resolveAuthoritativeEntries(effective);
-  const lookups = buildLookupMaps(effective);
-  const entries = sortEntriesBySchedule(authoritative.entries)
-    .map((entry) => shapePrintEntry(entry, lookups));
+  const { authoritative, entries } = buildShapedPrintEntriesFromEffective(effective);
   const entriesByDate = new Map();
   entries.forEach((entry) => {
     const date = cleanText(entry.date);
@@ -444,7 +454,7 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
     entries: entriesByDate.get(date) || []
   }));
   const timesheet = effective.timesheet || {};
-  const departmentTotals = buildDepartmentTotals(entries, lookups);
+  const departmentTotals = buildDepartmentTotalsFromEffective(effective);
   const reconciliationEntries = entries.filter((entry) => entry.reconciliationRequired === true);
   const provisionalEntries = reconciliationEntries.filter((entry) => entry.isProvisional === true);
   const makeupChains = Array.isArray(timesheet?.priorPeriodReconciliation?.makeupChains)
@@ -565,6 +575,8 @@ module.exports = {
   buildTimesheetPrintContext,
   buildTimesheetPrintDocument,
   buildDepartmentTotals,
+  buildDepartmentTotalsFromEffective,
+  buildShapedPrintEntriesFromEffective,
   buildDateKeys,
   calculateHoursFromRange,
   fillLegacyDisplayMetadata,

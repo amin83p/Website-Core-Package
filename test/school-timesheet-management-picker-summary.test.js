@@ -54,6 +54,63 @@ test('timesheet management department summary includes role-aware pay rate label
   assert.match(view, /payload\.roleTotals/);
   assert.match(view, /payload\.payrollWarnings/);
 });
+
+test('timesheet management department summary includes shared hours-by-department totals', () => {
+  const view = read('packages/school/MVC/views/school/timesheet/timesheetManage.ejs');
+  const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
+  const renderer = read('packages/school/public/scripts/timesheetDepartmentHoursView.js');
+  const masterHub = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');
+  const reportHub = read('packages/school/MVC/views/school/reportHub.ejs');
+
+  assert.match(controller, /timesheetPrintService\.buildDepartmentTotalsFromEffective\(effective\)/);
+  assert.match(controller, /departmentTotals/);
+
+  assert.match(view, /timesheetDepartmentHoursView\.js/);
+  assert.match(view, /TimesheetDepartmentHoursView\.renderTable\(payload\.departmentTotals\)/);
+  assert.match(view, /\$\{departmentHoursHtml\}/);
+
+  assert.match(renderer, /global\.TimesheetDepartmentHoursView/);
+  assert.match(renderer, />Group Hours</);
+  assert.match(renderer, />One-on-One Optional</);
+
+  assert.match(masterHub, /timesheetDepartmentHoursView\.js/);
+  assert.match(masterHub, /TimesheetDepartmentHoursView\.renderTable\(payload\.departmentTotals\)/);
+  assert.match(reportHub, /timesheetDepartmentHoursView\.js/);
+  assert.match(reportHub, /TimesheetDepartmentHoursView\.renderTable\(payload\.departmentTotals\)/);
+});
+
+test('timesheet department hours view renders split rows and totals footer', () => {
+  const renderer = read('packages/school/public/scripts/timesheetDepartmentHoursView.js');
+  const renderTable = new Function(`${renderer}; return TimesheetDepartmentHoursView.renderTable;`)();
+  const html = renderTable({
+    rows: [{
+      departmentName: 'LINC',
+      groupHours: 10,
+      oneOnOneHours: 5,
+      oneOnOneOptionalHours: 1.5,
+      groupPendingHours: 0,
+      oneOnOnePendingHours: 2,
+      totalHours: 17
+    }],
+    totals: {
+      groupHours: 10,
+      oneOnOneHours: 5,
+      oneOnOneOptionalHours: 1.5,
+      groupPendingHours: 0,
+      oneOnOnePendingHours: 2,
+      totalHours: 17
+    }
+  });
+
+  assert.match(html, /Hours by Department/);
+  assert.match(html, /LINC/);
+  assert.match(html, />10\.00</);
+  assert.match(html, />5\.00</);
+  assert.match(html, />1\.50</);
+  assert.match(html, />2\.00</);
+  assert.match(html, />17\.00</);
+});
+
 test('master academia hub timesheet summary mirrors role-aware pay display', () => {
   const view = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');
 

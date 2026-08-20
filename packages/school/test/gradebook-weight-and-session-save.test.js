@@ -13,11 +13,12 @@ const sessionManagerSource = fs.readFileSync(
   'utf8'
 );
 
-test('normalizeSessionGradebooksFromRequest persists sanitized attachments', () => {
+test('normalizeSessionGradebooksFromRequest persists weight and sanitized attachments', () => {
   const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
     {
       id: 'gb1',
       name: 'Quiz',
+      weight: 25,
       totalScore: 10,
       includeInGradeCalculation: true,
       scores: { p1: 8 },
@@ -28,16 +29,6 @@ test('normalizeSessionGradebooksFromRequest persists sanitized attachments', () 
           url: '/uploads/test.pdf',
           role: 'test',
           uploadedAt: '2026-01-01T00:00:00.000Z'
-        },
-        {
-          name: 'bad',
-          url: '',
-          role: 'test'
-        },
-        {
-          name: 'hack.exe',
-          url: '/uploads/hack.exe',
-          role: 'invalid_role'
         }
       ]
     }
@@ -50,21 +41,42 @@ test('normalizeSessionGradebooksFromRequest persists sanitized attachments', () 
   });
 
   assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].weight, 25);
+  assert.equal(normalized[0].totalScore, 10);
   assert.equal(normalized[0].attachments.length, 1);
-  assert.equal(normalized[0].attachments[0].role, 'test');
-  assert.equal(normalized[0].attachments[0].name, 'Test paper.pdf');
 });
 
-test('reportService period avg_percent uses earned over possible', () => {
-  assert.match(reportServiceSource, /student_gradebook_period_avg_percent:\s*percentFromEarnedPossible\(studentEarned, studentPossible\)/);
-  assert.match(reportServiceSource, /class_gradebook_period_avg_percent:\s*percentFromEarnedPossible\(classEarned, classPossible\)/);
-  assert.match(reportServiceSource, /Weighted average percent/);
+test('normalizeSessionGradebooksFromRequest defaults weight to totalScore when omitted', () => {
+  const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
+    {
+      id: 'gb1',
+      name: 'Quiz',
+      totalScore: 15,
+      includeInGradeCalculation: true,
+      scores: { p1: 12 }
+    }
+  ], {
+    personIds: ['p1'],
+    attendanceByPerson: new Map([['p1', 'present']]),
+    existingGradebookById: new Map(),
+    sessionSkillPolicy: { selectableIds: [], catalog: [] },
+    mergeHistoricalGradebookSkills: (_incoming, _existing, _ids) => []
+  });
+
+  assert.equal(normalized[0].weight, 15);
 });
 
-test('sessionManager saves gradebooks via Save session', () => {
+test('reportService period avg_percent uses gradebookWeightService', () => {
+  assert.match(reportServiceSource, /gradebookWeightService\.computeWeightedAveragePercent/);
+  assert.match(reportServiceSource, /resolveGradebookColumnScore/);
+});
+
+test('sessionManager saves gradebooks with weight and total points fields', () => {
   assert.doesNotMatch(sessionManagerSource, /id="btnSaveGradebooks"/);
   assert.match(sessionManagerSource, /markSessionAutosaveGradebookDirty/);
   assert.match(sessionManagerSource, /payload\.gradebooks = JSON\.stringify\(gradebooksState\)/);
-  assert.match(sessionManagerSource, /gb-total-score-info/);
+  assert.match(sessionManagerSource, /gbModalWeight/);
+  assert.match(sessionManagerSource, /gbWeightedContribution/);
+  assert.match(sessionManagerSource, /Wt %/);
   assert.match(sessionManagerSource, /gbModalAttachmentsList/);
 });

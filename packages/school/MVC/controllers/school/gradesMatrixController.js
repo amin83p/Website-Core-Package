@@ -19,6 +19,7 @@ const {
 } = require('../../services/school/attendanceMatrixAccessService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
 const matrixRollupService = require('../../services/school/matrixRollupService');
+const gradebookWeightService = require('../../services/school/gradebookWeightService');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -130,6 +131,7 @@ function collectColumns(filteredSessions) {
         itemId: id,
         label: String(gb?.name || 'Activity').slice(0, 120),
         includeInGradeCalculation: gb?.includeInGradeCalculation !== false,
+        weight: gradebookWeightService.resolveActivityWeight(gb),
         totalScore: total > 0 ? total : 0
       });
     });

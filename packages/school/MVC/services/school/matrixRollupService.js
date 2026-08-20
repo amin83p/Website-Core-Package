@@ -1,8 +1,20 @@
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
+const gradebookWeightService = require('./gradebookWeightService');
+
+function resolveAssignmentCellScore(cell, total) {
+  let score = cell?.score;
+  if (score == null && cell?.percent != null && Number.isFinite(Number(cell.percent))) {
+    score = (Number(cell.percent) / 100) * total;
+  }
+  if (score == null || !Number.isFinite(Number(score))) return null;
+  return Number(score);
+}
 
 function assignmentsCategoryAveragePercents(cells, columns) {
-  let earned = 0;
-  let possible = 0;
+  const gradebookPairs = [];
+  let otherEarned = 0;
+  let otherPossible = 0;
+
   for (let i = 0; i < columns.length; i += 1) {
     const col = columns[i];
     const cell = cells[i];
@@ -11,16 +23,52 @@ function assignmentsCategoryAveragePercents(cells, columns) {
     if (!cell.effective) continue;
     const total = Number(col.totalScore);
     if (!Number.isFinite(total) || total <= 0) continue;
-    let score = cell.score;
-    if (score == null && cell.percent != null && Number.isFinite(Number(cell.percent))) {
-      score = (Number(cell.percent) / 100) * total;
+    const score = resolveAssignmentCellScore(cell, total);
+    if (score == null) continue;
+
+    if (String(col.kind || '').trim().toLowerCase() === 'gradebook') {
+      gradebookPairs.push({ col, cell, score, total });
+      continue;
     }
-    if (score == null || !Number.isFinite(Number(score))) continue;
-    earned += Number(score);
-    possible += total;
+
+    otherEarned += score;
+    otherPossible += total;
   }
-  if (!possible) return null;
-  return Math.round((earned / possible) * 10000) / 100;
+
+  const gradebookAvg = gradebookPairs.length
+    ? gradebookWeightService.computeWeightedAveragePercent(
+      gradebookPairs.map(({ col }, index) => ({
+        id: String(col.colKey || col.itemId || `gb_${index}`).trim(),
+        weight: gradebookWeightService.resolveActivityWeight(col),
+        totalScore: Number(col.totalScore) || 0,
+        includeInGradeCalculation: col.includeInGradeCalculation !== false
+      })),
+      (_, index) => {
+        const pair = gradebookPairs[index];
+        return {
+          score: pair.score,
+          totalScore: pair.total
+        };
+      }
+    )
+    : null;
+
+  const otherAvg = otherPossible
+    ? Math.round((otherEarned / otherPossible) * 10000) / 100
+    : null;
+
+  if (gradebookAvg != null && otherAvg != null) {
+    const gbWeightSum = gradebookPairs.reduce(
+      (sum, { col }) => sum + gradebookWeightService.resolveActivityWeight(col),
+      0
+    );
+    const blendWeight = gbWeightSum + otherPossible;
+    if (!blendWeight) return null;
+    return Math.round((((gradebookAvg * gbWeightSum) + (otherAvg * otherPossible)) / blendWeight) * 100) / 100;
+  }
+  if (gradebookAvg != null) return gradebookAvg;
+  if (otherAvg != null) return otherAvg;
+  return null;
 }
 
 function computeFinalPercent(evaluation, attendancePct, assignmentsPct, midtermPct, finalExamPct) {

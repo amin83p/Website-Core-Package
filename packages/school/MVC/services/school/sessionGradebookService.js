@@ -1,5 +1,6 @@
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
+const gradebookWeightService = require('./gradebookWeightService');
 const schoolFileService = require('./schoolFileService');
 
 const GRADEBOOK_ATTACHMENT_ROLES = new Set(['test', 'answer_sheet', 'other']);
@@ -47,6 +48,10 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
     if (!Number.isFinite(totalScore) || totalScore <= 0) {
       throw new Error('Each activity must have a positive total score.');
     }
+    const weight = gradebookWeightService.resolveActivityWeight(gb);
+    if (!Number.isFinite(weight) || weight <= 0) {
+      throw new Error('Each activity must have a positive weight.');
+    }
     const name = String(gb.name || '').trim();
     if (!name) {
       throw new Error('Each gradebook activity must have a name.');
@@ -92,6 +97,7 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
       name: name.slice(0, 200),
       skills,
       skillFocus,
+      weight,
       totalScore,
       activityContent: String(gb.activityContent || ''),
       includeInGradeCalculation: Boolean(gb.includeInGradeCalculation),

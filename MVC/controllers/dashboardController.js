@@ -6,6 +6,13 @@ const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const adminCheckersService = require('../services/adminChekersService');
 const packageNavigationService = require('../services/packageNavigationService');
 const { resolveSectionDisplayTitle } = require('../utils/sectionDisplay');
+const {
+  applyModuleOrder,
+  buildDashboardOrderTableId,
+  extractModuleOrderFromSettings,
+  validateDashboardKey,
+  validateModuleOrder
+} = require('../utils/dashboardModuleOrder');
 
 const DASHBOARD_ALL_SECTIONS_CACHE_TTL_MS = 60 * 1000;
 const dashboardAllSectionsCache = new Map();
@@ -737,6 +744,7 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
     const colors = ['primary', 'secondary', 'success', 'info', 'warning', 'danger'];
     const color = colors[index % colors.length];
     return {
+      id: String(s.id || s.name || '').trim(),
       title: resolveSectionDisplayTitle(s, formatDashboardLabel),
       description: s.description || '',
       href,
@@ -957,11 +965,6 @@ async function showBootstrapSetup(req, res) {
   }
 }
 
-/* ============================================================
-   HELPER: Get Section for Sub-Dashboard (with Symbol Icon)
-   Use when rendering school/credit/ielts/etc. dashboards to get
-   the parent section's icon from symbols for the banner.
-============================================================ */
 async function getDashboardSection(homeURL, user) {
     if (!homeURL || typeof homeURL !== 'string') return null;
     const path = String(homeURL).trim().replace(/\/+$/, '') || '/';
@@ -983,6 +986,93 @@ async function getDashboardSection(homeURL, user) {
     }
 }
 
+function resolveModuleOrderContext(req) {
+  const keyCheck = validateDashboardKey(req.params.dashboardKey);
+  if (!keyCheck.ok) return { error: keyCheck.message, status: 400 };
+
+  const userId = String(req.user?.id || '').trim();
+  if (!userId) return { error: 'Authentication required.', status: 401 };
+
+  return {
+    dashboardKey: keyCheck.key,
+    userId,
+    tableId: buildDashboardOrderTableId(keyCheck.key)
+  };
+}
+
+async function getModuleOrder(req, res) {
+  try {
+    const ctx = resolveModuleOrderContext(req);
+    if (ctx.error) {
+      return res.status(ctx.status).json({ status: 'error', message: ctx.error });
+    }
+
+    const record = await dataService.getDataById(
+      'tableSettings',
+      { userId: ctx.userId, tableId: ctx.tableId },
+      req.user
+    );
+    const moduleOrder = extractModuleOrderFromSettings(record?.settings);
+
+    return res.json({ status: 'success', moduleOrder });
+  } catch (error) {
+    console.error('getModuleOrder Error:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to load module order.' });
+  }
+}
+
+async function saveModuleOrder(req, res) {
+  try {
+    const ctx = resolveModuleOrderContext(req);
+    if (ctx.error) {
+      return res.status(ctx.status).json({ status: 'error', message: ctx.error });
+    }
+
+    const orderCheck = validateModuleOrder(req.body?.moduleOrder);
+    if (!orderCheck.ok) {
+      return res.status(400).json({ status: 'error', message: orderCheck.message });
+    }
+
+    await dataService.updateData('tableSettings', null, {
+      userId: ctx.userId,
+      tableId: ctx.tableId,
+      settings: { moduleOrder: orderCheck.moduleOrder }
+    }, req.user);
+
+    return res.json({ status: 'success', message: 'Module order saved.' });
+  } catch (error) {
+    console.error('saveModuleOrder Error:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to save module order.' });
+  }
+}
+
+async function resetModuleOrder(req, res) {
+  try {
+    const ctx = resolveModuleOrderContext(req);
+    if (ctx.error) {
+      return res.status(ctx.status).json({ status: 'error', message: ctx.error });
+    }
+
+    const record = await dataService.getDataById(
+      'tableSettings',
+      { userId: ctx.userId, tableId: ctx.tableId },
+      req.user
+    );
+    if (record) {
+      await dataService.deleteData(
+        'tableSettings',
+        { userId: ctx.userId, tableId: ctx.tableId },
+        req.user
+      );
+    }
+
+    return res.json({ status: 'success', message: 'Module order reset.' });
+  } catch (error) {
+    console.error('resetModuleOrder Error:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to reset module order.' });
+  }
+}
+
 module.exports = {
   showDashboard,
   showSectionNav,
@@ -991,9 +1081,13 @@ module.exports = {
   getQuickMenu,
   getAllAccessibleSections,
   getStartMenu,
+  getModuleOrder,
+  saveModuleOrder,
+  resetModuleOrder,
   getDashboardSection,
   mapSymbolsToSections,
   filterMainDashboardSections,
   buildSectionOpenUrl,
-  resolveSingleMainDashboardRedirect
+  resolveSingleMainDashboardRedirect,
+  applyModuleOrder
 };

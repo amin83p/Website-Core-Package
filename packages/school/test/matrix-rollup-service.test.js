@@ -112,7 +112,7 @@ test('grades rollups filter attendance records to displayed column sessions', ()
   assert.equal(oneColumn.matrix[0].finalPercent, 90);
 });
 
-test('assignmentsCategoryAveragePercents weights by activity total points', () => {
+test('assignmentsCategoryAveragePercents weights by activity total points when kind is not gradebook', () => {
   const columns = [
     { includeInGradeCalculation: true, totalScore: 10 },
     { includeInGradeCalculation: true, totalScore: 20 },
@@ -127,6 +127,19 @@ test('assignmentsCategoryAveragePercents weights by activity total points', () =
   const equalMean = (80 + 75 + 60) / 3;
   assert.equal(weighted, Math.round((53 / 80) * 10000) / 100);
   assert.notEqual(weighted, Math.round(equalMean * 100) / 100);
+});
+
+test('assignmentsCategoryAveragePercents uses explicit gradebook weights when kind is gradebook', () => {
+  const columns = [
+    { kind: 'gradebook', includeInGradeCalculation: true, totalScore: 10, weight: 20, colKey: 's1::gradebook::a' },
+    { kind: 'gradebook', includeInGradeCalculation: true, totalScore: 20, weight: 30, colKey: 's1::gradebook::b' }
+  ];
+  const cells = [
+    { score: 8, percent: 80, effective: true },
+    { score: 15, percent: 75, effective: true }
+  ];
+  const weighted = matrixRollupService.assignmentsCategoryAveragePercents(cells, columns);
+  assert.equal(weighted, 77);
 });
 
 test('summarizeGradesRollupsForRows matches recompute for displayed slice', () => {

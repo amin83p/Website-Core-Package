@@ -80,6 +80,7 @@ const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
+const gradebookWeightService = require('../../services/school/gradebookWeightService');
 const sessionGradebookService = require('../../services/school/sessionGradebookService');
 const teachingOutlineSuggestionService = require('../../services/school/teachingOutlineSuggestionService');
 const teachingOutlineCatalogService = require('../../services/school/teachingOutlineCatalogService');
@@ -2200,6 +2201,7 @@ function resetGradebooksForMakeup(gradebooks = []) {
             skills,
             skillFocus,
             totalScore: Number(row?.totalScore || 0),
+            weight: gradebookWeightService.resolveActivityWeight(row),
             activityContent: String(row?.activityContent || ''),
             includeInGradeCalculation: Boolean(row?.includeInGradeCalculation),
             scores: {}

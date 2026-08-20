@@ -1372,6 +1372,8 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
             return acc;
         }, { autoHours: 0, manualHours: 0, reportHours: 0, activityHours: 0, totalHours: 0, grossPay: 0, entryCount: 0 });
 
+        const departmentTotals = timesheetPrintService.buildDepartmentTotalsFromEffective(effective);
+
         return res.json({
             status: 'success',
             period: {
@@ -1404,7 +1406,8 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
                 totalHours: Number(totals.totalHours.toFixed(2)),
                 grossPay: Number(totals.grossPay.toFixed(2)),
                 entryCount: totals.entryCount
-            }
+            },
+            departmentTotals
         });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
