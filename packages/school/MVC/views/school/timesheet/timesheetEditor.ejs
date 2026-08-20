@@ -114,6 +114,7 @@
   .ts-guidance-step--locked { border-left: 4px solid #198754; padding-left: 0.85rem; }
   .ts-guidance-step--instructions { border-left: 4px solid #0d6efd; padding-left: 0.85rem; }
   .ts-guidance-step--reconciliation { border-left: 4px solid #0d6efd; padding-left: 0.85rem; }
+  .ts-guidance-step--prior-review { border-left: 4px solid #20c997; padding-left: 0.85rem; }
   .ts-guidance-step--warning { border-left: 4px solid #ffc107; padding-left: 0.85rem; }
   .ts-guidance-step--payroll { border-left: 4px solid #fd7e14; padding-left: 0.85rem; }
   .ts-guidance-step--history { border-left: 4px solid #6f42c1; padding-left: 0.85rem; }
@@ -343,6 +344,20 @@
   .ts-day-name {
     margin-bottom: 0.1rem;
   }
+  #tsTable td.ts-day-date-cell {
+    vertical-align: top;
+    height: 1px;
+  }
+  .ts-date-cell-stack {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+  }
+  .ts-date-cell-actions {
+    margin-top: auto;
+    padding-top: 0.75rem;
+  }
   .ts-time-label {
     font-size: 0.8rem;
     font-weight: 500;
@@ -410,13 +425,6 @@
     font-weight: 750;
     color: #198754;
   }
-  .ts-hours-unit {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: #6c757d;
-  }
   .ts-optional-badge {
     background-color: #e0f2fe;
     border: 1px solid #7dd3fc;
@@ -424,6 +432,12 @@
     font-size: 0.68rem;
     letter-spacing: 0.035em;
     text-transform: uppercase;
+  }
+  #tsTable thead th {
+    text-align: center !important;
+    vertical-align: middle !important;
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.65rem !important;
   }
   #tsTable th.ts-col-status,
   #tsTable td.ts-col-status {
@@ -540,6 +554,41 @@
     line-height: 1.1;
     max-width: 4.5rem;
     white-space: normal;
+  }
+  #tsTable th.ts-col-hours-regular,
+  #tsTable td.ts-col-hours-regular {
+    width: 68px;
+    min-width: 68px;
+    max-width: 68px;
+    padding-left: 0.3rem !important;
+    padding-right: 0.3rem !important;
+  }
+  #tsTable th.ts-col-hours-optional,
+  #tsTable td.ts-col-hours-optional {
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+    padding-left: 0.3rem !important;
+    padding-right: 0.3rem !important;
+    vertical-align: middle !important;
+  }
+  #tsTable th.ts-col-hours-group {
+    font-size: 0.72rem;
+    line-height: 1.15;
+    white-space: normal;
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+  }
+  #tsTable td.ts-col-hours-regular,
+  #tsTable td.ts-col-hours-optional {
+    text-align: center !important;
+    vertical-align: middle !important;
+    overflow-wrap: anywhere;
+  }
+  #tsTable td.ts-col-hours-regular .ts-hours-line,
+  #tsTable td.ts-col-hours-optional .ts-hours-line {
+    justify-content: center;
+    width: 100%;
   }
   #tsTable th.ts-col-hours-time,
   #tsTable td.ts-col-hours-time {
@@ -751,13 +800,17 @@
                 <table class="table table-bordered align-middle mb-0" id="tsTable">
                     <thead class="table-light border-bottom">
                         <tr>
-                            <th class="ps-4" style="width: 140px;">Date</th>
-                            <th>Class / Description</th>
-                            <th style="width: 160px;">Student Name</th>
-                            <th class="ts-col-hours-time">Hours / Time</th>
-                            <th class="ts-col-status"><span class="ts-column-header-center">Status</span></th>
-                            <th style="min-width: 220px;">Comment</th>
-                            <% if (!isEditorLocked) { %><th class="ts-col-actions"><span class="ts-column-header-center">Act</span></th><% } %>
+                            <th style="width: 140px;" rowspan="2">Date</th>
+                            <th rowspan="2">Class / Description</th>
+                            <th style="width: 160px;" rowspan="2">Student Name</th>
+                            <th class="ts-col-hours-group" colspan="2">Hours/Time (Hrs)</th>
+                            <th class="ts-col-status" rowspan="2">Status</th>
+                            <th style="min-width: 220px;" rowspan="2">Comment</th>
+                            <% if (!isEditorLocked) { %><th class="ts-col-actions" rowspan="2">Act</th><% } %>
+                        </tr>
+                        <tr>
+                            <th class="ts-col-hours-regular">Regular</th>
+                            <th class="ts-col-hours-optional">Optional</th>
                         </tr>
                     </thead>
                     <tbody id="tsBody">
@@ -765,7 +818,8 @@
                     <tfoot class="table-light border-top border-3">
                         <tr>
                             <td colspan="3" class="text-end fw-bold text-uppercase">Total Period Hours:</td>
-                            <td class="ts-col-hours-time"><span class="ts-hours-value" id="lbl_grandTotal">0.00</span> <span class="ts-hours-unit">hrs</span></td>
+                            <td class="ts-col-hours-regular"><span class="ts-hours-value" id="lbl_grandTotal">0.00</span></td>
+                            <td class="ts-col-hours-optional"><span class="ts-hours-value text-info-emphasis" id="lbl_grandTotalOptional">0.00</span></td>
                             <td colspan="2"></td>
                             <% if (!isEditorLocked) { %><td></td><% } %>
                         </tr>
@@ -1188,6 +1242,8 @@
     }) %>;
     let actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     let priorReviewHasOpenMakeupChains = false;
+    let priorReviewGuidancePayload = null;
+    let priorReviewPendingAcknowledgement = false;
     let timesheetGuidanceSteps = [];
     let timesheetGuidanceStepIndex = 0;
     let timesheetGuidanceModal = null;
@@ -2221,6 +2277,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        if (priorReviewGuidancePayload) {
+            const priorFlags = analyzePriorReviewResult(priorReviewGuidancePayload);
+            steps.push({
+                id: 'prior-period-review',
+                tone: 'prior-review',
+                eyebrow: 'Prior period review',
+                title: 'No adjustment required',
+                html: `<div class="ts-guidance-body">${buildPriorPeriodGuidanceStepHtml(priorReviewGuidancePayload, priorFlags)}</div>`
+            });
+        }
+
         if (dynamic.reconciliationHours > 0 || dynamic.openChains.length > 0) {
             const provisionalDetail = dynamic.provisionalSessionCount > 0
                 ? `<strong>${dynamic.provisionalSessionCount}</strong> provisional session(s), totaling <strong>${dynamic.provisionalHours.toFixed(2)} hours</strong>, use their current status formula.`
@@ -2322,7 +2389,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (closeBtn) {
             closeBtn.classList.toggle('d-none', !isLast);
-            closeBtn.textContent = 'Got it';
+            closeBtn.textContent = isLast && priorReviewPendingAcknowledgement ? 'Continue to Timesheet' : 'Got it';
+            if (isLast && priorReviewPendingAcknowledgement) {
+                closeBtn.removeAttribute('data-bs-dismiss');
+            } else {
+                closeBtn.setAttribute('data-bs-dismiss', 'modal');
+            }
         }
     }
 
@@ -2352,9 +2424,16 @@ document.addEventListener('DOMContentLoaded', () => {
         timesheetGuidanceModal.show();
     }
 
+    function shouldAutoOpenTimesheetGuidance() {
+        const boot = TIMESHEET_GUIDANCE_BOOT && typeof TIMESHEET_GUIDANCE_BOOT === 'object'
+            ? TIMESHEET_GUIDANCE_BOOT
+            : {};
+        return String(boot.status || 'draft').trim().toLowerCase() === 'draft';
+    }
+
     function initializeTimesheetGuidance() {
         renderTimesheetGuidanceLauncher();
-        if (timesheetGuidanceSteps.length > 0) {
+        if (timesheetGuidanceSteps.length > 0 && shouldAutoOpenTimesheetGuidance()) {
             openTimesheetGuidanceModal(0);
         }
     }
@@ -2370,6 +2449,30 @@ document.addEventListener('DOMContentLoaded', () => {
         nextBtn?.addEventListener('click', () => {
             if (timesheetGuidanceStepIndex < timesheetGuidanceSteps.length - 1) {
                 renderTimesheetGuidanceStep(timesheetGuidanceStepIndex + 1);
+            }
+        });
+        const closeBtn = document.getElementById('btnTimesheetGuidanceClose');
+        closeBtn?.addEventListener('click', async (event) => {
+            if (!priorReviewPendingAcknowledgement) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            closeBtn.disabled = true;
+            const loadingToken = showTimesheetWaitingModal({
+                title: 'Review Complete',
+                note: 'Saving prior-period review acknowledgement...',
+                operation: 'Prior-period acknowledgement'
+            });
+            try {
+                await submitPriorReviewAcknowledgement();
+                priorReviewPendingAcknowledgement = false;
+                priorReviewGuidancePayload = null;
+                renderTimesheetGuidanceLauncher();
+                timesheetGuidanceModal?.hide();
+            } catch (error) {
+                await messageBox({ title: 'Error', icon: 'error', message: error.message });
+            } finally {
+                hideTimesheetWaitingModal(loadingToken);
+                closeBtn.disabled = false;
             }
         });
     }
@@ -2493,12 +2596,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const dayClass = isHoliday ? 'text-danger' : '';
         const addBtn = IS_READONLY
             ? ''
-            : `<button type="button" class="btn btn-primary btn-sm text-white ts-date-add-btn mt-2 fw-semibold" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg me-1"></i>Add</button>`;
+            : `<button type="button" class="btn btn-primary btn-sm text-white ts-date-add-btn fw-semibold" onclick="openManualModal('${dateStr}')"><i class="bi bi-plus-lg me-1"></i>Add</button>`;
+        const actionsHtml = addBtn ? `<div class="ts-date-cell-actions">${addBtn}</div>` : '';
         return `
-            <div class="ts-day-name ${dayClass}">${dayName}</div>
-            <div class="ts-date-label">${formatTimesheetDatePart(dateStr, { month: 'long', day: 'numeric' })}</div>
-            ${holidayLine}
-            ${addBtn}`;
+            <div class="ts-date-cell-stack">
+                <div class="ts-date-cell-main">
+                    <div class="ts-day-name ${dayClass}">${dayName}</div>
+                    <div class="ts-date-label">${formatTimesheetDatePart(dateStr, { month: 'long', day: 'numeric' })}</div>
+                    ${holidayLine}
+                </div>
+                ${actionsHtml}
+            </div>`;
     }
 
     function buildStudentNameCellHtml(ses) {
@@ -2648,41 +2756,62 @@ document.addEventListener('DOMContentLoaded', () => {
         const primary = href
             ? `<a href="${escapeHtml(href)}" class="ts-class-primary-link ts-tooltip-trigger" target="_blank" rel="noopener noreferrer" data-tip="${escapeHtml(tooltip)}" data-tip-variant="details" data-tip-bg="#0f172a" data-tip-fg="#ffffff" data-tip-border="#334155" aria-label="${escapeHtml(`${managerLabel}: ${fallback || departmentCode}`)}">${primaryContent}</a>`
             : primaryContent;
-        return `<div class="ts-class-primary">${primary}${payrollRoleBadge(entry?.personRole)}${coTeacherBadge(entry)}</div>`;
+        return `<div class="ts-class-primary">${primary}${payrollRoleBadge(entry?.personRole)}${coTeacherBadge(entry)}</div>${buildSessionScheduleLabelHtml(entry)}`;
     }
 
-    function buildOptionalBadgeHtml(entry) {
-        if (entry?.showOptionalBadge !== true) return '';
-        return '<span class="badge rounded-pill ts-optional-badge" title="One-on-one class was not held; badge is informational only.">Optional</span>';
-    }
-
-    function buildHoursTimeCellHtml(entry, hours, requestedHours) {
-        const optionalBadge = buildOptionalBadgeHtml(entry);
-        let hoursHtml = '';
-        if (isPendingApprovalEntry(entry)) {
-            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><span class="ts-hours-unit">hrs</span>${optionalBadge}</div><div class="small text-warning fw-semibold">0.00 hrs payable (pending)</div>`;
-        } else if (isRejectedApprovalEntry(entry)) {
-            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><span class="ts-hours-unit">hrs</span>${optionalBadge}</div><div class="small text-danger fw-semibold">0.00 hrs payable (rejected)</div>`;
-        } else if (isUnpaidApprovalEntry(entry)) {
-            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span><span class="ts-hours-unit">hrs</span>${optionalBadge}</div><div class="small text-secondary fw-semibold">0.00 hrs payable (unpaid)</div>`;
-        } else {
-            const valueClass = Number(hours) < 0 ? 'text-danger' : 'text-success';
-            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value ${valueClass}">${Number(hours || 0).toFixed(2)}</span><span class="ts-hours-unit">hrs</span>${optionalBadge}</div>`;
-        }
-
-        let timeHtml = '';
+    function buildSessionScheduleLabelHtml(entry) {
         if (entry?.isPriorPeriodAdjustment === true) {
             const referenceDate = String(entry?.adjustmentMeta?.sourceSessionDate || entry?.date || '').trim();
-            timeHtml = `<div class="ts-time-label"><i class="bi bi-arrow-counterclockwise me-1"></i>Prior period correction${referenceDate ? `<div class="small mt-1">Ref: ${escapeHtml(referenceDate)}</div>` : ''}</div>`;
-        } else {
-            const startTime = String(entry?.startTime || '').trim();
-            const endTime = String(entry?.endTime || '').trim();
-            const timeRange = startTime
-                ? `${escapeHtml(startTime)}${endTime ? ` – ${escapeHtml(endTime)}` : ''}`
-                : 'Manual time';
-            timeHtml = `<div class="ts-time-label"><i class="bi bi-clock me-1"></i>${timeRange}</div>`;
+            return `<div class="ts-time-label mt-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Prior period correction${referenceDate ? `<span class="ms-1">Ref: ${escapeHtml(referenceDate)}</span>` : ''}</div>`;
         }
-        return `<div class="ts-hours-time-stack">${hoursHtml}${timeHtml}</div>`;
+        const startTime = String(entry?.startTime || '').trim();
+        const endTime = String(entry?.endTime || '').trim();
+        if (!startTime && entry?.isManual !== true) return '';
+        const timeRange = startTime
+            ? `${escapeHtml(startTime)}${endTime ? ` – ${escapeHtml(endTime)}` : ''}`
+            : 'Manual time';
+        return `<div class="ts-time-label mt-1"><i class="bi bi-clock me-1"></i>${timeRange}</div>`;
+    }
+
+    function resolveRegularDisplayHours(entry, payableHours = 0) {
+        const optionalHours = resolveOptionalReportingHours(entry);
+        if (optionalHours > 0) return 0;
+        return Number(payableHours || 0);
+    }
+
+    function buildRegularHoursTimeCellHtml(entry, hours, requestedHours) {
+        const regularHours = resolveRegularDisplayHours(entry, hours);
+        const usesOptionalColumn = resolveOptionalReportingHours(entry) > 0;
+        let hoursHtml = '';
+        if (isPendingApprovalEntry(entry)) {
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div><div class="small text-warning fw-semibold">0.00 payable (pending)</div>`;
+        } else if (isRejectedApprovalEntry(entry)) {
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div><div class="small text-danger fw-semibold">0.00 payable (rejected)</div>`;
+        } else if (isUnpaidApprovalEntry(entry)) {
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div><div class="small text-secondary fw-semibold">0.00 payable (unpaid)</div>`;
+        } else if (usesOptionalColumn) {
+            hoursHtml = '<span class="text-muted">—</span>';
+        } else {
+            const valueClass = Number(regularHours) < 0 ? 'text-danger' : 'text-success';
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value ${valueClass}">${Number(regularHours || 0).toFixed(2)}</span></div>`;
+        }
+        return hoursHtml;
+    }
+
+    function buildOptionalHoursCellHtml(entry) {
+        const optionalHours = resolveOptionalReportingHours(entry);
+        if (!optionalHours || optionalHours <= 0) {
+            return '<span class="text-muted">—</span>';
+        }
+        return `<div class="ts-hours-line"><span class="ts-hours-value text-info-emphasis">${optionalHours.toFixed(2)}</span></div>`;
+    }
+
+    function buildEmptyRegularHoursCellHtml() {
+        return '<td class="ts-col-hours-regular align-middle"><div class="ts-hours-line"><span class="ts-hours-value">0.00</span></div></td>';
+    }
+
+    function buildEmptyOptionalHoursCellHtml() {
+        return '<td class="ts-col-hours-optional align-middle"><span class="text-muted">—</span></td>';
     }
 
     function resolveDepartmentLabel(entry) {
@@ -2796,7 +2925,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const sessionHours = Number(resolveEntryHours(entry) || 0);
             const pendingHours = isPendingApprovalEntry(entry) ? Number(resolveRequestedHours(entry) || 0) : 0;
             const optionalHours = resolveDepartmentOptionalHours(entry);
-            if ((!Number.isFinite(sessionHours) || sessionHours === 0)
+            const regularHours = optionalHours > 0 ? 0 : sessionHours;
+            if ((!Number.isFinite(regularHours) || regularHours === 0)
                 && (!Number.isFinite(pendingHours) || pendingHours === 0)
                 && (!Number.isFinite(optionalHours) || optionalHours === 0)) {
                 return;
@@ -2811,10 +2941,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 oneOnOnePendingHours: 0
             };
             if (isOneOnOne) {
-                current.oneOnOneHours = Number((current.oneOnOneHours + (Number.isFinite(sessionHours) ? sessionHours : 0)).toFixed(2));
+                current.oneOnOneHours = Number((current.oneOnOneHours + (Number.isFinite(regularHours) ? regularHours : 0)).toFixed(2));
                 current.oneOnOnePendingHours = Number((current.oneOnOnePendingHours + (Number.isFinite(pendingHours) ? pendingHours : 0)).toFixed(2));
             } else {
-                current.groupHours = Number((current.groupHours + (Number.isFinite(sessionHours) ? sessionHours : 0)).toFixed(2));
+                current.groupHours = Number((current.groupHours + (Number.isFinite(regularHours) ? regularHours : 0)).toFixed(2));
                 current.groupPendingHours = Number((current.groupPendingHours + (Number.isFinite(pendingHours) ? pendingHours : 0)).toFixed(2));
             }
             if (optionalHours > 0) {
@@ -2836,7 +2966,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const oneOnOneHours = Number(hrs.oneOnOneHours || 0);
             const oneOnOneOptionalHours = Number(hrs.oneOnOneOptionalHours || 0);
             const pendingHours = Number((hrs.groupPendingHours || 0) + (hrs.oneOnOnePendingHours || 0));
-            const rowTotal = Number((groupHours + oneOnOneHours + pendingHours).toFixed(2));
+            const rowTotal = Number((groupHours + oneOnOneHours + oneOnOneOptionalHours + pendingHours).toFixed(2));
             totalGroup += groupHours;
             totalOneOnOne += oneOnOneHours;
             totalOneOnOneOptional += oneOnOneOptionalHours;
@@ -2850,7 +2980,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="text-end pe-4 fw-semibold text-success">${rowTotal.toFixed(2)}</td>
             </tr>`;
         }).join('');
-        const grandTotal = Number((totalGroup + totalOneOnOne + totalPending).toFixed(2));
+        const grandTotal = Number((totalGroup + totalOneOnOne + totalOneOnOneOptional + totalPending).toFixed(2));
         totalsBody.innerHTML = `${html}<tr class="table-light">
             <td class="ps-4 fw-bold">Total</td>
             <td class="text-end pe-4 fw-bold text-success">${totalGroup.toFixed(2)}</td>
@@ -2864,6 +2994,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTable() {
         tbody.innerHTML = '';
         grandTotalHours = 0;
+        let grandTotalOptionalHours = 0;
         provisionalSessionCount = 0;
         provisionalHours = 0;
         reconciliationSessionCount = 0;
@@ -2888,21 +3019,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (dayEntries.length === 0) {
                 const dateCell = buildDateCellHtml(dateStr, dayName, isHoliday, hol);
-                const zeroHoursCell = '<td class="ts-col-hours-time align-middle"><div class="ts-hours-line"><span class="ts-hours-value">0.00</span><span class="ts-hours-unit">hrs</span></div></td>';
+                const zeroHoursCells = `${buildEmptyRegularHoursCellHtml()}${buildEmptyOptionalHoursCellHtml()}`;
                 if (isHoliday) {
                     tbody.innerHTML += `<tr class="${bgClass} row-hover ts-day-group-end">
-                        <td class="ps-4 align-middle border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
+                        <td class="ps-4 ts-day-date-cell border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
                         <td colspan="2" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
-                        ${zeroHoursCell}
+                        ${zeroHoursCells}
                         <td class="ts-col-status"></td>
                         <td></td>
                         ${IS_READONLY ? '' : '<td class="ts-col-actions"></td>'}
                     </tr>`;
                 } else {
                     tbody.innerHTML += `<tr class="${bgClass} row-hover ts-day-group-end">
-                        <td class="ps-4 align-middle border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
+                        <td class="ps-4 ts-day-date-cell border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
                         <td colspan="2" class="text-muted fst-italic align-middle">No sessions logged.</td>
-                        ${zeroHoursCell}
+                        ${zeroHoursCells}
                         <td class="ts-col-status"></td>
                         <td></td>
                         ${IS_READONLY ? '' : '<td class="ts-col-actions"></td>'}
@@ -2912,15 +3043,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 dayEntries.forEach((ses, sIdx) => {
                     const displaySes = resolveDisplayEntry(ses);
                     const hrs = resolveEntryHours(ses);
-                    grandTotalHours += hrs;
+                    const optionalHrs = resolveOptionalReportingHours(displaySes);
+                    const regularHrs = resolveRegularDisplayHours(displaySes, hrs);
+                    grandTotalHours += regularHrs;
+                    grandTotalOptionalHours += optionalHrs;
                     if (ses.reconciliationRequired === true) {
                         reconciliationSessionCount += 1;
-                        reconciliationHours += Math.max(0, hrs);
+                        reconciliationHours += Math.max(0, regularHrs);
                         guidanceReconciliationEntries.push(ses);
                     }
                     if (ses.isProvisional === true) {
                         provisionalSessionCount += 1;
-                        provisionalHours += hrs;
+                        provisionalHours += regularHrs;
                         guidanceProvisionalEntries.push(ses);
                     }
 
@@ -2970,13 +3104,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const actHtml = IS_READONLY ? '' : `<td class="ts-col-actions"><div class="ts-action-stack">${actBtns}</div></td>`;
                     const dateCell = sIdx === 0
-                        ? `<td class="ps-4 align-top border-end border-2${dayEntries.length > 1 ? ' ts-day-date-span' : ''}" rowspan="${dayRowSpan}">
+                        ? `<td class="ps-4 ts-day-date-cell border-end border-2${dayEntries.length > 1 ? ' ts-day-date-span' : ''}" rowspan="${dayRowSpan}">
                             ${buildDateCellHtml(dateStr, dayName, isHoliday, hol)}
                            </td>`
                         : '';
 
                     const requestedHours = resolveRequestedHours(ses);
-                    const hoursTimeHtml = buildHoursTimeCellHtml(displaySes, hrs, requestedHours);
+                    const regularHoursHtml = buildRegularHoursTimeCellHtml(displaySes, hrs, requestedHours);
+                    const optionalHoursHtml = buildOptionalHoursCellHtml(displaySes);
                     const classMeta = displaySes.isManual && displaySes.activityName
                         ? `<div class="small text-muted"><i class="bi bi-list-check me-1"></i>${escapeHtml(displaySes.activityName)}${displaySes.activityPaid ? ' (paid)' : ' (unpaid)'}</div>`
                         : (displaySes.isManual && displaySes.deliveryDepartmentName
@@ -2988,7 +3123,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${dateCell}
                             <td>${buildClassDescriptionCellHtml(displaySes)}${classMeta}</td>
                             <td>${buildStudentNameCellHtml(displaySes)}</td>
-                            <td class="ts-col-hours-time">${hoursTimeHtml}</td>
+                            <td class="ts-col-hours-regular align-middle">${regularHoursHtml}</td>
+                            <td class="ts-col-hours-optional align-middle">${optionalHoursHtml}</td>
                             <td class="ts-col-status"><div class="ts-status-stack">${statusBadge}${buildMakeupSessionStatusHtml(displaySes)}</div></td>
                             <td>${commentInput}</td>
                             ${actHtml}
@@ -2999,6 +3135,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.getElementById('lbl_grandTotal').innerText = grandTotalHours.toFixed(2);
+        const optionalTotalEl = document.getElementById('lbl_grandTotalOptional');
+        if (optionalTotalEl) optionalTotalEl.innerText = grandTotalOptionalHours.toFixed(2);
         renderTimesheetGuidanceLauncher();
 
         renderDepartmentTotals();
@@ -4474,6 +4612,106 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(row?.code || '').trim() !== 'orphaned_makeup_parent';
     }
 
+    function analyzePriorReviewResult(result = {}) {
+        const adjustments = Array.isArray(result.adjustments) ? result.adjustments : [];
+        const unresolved = Array.isArray(result.unresolved) ? result.unresolved : [];
+        const reconciliationResults = Array.isArray(result.reconciliationResults) ? result.reconciliationResults : [];
+        const resolvedNoChange = reconciliationResults.filter((row) => (
+            row?.state === 'resolved' && Math.abs(Number(row?.adjustmentHours || 0)) < 0.005
+        ));
+        const crossPeriodNettingPreview = Array.isArray(result.crossPeriodNettingPreview) ? result.crossPeriodNettingPreview : [];
+        const nettingRootSessionIds = new Set(
+            (Array.isArray(result.makeupChains) ? result.makeupChains : [])
+                .filter((chain) => chain?.crossPeriodNetting)
+                .map((chain) => String(chain.crossPeriodNetting.rootSessionId || ''))
+                .filter(Boolean)
+        );
+        const payableAdjustments = adjustments.filter((adj) => (
+            Math.abs(Number(adj.adjustmentHours ?? adj.deltaHours ?? 0)) >= 0.005
+            && !nettingRootSessionIds.has(String(adj.sourceSessionId || ''))
+        ));
+        const crossPeriodNettingRows = renderCrossPeriodNettingTableRows(crossPeriodNettingPreview);
+        const blockingMakeupConflicts = (Array.isArray(result.makeupConflicts) ? result.makeupConflicts : [])
+            .filter(isBlockingMakeupConflict);
+        const visibleMakeupChains = (Array.isArray(result.makeupChains) ? result.makeupChains : [])
+            .filter((chain) => chain?.crossPeriodNetting || chain?.state === 'open' || chain?.state === 'conflict');
+        const hasOpenMakeupChains = result.makeupState === 'open' || visibleMakeupChains.some((chain) => chain?.state === 'open');
+
+        return {
+            priorName: result.priorPeriod?.name || 'the previous period',
+            priorRange: result.priorPeriod
+                ? `${result.priorPeriod.startDate || ''} to ${result.priorPeriod.endDate || ''}`
+                : '',
+            summary: result.priorReviewSummary || {},
+            resolvedNoChange,
+            adjustments,
+            unresolved,
+            reconciliationResults,
+            payableAdjustments,
+            crossPeriodNettingRows,
+            crossPeriodNettingPreview,
+            nettingRootSessionIds,
+            hasAdjustments: payableAdjustments.length > 0 || crossPeriodNettingRows.length > 0,
+            hasUnresolved: unresolved.length > 0,
+            awaitingPriorProcessing: result.reconciliationState === 'awaiting_prior_processing',
+            hasMakeupConflict: result.makeupState === 'conflict' || blockingMakeupConflicts.length > 0,
+            blockingCrossPeriodNetting: Number(result.blockingCrossPeriodNettingCount || 0),
+            hasOpenMakeupChains,
+            priorPayrollGate: result.priorPayrollGate || null
+        };
+    }
+
+    function isPriorReviewGuidanceOnly(flags = {}) {
+        if (flags.awaitingPriorProcessing) return false;
+        if (flags.hasUnresolved || flags.hasMakeupConflict) return false;
+        if (flags.hasAdjustments || flags.blockingCrossPeriodNetting > 0) return false;
+        if (flags.hasOpenMakeupChains) return false;
+        return true;
+    }
+
+    function buildPriorPeriodGuidanceStepHtml(result = {}, flags = {}) {
+        const priorName = escapeHtml(flags.priorName || 'the previous period');
+        const priorRange = escapeHtml(flags.priorRange || '');
+        const summary = flags.summary || {};
+        const tableRows = (flags.resolvedNoChange || []).map((row) => `
+            <tr class="table-success">
+                <td class="small text-nowrap">${escapeHtml(row.sourceSessionDate || '-')}</td>
+                <td class="small">${escapeHtml(row.className || '-')}</td>
+                <td class="small">Resolved with no payable-hour difference (${escapeHtml(row.currentStatus || row.baselineStatus || 'final')}).</td>
+                <td class="text-end small">${Number(row.baselineHours || 0).toFixed(2)}</td>
+                <td class="text-end small">${Number(row.currentHours || 0).toFixed(2)}</td>
+                <td class="text-end small text-muted fw-semibold">0.00</td>
+            </tr>
+        `).join('');
+        const tableHtml = tableRows
+            ? `<div class="table-responsive border rounded mt-3">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Session Date</th>
+                            <th>Class / Description</th>
+                            <th>Change</th>
+                            <th class="text-end">Baseline Hrs</th>
+                            <th class="text-end">Final Hrs</th>
+                            <th class="text-end">Difference</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+            </div>`
+            : '';
+        return `
+            <p>We reviewed the deadline-window sessions from <strong>${priorName}</strong> (${priorRange}). No hour adjustment is required.</p>
+            <div class="alert alert-light border mb-0 mt-3">
+                <div><strong>Prior period:</strong> ${priorName} (${priorRange})</div>
+                <div class="small text-muted mt-1">Submitted entries: ${Number(summary.entryCount || 0)} | Snapshot hours: ${Number(summary.totalSnapshotHours || 0).toFixed(2)}</div>
+                <div class="small mt-1">Deadline-window sessions: <strong>${Number(summary.reconciliationCount || 0)}</strong> (${Number(summary.reconciliationHours || 0).toFixed(2)} hrs) | Provisional: <strong>${Number(summary.provisionalCount || 0)}</strong> (${Number(summary.provisionalHours || 0).toFixed(2)} hrs) | Unresolved: <strong>${Number(summary.unresolvedCount || 0)}</strong> | No-change resolutions: <strong>${Number(summary.resolvedNoChangeCount || 0)}</strong></div>
+            </div>
+            ${tableHtml}
+            <p class="small text-muted mb-0 mt-3">Use <strong>Continue to Timesheet</strong> on the last step to acknowledge this review.</p>
+        `;
+    }
+
     function renderCrossPeriodNettingTableRows(preview = []) {
         return (Array.isArray(preview) ? preview : []).flatMap((row) => {
             if (row?.nettingKind === 'net_summary') {
@@ -4635,38 +4873,52 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const result = await res.json();
             if (result.status !== 'success' || !result.needsReview) {
+                priorReviewGuidancePayload = null;
+                priorReviewPendingAcknowledgement = false;
                 return;
             }
 
-            const priorName = result.priorPeriod?.name || 'the previous period';
-            const priorRange = result.priorPeriod
-                ? `${result.priorPeriod.startDate || ''} to ${result.priorPeriod.endDate || ''}`
-                : '';
-            const adjustments = Array.isArray(result.adjustments) ? result.adjustments : [];
-            const unresolved = Array.isArray(result.unresolved) ? result.unresolved : [];
-            const reconciliationResults = Array.isArray(result.reconciliationResults) ? result.reconciliationResults : [];
-            const resolvedNoChange = reconciliationResults.filter((row) => row?.state === 'resolved' && Math.abs(Number(row?.adjustmentHours || 0)) < 0.005);
-            const hasAdjustments = adjustments.length > 0;
-            const hasUnresolved = unresolved.length > 0;
-            const awaitingPriorProcessing = result.reconciliationState === 'awaiting_prior_processing';
-            const blockingMakeupConflicts = (Array.isArray(result.makeupConflicts) ? result.makeupConflicts : [])
-                .filter(isBlockingMakeupConflict);
-            const hasMakeupConflict = result.makeupState === 'conflict' || blockingMakeupConflicts.length > 0;
-            const blockingCrossPeriodNetting = Number(result.blockingCrossPeriodNettingCount || 0);
-            const crossPeriodNettingPreview = Array.isArray(result.crossPeriodNettingPreview) ? result.crossPeriodNettingPreview : [];
-            const nettingRootSessionIds = new Set(
-                (Array.isArray(result.makeupChains) ? result.makeupChains : [])
-                    .filter((chain) => chain?.crossPeriodNetting)
-                    .map((chain) => String(chain.crossPeriodNetting.rootSessionId || ''))
-                    .filter(Boolean)
-            );
-            const summary = result.priorReviewSummary || {};
+            priorReviewGuidancePayload = null;
+            priorReviewPendingAcknowledgement = false;
+            const flags = analyzePriorReviewResult(result);
+            priorReviewHasOpenMakeupChains = flags.hasOpenMakeupChains;
+
+            if (isPriorReviewGuidanceOnly(flags)) {
+                priorReviewGuidancePayload = result;
+                priorReviewPendingAcknowledgement = true;
+                return;
+            }
+
+            const priorName = flags.priorName;
+            const priorRange = flags.priorRange;
+            const adjustments = flags.adjustments;
+            const unresolved = flags.unresolved;
+            const resolvedNoChange = flags.resolvedNoChange;
+            const hasAdjustments = flags.hasAdjustments;
+            const hasUnresolved = flags.hasUnresolved;
+            const awaitingPriorProcessing = flags.awaitingPriorProcessing;
+            const hasMakeupConflict = flags.hasMakeupConflict;
+            const blockingCrossPeriodNetting = flags.blockingCrossPeriodNetting;
+            const crossPeriodNettingPreview = flags.crossPeriodNettingPreview;
+            const nettingRootSessionIds = flags.nettingRootSessionIds;
+            const summary = flags.summary;
+            const priorPayrollGate = flags.priorPayrollGate;
             renderPriorMakeupChains(result);
 
             const intro = document.getElementById('priorAdjustmentIntro');
             if (intro) {
                 if (awaitingPriorProcessing) {
-                    intro.textContent = `The prior timesheet for "${priorName}" must be payroll processed before its deadline-window sessions can be reconciled. Current submission remains blocked until then.`;
+                    const pendingSteps = [];
+                    if (priorPayrollGate?.managerApproved !== true) pendingSteps.push('manager approval');
+                    if (String(priorPayrollGate?.timesheetStatus || 'submitted') !== 'processed') pendingSteps.push('payroll processing');
+                    const stepLabel = pendingSteps.length ? pendingSteps.join(' and ') : 'payroll processing';
+                    if (hasUnresolved) {
+                        intro.textContent = `${unresolved.length} prior-period session(s) are still non-final. Finalize them using the links below. After that, "${priorName}" still needs ${stepLabel} before adjustments can be applied to this timesheet.`;
+                    } else if (hasMakeupConflict) {
+                        intro.textContent = `The make-up reconciliation chain contains invalid or ambiguous relationships. Correct the chain below. After that, "${priorName}" still needs ${stepLabel} before adjustments can be applied.`;
+                    } else {
+                        intro.textContent = `Deadline-window sessions from "${priorName}" are finalized. That timesheet still needs ${stepLabel} before adjustments can be applied here. You can continue editing this timesheet now; submission stays blocked until then.`;
+                    }
                 } else if (hasMakeupConflict) {
                     intro.textContent = 'The make-up reconciliation chain contains invalid or ambiguous relationships. Open the affected sessions below and correct the chain before continuing.';
                 } else if (hasUnresolved) {
@@ -4687,9 +4939,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const summaryEl = document.getElementById('priorAdjustmentSummary');
             if (summaryEl) {
                 summaryEl.classList.remove('d-none');
+                const payrollGateLine = awaitingPriorProcessing
+                    ? `<div class="small mt-1 text-warning-emphasis">Prior timesheet status: <strong>${escapeHtml(String(priorPayrollGate?.timesheetStatus || 'submitted'))}</strong> | Manager approved: <strong>${priorPayrollGate?.managerApproved === true ? 'Yes' : 'No'}</strong> | Period status: <strong>${escapeHtml(String(priorPayrollGate?.periodStatus || 'open'))}</strong></div>`
+                    : '';
                 summaryEl.innerHTML = `
                     <div><strong>Prior period:</strong> ${priorName} (${priorRange})</div>
                     <div class="small text-muted mt-1">Submitted entries: ${Number(summary.entryCount || 0)} | Snapshot hours: ${Number(summary.totalSnapshotHours || 0).toFixed(2)}</div>
+                    ${payrollGateLine}
                     <div class="small mt-1">Deadline-window sessions: <strong>${Number(summary.reconciliationCount || 0)}</strong> (${Number(summary.reconciliationHours || 0).toFixed(2)} hrs) | Provisional: <strong>${Number(summary.provisionalCount || 0)}</strong> (${Number(summary.provisionalHours || 0).toFixed(2)} hrs) | Unresolved: <strong>${Number(summary.unresolvedCount || 0)}</strong> | No-change resolutions: <strong>${Number(summary.resolvedNoChangeCount || 0)}</strong></div>
                     ${Number(summary.makeupChainCount || 0) > 0 ? `<div class="small mt-1 text-warning-emphasis">Make-up chains: <strong>${Number(summary.makeupChainCount || 0)}</strong> | Open: <strong>${Number(summary.openMakeupChainCount || 0)}</strong> | Catch-up: <strong>${Number(summary.makeupCatchupCount || 0)}</strong> (${Number(summary.makeupCatchupHours || 0).toFixed(2)} hrs)</div>` : ''}
                 `;
@@ -4699,13 +4955,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const tbodyPrior = document.getElementById('priorAdjustmentTableBody');
             const applyBtn = document.getElementById('btnPriorAdjustmentApply');
             const continueBtn = document.getElementById('btnPriorAdjustmentContinue');
-            const crossPeriodNettingRows = renderCrossPeriodNettingTableRows(crossPeriodNettingPreview);
+            const crossPeriodNettingRows = flags.crossPeriodNettingRows;
 
-            const resolvedRows = adjustments
-                .filter((adj) => (
-                    Math.abs(Number(adj.adjustmentHours ?? adj.deltaHours ?? 0)) >= 0.005
-                    && !nettingRootSessionIds.has(String(adj.sourceSessionId || ''))
-                ))
+            const resolvedRows = flags.payableAdjustments
                 .map((adj) => `
                 <tr>
                     <td>${escapeHtml(adj.sourceSessionDate || '-')}</td>
@@ -4737,7 +4989,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>
             `);
 
-            if (!awaitingPriorProcessing && (resolvedRows.length || crossPeriodNettingRows.length || unresolvedRows.length || noChangeRows.length)) {
+            if (resolvedRows.length || crossPeriodNettingRows.length || unresolvedRows.length || noChangeRows.length) {
                 if (tableWrap) tableWrap.classList.remove('d-none');
                 if (tbodyPrior) tbodyPrior.innerHTML = [...unresolvedRows, ...crossPeriodNettingRows, ...resolvedRows, ...noChangeRows].join('');
             } else {
@@ -4745,7 +4997,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (tbodyPrior) tbodyPrior.innerHTML = '';
             }
 
-            if (awaitingPriorProcessing || hasUnresolved || hasMakeupConflict) {
+            const canContinueEditingWhileAwaitingPayroll = awaitingPriorProcessing && !hasUnresolved && !hasMakeupConflict;
+            if (awaitingPriorProcessing) {
+                if (applyBtn) applyBtn.classList.add('d-none');
+                if (canContinueEditingWhileAwaitingPayroll) {
+                    if (continueBtn) continueBtn.classList.remove('d-none');
+                    continueBtn.innerHTML = 'Continue Editing';
+                } else if (continueBtn) {
+                    continueBtn.classList.add('d-none');
+                }
+            } else if (hasUnresolved || hasMakeupConflict) {
                 if (applyBtn) applyBtn.classList.add('d-none');
                 if (continueBtn) continueBtn.classList.add('d-none');
             } else if (hasAdjustments || crossPeriodNettingRows.length) {
@@ -4802,7 +5063,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 applyBtn.onclick = () => runAcknowledgement(applyBtn, 'Adjustments Applied');
             }
             if (continueBtn) {
-                continueBtn.onclick = () => runAcknowledgement(continueBtn, 'Review Complete');
+                continueBtn.onclick = canContinueEditingWhileAwaitingPayroll
+                    ? () => modal.hide()
+                    : () => runAcknowledgement(continueBtn, 'Review Complete');
             }
 
             modal.show();

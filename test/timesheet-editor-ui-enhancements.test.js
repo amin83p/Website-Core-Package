@@ -348,10 +348,13 @@ test('timesheet editor exposes student column, date add action, date formatter, 
 
   assert.match(editor, /Student Name/);
   assert.match(editor, /singleStudentName/);
-  assert.match(editor, /Hours \/ Time/);
+  assert.match(editor, /Hours\/Time \(Hrs\)/);
   assert.match(editor, /buildClassDescriptionCellHtml/);
-  assert.match(editor, /buildHoursTimeCellHtml/);
-  assert.match(editor, /ts-optional-badge/);
+  assert.match(editor, /buildRegularHoursTimeCellHtml/);
+  assert.match(editor, /buildSessionScheduleLabelHtml/);
+  assert.match(editor, /buildOptionalHoursCellHtml/);
+  assert.match(editor, /ts-col-hours-optional/);
+  assert.doesNotMatch(editor, /buildHoursTimeCellHtml/);
   assert.doesNotMatch(editor, /<th class="text-end" style="width: 90px;">Hours<\/th>/);
   assert.match(editor, /formatTimesheetDateLabel/);
   assert.match(editor, /ts-date-add-btn/);
@@ -375,9 +378,12 @@ test('timesheet editor uses compact centered status and action columns', () => {
   const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
 
   assert.match(editor, /#tsTable th\.ts-col-status,[\s\S]*?vertical-align: middle !important;/);
-  assert.match(editor, /<th class="ts-col-status"><span class="ts-column-header-center">Status<\/span><\/th>/);
+  assert.match(editor, /#tsTable thead th \{[\s\S]*?text-align: center !important;[\s\S]*?vertical-align: middle !important;/);
+  assert.match(editor, /<th class="ts-col-status" rowspan="2">Status<\/th>/);
   assert.match(editor, /#tsTable th\.ts-col-actions,[\s\S]*?width: 88px;/);
-  assert.match(editor, /<th class="ts-col-actions"><span class="ts-column-header-center">Act<\/span><\/th>/);
+  assert.match(editor, /<th class="ts-col-actions" rowspan="2">Act<\/th>/);
+  assert.match(editor, /<th class="ts-col-hours-regular">Regular<\/th>/);
+  assert.match(editor, /<th class="ts-col-hours-optional">Optional<\/th>/);
   assert.match(editor, /class="ts-action-stack"/);
   assert.match(editor, /flex-wrap: wrap;/);
   assert.doesNotMatch(editor, /<th class="text-center" style="width: 120px;">Act<\/th>/);

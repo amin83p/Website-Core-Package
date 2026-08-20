@@ -377,7 +377,8 @@ function buildDepartmentTotals(entries = [], lookups = {}) {
       oneOnOnePendingHours: 0
     };
     if (isOneOnOne) {
-      bucket.oneOnOneHours = roundHours(bucket.oneOnOneHours + payableHours);
+      const regularPayableHours = departmentOptionalHours > 0 ? 0 : payableHours;
+      bucket.oneOnOneHours = roundHours(bucket.oneOnOneHours + regularPayableHours);
       bucket.oneOnOnePendingHours = roundHours(bucket.oneOnOnePendingHours + pendingHours);
     } else {
       bucket.groupHours = roundHours(bucket.groupHours + payableHours);
@@ -391,7 +392,13 @@ function buildDepartmentTotals(entries = [], lookups = {}) {
   const rows = [...buckets.values()]
     .map((row) => ({
       ...row,
-      totalHours: roundHours(row.groupHours + row.oneOnOneHours + row.groupPendingHours + row.oneOnOnePendingHours)
+      totalHours: roundHours(
+        row.groupHours
+        + row.oneOnOneHours
+        + row.oneOnOneOptionalHours
+        + row.groupPendingHours
+        + row.oneOnOnePendingHours
+      )
     }))
     .sort((a, b) => a.departmentName.localeCompare(b.departmentName));
   const totals = rows.reduce((sum, row) => ({

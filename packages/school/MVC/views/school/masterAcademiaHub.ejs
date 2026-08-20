@@ -4850,7 +4850,7 @@
         '<span class="hub-schedule-legend-item"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</span>',
         '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
         '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
-        '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</span>',
+        '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (partial credit, non-blocking)</span>',
         '<span class="hub-schedule-legend-item text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</span>',
         '<span class="hub-schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>'
       ];
@@ -4858,7 +4858,7 @@
     return [
       '<span class="hub-schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Complete</span>',
       '<span class="hub-schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history"></i> Pending</span>',
-      '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (0 h, non-blocking)</span>'
+      '<span class="hub-schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> Make-up required (partial credit, non-blocking)</span>'
     ];
   }
 
@@ -5210,7 +5210,7 @@
     const events = person ? (hubScheduleState.eventsByPersonId[person.id] || []) : [];
     const totals = new Map();
     (Array.isArray(events) ? events : []).forEach(function (event) {
-      if (event?.scheduleDisplayOnly === true || event?.countsTowardHours === false) return;
+      if (event?.countsTowardHours === false) return;
       const duration = Number(event?.duration || 0);
       if (!Number.isFinite(duration) || duration <= 0) return;
       const labels = Array.isArray(event?.hourCategoryLabels) && event.hourCategoryLabels.length

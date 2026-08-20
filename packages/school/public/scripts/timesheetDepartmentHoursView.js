@@ -53,7 +53,7 @@
       const oneOnOneHours = toHours(row.oneOnOneHours);
       const oneOnOneOptionalHours = toHours(row.oneOnOneOptionalHours);
       const pendingHours = toHours(row.groupPendingHours) + toHours(row.oneOnOnePendingHours);
-      const rowTotal = toHours(row.totalHours) || Number((groupHours + oneOnOneHours + pendingHours).toFixed(2));
+      const rowTotal = toHours(row.totalHours) || Number((groupHours + oneOnOneHours + oneOnOneOptionalHours + pendingHours).toFixed(2));
       totalGroup += groupHours;
       totalOneOnOne += oneOnOneHours;
       totalOneOnOneOptional += oneOnOneOptionalHours;
@@ -70,7 +70,7 @@
       ].join('');
     }).join('');
 
-    const grandTotal = Number((totalGroup + totalOneOnOne + totalPending).toFixed(2));
+    const grandTotal = Number((totalGroup + totalOneOnOne + totalOneOnOneOptional + totalPending).toFixed(2));
     const footerGroup = formatHours(totals.groupHours ?? totalGroup);
     const footerOneOnOne = formatHours(totals.oneOnOneHours ?? totalOneOnOne);
     const footerOptional = formatHours(totals.oneOnOneOptionalHours ?? totalOneOnOneOptional);

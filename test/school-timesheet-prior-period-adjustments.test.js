@@ -203,4 +203,8 @@ test('timesheet editor includes prior-period adjustment review modal and locked 
     assert.match(editor, /needsReview/);
     assert.match(editor, /btnPriorAdjustmentContinue/);
     assert.match(editor, /priorReviewSummary/);
+    assert.match(editor, /isPriorReviewGuidanceOnly/);
+    assert.match(editor, /priorReviewGuidancePayload/);
+    assert.match(editor, /prior-period-review/);
+    assert.match(editor, /Continue to Timesheet/);
 });

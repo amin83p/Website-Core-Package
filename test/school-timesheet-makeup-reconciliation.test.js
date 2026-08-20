@@ -79,6 +79,30 @@ test('future non-final make-up remains an open carried obligation without duplic
   assert.ok(child.openReasons.includes('status_not_final'));
 });
 
+test('standalone missed sessions in a future pay period are not surfaced as make-up chains', () => {
+  const augustFirstPeriod = {
+    id: 'TSP_AUG_1',
+    startDate: '2026-08-01',
+    submissionDeadline: '2026-08-14',
+    endDate: '2026-08-15'
+  };
+  const graph = buildGraph([
+    { sessionId: 'FUTURE_MISS', date: '2026-08-17', durationHours: 1.5, status: 'missed', delivery: delivery() }
+  ]);
+  const result = makeupReconciliationService.analyzeMakeupChains({
+    graph,
+    currentPeriod: augustFirstPeriod,
+    coverage: { isPaid: () => false, isPending: () => false },
+    baselineKeys: new Set(),
+    teacherId: 'P_1',
+    sourcePeriodId: 'TSP_JUL'
+  });
+
+  assert.equal(result.chains.length, 0);
+  assert.equal(result.makeupState, 'none');
+  assert.equal(result.openMakeupRootRefs.length, 0);
+});
+
 test('a non-final child in the current deadline window is marked provisional in chain audit', () => {
   const result = analyze([
     { sessionId: 'ROOT', date: '2026-05-14', durationHours: 2, status: 'missed', delivery: delivery() },

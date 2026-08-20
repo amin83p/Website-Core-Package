@@ -11,7 +11,7 @@
     text: '#664d03',
     border: '#ffc107'
   });
-  const MAKEUP_DISPLAY_TEXT = 'Make-up required · 0 schedule hours · non-blocking';
+  const MAKEUP_DISPLAY_TEXT = 'Make-up required · partial credit · non-blocking';
 
   function normalizeStatusCode(status) {
     return String(status || '').trim().toLowerCase().replace(/\s+/g, '_');

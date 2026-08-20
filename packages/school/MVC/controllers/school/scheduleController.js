@@ -166,8 +166,33 @@ function resolveClassSessionSchedulePolicy(statusMap, session, { teacherAssigned
     };
 }
 
+function resolveClassSessionScheduleHours(statusMap, session, scheduledDuration, schedulePolicy) {
+    const safeScheduled = Number(scheduledDuration);
+    if (!Number.isFinite(safeScheduled) || safeScheduled <= 0) {
+        return { duration: 0, countsTowardHours: false, timesheetHours: 0 };
+    }
+    if (!schedulePolicy?.scheduleDisplayOnly) {
+        return {
+            duration: safeScheduled,
+            countsTowardHours: true,
+            timesheetHours: safeScheduled
+        };
+    }
+    const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+        status: session?.status,
+        notes: session?.notes || '',
+        durationHours: safeScheduled,
+        session
+    });
+    return {
+        duration: timesheetHours,
+        countsTowardHours: timesheetHours > 0,
+        timesheetHours
+    };
+}
+
 function doesScheduleEventCountTowardHours(event) {
-    return event?.scheduleDisplayOnly !== true && event?.countsTowardHours !== false;
+    return event?.countsTowardHours !== false;
 }
 
 function doesScheduleEventBlockConflicts(event) {
@@ -1272,12 +1297,20 @@ function summarizeTimesheetHoursForEvents(events, statusMap) {
 
         const eventType = String(event?.eventType || '').trim().toLowerCase();
         if (eventType === 'class_session' || (!eventType && event?.sessionId)) {
-            totalTimesheetHours += sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
-                status: event?.status,
-                notes: event?.notes || '',
-                durationHours: Number(event?.duration || 0),
-                session: event
-            });
+            const explicitTimesheetHours = Number(event?.timesheetHours);
+            if (Number.isFinite(explicitTimesheetHours)) {
+                totalTimesheetHours += explicitTimesheetHours;
+            } else {
+                const durationHours = event?.scheduleDisplayOnly === true
+                    ? Number(event?.scheduledDuration ?? event?.duration ?? 0)
+                    : Number(event?.duration || 0);
+                totalTimesheetHours += sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+                    status: event?.status,
+                    notes: event?.notes || '',
+                    durationHours,
+                    session: event
+                });
+            }
         } else {
             totalTimesheetHours += Number(event?.timesheetHours ?? event?.duration ?? 0);
         }
@@ -1514,6 +1547,12 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
             const className = classDef?.title || classDef?.name || `Class ${classId}`;
             const classLifecycle = buildClassLifecycleSnapshot(classDef);
             const scheduledDuration = computeDurationHours(session);
+            const scheduleHours = resolveClassSessionScheduleHours(
+                effectiveStatusMap,
+                session,
+                scheduledDuration,
+                schedulePolicy
+            );
             const detailsUrl = sessionId
                 ? sessionNavigationService.buildManageSessionHref(classId, { sessionId, date: sessionDate })
                 : '';
@@ -1540,11 +1579,12 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
                 classId,
                 className: String(className || '').trim() || `Class ${classId}`,
                 classLifecycle,
-                duration: schedulePolicy.countsTowardHours ? scheduledDuration : 0,
+                duration: scheduleHours.duration,
                 scheduledDuration,
+                timesheetHours: scheduleHours.timesheetHours,
                 makeUpRequired: schedulePolicy.makeUpRequired,
                 scheduleDisplayOnly: schedulePolicy.scheduleDisplayOnly,
-                countsTowardHours: schedulePolicy.countsTowardHours,
+                countsTowardHours: scheduleHours.countsTowardHours,
                 blocksConflicts: schedulePolicy.blocksConflicts,
                 status: normalizeSessionStatus(session),
                 locked: session?.locked === true || String(session?.locked) === 'true',
@@ -2029,6 +2069,7 @@ module.exports = {
     summarizeTimesheetHoursForEvents,
     getScheduleEventHourCategoryLabels,
     resolveClassSessionSchedulePolicy,
+    resolveClassSessionScheduleHours,
     doesScheduleEventCountTowardHours,
     doesScheduleEventBlockConflicts,
     markOverlappingEvents

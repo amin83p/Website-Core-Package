@@ -613,11 +613,24 @@ async function resolvePriorReconciliationContext({ period, teacherId, activeOrgI
     });
     if (!prior) return { prior: null, reconciliationState: 'none', result: null };
     if (!prior.isPayrollFinal) {
+        const rawResult = await priorPeriodAdjustmentService.detectReconciliation({
+            priorTimesheet: prior.priorTimesheet,
+            priorPeriod: prior.priorPeriod,
+            currentPeriod: period,
+            teacherId,
+            activeOrgId,
+            reqUser
+        });
         return {
             prior,
             reconciliationState: 'awaiting_prior_processing',
-            result: null,
-            priorReviewSummary: buildPriorReconciliationSummary(prior.priorTimesheet)
+            result: rawResult,
+            priorReviewSummary: buildPriorReconciliationSummary(prior.priorTimesheet, rawResult),
+            priorPayrollGate: {
+                timesheetStatus: String(prior.priorTimesheet?.status || '').trim().toLowerCase(),
+                periodStatus: String(prior.priorPeriod?.status || '').trim().toLowerCase(),
+                managerApproved: prior.priorTimesheet?.managerApproved === true
+            }
         };
     }
     const rawResult = await priorPeriodAdjustmentService.detectReconciliation({
@@ -2603,9 +2616,14 @@ exports.saveTimesheet = async (req, res) => {
             if (priorReconciliationContext.prior) {
                 const priorPeriodId = String(priorReconciliationContext.prior.priorPeriod?.id || '');
                 if (priorReconciliationContext.reconciliationState === 'awaiting_prior_processing') {
+                    const gate = priorReconciliationContext.priorPayrollGate || {};
+                    const pendingSteps = [];
+                    if (gate.managerApproved !== true) pendingSteps.push('manager approval');
+                    if (String(gate.timesheetStatus || '') !== 'processed') pendingSteps.push('payroll processing');
+                    const stepLabel = pendingSteps.length ? pendingSteps.join(' and ') : 'payroll processing';
                     throwPriorReconciliationWarning(
                         'PRIOR_TIMESHEET_NOT_PROCESSED',
-                        'The previous timesheet must be payroll processed before its deadline-window sessions can be reconciled.'
+                        `The previous timesheet still needs ${stepLabel} before prior-period adjustments can be applied.`
                     );
                 }
                 const reviewedReceipt = existing?.priorPeriodReconciliation;
@@ -2869,6 +2887,7 @@ exports.getPriorAdjustments = async (req, res) => {
                 endDate: String(prior.priorPeriod.endDate || '')
             },
             priorReviewSummary: context.priorReviewSummary,
+            priorPayrollGate: context.priorPayrollGate || null,
             adjustments: context.result?.adjustments || [],
             unresolved: context.result?.unresolved || [],
             reconciliationResults: context.result?.items || [],

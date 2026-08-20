@@ -560,7 +560,7 @@ function analyzeMakeupChains({
     const wasPaidToAnother = coverage?.wasPaidToAnother?.(node) === true;
     if (!node.isMakeupSession && !node.makeUpRequired && !hasMakeupChildren && !wasPaidToAnother) return;
     const disposition = classifyDate(node.date, currentPeriod);
-    if (disposition !== 'closed_period' && disposition !== 'future_period') return;
+    if (disposition !== 'closed_period') return;
     if (
       wasPaidToAnother
       && coverage?.hasLegacyOtherPayment?.(node) === true

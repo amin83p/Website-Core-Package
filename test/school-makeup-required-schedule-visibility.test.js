@@ -40,7 +40,7 @@ function buildStatusMap() {
       code: 'missed_informed24',
       label: 'Missed (Informed-24)',
       makeUpRequired: true,
-      timesheetFormula: 'duration',
+      timesheetFormula: '0',
       excludeFromTeacherIndex: false,
       excludeFromStudentIndex: false
     }],
@@ -206,14 +206,41 @@ test('ordinary teacher-index exclusions remain hidden', () => {
   assert.equal(policy.studentVisible, false);
 });
 
-test('display-only make-up sessions contribute zero to schedule summaries', () => {
+test('make-up-required originals include immediate partial credit from the status timesheet formula', () => {
+  const statusMap = new Map([
+    ['missed', {
+      code: 'missed',
+      label: 'Missed (Informed Less Than 24 hrs)',
+      makeUpRequired: true,
+      timesheetFormula: 'duration * 0.5',
+      excludeFromTeacherIndex: false,
+      excludeFromStudentIndex: false
+    }]
+  ]);
+  const policy = scheduleController.resolveClassSessionSchedulePolicy(statusMap, {
+    status: 'missed'
+  }, { teacherAssigned: true });
+  const hours = scheduleController.resolveClassSessionScheduleHours(statusMap, {
+    status: 'missed',
+    startTime: '15:30',
+    endTime: '18:30'
+  }, 3, policy);
+
+  assert.equal(hours.duration, 1.5);
+  assert.equal(hours.timesheetHours, 1.5);
+  assert.equal(hours.countsTowardHours, true);
+  assert.equal(policy.scheduleDisplayOnly, true);
+});
+
+test('display-only make-up sessions with zero formula still contribute zero to schedule summaries', () => {
   const statusMap = buildStatusMap();
   const events = [{
     eventType: 'class_session',
     sessionId: 'SES-MAKEUP-ORIGINAL',
     status: 'missed_informed24',
-    duration: 2,
+    duration: 0,
     scheduledDuration: 2,
+    timesheetHours: 0,
     scheduleDisplayOnly: true,
     countsTowardHours: false,
     blocksConflicts: false
@@ -226,6 +253,34 @@ test('display-only make-up sessions contribute zero to schedule summaries', () =
   assert.equal(scheduleSummary.totalHours, 0);
   assert.equal(globalSummary.eventCount, 1);
   assert.equal(globalSummary.totalTimesheetHours, 0);
+});
+
+test('display-only make-up sessions with partial formula contribute immediate credit to schedule summaries', () => {
+  const statusMap = new Map([
+    ['missed', {
+      code: 'missed',
+      label: 'Missed (Informed Less Than 24 hrs)',
+      makeUpRequired: true,
+      timesheetFormula: 'duration * 0.5'
+    }]
+  ]);
+  const events = [{
+    eventType: 'class_session',
+    sessionId: 'SES-MISSED',
+    status: 'missed',
+    duration: 1.5,
+    scheduledDuration: 3,
+    timesheetHours: 1.5,
+    scheduleDisplayOnly: true,
+    countsTowardHours: true,
+    blocksConflicts: false
+  }];
+
+  const scheduleSummary = scheduleController.summarizeEvents(events, []);
+  const globalSummary = scheduleController.summarizeTimesheetHoursForEvents(events, statusMap);
+
+  assert.equal(scheduleSummary.totalHours, 1.5);
+  assert.equal(globalSummary.totalTimesheetHours, 1.5);
 });
 
 test('display-only events never overlap while blocking events around them still conflict', () => {
@@ -339,7 +394,7 @@ test('status policy and schedule surfaces expose the informational make-up treat
     'packages/school/MVC/views/school/masterAcademiaHub.ejs'
   ];
 
-  assert.match(sharedDisplay, /Make-up required · 0 schedule hours · non-blocking/);
+  assert.match(sharedDisplay, /Make-up required · partial credit · non-blocking/);
   assert.match(sharedDisplay, /buildMakeupRequiredBadge/);
   viewPaths.forEach((viewPath) => {
     assert.match(read(viewPath), /buildMakeupRequiredBadge/, `${viewPath} renders the make-up badge`);

@@ -247,9 +247,9 @@ test('Optional Hours remain informational and are listed separately by departmen
   assert.equal(optionalPaid.payableHours, 1);
   assert.equal(optionalUnpaid.payableHours, 0);
   assert.equal(totals.rows[0].groupHours, 0);
-  assert.equal(totals.rows[0].oneOnOneHours, 1);
+  assert.equal(totals.rows[0].oneOnOneHours, 0);
   assert.equal(totals.rows[0].groupPendingHours, 3);
-  assert.equal(totals.rows[0].totalHours, 4);
+  assert.equal(totals.rows[0].totalHours, 6);
   assert.equal(totals.rows[0].oneOnOneOptionalHours, 3);
   assert.equal(totals.totals.oneOnOneOptionalHours, 3);
   assert.equal(
