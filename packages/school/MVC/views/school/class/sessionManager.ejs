@@ -804,21 +804,6 @@
         color: #94a3b8;
     }
 
-    .session-exam-open-switch {
-        min-height: 1.75rem;
-        padding-top: 0.15rem;
-    }
-    .session-exam-open-switch .form-check-input {
-        width: 2.25rem;
-        height: 1.15rem;
-        cursor: pointer;
-    }
-    .session-exam-open-switch .form-check-label {
-        cursor: pointer;
-        color: #334155;
-        font-weight: 600;
-    }
-
     /* Shell + sidebar */
     .session-manager-shell {
         display: flex;
@@ -2415,7 +2400,7 @@
                     </div>
                     <% } %>
                     <div class="card-body">
-                        <div class="small text-muted mb-2">Items are delivered in order. Allocated exams are included automatically for this session.</div>
+                        <div class="small text-muted mb-2">Items are delivered in order.</div>
                         <div id="sessionContentList"></div>
                     </div>
                 </div>
@@ -6937,10 +6922,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    /* --- Session content stream (manual content + linked exams) --- */
+    /* --- Session content stream (manual content) --- */
     const contentReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
     let manualSessionContentState = <%- jsonForScript(sessionContentItems || []) %>;
-    const sessionExamContentItems = <%- jsonForScript(sessionExamContentItems || []) %>;
     let sessionContentOrderState = <%- jsonForScript(sessionContentOrder || []) %>;
 
     function contentEscapeHtml(str) {
@@ -6963,21 +6947,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildSessionContentCombined() {
-        const map = new Map();
-        (Array.isArray(manualSessionContentState) ? manualSessionContentState : []).forEach((item) => {
-            if (!item || typeof item !== 'object') return;
-            const id = String(item.id || '').trim();
-            if (!id) return;
-            map.set(id, { ...item, source: 'manual' });
-        });
-        (Array.isArray(sessionExamContentItems) ? sessionExamContentItems : []).forEach((item) => {
-            if (!item || typeof item !== 'object') return;
-            const id = String(item.id || '').trim();
-            if (!id) return;
-            map.set(id, { ...item, source: 'exam' });
-        });
-
-        const rows = Array.from(map.values());
+        const rows = (Array.isArray(manualSessionContentState) ? manualSessionContentState : [])
+            .filter((item) => item && typeof item === 'object')
+            .map((item) => ({ ...item, source: 'manual' }));
         const orderMap = new Map(contentNormalizeOrder(sessionContentOrderState).map((id, index) => [id, index]));
         rows.sort((a, b) => {
             const aId = String(a?.id || '').trim();
@@ -7010,71 +6982,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!rows.length) {
             host.innerHTML = `<div class="session-placeholder-card mb-0">
                 <div class="fw-semibold text-dark mb-1">No session content yet</div>
-                <div class="small">Add files and linked exams will also appear here.</div>
+                <div class="small">Add files or HTML content to build the session stream.</div>
             </div>`;
             return;
         }
         const parts = rows.map((item, index) => {
             const id = String(item?.id || '').trim();
-            const isExam = String(item?.type || '').trim().toLowerCase() === 'exam';
-            const badge = isExam
-                ? '<span class="badge bg-primary-subtle text-primary-emphasis border me-1">Exam</span>'
-                : `<span class="badge bg-light text-dark border me-1">${contentEscapeHtml(String(item?.type || '').toUpperCase())}</span>`;
+            const badge = `<span class="badge bg-light text-dark border me-1">${contentEscapeHtml(String(item?.type || '').toUpperCase())}</span>`;
             const time = String(item?.time || '').trim();
             const timeHtml = time ? `<span class="badge bg-light text-dark border">${contentEscapeHtml(time)}</span>` : '';
             const actions = contentReadOnly ? '' : `
                 <button type="button" class="btn btn-outline-secondary btn-sm content-move-up" data-id="${contentEscapeHtml(id)}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up"></i></button>
                 <button type="button" class="btn btn-outline-secondary btn-sm content-move-down" data-id="${contentEscapeHtml(id)}" ${index === rows.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down"></i></button>
-                ${isExam ? '' : `<button type="button" class="btn btn-outline-primary btn-sm content-edit" data-id="${contentEscapeHtml(id)}" data-type="${contentEscapeHtml(String(item?.type || 'file'))}"><i class="bi bi-pencil"></i></button>
-                <button type="button" class="btn btn-outline-danger btn-sm content-remove" data-id="${contentEscapeHtml(id)}"><i class="bi bi-trash"></i></button>`}
-            `;
-
-            const details = isExam
-                ? `<div class="small mt-2">
-                      ${(() => {
-                          const status = String(item?.status || '').trim().toLowerCase();
-                          const openUrl = contentEscapeHtml(String(item?.links?.openAllocation || '').trim());
-                          const swId = `exam-open-sw-${contentEscapeHtml(String(id).replace(/[^a-zA-Z0-9_-]/g, '_'))}`;
-                          if (status === 'cancelled' || status === 'archived') {
-                              return `<span class="badge ${status === 'cancelled' ? 'bg-danger-subtle text-danger-emphasis' : 'bg-secondary-subtle text-secondary-emphasis'} border me-1"><i class="bi bi-lock me-1"></i>${contentEscapeHtml(status)}</span>`;
-                          }
-                          if (contentReadOnly) {
-                              if (status === 'open') {
-                                  return '<span class="badge bg-success-subtle text-success-emphasis border me-1"><i class="bi bi-unlock me-1"></i>Open</span>';
-                              }
-                              return '<span class="badge bg-secondary-subtle text-secondary-emphasis border me-1"><i class="bi bi-lock me-1"></i>Not open</span>';
-                          }
-                          const checked = status === 'open' ? 'checked' : '';
-                          const labelText = status === 'open' ? 'Exam open' : 'Exam locked';
-                          return `<div class="form-check form-switch session-exam-open-switch d-inline-flex align-items-center gap-2 me-2 mb-1">
-                              <input class="form-check-input content-allocation-open-toggle" type="checkbox" role="switch" id="${swId}"
-                                data-status-url="${openUrl}" data-content-id="${contentEscapeHtml(id)}" ${checked}>
-                              <label class="form-check-label mb-0" for="${swId}">${contentEscapeHtml(labelText)}</label>
-                          </div>`;
-                      })()}
-                      <a href="${contentEscapeHtml(String(item?.links?.allocationEdit || item?.links?.allocation || '#'))}" class="btn btn-outline-secondary btn-sm me-1"><i class="bi bi-pencil-square me-1"></i>Allocation</a>
-                      <a href="${contentEscapeHtml(String(item?.links?.assignment || item?.links?.teacherQueue || '#'))}" class="btn btn-outline-primary btn-sm me-1"><i class="bi bi-list-check me-1"></i>Assignment</a>
-                      <a href="${contentEscapeHtml(String(item?.links?.start || '#'))}" class="btn btn-outline-success btn-sm me-1"><i class="bi bi-play-fill me-1"></i>Start</a>
-                      <a href="${contentEscapeHtml(String(item?.links?.review || item?.links?.teacherQueue || '#'))}" class="btn btn-outline-info btn-sm me-1"><i class="bi bi-clipboard-check me-1"></i>Review</a>
-                      ${item?.links?.template ? `<a href="${contentEscapeHtml(String(item.links.template))}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-journal-text me-1"></i>Template</a>` : ''}
-                      <details class="mt-2">
-                        <summary class="fw-semibold">Questions & expected answers (${Number((item?.questions || []).length || 0)})</summary>
-                        <div class="small mt-2 ps-2">
-                          ${(Array.isArray(item?.questions) ? item.questions : []).map((q) => {
-                              const qTitle = contentEscapeHtml(q?.promptText || q?.promptHtml || `Question ${Number(q?.sequenceNo || 0)}`);
-                              const options = Array.isArray(q?.answerOptions) ? q.answerOptions : [];
-                              const optionHtml = options.length
-                                  ? `<ul class="mb-1">${options.map((opt) => `<li>${contentEscapeHtml(opt?.text || '')}${opt?.isCorrect ? ' <strong>(Correct)</strong>' : ''}</li>`).join('')}</ul>`
-                                  : '<div class="text-muted">Subjective answer</div>';
-                              return `<div class="border rounded p-2 mb-2">
-                                  <div class="fw-semibold">Q${Number(q?.sequenceNo || 0)}: ${qTitle}</div>
-                                  ${optionHtml}
-                              </div>`;
-                          }).join('')}
-                        </div>
-                      </details>
-                    </div>`
-                : `<div class="small text-muted mt-2">
+                <button type="button" class="btn btn-outline-primary btn-sm content-edit" data-id="${contentEscapeHtml(id)}" data-type="${contentEscapeHtml(String(item?.type || 'file'))}"><i class="bi bi-pencil"></i></button>
+                <button type="button" class="btn btn-outline-danger btn-sm content-remove" data-id="${contentEscapeHtml(id)}"><i class="bi bi-trash"></i></button>`;
+            const details = `<div class="small text-muted mt-2">
                       ${item?.type === 'html'
                         ? `HTML content${item?.notes ? ` | ${contentEscapeHtml(item.notes)}` : ''}`
                         : `${(item?.file?.url || item?.fileUrl) ? `<a href="${contentEscapeHtml(String(item?.file?.url || item.fileUrl))}" target="_blank" rel="noopener">Open file</a>` : 'File link not set'}${item?.file?.originalName ? ` | ${contentEscapeHtml(item.file.originalName)}` : ''}${item?.notes ? ` | ${contentEscapeHtml(item.notes)}` : ''}`}
@@ -7226,76 +7148,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSessionContentList();
     }
 
-    async function handleAllocationOpenToggleChange(ev) {
-        const toggle = ev.target;
-        if (!toggle || !toggle.classList.contains('content-allocation-open-toggle')) return;
-        const statusUrl = String(toggle.getAttribute('data-status-url') || '').trim();
-        const contentId = String(toggle.getAttribute('data-content-id') || '').trim();
-        if (!statusUrl || !contentId) return;
-
-        const intendedOpen = toggle.checked;
-        const targetStatus = intendedOpen ? 'open' : 'scheduled';
-        toggle.checked = !intendedOpen;
-
-        const isOpenAction = intendedOpen;
-        const confirmTitle = isOpenAction ? 'Open exam for students?' : 'Lock exam (pause)?';
-        const confirmMessage = isOpenAction
-            ? 'Set this exam allocation to <strong>open</strong> so students can start?'
-            : 'Set this exam allocation to <strong>scheduled</strong> to temporarily lock the exam?';
-        const confirmButton = isOpenAction ? 'Open' : 'Lock';
-        const successTitle = isOpenAction ? 'Exam opened' : 'Exam locked';
-        const successFallback = isOpenAction
-            ? 'Students can now start the exam.'
-            : 'The exam is temporarily locked.';
-        const errorTitle = isOpenAction ? 'Open failed' : 'Lock failed';
-
-        const proceed = await sessionConfirmBox({
-            title: confirmTitle,
-            icon: 'warning',
-            message: `<p class="mb-0">${sessionEscapeMessage(confirmMessage)}</p>`,
-            confirmText: confirmButton,
-            confirmClass: 'btn-primary',
-            html: true
-        });
-        if (!proceed) return;
-
-        toggle.checked = intendedOpen;
-        toggle.disabled = true;
-        try {
-            const response = await fetch(statusUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({ status: targetStatus })
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok || String(payload?.status || '').toLowerCase() !== 'success') {
-                throw new Error(String(payload?.message || 'Could not update exam allocation status.'));
-            }
-            const target = (Array.isArray(sessionExamContentItems) ? sessionExamContentItems : [])
-                .find((row) => String(row?.id || '').trim() === contentId);
-            if (target) target.status = String(payload?.allocationStatus || targetStatus).trim().toLowerCase();
-            renderSessionContentList();
-            await sessionMessageBox({
-                title: successTitle,
-                icon: 'success',
-                message: String(payload?.message || successFallback)
-            });
-        } catch (error) {
-            toggle.checked = !intendedOpen;
-            await sessionMessageBox({
-                title: errorTitle,
-                icon: 'warning',
-                message: String(error?.message || error || 'Could not update exam allocation status.'),
-                okClass: 'btn-secondary'
-            });
-        } finally {
-            toggle.disabled = false;
-        }
-    }
-
     document.getElementById('btnAddFileContent')?.addEventListener('click', () => openSessionContentModal('file'));
     document.getElementById('contentModalSaveBtn')?.addEventListener('click', async () => {
         const button = document.getElementById('contentModalSaveBtn');
@@ -7319,12 +7171,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.disabled = false;
                 button.innerHTML = oldHtml;
             }
-        }
-    });
-
-    document.getElementById('sessionContentList')?.addEventListener('change', (event) => {
-        if (event.target.classList.contains('content-allocation-open-toggle')) {
-            handleAllocationOpenToggleChange(event);
         }
     });
 

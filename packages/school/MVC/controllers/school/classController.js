@@ -1208,24 +1208,6 @@ function normalizeSessionContentOrder(raw = []) {
         .filter(Boolean)));
 }
 
-function resolveSessionExamLinkByDateTime(allocation = {}, session = {}) {
-    const sessionDate = normalizeDateOnlyValue(session?.date);
-    const sessionStart = normalizeClockTime(session?.startTime);
-    const sourceDate = normalizeDateOnlyValue(
-        allocation?.extensions?.sourceSession?.sessionDate
-        || allocation?.windowStartLocalDate
-        || allocation?.scheduling?.windowStartLocalDate
-    );
-    const sourceStart = normalizeClockTime(
-        allocation?.extensions?.sourceSession?.startTime
-        || allocation?.windowStartLocalTime
-        || allocation?.scheduling?.windowStartLocalTime
-    );
-    if (!sessionDate || !sourceDate || sessionDate !== sourceDate) return false;
-    if (!sessionStart || !sourceStart) return true;
-    return sessionStart === sourceStart;
-}
-
 function sortSessionContentItemsByOrder(items = [], order = []) {
     const orderMap = new Map((Array.isArray(order) ? order : []).map((id, index) => [String(id || '').trim(), index]));
     return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
@@ -1411,7 +1393,7 @@ function resolveSessionDateFromRequest(req) {
 /**
  * Same effective roster Manage Session shows (enrollment + persisted roster + gradebook scores).
  */
-async function buildEnrichedSessionRosterForMutation({ classData, session, reqUser }) {
+async function loadSessionRosterIdentityData(reqUser) {
     const [persons, students] = await Promise.all([
         schoolIdentityLookupService.listSchoolPersonRecords({
             reqUser,
@@ -1420,6 +1402,18 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         }).then((payload) => payload.allRows || payload.rows || []),
         schoolDataService.fetchAllData('students', {}, reqUser)
     ]);
+    return {
+        persons: Array.isArray(persons) ? persons : [],
+        students: Array.isArray(students) ? students : []
+    };
+}
+
+async function buildEnrichedSessionRosterForMutation({ classData, session, reqUser, prefetchedPersons = null, prefetchedStudents = null }) {
+    const hasPrefetch = Array.isArray(prefetchedPersons) && Array.isArray(prefetchedStudents);
+    const identityData = hasPrefetch
+        ? { persons: prefetchedPersons, students: prefetchedStudents }
+        : await loadSessionRosterIdentityData(reqUser);
+    const { persons, students } = identityData;
 
     const workingSession = {
         ...session,
@@ -3886,29 +3880,22 @@ async function manageSession(req, res) {
         
         const isReadOnly = !canEditSession || (isSessionLocked && !canOverride);
 
-        // 2. Resolve effective session roster (same rules as Manage Session display)
+        // 2. Prefetch identity+student datasets once and reuse for roster enrichment.
+        const [allSubjects, rosterIdentityData] = await Promise.all([
+            schoolDataService.fetchAllData('subjects', {}, req.user),
+            loadSessionRosterIdentityData(req.user)
+        ]);
+
+        // 3. Resolve effective session roster (same rules as Manage Session display)
         session.roster = await buildEnrichedSessionRosterForMutation({
             classData,
             session,
-            reqUser: req.user
+            reqUser: req.user,
+            prefetchedPersons: rosterIdentityData.persons,
+            prefetchedStudents: rosterIdentityData.students
         });
 
-        // 3. Fetch Curriculum Content + Session Content/Exam Stream
-        const [allSubjects, examAllocations, examTemplates, examQuestions, examAssignments, studentsForExamStart] = await Promise.all([
-            schoolDataService.fetchAllData('subjects', {}, req.user),
-            schoolDataService.fetchData('examAllocations', { classId__eq: classId }, req.user),
-            schoolDataService.fetchAllData('examTemplates', {}, req.user),
-            schoolDataService.fetchAllData('examQuestions', {}, req.user),
-            schoolDataService.fetchData('examAssignments', { classId__eq: classId }, req.user),
-            schoolDataService.fetchAllData('students', {}, req.user)
-        ]);
-        const currentUserPersonId = String(req.user?.personId || '').trim();
-        const ownedStudentIdsForExamStart = new Set((Array.isArray(studentsForExamStart) ? studentsForExamStart : [])
-            .filter((row) => idsEqual(row?.personId, currentUserPersonId))
-            .map((row) => String(row?.id || '').trim())
-            .filter(Boolean));
-        const isStaffForExamStart = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_EXAMS_TAKING, OPERATIONS.START)
-            || isUserInstructorOnClass(classData, req.user?.personId);
+        // 4. Build curriculum subjects for class curriculum panel
         const classSubjects = (classData.curriculum?.subjects || []).map(subMap => {
             const fullSubject = allSubjects.find((s) => idsEqual(s.id, subMap.subjectId));
             return {
@@ -3920,111 +3907,8 @@ async function manageSession(req, res) {
 
         const sessionContentItems = normalizeSessionContentItems(session?.contentItems || []);
         const sessionContentOrder = normalizeSessionContentOrder(session?.contentOrder || []);
-        const templateById = new Map((Array.isArray(examTemplates) ? examTemplates : []).map((row) => [String(row?.id || '').trim(), row]));
-        const questionsByRevisionId = new Map();
-        (Array.isArray(examQuestions) ? examQuestions : []).forEach((row) => {
-            const revisionId = String(row?.revisionId || '').trim();
-            if (!revisionId) return;
-            if (!questionsByRevisionId.has(revisionId)) questionsByRevisionId.set(revisionId, []);
-            questionsByRevisionId.get(revisionId).push(row);
-        });
-        questionsByRevisionId.forEach((rows, key) => {
-            rows.sort((a, b) => Number(a?.sequenceNo || 0) - Number(b?.sequenceNo || 0));
-            questionsByRevisionId.set(key, rows);
-        });
-        const assignmentsByAllocationId = new Map();
-        (Array.isArray(examAssignments) ? examAssignments : []).forEach((row) => {
-            const allocationId = String(row?.allocationId || '').trim();
-            if (!allocationId) return;
-            if (!assignmentsByAllocationId.has(allocationId)) assignmentsByAllocationId.set(allocationId, []);
-            assignmentsByAllocationId.get(allocationId).push(row);
-        });
-
-        const sessionExamContentItems = (Array.isArray(examAllocations) ? examAllocations : [])
-            .filter((row) => {
-                const status = String(row?.status || '').trim().toLowerCase();
-                if (['cancelled', 'archived'].includes(status)) return false;
-                const sourceSessionId = String(
-                    row?.extensions?.sourceSession?.sessionId
-                    || row?.extensions?.sourceSession?.id
-                    || row?.sourceSessionId
-                    || ''
-                ).trim();
-                if (sourceSessionId) return idsEqual(sourceSessionId, sessionId);
-                return resolveSessionExamLinkByDateTime(row, session);
-            })
-            .map((row) => {
-                const allocationId = String(row?.id || '').trim();
-                const templateId = String(row?.templateId || '').trim();
-                const revisionId = String(row?.revisionId || '').trim();
-                const template = templateById.get(templateId) || null;
-                const questionRows = questionsByRevisionId.get(revisionId) || [];
-                const linkedAssignments = (assignmentsByAllocationId.get(allocationId) || [])
-                    .slice()
-                    .sort((a, b) => String(b?.audit?.lastUpdateDateTime || b?.audit?.createDateTime || '')
-                        .localeCompare(String(a?.audit?.lastUpdateDateTime || a?.audit?.createDateTime || '')));
-                const myTakeAssignment = linkedAssignments.find((assignmentRow) => {
-                    const st = String(assignmentRow?.status || '').trim().toLowerCase();
-                    if (st === 'cancelled') return false;
-                    return ownedStudentIdsForExamStart.has(String(assignmentRow?.studentId || '').trim())
-                        && idsEqual(assignmentRow?.classId, classId);
-                }) || null;
-                let startUrl;
-                if (myTakeAssignment) {
-                    startUrl = `/school/exams/take/${encodeURIComponent(String(myTakeAssignment.id || '').trim())}?autostart=1`;
-                } else if (isStaffForExamStart) {
-                    const q = new URLSearchParams({ classId: String(classId || '').trim(), sessionId: String(sessionId || '').trim() });
-                    startUrl = `/school/exams/allocations/${encodeURIComponent(allocationId)}/simulate?${q.toString()}`;
-                } else if (ownedStudentIdsForExamStart.size > 0) {
-                    startUrl = `/school/exams/allocations/${encodeURIComponent(allocationId)}`;
-                } else {
-                    const q = new URLSearchParams({ classId: String(classId || '').trim(), sessionId: String(sessionId || '').trim() });
-                    startUrl = `/school/exams/allocations/${encodeURIComponent(allocationId)}/simulate?${q.toString()}`;
-                }
-                const time = normalizeClockTime(
-                    row?.extensions?.sourceSession?.startTime
-                    || row?.windowStartLocalTime
-                    || row?.scheduling?.windowStartLocalTime
-                    || session?.startTime
-                );
-                return {
-                    id: `exam:${allocationId}`,
-                    type: 'exam',
-                    title: String(row?.allocationName || template?.title || allocationId || 'Exam').trim(),
-                    time,
-                    allocationId,
-                    templateId,
-                    revisionId,
-                    status: String(row?.status || '').trim().toLowerCase() || 'scheduled',
-                    questions: questionRows.map((q) => ({
-                        id: String(q?.id || '').trim(),
-                        sequenceNo: Number(q?.sequenceNo || 0),
-                        questionType: String(q?.questionType || '').trim().toLowerCase(),
-                        objectiveMode: String(q?.objectiveMode || '').trim().toLowerCase(),
-                        promptText: String(q?.promptText || '').trim(),
-                        promptHtml: String(q?.promptHtml || '').trim(),
-                        answerOptions: Array.isArray(q?.objectiveOptions) ? q.objectiveOptions.map((opt) => ({
-                            id: String(opt?.id || '').trim(),
-                            text: String(opt?.text || '').trim(),
-                            isCorrect: opt?.isCorrect === true
-                        })) : [],
-                        acceptedOptionIds: Array.isArray(q?.acceptedOptionIds) ? q.acceptedOptionIds.map((v) => String(v || '').trim()).filter(Boolean) : []
-                    })),
-                    links: {
-                        assignment: `/school/exams/allocations/${encodeURIComponent(allocationId)}`,
-                        allocationEdit: `/school/exams/allocations/${encodeURIComponent(allocationId)}/edit`,
-                        start: startUrl,
-                        review: `/school/exams/teacher-assignments/${encodeURIComponent(allocationId)}`,
-                        openAllocation: `/school/exams/allocations/${encodeURIComponent(allocationId)}/open`,
-                        teacherQueue: `/school/exams/teacher-assignments/${encodeURIComponent(allocationId)}`,
-                        allocation: `/school/exams/allocations/${encodeURIComponent(allocationId)}`,
-                        template: templateId ? `/school/exams/templates/${encodeURIComponent(templateId)}` : ''
-                    }
-                };
-            });
-
         const combinedSessionContent = sortSessionContentItemsByOrder(
-            [...sessionContentItems, ...sessionExamContentItems],
+            sessionContentItems,
             sessionContentOrder
         );
 
@@ -4194,7 +4078,6 @@ async function manageSession(req, res) {
             classSubjects,
             sessionContentItems,
             sessionContentOrder,
-            sessionExamContentItems,
             combinedSessionContent,
             sessionReportInstanceRows,
             sessionRosterReconciliation,
