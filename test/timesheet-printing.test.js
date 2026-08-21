@@ -363,7 +363,7 @@ function sampleDocument(name, overrides = {}) {
   };
 }
 
-test('print review type defaults to managerial and financial uses the same layout with a different subtitle', () => {
+test('print review type defaults to managerial and financial uses a compact description layout', () => {
   assert.equal(printService.parsePrintReviewType('financial'), 'financial');
   assert.equal(printService.parsePrintReviewType('managerial'), 'managerial');
   assert.equal(printService.parsePrintReviewType(''), 'managerial');
@@ -377,6 +377,7 @@ test('print review type defaults to managerial and financial uses the same layou
 
   const viewPath = path.join(ROOT_DIR, 'packages/school/MVC/views/school/timesheet/timesheetPrint.ejs');
   const source = fs.readFileSync(viewPath, 'utf8');
+  const document = sampleDocument('Person One');
   const financialHtml = ejs.render(source, {
     title: 'Timesheet Print',
     appBrand: { appName: 'Example Website' },
@@ -387,7 +388,21 @@ test('print review type defaults to managerial and financial uses the same layou
       printReviewType: 'financial',
       printReviewTitle: 'Financial Review',
       period: { name: '2026-JULY-02', startDateLabel: 'July 15, 2026', endDateLabel: 'July 31, 2026', deadlineLabel: '2026-07-30 23:59' },
-      documents: [sampleDocument('Person One')]
+      documents: [document]
+    },
+    printSettings: { orientation: 'landscape', density: 'compact' }
+  }, { filename: viewPath });
+  const managerialHtml = ejs.render(source, {
+    title: 'Timesheet Print',
+    appBrand: { appName: 'Example Website' },
+    printContext: {
+      organizationName: 'Example School',
+      printedByName: 'Printer User',
+      printedAtLabel: 'Jul 15, 2026, 09:00 a.m.',
+      printReviewType: 'managerial',
+      printReviewTitle: 'Managerial Review',
+      period: { name: '2026-JULY-02', startDateLabel: 'July 15, 2026', endDateLabel: 'July 31, 2026', deadlineLabel: '2026-07-30 23:59' },
+      documents: [document]
     },
     printSettings: { orientation: 'landscape', density: 'compact' }
   }, { filename: viewPath });
@@ -396,6 +411,55 @@ test('print review type defaults to managerial and financial uses the same layou
   assert.match(financialHtml, />Financial Review</);
   assert.match(financialHtml, /Hours\/Time \(Hrs\)/);
   assert.match(financialHtml, /Total Period Hours:/);
+  assert.match(financialHtml, /class="session-department-text">EAL<\/span>/);
+  assert.match(financialHtml, /class="badge one-on-one-badge">One on One<\/span>/);
+  assert.match(financialHtml, /print-review-financial/);
+  assert.match(financialHtml, /pinDepartmentToBottom/);
+  assert.match(financialHtml, /bounds\.height \/ Math\.max\(scale, 0\.01\)/);
+  assert.match(financialHtml, /body\.print-review-financial \.col-description \{ width: 22%; \}/);
+  assert.match(financialHtml, /body\.print-review-financial \.col-comment \{ width: 43%; \}/);
+  assert.doesNotMatch(financialHtml, /class="session-class-time-line"/);
+  assert.doesNotMatch(financialHtml, /class="badge role-badge"/);
+  assert.doesNotMatch(financialHtml, /class="badge status-badge"/);
+  assert.doesNotMatch(financialHtml, /08:00 – 09:30/);
+  assert.match(financialHtml, /class="comment-text">Printed comment<\/span>/);
+
+  assert.match(managerialHtml, /print-review-managerial/);
+  assert.match(managerialHtml, /class="session-class-time-line">&lt;script&gt;alert\(1\)&lt;\/script&gt; - 08:00 – 09:30<\/div>/);
+  assert.match(managerialHtml, /class="badge role-badge">Teacher<\/span>/);
+  assert.match(managerialHtml, /class="badge status-badge">Completed<\/span>/);
+});
+
+test('financial print omits empty Saturday and Sunday days but keeps logged weekends and empty weekdays', () => {
+  assert.equal(printService.isWeekendDateKey('2026-07-18'), true); // Saturday
+  assert.equal(printService.isWeekendDateKey('2026-07-19'), true); // Sunday
+  assert.equal(printService.isWeekendDateKey('2026-07-17'), false); // Friday
+
+  const days = [
+    { date: '2026-07-17', dayName: 'Fri.', entries: [] },
+    { date: '2026-07-18', dayName: 'Sat.', entries: [] },
+    { date: '2026-07-19', dayName: 'Sun.', entries: [{ sessionId: 'weekend-session' }] },
+    { date: '2026-07-20', dayName: 'Mon.', entries: [] }
+  ];
+
+  const managerialDays = printService.filterDaysForPrintReview(days, 'managerial');
+  assert.deepEqual(managerialDays.map((day) => day.date), [
+    '2026-07-17',
+    '2026-07-18',
+    '2026-07-19',
+    '2026-07-20'
+  ]);
+
+  const financialDays = printService.filterDaysForPrintReview(days, 'financial');
+  assert.deepEqual(financialDays.map((day) => day.date), [
+    '2026-07-17',
+    '2026-07-19',
+    '2026-07-20'
+  ]);
+
+  const serviceSource = read('packages/school/MVC/services/school/timesheetPrintService.js');
+  assert.match(serviceSource, /filterDaysForPrintReview\(/);
+  assert.match(serviceSource, /printReviewType:\s*normalizedReviewType/);
 });
 
 test('shapePrintEntry exposes split regular and optional hour labels without hrs suffix', () => {
@@ -500,8 +564,11 @@ test('standalone print view renders safe single and batch documents with print C
   assert.match(html, />Regular</);
   assert.match(html, />Optional</);
   assert.match(html, /\.timesheet-table th\.col-hours-regular,[\s\S]*?font-size: 10px;[\s\S]*?white-space: nowrap;/);
-  assert.match(html, /\.col-description \{ width: 39%; \}/);
-  assert.match(html, /\.col-comment \{ width: 28%;/);
+  assert.match(html, /\.col-date \{ width: 10%; \}/);
+  assert.match(html, /\.col-description \{ width: 42%; \}/);
+  assert.match(html, /\.col-comment \{ width: 23%;/);
+  assert.match(html, /\.holiday-row > td \{ background: #fff1f2 !important; \}/);
+  assert.match(html, /\.holiday-name-cell \{/);
   assert.doesNotMatch(html, /<col class="col-status">/);
   assert.doesNotMatch(html, /<th class="col-status" rowspan="2">Status<\/th>/);
   assert.doesNotMatch(html, /<td class="col-status">/);
@@ -509,8 +576,41 @@ test('standalone print view renders safe single and batch documents with print C
   assert.match(html, /class="date-day">Wed\.<\/div>\s*<div class="date-value">Jul\. 15<\/div>/);
   assert.doesNotMatch(html, /class="date-line"/);
   assert.doesNotMatch(html, /class="date-day">Wednesday<\/div>/);
-  assert.match(html, /<tr class="no-log-row">\s*<td colspan="6" class="empty-row">[\s\S]*?<span class="no-log-row-date">Thu\. Jul\. 16<\/span>\s*<span class="no-log-row-note">No sessions logged\.<\/span>/);
-  assert.match(html, /\.no-log-row td \{ border-left: 0; border-right: 0; padding: 6px 8px; \}/);
+  assert.match(html, /<tr class="no-session-row">\s*<td>\s*<div class="date-day">Thu\.<\/div>\s*<div class="date-value">Jul\. 16<\/div>\s*<\/td>\s*<td class="empty-row">No sessions logged\.<\/td>\s*<td>—<\/td>\s*<td class="col-hours-regular"><span class="hours-value">0\.00<\/span><\/td>\s*<td class="col-hours-optional"><span class="hours-value is-dash">—<\/span><\/td>\s*<td class="col-comment"><\/td>\s*<\/tr>/);
+  const holidayDocument = sampleDocument('Holiday Person', {
+    days: [{
+      date: '2026-07-01',
+      dayName: 'Wed.',
+      dateLabel: 'Jul. 1',
+      holidayName: 'Canada Day',
+      entries: []
+    }]
+  });
+  const holidayHtml = ejs.render(source, {
+    title: 'Timesheet Print',
+    appBrand: { appName: 'Example Website' },
+    printContext: {
+      organizationName: 'Example School',
+      printedByName: 'Printer User',
+      printedAtLabel: 'Jul 15, 2026, 09:00 a.m.',
+      printReviewType: 'managerial',
+      printReviewTitle: 'Managerial Review',
+      period: {
+        name: '2026-JULY-02',
+        startDateLabel: 'July 15, 2026',
+        endDateLabel: 'July 31, 2026',
+        deadlineLabel: '2026-07-30 23:59'
+      },
+      documents: [holidayDocument]
+    },
+    printSettings: { orientation: 'portrait', density: 'compact' }
+  }, { filename: viewPath });
+  assert.match(holidayHtml, /<tr class="no-session-row holiday-row">/);
+  assert.match(holidayHtml, /<td class="holiday-name-cell">Canada Day<\/td>/);
+  assert.doesNotMatch(holidayHtml, /Holiday: Canada Day/);
+  assert.doesNotMatch(html, /class="no-log-row"/);
+  assert.doesNotMatch(html, /no-log-row-date/);
+  assert.doesNotMatch(html, /border-left: 0; border-right: 0;/);
   assert.match(html, /class="badge status-badge">Completed<\/span>\s*<span class="comment-separator">-<\/span><span class="comment-text">Printed comment<\/span>/);
   assert.match(html, /class="session-department-line">\s*<span class="session-department-text">EAL<\/span>/);
   assert.match(html, /class="session-class-time-line">&lt;script&gt;alert\(1\)&lt;\/script&gt; - 08:00 – 09:30<\/div>/);
@@ -533,12 +633,9 @@ test('standalone print view renders safe single and batch documents with print C
   assert.match(html, /var layoutWidth = bounds\.width \/ Math\.max\(scale, 0\.01\);/);
   assert.match(html, /sheet\.style\.width = layoutWidth \+ 'px'/);
   assert.doesNotMatch(html, /sheet\.style\.width = \(bounds\.width \/ scale\) \+ 'px'/);
-  assert.match(html, /var readableScaleFloor = 0\.86;/);
-  assert.match(html, /Math\.max\(scale, readableScaleFloor\)/);
-  assert.match(html, /frame\.dataset\.printOverflow = 'readable'/);
-  assert.match(html, /frame\.style\.height = '';\s*frame\.style\.maxHeight = '';[\s\S]*?sheet\.style\.transform = '';[\s\S]*?return;/);
-  assert.match(html, /\.print-sheet-frame\[data-print-overflow="readable"\] \{ overflow: visible; \}/);
-  assert.match(html, /\.print-sheet-frame \{ width: 100%; max-width: 100%; margin: 0; padding: 0; overflow: visible; \}/);
+  assert.doesNotMatch(html, /readableScaleFloor/);
+  assert.doesNotMatch(html, /printOverflow/);
+  assert.doesNotMatch(html, /data-print-overflow/);
   assert.match(html, /sheet\.style\.transform = 'scale\(' \+ scale\.toFixed\(4\) \+ '\)'/);
   assert.doesNotMatch(html, /scale\(1,\s*y\)/);
   assert.doesNotMatch(html, /allow a second printed page/);

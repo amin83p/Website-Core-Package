@@ -159,6 +159,23 @@ function resolvePrintReviewTitle(printReviewType = 'managerial') {
     : 'Managerial Review';
 }
 
+function isWeekendDateKey(dateKey) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanText(dateKey))) return false;
+  const weekday = new Date(`${cleanText(dateKey)}T12:00:00.000Z`).getUTCDay();
+  return weekday === 0 || weekday === 6;
+}
+
+function filterDaysForPrintReview(days = [], printReviewType = 'managerial') {
+  if (parsePrintReviewType(printReviewType) !== 'financial') {
+    return Array.isArray(days) ? days.slice() : [];
+  }
+  return (Array.isArray(days) ? days : []).filter((day) => {
+    const entries = Array.isArray(day?.entries) ? day.entries : [];
+    if (entries.length > 0) return true;
+    return !isWeekendDateKey(day?.date);
+  });
+}
+
 function fillLegacyDisplayMetadata(snapshotEntry = {}, liveEntry = {}) {
   const merged = { ...(liveEntry || {}), ...(snapshotEntry || {}) };
   const snapshotHasDisplayIdentity = Boolean(
@@ -463,7 +480,15 @@ function buildDepartmentTotalsFromEffective(effective = {}) {
   return buildDepartmentTotals(entries, lookups);
 }
 
-async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUser, holidays = null }) {
+async function buildTimesheetPrintDocument({
+  period,
+  person,
+  activeOrgId,
+  reqUser,
+  holidays = null,
+  printReviewType = 'managerial'
+}) {
+  const normalizedReviewType = parsePrintReviewType(printReviewType);
   const personId = cleanText(person?.id || person?.personId);
   const effective = await timesheetEffectiveEntryService.buildEffectiveTimesheetEntries({
     period,
@@ -484,16 +509,19 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
   const holidayMap = new Map((Array.isArray(holidayRows) ? holidayRows : [])
     .filter((row) => cleanText(row?.date) >= cleanText(period.startDate) && cleanText(row?.date) <= cleanText(period.endDate))
     .map((row) => [cleanText(row?.date), row]));
-  const days = buildDateKeys(period.startDate, period.endDate).map((date) => {
-    const shortMonth = formatDateKey(date, { month: 'short' });
-    return {
-      date,
-      dayName: `${formatDateKey(date, { weekday: 'short' })}.`,
-      dateLabel: `${shortMonth}. ${formatDateKey(date, { day: 'numeric' })}`,
-      holidayName: cleanText(holidayMap.get(date)?.name || holidayMap.get(date)?.title),
-      entries: entriesByDate.get(date) || []
-    };
-  });
+  const days = filterDaysForPrintReview(
+    buildDateKeys(period.startDate, period.endDate).map((date) => {
+      const shortMonth = formatDateKey(date, { month: 'short' });
+      return {
+        date,
+        dayName: `${formatDateKey(date, { weekday: 'short' })}.`,
+        dateLabel: `${shortMonth}. ${formatDateKey(date, { day: 'numeric' })}`,
+        holidayName: cleanText(holidayMap.get(date)?.name || holidayMap.get(date)?.title),
+        entries: entriesByDate.get(date) || []
+      };
+    }),
+    normalizedReviewType
+  );
   const timesheet = effective.timesheet || {};
   const departmentTotals = buildDepartmentTotalsFromEffective(effective);
   const reconciliationEntries = entries.filter((entry) => entry.reconciliationRequired === true);
@@ -518,6 +546,7 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
     submittedAt: cleanText(timesheet?.submissionSnapshot?.submittedAt),
     approvedAt: cleanText(timesheet?.managerReview?.approvedAt || timesheet?.approvedAt),
     processedAt: cleanText(timesheet?.processedAt),
+    printReviewType: normalizedReviewType,
     days,
     entries,
     departmentTotals,
@@ -593,7 +622,14 @@ async function buildTimesheetPrintContext({
   for (const person of (Array.isArray(people) ? people : [])) {
     // Deliberately sequential to avoid multiplying class/enrollment reads for large batches.
     // eslint-disable-next-line no-await-in-loop
-    documents.push(await buildTimesheetPrintDocument({ period, person, activeOrgId, reqUser, holidays }));
+    documents.push(await buildTimesheetPrintDocument({
+      period,
+      person,
+      activeOrgId,
+      reqUser,
+      holidays,
+      printReviewType: normalizedReviewType
+    }));
   }
   const printedAtIso = new Date().toISOString();
   return {
@@ -639,6 +675,8 @@ module.exports = {
   resolvePayableHours,
   resolvePrintReviewTitle,
   resolveRegularDisplayHours,
+  filterDaysForPrintReview,
+  isWeekendDateKey,
   shapePrintEntry,
   sortEntriesBySchedule
 };

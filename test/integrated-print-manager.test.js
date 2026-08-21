@@ -72,11 +72,10 @@ test('timesheet print settings are normalized and passed to the print view', () 
   assert.match(view, /fitPrintSheetsToPage/);
   assert.match(view, /body\[data-print-orientation="portrait"\] \.print-sheet-frame/);
   assert.match(view, /var layoutWidth = bounds\.width \/ Math\.max\(scale, 0\.01\);/);
-  assert.match(view, /var readableScaleFloor = 0\.86;/);
+  assert.doesNotMatch(view, /readableScaleFloor/);
   assert.match(view, /session-class-time-line/);
   assert.match(view, /entry\.department\?\.code \|\| entry\.primaryLabel/);
   assert.match(view, /row\.departmentCode \|\| row\.departmentName/);
-  assert.match(view, /frame\.style\.height = '';\s*frame\.style\.maxHeight = '';[\s\S]*?sheet\.style\.transform = '';[\s\S]*?return;/);
   assert.match(view, /sheet\.style\.transform = 'scale\(' \+ scale\.toFixed\(4\) \+ '\)'/);
   assert.match(view, /printHeaderNote/);
   assert.match(view, /applyPrintOrientation/);
