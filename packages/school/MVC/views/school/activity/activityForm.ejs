@@ -494,6 +494,23 @@ document.addEventListener('DOMContentLoaded', function () {
     return normalizedRoles[0] || preferredRole || 'participant';
   }
 
+  function resolveAssigneeRoleList(item, personId) {
+    const token = String(personId || item?.personId || item?.id || '').trim();
+    const merged = [];
+    [
+      item?.roles,
+      item?.availableRoles,
+      item?.matchedRole,
+      item?.role,
+      token ? eligiblePersonMap.get(token)?.roles : null
+    ].forEach(function (source) {
+      normalizeRoleList(source).forEach(function (role) {
+        if (role && !merged.includes(role)) merged.push(role);
+      });
+    });
+    return merged;
+  }
+
   function buildPersonDisplayName(item, fallback) {
     const preferred = String(item?.preferredName || item?.name?.preferred || '').trim();
     if (preferred) return preferred;
@@ -583,6 +600,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const displayName = incomingIsIdFallback && existingHasRealName
       ? existing.displayName
       : incomingDisplayName;
+    const roles = resolveAssigneeRoleList(item, personId);
     const normalized = {
       id: personId,
       personId,
@@ -590,8 +608,8 @@ document.addEventListener('DOMContentLoaded', function () {
       firstName: String(item?.firstName || item?.name?.first || existing?.firstName || '').trim(),
       lastName: String(item?.lastName || item?.name?.last || existing?.lastName || '').trim(),
       preferredName: String(item?.preferredName || item?.name?.preferred || existing?.preferredName || '').trim(),
-      roles: normalizeRoleList(item?.roles || item?.availableRoles || item?.matchedRole || item?.role || existing?.roles),
-      matchedRole: normalizeRole(item?.matchedRole || item?.role || existing?.matchedRole || '')
+      roles,
+      matchedRole: normalizeRole(item?.matchedRole || item?.role || existing?.matchedRole || roles[0] || '')
     };
     eligiblePersonMap.set(personId, normalized);
     return normalized;
@@ -623,6 +641,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const resolvedName = resolvePersonLabel(personId, assignee.personName);
         if (resolvedName && resolvedName !== personId) {
           assignee.personName = resolvedName;
+        }
+        const mergedRoles = resolveAssigneeRoleList(assignee, personId);
+        if (mergedRoles.length) {
+          assignee.roles = mergedRoles;
+          assignee.role = pickDefaultRole(mergedRoles, assignee.role);
         }
         ensurePersonRecord(assignee);
       });
@@ -792,7 +815,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function normalizeAttendee(item, entryDuration) {
     const personId = String(item?.personId || item?.id || '').trim();
     if (!personId) return null;
-    const roles = normalizeRoleList(item?.roles || item?.availableRoles || item?.role || item?.matchedRole);
+    const roles = resolveAssigneeRoleList(item, personId);
     const selectedRole = pickDefaultRole(roles, item?.role || item?.matchedRole);
     return {
       personId,
@@ -890,7 +913,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function renderRoleSelect(item, entryIndex, assigneeIndex) {
-    const roles = normalizeRoleList(item.roles || item.role);
+    const roles = resolveAssigneeRoleList(item, item?.personId);
     const selectedRole = pickDefaultRole(roles, item.role);
     entries[entryIndex].assignees[assigneeIndex].role = selectedRole;
     entries[entryIndex].assignees[assigneeIndex].roles = roles.length ? roles : [selectedRole];
@@ -1289,7 +1312,7 @@ document.addEventListener('DOMContentLoaded', function () {
         firstName: String(person?.firstName || '').trim(),
         lastName: String(person?.lastName || '').trim(),
         preferredName: String(person?.preferredName || '').trim(),
-        roles: normalizeRoleList(person?.roles || person?.matchedRole || person?.role),
+        roles: resolveAssigneeRoleList(person, personId),
         matchedRole: normalizeRole(person?.matchedRole || person?.role || ''),
         title: displayName
       };

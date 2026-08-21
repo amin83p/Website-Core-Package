@@ -1093,6 +1093,30 @@
       return normalizedRoles[0] || preferredRole || 'participant';
     }
 
+    const eligibleRolesByPersonId = new Map(
+      eligibleAssigneePersons.map(function (person) {
+        const personId = String(person?.personId || person?.id || '').trim();
+        return [personId, normalizeRoleList(person?.roles || person?.matchedRole || person?.role)];
+      }).filter(function (entry) { return entry[0]; })
+    );
+
+    function resolveAssigneeRoleList(item, personId) {
+      const token = String(personId || item?.personId || item?.id || '').trim();
+      const merged = [];
+      [
+        item?.roles,
+        item?.availableRoles,
+        item?.matchedRole,
+        item?.role,
+        token ? eligibleRolesByPersonId.get(token) : null
+      ].forEach(function (source) {
+        normalizeRoleList(source).forEach(function (role) {
+          if (role && !merged.includes(role)) merged.push(role);
+        });
+      });
+      return merged;
+    }
+
     function buildRoleOptions(roles, selectedRole) {
       const normalizedRoles = normalizeRoleList(roles);
       const selected = pickDefaultRole(normalizedRoles, selectedRole);
@@ -1205,7 +1229,7 @@
       const personId = String(item?.personId || item?.id || item?.value || '').trim();
       if (!personId) return null;
       const personName = String(item?.displayName || item?.personName || item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || personId).trim();
-      const roles = normalizeRoleList(item?.roles || item?.availableRoles || item?.matchedRole || item?.role);
+      const roles = resolveAssigneeRoleList(item, personId);
       const role = pickDefaultRole(roles, item?.matchedRole || item?.role);
       return { personId, personName, role, roles: roles.length ? roles : [role] };
     }

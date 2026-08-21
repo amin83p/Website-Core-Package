@@ -755,6 +755,51 @@ test('Admin metadata save updates work session details and syncs assignee hours'
   }
 });
 
+test('getWorkSessionContext merges eligible lookup roles into assignee role options', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+  const originalGetEligiblePersons = activityService.getEligiblePersons;
+
+  const activity = {
+    id: 'ACT-ROLE-MERGE',
+    orgId: '900000',
+    title: 'Role Merge Activity',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    visibilityScope: 'school',
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      durationHours: 1,
+      status: 'posted',
+      assignees: [{ personId: 'P1', personName: 'Dual Role Person', role: 'teacher', roles: ['teacher'] }]
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+  activityService.getEligiblePersons = async () => ([
+    { personId: 'P1', displayName: 'Dual Role Person', roles: ['teacher', 'staff'], matchedRole: 'teacher' }
+  ]);
+
+  try {
+    const context = await activityWorkSessionService.getWorkSessionContext(
+      activity.id,
+      'ENTRY-1',
+      { id: 'U1', personId: 'P1', activeOrgId: '900000', orgId: '900000' },
+      { scopeId: 'SCP_ORG', personId: 'P1' }
+    );
+    assert.deepEqual(context.entry.assignees[0].roles, ['teacher', 'staff']);
+    assert.equal(context.entry.assignees[0].role, 'teacher');
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    activityService.getEligiblePersons = originalGetEligiblePersons;
+  }
+});
+
 test('Work session context scopes non-admin users to their own assignee row', async () => {
   const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
   const activityService = require('../packages/school/MVC/services/school/activityService');

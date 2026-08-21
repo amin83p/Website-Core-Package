@@ -305,11 +305,26 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
   const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);
   const scopedPersonId = normalizeId(access.personId || reqUser?.personId);
   const canManageAll = canManageAllActivityWorkSessions(reqUser);
+  const eligibleAssigneePersons = await buildEligibleAssigneePersons(activity, entry, reqUser);
+  const eligibleRolesByPersonId = new Map(
+    eligibleAssigneePersons.map((row) => [
+      normalizeId(row.personId),
+      normalizeRoleList(row.roles || row.matchedRole || row.role, row.matchedRole || 'participant')
+    ]).filter(([personId]) => Boolean(personId))
+  );
   const assignees = normalizeAssigneeRows(entry.assignees)
-    .map((assignee) => enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId }))
+    .map((assignee) => {
+      const enriched = enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId });
+      const personId = normalizeId(enriched.personId);
+      const mergedRoles = mergeAssigneeRoleLists(
+        enriched.roles || enriched.role,
+        eligibleRolesByPersonId.get(personId) || [],
+        enriched.role
+      );
+      return { ...enriched, ...mergedRoles };
+    })
     .filter((assignee) => canManageAll || assignee.isSelf);
   const siblingSessions = buildSiblingSessions(activity, access, entryId);
-  const eligibleAssigneePersons = await buildEligibleAssigneePersons(activity, entry, reqUser);
   const visibilityScope = activityService.normalizeActivityVisibilityScope(
     activity.visibilityScope || activity.calendarScope || activity.scope
   );
@@ -335,6 +350,17 @@ function normalizeRoleList(value, fallback = 'participant') {
     { max: 40 }
   ).toLowerCase()).filter(Boolean))];
   return roles.length ? roles : [fallback];
+}
+
+function mergeAssigneeRoleLists(storedRoles, lookupRoles, selectedRole = 'participant') {
+  const role = cleanText(selectedRole || 'participant', { max: 40 }).toLowerCase() || 'participant';
+  const roles = normalizeRoleList([
+    ...(Array.isArray(storedRoles) ? storedRoles : []),
+    role,
+    ...(Array.isArray(lookupRoles) ? lookupRoles : [])
+  ], role);
+  const normalizedRole = roles.includes(role) ? role : (roles[0] || 'participant');
+  return { role: normalizedRole, roles };
 }
 
 function normalizeAdminAssigneeRow(row = {}, priorByPerson = new Map(), durationHours = 0, evaluationType = 'attendance', reqUser = {}) {
