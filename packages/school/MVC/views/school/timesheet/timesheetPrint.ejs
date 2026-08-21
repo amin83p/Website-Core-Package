@@ -130,10 +130,12 @@
     thead { display: table-header-group; }
     tfoot { display: table-footer-group; }
     thead tr, tfoot tr { break-inside: avoid; page-break-inside: avoid; }
-    th, td { border: 1px solid var(--line); padding: 8px 8px; vertical-align: middle; overflow-wrap: anywhere; word-break: break-word; }
-    th { background: #eaf0f7; font-size: 12px; letter-spacing: .035em; text-align: left; text-transform: uppercase; }
+    th, td { border: 1px solid var(--line); padding: 10px 9px; vertical-align: middle; overflow-wrap: anywhere; word-break: break-word; }
+    th { background: #eaf0f7; font-size: 12.5px; letter-spacing: .035em; text-align: left; text-transform: uppercase; }
     tbody tr:nth-child(even) > td { background: #fafbfd; }
     .timesheet-table { width: 100%; max-width: 100%; }
+    .timesheet-table th,
+    .timesheet-table td { padding: 10px 9px; }
     .col-date { width: 9%; }
     .col-description { width: 25%; }
     .col-student { width: 14%; }
@@ -142,71 +144,87 @@
     .col-hours-optional { width: 7%; text-align: center; }
     .col-status { width: 11%; text-align: center; }
     .col-comment { width: 27%; }
-    .date-day { font-size: 14px; font-weight: 700; }
-    .date-value { color: var(--muted); font-size: 13px; font-weight: 700; }
-    .holiday-label { margin-top: 3px; color: var(--red); font-size: 11.5px; font-weight: 700; }
-    .primary-label { font-weight: 800; }
-    .secondary-label, .cell-muted, .schedule-label { margin-top: 2px; color: var(--muted); font-size: 12px; }
-    .hours-value { color: var(--green); font-size: 16px; font-weight: 800; text-align: center; }
+    .date-day { font-size: 15px; font-weight: 700; }
+    .date-value { color: var(--muted); font-size: 14px; font-weight: 700; }
+    .holiday-label { margin-top: 3px; color: var(--red); font-size: 12px; font-weight: 700; }
+    .primary-label { font-weight: 800; font-size: 14px; }
+    .secondary-label, .cell-muted, .schedule-label { margin-top: 3px; color: var(--muted); font-size: 12.5px; }
+    .hours-value { color: var(--green); font-size: 17px; font-weight: 800; text-align: center; }
     .hours-value.is-dash { color: var(--muted); font-weight: 700; }
     .hours-value.is-optional { color: var(--optional); }
     .hours-value.is-struck { color: var(--muted); text-decoration: line-through; }
-    .payable-note { margin-top: 2px; color: var(--amber); font-size: 9.5px; font-weight: 700; }
-    .time-label { margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .payable-note { margin-top: 2px; color: var(--amber); font-size: 10.5px; font-weight: 700; }
+    .time-label { margin-top: 2px; color: var(--muted); font-size: 11px; }
     .empty-row { color: var(--muted); font-style: italic; }
     .total-row td { background: #eef7f1 !important; font-weight: 800; }
     .total-label { text-align: right; text-transform: uppercase; }
-    .total-hours { color: var(--green); font-size: 16px; text-align: center; }
-    .total-hours-optional { color: var(--optional); font-size: 16px; text-align: center; }
+    .total-hours { color: var(--green); font-size: 17px; text-align: center; }
+    .total-hours-optional { color: var(--optional); font-size: 17px; text-align: center; }
     .department-section { margin-top: 0; }
-    .department-heading { margin: 0 0 5px; font-size: 16px; }
-    .department-table { table-layout: fixed; width: 100%; max-width: 100%; }
+    .department-heading { margin: 0 0 8px; font-size: 18px; }
+    .department-table { table-layout: fixed; width: 100%; max-width: 100%; font-size: 14px; }
     .department-table th,
-    .department-table td { text-align: center; }
-    .department-name-row th { white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.2; }
+    .department-table td {
+      text-align: center;
+      padding: 11px 10px;
+      font-size: 14px;
+    }
+    .department-name-row th { white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.25; }
     .department-metric-label { white-space: nowrap; }
     .department-name-row th {
       background: #eaf0f7;
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 800;
       letter-spacing: normal;
       text-transform: none;
     }
-    .department-hours-row td { color: var(--green); font-weight: 800; }
-    .department-metric-label { text-align: left; font-weight: 700; background: #f8fafc !important; }
+    .department-hours-row td { color: var(--green); font-weight: 800; font-size: 15px; }
+    .department-metric-label { text-align: left; font-weight: 700; background: #f8fafc !important; font-size: 13.5px; }
     .department-total-col { background: #eef7f1 !important; }
     .optional-row td { background: #eef9ff !important; color: var(--optional); font-weight: 700; }
-    .print-sheet.print-fit-step-1 .identity-block { margin-bottom: 3px; }
-    .print-sheet.print-fit-step-1 .department-section { margin-top: 4px; }
-    .print-sheet.print-fit-step-1 th, .print-sheet.print-fit-step-1 td { padding: 2px 3px; }
-    .print-sheet.print-fit-step-1 .document-title { font-size: 15px; }
-    .print-sheet.print-fit-step-1 .person-name { font-size: 12px; }
-    .print-sheet.print-fit-step-1 .date-day, .print-sheet.print-fit-step-1 .date-value { font-size: 9px; }
+    /* Mild shrink only — keep tables readable when content is dense. */
+    .print-sheet.print-fit-step-1 .identity-block { margin-bottom: 6px; }
+    .print-sheet.print-fit-step-1 .department-heading { margin-bottom: 6px; font-size: 16px; }
+    .print-sheet.print-fit-step-1 .timesheet-table th,
+    .print-sheet.print-fit-step-1 .timesheet-table td { padding: 7px 7px; }
+    .print-sheet.print-fit-step-1 .department-table th,
+    .print-sheet.print-fit-step-1 .department-table td { padding: 8px 8px; font-size: 13px; }
+    .print-sheet.print-fit-step-1 .document-title { font-size: 20px; }
+    .print-sheet.print-fit-step-1 .person-name { font-size: 16px; }
+    .print-sheet.print-fit-step-1 .date-day, .print-sheet.print-fit-step-1 .date-value { font-size: 13px; }
+    .print-sheet.print-fit-step-1 .primary-label { font-size: 13px; }
     .print-sheet.print-fit-step-1 .secondary-label,
     .print-sheet.print-fit-step-1 .schedule-label,
-    .print-sheet.print-fit-step-1 .cell-muted { font-size: 7.5px; }
+    .print-sheet.print-fit-step-1 .cell-muted { font-size: 11px; }
     .print-sheet.print-fit-step-1 .hours-value,
     .print-sheet.print-fit-step-1 .total-hours,
-    .print-sheet.print-fit-step-1 .total-hours-optional { font-size: 10px; }
-    .print-sheet.print-fit-step-2 { font-size: 9px; line-height: 1.15; }
-    .print-sheet.print-fit-step-2 .identity-block { margin-bottom: 2px; }
-    .print-sheet.print-fit-step-2 .department-section { margin-top: 3px; }
-    .print-sheet.print-fit-step-2 .department-heading { margin-bottom: 1px; font-size: 10px; }
-    .print-sheet.print-fit-step-2 th, .print-sheet.print-fit-step-2 td { padding: 1px 2px; }
-    .print-sheet.print-fit-step-2 th { font-size: 7.5px; }
-    .print-sheet.print-fit-step-2 .document-title { font-size: 14px; }
-    .print-sheet.print-fit-step-2 .person-name { font-size: 11px; }
+    .print-sheet.print-fit-step-1 .total-hours-optional { font-size: 14px; }
+    .print-sheet.print-fit-step-1 .department-hours-row td { font-size: 14px; }
+    .print-sheet.print-fit-step-2 { font-size: 12px; line-height: 1.3; }
+    .print-sheet.print-fit-step-2 .identity-block { margin-bottom: 4px; }
+    .print-sheet.print-fit-step-2 .department-heading { margin-bottom: 5px; font-size: 14px; }
+    .print-sheet.print-fit-step-2 .timesheet-table th,
+    .print-sheet.print-fit-step-2 .timesheet-table td { padding: 5px 6px; }
+    .print-sheet.print-fit-step-2 .department-table th,
+    .print-sheet.print-fit-step-2 .department-table td { padding: 6px 7px; font-size: 12px; }
+    .print-sheet.print-fit-step-2 th { font-size: 10px; }
+    .print-sheet.print-fit-step-2 .document-title { font-size: 18px; }
+    .print-sheet.print-fit-step-2 .person-name { font-size: 14px; }
     .print-sheet.print-fit-step-2 .period-range,
-    .print-sheet.print-fit-step-2 .print-sheet-footer { font-size: 8.5px; }
-    .print-sheet.print-fit-step-2 .badge { padding: 0 4px; font-size: 7px; }
-    .print-sheet.print-fit-step-2 .date-day, .print-sheet.print-fit-step-2 .date-value { font-size: 8px; }
+    .print-sheet.print-fit-step-2 .print-sheet-footer { font-size: 11px; }
+    .print-sheet.print-fit-step-2 .badge { padding: 1px 5px; font-size: 9px; }
+    .print-sheet.print-fit-step-2 .date-day, .print-sheet.print-fit-step-2 .date-value { font-size: 12px; }
+    .print-sheet.print-fit-step-2 .primary-label { font-size: 12px; }
     .print-sheet.print-fit-step-2 .secondary-label,
     .print-sheet.print-fit-step-2 .schedule-label,
     .print-sheet.print-fit-step-2 .cell-muted,
-    .print-sheet.print-fit-step-2 .payable-note { font-size: 7px; }
+    .print-sheet.print-fit-step-2 .payable-note { font-size: 10px; }
     .print-sheet.print-fit-step-2 .hours-value,
     .print-sheet.print-fit-step-2 .total-hours,
-    .print-sheet.print-fit-step-2 .total-hours-optional { font-size: 9px; }
+    .print-sheet.print-fit-step-2 .total-hours-optional { font-size: 13px; }
+    .print-sheet.print-fit-step-2 .department-hours-row td { font-size: 13px; }
+    .print-sheet.print-fit-step-2 .department-name-row th,
+    .print-sheet.print-fit-step-2 .department-metric-label { font-size: 12px; }
     @media print {
       html, body { width: 100%; max-width: 100%; min-width: 0; margin: 0; }
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
@@ -214,29 +232,44 @@
       .print-sheet-frame { width: 100%; max-width: 100%; margin: 0; padding: 0; }
       .print-sheet { width: 100%; max-width: 100%; margin: 0; padding: 0; min-height: 100%; }
       .timesheet-table, .department-table { width: 100%; max-width: 100%; }
-      /* Prefer readable sizes; fit steps only shrink when content overflows. */
-      body { font-size: 13px; line-height: 1.4; }
-      .identity-block { margin-bottom: 8px; }
-      .document-title { font-size: 22px; }
-      .person-name { font-size: 17px; }
-      .period-range, .print-sheet-footer { font-size: 12px; }
-      th, td { padding: 7px 7px; }
-      th { font-size: 11px; }
-      .badge { padding: 2px 6px; font-size: 10px; }
-      .date-day, .date-value { font-size: 13px; }
-      .holiday-label, .secondary-label, .cell-muted, .schedule-label, .payable-note, .time-label { margin-top: 2px; font-size: 11px; }
-      .hours-value, .total-hours, .total-hours-optional { font-size: 15px; }
-      .department-heading { margin-bottom: 5px; font-size: 15px; }
-      body.print-density-normal { font-size: 14px; line-height: 1.45; }
-      body.print-density-normal .document-title { font-size: 24px; }
-      body.print-density-normal .person-name { font-size: 18px; }
+      /* Prefer readable sizes; fit steps only shrink mildly when content overflows. */
+      body { font-size: 14px; line-height: 1.42; }
+      .identity-block { margin-bottom: 10px; }
+      .document-title { font-size: 24px; }
+      .person-name { font-size: 18px; }
+      .period-range, .print-sheet-footer { font-size: 13px; }
+      th, td { padding: 9px 8px; }
+      .timesheet-table th,
+      .timesheet-table td { padding: 9px 8px; }
+      th { font-size: 12px; }
+      .badge { padding: 2px 7px; font-size: 10.5px; }
+      .date-day { font-size: 14px; }
+      .date-value { font-size: 13px; }
+      .primary-label { font-size: 13.5px; }
+      .holiday-label, .secondary-label, .cell-muted, .schedule-label, .payable-note, .time-label { margin-top: 2px; font-size: 11.5px; }
+      .hours-value, .total-hours, .total-hours-optional { font-size: 16px; }
+      .department-heading { margin-bottom: 8px; font-size: 17px; }
+      .department-table th,
+      .department-table td { padding: 10px 9px; font-size: 14px; }
+      .department-name-row th { font-size: 13px; }
+      .department-metric-label { font-size: 13px; }
+      .department-hours-row td { font-size: 15px; }
+      body.print-density-normal { font-size: 15px; line-height: 1.46; }
+      body.print-density-normal .document-title { font-size: 26px; }
+      body.print-density-normal .person-name { font-size: 19px; }
       body.print-density-normal .period-range,
-      body.print-density-normal .print-sheet-footer { font-size: 13px; }
-      body.print-density-normal th { font-size: 12px; }
-      body.print-density-normal th, body.print-density-normal td { padding: 8px 8px; }
+      body.print-density-normal .print-sheet-footer { font-size: 14px; }
+      body.print-density-normal th { font-size: 12.5px; }
+      body.print-density-normal th, body.print-density-normal td { padding: 10px 9px; }
+      body.print-density-normal .timesheet-table th,
+      body.print-density-normal .timesheet-table td { padding: 10px 9px; }
       body.print-density-normal .hours-value,
       body.print-density-normal .total-hours,
-      body.print-density-normal .total-hours-optional { font-size: 16px; }
+      body.print-density-normal .total-hours-optional { font-size: 17px; }
+      body.print-density-normal .department-table th,
+      body.print-density-normal .department-table td { padding: 12px 10px; font-size: 15px; }
+      body.print-density-normal .department-heading { font-size: 18px; }
+      body.print-density-normal .department-hours-row td { font-size: 16px; }
     }
     @media screen {
       body { background: #e9ecef; padding: 16px; }
@@ -542,13 +575,13 @@
           return;
         }
 
-        var heightScale = bounds.height / naturalHeight;
-        sheet.style.minHeight = naturalHeight + 'px';
+        // Keep natural proportions — never use non-uniform scale(1, y), which
+        // stretches or squashes text. Prefer denser CSS steps above; if content
+        // still overflows, allow a second printed page rather than distorting.
+        frame.style.height = '';
+        frame.style.maxHeight = '';
+        sheet.style.minHeight = '';
         sheet.style.height = '';
-        sheet.style.transformOrigin = 'top left';
-        sheet.style.transform = 'scale(1, ' + heightScale + ')';
-        frame.style.height = bounds.height + 'px';
-        frame.style.maxHeight = bounds.height + 'px';
       });
     }
 

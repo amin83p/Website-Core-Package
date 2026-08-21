@@ -510,10 +510,11 @@ test('standalone print view renders safe single and batch documents with print C
   assert.match(html, /<th scope="col" class="department-total-col">Total<\/th>/);
   assert.doesNotMatch(html, /Total Optional Hours/);
   assert.doesNotMatch(html, /<th>Payable Hours<\/th>/);
-  assert.match(html, /body \{ font-size: 13px; line-height: 1\.4; \}/);
+  assert.match(html, /body \{ font-size: 14px; line-height: 1\.42; \}/);
+  assert.match(html, /\.department-table th,\s*\.department-table td \{[\s\S]*?padding: 10px 9px;/);
   assert.match(html, /print-sheet-bottom/);
   assert.match(html, /print-sheet-main/);
-  assert.match(html, /th, td \{ padding: 3px 4px; \}/);
+  assert.match(html, /th, td \{ padding: 9px 8px; \}/);
   assert.doesNotMatch(html, /class="meta-grid"/);
   assert.doesNotMatch(html, /class="draft-warning"/);
   assert.doesNotMatch(html, /class="document-footer"/);
