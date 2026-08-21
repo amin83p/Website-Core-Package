@@ -411,6 +411,19 @@
       .replace(/'/g, '&#39;');
   }
 
+  function resolvePickerPersonLabel(person) {
+    const preferred = String(person?.preferredName || person?.name?.preferred || '').trim();
+    if (preferred) return preferred;
+    const first = String(person?.firstName || person?.name?.first || '').trim();
+    const last = String(person?.lastName || person?.name?.last || '').trim();
+    const joined = [first, last].filter(Boolean).join(' ').trim();
+    if (joined) return joined;
+    if (typeof person?.name === 'string') return String(person.name).trim();
+    const displayName = String(person?.displayName || '').trim();
+    if (displayName) return displayName;
+    return String(person?.personId || person?.id || '').trim();
+  }
+
   function normalizePersonRoles(org) {
     if (window.SchoolRoleDisplay && typeof window.SchoolRoleDisplay.filterSchoolPackageOrgRoles === 'function') {
       return window.SchoolRoleDisplay.filterSchoolPackageOrgRoles(org);
@@ -705,6 +718,8 @@
           apiEndpoint: '/school/staff/api/eligible-persons',
           placeholder: 'Search by name or email...',
           onSelect: (item) => {
+            const personId = String(item?.personId || item?.id || '').trim();
+            const personLabel = resolvePickerPersonLabel(item);
             if (item?.alreadyHasSchoolAccount) {
               const linked = item.linkedSchoolAccount || {};
               const targetUrl = linked.archived ? linked.recoveryUrl : linked.editUrl;
@@ -716,8 +731,8 @@
               });
               return;
             }
-            document.getElementById('inp_personId').value = item.id || '';
-            document.getElementById('inp_personName').value = `${item.name?.first || ''} ${item.name?.last || ''}`.trim() || item.id;
+            document.getElementById('inp_personId').value = personId;
+            document.getElementById('inp_personName').value = personLabel || personId;
             selectedPersonOrganizations = Array.isArray(item.organizations) ? item.organizations : [];
             renderPersonRoleSummary();
             refreshEditPersonButton();
