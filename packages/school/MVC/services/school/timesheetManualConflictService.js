@@ -387,7 +387,8 @@ async function detectRoleAwareManualEntryConflicts({
   });
 
   const internalConflicts = detectTimesheetInternalOverlaps(timesheetEntries, { ignoreSessionId });
-  return dedupeConflicts([...scheduleConflicts, ...internalConflicts]);
+  const combined = [...scheduleConflicts, ...internalConflicts];
+  return dedupeConflicts(combined);
 }
 
 module.exports = {

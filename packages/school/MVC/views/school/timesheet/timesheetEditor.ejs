@@ -1219,6 +1219,7 @@
     const IS_READONLY = <%= isEditorLocked %>;
     const IS_ADMIN = <%= isAdmin %>;
     const CAN_MANAGER_REVIEW = <%= (typeof canSendBack !== 'undefined' && canSendBack) ? 'true' : 'false' %>;
+    const IS_REVIEWER_EDITING = <%= isReviewerEditing ? 'true' : 'false' %>;
     const IS_SUBMISSION_DEADLINE_PASSED = <%= isSubmissionDeadlinePassedFlag ? 'true' : 'false' %>;
     const ALLOW_LATE_SUBMISSION = <%= allowLateSubmissionFlag ? 'true' : 'false' %>;
     const SHOW_PRIOR_ADJUSTMENT_REVIEW = <%= showPriorAdjustmentReview ? 'true' : 'false' %>;
@@ -1931,6 +1932,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let isEdited = <%= isManuallyEdited %>;
 
     const savedComments = {};
+    const persistedTimesheetEntryIds = new Set(
+        (Array.isArray(TIMESHEET_ENTRIES) ? TIMESHEET_ENTRIES : [])
+            .filter((row) => row && row.isDeleted !== true)
+            .map((row) => String(row?.sessionId || '').trim())
+            .filter(Boolean)
+    );
     TIMESHEET_ENTRIES.forEach(e => {
         if (e.isDeleted) {
             if (IS_ADMIN || e.isManual || e.isPriorPeriodAdjustment) {
@@ -2993,6 +3000,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTable() {
         tbody.innerHTML = '';
+        let tbodyHtml = '';
         grandTotalHours = 0;
         let grandTotalOptionalHours = 0;
         provisionalSessionCount = 0;
@@ -3021,7 +3029,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateCell = buildDateCellHtml(dateStr, dayName, isHoliday, hol);
                 const zeroHoursCells = `${buildEmptyRegularHoursCellHtml()}${buildEmptyOptionalHoursCellHtml()}`;
                 if (isHoliday) {
-                    tbody.innerHTML += `<tr class="${bgClass} row-hover ts-day-group-end">
+                    tbodyHtml += `<tr class="${bgClass} row-hover ts-day-group-end">
                         <td class="ps-4 ts-day-date-cell border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
                         <td colspan="2" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
                         ${zeroHoursCells}
@@ -3030,7 +3038,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${IS_READONLY ? '' : '<td class="ts-col-actions"></td>'}
                     </tr>`;
                 } else {
-                    tbody.innerHTML += `<tr class="${bgClass} row-hover ts-day-group-end">
+                    tbodyHtml += `<tr class="${bgClass} row-hover ts-day-group-end">
                         <td class="ps-4 ts-day-date-cell border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
                         <td colspan="2" class="text-muted fst-italic align-middle">No sessions logged.</td>
                         ${zeroHoursCells}
@@ -3085,14 +3093,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else if (isPriorAdj) {
                             actBtns = `<span class="text-muted small"><i class="bi bi-lock-fill"></i></span>`;
                         } else if (ses.isManual) {
-                            const reviewBtns = CAN_MANAGER_REVIEW && isPendingApprovalEntry(ses) && ses.activityPaid === true
+                            const isPersistedManualEntry = persistedTimesheetEntryIds.has(String(ses.sessionId || '').trim());
+                            const reviewBtns = CAN_MANAGER_REVIEW && isPendingApprovalEntry(ses) && ses.activityPaid === true && isPersistedManualEntry
                                 ? `<button class="btn btn-sm btn-outline-success py-0 px-1 me-1" title="Approve paid manual row" onclick="decideManualRow('${ses.sessionId}', 'approved')"><i class="bi bi-check-lg"></i></button>
                                    <button class="btn btn-sm btn-outline-danger py-0 px-1 me-1" title="Reject paid manual row" onclick="decideManualRow('${ses.sessionId}', 'rejected')"><i class="bi bi-x-lg"></i></button>`
+                                : '';
+                            const saveFirstHint = CAN_MANAGER_REVIEW && isPendingApprovalEntry(ses) && ses.activityPaid === true && !isPersistedManualEntry
+                                ? `<span class="text-muted small ts-tooltip-trigger me-1" data-tip="Save timesheet changes first, then approve or reject this new manual row." tabindex="0"><i class="bi bi-floppy"></i></span>`
                                 : '';
                             const copyBtn = isIndividualManualActivityRow(ses)
                                 ? `<button class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" title="Copy to other days" onclick="openCopyManualRowModal('${ses.sessionId}')"><i class="bi bi-copy"></i></button>`
                                 : '';
-                            actBtns = `${reviewBtns}<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit" onclick="openManualModal('${dateStr}', '${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
+                            actBtns = `${saveFirstHint}${reviewBtns}<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit" onclick="openManualModal('${dateStr}', '${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
                                        ${copyBtn}
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" title="Remove" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
                         } else if (isAutoPulledTimesheetEntry(ses) && !IS_ADMIN) {
@@ -3118,7 +3130,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ? `<div class="small text-muted"><i class="bi bi-building me-1"></i>${escapeHtml(displaySes.deliveryDepartmentName)}</div>`
                             : '');
 
-                    tbody.innerHTML += `
+                    tbodyHtml += `
                         <tr class="${rowClass}">
                             ${dateCell}
                             <td>${buildClassDescriptionCellHtml(displaySes)}${classMeta}</td>
@@ -3133,6 +3145,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         });
+        tbody.innerHTML = tbodyHtml;
 
         document.getElementById('lbl_grandTotal').innerText = grandTotalHours.toFixed(2);
         const optionalTotalEl = document.getElementById('lbl_grandTotalOptional');
@@ -3290,16 +3303,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return (Array.isArray(dates) ? dates : []).filter((dateStr) => String(dateStr || '').trim() && String(dateStr) !== source);
     }
 
-    async function isCopyTargetDayEligible(sourceEntry, targetDate) {
+    function buildCopyManualValidationRow(sourceEntry, targetDate, rowSuffix = '') {
         const hrs = Number(resolveRequestedHours(sourceEntry) || 0);
-        if (!Number.isFinite(hrs) || hrs <= 0) return false;
-        const existingHours = activeEntries
-            .filter((row) => String(row?.date || '') === String(targetDate || ''))
-            .reduce((sum, row) => sum + resolveRequestedHours(row), 0);
-        if (existingHours + hrs > MAX_DAILY_HOURS) return false;
-
-        const proposedRow = {
-            sessionId: `MAN_COPY_PREVIEW_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        if (!Number.isFinite(hrs) || hrs <= 0) return null;
+        const suffix = rowSuffix || `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        return {
+            sessionId: `MAN_COPY_PREVIEW_${suffix}`,
             date: targetDate,
             activityId: String(sourceEntry.activityId || '').trim(),
             activityName: String(sourceEntry.activityName || '').trim(),
@@ -3314,24 +3323,54 @@ document.addEventListener('DOMContentLoaded', () => {
             requestedHours: hrs,
             isManual: true
         };
+    }
+
+    function listCopyTargetDatesPassingDailyLimit(sourceEntry, targetDates = []) {
+        const hrs = Number(resolveRequestedHours(sourceEntry) || 0);
+        if (!Number.isFinite(hrs) || hrs <= 0) return [];
+        return (Array.isArray(targetDates) ? targetDates : []).filter((targetDate) => {
+            const existingHours = activeEntries
+                .filter((row) => String(row?.date || '') === String(targetDate || ''))
+                .reduce((sum, row) => sum + resolveRequestedHours(row), 0);
+            return existingHours + hrs <= MAX_DAILY_HOURS;
+        });
+    }
+
+    async function validateCopyTargetDatesBatch(sourceEntry, targetDates = []) {
+        const datesToValidate = listCopyTargetDatesPassingDailyLimit(sourceEntry, targetDates);
+        if (!datesToValidate.length) return new Set();
+        const candidates = datesToValidate
+            .map((dateStr, index) => buildCopyManualValidationRow(sourceEntry, dateStr, `${Date.now()}_${index}`))
+            .filter(Boolean);
+        if (!candidates.length) return new Set();
+        const existingRows = activeEntries
+            .filter((row) => row && row.isDeleted !== true);
         try {
-            const response = await fetch(`/school/timesheets/editor/${encodeURIComponent(PERIOD_ID)}/api/validate-manual-row${buildMutationQuery()}`, {
+            const response = await fetch(`/school/timesheets/editor/${encodeURIComponent(PERIOD_ID)}/api/validate-manual-row-batch${buildMutationQuery()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    proposed: proposedRow,
-                    draftEntries: activeEntries,
-                    timesheetEntries: activeEntries,
-                    editSessionId: ''
+                    candidates,
+                    draftEntries: existingRows,
+                    timesheetEntries: existingRows
                 })
             });
             const result = await response.json().catch(() => ({}));
-            if (!response.ok) return false;
-            if (result.status === 'warning' || (Array.isArray(result.conflicts) && result.conflicts.length)) return false;
-            return result.status === 'success';
+            if (!response.ok || result.status !== 'success') return new Set();
+            const eligibleDates = Array.isArray(result?.eligibleDates)
+                ? result.eligibleDates
+                : (Array.isArray(result?.results)
+                    ? result.results.filter((row) => row?.ok === true).map((row) => row?.date)
+                    : []);
+            return new Set(eligibleDates.map((dateStr) => String(dateStr || '').trim()).filter(Boolean));
         } catch (_error) {
-            return false;
+            return new Set();
         }
+    }
+
+    async function isCopyTargetDayEligible(sourceEntry, targetDate) {
+        const eligible = await validateCopyTargetDatesBatch(sourceEntry, [targetDate]);
+        return eligible.has(String(targetDate || '').trim());
     }
 
     function syncCopyManualConfirmButton() {
@@ -3448,13 +3487,10 @@ document.addEventListener('DOMContentLoaded', () => {
             note: 'Finding eligible days without conflicts…',
             operation: 'copy_manual_probe'
         });
-        const eligible = [];
+        let eligible = [];
         try {
-            for (const dateStr of candidateDates) {
-                // eslint-disable-next-line no-await-in-loop
-                const ok = await isCopyTargetDayEligible(source, dateStr);
-                if (ok) eligible.push(dateStr);
-            }
+            const eligibleSet = await validateCopyTargetDatesBatch(source, candidateDates);
+            eligible = candidateDates.filter((dateStr) => eligibleSet.has(String(dateStr || '').trim()));
         } finally {
             hideTimesheetWaitingModal(loadingToken);
         }
@@ -3501,12 +3537,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const paid = source.activityPaid === true;
         const approvalStatus = paid ? 'pending_approval' : 'unpaid';
         const excludeFromTotals = true;
+        const stillEligibleSet = await validateCopyTargetDatesBatch(source, selectedDates);
         let copied = 0;
         for (const dateStr of selectedDates) {
-            // Re-check eligibility in case the table changed while the modal was open.
-            // eslint-disable-next-line no-await-in-loop
-            const stillOk = await isCopyTargetDayEligible(source, dateStr);
-            if (!stillOk) continue;
+            if (!stillEligibleSet.has(String(dateStr || '').trim())) continue;
             activeEntries.push({
                 sessionId: createManualSessionId({ classId: null, activityId: String(source.activityId || '').trim() }),
                 date: dateStr,
@@ -4148,7 +4182,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             hideTimesheetWaitingModal(loadingToken);
             await messageBox({ title: 'Success', icon: 'success', message: result.message, okText: 'OK', okClass: 'btn-success' });
-            window.location.href = '/school/timesheets/my-timesheets';
+            if (IS_REVIEWER_EDITING) {
+                window.location.reload();
+            } else {
+                window.location.href = '/school/timesheets/my-timesheets';
+            }
         } catch (e) {
             await messageBox({ title: 'Error', icon: 'error', message: e.message });
         } finally {
@@ -4365,43 +4403,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function executeManualRowDecision(entryId, decision, note = '') {
-        const loadingToken = showTimesheetWaitingModal({
-            title: decision === 'approved' ? 'Approving Manual Row' : 'Rejecting Manual Row',
-            note: 'Please wait while the decision and payable total are updated...',
-            operation: 'Manual row decision'
-        });
         const local = activeEntries.find((row) => String(row?.sessionId || '') === String(entryId || ''));
-        try {
-            const res = await fetch(`/school/timesheets/editor/${PERIOD_ID}/manual-entries/${encodeURIComponent(entryId)}/decision${buildMutationQuery()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
-                body: JSON.stringify({
-                    decision,
-                    note,
-                    actionStateId,
-                    startTime: local?.startTime || '',
-                    endTime: local?.endTime || '',
-                    requestedHours: local?.requestedHours,
-                    durationHours: local?.durationHours
-                })
-            });
-            const result = await res.json();
-            const guarded = typeof window.applyGuardedApiResult === 'function'
-                ? await window.applyGuardedApiResult(result, { busyTitle: 'Decision In Progress', replayTitle: 'Decision Already Processed' })
-                : { stop: false };
-            if (guarded.stop) return;
-            if (result.status !== 'success') throw new Error(result.message || 'Manual-row decision failed.');
-            hideTimesheetWaitingModal(loadingToken);
-            await messageBox({ title: 'Manual Row Updated', icon: 'success', message: result.message || 'Decision saved.' });
-            window.location.reload();
-        } catch (error) {
-            await messageBox({ title: 'Error', icon: 'error', message: error.message });
-        } finally {
-            hideTimesheetWaitingModal(loadingToken);
+        if (!local) {
+            await messageBox({ title: 'Row Not Found', icon: 'error', message: 'The selected manual row is no longer available in this draft.' });
+            return;
         }
+        const normalizedDecision = String(decision || '').trim().toLowerCase();
+        if (!['approved', 'rejected'].includes(normalizedDecision)) {
+            await messageBox({ title: 'Invalid Decision', icon: 'error', message: 'Manual row decision must be approved or rejected.' });
+            return;
+        }
+        if (normalizedDecision === 'rejected' && !String(note || '').trim()) {
+            await messageBox({ title: 'Reason Required', icon: 'warning', message: 'Please explain why this manual row is being rejected.' });
+            return;
+        }
+        const requestedHours = Number(resolveRequestedHours(local) || 0);
+        if (normalizedDecision === 'approved' && (!Number.isFinite(requestedHours) || requestedHours <= 0)) {
+            await messageBox({ title: 'Invalid Hours', icon: 'error', message: 'This manual row has invalid requested hours and cannot be approved.' });
+            return;
+        }
+        local.approvalStatus = normalizedDecision;
+        local.excludeFromTotals = normalizedDecision !== 'approved';
+        local.status = normalizedDecision === 'approved' ? 'manual' : 'rejected';
+        local.hours = normalizedDecision === 'approved' ? requestedHours : 0;
+        local.timesheetHours = normalizedDecision === 'approved' ? requestedHours : 0;
+        local.durationHours = requestedHours;
+        local.requestedHours = requestedHours;
+        local.decisionNote = normalizedDecision === 'rejected' ? String(note || '').trim() : '';
+        local.decisionAt = '';
+        local.decisionBy = '';
+        local.decisionByName = '';
+        isEdited = true;
+        document.getElementById('badge_manualEdit')?.classList.remove('d-none');
+        renderTable();
+        await messageBox({
+            title: 'Manual Row Updated',
+            icon: 'success',
+            message: `${normalizedDecision === 'approved' ? 'Approved' : 'Rejected'} in this draft. Save review changes to apply it.`
+        });
     }
 
     window.decideManualRow = async function(entryId, decision) {
+        const entryToken = String(entryId || '').trim();
+        const persisted = persistedTimesheetEntryIds.has(entryToken);
+        if (!persisted) {
+            await messageBox({
+                title: 'Save Required',
+                icon: 'warning',
+                message: 'Save the timesheet changes first, then approve or reject this paid manual row.'
+            });
+            return;
+        }
         if (decision === 'approved') {
             const ok = await confirmAction({
                 title: 'Approve Manual Row',

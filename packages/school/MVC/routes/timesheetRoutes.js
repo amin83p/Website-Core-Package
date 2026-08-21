@@ -70,6 +70,11 @@ router.post('/editor/:periodId/api/validate-manual-row',
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.validateManualTimesheetRow);
 
+router.post('/editor/:periodId/api/validate-manual-row-batch',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.validateManualTimesheetRowsBatch);
+
 router.get('/editor/:periodId',
   requireAccessAny([SECTIONS.SCHOOL_TIMESHEETS, SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT], OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),

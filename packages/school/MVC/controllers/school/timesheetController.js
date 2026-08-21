@@ -1653,18 +1653,7 @@ exports.viewTimesheet = async (req, res) => {
         const sessionStatusMeta = await sessionStatusPolicyService.getClientStatusMeta(period.orgId || activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(sessionStatusMeta);
 
-        const timesheetQuery = teacherContext.targetTeacherId
-            ? { teacherId__eq: teacherContext.targetTeacherId }
-            : { limit: 0 };
-        const allTimesheets = await dataService.fetchData(
-            'timesheets',
-            timesheetQuery,
-            req.user,
-            { ...dataService.buildRouteAccessContext(req), unbounded: !teacherContext.targetTeacherId }
-        );
-        let timesheet = allTimesheets.find(
-            (t) => idsEqual(t.periodId, periodId) && idsEqual(t.teacherId, teacherContext.targetTeacherId)
-        );
+        let timesheet = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
 
         if (!timesheet) {
             timesheet = {
@@ -1792,7 +1781,7 @@ exports.viewTimesheet = async (req, res) => {
         });
 
         for (const c of scopedClasses) {
-            const sessions = await dataService.getClassSessions(c.id, req.user);
+            const sessions = sessionsByClassId.get(String(c.id || '').trim()) || [];
             (Array.isArray(sessions) ? sessions : []).forEach((s) => {
                 if (!sessionDeliveryTeamService.isPersonOnSessionDelivery(s, teacherContext.targetTeacherId)) return;
                 const duePeriodId = String(s?.attendanceDuePeriodId || '').trim();
@@ -2129,6 +2118,18 @@ exports.saveTimesheet = async (req, res) => {
 
         const existingRaw = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
         const existing = normalizeTimesheetLifecycle(existingRaw);
+        const existingEntriesList = Array.isArray(existing?.entries) ? existing.entries : [];
+        const existingEntriesBySessionId = new Map(
+            existingEntriesList
+                .map((entry) => [String(entry?.sessionId || '').trim(), entry])
+                .filter(([sessionId]) => Boolean(sessionId))
+        );
+        const existingManualEntriesBySessionId = new Map(
+            existingEntriesList
+                .filter((entry) => entry && entry.isDeleted !== true && entry.isManual === true)
+                .map((entry) => [String(entry?.sessionId || '').trim(), entry])
+                .filter(([sessionId]) => Boolean(sessionId))
+        );
         const canReviewerEdit = await hasTimesheetManagementAuthority(req.user, OPERATIONS.UPDATE);
         const existingStatus = String(existing?.status || 'draft').toLowerCase();
         const reviewerEdit = Boolean(existing?.id && existingStatus === 'submitted' && canReviewerEdit);
@@ -2321,9 +2322,10 @@ exports.saveTimesheet = async (req, res) => {
                 if (!sessionId) throw new Error('Manual entry session id is required.');
                 const classId = String(entry.classId || '').trim();
                 const activityId = String(entry.activityId || '').trim();
+                const priorManualEntry = existingManualEntriesBySessionId.get(sessionId) || null;
                 assertManualStructuredEntryRequired({
                     entry: { sessionId, classId, activityId },
-                    existingEntries: Array.isArray(existing?.entries) ? existing.entries : []
+                    existingEntries: existingEntriesList
                 });
                 const activityRow = activityId ? activityById.get(activityId) : null;
                 if (activityId && !activityRow) {
@@ -2335,16 +2337,30 @@ exports.saveTimesheet = async (req, res) => {
                 if (activityRow && String(activityRow?.status || '').toLowerCase() !== 'posted') {
                     throw new Error('Selected activity must be posted before it can be used on a timesheet.');
                 }
+                const resolvedActivityVisibilityScope = activityRow
+                    ? activityService.normalizeActivityVisibilityScope(
+                        activityRow.visibilityScope || activityRow.calendarScope || activityRow.scope
+                    )
+                    : '';
+                const rawActivityEntryId = String(entry?.activityEntryId || '').trim();
+                const sanitizedActivityEntryId = resolvedActivityVisibilityScope === 'individual'
+                    ? ''
+                    : rawActivityEntryId;
 
-                const workSessionBinding = activityRow
-                    ? resolveManualActivityWorkSessionBinding({
-                        activityRow,
-                        activityEntryId: entry.activityEntryId,
-                        teacherId: teacherContext.targetTeacherId,
-                        entrySessionId: sessionId,
-                        allManualEntries: entryRows
-                    })
-                    : null;
+                let workSessionBinding = null;
+                if (activityRow) {
+                    try {
+                        workSessionBinding = resolveManualActivityWorkSessionBinding({
+                            activityRow,
+                            activityEntryId: sanitizedActivityEntryId,
+                            teacherId: teacherContext.targetTeacherId,
+                            entrySessionId: sessionId,
+                            allManualEntries: entryRows
+                        });
+                    } catch (bindingError) {
+                        throw bindingError;
+                    }
+                }
 
                 let dateValue = normalizeDateOnly(entry.date);
                 if (workSessionBinding?.activityEntryId && workSessionBinding.date) {
@@ -2439,10 +2455,12 @@ exports.saveTimesheet = async (req, res) => {
                             : ''),
                     approvalStatus,
                     excludeFromTotals,
-                    decisionAt: reviewerEdit ? String(entry.decisionAt || '').trim() : '',
-                    decisionBy: reviewerEdit ? String(entry.decisionBy || '').trim() : '',
-                    decisionByName: reviewerEdit ? String(entry.decisionByName || '').trim() : '',
-                    decisionNote: reviewerEdit ? String(entry.decisionNote || '').trim() : '',
+                    decisionAt: reviewerEdit ? String(priorManualEntry?.decisionAt || '').trim() : '',
+                    decisionBy: reviewerEdit ? String(priorManualEntry?.decisionBy || '').trim() : '',
+                    decisionByName: reviewerEdit ? String(priorManualEntry?.decisionByName || '').trim() : '',
+                    decisionNote: reviewerEdit
+                        ? String(entry.decisionNote || priorManualEntry?.decisionNote || '').trim()
+                        : '',
                     deliveryDepartmentId: String(entry.deliveryDepartmentId || activityRow?.departmentId || '').trim(),
                     deliveryDepartmentName: String(entry.deliveryDepartmentName || activityRow?.departmentName || '').trim(),
                     categoryName: String(entry.categoryName || activityRow?.categoryName || '').trim(),
@@ -2552,18 +2570,52 @@ exports.saveTimesheet = async (req, res) => {
         );
 
         const manualRows = manualSessionNormalizedEntries.filter((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
-        if (manualRows.length || manualSessionNormalizedEntries.some((entry) => entry?.startTime && entry?.endTime)) {
+        const resolveEntryConflictScope = (entry = {}) => {
+            const activityId = String(entry?.activityId || '').trim();
+            if (!activityId) return '';
+            const activityRow = activityById.get(activityId);
+            const explicitScope = String(entry?.visibilityScope || '').trim().toLowerCase();
+            if (explicitScope === 'individual' || explicitScope === 'school') return explicitScope;
+            return activityRow
+                ? activityService.normalizeActivityVisibilityScope(activityRow.visibilityScope || activityRow.calendarScope || activityRow.scope)
+                : '';
+        };
+        const manualConflictFingerprint = (entry = {}) => {
+            const scope = resolveEntryConflictScope(entry);
+            return JSON.stringify({
+                date: normalizeDateOnly(entry?.date),
+                startTime: normalizeClockTime(entry?.startTime || ''),
+                endTime: normalizeClockTime(entry?.endTime || ''),
+                classId: String(entry?.classId || '').trim(),
+                activityId: String(entry?.activityId || '').trim(),
+                activityEntryId: scope === 'individual' ? '' : String(entry?.activityEntryId || '').trim()
+            });
+        };
+        const conflictCandidateManualRows = manualRows.filter((entry) => {
+            const sessionId = String(entry?.sessionId || '').trim();
+            if (!sessionId) return true;
+            const prior = existingManualEntriesBySessionId.get(sessionId);
+            if (!prior) return true;
+            return manualConflictFingerprint(entry) !== manualConflictFingerprint(prior);
+        });
+        if (conflictCandidateManualRows.length) {
             const conflicts = await runTimesheetConflictValidation({
                 activeOrgId,
                 personId: teacherContext.targetTeacherId,
                 period,
-                candidateEntries: manualRows,
+                candidateEntries: conflictCandidateManualRows,
                 draftEntries: manualRows,
                 timesheetEntries: manualSessionNormalizedEntries.filter((entry) => entry && entry.isDeleted !== true),
                 reqUser: req.user
             });
-            if (Array.isArray(conflicts) && conflicts.length) {
-                throwTimesheetConflictError(conflicts);
+            const candidateIds = new Set(conflictCandidateManualRows.map((row) => String(row?.sessionId || '').trim()).filter(Boolean));
+            const scopedConflicts = (Array.isArray(conflicts) ? conflicts : []).filter((row) => {
+                const entrySessionId = String(row?.entrySessionId || '').trim();
+                const sourceSessionId = String(row?.sourceSessionId || '').trim();
+                return candidateIds.has(entrySessionId) || candidateIds.has(sourceSessionId);
+            });
+            if (scopedConflicts.length) {
+                throwTimesheetConflictError(scopedConflicts);
             }
         }
 
@@ -2603,6 +2655,124 @@ exports.saveTimesheet = async (req, res) => {
             });
             await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
             entriesForSave = restoreRevertedManualEntryIds(entriesForSave, revertSummary);
+        }
+        if (reviewerEdit) {
+            const reviewerDecisionAt = new Date().toISOString();
+            const reviewerDecisionBy = resolveActorId(req.user);
+            const reviewerDecisionByName = resolveActorName(req.user);
+            const transitionedEntries = [];
+            for (const row of entriesForSave) {
+                if (!row || row.isDeleted === true || row.isManual !== true || row.activityPaid !== true) {
+                    transitionedEntries.push(row);
+                    continue;
+                }
+                const sessionId = String(row.sessionId || '').trim();
+                const prior = existingEntriesBySessionId.get(sessionId);
+                const priorApprovalStatus = normalizeManualApprovalStatus(prior?.approvalStatus);
+                const nextApprovalStatus = normalizeManualApprovalStatus(row?.approvalStatus);
+                const canDecide = Boolean(prior && (
+                    isPendingManualApproval(prior)
+                    || ['approved', 'rejected'].includes(priorApprovalStatus)
+                ));
+
+                if (!canDecide) {
+                    if (['approved', 'rejected'].includes(nextApprovalStatus)) {
+                        throw new Error('Save the newly added manual row first, then approve or reject it.');
+                    }
+                    transitionedEntries.push(row);
+                    continue;
+                }
+
+                if (!nextApprovalStatus) {
+                    transitionedEntries.push({
+                        ...row,
+                        approvalStatus: priorApprovalStatus || 'pending_approval',
+                        decisionAt: String(prior?.decisionAt || ''),
+                        decisionBy: String(prior?.decisionBy || ''),
+                        decisionByName: String(prior?.decisionByName || ''),
+                        decisionNote: String(prior?.decisionNote || '')
+                    });
+                    continue;
+                }
+
+                let nextRow = { ...row };
+                if (nextApprovalStatus !== priorApprovalStatus && ['approved', 'rejected'].includes(nextApprovalStatus)) {
+                    if (nextApprovalStatus === 'rejected' && !String(nextRow?.decisionNote || '').trim()) {
+                        throw new Error('A rejection note is required.');
+                    }
+                    const payableHours = Number(parseFloat(nextRow.requestedHours ?? nextRow.durationHours ?? nextRow.hours) || 0);
+                    nextRow = {
+                        ...nextRow,
+                        approvalStatus: nextApprovalStatus,
+                        excludeFromTotals: nextApprovalStatus === 'rejected',
+                        hours: nextApprovalStatus === 'approved' ? payableHours : 0,
+                        timesheetHours: nextApprovalStatus === 'approved' ? payableHours : 0,
+                        status: nextApprovalStatus === 'approved' ? 'manual' : 'rejected',
+                        decisionAt: reviewerDecisionAt,
+                        decisionBy: reviewerDecisionBy,
+                        decisionByName: reviewerDecisionByName,
+                        decisionNote: String(nextRow?.decisionNote || '').trim()
+                    };
+                    const activityId = String(nextRow.activityId || '').trim();
+                    const alreadyMaterialized = Boolean(nextRow.materializedAt || nextRow.materializedSessionId);
+                    if (nextApprovalStatus === 'approved' && activityId && !alreadyMaterialized) {
+                        // eslint-disable-next-line no-await-in-loop
+                        const materializeResult = await timesheetManualMaterializationService.materializeActivityManualEntry({
+                            entry: nextRow,
+                            timesheet: existing,
+                            teacherId: teacherContext.targetTeacherId,
+                            reqUser: req.user
+                        });
+                        if (materializeResult) {
+                            nextRow = timesheetManualMaterializationService.applyActivityMaterializationMarkers(
+                                nextRow,
+                                materializeResult,
+                                existing
+                            );
+                        }
+                    } else if (nextApprovalStatus === 'rejected' && activityId && alreadyMaterialized) {
+                        // eslint-disable-next-line no-await-in-loop
+                        await timesheetManualMaterializationService.revertMaterializedActivityManualEntry({
+                            timesheetId: existing.id,
+                            timesheetEntryId: sessionId,
+                            activityId,
+                            activityEntryId: String(nextRow.activityEntryId || '').trim(),
+                            reqUser: req.user
+                        });
+                        nextRow = timesheetManualMaterializationService.clearActivityMaterializationMarkers(nextRow);
+                        if (!String(prior?.activityEntryId || '').trim()) {
+                            nextRow.activityEntryId = '';
+                        }
+                    }
+                } else {
+                    if (nextApprovalStatus !== priorApprovalStatus && !['approved', 'rejected'].includes(nextApprovalStatus)) {
+                        const fallbackApproval = priorApprovalStatus || 'pending_approval';
+                        const requestedHours = Number(parseFloat(nextRow.requestedHours ?? nextRow.durationHours ?? nextRow.hours) || 0);
+                        const fallbackExcluded = ['pending_approval', 'rejected', 'unpaid'].includes(fallbackApproval);
+                        const fallbackHours = fallbackExcluded ? 0 : requestedHours;
+                        nextRow = {
+                            ...nextRow,
+                            approvalStatus: fallbackApproval,
+                            excludeFromTotals: fallbackExcluded,
+                            hours: fallbackHours,
+                            timesheetHours: fallbackHours,
+                            status: fallbackApproval === 'pending_approval'
+                                ? 'pending_approval'
+                                : (fallbackApproval === 'rejected' ? 'rejected' : 'manual')
+                        };
+                    }
+                    nextRow = {
+                        ...nextRow,
+                        decisionAt: String(prior?.decisionAt || ''),
+                        decisionBy: String(prior?.decisionBy || ''),
+                        decisionByName: String(prior?.decisionByName || ''),
+                        decisionNote: String(nextRow?.decisionNote || prior?.decisionNote || '').trim()
+                    };
+                }
+
+                transitionedEntries.push(nextRow);
+            }
+            entriesForSave = transitionedEntries;
         }
 
         let priorReconciliationContext = null;
@@ -3229,15 +3399,150 @@ exports.validateManualTimesheetRow = async (req, res) => {
             ignoreSessionId,
             reqUser: req.user
         });
-        if (conflicts.length) {
+        const proposedSessionId = String(proposed?.sessionId || '').trim();
+        const scopedConflicts = proposedSessionId
+            ? (Array.isArray(conflicts) ? conflicts : []).filter((row) => String(row?.entrySessionId || '').trim() === proposedSessionId)
+            : (Array.isArray(conflicts) ? conflicts : []);
+        if (scopedConflicts.length) {
             return res.status(409).json({
                 status: 'warning',
                 code: 'MANUAL_ENTRY_SCHEDULE_CONFLICT',
                 message: 'Selected date/time conflicts with your schedule or another timesheet row.',
-                conflicts
+                conflicts: scopedConflicts
             });
         }
         return res.json({ status: 'success', conflicts: [] });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.validateManualTimesheetRowsBatch = async (req, res) => {
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.UPDATE });
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const rawCandidates = Array.isArray(body.candidates) ? body.candidates : [];
+        const draftEntries = Array.isArray(body.draftEntries) ? body.draftEntries : [];
+        const timesheetEntries = Array.isArray(body.timesheetEntries) ? body.timesheetEntries : draftEntries;
+        if (!rawCandidates.length) {
+            return res.json({ status: 'success', results: [], eligibleDates: [] });
+        }
+
+        const stored = normalizeTimesheetLifecycle(
+            await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user)
+        );
+        const activityCache = new Map();
+        const classCache = new Map();
+        const allManualEntries = [...draftEntries, ...timesheetEntries, ...rawCandidates];
+        const candidates = [];
+
+        for (let index = 0; index < rawCandidates.length; index += 1) {
+            const row = rawCandidates[index] && typeof rawCandidates[index] === 'object'
+                ? { ...rawCandidates[index] }
+                : {};
+            const sessionId = String(row.sessionId || `MAN_BATCH_PREVIEW_${index}`).trim();
+            const classId = String(row.classId || '').trim();
+            const activityId = String(row.activityId || '').trim();
+            assertManualStructuredEntryRequired({
+                entry: { sessionId, classId, activityId },
+                existingEntries: Array.isArray(stored?.entries) ? stored.entries : []
+            });
+
+            if (activityId) {
+                let activityRow = activityCache.get(activityId);
+                if (!activityRow) {
+                    // eslint-disable-next-line no-await-in-loop
+                    activityRow = await activityService.getActivity(activityId, req.user);
+                    activityCache.set(activityId, activityRow || null);
+                }
+                if (!activityRow || !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
+                    throw new Error('You are not eligible for one or more selected activities.');
+                }
+                const binding = resolveManualActivityWorkSessionBinding({
+                    activityRow,
+                    activityEntryId: row.activityEntryId,
+                    teacherId: teacherContext.targetTeacherId,
+                    entrySessionId: sessionId,
+                    allManualEntries
+                });
+                if (binding.activityEntryId) {
+                    row.activityEntryId = binding.activityEntryId;
+                    row.date = binding.date || row.date;
+                    row.startTime = binding.startTime;
+                    row.endTime = binding.endTime;
+                    row.durationHours = binding.durationHours;
+                    row.requestedHours = binding.durationHours;
+                    row.className = binding.className || row.className;
+                    row.description = binding.description || row.description;
+                    row.visibilityScope = binding.visibilityScope;
+                } else {
+                    row.activityEntryId = '';
+                    row.visibilityScope = binding.visibilityScope || 'individual';
+                }
+            }
+
+            if (classId) {
+                let classRow = classCache.get(classId);
+                if (!classRow) {
+                    // eslint-disable-next-line no-await-in-loop
+                    classRow = await dataService.getDataById('classes', classId, req.user);
+                    classCache.set(classId, classRow || null);
+                }
+                if (!classRow || !isActiveClassForManualEntry(classRow) || isInactiveSchoolRecord(classRow)) {
+                    throw new Error('One or more selected classes is not active or is no longer available.');
+                }
+            }
+
+            candidates.push({
+                ...row,
+                sessionId,
+                classId,
+                activityId,
+                isManual: true
+            });
+        }
+
+        const conflicts = await runTimesheetConflictValidation({
+            activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            period,
+            candidateEntries: candidates,
+            draftEntries,
+            timesheetEntries,
+            ignoreSessionId: '',
+            reqUser: req.user
+        });
+        const conflictsBySessionId = new Map();
+        (Array.isArray(conflicts) ? conflicts : []).forEach((row) => {
+            const sessionId = String(row?.entrySessionId || '').trim();
+            if (!sessionId) return;
+            if (!conflictsBySessionId.has(sessionId)) conflictsBySessionId.set(sessionId, []);
+            conflictsBySessionId.get(sessionId).push(row);
+        });
+
+        const results = candidates.map((candidate) => {
+            const sessionId = String(candidate.sessionId || '').trim();
+            const rows = conflictsBySessionId.get(sessionId) || [];
+            return {
+                sessionId,
+                date: String(candidate.date || '').trim(),
+                ok: rows.length === 0,
+                conflictCount: rows.length,
+                conflicts: rows
+            };
+        });
+
+        return res.json({
+            status: 'success',
+            results,
+            eligibleDates: results.filter((row) => row.ok).map((row) => row.date)
+        });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }
@@ -3346,14 +3651,14 @@ exports.decideManualTimesheetRow = async (req, res) => {
         if (period.status === 'processed') throw new Error('This period has been processed and is locked.');
         const existing = normalizeTimesheetLifecycle(await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user));
         if (!existing) throw new Error('Timesheet not found.');
+        const sourceEntries = Array.isArray(existing.entries) ? existing.entries : [];
+        const targetEntry = sourceEntries.find((entry) => idsEqual(entry?.sessionId, entryId));
         if (existing.status !== 'submitted') throw new Error('Manual-row decisions are available only for submitted timesheets.');
 
         const now = new Date().toISOString();
         const bodyStartTime = normalizeClockTime(req.body?.startTime || '');
         const bodyEndTime = normalizeClockTime(req.body?.endTime || '');
         const bodyRequestedHours = Number(parseFloat(req.body?.requestedHours ?? req.body?.durationHours) || 0);
-        const sourceEntries = Array.isArray(existing.entries) ? existing.entries : [];
-        const targetEntry = sourceEntries.find((entry) => idsEqual(entry?.sessionId, entryId));
         if (!targetEntry) throw new Error('Manual row not found.');
         if (targetEntry?.isManual !== true || targetEntry?.activityPaid !== true) {
             throw new Error('Only paid manual rows can receive an approval decision.');
