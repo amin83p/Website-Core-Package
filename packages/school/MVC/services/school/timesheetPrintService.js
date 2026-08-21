@@ -396,10 +396,11 @@ function buildDepartmentTotals(entries = [], lookups = {}) {
     const classRow = lookups.classMap?.get(cleanText(entry.classId)) || {};
     const departmentOptionalHours = resolveDepartmentOptionalHours(entry, classRow);
     if (payableHours === 0 && pendingHours === 0 && departmentOptionalHours === 0) return;
-    const key = entry.department?.name || 'No Department';
+    const key = entry.department?.code || entry.department?.name || 'No Department';
     const isOneOnOne = isDepartmentOneOnOneEntry(entry, classRow);
     const bucket = buckets.get(key) || {
       departmentName: key,
+      departmentCode: entry.department?.code || '',
       groupHours: 0,
       oneOnOneHours: 0,
       oneOnOneOptionalHours: 0,
@@ -483,13 +484,16 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
   const holidayMap = new Map((Array.isArray(holidayRows) ? holidayRows : [])
     .filter((row) => cleanText(row?.date) >= cleanText(period.startDate) && cleanText(row?.date) <= cleanText(period.endDate))
     .map((row) => [cleanText(row?.date), row]));
-  const days = buildDateKeys(period.startDate, period.endDate).map((date) => ({
-    date,
-    dayName: formatDateKey(date, { weekday: 'long' }),
-    dateLabel: formatDateKey(date, { month: 'long', day: 'numeric' }),
-    holidayName: cleanText(holidayMap.get(date)?.name || holidayMap.get(date)?.title),
-    entries: entriesByDate.get(date) || []
-  }));
+  const days = buildDateKeys(period.startDate, period.endDate).map((date) => {
+    const shortMonth = formatDateKey(date, { month: 'short' });
+    return {
+      date,
+      dayName: `${formatDateKey(date, { weekday: 'short' })}.`,
+      dateLabel: `${shortMonth}. ${formatDateKey(date, { day: 'numeric' })}`,
+      holidayName: cleanText(holidayMap.get(date)?.name || holidayMap.get(date)?.title),
+      entries: entriesByDate.get(date) || []
+    };
+  });
   const timesheet = effective.timesheet || {};
   const departmentTotals = buildDepartmentTotalsFromEffective(effective);
   const reconciliationEntries = entries.filter((entry) => entry.reconciliationRequired === true);

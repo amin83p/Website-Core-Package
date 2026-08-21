@@ -3,7 +3,7 @@
   const documents = Array.isArray(context.documents) ? context.documents : [];
   const period = context.period || {};
   const rawPrintSettings = (typeof printSettings !== 'undefined' && printSettings && typeof printSettings === 'object') ? printSettings : {};
-  const printOrientation = String(rawPrintSettings.orientation || '').trim().toLowerCase() === 'portrait' ? 'portrait' : 'landscape';
+  const printOrientation = String(rawPrintSettings.orientation || '').trim().toLowerCase() === 'landscape' ? 'landscape' : 'portrait';
   const printDensity = String(rawPrintSettings.density || '').trim().toLowerCase() === 'normal' ? 'normal' : 'compact';
   const printIncludeHeaderNote = rawPrintSettings.includeHeaderNote === true;
   const printHeaderNote = printIncludeHeaderNote ? String(rawPrintSettings.headerNote || '').trim() : '';
@@ -36,10 +36,10 @@
     body {
       color: var(--ink);
       font-family: "Segoe UI", Arial, sans-serif;
-      font-size: 14px;
-      line-height: 1.45;
+      font-size: 15px;
+      line-height: 1.42;
     }
-    body.print-density-normal { font-size: 15px; line-height: 1.48; }
+    body.print-density-normal { font-size: 15.5px; line-height: 1.45; }
     .screen-actions {
       display: flex;
       align-items: center;
@@ -65,6 +65,7 @@
       break-after: page;
       page-break-after: always;
     }
+    .print-sheet-frame[data-print-overflow="readable"] { overflow: visible; }
     .print-sheet-frame:last-child { break-after: auto; page-break-after: auto; }
     .print-sheet {
       width: 100%;
@@ -123,7 +124,7 @@
     .one-on-one-badge { margin-left: 5px; color: #5b21b6; background: #f5f0ff; }
     .optional-badge { margin-left: 5px; color: var(--optional); background: #eaf7ff; }
     .role-badge { margin-left: 5px; color: #46505d; background: #f5f6f8; }
-    .reconciliation-badge { display: block; width: fit-content; margin: 3px auto 0; color: #084298; background: #cfe2ff; }
+    .reconciliation-badge { margin-left: 4px; color: #084298; background: #cfe2ff; }
     .provisional-row td { box-shadow: inset 3px 0 0 #0d6efd; }
     .reconciliation-summary { margin-top: 4px; padding: 4px 6px; color: #084298; background: #eef5ff; border: 1px solid #b6d4fe; font-size: 11px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -136,26 +137,53 @@
     .timesheet-table { width: 100%; max-width: 100%; }
     .timesheet-table th,
     .timesheet-table td { padding: 10px 9px; }
-    .col-date { width: 9%; }
-    .col-description { width: 25%; }
-    .col-student { width: 14%; }
-    .col-hours-group { text-align: center; width: 14%; }
-    .col-hours-regular { width: 7%; text-align: center; }
-    .col-hours-optional { width: 7%; text-align: center; }
-    .col-status { width: 11%; text-align: center; }
-    .col-comment { width: 27%; }
-    .date-day { font-size: 15px; font-weight: 700; }
-    .date-value { color: var(--muted); font-size: 14px; font-weight: 700; }
+    .col-date { width: 8%; }
+    .col-description { width: 39%; }
+    .col-student { width: 13%; }
+    .col-hours-group { text-align: center; }
+    .col-hours-regular { width: 6%; text-align: center; }
+    .col-hours-optional { width: 6%; text-align: center; }
+    .col-comment { width: 28%; text-align: left; vertical-align: top; }
+    .timesheet-table th.col-hours-regular,
+    .timesheet-table th.col-hours-optional {
+      padding-left: 3px;
+      padding-right: 3px;
+      font-size: 10px;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+    .date-day { font-size: 15px; font-weight: 700; white-space: nowrap; }
+    .date-value { color: var(--muted); font-size: 14px; font-weight: 700; white-space: nowrap; }
     .holiday-label { margin-top: 3px; color: var(--red); font-size: 12px; font-weight: 700; }
-    .primary-label { font-weight: 800; font-size: 14px; }
-    .secondary-label, .cell-muted, .schedule-label { margin-top: 3px; color: var(--muted); font-size: 12.5px; }
+    .session-description { display: flex; flex-direction: column; gap: 2px; line-height: 1.25; }
+    .session-department-line { font-weight: 800; font-size: 15px; }
+    .session-department-text { vertical-align: middle; }
+    .session-class-time-line {
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: 0;
+      white-space: nowrap;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+    .secondary-label, .cell-muted { margin-top: 3px; color: var(--muted); font-size: 12.5px; }
     .hours-value { color: var(--green); font-size: 17px; font-weight: 800; text-align: center; }
     .hours-value.is-dash { color: var(--muted); font-weight: 700; }
     .hours-value.is-optional { color: var(--optional); }
     .hours-value.is-struck { color: var(--muted); text-decoration: line-through; }
     .payable-note { margin-top: 2px; color: var(--amber); font-size: 10.5px; font-weight: 700; }
     .time-label { margin-top: 2px; color: var(--muted); font-size: 11px; }
+    .comment-cell { text-align: left; font-size: 12.5px; line-height: 1.32; }
+    .comment-cell .badge { vertical-align: top; }
+    .comment-separator { color: var(--muted); font-weight: 800; padding: 0 4px; }
+    .comment-text { color: var(--ink); }
     .empty-row { color: var(--muted); font-style: italic; }
+    .no-log-row td { border-left: 0; border-right: 0; padding: 6px 8px; }
+    .no-log-row-content { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .no-log-row-date { color: var(--ink); font-weight: 800; font-style: normal; }
+    .no-log-row-note { color: var(--muted); font-style: italic; }
     .total-row td { background: #eef7f1 !important; font-weight: 800; }
     .total-label { text-align: right; text-transform: uppercase; }
     .total-hours { color: var(--green); font-size: 17px; text-align: center; }
@@ -191,16 +219,20 @@
     .print-sheet.print-fit-step-1 .department-table td { padding: 8px 8px; font-size: 13px; }
     .print-sheet.print-fit-step-1 .document-title { font-size: 20px; }
     .print-sheet.print-fit-step-1 .person-name { font-size: 16px; }
-    .print-sheet.print-fit-step-1 .date-day, .print-sheet.print-fit-step-1 .date-value { font-size: 13px; }
-    .print-sheet.print-fit-step-1 .primary-label { font-size: 13px; }
+    .print-sheet.print-fit-step-1 .date-day,
+    .print-sheet.print-fit-step-1 .date-value { font-size: 13px; }
+    .print-sheet.print-fit-step-1 .session-department-line { font-size: 14px; }
+    .print-sheet.print-fit-step-1 .session-class-time-line { font-size: 11px; }
     .print-sheet.print-fit-step-1 .secondary-label,
-    .print-sheet.print-fit-step-1 .schedule-label,
     .print-sheet.print-fit-step-1 .cell-muted { font-size: 11px; }
     .print-sheet.print-fit-step-1 .hours-value,
     .print-sheet.print-fit-step-1 .total-hours,
     .print-sheet.print-fit-step-1 .total-hours-optional { font-size: 14px; }
+    .print-sheet.print-fit-step-1 .comment-cell { font-size: 11px; }
+    .print-sheet.print-fit-step-1 .timesheet-table th.col-hours-regular,
+    .print-sheet.print-fit-step-1 .timesheet-table th.col-hours-optional { font-size: 9px; }
     .print-sheet.print-fit-step-1 .department-hours-row td { font-size: 14px; }
-    .print-sheet.print-fit-step-2 { font-size: 12px; line-height: 1.3; }
+    .print-sheet.print-fit-step-2 { font-size: 13px; line-height: 1.25; }
     .print-sheet.print-fit-step-2 .identity-block { margin-bottom: 4px; }
     .print-sheet.print-fit-step-2 .department-heading { margin-bottom: 5px; font-size: 14px; }
     .print-sheet.print-fit-step-2 .timesheet-table th,
@@ -213,15 +245,19 @@
     .print-sheet.print-fit-step-2 .period-range,
     .print-sheet.print-fit-step-2 .print-sheet-footer { font-size: 11px; }
     .print-sheet.print-fit-step-2 .badge { padding: 1px 5px; font-size: 9px; }
-    .print-sheet.print-fit-step-2 .date-day, .print-sheet.print-fit-step-2 .date-value { font-size: 12px; }
-    .print-sheet.print-fit-step-2 .primary-label { font-size: 12px; }
+    .print-sheet.print-fit-step-2 .date-day,
+    .print-sheet.print-fit-step-2 .date-value { font-size: 12px; }
+    .print-sheet.print-fit-step-2 .session-department-line { font-size: 13.5px; }
+    .print-sheet.print-fit-step-2 .session-class-time-line { font-size: 10.5px; }
     .print-sheet.print-fit-step-2 .secondary-label,
-    .print-sheet.print-fit-step-2 .schedule-label,
     .print-sheet.print-fit-step-2 .cell-muted,
     .print-sheet.print-fit-step-2 .payable-note { font-size: 10px; }
     .print-sheet.print-fit-step-2 .hours-value,
     .print-sheet.print-fit-step-2 .total-hours,
     .print-sheet.print-fit-step-2 .total-hours-optional { font-size: 13px; }
+    .print-sheet.print-fit-step-2 .comment-cell { font-size: 10px; }
+    .print-sheet.print-fit-step-2 .timesheet-table th.col-hours-regular,
+    .print-sheet.print-fit-step-2 .timesheet-table th.col-hours-optional { font-size: 8px; }
     .print-sheet.print-fit-step-2 .department-hours-row td { font-size: 13px; }
     .print-sheet.print-fit-step-2 .department-name-row th,
     .print-sheet.print-fit-step-2 .department-metric-label { font-size: 12px; }
@@ -229,11 +265,23 @@
       html, body { width: 100%; max-width: 100%; min-width: 0; margin: 0; }
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       .no-print { display: none !important; }
-      .print-sheet-frame { width: 100%; max-width: 100%; margin: 0; padding: 0; }
+      .print-sheet-frame { width: 100%; max-width: 100%; margin: 0; padding: 0; overflow: visible; }
+      body[data-print-orientation="portrait"] .print-sheet-frame {
+        width: calc(210mm - 20mm);
+        max-width: calc(210mm - 20mm);
+        height: calc(297mm - 20mm);
+        max-height: calc(297mm - 20mm);
+      }
+      body[data-print-orientation="landscape"] .print-sheet-frame {
+        width: calc(297mm - 20mm);
+        max-width: calc(297mm - 20mm);
+        height: calc(210mm - 20mm);
+        max-height: calc(210mm - 20mm);
+      }
       .print-sheet { width: 100%; max-width: 100%; margin: 0; padding: 0; min-height: 100%; }
       .timesheet-table, .department-table { width: 100%; max-width: 100%; }
       /* Prefer readable sizes; fit steps only shrink mildly when content overflows. */
-      body { font-size: 14px; line-height: 1.42; }
+      body { font-size: 15px; line-height: 1.38; }
       .identity-block { margin-bottom: 10px; }
       .document-title { font-size: 24px; }
       .person-name { font-size: 18px; }
@@ -245,9 +293,11 @@
       .badge { padding: 2px 7px; font-size: 10.5px; }
       .date-day { font-size: 14px; }
       .date-value { font-size: 13px; }
-      .primary-label { font-size: 13.5px; }
-      .holiday-label, .secondary-label, .cell-muted, .schedule-label, .payable-note, .time-label { margin-top: 2px; font-size: 11.5px; }
-      .hours-value, .total-hours, .total-hours-optional { font-size: 16px; }
+      .session-department-line { font-size: 15px; }
+      .session-class-time-line { font-size: 11.5px; }
+      .holiday-label, .secondary-label, .cell-muted, .payable-note, .time-label { margin-top: 2px; font-size: 11.5px; }
+      .comment-cell { font-size: 11.5px; }
+      .hours-value, .total-hours, .total-hours-optional { font-size: 17px; }
       .department-heading { margin-bottom: 8px; font-size: 17px; }
       .department-table th,
       .department-table td { padding: 10px 9px; font-size: 14px; }
@@ -304,7 +354,7 @@
     <button type="button" onclick="window.print()">Print</button>
     <button type="button" onclick="window.close()">Close</button>
   </div>
-  <p class="screen-actions-hint no-print">Each timesheet is sized for one A4 page at 100% scale. Avoid &ldquo;Fit to printable area&rdquo; unless you need extra margin.</p>
+  <p class="screen-actions-hint no-print">Each timesheet is fit to one A4 page. Keep browser scale at 100% for the closest preview match.</p>
 
   <% documents.forEach((document) => { %>
     <div class="print-sheet-frame">
@@ -332,7 +382,6 @@
           <col class="col-student">
           <col class="col-hours-regular">
           <col class="col-hours-optional">
-          <col class="col-status">
           <col class="col-comment">
         </colgroup>
         <thead>
@@ -341,7 +390,6 @@
             <th class="col-description" rowspan="2">Class / Description</th>
             <th class="col-student" rowspan="2">Student Name</th>
             <th class="col-hours-group" colspan="2">Hours/Time (Hrs)</th>
-            <th class="col-status" rowspan="2">Status</th>
             <th class="col-comment" rowspan="2">Comment</th>
           </tr>
           <tr>
@@ -351,18 +399,15 @@
         </thead>
         <tbody>
           <% document.days.forEach((day) => { %>
+            <% const dateLineLabel = [day.dayName, day.dateLabel].filter(Boolean).join(' '); %>
             <% if (!day.entries.length) { %>
-              <tr>
-                <td>
-                  <div class="date-day"><%= day.dayName %></div>
-                  <div class="date-value"><%= day.dateLabel %></div>
-                  <% if (day.holidayName) { %><div class="holiday-label"><%= day.holidayName %></div><% } %>
+              <tr class="no-log-row">
+                <td colspan="6" class="empty-row">
+                  <div class="no-log-row-content">
+                    <span class="no-log-row-date"><%= dateLineLabel %></span>
+                    <span class="no-log-row-note"><%= day.holidayName ? `Holiday: ${day.holidayName}` : 'No sessions logged.' %></span>
+                  </div>
                 </td>
-                <td colspan="2" class="empty-row"><%= day.holidayName ? `Holiday: ${day.holidayName}` : 'No sessions logged.' %></td>
-                <td class="col-hours-regular"><span class="hours-value">0.00</span></td>
-                <td class="col-hours-optional"><span class="hours-value is-dash">—</span></td>
-                <td></td>
-                <td></td>
               </tr>
             <% } else { %>
               <% day.entries.forEach((entry, entryIndex) => { %>
@@ -374,14 +419,21 @@
                       <% if (day.holidayName) { %><div class="holiday-label"><%= day.holidayName %></div><% } %>
                     </td>
                   <% } %>
+                  <%
+                    const sessionDepartmentLine = String(entry.department?.code || entry.primaryLabel || entry.department?.name || 'Activity').trim();
+                    const sessionClassLabel = String(entry.secondaryLabel || entry.primaryLabel || '').trim();
+                    const sessionTimeLabel = String(entry.scheduleLabel || '').trim();
+                    const sessionClassTimeLine = [sessionClassLabel, sessionTimeLabel].filter(Boolean).join(' - ');
+                  %>
                   <td>
-                    <div>
-                      <span class="primary-label"><%= entry.primaryLabel %></span>
-                      <% if (entry.isOneOnOne) { %><span class="badge one-on-one-badge">One on One</span><% } %>
-                      <% if (entry.roleLabel) { %><span class="badge role-badge"><%= entry.roleLabel %></span><% } %>
+                    <div class="session-description">
+                      <div class="session-department-line">
+                        <span class="session-department-text"><%= sessionDepartmentLine %></span>
+                        <% if (entry.isOneOnOne) { %><span class="badge one-on-one-badge">One on One</span><% } %>
+                        <% if (entry.roleLabel) { %><span class="badge role-badge"><%= entry.roleLabel %></span><% } %>
+                      </div>
+                      <% if (sessionClassTimeLine) { %><div class="session-class-time-line"><%= sessionClassTimeLine %></div><% } %>
                     </div>
-                    <% if (entry.secondaryLabel) { %><div class="secondary-label"><%= entry.secondaryLabel %></div><% } %>
-                    <% if (entry.scheduleLabel) { %><div class="schedule-label"><%= entry.scheduleLabel %></div><% } %>
                   </td>
                   <td>
                     <div><%= entry.studentName || '—' %></div>
@@ -396,11 +448,13 @@
                   <td class="col-hours-optional">
                     <span class="hours-value<%= entry.optionalHoursLabel === '—' ? ' is-dash' : ' is-optional' %>"><%= entry.optionalHoursLabel %></span>
                   </td>
-                  <td class="col-status">
-                    <span class="badge"><%= entry.statusLabel %></span>
-                    <% if (entry.showReconciliationBadge) { %><span class="badge reconciliation-badge">Reconciliation</span><% } %>
+                  <td class="col-comment">
+                    <div class="comment-cell">
+                      <span class="badge status-badge"><%= entry.statusLabel %></span>
+                      <% if (entry.showReconciliationBadge) { %><span class="badge reconciliation-badge">Reconciliation</span><% } %>
+                      <% if (entry.commentLabel) { %><span class="comment-separator">-</span><span class="comment-text"><%= entry.commentLabel %></span><% } %>
+                    </div>
                   </td>
-                  <td><%= entry.commentLabel %></td>
                 </tr>
               <% }); %>
             <% } %>
@@ -411,7 +465,7 @@
             <td colspan="3" class="total-label">Total Period Hours:</td>
             <td class="total-hours"><%= Number(document.regularTotalHours || 0).toFixed(2) %></td>
             <td class="total-hours-optional"><%= Number(document.optionalTotalHours || 0).toFixed(2) %></td>
-            <td colspan="2"></td>
+            <td></td>
           </tr>
         </tfoot>
       </table>
@@ -440,7 +494,7 @@
               <tr class="department-name-row">
                 <th scope="col" class="department-metric-label"></th>
                 <% departmentRows.forEach((row) => { %>
-                  <th scope="col"><%= row.departmentName %></th>
+                  <th scope="col"><%= row.departmentCode || row.departmentName %></th>
                 <% }); %>
                 <th scope="col" class="department-total-col">Total</th>
               </tr>
@@ -492,7 +546,7 @@
   <script>
   (function() {
     function normalizeOrientation(value) {
-      return String(value || 'landscape').trim().toLowerCase() === 'portrait' ? 'portrait' : 'landscape';
+      return String(value || 'portrait').trim().toLowerCase() === 'landscape' ? 'landscape' : 'portrait';
     }
 
     function buildPageCss(orientation) {
@@ -516,7 +570,9 @@
 
     function resetPrintSheetFit() {
       document.querySelectorAll('.print-sheet-frame').forEach(function(frame) {
+        delete frame.dataset.printOverflow;
         frame.style.width = '';
+        frame.style.maxWidth = '';
         frame.style.height = '';
         frame.style.maxHeight = '';
         var sheet = frame.querySelector('.print-sheet');
@@ -525,6 +581,7 @@
         sheet.style.transform = '';
         sheet.style.transformOrigin = '';
         sheet.style.width = '100%';
+        sheet.style.maxWidth = '';
         sheet.style.minHeight = '';
         sheet.style.height = '';
       });
@@ -532,9 +589,10 @@
 
     function fitPrintSheetsToPage() {
       resetPrintSheetFit();
-      var bounds = getPrintableBounds(document.body.dataset.printOrientation || 'landscape');
+      var bounds = getPrintableBounds(document.body.dataset.printOrientation || 'portrait');
       var fitSteps = ['', 'print-fit-step-1', 'print-fit-step-2'];
       var heightSlop = 2;
+      var readableScaleFloor = 0.86;
 
       document.querySelectorAll('.print-sheet-frame').forEach(function(frame) {
         var sheet = frame.querySelector('.print-sheet');
@@ -542,9 +600,11 @@
 
         // Measure true content height without page-stretch / flex growth.
         frame.style.width = bounds.width + 'px';
+        frame.style.maxWidth = bounds.width + 'px';
         frame.style.height = '';
         frame.style.maxHeight = '';
         sheet.style.width = '100%';
+        sheet.style.maxWidth = 'none';
         sheet.style.minHeight = '0';
         sheet.style.height = 'auto';
         sheet.style.transform = '';
@@ -569,19 +629,67 @@
         sheet.classList.remove('print-measuring');
 
         if (naturalHeight <= bounds.height + heightSlop) {
+          frame.style.width = bounds.width + 'px';
+          frame.style.maxWidth = bounds.width + 'px';
           frame.style.height = bounds.height + 'px';
+          frame.style.maxHeight = bounds.height + 'px';
+          sheet.style.width = bounds.width + 'px';
+          sheet.style.maxWidth = 'none';
           sheet.style.minHeight = bounds.height + 'px';
           sheet.style.height = '';
           return;
         }
 
-        // Keep natural proportions — never use non-uniform scale(1, y), which
-        // stretches or squashes text. Prefer denser CSS steps above; if content
-        // still overflows, allow a second printed page rather than distorting.
-        frame.style.height = '';
-        frame.style.maxHeight = '';
-        sheet.style.minHeight = '';
-        sheet.style.height = '';
+        var scale = bounds.height / Math.max(naturalHeight, 1);
+        if (!Number.isFinite(scale) || scale <= 0) scale = 1;
+        scale = Math.min(1, Math.max(scale, readableScaleFloor));
+        var layoutWidth = bounds.width / Math.max(scale, 0.01);
+
+        for (var iteration = 0; iteration < 3; iteration += 1) {
+          sheet.style.width = layoutWidth + 'px';
+          sheet.style.maxWidth = 'none';
+          sheet.style.transform = '';
+          naturalHeight = sheet.scrollHeight;
+          var naturalWidth = Math.max(sheet.scrollWidth, layoutWidth);
+          var requiredScale = Math.min(
+            bounds.width / Math.max(naturalWidth, 1),
+            bounds.height / Math.max(naturalHeight, 1),
+            1
+          );
+          scale = Math.max(requiredScale, readableScaleFloor);
+          if (!Number.isFinite(scale) || scale <= 0) scale = 1;
+          var nextLayoutWidth = bounds.width / Math.max(scale, 0.01);
+          if (Math.abs(nextLayoutWidth - layoutWidth) < 1) break;
+          layoutWidth = nextLayoutWidth;
+        }
+
+        var scaledHeight = Math.ceil(naturalHeight * scale);
+        var frameHeight = Math.max(bounds.height, scaledHeight);
+        var hasReadableOverflow = scaledHeight > bounds.height + heightSlop;
+
+        frame.style.width = bounds.width + 'px';
+        frame.style.maxWidth = bounds.width + 'px';
+        if (hasReadableOverflow) {
+          frame.dataset.printOverflow = 'readable';
+          frame.style.height = '';
+          frame.style.maxHeight = '';
+          sheet.style.width = bounds.width + 'px';
+          sheet.style.maxWidth = 'none';
+          sheet.style.minHeight = '0';
+          sheet.style.height = 'auto';
+          sheet.style.transformOrigin = '';
+          sheet.style.transform = '';
+          return;
+        }
+
+        frame.style.height = frameHeight + 'px';
+        frame.style.maxHeight = bounds.height + 'px';
+        sheet.style.width = layoutWidth + 'px';
+        sheet.style.maxWidth = 'none';
+        sheet.style.minHeight = '0';
+        sheet.style.height = 'auto';
+        sheet.style.transformOrigin = 'top left';
+        sheet.style.transform = 'scale(' + scale.toFixed(4) + ')';
       });
     }
 

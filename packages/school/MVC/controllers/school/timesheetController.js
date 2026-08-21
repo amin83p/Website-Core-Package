@@ -742,9 +742,9 @@ function parsePrintSettingBoolean(value, fallback = false) {
 }
 
 function parseTimesheetPrintSettings(body = {}) {
-    const orientation = String(body.printOrientation || '').trim().toLowerCase() === 'portrait'
-        ? 'portrait'
-        : 'landscape';
+    const orientation = String(body.printOrientation || '').trim().toLowerCase() === 'landscape'
+        ? 'landscape'
+        : 'portrait';
     const density = String(body.printDensity || '').trim().toLowerCase() === 'normal'
         ? 'normal'
         : 'compact';

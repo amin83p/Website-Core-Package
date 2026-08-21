@@ -444,13 +444,14 @@ test('controller and views expose trusted rebuild, conflict codes, and reconcili
   assert.match(controller, /MAKEUP_RECONCILIATION_CONFIRMATION_REQUIRED/);
   assert.match(controller, /confirmOpenMakeupChains/);
   assert.match(controller, /lockReconciliationSourceRefs/);
-  assert.match(editor, /provisionalSessionsSummary/);
+  assert.match(editor, /provisionalSessionCount/);
+  assert.match(editor, /provisionalSummaryHtml/);
   assert.match(editor, /row-provisional/);
   assert.match(editor, /let reconciliationHours = 0/);
-  assert.match(editor, /reconciliationHours \+= Math\.max\(0, hrs\)/);
-  assert.match(editor, /if \(reconciliationHours > 0\)/);
+  assert.match(editor, /reconciliationHours \+= Math\.max\(0, regularHrs\)/);
+  assert.match(editor, /if \(dynamic\.reconciliationHours > 0 \|\| dynamic\.openChains\.length > 0\)/);
   assert.doesNotMatch(editor, /if \(reconciliationSessionCount > 0\)/);
-  assert.match(editor, /class="ts-reconciliation-note mb-4 d-none"/);
+  assert.match(editor, /id: 'reconciliation'/);
   assert.match(editor, /return `\$\{statusChip\}\$\{reconciliationChip\}`/);
   assert.match(editor, /label: reconciliationLabel/);
   assert.doesNotMatch(editor, /label: `Provisional -/);
@@ -461,7 +462,7 @@ test('controller and views expose trusted rebuild, conflict codes, and reconcili
   assert.match(editor, /confirmOpenMakeupChains: priorReviewHasOpenMakeupChains/);
   assert.match(editor, /loadPriorAdjustmentsReview\(\{ force: true \}\)/);
   assert.match(editor, /Schedule remaining make-up/);
-  assert.match(editor, /openMakeupChainSummary/);
+  assert.match(editor, /buildMakeupChainSummaryHtml/);
   assert.match(editor, /Deadline-window sessions must remain/);
   assert.match(manageView, /row\.provisionalCount/);
   assert.match(manageView, /row\.provisionalHours/);
@@ -480,7 +481,8 @@ test('timesheet load warnings are serialized and prior review refreshes explicit
 
   assert.match(editor, /function waitForTimesheetPageLoad\(\)/);
   assert.match(editor, /document\.readyState === 'complete'/);
-  assert.match(editor, /async function initializeTimesheetLoadWarnings\(\)[\s\S]*await showIncompleteSessionWarningOnLoad\(\);[\s\S]*await waitForTimesheetPageLoad\(\);[\s\S]*await loadPriorAdjustmentsReview\(\);/);
+  assert.match(editor, /async function initializeTimesheetLoadWarnings\(\)[\s\S]*await waitForTimesheetPageLoad\(\);[\s\S]*await loadPriorAdjustmentsReview\(\);/);
+  assert.match(editor, /renderIncompleteSessionsPanel\(\);[\s\S]*void initializeTimesheetLoadWarnings\(\);/);
   assert.match(editor, /void initializeTimesheetLoadWarnings\(\);/);
   assert.match(editor, /id="btnPriorAdjustmentLater"[^>]*>[\s\S]*Refresh Timesheet<\/button>/);
   assert.match(editor, /function refreshTimesheetAfterPriorReview\(\)[\s\S]*showTimesheetWaitingModal\([\s\S]*window\.location\.reload\(\);/);
