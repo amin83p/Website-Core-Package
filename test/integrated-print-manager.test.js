@@ -66,7 +66,9 @@ test('timesheet print settings are normalized and passed to the print view', () 
   assert.match(view, /data-print-orientation/);
   assert.match(view, /data-print-orientation="landscape"/);
   assert.match(view, /data-print-orientation="portrait"/);
-  assert.match(view, /print-logo/);
+  assert.match(view, /print-sheet-frame/);
+  assert.match(view, /print-sheet-bottom/);
+  assert.match(view, /fitPrintSheetsToPage/);
   assert.match(view, /printHeaderNote/);
   assert.match(view, /applyPrintOrientation/);
   assert.doesNotMatch(view, /size:\s*letter/i);

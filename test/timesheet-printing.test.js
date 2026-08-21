@@ -300,6 +300,8 @@ function sampleDocument(name, overrides = {}) {
     managerApproved: false,
     source: 'live',
     payableTotalHours: 1.5,
+    regularTotalHours: 0,
+    optionalTotalHours: 1.5,
     days: [{
       date: '2026-07-15',
       dayName: 'Wednesday',
@@ -312,11 +314,12 @@ function sampleDocument(name, overrides = {}) {
         roleLabel: 'Teacher',
         studentName: 'Student One',
         attendanceLabel: 'Absent',
-        hoursLabel: '1.50 hrs',
+        regularHoursLabel: '—',
+        optionalHoursLabel: '1.50',
         hoursIsStruck: false,
         showOptionalBadge: true,
         payableNote: '',
-        timeLabel: '08:00 – 09:30',
+        scheduleLabel: '08:00 – 09:30',
         statusLabel: 'Completed',
         commentLabel: 'Printed comment'
       }]
@@ -344,6 +347,73 @@ function sampleDocument(name, overrides = {}) {
   };
 }
 
+test('print review type defaults to managerial and financial uses the same layout with a different subtitle', () => {
+  assert.equal(printService.parsePrintReviewType('financial'), 'financial');
+  assert.equal(printService.parsePrintReviewType('managerial'), 'managerial');
+  assert.equal(printService.parsePrintReviewType(''), 'managerial');
+  assert.equal(printService.resolvePrintReviewTitle('financial'), 'Financial Review');
+  assert.equal(printService.resolvePrintReviewTitle('managerial'), 'Managerial Review');
+
+  const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
+  assert.match(controller, /const printReviewType = timesheetPrintService\.parsePrintReviewType\(body\.printReviewType\)/);
+  assert.match(controller, /printReviewType:\s*printSettings\.printReviewType/);
+
+  const viewPath = path.join(ROOT_DIR, 'packages/school/MVC/views/school/timesheet/timesheetPrint.ejs');
+  const source = fs.readFileSync(viewPath, 'utf8');
+  const financialHtml = ejs.render(source, {
+    title: 'Timesheet Print',
+    appBrand: { appName: 'Example Website' },
+    printContext: {
+      organizationName: 'Example School',
+      printedByName: 'Printer User',
+      printedAtLabel: 'Jul 15, 2026, 09:00 a.m.',
+      printReviewType: 'financial',
+      printReviewTitle: 'Financial Review',
+      period: { name: '2026-JULY-02', startDateLabel: 'July 15, 2026', endDateLabel: 'July 31, 2026', deadlineLabel: '2026-07-30 23:59' },
+      documents: [sampleDocument('Person One')]
+    },
+    printSettings: { orientation: 'landscape', density: 'compact' }
+  }, { filename: viewPath });
+
+  assert.match(financialHtml, /class="print-sheet-footer"/);
+  assert.match(financialHtml, />Financial Review</);
+  assert.match(financialHtml, /Hours\/Time \(Hrs\)/);
+  assert.match(financialHtml, /Total Period Hours:/);
+});
+
+test('shapePrintEntry exposes split regular and optional hour labels without hrs suffix', () => {
+  const shaped = printService.shapePrintEntry({
+    sessionId: 'optional-row',
+    classId: 'CLASS-1',
+    classMaxCapacity: 1,
+    deliveryDepartmentCode: 'ESL',
+    durationHours: 1.5,
+    timesheetHours: 0,
+    showOptionalBadge: true,
+    isOneOnOne: true,
+    startTime: '08:00',
+    endTime: '09:30'
+  }, { classMap: new Map(), departmentMap: new Map() });
+
+  assert.equal(shaped.regularHoursLabel, '—');
+  assert.equal(shaped.optionalHoursLabel, '1.50');
+  assert.equal(shaped.scheduleLabel, '08:00 – 09:30');
+  assert.equal(shaped.regularDisplayHours, 0);
+  assert.equal(shaped.optionalHours, 1.5);
+
+  const pending = printService.shapePrintEntry({
+    sessionId: 'pending-row',
+    isManual: true,
+    approvalStatus: 'pending_approval',
+    requestedHours: 2.5
+  }, { classMap: new Map(), departmentMap: new Map() });
+
+  assert.equal(pending.regularHoursLabel, '2.50');
+  assert.equal(pending.hoursIsStruck, true);
+  assert.equal(pending.payableNote, '0.00 payable (pending)');
+  assert.equal(pending.optionalHoursLabel, '—');
+});
+
 test('standalone print view renders safe single and batch documents with print CSS', () => {
   const viewPath = path.join(ROOT_DIR, 'packages/school/MVC/views/school/timesheet/timesheetPrint.ejs');
   const source = fs.readFileSync(viewPath, 'utf8');
@@ -365,6 +435,8 @@ test('standalone print view renders safe single and batch documents with print C
       organizationName: 'Example School',
       printedByName: 'Printer User',
       printedAtLabel: 'Jul 15, 2026, 09:00 a.m.',
+      printReviewType: 'managerial',
+      printReviewTitle: 'Managerial Review',
       period: {
         name: '2026-JULY-02',
         startDateLabel: 'July 15, 2026',
@@ -384,10 +456,11 @@ test('standalone print view renders safe single and batch documents with print C
     }
   }, { filename: viewPath });
 
+  assert.equal((html.match(/class="print-sheet-frame"/g) || []).length, 2);
   assert.equal((html.match(/class="print-sheet"/g) || []).length, 2);
-  assert.match(html, /@page \{ margin: 10mm; size: portrait; \}/);
+  assert.match(html, /@page \{ margin: 10mm; size: A4 portrait; \}/);
   assert.doesNotMatch(html, /size:\s*letter/i);
-  assert.match(html, /html, body \{ width: auto; min-width: 0; max-width: none; \}/);
+  assert.match(html, /html, body \{ width: 100%; max-width: 100%; min-width: 0; margin: 0; \}/);
   assert.match(html, /break-after: page/);
   assert.match(html, /class="screen-actions no-print"/);
   assert.match(html, /data-print-orientation="landscape"/);
@@ -397,19 +470,32 @@ test('standalone print view renders safe single and batch documents with print C
   assert.match(html, />Print<\/button>/);
   assert.doesNotMatch(html, /Print Again/);
   assert.match(html, /window\.print\(\)/);
-  assert.match(html, /Printed School Name/);
-  assert.match(html, /<h1 class="organization-name">Printed School Name<\/h1>/);
   assert.match(html, /Payroll copy/);
+  assert.match(html, /<h1 class="document-title">Timesheet<\/h1>/);
+  assert.match(html, /July 15, 2026 to July 31, 2026/);
+  assert.match(html, /class="print-sheet-footer"/);
   assert.match(html, /Requested by: Print Clerk/);
-  assert.match(html, /<div class="document-name">Timesheet<\/div>/);
-  assert.match(html, /class="print-logo" src="\/uploads\/GLOBAL\/logo\/example-logo\.png" alt="Example Website Logo"/);
-  assert.match(html, /\.print-logo \{[^}]*height: 58px;[^}]*max-width: 180px;/);
-  assert.match(html, /\.print-logo \{ height: 42px; max-width: 140px; \}/);
+  assert.match(html, />Managerial Review</);
+  assert.doesNotMatch(html, /Printed School Name/);
+  assert.doesNotMatch(html, /class="print-logo"/);
+  assert.doesNotMatch(html, /2026-JULY-02/);
+  assert.match(html, /Hours\/Time \(Hrs\)/);
+  assert.match(html, />Regular</);
+  assert.match(html, />Optional</);
+  assert.match(html, /class="schedule-label">08:00 – 09:30</);
+  assert.match(html, /Total Period Hours:/);
+  assert.match(html, /<td class="total-hours">0\.00<\/td>/);
+  assert.match(html, /<td class="total-hours-optional">1\.50<\/td>/);
+  assert.doesNotMatch(html, /Total Payable Hours/);
+  assert.doesNotMatch(html, /class="badge optional-badge"/);
   assert.match(html, /Person One/);
-  assert.match(html, /2026-JULY-02/);
   assert.match(html, /class="timesheet-table"/);
+  assert.match(html, /<colgroup>/);
+  assert.match(html, /print-fit-step-1/);
+  assert.match(html, /190mm/);
+  assert.match(html, /size: A4 /);
   assert.match(html, /One on One/);
-  assert.match(html, />Optional<\/span>/);
+  assert.doesNotMatch(html, /class="badge optional-badge"/);
   assert.equal((html.match(/class="badge reconciliation-badge"/g) || []).length, 1);
   assert.match(html, />Scheduled<\/span>/);
   assert.match(html, />Reconciliation<\/span>/);
@@ -424,8 +510,10 @@ test('standalone print view renders safe single and batch documents with print C
   assert.match(html, /<th scope="col" class="department-total-col">Total<\/th>/);
   assert.doesNotMatch(html, /Total Optional Hours/);
   assert.doesNotMatch(html, /<th>Payable Hours<\/th>/);
-  assert.match(html, /body \{ font-size: 8px; line-height: 1\.15; \}/);
-  assert.match(html, /th, td \{ padding: 2px 3px; \}/);
+  assert.match(html, /body \{ font-size: 13px; line-height: 1\.4; \}/);
+  assert.match(html, /print-sheet-bottom/);
+  assert.match(html, /print-sheet-main/);
+  assert.match(html, /th, td \{ padding: 3px 4px; \}/);
   assert.doesNotMatch(html, /class="meta-grid"/);
   assert.doesNotMatch(html, /class="draft-warning"/);
   assert.doesNotMatch(html, /class="document-footer"/);
@@ -510,6 +598,7 @@ test('timesheet editor always exposes Print and blocks dirty drafts', () => {
   assert.match(editor, /Save Before Printing/);
   assert.match(editor, /This timesheet has unsaved changes\. Save the timesheet before opening the print preview\./);
   assert.match(editor, /AppPrintManager\.openSettings/);
+  assert.match(editor, /openTimesheetReviewTypeChooser/);
   assert.match(editor, /appendSettingsToSearchParams/);
   assert.match(editor, /window\.open\('', '_blank', 'height=720,width=1100'\)/);
   assert.match(editor, /fetch\(TIMESHEET_PRINT_ACTION/);
@@ -532,8 +621,10 @@ test('timesheet management page exposes selection print and disables generic tab
   assert.match(manage, /optionalBtnsBeforePrint/);
   assert.match(manage, /TIMESHEET_MANAGE_PRINT_ACTION = '\/school\/timesheets\/manage\/print'/);
   assert.match(manage, /openSelectedTimesheetPrintPreview/);
+  assert.match(manage, /openTimesheetReviewTypeChooser/);
   assert.match(manage, /AppPrintManager\.openSettings/);
   assert.match(manage, /appendSettingsToSearchParams/);
+  assert.match(manage, /printReviewType/);
   assert.match(manage, /isPrintableRow/);
   assert.match(manage, /submitted.*processed|processed.*submitted/);
   assert.doesNotMatch(manage, /printTableBtn/);

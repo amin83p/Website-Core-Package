@@ -144,6 +144,21 @@ function resolveOptionalHours(entry = {}) {
   return roundHours(baseHours);
 }
 
+function resolveRegularDisplayHours(entry = {}, payableHours = 0) {
+  if (resolveOptionalHours(entry) > 0) return 0;
+  return roundHours(payableHours);
+}
+
+function parsePrintReviewType(value) {
+  return cleanText(value).toLowerCase() === 'financial' ? 'financial' : 'managerial';
+}
+
+function resolvePrintReviewTitle(printReviewType = 'managerial') {
+  return parsePrintReviewType(printReviewType) === 'financial'
+    ? 'Financial Review'
+    : 'Managerial Review';
+}
+
 function fillLegacyDisplayMetadata(snapshotEntry = {}, liveEntry = {}) {
   const merged = { ...(liveEntry || {}), ...(snapshotEntry || {}) };
   const snapshotHasDisplayIdentity = Boolean(
@@ -279,9 +294,21 @@ function shapePrintEntry(entry = {}, lookups = {}) {
   const optionalHours = resolveOptionalHours(entry);
   const approval = cleanText(entry.approvalStatus).toLowerCase();
   let payableNote = '';
-  if (approval === 'pending_approval') payableNote = '0.00 hrs payable (pending)';
-  else if (approval === 'rejected') payableNote = '0.00 hrs payable (rejected)';
-  else if (approval === 'unpaid') payableNote = '0.00 hrs payable (unpaid)';
+  if (approval === 'pending_approval') payableNote = '0.00 payable (pending)';
+  else if (approval === 'rejected') payableNote = '0.00 payable (rejected)';
+  else if (approval === 'unpaid') payableNote = '0.00 payable (unpaid)';
+
+  const regularDisplayHours = resolveRegularDisplayHours(entry, payableHours);
+  const usesOptionalColumn = optionalHours > 0;
+  let regularHoursLabel = '—';
+  let hoursIsStruck = false;
+  if (payableNote) {
+    regularHoursLabel = requestedHours.toFixed(2);
+    hoursIsStruck = true;
+  } else if (!usesOptionalColumn) {
+    regularHoursLabel = regularDisplayHours.toFixed(2);
+  }
+  const optionalHoursLabel = optionalHours > 0 ? optionalHours.toFixed(2) : '—';
 
   const isActivity = isActivityEntry(entry);
   const fallback = cleanText(entry.description || entry.className || entry.activityName || entry.classId || 'Activity');
@@ -316,9 +343,12 @@ function shapePrintEntry(entry = {}, lookups = {}) {
     requestedHours,
     payableHours,
     optionalHours,
-    hoursLabel: `${(payableNote ? requestedHours : payableHours).toFixed(2)} hrs`,
+    regularDisplayHours,
+    regularHoursLabel,
+    optionalHoursLabel,
+    scheduleLabel: timeLabel,
     payableNote,
-    hoursIsStruck: Boolean(payableNote),
+    hoursIsStruck,
     timeLabel,
     statusLabel: resolveStatusLabel(entry),
     showReconciliationBadge: entry.reconciliationRequired === true,
@@ -494,7 +524,9 @@ async function buildTimesheetPrintDocument({ period, person, activeOrgId, reqUse
     makeupChainCount: makeupChains.length,
     openMakeupChainCount: openMakeupChains.length,
     openMakeupNodeCount: openMakeupNodes.length,
-    payableTotalHours: roundHours(entries.reduce((sum, entry) => sum + entry.payableHours, 0))
+    payableTotalHours: roundHours(entries.reduce((sum, entry) => sum + entry.payableHours, 0)),
+    regularTotalHours: roundHours(entries.reduce((sum, entry) => sum + (entry.regularDisplayHours || 0), 0)),
+    optionalTotalHours: roundHours(entries.reduce((sum, entry) => sum + (entry.optionalHours || 0), 0))
   };
 }
 
@@ -545,8 +577,10 @@ async function buildTimesheetPrintContext({
   activeOrgId,
   reqUser,
   printedByName = '',
-  orgTimeZone = ''
+  orgTimeZone = '',
+  printReviewType = 'managerial'
 }) {
+  const normalizedReviewType = parsePrintReviewType(printReviewType);
   const documents = [];
   const [holidays, organizationName] = await Promise.all([
     schoolDataService.fetchAllData('holidays', {}, reqUser),
@@ -563,6 +597,8 @@ async function buildTimesheetPrintContext({
     printedByName: cleanText(printedByName),
     printedAtIso,
     printedAtLabel: formatDateTime(printedAtIso, orgTimeZone),
+    printReviewType: normalizedReviewType,
+    printReviewTitle: resolvePrintReviewTitle(normalizedReviewType),
     period: {
       id: cleanText(period?.id),
       name: cleanText(period?.name || period?.id),
@@ -595,7 +631,10 @@ module.exports = {
   resolveDepartmentOptionalHours,
   resolveOptionalHours,
   resolveOrganizationNameFromContext,
+  parsePrintReviewType,
   resolvePayableHours,
+  resolvePrintReviewTitle,
+  resolveRegularDisplayHours,
   shapePrintEntry,
   sortEntriesBySchedule
 };

@@ -523,7 +523,7 @@
     }
   }
 
-  async function openSelectedTimesheetPrintPreview(printSettings = null) {
+  async function openSelectedTimesheetPrintPreview(printSettings = null, printReviewType = null) {
     if (!CAN_PRINT_MANAGED_TIMESHEETS) {
       await showMessage({ title: 'Print Access Required', icon: 'warning', message: 'EXPORT access is required to print timesheets.' });
       return;
@@ -539,6 +539,12 @@
       return;
     }
 
+    if (!printReviewType && window.AppPrintManager?.openTimesheetReviewTypeChooser) {
+      const selectedReviewType = await window.AppPrintManager.openTimesheetReviewTypeChooser();
+      if (!selectedReviewType) return;
+      return openSelectedTimesheetPrintPreview(printSettings, selectedReviewType);
+    }
+
     if (!printSettings && window.AppPrintManager?.openSettings) {
       window.AppPrintManager.openSettings({
         mode: 'timesheet-management',
@@ -548,11 +554,19 @@
           density: 'compact'
         },
         onConfirm: (settings) => {
-          void openSelectedTimesheetPrintPreview(settings);
+          void openSelectedTimesheetPrintPreview({ ...settings, printReviewType: printReviewType || 'managerial' }, printReviewType || 'managerial');
         }
       });
       return;
     }
+
+    const effectiveReviewType = printReviewType
+      || printSettings?.printReviewType
+      || 'managerial';
+    const mergedPrintSettings = {
+      ...(printSettings || {}),
+      printReviewType: effectiveReviewType
+    };
 
     const printWindow = window.open('', '_blank', 'height=720,width=1100');
     if (!printWindow) {
@@ -571,7 +585,7 @@
       params.set('periodId', periodId);
       personIds.forEach((personId) => params.append('personIds', personId));
       if (window.AppPrintManager?.appendSettingsToSearchParams) {
-        window.AppPrintManager.appendSettingsToSearchParams(params, printSettings || {});
+        window.AppPrintManager.appendSettingsToSearchParams(params, mergedPrintSettings);
       }
       const response = await fetch(TIMESHEET_MANAGE_PRINT_ACTION, {
         method: 'POST',

@@ -748,6 +748,7 @@ function parseTimesheetPrintSettings(body = {}) {
     const density = String(body.printDensity || '').trim().toLowerCase() === 'normal'
         ? 'normal'
         : 'compact';
+    const printReviewType = timesheetPrintService.parsePrintReviewType(body.printReviewType);
     return {
         orientation,
         density,
@@ -755,7 +756,8 @@ function parseTimesheetPrintSettings(body = {}) {
         orgName: cleanPrintSettingText(body.printOrgName, 240),
         includeHeaderNote: parsePrintSettingBoolean(body.printIncludeHeaderNote, false),
         headerNote: cleanPrintSettingText(body.printHeaderNote, 3000),
-        requestedByLabel: cleanPrintSettingText(body.printRequestedByLabel, 240)
+        requestedByLabel: cleanPrintSettingText(body.printRequestedByLabel, 240),
+        printReviewType
     };
 }
 
@@ -1434,7 +1436,8 @@ async function renderTimesheetPrintPreview(req, res, { period, people, activeOrg
         activeOrgId,
         reqUser: req.user,
         printedByName: resolveActorName(req.user),
-        orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
+        orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+        printReviewType: printSettings.printReviewType
     });
     setTimesheetPrintResponseHeaders(res);
     return res.render('school/timesheet/timesheetPrint', {

@@ -468,7 +468,7 @@ test('controller and views expose trusted rebuild, conflict codes, and reconcili
   assert.match(manageView, /reconciliation session/);
   assert.match(manageView, /openMakeupChainCount/);
   assert.doesNotMatch(manageView, /\brecheck\b/i);
-  assert.match(printView, /Deadline-window reconciliation/);
+  assert.doesNotMatch(printView, /Deadline-window reconciliation/);
   assert.match(printView, /entry\.showReconciliationBadge/);
   assert.match(printView, /document\.openMakeupChainCount/);
   assert.match(printView, />Reconciliation<\/span>/);

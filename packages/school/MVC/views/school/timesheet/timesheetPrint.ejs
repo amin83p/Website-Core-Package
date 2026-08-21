@@ -2,17 +2,14 @@
   const context = printContext || {};
   const documents = Array.isArray(context.documents) ? context.documents : [];
   const period = context.period || {};
-  const printBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
-  const printLogoUrl = printBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
-  const printLogoAlt = `${printBrand.appName || printBrand.ownerDisplayName || context.organizationName || 'Website'} Logo`;
   const rawPrintSettings = (typeof printSettings !== 'undefined' && printSettings && typeof printSettings === 'object') ? printSettings : {};
   const printOrientation = String(rawPrintSettings.orientation || '').trim().toLowerCase() === 'portrait' ? 'portrait' : 'landscape';
   const printDensity = String(rawPrintSettings.density || '').trim().toLowerCase() === 'normal' ? 'normal' : 'compact';
-  const printIncludeOrg = rawPrintSettings.includeOrg !== false;
-  const printOrgName = printIncludeOrg ? String(rawPrintSettings.orgName || context.organizationName || '').trim() : '';
   const printIncludeHeaderNote = rawPrintSettings.includeHeaderNote === true;
   const printHeaderNote = printIncludeHeaderNote ? String(rawPrintSettings.headerNote || '').trim() : '';
   const printRequestedByLabel = String(rawPrintSettings.requestedByLabel || context.printedByName || '').trim();
+  const printReviewTitle = String(context.printReviewTitle || 'Managerial Review').trim();
+  const periodRangeLabel = [period.startDateLabel, period.endDateLabel].filter(Boolean).join(' to ');
 %>
 <!doctype html>
 <html lang="en">
@@ -20,7 +17,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title || 'Timesheet Print' %></title>
-  <style id="print-page-orientation-css">@page { margin: 10mm; size: <%= printOrientation %>; }</style>
+  <style id="print-page-orientation-css">@page { margin: 10mm; size: A4 <%= printOrientation %>; }</style>
   <style>
     :root {
       color-scheme: light;
@@ -39,10 +36,10 @@
     body {
       color: var(--ink);
       font-family: "Segoe UI", Arial, sans-serif;
-      font-size: 11px;
-      line-height: 1.35;
+      font-size: 14px;
+      line-height: 1.45;
     }
-    body.print-density-normal { font-size: 11px; line-height: 1.35; }
+    body.print-density-normal { font-size: 15px; line-height: 1.48; }
     .screen-actions {
       display: flex;
       align-items: center;
@@ -61,25 +58,62 @@
     }
     .screen-actions button.is-active { background: var(--blue); border-color: var(--blue); color: #fff; }
     .screen-actions-hint { margin: -4px 0 10px; color: var(--muted); font-size: 11px; }
-    .print-sheet {
+    .print-sheet-frame {
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
       break-after: page;
       page-break-after: always;
     }
-    .print-sheet:last-child { break-after: auto; page-break-after: auto; }
-    .identity-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
-    .identity-copy { min-width: 0; flex: 1 1 auto; }
-    .print-logo { display: block; flex: 0 0 auto; width: auto; height: 58px; max-width: 180px; object-fit: contain; object-position: right top; }
+    .print-sheet-frame:last-child { break-after: auto; page-break-after: auto; }
+    .print-sheet {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .print-sheet-main {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .print-sheet.print-measuring {
+      min-height: 0 !important;
+      height: auto !important;
+    }
+    .print-sheet.print-measuring .print-sheet-main {
+      flex: 0 0 auto;
+    }
+    .print-sheet-bottom {
+      flex: 0 0 auto;
+      margin-top: auto;
+      width: 100%;
+    }
+    .identity-block { margin-bottom: 10px; }
+    .identity-copy { min-width: 0; }
     .print-note { margin: 0 0 8px; border: 1px solid var(--line); background: var(--soft); padding: 6px 8px; color: var(--muted); white-space: pre-wrap; }
-    .organization-name { margin: 0 0 2px; color: var(--ink); font-size: 19px; font-weight: 800; line-height: 1.1; }
-    .document-name { color: var(--blue); font-size: 15px; font-weight: 800; }
-    .person-name { color: var(--blue); font-size: 16px; font-weight: 700; }
-    .period-name { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .document-title { margin: 0 0 2px; color: var(--ink); font-size: 24px; font-weight: 800; line-height: 1.1; }
+    .person-name { margin-top: 2px; color: var(--blue); font-size: 19px; font-weight: 700; }
+    .period-range { margin-top: 3px; color: var(--muted); font-size: 13px; font-weight: 700; }
+    .print-sheet-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-align: right;
+    }
     .badge {
       display: inline-block;
       border: 1px solid currentColor;
       border-radius: 999px;
       padding: 2px 7px;
-      font-size: 8.5px;
+      font-size: 10.5px;
       font-weight: 700;
       line-height: 1.25;
       letter-spacing: .02em;
@@ -91,41 +125,49 @@
     .role-badge { margin-left: 5px; color: #46505d; background: #f5f6f8; }
     .reconciliation-badge { display: block; width: fit-content; margin: 3px auto 0; color: #084298; background: #cfe2ff; }
     .provisional-row td { box-shadow: inset 3px 0 0 #0d6efd; }
-    .reconciliation-summary { margin-top: 4px; padding: 4px 6px; color: #084298; background: #eef5ff; border: 1px solid #b6d4fe; font-size: 9px; }
+    .reconciliation-summary { margin-top: 4px; padding: 4px 6px; color: #084298; background: #eef5ff; border: 1px solid #b6d4fe; font-size: 11px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     thead { display: table-header-group; }
     tfoot { display: table-footer-group; }
-    tr { break-inside: avoid; page-break-inside: avoid; }
-    th, td { border: 1px solid var(--line); padding: 5px 6px; vertical-align: middle; overflow-wrap: anywhere; }
-    th { background: #eaf0f7; font-size: 8.5px; letter-spacing: .035em; text-align: left; text-transform: uppercase; }
+    thead tr, tfoot tr { break-inside: avoid; page-break-inside: avoid; }
+    th, td { border: 1px solid var(--line); padding: 8px 8px; vertical-align: middle; overflow-wrap: anywhere; word-break: break-word; }
+    th { background: #eaf0f7; font-size: 12px; letter-spacing: .035em; text-align: left; text-transform: uppercase; }
     tbody tr:nth-child(even) > td { background: #fafbfd; }
-    .col-date { width: 11%; }
-    .col-description { width: 23%; }
-    .col-student { width: 15%; }
-    .col-hours { width: 16%; }
-    .col-status { width: 13%; text-align: center; }
-    .col-comment { width: 22%; }
-    .date-day { font-size: 11px; font-weight: 700; }
-    .date-value { color: var(--muted); font-size: 10px; font-weight: 700; }
-    .holiday-label { margin-top: 3px; color: var(--red); font-size: 8.5px; font-weight: 700; }
+    .timesheet-table { width: 100%; max-width: 100%; }
+    .col-date { width: 9%; }
+    .col-description { width: 25%; }
+    .col-student { width: 14%; }
+    .col-hours-group { text-align: center; width: 14%; }
+    .col-hours-regular { width: 7%; text-align: center; }
+    .col-hours-optional { width: 7%; text-align: center; }
+    .col-status { width: 11%; text-align: center; }
+    .col-comment { width: 27%; }
+    .date-day { font-size: 14px; font-weight: 700; }
+    .date-value { color: var(--muted); font-size: 13px; font-weight: 700; }
+    .holiday-label { margin-top: 3px; color: var(--red); font-size: 11.5px; font-weight: 700; }
     .primary-label { font-weight: 800; }
-    .secondary-label, .cell-muted { margin-top: 2px; color: var(--muted); font-size: 9px; }
-    .hours-value { color: var(--green); font-size: 12px; font-weight: 800; }
+    .secondary-label, .cell-muted, .schedule-label { margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .hours-value { color: var(--green); font-size: 16px; font-weight: 800; text-align: center; }
+    .hours-value.is-dash { color: var(--muted); font-weight: 700; }
+    .hours-value.is-optional { color: var(--optional); }
     .hours-value.is-struck { color: var(--muted); text-decoration: line-through; }
-    .payable-note { margin-top: 2px; color: var(--amber); font-size: 8.5px; font-weight: 700; }
-    .time-label { margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .payable-note { margin-top: 2px; color: var(--amber); font-size: 9.5px; font-weight: 700; }
+    .time-label { margin-top: 2px; color: var(--muted); font-size: 10px; }
     .empty-row { color: var(--muted); font-style: italic; }
     .total-row td { background: #eef7f1 !important; font-weight: 800; }
-    .total-label { text-align: right; }
-    .total-hours { color: var(--green); font-size: 12px; text-align: center; }
-    .department-section { margin-top: 8px; }
-    .department-heading { margin: 0 0 4px; font-size: 13px; }
-    .department-table { table-layout: auto; width: auto; max-width: 100%; }
+    .total-label { text-align: right; text-transform: uppercase; }
+    .total-hours { color: var(--green); font-size: 16px; text-align: center; }
+    .total-hours-optional { color: var(--optional); font-size: 16px; text-align: center; }
+    .department-section { margin-top: 0; }
+    .department-heading { margin: 0 0 5px; font-size: 16px; }
+    .department-table { table-layout: fixed; width: 100%; max-width: 100%; }
     .department-table th,
-    .department-table td { text-align: center; white-space: nowrap; }
+    .department-table td { text-align: center; }
+    .department-name-row th { white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.2; }
+    .department-metric-label { white-space: nowrap; }
     .department-name-row th {
       background: #eaf0f7;
-      font-size: 9px;
+      font-size: 11px;
       font-weight: 800;
       letter-spacing: normal;
       text-transform: none;
@@ -134,48 +176,90 @@
     .department-metric-label { text-align: left; font-weight: 700; background: #f8fafc !important; }
     .department-total-col { background: #eef7f1 !important; }
     .optional-row td { background: #eef9ff !important; color: var(--optional); font-weight: 700; }
+    .print-sheet.print-fit-step-1 .identity-block { margin-bottom: 3px; }
+    .print-sheet.print-fit-step-1 .department-section { margin-top: 4px; }
+    .print-sheet.print-fit-step-1 th, .print-sheet.print-fit-step-1 td { padding: 2px 3px; }
+    .print-sheet.print-fit-step-1 .document-title { font-size: 15px; }
+    .print-sheet.print-fit-step-1 .person-name { font-size: 12px; }
+    .print-sheet.print-fit-step-1 .date-day, .print-sheet.print-fit-step-1 .date-value { font-size: 9px; }
+    .print-sheet.print-fit-step-1 .secondary-label,
+    .print-sheet.print-fit-step-1 .schedule-label,
+    .print-sheet.print-fit-step-1 .cell-muted { font-size: 7.5px; }
+    .print-sheet.print-fit-step-1 .hours-value,
+    .print-sheet.print-fit-step-1 .total-hours,
+    .print-sheet.print-fit-step-1 .total-hours-optional { font-size: 10px; }
+    .print-sheet.print-fit-step-2 { font-size: 9px; line-height: 1.15; }
+    .print-sheet.print-fit-step-2 .identity-block { margin-bottom: 2px; }
+    .print-sheet.print-fit-step-2 .department-section { margin-top: 3px; }
+    .print-sheet.print-fit-step-2 .department-heading { margin-bottom: 1px; font-size: 10px; }
+    .print-sheet.print-fit-step-2 th, .print-sheet.print-fit-step-2 td { padding: 1px 2px; }
+    .print-sheet.print-fit-step-2 th { font-size: 7.5px; }
+    .print-sheet.print-fit-step-2 .document-title { font-size: 14px; }
+    .print-sheet.print-fit-step-2 .person-name { font-size: 11px; }
+    .print-sheet.print-fit-step-2 .period-range,
+    .print-sheet.print-fit-step-2 .print-sheet-footer { font-size: 8.5px; }
+    .print-sheet.print-fit-step-2 .badge { padding: 0 4px; font-size: 7px; }
+    .print-sheet.print-fit-step-2 .date-day, .print-sheet.print-fit-step-2 .date-value { font-size: 8px; }
+    .print-sheet.print-fit-step-2 .secondary-label,
+    .print-sheet.print-fit-step-2 .schedule-label,
+    .print-sheet.print-fit-step-2 .cell-muted,
+    .print-sheet.print-fit-step-2 .payable-note { font-size: 7px; }
+    .print-sheet.print-fit-step-2 .hours-value,
+    .print-sheet.print-fit-step-2 .total-hours,
+    .print-sheet.print-fit-step-2 .total-hours-optional { font-size: 9px; }
     @media print {
-      html, body { width: auto; min-width: 0; max-width: none; }
-      body { margin: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      html, body { width: 100%; max-width: 100%; min-width: 0; margin: 0; }
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       .no-print { display: none !important; }
-      .print-sheet { width: auto; min-width: 0; max-width: none; margin: 0; padding: 0; }
-      .timesheet-table { width: 100%; max-width: none; }
-      /* Compact defaults keep a normal timesheet and its department summary
-         together on one printed page. Browser Scale remains fully available. */
-      body { font-size: 8px; line-height: 1.15; }
-      .identity-block { gap: 8px; margin-bottom: 4px; }
-      .print-logo { height: 42px; max-width: 140px; }
-      .organization-name { font-size: 14px; }
-      .document-name { font-size: 11px; }
-      .person-name { font-size: 10px; }
-      .period-name { margin-top: 1px; font-size: 8px; }
-      th, td { padding: 2px 3px; }
-      th { font-size: 7px; }
-      .badge { padding: 1px 4px; font-size: 6.5px; }
-      .date-day, .date-value { font-size: 8px; }
-      .holiday-label, .secondary-label, .cell-muted, .payable-note, .time-label { margin-top: 1px; font-size: 7px; }
-      .hours-value, .total-hours { font-size: 9px; }
-      .department-section { margin-top: 5px; }
-      .department-heading { margin-bottom: 2px; font-size: 10px; }
-      body.print-density-normal { font-size: 10px; line-height: 1.28; }
-      body.print-density-normal .print-logo { height: 52px; max-width: 165px; }
-      body.print-density-normal .organization-name { font-size: 17px; }
-      body.print-density-normal .document-name { font-size: 13px; }
-      body.print-density-normal .person-name { font-size: 14px; }
-      body.print-density-normal th, body.print-density-normal td { padding: 4px 5px; }
+      .print-sheet-frame { width: 100%; max-width: 100%; margin: 0; padding: 0; }
+      .print-sheet { width: 100%; max-width: 100%; margin: 0; padding: 0; min-height: 100%; }
+      .timesheet-table, .department-table { width: 100%; max-width: 100%; }
+      /* Prefer readable sizes; fit steps only shrink when content overflows. */
+      body { font-size: 13px; line-height: 1.4; }
+      .identity-block { margin-bottom: 8px; }
+      .document-title { font-size: 22px; }
+      .person-name { font-size: 17px; }
+      .period-range, .print-sheet-footer { font-size: 12px; }
+      th, td { padding: 7px 7px; }
+      th { font-size: 11px; }
+      .badge { padding: 2px 6px; font-size: 10px; }
+      .date-day, .date-value { font-size: 13px; }
+      .holiday-label, .secondary-label, .cell-muted, .schedule-label, .payable-note, .time-label { margin-top: 2px; font-size: 11px; }
+      .hours-value, .total-hours, .total-hours-optional { font-size: 15px; }
+      .department-heading { margin-bottom: 5px; font-size: 15px; }
+      body.print-density-normal { font-size: 14px; line-height: 1.45; }
+      body.print-density-normal .document-title { font-size: 24px; }
+      body.print-density-normal .person-name { font-size: 18px; }
+      body.print-density-normal .period-range,
+      body.print-density-normal .print-sheet-footer { font-size: 13px; }
+      body.print-density-normal th { font-size: 12px; }
+      body.print-density-normal th, body.print-density-normal td { padding: 8px 8px; }
+      body.print-density-normal .hours-value,
+      body.print-density-normal .total-hours,
+      body.print-density-normal .total-hours-optional { font-size: 16px; }
     }
     @media screen {
       body { background: #e9ecef; padding: 16px; }
+      .print-sheet-frame {
+        width: min(100%, 190mm);
+        max-width: 100%;
+        margin: 0 auto 16px;
+      }
+      body[data-print-orientation="landscape"] .print-sheet-frame {
+        width: min(100%, 277mm);
+      }
       .print-sheet {
-        width: 100%;
-        margin: 0 0 16px;
-        padding: 14px 16px;
+        padding: 0;
         background: #fff;
         box-shadow: 0 1px 6px rgba(0,0,0,.12);
+        min-height: 277mm;
+      }
+      body[data-print-orientation="landscape"] .print-sheet {
+        min-height: 190mm;
       }
     }
     @media (max-width: 800px) {
-      .print-sheet { padding: 12px; }
+      .print-sheet-frame { width: 100%; }
     }
   </style>
 </head>
@@ -187,24 +271,17 @@
     <button type="button" onclick="window.print()">Print</button>
     <button type="button" onclick="window.close()">Close</button>
   </div>
-  <p class="screen-actions-hint no-print">Change orientation here, then click Print. Browser Scale (%) still applies in the print dialog.</p>
+  <p class="screen-actions-hint no-print">Each timesheet is sized for one A4 page at 100% scale. Avoid &ldquo;Fit to printable area&rdquo; unless you need extra margin.</p>
 
   <% documents.forEach((document) => { %>
+    <div class="print-sheet-frame">
     <section class="print-sheet">
+      <div class="print-sheet-main">
       <div class="identity-block">
         <div class="identity-copy">
-          <% if (printOrgName) { %><h1 class="organization-name"><%= printOrgName %></h1><% } %>
-          <div class="document-name">Timesheet</div>
+          <h1 class="document-title">Timesheet</h1>
           <div class="person-name"><%= document.person.name %></div>
-          <div class="period-name"><%= period.name %></div>
-          <% if (printRequestedByLabel) { %><div class="period-name">Requested by: <%= printRequestedByLabel %></div><% } %>
-          <% if (document.reconciliationEntryCount > 0) { %>
-            <div class="reconciliation-summary">
-              Deadline-window reconciliation: <strong><%= document.provisionalEntryCount %></strong> provisional session(s),
-              <strong><%= Number(document.provisionalHours || 0).toFixed(2) %> hrs</strong>; all
-              <strong><%= document.reconciliationEntryCount %></strong> window session(s) will be checked in the next timesheet.
-            </div>
-          <% } %>
+          <% if (periodRangeLabel) { %><div class="period-range"><%= periodRangeLabel %></div><% } %>
           <% if (document.openMakeupChainCount > 0) { %>
             <div class="reconciliation-summary">
               Open make-up reconciliation: <strong><%= document.openMakeupChainCount %></strong> confirmed chain(s),
@@ -212,19 +289,31 @@
             </div>
           <% } %>
         </div>
-        <img class="print-logo" src="<%= printLogoUrl %>" alt="<%= printLogoAlt %>" onerror="this.style.display='none'">
       </div>
       <% if (printHeaderNote) { %><div class="print-note"><%= printHeaderNote %></div><% } %>
 
       <table class="timesheet-table">
+        <colgroup>
+          <col class="col-date">
+          <col class="col-description">
+          <col class="col-student">
+          <col class="col-hours-regular">
+          <col class="col-hours-optional">
+          <col class="col-status">
+          <col class="col-comment">
+        </colgroup>
         <thead>
           <tr>
-            <th class="col-date">Date</th>
-            <th class="col-description">Class / Description</th>
-            <th class="col-student">Student Name</th>
-            <th class="col-hours">Hours / Time</th>
-            <th class="col-status">Status</th>
-            <th class="col-comment">Comment</th>
+            <th class="col-date" rowspan="2">Date</th>
+            <th class="col-description" rowspan="2">Class / Description</th>
+            <th class="col-student" rowspan="2">Student Name</th>
+            <th class="col-hours-group" colspan="2">Hours/Time (Hrs)</th>
+            <th class="col-status" rowspan="2">Status</th>
+            <th class="col-comment" rowspan="2">Comment</th>
+          </tr>
+          <tr>
+            <th class="col-hours-regular">Regular</th>
+            <th class="col-hours-optional">Optional</th>
           </tr>
         </thead>
         <tbody>
@@ -237,7 +326,8 @@
                   <% if (day.holidayName) { %><div class="holiday-label"><%= day.holidayName %></div><% } %>
                 </td>
                 <td colspan="2" class="empty-row"><%= day.holidayName ? `Holiday: ${day.holidayName}` : 'No sessions logged.' %></td>
-                <td><span class="hours-value">0.00 hrs</span></td>
+                <td class="col-hours-regular"><span class="hours-value">0.00</span></td>
+                <td class="col-hours-optional"><span class="hours-value is-dash">—</span></td>
                 <td></td>
                 <td></td>
               </tr>
@@ -258,18 +348,20 @@
                       <% if (entry.roleLabel) { %><span class="badge role-badge"><%= entry.roleLabel %></span><% } %>
                     </div>
                     <% if (entry.secondaryLabel) { %><div class="secondary-label"><%= entry.secondaryLabel %></div><% } %>
+                    <% if (entry.scheduleLabel) { %><div class="schedule-label"><%= entry.scheduleLabel %></div><% } %>
                   </td>
                   <td>
                     <div><%= entry.studentName || '—' %></div>
                     <% if (entry.attendanceLabel) { %><div class="cell-muted"><%= entry.attendanceLabel %></div><% } %>
                   </td>
-                  <td>
+                  <td class="col-hours-regular">
                     <div>
-                      <span class="hours-value<%= entry.hoursIsStruck ? ' is-struck' : '' %>"><%= entry.hoursLabel %></span>
-                      <% if (entry.showOptionalBadge) { %><span class="badge optional-badge">Optional</span><% } %>
+                      <span class="hours-value<%= entry.regularHoursLabel === '—' ? ' is-dash' : '' %><%= entry.hoursIsStruck ? ' is-struck' : '' %>"><%= entry.regularHoursLabel %></span>
                     </div>
                     <% if (entry.payableNote) { %><div class="payable-note"><%= entry.payableNote %></div><% } %>
-                    <div class="time-label"><%= entry.timeLabel %></div>
+                  </td>
+                  <td class="col-hours-optional">
+                    <span class="hours-value<%= entry.optionalHoursLabel === '—' ? ' is-dash' : ' is-optional' %>"><%= entry.optionalHoursLabel %></span>
                   </td>
                   <td class="col-status">
                     <span class="badge"><%= entry.statusLabel %></span>
@@ -283,13 +375,16 @@
         </tbody>
         <tfoot>
           <tr class="total-row">
-            <td colspan="3" class="total-label">Total Payable Hours</td>
-            <td class="total-hours"><%= document.payableTotalHours.toFixed(2) %> hrs</td>
+            <td colspan="3" class="total-label">Total Period Hours:</td>
+            <td class="total-hours"><%= Number(document.regularTotalHours || 0).toFixed(2) %></td>
+            <td class="total-hours-optional"><%= Number(document.optionalTotalHours || 0).toFixed(2) %></td>
             <td colspan="2"></td>
           </tr>
         </tfoot>
       </table>
+      </div>
 
+      <div class="print-sheet-bottom">
       <section class="department-section">
         <h2 class="department-heading">Hours by Department</h2>
         <% const departmentRows = Array.isArray(document.departmentTotals?.rows) ? document.departmentTotals.rows : []; %>
@@ -351,7 +446,14 @@
         </table>
       </section>
 
+      <div class="print-sheet-footer">
+        <% if (printRequestedByLabel) { %><span>Requested by: <%= printRequestedByLabel %></span><% } %>
+        <span><%= printReviewTitle %></span>
+      </div>
+      </div>
+
     </section>
+    </div>
   <% }); %>
 
   <script>
@@ -361,7 +463,93 @@
     }
 
     function buildPageCss(orientation) {
-      return '@page { margin: 10mm; size: ' + normalizeOrientation(orientation) + '; }';
+      return '@page { margin: 10mm; size: A4 ' + normalizeOrientation(orientation) + '; }';
+    }
+
+    function mmToPx(mm) {
+      return mm * 96 / 25.4;
+    }
+
+    function getPrintableBounds(orientation) {
+      var portrait = normalizeOrientation(orientation) === 'portrait';
+      var pageWidthMm = portrait ? 210 : 297;
+      var pageHeightMm = portrait ? 297 : 210;
+      var marginMm = 10;
+      return {
+        width: mmToPx(pageWidthMm - (marginMm * 2)),
+        height: mmToPx(pageHeightMm - (marginMm * 2))
+      };
+    }
+
+    function resetPrintSheetFit() {
+      document.querySelectorAll('.print-sheet-frame').forEach(function(frame) {
+        frame.style.width = '';
+        frame.style.height = '';
+        frame.style.maxHeight = '';
+        var sheet = frame.querySelector('.print-sheet');
+        if (!sheet) return;
+        sheet.classList.remove('print-fit-step-1', 'print-fit-step-2', 'print-measuring');
+        sheet.style.transform = '';
+        sheet.style.transformOrigin = '';
+        sheet.style.width = '100%';
+        sheet.style.minHeight = '';
+        sheet.style.height = '';
+      });
+    }
+
+    function fitPrintSheetsToPage() {
+      resetPrintSheetFit();
+      var bounds = getPrintableBounds(document.body.dataset.printOrientation || 'landscape');
+      var fitSteps = ['', 'print-fit-step-1', 'print-fit-step-2'];
+      var heightSlop = 2;
+
+      document.querySelectorAll('.print-sheet-frame').forEach(function(frame) {
+        var sheet = frame.querySelector('.print-sheet');
+        if (!sheet) return;
+
+        // Measure true content height without page-stretch / flex growth.
+        frame.style.width = bounds.width + 'px';
+        frame.style.height = '';
+        frame.style.maxHeight = '';
+        sheet.style.width = '100%';
+        sheet.style.minHeight = '0';
+        sheet.style.height = 'auto';
+        sheet.style.transform = '';
+        sheet.style.transformOrigin = '';
+        sheet.classList.add('print-measuring');
+
+        var matchedStep = fitSteps[fitSteps.length - 1];
+        var naturalHeight = 0;
+        for (var stepIndex = 0; stepIndex < fitSteps.length; stepIndex += 1) {
+          sheet.classList.remove('print-fit-step-1', 'print-fit-step-2');
+          if (fitSteps[stepIndex]) sheet.classList.add(fitSteps[stepIndex]);
+          naturalHeight = sheet.scrollHeight;
+          if (naturalHeight <= bounds.height + heightSlop) {
+            matchedStep = fitSteps[stepIndex];
+            break;
+          }
+        }
+
+        sheet.classList.remove('print-fit-step-1', 'print-fit-step-2');
+        if (matchedStep) sheet.classList.add(matchedStep);
+        naturalHeight = sheet.scrollHeight;
+        sheet.classList.remove('print-measuring');
+
+        if (naturalHeight <= bounds.height + heightSlop) {
+          frame.style.height = bounds.height + 'px';
+          sheet.style.minHeight = bounds.height + 'px';
+          sheet.style.height = '';
+          return;
+        }
+
+        var heightScale = bounds.height / naturalHeight;
+        sheet.style.minHeight = naturalHeight + 'px';
+        sheet.style.height = '';
+        sheet.style.transformOrigin = 'top left';
+        sheet.style.transform = 'scale(1, ' + heightScale + ')';
+        frame.style.height = bounds.height + 'px';
+        frame.style.maxHeight = bounds.height + 'px';
+      });
     }
 
     function applyPrintOrientation(orientation) {
@@ -374,6 +562,9 @@
         btn.classList.toggle('is-active', active);
         btn.setAttribute('aria-pressed', active ? 'true' : 'false');
       });
+      window.requestAnimationFrame(function() {
+        window.requestAnimationFrame(fitPrintSheetsToPage);
+      });
     }
 
     document.querySelectorAll('[data-print-orientation]').forEach(function(btn) {
@@ -384,6 +575,9 @@
 
     applyPrintOrientation('<%= printOrientation %>');
     window.applyPrintOrientation = applyPrintOrientation;
+    window.addEventListener('beforeprint', fitPrintSheetsToPage);
+    window.addEventListener('afterprint', resetPrintSheetFit);
+    window.addEventListener('resize', fitPrintSheetsToPage);
   })();
   </script>
 </body>

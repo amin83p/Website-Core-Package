@@ -4214,7 +4214,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function openTimesheetPrintPreview(printSettings = null) {
+    async function openTimesheetPrintPreview(printSettings = null, printReviewType = null) {
         const printButton = document.getElementById('btnPrintTimesheet');
         if (!printButton) return;
 
@@ -4235,6 +4235,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (!printReviewType && TIMESHEET_PRINT_MODE === 'management' && window.AppPrintManager?.openTimesheetReviewTypeChooser) {
+            const selectedReviewType = await window.AppPrintManager.openTimesheetReviewTypeChooser();
+            if (!selectedReviewType) return;
+            return openTimesheetPrintPreview(printSettings, selectedReviewType);
+        }
+
         if (!printSettings && window.AppPrintManager?.openSettings) {
             window.AppPrintManager.openSettings({
                 mode: 'timesheet-editor',
@@ -4244,11 +4250,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     density: 'compact'
                 },
                 onConfirm: (settings) => {
-                    void openTimesheetPrintPreview(settings);
+                    const effectiveReviewType = printReviewType || 'managerial';
+                    void openTimesheetPrintPreview({ ...settings, printReviewType: effectiveReviewType }, effectiveReviewType);
                 }
             });
             return;
         }
+
+        const effectiveReviewType = printReviewType
+            || printSettings?.printReviewType
+            || 'managerial';
+        const mergedPrintSettings = {
+            ...(printSettings || {}),
+            printReviewType: effectiveReviewType
+        };
 
         // Match Attendance printing: open the page synchronously, populate it,
         // focus it, then launch the browser print dialog from that preview.
@@ -4278,7 +4293,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 params.set('printSource', 'editor');
             }
             if (window.AppPrintManager?.appendSettingsToSearchParams) {
-                window.AppPrintManager.appendSettingsToSearchParams(params, printSettings || {});
+                window.AppPrintManager.appendSettingsToSearchParams(params, mergedPrintSettings);
             }
             const response = await fetch(TIMESHEET_PRINT_ACTION, {
                 method: 'POST',

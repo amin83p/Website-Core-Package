@@ -248,6 +248,94 @@
       : '';
   }
 
+  function normalizeReviewType(value) {
+    return String(value || 'managerial').trim().toLowerCase() === 'financial' ? 'financial' : 'managerial';
+  }
+
+  function ensureTimesheetReviewTypeModal() {
+    if (global.document?.getElementById('timesheetReviewTypeModal')) return;
+    if (!global.document?.body) return;
+    const wrapper = global.document.createElement('div');
+    wrapper.innerHTML = `
+      <div class="modal fade" id="timesheetReviewTypeModal" tabindex="-1" aria-labelledby="timesheetReviewTypeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+              <div>
+                <h5 class="modal-title fw-bold" id="timesheetReviewTypeModalLabel">Choose Print Type</h5>
+                <div class="small text-muted">Select the review format for this timesheet print.</div>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="radio" name="timesheetReviewType" id="timesheetReviewTypeManagerial" value="managerial" checked>
+                <label class="form-check-label fw-semibold" for="timesheetReviewTypeManagerial">Managerial Review</label>
+                <div class="small text-muted ms-4">Operational review with regular and optional hours split by session.</div>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="timesheetReviewType" id="timesheetReviewTypeFinancial" value="financial">
+                <label class="form-check-label fw-semibold" for="timesheetReviewTypeFinancial">Financial Review</label>
+                <div class="small text-muted ms-4">Finance-oriented review layout for payroll and accounting review.</div>
+              </div>
+            </div>
+            <div class="modal-footer bg-light">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary btn-filled" id="timesheetReviewTypeContinueBtn">Continue</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    global.document.body.appendChild(wrapper.firstElementChild);
+  }
+
+  function readSelectedReviewType() {
+    const selected = global.document?.querySelector('input[name="timesheetReviewType"]:checked');
+    return normalizeReviewType(selected?.value || 'managerial');
+  }
+
+  function openTimesheetReviewTypeChooser(options = {}) {
+    ensureTimesheetReviewTypeModal();
+    const modalEl = global.document?.getElementById('timesheetReviewTypeModal');
+    const defaultType = normalizeReviewType(options.defaultType || 'managerial');
+    const onConfirm = typeof options.onConfirm === 'function' ? options.onConfirm : null;
+
+    global.document?.querySelectorAll('input[name="timesheetReviewType"]').forEach((input) => {
+      input.checked = normalizeReviewType(input.value) === defaultType;
+    });
+
+    if (!modalEl || !global.bootstrap?.Modal) {
+      if (onConfirm) onConfirm(defaultType);
+      return Promise.resolve(defaultType);
+    }
+
+    const modalInstance = global.bootstrap.Modal.getOrCreateInstance(modalEl);
+    const continueBtn = global.document.getElementById('timesheetReviewTypeContinueBtn');
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        modalInstance.hide();
+        resolve(value);
+        if (onConfirm && value) onConfirm(value);
+      };
+
+      const onContinue = () => finish(readSelectedReviewType());
+      const onHidden = () => {
+        continueBtn?.removeEventListener('click', onContinue);
+        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        if (!settled) finish(null);
+      };
+
+      continueBtn?.addEventListener('click', onContinue);
+      modalEl.addEventListener('hidden.bs.modal', onHidden, { once: true });
+      modalInstance.show();
+    });
+  }
+
   function appendSettingsToSearchParams(params, settings = {}) {
     const target = params instanceof URLSearchParams ? params : new URLSearchParams();
     const next = normalizeSettings(settings);
@@ -258,6 +346,9 @@
     target.set('printIncludeHeaderNote', next.includeHeaderNote ? 'true' : 'false');
     target.set('printHeaderNote', next.headerNote);
     target.set('printRequestedByLabel', next.requestedByLabel);
+    if (settings && typeof settings === 'object' && settings.printReviewType) {
+      target.set('printReviewType', normalizeReviewType(settings.printReviewType));
+    }
     return target;
   }
 
@@ -327,7 +418,9 @@
     buildPreviewControlsHtml,
     buildPrintNoteHtml,
     appendSettingsToSearchParams,
-    buildPrintPlaceholderHtml
+    buildPrintPlaceholderHtml,
+    normalizeReviewType,
+    openTimesheetReviewTypeChooser
   };
 
   global.AppPrintManager = api;

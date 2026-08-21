@@ -691,8 +691,24 @@
     .schedule-calendar-card-body {
         min-height: min(92vh, 1280px);
     }
+    .schedule-calendar-card-body.is-month-view {
+        min-height: 0;
+        max-height: none;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
     .schedule-calendar-card-body.schedule-calendar-card-body-multi-week {
         min-height: auto;
+    }
+    .schedule-visual-area.schedule-month-view-host {
+        flex: 1 1 auto;
+        min-height: min(62vh, 760px);
+        max-height: min(calc(100vh - 280px), 920px);
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-right: 0.15rem;
     }
     .schedule-vertical-scroll {
         overflow-x: auto;
@@ -804,8 +820,110 @@
     }
     
     /* --- CALENDAR CSS (Monthly/Yearly View) --- */
+    .schedule-month-view-host .schedule-month-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+    .schedule-month-view-host .schedule-month-card .card-header {
+        font-size: 1rem;
+        letter-spacing: 0.02em;
+    }
+    .schedule-month-view-host .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+    .schedule-month-view-host .cal-day {
+        min-height: 5.75rem;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.28rem 0.32rem 0.35rem;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        position: relative;
+        transition: 0.15s ease;
+        font-size: 0.72rem;
+        background: #fff;
+    }
+    .schedule-month-view-host .cal-day-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.25rem;
+        margin-bottom: 0.18rem;
+        min-height: 1rem;
+    }
+    .schedule-month-view-host .cal-day-number {
+        font-size: 0.8rem;
+        font-weight: 700;
+        line-height: 1;
+        color: #212529;
+    }
+    .schedule-month-view-host .cal-day-sessions {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        width: 100%;
+        min-height: 0;
+        overflow: hidden;
+    }
+    .schedule-month-view-host .cal-session-chip {
+        display: block;
+        min-width: 0;
+        padding: 1px 4px;
+        border-radius: 3px;
+        border-left: 3px solid transparent;
+        background: rgba(248, 249, 250, 0.95);
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .schedule-month-view-host .cal-session-chip.is-complete {
+        border-left-color: #198754;
+        background: rgba(209, 231, 221, 0.55);
+    }
+    .schedule-month-view-host .cal-session-chip.is-pending {
+        border-left-color: #ffc107;
+        background: rgba(255, 243, 205, 0.65);
+    }
+    .schedule-month-view-host .cal-session-chip.is-conflict {
+        border-left-color: #dc3545;
+        background: rgba(248, 215, 218, 0.85);
+    }
+    .schedule-month-view-host .cal-session-chip.is-leave {
+        border-left-color: #f59f00;
+        background: rgba(255, 243, 205, 0.78);
+    }
+    .schedule-month-view-host .cal-session-time {
+        font-size: 0.68rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #212529;
+    }
+    .schedule-month-view-host .cal-session-makeup {
+        margin-left: 2px;
+        font-size: 0.58rem;
+        font-weight: 800;
+        color: #664d03;
+    }
+    .schedule-month-view-host .cal-session-more {
+        font-size: 0.62rem;
+        font-weight: 700;
+        color: #6c757d;
+        padding-left: 2px;
+    }
+    @media (min-width: 992px) {
+        .schedule-month-view-host .cal-day {
+            min-height: 6.5rem;
+        }
+    }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
     .cal-day { aspect-ratio: 1/1; border: 1px solid #f8f9fa; border-radius: 4px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: 0.2s; font-size: 0.85rem;}
+    .schedule-month-view-host .cal-day.empty { color: #adb5bd; cursor: default; background: #f8f9fa; }
+    .schedule-month-view-host .cal-day.active { background-color: #fff; border-color: #ced4da; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .schedule-month-view-host .cal-day.active:hover { background-color: #eef5ff; border-color: #9ec5fe; }
+    .schedule-month-view-host .cal-day.conflict { background-color: #fff5f5; border-color: #f1aeb5; cursor: pointer; }
+    .schedule-month-view-host .cal-day.leave { background-color: #fff9db; border-color: #ffc107; cursor: pointer; }
     .cal-day.empty { color: #adb5bd; cursor: default; }
     .cal-day.active { background-color: #f8f9fa; border-color: #dee2e6; color: #495057; font-weight: 400; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .cal-day.active:hover { background-color: #cfe2ff; transform: translateY(-2px); }
@@ -2105,6 +2223,26 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.max(stackedHeight, singleWeekHeight);
     }
 
+    function syncScheduleMonthViewLayout(container) {
+        const calendarBody = document.querySelector('.schedule-calendar-card-body');
+        if (calendarBody) {
+            calendarBody.classList.add('is-month-view');
+            calendarBody.classList.remove('schedule-calendar-card-body-multi-week');
+            calendarBody.style.removeProperty('min-height');
+        }
+        if (!container) return;
+        container.classList.remove('schedule-week-grid-host');
+        container.classList.add('schedule-month-view-host');
+        container.style.removeProperty('height');
+        container.style.removeProperty('min-height');
+    }
+
+    function clearScheduleMonthViewLayout(container) {
+        const calendarBody = document.querySelector('.schedule-calendar-card-body');
+        calendarBody?.classList.remove('is-month-view');
+        container?.classList.remove('schedule-month-view-host');
+    }
+
     function syncScheduleCalendarCardBody(weekCount, gridHeight) {
         const body = document.querySelector('.schedule-calendar-card-body');
         if (!body) return;
@@ -2226,14 +2364,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function scheduleLegendItemsForMode(mode) {
         if (mode === 'calendar') {
             return [
-                '<span class="schedule-legend-item text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</span>',
-                '<span class="schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Complete count</span>',
-                '<span class="schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending count</span>',
+                '<span class="schedule-legend-item text-muted small">Month cells show compact start times; click a day for vertical day view</span>',
+                '<span class="schedule-legend-item text-success fw-bold"><i class="bi bi-check-circle-fill small"></i> Completed session</span>',
+                '<span class="schedule-legend-item text-warning fw-bold"><i class="bi bi-clock-history small"></i> Pending session</span>',
                 '<span class="schedule-legend-item text-warning-emphasis fw-bold"><i class="bi bi-calendar-plus"></i> M = Make-up required</span>',
                 '<span class="schedule-legend-item text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</span>',
                 '<span class="schedule-legend-item text-danger fw-bold"><i class="bi bi-stars me-1"></i> Important report</span>',
-                '<span class="schedule-legend-item text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</span>',
-                '<span class="schedule-legend-item text-muted small">Click any day to load it in vertical day view</span>'
+                '<span class="schedule-legend-item text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</span>'
             ];
         }
         return [
@@ -2814,16 +2951,12 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshScheduleSummary(events);
         if (mode === 'calendar') {
             const range = getScheduleRange();
-            container.classList.remove('schedule-week-grid-host');
-            const calendarBody = document.querySelector('.schedule-calendar-card-body');
-            if (calendarBody) {
-                calendarBody.style.removeProperty('min-height');
-                calendarBody.classList.remove('schedule-calendar-card-body-multi-week');
-            }
+            syncScheduleMonthViewLayout(container);
             renderCalendarView(grouped, range.startDate, range.endDate, container);
             setSchedulePrintEnabled(true);
             return;
         }
+        clearScheduleMonthViewLayout(container);
         container.classList.add('schedule-week-grid-host');
         if (!events.length && scheduleState.hideEmptyDays) {
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
@@ -3397,32 +3530,81 @@ document.addEventListener('DOMContentLoaded', () => {
         return scheduleCalendarCore.renderVerticalWeekGrid(eventsByDate, container, null, buildScheduleWeekGridRenderOptions('verticalTimeline'));
     }
 
+    function formatScheduleCompactClock(timeStr) {
+        const raw = String(timeStr || '').trim();
+        const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return raw || '-';
+        const hour = Number(match[1]);
+        const minute = Number(match[2]);
+        if (!Number.isFinite(hour) || !Number.isFinite(minute)) return raw;
+        const period = hour >= 12 ? 'p' : 'a';
+        const h12 = hour % 12 === 0 ? 12 : hour % 12;
+        if (minute === 0) return `${h12}${period}`;
+        return `${h12}:${String(minute).padStart(2, '0')}${period}`;
+    }
+
+    function sortScheduleDayEvents(events) {
+        return (Array.isArray(events) ? events : []).slice().sort((a, b) => {
+            const startA = String(a?.start || '');
+            const startB = String(b?.start || '');
+            if (startA !== startB) return startA.localeCompare(startB);
+            return getEventTitle(a).localeCompare(getEventTitle(b));
+        });
+    }
+
+    function buildCalendarSessionChipHtml(event, scd, statusMap) {
+        const scan = scd?.resolveScheduleCompletionScan
+            ? scd.resolveScheduleCompletionScan(event, statusMap)
+            : null;
+        const stateClass = event?.hasOverlap
+            ? 'is-conflict'
+            : (isLeaveEvent(event)
+                ? 'is-leave'
+                : (scan?.isComplete ? 'is-complete' : 'is-pending'));
+        const timeLabel = formatScheduleCompactClock(event?.start);
+        const makeupMark = scd?.isMakeupRequiredDisplayEvent && scd.isMakeupRequiredDisplayEvent(event)
+            ? '<span class="cal-session-makeup">M</span>'
+            : '';
+        const tooltip = buildScheduleEventTooltip(event, statusMap, scan);
+        return `<div class="cal-session-chip ${stateClass}" title="${escapeHtml(tooltip)}"><span class="cal-session-time">${escapeHtml(timeLabel)}${makeupMark}</span></div>`;
+    }
+
+    function buildCalendarDaySessionsHtml(dayEvents, scd, statusMap, maxVisible = 4) {
+        const sorted = sortScheduleDayEvents(dayEvents);
+        if (!sorted.length) return '';
+        const visible = sorted.slice(0, maxVisible);
+        const overflow = sorted.length - visible.length;
+        const chips = visible.map((event) => buildCalendarSessionChipHtml(event, scd, statusMap)).join('');
+        const more = overflow > 0 ? `<div class="cal-session-more">+${overflow}</div>` : '';
+        return `<div class="cal-day-sessions">${chips}${more}</div>`;
+    }
+
     function renderCalendarView(eventsByDate, startStr, endStr, container) {
         const scd = window.ScheduleCompletionDisplay;
         let current = new Date(startStr + 'T00:00:00');
-        current.setDate(1); 
-        
+        current.setDate(1);
+
         const end = new Date(endStr + 'T00:00:00');
         end.setMonth(end.getMonth() + 1);
-        end.setDate(0); 
+        end.setDate(0);
 
-        let html = '<div class="row g-4">';
+        let html = '<div class="schedule-month-stack">';
         while (current <= end) {
             const year = current.getFullYear();
             const month = current.getMonth();
             const monthName = current.toLocaleString('default', { month: 'long', year: 'numeric' });
-            const firstDayIndex = new Date(year, month, 1).getDay(); 
+            const firstDayIndex = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             html += `
-                <div class="col-md-6 col-lg-4">
-                    <div class="card h-100 shadow-sm border-0">
-                        <div class="card-header bg-dark text-white text-center fw-bold py-2">${monthName}</div>
-                        <div class="card-body p-2 bg-light">
+                <div class="schedule-month-card">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-dark text-white text-center fw-bold py-2">${escapeHtml(monthName)}</div>
+                        <div class="card-body p-2 p-md-3 bg-light">
                             <div class="cal-grid">
             `;
             ['S','M','T','W','T','F','S'].forEach(d => html += `<div class="text-center x-small fw-bold text-muted mb-1">${d}</div>`);
             for(let i=0; i<firstDayIndex; i++) html += `<div class="cal-day empty"></div>`;
-            
+
             for(let d=1; d<=daysInMonth; d++) {
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                 const dayEvents = eventsByDate[dateStr] || [];
@@ -3431,33 +3613,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 const count = dayEvents.length;
                 const reportMarker = dayEvents.some(isReportScheduleEvent) ? buildReportPriorityMarker(dayEvents.find(isReportScheduleEvent)) : '';
                 let classes = 'cal-day ';
-                let badges = '';
-                
+
                 if (hasConflict) {
                     classes += 'conflict';
-                    badges = `<div class="cal-badge bg-danger">${count}</div>`;
                 } else if (hasLeave) {
                     classes += 'leave';
-                    badges = `<div class="cal-badge bg-warning text-dark">${count}</div>`;
                 } else if (count > 0) {
                     classes += 'active';
-                    badges = scd
-                        ? scd.buildCalendarDayBadges(dayEvents, sessionStatusMetaMap, { hasConflict: false, hasLeave: false })
-                        : `<div class="cal-badge bg-primary">${count}</div>`;
                 } else {
                     classes += 'empty';
                 }
 
-                html += `<div class="${classes}" data-date="${dateStr}" title="${count} classes scheduled">
-                            ${reportMarker}<span class="d-block">${d}</span>
-                            ${badges}
+                const sessionsHtml = count > 0
+                    ? buildCalendarDaySessionsHtml(dayEvents, scd, sessionStatusMetaMap)
+                    : '';
+
+                html += `<div class="${classes}" data-date="${dateStr}" title="${count} session${count === 1 ? '' : 's'} scheduled">
+                            <div class="cal-day-head">
+                                ${reportMarker}<span class="cal-day-number">${d}</span>
+                            </div>
+                            ${sessionsHtml}
                          </div>`;
             }
 
             html += `</div></div></div></div>`;
             current.setMonth(current.getMonth() + 1);
         }
-        
+
         html += '</div>';
         container.innerHTML = html;
     }
