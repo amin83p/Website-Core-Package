@@ -5,6 +5,7 @@ const { getMongoCollection } = require('./mongoConnection');
 
 const DEFAULT_COLLECTION_NAME = 'expressSessions';
 const DEFAULT_TTL_MS = 12 * 60 * 60 * 1000;
+const DEFAULT_TOUCH_THROTTLE_MS = 5 * 60 * 1000;
 
 function toDate(value) {
   if (!value) return null;
@@ -18,11 +19,17 @@ function resolveExpiry(sessionData = {}, ttlMs = DEFAULT_TTL_MS) {
   return new Date(Date.now() + ttlMs);
 }
 
+function normalizeDurationMs(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 class MongoSessionStore extends expressSession.Store {
   constructor(options = {}) {
     super();
     this.collectionName = String(options.collectionName || DEFAULT_COLLECTION_NAME).trim() || DEFAULT_COLLECTION_NAME;
-    this.ttlMs = Number(options.ttlMs || DEFAULT_TTL_MS);
+    this.ttlMs = normalizeDurationMs(options.ttlMs, DEFAULT_TTL_MS);
+    this.touchThrottleMs = normalizeDurationMs(options.touchThrottleMs, DEFAULT_TOUCH_THROTTLE_MS);
     this.indexPromise = null;
   }
 
@@ -86,14 +93,29 @@ class MongoSessionStore extends expressSession.Store {
   }
 
   touch(sid, sessionData, callback = () => {}) {
+    const sessionId = String(sid || '');
+    const now = new Date();
+    const expiresAt = resolveExpiry(sessionData, this.ttlMs);
+    const refreshBefore = new Date(now.getTime() + this.touchThrottleMs);
+    const staleBefore = new Date(now.getTime() - this.touchThrottleMs);
+    const filter = { sid: sessionId };
+    if (this.touchThrottleMs > 0) {
+      filter.$or = [
+        { updatedAt: { $lte: staleBefore } },
+        { updatedAt: { $exists: false } },
+        { expiresAt: { $lte: refreshBefore } },
+        { expiresAt: { $exists: false } }
+      ];
+    }
+
     this.ensureIndexes()
       .then(() => this.collection().updateOne(
-        { sid: String(sid || '') },
+        filter,
         {
           $set: {
             session: sessionData,
-            expiresAt: resolveExpiry(sessionData, this.ttlMs),
-            updatedAt: new Date()
+            expiresAt,
+            updatedAt: now
           }
         }
       ))
@@ -105,5 +127,6 @@ class MongoSessionStore extends expressSession.Store {
 module.exports = {
   MongoSessionStore,
   DEFAULT_COLLECTION_NAME,
-  DEFAULT_TTL_MS
+  DEFAULT_TTL_MS,
+  DEFAULT_TOUCH_THROTTLE_MS
 };

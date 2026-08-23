@@ -111,6 +111,7 @@ const TARGET_COLLECTIONS = new Set([
   'accesses',
   'accessPolicies',
   'tableSettings',
+  'userSettings',
   'scopes',
   'sessions',
   'logs',

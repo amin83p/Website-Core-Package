@@ -107,12 +107,17 @@
       button.setAttribute('aria-label', 'Manage autosave for this page');
       button.title = 'Autosave';
       renderSideControlContent(button);
-      host.appendChild(button);
     } else {
       button.setAttribute('data-no-wait', 'true');
       if (!button.querySelector('.school-autosave-side-control__icon')) {
         renderSideControlContent(button);
       }
+    }
+    const diagnosticsButton = document.getElementById('pageDiagnosticsSideControl');
+    if (diagnosticsButton && diagnosticsButton.parentElement === host) {
+      if (diagnosticsButton.previousElementSibling !== button) diagnosticsButton.before(button);
+    } else if (button.parentElement !== host) {
+      host.appendChild(button);
     }
     return button;
   }

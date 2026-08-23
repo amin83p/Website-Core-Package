@@ -10,6 +10,8 @@
   const layoutHtmlClass = (typeof htmlClass !== 'undefined' && htmlClass) ? String(htmlClass).trim() : '';
   const layoutBodyClass = (typeof bodyClass !== 'undefined' && bodyClass) ? String(bodyClass).trim() : '';
   const layoutMainClass = (typeof mainClass !== 'undefined' && mainClass) ? String(mainClass).trim() : 'container my-4';
+  const layoutCanUsePageDiagnostics = (typeof canUsePageDiagnostics !== 'undefined' && canUsePageDiagnostics);
+  const layoutPageDiagnosticsEnabled = (typeof pageDiagnosticsEnabled === 'undefined' || pageDiagnosticsEnabled);
 %>
 <html lang="en"<% if (layoutHtmlClass) { %> class="<%= layoutHtmlClass %>"<% } %>>
 <head>
@@ -113,13 +115,39 @@
   <% if ((typeof print !== 'undefined' && print) || (typeof includePrintManager !== 'undefined' && includePrintManager)) { %>
     <%- include('../partials/printSettingsModal') %>
   <% } %>
+  <% if (layoutCanUsePageDiagnostics && !layoutPageDiagnosticsEnabled) { %>
+    <div class="modal fade page-diagnostics-toggle-modal" id="pageDiagnosticsToggleModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3">
+          <div class="modal-header bg-light border-bottom">
+            <h5 class="modal-title fw-bold text-dark mb-0">
+              <i class="bi bi-speedometer2 me-2" aria-hidden="true"></i>Page Diagnostics
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="page-diagnostics-preference-panel">
+              <div class="form-check form-switch mb-1">
+                <input class="form-check-input" type="checkbox" role="switch" id="pageDiagnosticsToggleSwitch" data-no-wait="true">
+                <label class="form-check-label fw-semibold" for="pageDiagnosticsToggleSwitch">Page Diagnostics</label>
+              </div>
+              <div class="small text-muted">Diagnostics are off for this account, so full page diagnostics scripts are not loaded.</div>
+              <div class="alert alert-danger d-none mt-3 mb-0" id="pageDiagnosticsToggleError"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <% if (typeof canUsePageDiagnostics !== 'undefined' && canUsePageDiagnostics) { %>
+  <% if (layoutCanUsePageDiagnostics && layoutPageDiagnosticsEnabled) { %>
     <script>
       window.__PAGE_DIAGNOSTICS__ = {
         enabled: true,
         endpoint: '/debug/client-diagnostics/page-presence',
+        preferenceEndpoint: <%- JSON.stringify(typeof pageDiagnosticsPreferenceEndpoint !== 'undefined' ? pageDiagnosticsPreferenceEndpoint : '/debug/client-diagnostics/preference') %>,
+        csrfToken: <%- JSON.stringify(typeof csrfToken !== 'undefined' ? csrfToken : '') %>,
         currentPath: <%- JSON.stringify((typeof originalUrl !== 'undefined' && originalUrl) ? String(originalUrl).split(/[?#]/)[0] : '') %>,
         requestId: <%- JSON.stringify(typeof requestId !== 'undefined' ? requestId : '') %>,
         buildVersion: <%- JSON.stringify(typeof buildVersionShort !== 'undefined' ? buildVersionShort : '') %>,
@@ -128,6 +156,55 @@
     </script>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnosticsHealth.js') : '/scripts/pageDiagnosticsHealth.js' %>"></script>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnostics.js') : '/scripts/pageDiagnostics.js' %>"></script>
+  <% } else if (layoutCanUsePageDiagnostics) { %>
+    <script>
+      (function () {
+        const endpoint = <%- JSON.stringify(typeof pageDiagnosticsPreferenceEndpoint !== 'undefined' ? pageDiagnosticsPreferenceEndpoint : '/debug/client-diagnostics/preference') %>;
+        const csrfToken = <%- JSON.stringify(typeof csrfToken !== 'undefined' ? csrfToken : '') %>;
+        function setError(message) {
+          const target = document.getElementById('pageDiagnosticsToggleError');
+          if (!target) return;
+          const text = String(message || '').trim();
+          target.textContent = text;
+          target.classList.toggle('d-none', !text);
+        }
+        async function savePreference(enabled) {
+          const headers = {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'x-ajax-request': 'true'
+          };
+          if (csrfToken) headers['x-csrf-token'] = csrfToken;
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            credentials: 'same-origin',
+            body: JSON.stringify({ enabled })
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || payload.status !== 'success') {
+            throw new Error(payload.message || 'Unable to update page diagnostics.');
+          }
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+          const input = document.getElementById('pageDiagnosticsToggleSwitch');
+          if (!input) return;
+          input.addEventListener('change', async function () {
+            if (!input.checked) return;
+            setError('');
+            input.disabled = true;
+            try {
+              await savePreference(true);
+              window.location.reload();
+            } catch (error) {
+              input.checked = false;
+              input.disabled = false;
+              setError(error && error.message ? error.message : 'Unable to update page diagnostics.');
+            }
+          });
+        });
+      })();
+    </script>
   <% } %>
   <% if (typeof orgTimeZone !== 'undefined' && orgTimeZone) { %>
     <script>

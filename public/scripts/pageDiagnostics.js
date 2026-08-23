@@ -531,10 +531,18 @@
     modal.innerHTML = `
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
         <div class="modal-content border-0 shadow-lg rounded-3">
-          <div class="modal-header bg-light border-bottom">
+          <div class="modal-header bg-light border-bottom gap-3 flex-wrap">
             <h5 class="modal-title fw-bold text-dark mb-0">
               <i class="bi bi-speedometer2 me-2"></i>Page Diagnostics
             </h5>
+            <div class="page-diagnostics-preference-panel page-diagnostics-preference-panel--inline ms-auto">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="pageDiagnosticsEnabledSwitch" data-no-wait="true" checked>
+                <label class="form-check-label fw-semibold" for="pageDiagnosticsEnabledSwitch">Page Diagnostics</label>
+              </div>
+              <div class="small text-muted">Diagnostics are active for this account.</div>
+              <div class="small text-danger d-none" id="pageDiagnosticsPreferenceError"></div>
+            </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -595,12 +603,63 @@
       }
     });
 
+    document.getElementById('pageDiagnosticsEnabledSwitch')?.addEventListener('change', (event) => {
+      handlePreferenceToggle(event.target);
+    });
+
     return modal;
   }
 
   function setStatus(message) {
     const el = document.getElementById('pageDiagnosticsStatus');
     if (el) el.textContent = String(message || '');
+  }
+
+  function setPreferenceError(message) {
+    const el = document.getElementById('pageDiagnosticsPreferenceError');
+    if (!el) return;
+    const text = String(message || '').trim();
+    el.textContent = text;
+    el.classList.toggle('d-none', !text);
+  }
+
+  async function savePreference(enabled) {
+    const endpoint = String(config.preferenceEndpoint || '').trim();
+    if (!endpoint) throw new Error('Preference endpoint is unavailable.');
+    const headers = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'x-ajax-request': 'true'
+    };
+    if (config.csrfToken) headers['x-csrf-token'] = String(config.csrfToken);
+
+    const response = await global.fetch(endpoint, {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      body: JSON.stringify({ enabled })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.status !== 'success') {
+      throw new Error(payload.message || 'Unable to update page diagnostics.');
+    }
+    return Boolean(payload.enabled);
+  }
+
+  async function handlePreferenceToggle(input) {
+    if (!input || input.checked) return;
+    setPreferenceError('');
+    setStatus('Saving preference...');
+    input.disabled = true;
+    try {
+      await savePreference(false);
+      global.location.reload();
+    } catch (error) {
+      input.checked = true;
+      input.disabled = false;
+      setStatus('');
+      setPreferenceError(error?.message || 'Unable to update page diagnostics.');
+    }
   }
 
   function renderDiagnosticsModal() {

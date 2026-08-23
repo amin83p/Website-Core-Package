@@ -61,6 +61,11 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { tableId: 1 }, options: { name: 'idx_table_settings_table_id' } },
     { key: { 'audit.lastUpdateDateTime': -1 }, options: { name: 'idx_table_settings_last_update_dt' } }
   ],
+  userSettings: [
+    { key: { id: 1 }, options: { name: 'idx_user_settings_id', unique: true } },
+    { key: { userId: 1 }, options: { name: 'idx_user_settings_userId', unique: true } },
+    { key: { 'audit.lastUpdateDateTime': -1 }, options: { name: 'idx_user_settings_last_update_dt' } }
+  ],
   contracts: [
     { key: { id: 1 }, options: { name: 'idx_contracts_id' } },
     { key: { orgId: 1, status: 1 }, options: { name: 'idx_contracts_org_status' } },

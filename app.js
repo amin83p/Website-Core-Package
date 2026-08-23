@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http'); // Import HTTP module
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
@@ -53,8 +54,6 @@ const settingService = require('./MVC/services/settingService'); // Import Setti
 const appBrandingService = require('./MVC/services/appBrandingService');
 const smsProviderService = require('./MVC/services/sms/smsProviderService');
 const adminAuthorityService = require('./MVC/services/adminAuthorityService');
-const accessUiService = require('./MVC/services/security/accessUiService');
-const { SECTIONS, OPERATIONS } = require('./config/accessConstants');
 const { registerCoreEntityQueryExecutors } = require('./MVC/models/queryExecutorBootstrap');
 const dataBackendRuntimeService = require('./MVC/services/dataBackendRuntimeService');
 const dataBackendRecoveryMiddleware = require('./MVC/middleware/dataBackendRecoveryMiddleware');
@@ -74,8 +73,71 @@ const staticAssetMiddleware = require('./MVC/middleware/staticAssetMiddleware');
 const { SESSION_SECRET } = require('./config/security');
 const { resolveDataBackendConfig } = require('./config/dataBackend');
 const { MongoSessionStore } = require('./MVC/infrastructure/mongo/mongoSessionStore');
+const { isHtmlNavigationRequest } = require('./MVC/utils/pagePathUtils');
 
-const PORT    = process.env.PORT || 3000;
+function normalizeListenTarget(value) {
+  if (typeof value === 'number') return value;
+  const token = String(value || '').trim();
+  if (/^\d+$/.test(token)) {
+    const port = Number.parseInt(token, 10);
+    if (Number.isInteger(port) && port >= 0 && port <= 65535) return port;
+  }
+  return token || 3000;
+}
+
+function describeListenTarget(value) {
+  return typeof value === 'number' ? `http://localhost:${value}` : String(value || '');
+}
+
+function normalizeListenError(error, value) {
+  if (error?.code !== 'EADDRINUSE') return error;
+  const friendly = new Error(`${describeListenTarget(value)} is already in use. Stop the existing app process or choose a different PORT.`);
+  friendly.code = error.code;
+  friendly.cause = error;
+  return friendly;
+}
+
+function assertListenTargetAvailable(value) {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    let settled = false;
+    const finish = (error = null) => {
+      if (settled) return;
+      settled = true;
+      probe.removeAllListeners('error');
+      if (error) {
+        reject(normalizeListenError(error, value));
+        return;
+      }
+      resolve();
+    };
+
+    probe.once('error', finish);
+    probe.listen(value, () => {
+      probe.close(() => finish());
+    });
+  });
+}
+
+function listenHttpServer(httpServer, value, onListening) {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      httpServer.off('error', onError);
+    };
+    const onError = (error) => {
+      cleanup();
+      reject(normalizeListenError(error, value));
+    };
+    httpServer.once('error', onError);
+    httpServer.listen(value, () => {
+      cleanup();
+      if (typeof onListening === 'function') onListening();
+      resolve();
+    });
+  });
+}
+
+const PORT = normalizeListenTarget(process.env.PORT || 3000);
 const isProduction = String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
 const DEFAULT_PACKAGE_STARTUP_RECOVERY_WINDOW_MS = 300000;
 const DEFAULT_PACKAGE_STARTUP_RECOVERY_INTERVAL_MS = 15000;
@@ -178,6 +240,28 @@ function resolveAppUiSettings() {
   };
 }
 
+function isEnabledFlag(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function isRequestPathTimingEnabled(env = process.env) {
+  return !isProduction && isEnabledFlag(env.REQUEST_PATH_TIMING);
+}
+
+function createRequestPathTimingMiddleware(label) {
+  const timingEnabled = isRequestPathTimingEnabled();
+  return (req, res, next) => {
+    if (!timingEnabled || !isHtmlNavigationRequest(req)) return next();
+    const startedAt = process.hrtime.bigint();
+    res.on('finish', () => {
+      const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1000000;
+      const requestPath = String(req.originalUrl || req.url || '').slice(0, 300);
+      console.info(`[request-path] ${label} ${req.method} ${requestPath} ${res.statusCode} ${elapsedMs.toFixed(1)}ms`);
+    });
+    return next();
+  };
+}
+
 function createAppStaticMiddleware(rootPath, cacheProfile = 'static') {
   return staticAssetMiddleware.createStaticAssetMiddleware(rootPath, {
     isProduction,
@@ -210,6 +294,63 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
+app.use(compression({
+  threshold: 1024,
+  filter(req, res) {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
+const packageAssetRuntimeRouter = express.Router();
+app.locals.packageAssetRuntimeRouter = packageAssetRuntimeRouter;
+
+app.get('/site.webmanifest', (req, res) => {
+  res.type('application/manifest+json');
+  res.setHeader('Cache-Control', 'no-cache');
+  return res.json(appBrandingService.getManifest());
+});
+
+app.use(createAppStaticMiddleware(path.join(__dirname, 'public')));
+const uploadsStaticContext = {
+  root: '',
+  middleware: null
+};
+app.use('/uploads', (req, res, next) => {
+  const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
+  if (!uploadsStaticContext.middleware || uploadsStaticContext.root !== uploadRoot) {
+    uploadsStaticContext.root = uploadRoot;
+    uploadsStaticContext.middleware = createAppStaticMiddleware(uploadRoot, 'upload');
+  }
+
+  const requestedDiskPath = uploadPathUtils.fromUploadsUrlToDiskPath(req.originalUrl || req.url, uploadRoot);
+  const hasLocalArtifact = Boolean(requestedDiskPath && fs.existsSync(requestedDiskPath));
+
+  if (isRailwayProxyMode()) {
+    const gatewayBaseUrl = getGatewayBaseUrl();
+    if (gatewayBaseUrl) {
+      let isSameHost = false;
+      try {
+        const gatewayHost = new URL(gatewayBaseUrl).host.toLowerCase();
+        const requestHost = String(req.get('host') || '').toLowerCase();
+        isSameHost = gatewayHost === requestHost;
+      } catch (_) {
+        isSameHost = false;
+      }
+      // In local/dev flows we may have build artifacts on local disk while proxy mode is still enabled.
+      // Prefer serving local files when they exist; otherwise keep gateway redirect behavior.
+      if (!isSameHost && !hasLocalArtifact) {
+        const suffix = String(req.originalUrl || '').replace(/^\/uploads/, '');
+        const targetUrl = `${gatewayBaseUrl}/uploads${suffix}`;
+        return res.redirect(307, targetUrl);
+      }
+    }
+  }
+
+  return uploadsStaticContext.middleware(req, res, next);
+});
+app.use(packageAssetRuntimeRouter);
+
 // Increase limit to 50MB (or more if needed)
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
@@ -217,9 +358,9 @@ app.use(cookieParser(SESSION_SECRET)); // Use session secret for signed cookies 
 app.use(expressSession({
   name: 'admin_flow.sid',
   secret: SESSION_SECRET,
-  resave: true,
-  saveUninitialized: true,
-  rolling: true,
+  resave: false,
+  saveUninitialized: false,
+  rolling: sessionStore ? false : true,
   ...(sessionStore ? { store: sessionStore } : {}),
   cookie: {
     httpOnly: true,
@@ -269,59 +410,6 @@ app.use((req, res, next) => {
 
 // 3. Enforce Session Limits (Reads cookies)
 app.use(sessionEnforcement);
-
-app.get('/site.webmanifest', (req, res) => {
-  res.type('application/manifest+json');
-  res.setHeader('Cache-Control', 'no-cache');
-  return res.json(appBrandingService.getManifest());
-});
-
-app.use(compression({
-  threshold: 1024,
-  filter(req, res) {
-    if (req.headers['x-no-compression']) return false;
-    return compression.filter(req, res);
-  }
-}));
-
-app.use(createAppStaticMiddleware(path.join(__dirname, 'public')));
-const uploadsStaticContext = {
-  root: '',
-  middleware: null
-};
-app.use('/uploads', (req, res, next) => {
-  const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
-  if (!uploadsStaticContext.middleware || uploadsStaticContext.root !== uploadRoot) {
-    uploadsStaticContext.root = uploadRoot;
-    uploadsStaticContext.middleware = createAppStaticMiddleware(uploadRoot, 'upload');
-  }
-
-  const requestedDiskPath = uploadPathUtils.fromUploadsUrlToDiskPath(req.originalUrl || req.url, uploadRoot);
-  const hasLocalArtifact = Boolean(requestedDiskPath && fs.existsSync(requestedDiskPath));
-
-  if (isRailwayProxyMode()) {
-    const gatewayBaseUrl = getGatewayBaseUrl();
-    if (gatewayBaseUrl) {
-      let isSameHost = false;
-      try {
-        const gatewayHost = new URL(gatewayBaseUrl).host.toLowerCase();
-        const requestHost = String(req.get('host') || '').toLowerCase();
-        isSameHost = gatewayHost === requestHost;
-      } catch (_) {
-        isSameHost = false;
-      }
-      // In local/dev flows we may have build artifacts on local disk while proxy mode is still enabled.
-      // Prefer serving local files when they exist; otherwise keep gateway redirect behavior.
-      if (!isSameHost && !hasLocalArtifact) {
-        const suffix = String(req.originalUrl || '').replace(/^\/uploads/, '');
-        const targetUrl = `${gatewayBaseUrl}/uploads${suffix}`;
-        return res.redirect(307, targetUrl);
-      }
-    }
-  }
-
-  return uploadsStaticContext.middleware(req, res, next);
-});
 //Middle wares
 ///const {userAuth} = require('./MVC/middleware/authMiddleware');
 const {timeCheckMiddleware} = require('./MVC/middleware/timeCheckMiddleware');
@@ -367,11 +455,13 @@ app.use((req, res, next) => {
 });
 
 // 2. Soft Auth (Populate req.user if token exists, but don't block)
+app.use(createRequestPathTimingMiddleware('authenticated-html'));
 app.use(softAuth); 
+app.use(sessionEnforcement.trackCurrentPathAfterAuth);
 app.use(orgTimezoneLocals);
 app.use(dataBackendRecoveryMiddleware.exposeBackendStatus);
 app.use(chatAccessLocals);
-app.use(async (req, res, next) => {
+app.use((req, res, next) => {
   res.locals.appBrand = appBrandingService.getBrand();
   res.locals.appContact = appBrandingService.getContact();
   res.locals.appContactPage = appBrandingService.getContactPage();
@@ -388,23 +478,14 @@ app.use(async (req, res, next) => {
   );
   res.locals.canViewActiveUsers = false;
   res.locals.canUsePageDiagnostics = false;
+  res.locals.pageDiagnosticsEnabled = false;
+  res.locals.pageDiagnosticsPreferenceEndpoint = '/debug/client-diagnostics/preference';
   if (req.user) {
-    try {
-      res.locals.canViewActiveUsers = await accessUiService.canAccessTarget(req, {
-        sectionId: SECTIONS.ACTIVE_USERS,
-        operationId: OPERATIONS.READ_ALL
-      });
-    } catch (_) {
-      res.locals.canViewActiveUsers = false;
-    }
-    try {
-      res.locals.canUsePageDiagnostics = await accessUiService.canAccessTarget(req, {
-        sectionId: SECTIONS.PAGE_DIAGNOSTICS,
-        operationId: OPERATIONS.READ_ALL
-      });
-    } catch (_) {
-      res.locals.canUsePageDiagnostics = false;
-    }
+    const canViewActiveUsers = req.user.canViewActiveUsers === true || req.user.uiAccess?.canViewActiveUsers === true;
+    const canUsePageDiagnostics = req.user.canUsePageDiagnostics === true || req.user.uiAccess?.canUsePageDiagnostics === true;
+    res.locals.canViewActiveUsers = canViewActiveUsers;
+    res.locals.canUsePageDiagnostics = canUsePageDiagnostics;
+    res.locals.pageDiagnosticsEnabled = canUsePageDiagnostics && req.user.pageDiagnosticsEnabled !== false;
   }
   next();
 });
@@ -429,6 +510,7 @@ const scopeRoutes = require('./MVC/routes/scopeRoutes');
 const accessRoutes = require('./MVC/routes/accessRoutes');
 const restrictedRoutes = require('./MVC/routes/restrictedRoutes');
 const tableSettingsRoutes = require('./MVC/routes/tableSettingsRoutes');
+const userSettingsRoutes = require('./MVC/routes/userSettingsRoutes');
 const verifyAdmin = require('./MVC/routes/securityRoutes');
 const fileRoutes = require('./MVC/routes/fileRoutes');
 const dashboardPanels = require('./MVC/routes/dashboardRoutes');
@@ -473,6 +555,7 @@ app.use('/roles', roleRoutes);
 app.use('/scopes', scopeRoutes);
 app.use('/accesses', accessRoutes);
 app.use('/tableSettings', tableSettingsRoutes);
+app.use('/userSettings', userSettingsRoutes);
 app.use('/verify-admin', verifyAdmin)
 app.use('/files', fileRoutes);
 app.use('/dashboard', dashboardPanels);
@@ -678,7 +761,8 @@ function startPackageRuntimeReconcileLoop({
   backendMode = '',
   packageRootDir = '',
   packageLoaderHooks = {},
-  packageRuntimeRouter = null
+  packageRuntimeRouter = null,
+  packageAssetRuntimeRouter = null
 } = {}) {
   stopPackageRuntimeReconcileLoop();
   const settings = resolvePackageRuntimeReconcileSettings(process.env);
@@ -708,6 +792,7 @@ function startPackageRuntimeReconcileLoop({
       const latestSummary = await packageLoaderService.loadEnabledPackages({
         app,
         packageRuntimeRouter,
+        packageAssetRuntimeRouter,
         backendMode,
         packageRootDir,
         hooks: packageLoaderHooks,
@@ -741,7 +826,8 @@ function startPackageStartupRecoveryLoop({
   backendMode = '',
   packageRootDir = '',
   packageLoaderHooks = {},
-  packageRuntimeRouter = null
+  packageRuntimeRouter = null,
+  packageAssetRuntimeRouter = null
 } = {}) {
   stopPackageStartupRecoveryLoop();
   const settings = resolvePackageStartupRecoverySettings(process.env);
@@ -783,6 +869,7 @@ function startPackageStartupRecoveryLoop({
       const latestSummary = await packageLoaderService.loadEnabledPackages({
         app,
         packageRuntimeRouter,
+        packageAssetRuntimeRouter,
         backendMode,
         packageRootDir,
         hooks: packageLoaderHooks,
@@ -824,6 +911,7 @@ socketService.init(server);
 // ✅ Initialize Settings (Load JSON to Memory)
 async function startServer() {
   try {
+    await assertListenTargetAvailable(PORT);
     const dataBackend = await dataBackendRuntimeService.initializeDataBackend(process.env);
     registerCoreEntityQueryExecutors({ backendMode: dataBackend.mode });
     app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
@@ -883,6 +971,7 @@ async function startServer() {
       const packageLoadSummary = await packageLoaderService.loadEnabledPackages({
         app,
         packageRuntimeRouter,
+        packageAssetRuntimeRouter,
         backendMode: dataBackend.mode,
         packageRootDir,
         hooks: packageLoaderHooks
@@ -893,13 +982,15 @@ async function startServer() {
         backendMode: dataBackend.mode,
         packageRootDir,
         packageLoaderHooks,
-        packageRuntimeRouter
+        packageRuntimeRouter,
+        packageAssetRuntimeRouter
       });
       startPackageRuntimeReconcileLoop({
         backendMode: dataBackend.mode,
         packageRootDir,
         packageLoaderHooks,
-        packageRuntimeRouter
+        packageRuntimeRouter,
+        packageAssetRuntimeRouter
       });
     } catch (packageLoaderError) {
       startupLogger.warn('PACKAGE_LOADER', 'STARTUP', 'Package loader failed during startup; continuing with core + hardcoded routes.', {
@@ -927,11 +1018,8 @@ async function startServer() {
       });
       app.locals.packageNavigationSnapshot = null;
     }
-    actionStateRetentionService.start({ enabled: dataBackend.mode === 'mongo' });
-    smsProviderService.logStartupDiagnostics();
-
-    server.listen(PORT, () => {
-      startupLogger.success('APP', 'HTTP_SERVER', 'Server listening.', { url: `http://localhost:${PORT}` });
+    await listenHttpServer(server, PORT, () => {
+      startupLogger.success('APP', 'HTTP_SERVER', 'Server listening.', { url: describeListenTarget(PORT) });
       const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
       const appSettingsSnapshot = (() => {
         const appSettings = settingService.get().app || {};
@@ -949,7 +1037,14 @@ async function startServer() {
       })();
       startupLogger.info('APP', 'SETTINGS_SNAPSHOT', 'Loaded settings summary.', appSettingsSnapshot);
     });
+    actionStateRetentionService.start({ enabled: dataBackend.mode === 'mongo' });
+    smsProviderService.logStartupDiagnostics();
   } catch (err) {
+    if (err?.code === 'EADDRINUSE') {
+      startupLogger.error('APP', 'HTTP_SERVER', err.message, { target: describeListenTarget(PORT) });
+      console.error(err.message);
+      process.exit(1);
+    }
     startupLogger.error('APP', 'BOOT', 'Failed to start server with current settings/backend configuration.', { error: err?.message || String(err) });
     console.error(err);
     process.exit(1);

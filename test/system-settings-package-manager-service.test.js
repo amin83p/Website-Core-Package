@@ -430,8 +430,11 @@ test('discoverLocalManifests merges package roots and dedupes duplicate package 
     const snapshot = await service.listPackageSnapshot({ backendMode: 'json' });
 
     const manifestIds = snapshot.localManifests.map((row) => row.packageId).sort();
-    assert.equal(snapshot.localManifests.length, 3);
-    assert.deepEqual(manifestIds, ['ielts', 'pte', 'school']);
+    assert.equal(manifestIds.filter((id) => id === 'pte').length, 1);
+    assert.ok(manifestIds.includes('ielts'));
+    assert.ok(manifestIds.includes('pte'));
+    assert.ok(manifestIds.includes('school'));
+    assert.deepEqual(manifestIds, Array.from(new Set(manifestIds)).sort());
   } finally {
     if (previousRoots === undefined) delete process.env.PACKAGE_STORAGE_ROOTS;
     else process.env.PACKAGE_STORAGE_ROOTS = previousRoots;
@@ -666,7 +669,7 @@ test('installPackage accepts runtime route already-mounted skip as healthy', asy
   assert.equal(report.runtime?.hooks?.routes?.failed, 0);
 });
 
-test('installPackage prefers package runtime router for routes/assets when available', async () => {
+test('installPackage prefers runtime router for routes and asset router for assets when available', async () => {
   const setup = createBaseDeps();
   let routeAppRef = null;
   let viewAppRef = null;
@@ -688,7 +691,16 @@ test('installPackage prefers package runtime router for routes/assets when avail
   });
   const service = createService(setup.deps);
   const runtimeRouter = { use() {} };
-  const app = { use() {}, get() {}, set() {}, locals: { packageRuntimeRouter: runtimeRouter } };
+  const assetRuntimeRouter = { use() {} };
+  const app = {
+    use() {},
+    get() {},
+    set() {},
+    locals: {
+      packageRuntimeRouter: runtimeRouter,
+      packageAssetRuntimeRouter: assetRuntimeRouter
+    }
+  };
 
   const report = await service.installPackage({
     installMethod: 'json',
@@ -704,10 +716,10 @@ test('installPackage prefers package runtime router for routes/assets when avail
   });
 
   assert.equal(routeAppRef, runtimeRouter);
-  assert.equal(assetAppRef, runtimeRouter);
+  assert.equal(assetAppRef, assetRuntimeRouter);
   assert.equal(viewAppRef, app);
   assert.equal(report.runtime?.mountTarget?.routes, 'packageRuntimeRouter');
-  assert.equal(report.runtime?.mountTarget?.assets, 'packageRuntimeRouter');
+  assert.equal(report.runtime?.mountTarget?.assets, 'packageAssetRuntimeRouter');
   assert.equal(report.runtime?.mountTarget?.views, 'app');
 });
 

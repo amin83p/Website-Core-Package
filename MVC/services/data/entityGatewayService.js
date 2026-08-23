@@ -9,6 +9,7 @@ const scopeRepository = require('../../repositories/scopeRepository');
 const accessRepository = require('../../repositories/accessRepository');
 const accessPolicyRepository = require('../../repositories/accessPolicyRepository');
 const tableSettingsRepository = require('../../repositories/tableSettingsRepository');
+const userSettingsRepository = require('../../repositories/userSettingsRepository');
 const logRepository = require('../../repositories/logRepository');
 const actionStateRepository = require('../../repositories/actionStateRepository');
 const orgPolicyRepository = require('../../repositories/orgPolicyRepository');
@@ -33,6 +34,7 @@ const {
   buildAccessScope,
   buildAccessPolicyScope,
   buildTableSettingsScope,
+  buildUserSettingsScope,
   buildOrgPolicyScope,
   buildSymbolScope,
   buildSessionScope,
@@ -147,6 +149,10 @@ function resolveTrackedEntityId(entityType, inputId, resultRow = null) {
     return '';
   }
 
+  if (normalizedType === 'userSettings') {
+    return toPublicId(resultRow?.userId || resultRow?.id || inputId);
+  }
+
   const fromResult = toPublicId(resultRow?.id || '');
   if (fromResult) return fromResult;
   return toPublicId(inputId);
@@ -200,6 +206,10 @@ const FETCH_ENTITY_REGISTRY = Object.freeze({
   tableSettings: {
     repository: tableSettingsRepository,
     buildScope: buildTableSettingsScope
+  },
+  userSettings: {
+    repository: userSettingsRepository,
+    buildScope: buildUserSettingsScope
   },
   actionStates: {
     repository: actionStateRepository,
@@ -401,6 +411,7 @@ const entityGatewayService = {
       case 'accesses': return await trackCreate(accessRepository.create(data, options));
       case 'accessPolicies': return await trackCreate(accessPolicyRepository.create(data, options));
       case 'tableSettings': return await trackCreate(tableSettingsRepository.create({ ...data, auditUser }, options));
+      case 'userSettings': return await trackCreate(userSettingsRepository.create({ ...data, auditUser }, options));
       case 'logs':
         return await trackCreate(logRepository.create({
           sectionId: data.sectionId,
@@ -477,6 +488,7 @@ const entityGatewayService = {
       case 'accesses': return await trackUpdate(accessRepository.update(id, data, options));
       case 'accessPolicies': return await trackUpdate(accessPolicyRepository.update(id, data, options));
       case 'tableSettings': return await trackUpdate(tableSettingsRepository.update(null, { ...data, auditUser }, options));
+      case 'userSettings': return await trackUpdate(userSettingsRepository.update(id, { ...data, auditUser }, options));
       case 'orgPolicies': return await trackUpdate(orgPolicyRepository.update(id, data, options));
       case 'symbols': return await trackUpdate(symbolRepository.update(id, data, options));
       case 'sessions': return await trackUpdate(sessionRepository.update(id, data, options));
@@ -567,6 +579,7 @@ const entityGatewayService = {
       case 'tableSettings':
         if (typeof id === 'object' && id.userId && id.tableId) return await trackDelete(tableSettingsRepository.remove(id, options));
         throw new Error('Invalid ID format.');
+      case 'userSettings': return await trackDelete(userSettingsRepository.remove(id, options));
       case 'actionStates': return await trackDelete(actionStateRepository.remove(id, options));
       case 'orgPolicies': return await trackDelete(orgPolicyRepository.remove(id, options));
       case 'symbols': return await trackDelete(symbolRepository.remove(id, options));

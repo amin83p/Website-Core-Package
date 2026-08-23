@@ -86,6 +86,12 @@ function buildTableSettingsScope(requestingUser) {
   return { canViewAll: false, userId: toPublicId(requestingUser?.id) };
 }
 
+function buildUserSettingsScope(requestingUser) {
+  if (!requestingUser) return { canViewAll: false, userId: null };
+  if (adminChekersService.isSuperAdmin(requestingUser)) return { canViewAll: true };
+  return { canViewAll: false, userId: toPublicId(requestingUser?.id) };
+}
+
 function buildOrgPolicyScope(requestingUser) {
   if (!requestingUser) return { canViewAll: false, orgIds: [] };
   if (adminChekersService.isSuperAdmin(requestingUser)) return { canViewAll: true };
@@ -178,6 +184,7 @@ module.exports = {
   buildAccessScope,
   buildAccessPolicyScope,
   buildTableSettingsScope,
+  buildUserSettingsScope,
   buildOrgPolicyScope,
   buildSymbolScope,
   buildSessionScope,

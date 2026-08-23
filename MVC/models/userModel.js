@@ -250,6 +250,18 @@ async function updateUser(id, updates) {
       if (updates.primaryOrgId) {
           VIRTUAL_ADMINS[vIndex].primaryOrgId = Number(updates.primaryOrgId);
       }
+      if (updates.preferences && typeof updates.preferences === 'object') {
+          VIRTUAL_ADMINS[vIndex].preferences = {
+              ...((VIRTUAL_ADMINS[vIndex].preferences && typeof VIRTUAL_ADMINS[vIndex].preferences === 'object') ? VIRTUAL_ADMINS[vIndex].preferences : {}),
+              ...updates.preferences
+          };
+      }
+      if (updates.audit && typeof updates.audit === 'object') {
+          VIRTUAL_ADMINS[vIndex].audit = {
+              ...((VIRTUAL_ADMINS[vIndex].audit && typeof VIRTUAL_ADMINS[vIndex].audit === 'object') ? VIRTUAL_ADMINS[vIndex].audit : {}),
+              ...updates.audit
+          };
+      }
       return VIRTUAL_ADMINS[vIndex];
   }
 
@@ -266,6 +278,15 @@ async function updateUser(id, updates) {
       ...updates,
       audit: { ...current.audit, ...(updates.audit || {}) }
     };
+    if (
+      (current.preferences && typeof current.preferences === 'object') ||
+      (updates.preferences && typeof updates.preferences === 'object')
+    ) {
+      merged.preferences = {
+        ...((current.preferences && typeof current.preferences === 'object') ? current.preferences : {}),
+        ...((updates.preferences && typeof updates.preferences === 'object') ? updates.preferences : {})
+      };
+    }
 
     // ✅ AUTO-CORRECT: Enforce Inactive Status
     if (['pending', 'suspended', 'deleted'].includes(merged.status)) {

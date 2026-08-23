@@ -2008,10 +2008,15 @@ function createService(overrides = {}) {
     const packageRuntimeRouter = options?.packageRuntimeRouter
       || app?.locals?.packageRuntimeRouter
       || null;
+    const packageAssetRuntimeRouter = options?.packageAssetRuntimeRouter
+      || app?.locals?.packageAssetRuntimeRouter
+      || null;
     const routesApp = packageRuntimeRouter && typeof packageRuntimeRouter.use === 'function'
       ? packageRuntimeRouter
       : app;
-    const assetsApp = routesApp;
+    const assetsApp = packageAssetRuntimeRouter && typeof packageAssetRuntimeRouter.use === 'function'
+      ? packageAssetRuntimeRouter
+      : routesApp;
     const viewsApp = app && typeof app.get === 'function' && typeof app.set === 'function'
       ? app
       : routesApp;
@@ -2059,7 +2064,7 @@ function createService(overrides = {}) {
       mountTarget: {
         routes: routesApp === packageRuntimeRouter ? 'packageRuntimeRouter' : 'app',
         views: viewsApp === app ? 'app' : (viewsApp === packageRuntimeRouter ? 'packageRuntimeRouter' : 'none'),
-        assets: assetsApp === packageRuntimeRouter ? 'packageRuntimeRouter' : 'app'
+        assets: assetsApp === packageAssetRuntimeRouter ? 'packageAssetRuntimeRouter' : (assetsApp === packageRuntimeRouter ? 'packageRuntimeRouter' : 'app')
       }
     };
   }
@@ -3397,6 +3402,9 @@ function createService(overrides = {}) {
     const packageRuntimeRouter = options.packageRuntimeRouter
       || app?.locals?.packageRuntimeRouter
       || null;
+    const packageAssetRuntimeRouter = options.packageAssetRuntimeRouter
+      || app?.locals?.packageAssetRuntimeRouter
+      || null;
 
     const declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
       backendMode,
@@ -3409,6 +3417,7 @@ function createService(overrides = {}) {
       loaderSummary = await deps.packageLoaderService.loadEnabledPackages({
         app,
         packageRuntimeRouter,
+        packageAssetRuntimeRouter,
         backendMode,
         packageRootDir,
         hooks,
@@ -3426,7 +3435,8 @@ function createService(overrides = {}) {
     const runtime = await applyRuntimeEnableHooks(context, {
       backendMode,
       app,
-      packageRuntimeRouter
+      packageRuntimeRouter,
+      packageAssetRuntimeRouter
     });
     try {
       assertRuntimeRouteMountHealth(context, runtime, {

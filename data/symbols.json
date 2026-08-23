@@ -1336,6 +1336,24 @@
     "value": "bi bi-table"
   },
   {
+    "id": "SYM_SYSTEM_091",
+    "name": "USER_SETTINGS",
+    "orgId": "SYSTEM",
+    "tags": [
+      "USER_SETTINGS",
+      "USER_SETTING",
+      "862453"
+    ],
+    "type": "class",
+    "value": "bi bi-person-gear",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-23T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-23T00:00:00.000Z"
+    }
+  },
+  {
     "id": "SYM_SYSTEM_016",
     "audit": {
       "createUser": "SYS_ROOT_001",

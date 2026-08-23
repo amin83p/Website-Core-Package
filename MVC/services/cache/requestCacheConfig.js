@@ -25,6 +25,11 @@ function resolveRequestCacheTtlMs() {
 }
 
 function resolveRequestCacheMaxEntries() {
+  const envOverride = Number.parseInt(String(process.env.REQUEST_CACHE_MAX_ENTRIES || ''), 10);
+  if (Number.isFinite(envOverride) && envOverride > 0) {
+    return Math.min(MAX_MAX_ENTRIES, Math.max(MIN_MAX_ENTRIES, envOverride));
+  }
+
   const fromSettings = settingService.getValue('app', 'requestCacheMaxEntries');
   return parsePositiveInt(fromSettings, DEFAULT_MAX_ENTRIES, MIN_MAX_ENTRIES, MAX_MAX_ENTRIES);
 }

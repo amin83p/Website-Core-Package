@@ -198,6 +198,61 @@ test('loader prefers package runtime router for route/asset hooks when provided'
   });
 });
 
+test('loader prefers package asset runtime router for asset hooks when provided', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte'
+    });
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const runtimeRouter = { use() {} };
+    const assetRuntimeRouter = { use() {} };
+    const app = {
+      use() {},
+      get() {},
+      set() {},
+      locals: {
+        packageRuntimeRouter: runtimeRouter,
+        packageAssetRuntimeRouter: assetRuntimeRouter
+      }
+    };
+    let routeAppRef = null;
+    let viewAppRef = null;
+    let assetAppRef = null;
+
+    const hooks = {
+      registerRoutes: async ({ app: hookApp }) => { routeAppRef = hookApp; },
+      registerViews: async ({ app: hookApp }) => { viewAppRef = hookApp; },
+      registerAssets: async ({ app: hookApp }) => { assetAppRef = hookApp; },
+      registerRegistryData: async () => {},
+      registerUploadFolders: async () => {},
+      registerQueryExecutors: async () => {}
+    };
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      app,
+      packageRuntimeRouter: runtimeRouter,
+      packageAssetRuntimeRouter: assetRuntimeRouter,
+      hooks,
+      logger: makeSilentLogger()
+    });
+
+    assert.equal(summary.loadedCount, 1);
+    assert.equal(routeAppRef, runtimeRouter);
+    assert.equal(assetAppRef, assetRuntimeRouter);
+    assert.equal(viewAppRef, app);
+  });
+});
+
 test('loader skips invalid package manifest without crashing when continueOnError=true', async () => {
   await withTempPackageWorkspace(async ({ packageRootDir }) => {
     await writeManifest(packageRootDir, 'school', {

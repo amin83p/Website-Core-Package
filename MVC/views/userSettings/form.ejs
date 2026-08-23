@@ -1,0 +1,121 @@
+<%
+  const rec = record || {};
+  const isReadOnly = typeof readOnly !== 'undefined' && readOnly;
+  const userSettingsId = rec.userId || rec.id || '';
+  const formMode = typeof mode !== 'undefined' && mode === 'edit' ? 'edit' : 'view';
+  const userDisplay = typeof selectedUser !== 'undefined' && selectedUser ? selectedUser : {};
+  const rowExists = typeof hasSavedSettings !== 'undefined' ? hasSavedSettings : true;
+  const userDisplayName = userDisplay.displayName || userDisplay.name || userDisplay.username || userDisplay.email || userSettingsId || 'Unknown User';
+  const userSummaryParts = [
+    userDisplay.username ? `@${userDisplay.username}` : '',
+    userDisplay.email || '',
+    userDisplay.status ? `Status: ${userDisplay.status}` : '',
+    userDisplay.primaryOrgId ? `Org: ${userDisplay.primaryOrgId}` : ''
+  ].filter(Boolean);
+  const userSummary = userSummaryParts.join(' | ');
+  const pickerStateJson = JSON.stringify({
+    mode: formMode,
+    selectedUserId: userSettingsId
+  })
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+%>
+
+<div class="sections-page">
+  <%- include('../partials/formPage_PageTitle', {
+    isEditMode: !isReadOnly,
+    name: 'User Settings',
+    id: userSettingsId || 'New'
+  }) %>
+
+  <div class="form-container user-settings-form-container">
+    <form method="POST" action="/userSettings/edit/<%= encodeURIComponent(userSettingsId) %>">
+      <div class="user-settings-picker-panel mb-4">
+        <div class="user-settings-picker-main">
+          <div class="user-settings-picker-icon" aria-hidden="true">
+            <i class="bi bi-person-gear"></i>
+          </div>
+          <div class="min-w-0 flex-grow-1">
+            <label class="form-label small fw-bold text-muted mb-1" for="userSettingsSelectedUserId">Selected User</label>
+            <input type="hidden" id="userSettingsSelectedUserId" value="<%= userSettingsId %>">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <div class="min-w-0">
+                <div class="fw-bold text-truncate" id="userSettingsSelectedUserName"><%= userDisplayName %></div>
+                <div class="small text-muted text-break">
+                  <span class="font-monospace"><%= userSettingsId || '-' %></span>
+                  <% if (userSummary) { %>
+                    <span class="mx-1">|</span><span><%= userSummary %></span>
+                  <% } %>
+                </div>
+              </div>
+              <% if (rowExists === false) { %>
+                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">No saved settings</span>
+              <% } %>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="pickUserSettingsUserBtn" title="Pick user" aria-label="Pick user">
+          <i class="bi bi-search me-1"></i><span>Pick User</span>
+        </button>
+      </div>
+
+      <label class="form-label small fw-bold text-muted" for="settingsJson">Settings JSON</label>
+      <textarea
+        id="settingsJson"
+        name="settingsJson"
+        class="form-control font-monospace size-sm"
+        rows="20"
+        spellcheck="false"
+        <%= isReadOnly ? 'readonly' : 'required' %>><%= settingsJson || '{}' %></textarea>
+
+      <div class="button-row mt-4 pt-3 border-top d-flex gap-2">
+        <% if (!isReadOnly) { %>
+          <button type="submit" class="btn btn-filled btn-primary btn-md px-4">
+            <i class="bi bi-save me-2"></i>Save Settings
+          </button>
+        <% } %>
+        <a href="/userSettings/" class="btn btn-filled btn-secondary btn-md px-4">Back</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker', { user }) %>
+<script>
+(function initUserSettingsUserPicker() {
+  const state = <%- pickerStateJson %>;
+  const pickButton = document.getElementById('pickUserSettingsUserBtn');
+  if (!pickButton) return;
+
+  function resolveItemId(item) {
+    return String(item && (item.id || item.userId) || '').trim();
+  }
+
+  function targetUrl(userId) {
+    const encoded = encodeURIComponent(userId);
+    return state.mode === 'edit' ? `/userSettings/edit/${encoded}` : `/userSettings/${encoded}`;
+  }
+
+  pickButton.addEventListener('click', function handlePickUserClick() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const context = window.GenericPickerContexts && typeof window.GenericPickerContexts.allUsers === 'function'
+      ? window.GenericPickerContexts.allUsers()
+      : null;
+    const config = window.GenericPickerPresets.user({
+      title: 'Select User',
+      apiEndpoint: '/userSettings/picker/users',
+      context,
+      initialSearchTerm: state.selectedUserId || '',
+      onSelect: function onSelectUser(item) {
+        const userId = resolveItemId(item);
+        if (!userId) return;
+        window.location.href = targetUrl(userId);
+      }
+    });
+    window.GenericPicker.open(config);
+  });
+})();
+</script>

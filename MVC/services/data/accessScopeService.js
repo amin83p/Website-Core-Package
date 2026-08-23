@@ -8,6 +8,7 @@ const scopeRepository = require('../../repositories/scopeRepository');
 const accessRepository = require('../../repositories/accessRepository');
 const accessPolicyRepository = require('../../repositories/accessPolicyRepository');
 const tableSettingsRepository = require('../../repositories/tableSettingsRepository');
+const userSettingsRepository = require('../../repositories/userSettingsRepository');
 const logRepository = require('../../repositories/logRepository');
 const actionStateRepository = require('../../repositories/actionStateRepository');
 const orgPolicyRepository = require('../../repositories/orgPolicyRepository');
@@ -26,6 +27,7 @@ const {
   buildAccessScope,
   buildAccessPolicyScope,
   buildTableSettingsScope,
+  buildUserSettingsScope,
   buildOrgPolicyScope,
   buildSymbolScope,
   buildSessionScope,
@@ -87,6 +89,10 @@ const accessScopeService = {
 
   async getAccessibleTableSettings(requestingUser) {
     return await tableSettingsRepository.list({ scope: buildTableSettingsScope(requestingUser) });
+  },
+
+  async getAccessibleUserSettings(requestingUser) {
+    return await userSettingsRepository.list({ scope: buildUserSettingsScope(requestingUser) });
   },
 
   async getAccessibleLogs(_requestingUser, filters = {}) {

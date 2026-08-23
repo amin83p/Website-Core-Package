@@ -2,6 +2,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs'); 
 const dataService = require('./dataService'); 
+const userSettingsService = require('./userSettingsService');
 const { SECRET_KEY } = require('../../config/security'); 
 const { SYSTEM_CONTEXT } = require('../../config/constants'); 
 const sessionService = require('./SessionService'); 
@@ -10,6 +11,8 @@ const { normalizeOrgRoles, getPrimaryOrgRole } = require('../utils/orgContextUti
 const { idsEqual, toPublicId, toStorageId } = require('../utils/idAdapter');
 const userRepository = require('../repositories/userRepository');
 const { evaluateUserEntitlement } = require('./security/entitlementService');
+const { evaluateAccess } = require('./security/accessControl');
+const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const {
   resolveOrganizationTimezoneFromRow,
   resolveActiveOrgTimezoneFromUser,
@@ -44,6 +47,76 @@ async function fetchUserMembershipRows(userId) {
         page: 1,
         limit: 5000
     }, SYSTEM_CONTEXT);
+}
+
+async function loadSafeUserSettings(userId, legacyPreferences = {}) {
+    const safeLegacy = legacyPreferences && typeof legacyPreferences === 'object' && !Array.isArray(legacyPreferences)
+        ? legacyPreferences
+        : {};
+    try {
+        const stored = await userSettingsService.getSettings(userId);
+        const safeStored = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+        const storedPageDiagnostics = safeStored.pageDiagnostics && typeof safeStored.pageDiagnostics === 'object'
+            ? safeStored.pageDiagnostics
+            : null;
+        const legacyPageDiagnostics = safeLegacy.pageDiagnostics && typeof safeLegacy.pageDiagnostics === 'object'
+            ? safeLegacy.pageDiagnostics
+            : null;
+        const pageDiagnostics = storedPageDiagnostics && typeof storedPageDiagnostics.enabled === 'boolean'
+            ? storedPageDiagnostics
+            : legacyPageDiagnostics;
+        return {
+            ...safeLegacy,
+            ...safeStored,
+            ...(pageDiagnostics ? { pageDiagnostics } : {})
+        };
+    } catch (_) {
+        return safeLegacy;
+    }
+}
+
+function resolvePageDiagnosticsEnabled(canUsePageDiagnostics, userSettings = {}, legacyPreferences = {}) {
+    if (canUsePageDiagnostics !== true) return false;
+    const storedPageDiagnostics = userSettings?.pageDiagnostics && typeof userSettings.pageDiagnostics === 'object'
+        ? userSettings.pageDiagnostics
+        : null;
+    const legacyPageDiagnostics = legacyPreferences?.pageDiagnostics && typeof legacyPreferences.pageDiagnostics === 'object'
+        ? legacyPreferences.pageDiagnostics
+        : null;
+    const pageDiagnostics = storedPageDiagnostics && typeof storedPageDiagnostics.enabled === 'boolean'
+        ? storedPageDiagnostics
+        : legacyPageDiagnostics;
+    return !(pageDiagnostics && typeof pageDiagnostics === 'object' && pageDiagnostics.enabled === false);
+}
+
+async function canAccessCachedLayoutTarget(userContext, sectionId, operationId) {
+    try {
+        const result = await evaluateAccess({
+            user: userContext,
+            sectionId,
+            operationId,
+            ipAddress: ''
+        });
+        return result?.allowed === true;
+    } catch (_) {
+        return false;
+    }
+}
+
+async function buildCachedLayoutAccess(userContext, userSettings = {}, legacyPreferences = {}) {
+    const [canViewActiveUsers, canUsePageDiagnostics] = await Promise.all([
+        canAccessCachedLayoutTarget(userContext, SECTIONS.ACTIVE_USERS, OPERATIONS.READ_ALL),
+        canAccessCachedLayoutTarget(userContext, SECTIONS.PAGE_DIAGNOSTICS, OPERATIONS.READ_ALL)
+    ]);
+    return {
+        canViewActiveUsers,
+        canUsePageDiagnostics,
+        pageDiagnosticsEnabled: resolvePageDiagnosticsEnabled(canUsePageDiagnostics, userSettings, legacyPreferences),
+        uiAccess: {
+            canViewActiveUsers,
+            canUsePageDiagnostics
+        }
+    };
 }
 
 function buildBypassEntitlement(status, reason) {
@@ -430,7 +503,11 @@ async function hydrateUserContextFromToken(token, decoded) {
     }
   }
 
-  return {
+  const legacyPreferences = (user.preferences && typeof user.preferences === 'object' && !Array.isArray(user.preferences))
+    ? user.preferences
+    : {};
+  const userSettings = await loadSafeUserSettings(user.id, legacyPreferences);
+  const baseUserContext = {
     ...decoded,
     id: user.id, 
     username: user.username, 
@@ -452,7 +529,15 @@ async function hydrateUserContextFromToken(token, decoded) {
     activeOrgPolicy,
     canSwitchProfile,
     currentProfileMode,
-    entitlement
+    entitlement,
+    preferences: legacyPreferences,
+    userSettings: userSettings
+  };
+  const layoutAccess = await buildCachedLayoutAccess(baseUserContext, userSettings, legacyPreferences);
+
+  return {
+    ...baseUserContext,
+    ...layoutAccess
   };
 }
 

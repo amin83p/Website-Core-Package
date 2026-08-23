@@ -15,6 +15,7 @@ const scopeModel = require('./scopeModel');
 const accessModel = require('./accessModel');
 const accessPolicyModel = require('./accessPolicyModel');
 const tableSettingsModel = require('./tableSettingsModel');
+const userSettingsModel = require('./userSettingsModel');
 const logModel = require('./logModel');
 const actionStateModel = require('./actionStateModel');
 const orgPolicyModel = require('./orgPolicyModel');
@@ -108,6 +109,15 @@ function applyTableSettingsScope(rows, scope = {}) {
   const userId = toPublicId(scope?.userId) || null;
   if (!userId) return [];
   return list.filter((row) => idsEqual(row?.userId, userId));
+}
+
+function applyUserSettingsScope(rows, scope = {}) {
+  const list = normalizeRows(rows);
+  if (scope?.canViewAll !== false) return list;
+
+  const userId = toPublicId(scope?.userId) || null;
+  if (!userId) return [];
+  return list.filter((row) => idsEqual(row?.userId || row?.id, userId));
 }
 
 function applyOrgPolicyScope(rows, scope = {}) {
@@ -220,6 +230,7 @@ function registerCoreEntityQueryExecutors(options = {}) {
     ['accesses', createExecutor(accessModel.getAllAccesses, applyAccessScope)],
     ['accesspolicies', createExecutor(accessPolicyModel.getAllPolicies, applyAccessPolicyScope)],
     ['tablesettings', createExecutor(tableSettingsModel.getAllSettings, applyTableSettingsScope)],
+    ['usersettings', createExecutor(userSettingsModel.getAllSettings, applyUserSettingsScope)],
     ['logs', createExecutor(logModel.getAllLogs, applyCanViewAllScope)],
     ['actionstates', createExecutor(actionStateModel.getAllActionStates, applyCanViewAllScope)],
     ['orgpolicies', createExecutor(orgPolicyModel.getAllPolicies, applyOrgPolicyScope)],

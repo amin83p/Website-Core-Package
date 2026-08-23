@@ -220,8 +220,16 @@ async function runLoaderHooks(hooks, context = {}) {
     : (app?.locals?.packageRuntimeRouter && typeof app.locals.packageRuntimeRouter.use === 'function'
       ? app.locals.packageRuntimeRouter
       : null);
+  const packageAssetRuntimeRouterCandidate = context?.packageAssetRuntimeRouter;
+  const packageAssetRuntimeRouter = packageAssetRuntimeRouterCandidate && typeof packageAssetRuntimeRouterCandidate.use === 'function'
+    ? packageAssetRuntimeRouterCandidate
+    : (app?.locals?.packageAssetRuntimeRouter && typeof app.locals.packageAssetRuntimeRouter.use === 'function'
+      ? app.locals.packageAssetRuntimeRouter
+      : null);
   const routesApp = runtimeRouter && typeof runtimeRouter.use === 'function' ? runtimeRouter : app;
-  const assetsApp = runtimeRouter && typeof runtimeRouter.use === 'function' ? runtimeRouter : app;
+  const assetsApp = packageAssetRuntimeRouter && typeof packageAssetRuntimeRouter.use === 'function'
+    ? packageAssetRuntimeRouter
+    : (runtimeRouter && typeof runtimeRouter.use === 'function' ? runtimeRouter : app);
   const viewsApp = app && typeof app.get === 'function' && typeof app.set === 'function'
     ? app
     : ((runtimeRouter && typeof runtimeRouter.get === 'function' && typeof runtimeRouter.set === 'function')
@@ -370,6 +378,7 @@ async function loadEnabledPackages(options = {}) {
       const hookReport = await runLoaderHooks(hooks, {
         app: options.app || null,
         packageRuntimeRouter: options.packageRuntimeRouter || options.app?.locals?.packageRuntimeRouter || null,
+        packageAssetRuntimeRouter: options.packageAssetRuntimeRouter || options.app?.locals?.packageAssetRuntimeRouter || null,
         backendMode,
         packageId,
         manifest,

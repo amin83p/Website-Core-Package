@@ -146,6 +146,61 @@
     "trackState": false
   },
   {
+    "id": "862453",
+    "name": "USER_SETTINGS",
+    "category": "SYSTEM",
+    "description": "Manage saved per-user application settings.",
+    "homeURL": "/userSettings/",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 7,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-23T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-23T00:00:00.000Z"
+    }
+  },
+  {
     "id": "111975",
     "active": true,
     "audit": {
@@ -2187,6 +2242,9 @@
     "subsections": [
       {
         "id": "100102"
+      },
+      {
+        "id": "862453"
       },
       {
         "id": "340738"

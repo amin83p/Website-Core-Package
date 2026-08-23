@@ -20,6 +20,7 @@ const ENTITY_KEYS = Object.freeze([
 ]);
 
 const SYSTEM_ACTOR = 'SYSTEM';
+const CATALOG_NOT_LOADED = Symbol('CATALOG_NOT_LOADED');
 
 function cleanText(value, max = 4000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -500,7 +501,85 @@ function createDefaultDependencies(overrides = {}) {
   };
 }
 
+function getRepositoryForCategory(deps = {}, category = '') {
+  if (category === 'operations') return deps.operationRepository;
+  if (category === 'roles') return deps.roleRepository;
+  if (category === 'sections') return deps.sectionRepository;
+  if (category === 'symbols') return deps.symbolRepository;
+  if (category === 'accesses') return deps.accessRepository;
+  return null;
+}
+
+function getCatalogRows(lookupCatalog = null, category = '') {
+  const catalog = lookupCatalog && typeof lookupCatalog === 'object'
+    ? lookupCatalog[category]
+    : null;
+  if (!catalog || catalog.loaded !== true) return CATALOG_NOT_LOADED;
+  return Array.isArray(catalog.rows) ? catalog.rows : [];
+}
+
+function findCatalogRow(lookupCatalog = null, category = '', predicate = null) {
+  const rows = getCatalogRows(lookupCatalog, category);
+  if (rows === CATALOG_NOT_LOADED) return CATALOG_NOT_LOADED;
+  if (typeof predicate !== 'function') return null;
+  return rows.find((row) => row && predicate(row)) || null;
+}
+
+function findCatalogRowById(lookupCatalog = null, category = '', id = '') {
+  const token = cleanText(id, 120);
+  if (!token) return null;
+  return findCatalogRow(
+    lookupCatalog,
+    category,
+    (row) => cleanText(row?.id, 120) === token
+  );
+}
+
+function replaceCatalogRow(lookupCatalog = null, category = '', row = null) {
+  const rows = getCatalogRows(lookupCatalog, category);
+  if (rows === CATALOG_NOT_LOADED || !row || typeof row !== 'object') return;
+  const rowId = cleanText(row?.id, 120);
+  const index = rows.findIndex((existing) => {
+    if (rowId && cleanText(existing?.id, 120) === rowId) return true;
+    return rowBelongsToSameIdentity(category, existing, row);
+  });
+  if (index >= 0) rows[index] = row;
+  else rows.push(row);
+}
+
+async function buildEntityLookupCatalog(declarationsByCategory = {}, deps = {}, options = {}) {
+  const backendMode = cleanText(options?.backendMode || '', 20);
+  const catalog = {};
+  await Promise.all(ENTITY_KEYS.map(async (category) => {
+    const rows = normalizeDeclarationArray(declarationsByCategory[category]);
+    if (!rows.length) return;
+    const repo = getRepositoryForCategory(deps, category);
+    if (!repo || typeof repo.list !== 'function') return;
+    try {
+      const existingRows = await repo.list({
+        backendMode,
+        query: { limit: 0 }
+      });
+      catalog[category] = {
+        loaded: true,
+        rows: Array.isArray(existingRows)
+          ? existingRows.filter((row) => row && typeof row === 'object')
+          : []
+      };
+    } catch (_) {
+      // Fall back to the older direct lookup path if a custom repository cannot list all rows.
+    }
+  }));
+  return catalog;
+}
+
 async function findOperationByName(repo, name, options = {}) {
+  const catalogResult = findCatalogRow(
+    options?.lookupCatalog,
+    'operations',
+    (row) => cleanText(row?.name, 180).toUpperCase() === cleanText(name, 180).toUpperCase()
+  );
+  if (catalogResult !== CATALOG_NOT_LOADED) return catalogResult;
   if (typeof repo.getByName === 'function') {
     return repo.getByName(name, options);
   }
@@ -509,6 +588,12 @@ async function findOperationByName(repo, name, options = {}) {
 }
 
 async function findRoleByKey(repo, key, options = {}) {
+  const catalogResult = findCatalogRow(
+    options?.lookupCatalog,
+    'roles',
+    (row) => cleanText(row?.key, 180).toLowerCase() === cleanText(key, 180).toLowerCase()
+  );
+  if (catalogResult !== CATALOG_NOT_LOADED) return catalogResult;
   if (typeof repo.getByKey === 'function') {
     return repo.getByKey(key, options);
   }
@@ -517,6 +602,12 @@ async function findRoleByKey(repo, key, options = {}) {
 }
 
 async function findSectionByName(repo, name, options = {}) {
+  const catalogResult = findCatalogRow(
+    options?.lookupCatalog,
+    'sections',
+    (row) => cleanText(row?.name, 180).toUpperCase() === cleanText(name, 180).toUpperCase()
+  );
+  if (catalogResult !== CATALOG_NOT_LOADED) return catalogResult;
   if (typeof repo.getByName === 'function') {
     return repo.getByName(name, options);
   }
@@ -525,6 +616,13 @@ async function findSectionByName(repo, name, options = {}) {
 }
 
 async function findSymbolByNameOrg(repo, name, orgId, options = {}) {
+  const catalogResult = findCatalogRow(
+    options?.lookupCatalog,
+    'symbols',
+    (row) => cleanText(row?.name, 180).toUpperCase() === cleanText(name, 180).toUpperCase()
+      && normalizeOrgIdComparable(row?.orgId) === normalizeOrgIdComparable(orgId)
+  );
+  if (catalogResult !== CATALOG_NOT_LOADED) return catalogResult;
   const rows = await repo.list({
     ...options,
     query: {
@@ -537,6 +635,13 @@ async function findSymbolByNameOrg(repo, name, orgId, options = {}) {
 }
 
 async function findAccessByNameOrg(repo, name, orgId, options = {}) {
+  const catalogResult = findCatalogRow(
+    options?.lookupCatalog,
+    'accesses',
+    (row) => cleanText(row?.name, 180).toUpperCase() === cleanText(name, 180).toUpperCase()
+      && normalizeOrgIdComparable(row?.orgId) === normalizeOrgIdComparable(orgId)
+  );
+  if (catalogResult !== CATALOG_NOT_LOADED) return catalogResult;
   const rows = await repo.list({
     ...options,
     query: {
@@ -572,6 +677,7 @@ function collectManifestDuplicateIdErrors(rows = [], category = 'sections') {
 
 async function validateManifestEntityIds(manifest = {}, deps = {}, options = {}) {
   const repoOptions = { backendMode: options?.backendMode || '' };
+  const lookupCatalog = options?.lookupCatalog || null;
   const errors = [
     ...collectManifestDuplicateIdErrors(manifest.sections, 'sections'),
     ...collectManifestDuplicateIdErrors(manifest.operations, 'operations')
@@ -581,7 +687,10 @@ async function validateManifestEntityIds(manifest = {}, deps = {}, options = {})
     const id = cleanText(row?.id, 120);
     const name = cleanText(row?.name, 180).toUpperCase();
     if (!id || !name) continue;
-    const existing = await deps.sectionRepository.getById(id, repoOptions);
+    const catalogResult = findCatalogRowById(lookupCatalog, 'sections', id);
+    const existing = catalogResult !== CATALOG_NOT_LOADED
+      ? catalogResult
+      : await deps.sectionRepository.getById(id, repoOptions);
     if (!existing) continue;
     const existingName = cleanText(existing?.name, 180).toUpperCase();
     if (existingName === name) continue;
@@ -597,7 +706,10 @@ async function validateManifestEntityIds(manifest = {}, deps = {}, options = {})
     const id = cleanText(row?.id, 120);
     const name = cleanText(row?.name, 180).toUpperCase();
     if (!id || !name) continue;
-    const existing = await deps.operationRepository.getById(id, repoOptions);
+    const catalogResult = findCatalogRowById(lookupCatalog, 'operations', id);
+    const existing = catalogResult !== CATALOG_NOT_LOADED
+      ? catalogResult
+      : await deps.operationRepository.getById(id, repoOptions);
     if (!existing) continue;
     const existingName = cleanText(existing?.name, 180).toUpperCase();
     if (existingName === name) continue;
@@ -624,8 +736,8 @@ function isSymbolIdentityMatch(existing = {}, normalized = {}) {
     && normalizeOrgIdComparable(existing?.orgId) === normalizeOrgIdComparable(normalized?.orgId);
 }
 
-function buildEntityDefinitions(deps, packageMeta, backendMode) {
-  const repoOptions = { backendMode };
+function buildEntityDefinitions(deps, packageMeta, backendMode, lookupCatalog = null) {
+  const repoOptions = { backendMode, lookupCatalog };
   return {
     operations: {
       normalize: (row) => normalizeOperationDeclaration(row, packageMeta),
@@ -756,14 +868,19 @@ async function installEntityDeclarations(manifest, summary, context, deps, optio
     symbols: normalizeDeclarationArray(manifest.symbols),
     accesses: normalizeDeclarationArray(manifest.accesses)
   };
+  const lookupCatalog = await buildEntityLookupCatalog(declarationsByCategory, deps, {
+    backendMode: summary.backendMode
+  });
   const entityDefs = buildEntityDefinitions(
     deps,
     { packageId: summary.packageId, packageName: summary.packageName },
-    summary.backendMode
+    summary.backendMode,
+    lookupCatalog
   );
 
   const idValidationErrors = await validateManifestEntityIds(manifest, deps, {
-    backendMode: summary.backendMode
+    backendMode: summary.backendMode,
+    lookupCatalog
   });
   const blockedDeclarationKeys = new Set();
   for (const validationError of idValidationErrors) {
@@ -889,6 +1006,7 @@ async function installEntityDeclarations(manifest, summary, context, deps, optio
           }
 
           const updated = await entityDef.update(existing.id, patch);
+          replaceCatalogRow(lookupCatalog, category, updated);
           markResult(summary, category, {
             status: 'updated',
             key: identity,
@@ -899,6 +1017,7 @@ async function installEntityDeclarations(manifest, summary, context, deps, optio
         }
 
         const created = await entityDef.create(normalized);
+        replaceCatalogRow(lookupCatalog, category, created);
         markResult(summary, category, {
           status: 'created',
           key: identity,

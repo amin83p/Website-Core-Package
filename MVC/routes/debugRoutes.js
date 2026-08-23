@@ -36,6 +36,12 @@ router.get('/client-diagnostics/page-presence',
   pageDiagnosticsCtrl.fetchPagePresence
 );
 
+router.post('/client-diagnostics/preference',
+  requireAuth,
+  requireAccess(SECTIONS.PAGE_DIAGNOSTICS, OPERATIONS.READ_ALL),
+  pageDiagnosticsCtrl.updatePreference
+);
+
 router.get('/', requireAuth, requireDebugAccess(), ctrl.showDebugHub);
 // Route to display the debugger page
 // Example URL: /debug/checker

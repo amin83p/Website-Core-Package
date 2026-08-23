@@ -29,9 +29,16 @@ function createMemoryRepository(initialRows = [], options = {}) {
   const rows = clone(initialRows);
   let seq = 1;
   const idPrefix = String(options.idPrefix || 'ROW');
+  const stats = {
+    list: 0,
+    create: 0,
+    update: 0,
+    remove: 0
+  };
 
   return {
     list: async (params = {}) => {
+      stats.list += 1;
       const query = params?.query || {};
       const filtered = rows.filter((row) => matchesEqQuery(row, query));
       const limit = Number.isInteger(query.limit) ? query.limit : 0;
@@ -39,6 +46,7 @@ function createMemoryRepository(initialRows = [], options = {}) {
       return clone(out);
     },
     create: async (payload = {}) => {
+      stats.create += 1;
       const row = clone(payload);
       if (!row.id) {
         row.id = `${idPrefix}${seq++}`;
@@ -47,6 +55,7 @@ function createMemoryRepository(initialRows = [], options = {}) {
       return clone(row);
     },
     update: async (id, payload = {}) => {
+      stats.update += 1;
       const index = rows.findIndex((row) => String(row?.id || '') === String(id || ''));
       if (index < 0) throw new Error(`Row not found: ${id}`);
       const next = clone(payload);
@@ -55,12 +64,14 @@ function createMemoryRepository(initialRows = [], options = {}) {
       return clone(next);
     },
     remove: async (id) => {
+      stats.remove += 1;
       const index = rows.findIndex((row) => String(row?.id || '') === String(id || ''));
       if (index < 0) return null;
       const [removed] = rows.splice(index, 1);
       return clone(removed);
     },
-    getRows: () => clone(rows)
+    getRows: () => clone(rows),
+    getStats: () => ({ ...stats })
   };
 }
 
@@ -330,6 +341,86 @@ test('installer is idempotent for already-owned declarations', async () => {
   assert.equal(second.entities.sections.updated + second.entities.sections.skipped, 1);
   assert.equal(second.entities.symbols.updated + second.entities.symbols.skipped, 1);
   assert.equal(second.entities.accesses.updated + second.entities.accesses.skipped, 1);
+});
+
+test('installer catalogs registry rows once per category during startup sync', async () => {
+  const { deps, repos } = createInstallerDeps({
+    operations: [{
+      id: 'OP9001',
+      name: 'pte_runner',
+      packageId: 'pte',
+      packageName: 'PTE',
+      active: true,
+      system: false,
+      trackState: true
+    }],
+    roles: [{
+      id: 'ROL9001',
+      key: 'pte_runner',
+      label: 'PTE Runner',
+      packageId: 'pte',
+      packageName: 'PTE',
+      domain: 'pte',
+      active: true,
+      system: false,
+      aliases: []
+    }],
+    sections: [{
+      id: 'SEC9001',
+      name: 'pte_runner',
+      packageId: 'pte',
+      packageName: 'PTE',
+      category: 'PTE',
+      active: true,
+      operations: []
+    }],
+    symbols: [{
+      id: 'SYM9001',
+      name: 'pte_runner',
+      packageId: 'pte',
+      packageName: 'PTE',
+      orgId: 'SYSTEM',
+      type: 'class',
+      value: 'bi bi-play'
+    }],
+    accesses: [{
+      id: 'ACC9001',
+      name: 'pte_runner',
+      packageId: 'pte',
+      packageName: 'PTE',
+      orgId: '',
+      active: true,
+      sections: [],
+      fullAdmin: false
+    }]
+  });
+
+  const summary = await packageRegistryInstallerService.installPackageRegistryDeclarations({
+    backendMode: 'mongo',
+    packageId: 'pte',
+    manifest: {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      operations: [{ id: 'OP9001', name: 'PTE_RUNNER', description: 'Runner op' }],
+      roles: [{ id: 'ROL9001', key: 'pte_runner', label: 'PTE Runner' }],
+      sections: [{ id: 'SEC9001', name: 'PTE_RUNNER', category: 'PTE', description: 'Runner section', operations: [] }],
+      symbols: [{ id: 'SYM9001', name: 'PTE_RUNNER', orgId: 'SYSTEM', type: 'class', value: 'bi bi-play' }],
+      accesses: [{ id: 'ACC9001', name: 'PTE_RUNNER', orgId: null, sections: [] }]
+    }
+  }, deps);
+
+  assert.equal(summary.entities.operations.created, 0);
+  assert.equal(summary.entities.roles.created, 0);
+  assert.equal(summary.entities.sections.created, 0);
+  assert.equal(summary.entities.symbols.created, 0);
+  assert.equal(summary.entities.accesses.created, 0);
+  assert.equal(repos.opRepo.getStats().list, 1);
+  assert.equal(repos.roleRepo.getStats().list, 1);
+  assert.equal(repos.sectionRepo.getStats().list, 1);
+  assert.equal(repos.symbolRepo.getStats().list, 1);
+  assert.equal(repos.accessRepo.getStats().list, 1);
 });
 
 test('installer protects ownership boundaries and supports explicit adoption', async () => {

@@ -1,11 +1,91 @@
 const accessService = require('./index');
 
+const UI_ACCESS_CACHE_TTL_MS = 30 * 1000;
+const UI_ACCESS_CACHE_MAX_ENTRIES = 2000;
+const uiAccessCache = new Map();
+
 function normalizeText(value) {
   return String(value || '').trim();
 }
 
 function cacheKey(sectionId = '', operationId = '') {
   return `${normalizeText(sectionId)}::${normalizeText(operationId)}`;
+}
+
+function extractSessionId(req) {
+  const token = String(req?.cookies?.auth_token || '').trim();
+  const parts = token.split('.');
+  return parts.length === 3 ? normalizeText(parts[2]) : '';
+}
+
+function resolveProfileKey(user = {}) {
+  return [
+    user.currentProfileMode,
+    user.activeProfile?.id,
+    user.activeProfile?.updatedAt || user.activeProfile?.audit?.lastUpdateDateTime,
+    user.activePolicy?.id,
+    user.activePolicy?.updatedAt || user.activePolicy?.audit?.lastUpdateDateTime,
+    user.activeOrgPolicy?.id,
+    user.activeOrgPolicy?.updatedAt || user.activeOrgPolicy?.audit?.lastUpdateDateTime
+  ].map(normalizeText).join('|');
+}
+
+function globalCacheKey(req, sectionId = '', operationId = '') {
+  const user = req?.user;
+  const userId = normalizeText(user?.id);
+  if (!userId) return '';
+  return [
+    userId,
+    extractSessionId(req),
+    normalizeText(user?.activeOrgId),
+    resolveProfileKey(user),
+    normalizeText(req?.ip),
+    normalizeText(sectionId),
+    normalizeText(operationId)
+  ].join('::');
+}
+
+function getCachedUiAccess(req, sectionId = '', operationId = '') {
+  const key = globalCacheKey(req, sectionId, operationId);
+  if (!key) return { hit: false, value: false };
+
+  const cached = uiAccessCache.get(key);
+  if (!cached) return { hit: false, value: false };
+  if (cached.expiresAt <= Date.now()) {
+    uiAccessCache.delete(key);
+    return { hit: false, value: false };
+  }
+  return { hit: true, value: cached.allowed === true };
+}
+
+function setCachedUiAccess(req, sectionId = '', operationId = '', allowed = false) {
+  const key = globalCacheKey(req, sectionId, operationId);
+  if (!key) return;
+
+  if (uiAccessCache.size >= UI_ACCESS_CACHE_MAX_ENTRIES) {
+    const oldestKey = uiAccessCache.keys().next().value;
+    if (oldestKey) uiAccessCache.delete(oldestKey);
+  }
+  uiAccessCache.set(key, {
+    allowed: allowed === true,
+    expiresAt: Date.now() + UI_ACCESS_CACHE_TTL_MS
+  });
+}
+
+function clearUiAccessCache() {
+  uiAccessCache.clear();
+}
+
+function invalidateUiAccessCacheForUser(userId) {
+  const prefix = `${normalizeText(userId)}::`;
+  if (prefix === '::') return 0;
+  let removed = 0;
+  for (const key of Array.from(uiAccessCache.keys())) {
+    if (!key.startsWith(prefix)) continue;
+    uiAccessCache.delete(key);
+    removed += 1;
+  }
+  return removed;
 }
 
 function getRequestCache(req) {
@@ -30,6 +110,12 @@ async function canAccessTarget(req, target = {}) {
   const key = cacheKey(sectionId, operationId);
   if (cache.has(key)) return cache.get(key);
 
+  const globalCached = getCachedUiAccess(req, sectionId, operationId);
+  if (globalCached.hit) {
+    cache.set(key, globalCached.value);
+    return globalCached.value;
+  }
+
   let allowed = false;
   try {
     const evaluation = await accessService.evaluateAccess({
@@ -44,6 +130,7 @@ async function canAccessTarget(req, target = {}) {
   }
 
   cache.set(key, allowed);
+  setCachedUiAccess(req, sectionId, operationId, allowed);
   return allowed;
 }
 
@@ -107,6 +194,8 @@ function renderActions(actions = [], options = {}) {
 }
 
 module.exports = {
+  clearUiAccessCache,
+  invalidateUiAccessCacheForUser,
   accessFlags,
   canAccessAction,
   canAccessTarget,

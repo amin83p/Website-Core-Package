@@ -1,4 +1,6 @@
 const activeUsersService = require('../services/security/activeUsersService');
+const userSettingsService = require('../services/userSettingsService');
+const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 const { sanitizeCurrentPath } = require('../utils/pagePathUtils');
 
 async function fetchPagePresence(req, res) {
@@ -52,6 +54,58 @@ async function fetchPagePresence(req, res) {
   }
 }
 
+async function updatePreference(req, res) {
+  try {
+    const enabled = req.body?.enabled;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'The enabled value must be a boolean.'
+      });
+    }
+
+    const userId = String(req.user?.id || '').trim();
+    if (!userId) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Authentication required.'
+      });
+    }
+
+    await userSettingsService.setSetting(
+      userId,
+      'pageDiagnostics.enabled',
+      enabled,
+      req.user || userId
+    );
+
+    invalidateAuthContextForUser(userId);
+    if (req.user) {
+      req.user.pageDiagnosticsEnabled = enabled;
+      req.user.userSettings = {
+        ...((req.user.userSettings && typeof req.user.userSettings === 'object') ? req.user.userSettings : {}),
+        pageDiagnostics: {
+          ...((req.user.userSettings?.pageDiagnostics && typeof req.user.userSettings.pageDiagnostics === 'object')
+            ? req.user.userSettings.pageDiagnostics
+            : {}),
+          enabled
+        }
+      };
+    }
+
+    return res.json({
+      status: 'success',
+      enabled
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to update page diagnostics preference.'
+    });
+  }
+}
+
 module.exports = {
-  fetchPagePresence
+  fetchPagePresence,
+  updatePreference
 };

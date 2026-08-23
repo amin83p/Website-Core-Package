@@ -72,6 +72,13 @@ test('app wires compression and static asset middleware', () => {
   assert.match(appSource, /staticAssetMiddleware/);
   assert.match(appSource, /createAppStaticMiddleware/);
   assert.match(appSource, /staticFactory:\s*\(rootPath\)\s*=>\s*createAppStaticMiddleware\(rootPath\)/);
+  assert.ok(appSource.indexOf("app.use(createAppStaticMiddleware(path.join(__dirname, 'public')))") < appSource.indexOf('app.use(cookieParser'));
+  assert.ok(appSource.indexOf('app.use(packageAssetRuntimeRouter)') < appSource.indexOf('app.use(cookieParser'));
+  assert.match(appSource, /rolling:\s*sessionStore \? false : true/);
+  assert.match(appSource, /REQUEST_PATH_TIMING/);
+  assert.match(appSource, /createRequestPathTimingMiddleware\('authenticated-html'\)/);
+  assert.ok(appSource.indexOf('resave: false') < appSource.indexOf('rolling: sessionStore ? false : true'));
+  assert.ok(appSource.indexOf('saveUninitialized: false') < appSource.indexOf('rolling: sessionStore ? false : true'));
 });
 
 test('layout uses versioned static asset URLs when helper is available', () => {

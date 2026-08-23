@@ -49,7 +49,16 @@ function setCachedAuthContext(userId, sessionId, userContext) {
 function invalidateAuthContextForUser(userId) {
   const normalizedUserId = String(userId || '').trim();
   if (!normalizedUserId) return 0;
-  return getAuthContextCache().deleteByPrefix(`${normalizedUserId}:`);
+  const removed = getAuthContextCache().deleteByPrefix(`${normalizedUserId}:`);
+  try {
+    const accessUiService = require('../security/accessUiService');
+    if (accessUiService && typeof accessUiService.invalidateUiAccessCacheForUser === 'function') {
+      accessUiService.invalidateUiAccessCacheForUser(normalizedUserId);
+    }
+  } catch (_) {
+    // ignore
+  }
+  return removed;
 }
 
 function invalidateAuthContextForSession(userId, sessionId) {
@@ -68,6 +77,14 @@ function clearAllRequestCaches() {
   try {
     const websitePolicyCacheService = require('./websitePolicyCacheService');
     websitePolicyCacheService.clearWebsitePolicyCache();
+  } catch (_) {
+    // ignore
+  }
+  try {
+    const accessUiService = require('../security/accessUiService');
+    if (accessUiService && typeof accessUiService.clearUiAccessCache === 'function') {
+      accessUiService.clearUiAccessCache();
+    }
   } catch (_) {
     // ignore
   }
