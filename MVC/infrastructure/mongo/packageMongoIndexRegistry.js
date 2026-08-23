@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const { getPackageStorageRootAbsolute } = require('../../utils/packageStoragePathUtils');
+const {
+  getPackageStorageRootAbsolute,
+  getPackageStorageRootCandidatesAbsolute
+} = require('../../utils/packageStoragePathUtils');
 
 const registeredDefinitions = new Map();
 
@@ -113,17 +116,26 @@ function loadMongoIndexDefinitionsFromManifest(manifestPath = '') {
 }
 
 function loadMongoIndexDefinitionsFromPackageManifests(options = {}) {
-  const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
-  if (!fs.existsSync(packageRootDir)) return [];
-
   const loaded = [];
-  fs.readdirSync(packageRootDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .forEach((entry) => {
-      const manifestPath = path.join(packageRootDir, entry.name, 'package.manifest.json');
-      if (!fs.existsSync(manifestPath)) return;
-      loaded.push(...loadMongoIndexDefinitionsFromManifest(manifestPath));
-    });
+  const roots = options.packageRootDir
+    ? [getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir })]
+    : getPackageStorageRootCandidatesAbsolute(options);
+  const seenManifestPaths = new Set();
+
+  roots.forEach((packageRootDir) => {
+    if (!packageRootDir || !fs.existsSync(packageRootDir)) return;
+    fs.readdirSync(packageRootDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .forEach((entry) => {
+        const manifestPath = path.join(packageRootDir, entry.name, 'package.manifest.json');
+        const manifestKey = path.resolve(manifestPath).toLowerCase();
+        if (seenManifestPaths.has(manifestKey)) return;
+        seenManifestPaths.add(manifestKey);
+        if (!fs.existsSync(manifestPath)) return;
+        loaded.push(...loadMongoIndexDefinitionsFromManifest(manifestPath));
+      });
+  });
+
   return loaded;
 }
 

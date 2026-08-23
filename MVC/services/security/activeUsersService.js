@@ -2,6 +2,7 @@ const dataService = require('../dataService');
 const { getMongoCollection } = require('../../infrastructure/mongo/mongoConnection');
 const { SYSTEM_CONTEXT, DEFAULTS } = require('../../../config/constants');
 const { toPublicId } = require('../../utils/idAdapter');
+const { sanitizeCurrentPath } = require('../../utils/pagePathUtils');
 
 function parseSafeInt(value, fallback) {
   const parsed = parseInt(value, 10);
@@ -51,7 +52,9 @@ function groupSessionsByUser(sessions = [], now = new Date(), staleMinutes = get
         lastActivityAt: lastActivityAt.toISOString(),
         sessionCount: 1,
         currentOrgId: session.currentOrgId || null,
-        deviceFingerprint: session.deviceFingerprint || null
+        deviceFingerprint: session.deviceFingerprint || null,
+        currentPath: sanitizeCurrentPath(session.currentPath || ''),
+        currentPathUpdatedAt: session.currentPathUpdatedAt || null
       });
       return;
     }
@@ -61,12 +64,21 @@ function groupSessionsByUser(sessions = [], now = new Date(), staleMinutes = get
       existing.lastActivityAt = lastActivityAt.toISOString();
       existing.currentOrgId = session.currentOrgId || existing.currentOrgId;
       existing.deviceFingerprint = session.deviceFingerprint || existing.deviceFingerprint;
+      existing.currentPath = sanitizeCurrentPath(session.currentPath || '') || existing.currentPath || '';
+      existing.currentPathUpdatedAt = session.currentPathUpdatedAt || existing.currentPathUpdatedAt || null;
     }
   });
 
   return Array.from(grouped.values()).sort((a, b) => (
     new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime()
   ));
+}
+
+function filterSessionsByCurrentPath(sessions = [], currentPath = '') {
+  const targetPath = sanitizeCurrentPath(currentPath);
+  const rows = Array.isArray(sessions) ? sessions : [];
+  if (!targetPath) return rows;
+  return rows.filter((session) => sanitizeCurrentPath(session?.currentPath || '') === targetPath);
 }
 
 function normalizeSearchText(value) {
@@ -235,6 +247,8 @@ function mapActiveUserRow(groupRow, userMap) {
     currentOrgId: groupRow.currentOrgId || null,
     sessionCount: groupRow.sessionCount || 0,
     deviceFingerprint: groupRow.deviceFingerprint || null,
+    currentPath: sanitizeCurrentPath(groupRow.currentPath || ''),
+    currentPathUpdatedAt: groupRow.currentPathUpdatedAt || null,
     trackActivityUrl: `/security/track-activity/?userId=${encodeURIComponent(groupRow.userId)}`
   };
 }
@@ -244,10 +258,13 @@ async function listActiveUsers({ query = {} } = {}) {
   const staleMinutes = getActiveUserStaleMinutes();
   const cutoff = new Date(now.getTime() - (staleMinutes * 60 * 1000)).toISOString();
   const collection = getMongoCollection('sessions');
-  const sessions = await collection.find({
+  const currentPath = sanitizeCurrentPath(query.currentPath || query.path);
+  const mongoQuery = {
     status: 'active',
     lastActivityAt: { $gte: cutoff }
-  }).toArray();
+  };
+  if (currentPath) mongoQuery.currentPath = currentPath;
+  const sessions = filterSessionsByCurrentPath(await collection.find(mongoQuery).toArray(), currentPath);
 
   const grouped = groupSessionsByUser(sessions, now, staleMinutes);
   const userMap = await loadUsersByIds(grouped.map((row) => row.userId));
@@ -257,7 +274,10 @@ async function listActiveUsers({ query = {} } = {}) {
     .map((row) => mapActiveUserRow(row, userMap))
     .filter((row) => matchesSearch(row, searchText));
 
-  const summary = await buildSummary(enriched, grouped, now, staleMinutes);
+  const summary = {
+    ...(await buildSummary(enriched, grouped, now, staleMinutes)),
+    currentPath
+  };
 
   const previewLimit = String(query.preview || '').trim() === '1'
     ? Math.max(1, Math.min(parseSafeInt(query.limit, 12), 50))
@@ -276,6 +296,7 @@ async function listActiveUsers({ query = {} } = {}) {
 module.exports = {
   getActiveUserStaleMinutes,
   isRecentlyActiveSession,
+  filterSessionsByCurrentPath,
   groupSessionsByUser,
   computeSummaryMetrics,
   listActiveUsers

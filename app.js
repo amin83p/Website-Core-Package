@@ -72,15 +72,59 @@ const buildVersionResolver = require('./MVC/utils/buildVersionResolver');
 const { buildStaticAssetUrl } = require('./MVC/utils/staticAssetUrl');
 const staticAssetMiddleware = require('./MVC/middleware/staticAssetMiddleware');
 const { SESSION_SECRET } = require('./config/security');
+const { resolveDataBackendConfig } = require('./config/dataBackend');
+const { MongoSessionStore } = require('./MVC/infrastructure/mongo/mongoSessionStore');
 
 const PORT    = process.env.PORT || 3000;
+const isProduction = String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
 const DEFAULT_PACKAGE_STARTUP_RECOVERY_WINDOW_MS = 300000;
 const DEFAULT_PACKAGE_STARTUP_RECOVERY_INTERVAL_MS = 15000;
 const DEFAULT_PACKAGE_RUNTIME_RECONCILE_INTERVAL_MS = 60000;
 
+function cleanRuntimeToken(value = '') {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32);
+}
+
+function requestHostIsLocal(req) {
+  const host = String(req?.hostname || req?.headers?.host || '').trim().toLowerCase();
+  const withoutPort = host.startsWith('[')
+    ? host.replace(/^\[|\].*$/g, '')
+    : host.split(':')[0];
+  return ['localhost', '127.0.0.1', '::1'].includes(withoutPort);
+}
+
+function hasRailwayRuntimeEnv(env = process.env) {
+  return Boolean(
+    env.RAILWAY_ENVIRONMENT
+    || env.RAILWAY_PROJECT_ID
+    || env.RAILWAY_SERVICE_ID
+    || env.RAILWAY_DEPLOYMENT_ID
+    || env.RAILWAY_REPLICA_ID
+  );
+}
+
+function resolvePageDiagnosticsRuntime(req, env = process.env) {
+  const nodeEnv = cleanRuntimeToken(env.NODE_ENV || '');
+  const railway = hasRailwayRuntimeEnv(env);
+  const local = requestHostIsLocal(req) || (!railway && nodeEnv !== 'production');
+  return {
+    kind: local ? 'local' : (railway ? 'railway' : 'server'),
+    nodeEnv: nodeEnv || 'development',
+    isProduction: nodeEnv === 'production'
+  };
+}
+
+function createSessionStore() {
+  const backendConfig = resolveDataBackendConfig(process.env);
+  const useMongoStore = isProduction && backendConfig.mode === 'mongo' && backendConfig.mongo?.ready;
+  return useMongoStore ? new MongoSessionStore() : null;
+}
+
 const app = express();
 const server = http.createServer(app); // Create explicit server
+const sessionStore = createSessionStore();
 app.locals.httpServer = server;
+app.locals.sessionStore = sessionStore;
 
 // Railway (and similar platforms) run Node behind a reverse proxy.
 // express-rate-limit requires trusted proxy headers for correct client IP detection.
@@ -170,13 +214,13 @@ app.use(helmet({
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use(cookieParser(SESSION_SECRET)); // Use session secret for signed cookies if needed
-const isProduction = String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
 app.use(expressSession({
   name: 'admin_flow.sid',
   secret: SESSION_SECRET,
   resave: true,
   saveUninitialized: true,
   rolling: true,
+  ...(sessionStore ? { store: sessionStore } : {}),
   cookie: {
     httpOnly: true,
     secure: isProduction,
@@ -335,11 +379,15 @@ app.use(async (req, res, next) => {
   res.locals.publicMenuEndpointOptions = appBrandingService.getPublicMenuEndpointOptions();
   res.locals.appUiSettings = resolveAppUiSettings();
   res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
+  res.locals.requestId = String(req.requestId || '').trim();
+  res.locals.originalUrl = String(req.originalUrl || req.url || '').trim();
+  res.locals.pageDiagnosticsRuntime = resolvePageDiagnosticsRuntime(req);
   res.locals.staticAssetUrl = (assetPath) => buildStaticAssetUrl(assetPath, res.locals.buildVersionShort);
   res.locals.canUseAdminAuthenticator = Boolean(
     req.user && adminAuthorityService.hasAnyAdminPrivilege(req.user)
   );
   res.locals.canViewActiveUsers = false;
+  res.locals.canUsePageDiagnostics = false;
   if (req.user) {
     try {
       res.locals.canViewActiveUsers = await accessUiService.canAccessTarget(req, {
@@ -348,6 +396,14 @@ app.use(async (req, res, next) => {
       });
     } catch (_) {
       res.locals.canViewActiveUsers = false;
+    }
+    try {
+      res.locals.canUsePageDiagnostics = await accessUiService.canAccessTarget(req, {
+        sectionId: SECTIONS.PAGE_DIAGNOSTICS,
+        operationId: OPERATIONS.READ_ALL
+      });
+    } catch (_) {
+      res.locals.canUsePageDiagnostics = false;
     }
   }
   next();
@@ -771,6 +827,12 @@ async function startServer() {
     const dataBackend = await dataBackendRuntimeService.initializeDataBackend(process.env);
     registerCoreEntityQueryExecutors({ backendMode: dataBackend.mode });
     app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    if (sessionStore && typeof sessionStore.ensureIndexes === 'function') {
+      await sessionStore.ensureIndexes();
+      startupLogger.success('SESSION', 'STORE', 'Mongo session store initialized.', {
+        collection: sessionStore.collectionName
+      });
+    }
 
     await settingService.init();
     try {

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   isRecentlyActiveSession,
+  filterSessionsByCurrentPath,
   groupSessionsByUser,
   computeSummaryMetrics
 } = require('../MVC/services/security/activeUsersService');
@@ -119,4 +120,50 @@ test('computeSummaryMetrics calculates session and activity averages', () => {
   assert.equal(summary.avgSessionsPerUser, 1.5);
   assert.equal(summary.multiSessionUsers, 1);
   assert.equal(summary.avgMinutesSinceLastActivity, 3);
+});
+
+test('filterSessionsByCurrentPath matches sanitized paths only', () => {
+  const rows = filterSessionsByCurrentPath([
+    {
+      status: 'active',
+      userId: 'USR-1',
+      currentPath: '/school/classes/123/sessions/456'
+    },
+    {
+      status: 'active',
+      userId: 'USR-2',
+      currentPath: '/school/classes/123/sessions/456/roster'
+    },
+    {
+      status: 'active',
+      userId: 'USR-3',
+      currentPath: '/school/classes/123/sessions/456?secret=hidden'
+    }
+  ], '/school/classes/123/sessions/456?tab=attendance#top');
+
+  assert.deepEqual(rows.map((row) => row.userId), ['USR-1', 'USR-3']);
+});
+
+test('groupSessionsByUser exposes current path from latest active session', () => {
+  const grouped = groupSessionsByUser([
+    {
+      status: 'active',
+      userId: 'USR-1',
+      lastActivityAt: '2026-07-12T11:56:00.000Z',
+      absoluteExpiry: '2026-07-12T20:00:00.000Z',
+      currentPath: '/older'
+    },
+    {
+      status: 'active',
+      userId: 'USR-1',
+      lastActivityAt: '2026-07-12T11:58:00.000Z',
+      absoluteExpiry: '2026-07-12T20:00:00.000Z',
+      currentPath: '/newer?token=hidden',
+      currentPathUpdatedAt: '2026-07-12T11:58:00.000Z'
+    }
+  ], NOW, STALE_MINUTES);
+
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].currentPath, '/newer');
+  assert.equal(grouped[0].currentPathUpdatedAt, '2026-07-12T11:58:00.000Z');
 });

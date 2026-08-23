@@ -7,7 +7,7 @@ const {
   resolveRequestCacheMaxEntries
 } = require('./requestCacheConfig');
 
-let authContextCache = createAuthContextCache();
+let authContextCache = null;
 
 function createAuthContextCache() {
   return createTtlLruCache({
@@ -21,6 +21,11 @@ function rebuildAuthContextCache() {
   authContextCache = createAuthContextCache();
 }
 
+function getAuthContextCache() {
+  if (!authContextCache) rebuildAuthContextCache();
+  return authContextCache;
+}
+
 function buildAuthContextCacheKey(userId, sessionId) {
   const normalizedUserId = String(userId || '').trim();
   const normalizedSessionId = String(sessionId || '').trim();
@@ -31,30 +36,30 @@ function buildAuthContextCacheKey(userId, sessionId) {
 function getCachedAuthContext(userId, sessionId) {
   const cacheKey = buildAuthContextCacheKey(userId, sessionId);
   if (!cacheKey) return null;
-  const cached = authContextCache.get(cacheKey);
+  const cached = getAuthContextCache().get(cacheKey);
   return cached ? cloneCacheValue(cached) : null;
 }
 
 function setCachedAuthContext(userId, sessionId, userContext) {
   const cacheKey = buildAuthContextCacheKey(userId, sessionId);
   if (!cacheKey || !userContext) return;
-  authContextCache.set(cacheKey, userContext, resolveRequestCacheTtlMs());
+  getAuthContextCache().set(cacheKey, userContext, resolveRequestCacheTtlMs());
 }
 
 function invalidateAuthContextForUser(userId) {
   const normalizedUserId = String(userId || '').trim();
   if (!normalizedUserId) return 0;
-  return authContextCache.deleteByPrefix(`${normalizedUserId}:`);
+  return getAuthContextCache().deleteByPrefix(`${normalizedUserId}:`);
 }
 
 function invalidateAuthContextForSession(userId, sessionId) {
   const cacheKey = buildAuthContextCacheKey(userId, sessionId);
   if (!cacheKey) return;
-  authContextCache.delete(cacheKey);
+  getAuthContextCache().delete(cacheKey);
 }
 
 function clearAuthContextCache() {
-  authContextCache.clear();
+  if (authContextCache) authContextCache.clear();
 }
 
 function clearAllRequestCaches() {
@@ -77,5 +82,5 @@ module.exports = {
   clearAuthContextCache,
   clearAllRequestCaches,
   rebuildAuthContextCache,
-  _authContextCache: () => authContextCache
+  _authContextCache: () => getAuthContextCache()
 };

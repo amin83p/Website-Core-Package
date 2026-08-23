@@ -4585,6 +4585,9 @@
       },
       {
         "id": "851321"
+      },
+      {
+        "id": "862452"
       }
     ],
     "trackState": false
@@ -7352,6 +7355,37 @@
       },
       {
         "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "related": [],
+    "subsections": [],
+    "trackState": true
+  },
+  {
+    "id": "862452",
+    "active": true,
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-22T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-22T00:00:00.000Z"
+    },
+    "category": "LOGGING",
+    "dashboardDisplay": true,
+    "description": "Inspect page load, client console, fetch activity, and current-page active users.",
+    "homeURL": "",
+    "inactiveMessage": "",
+    "mainDashboardDisplay": false,
+    "message": "",
+    "minimumAccessRequirement": 8,
+    "name": "PAGE_DIAGNOSTICS",
+    "navigatorSection": false,
+    "operations": [
+      {
+        "id": "OP1003",
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true

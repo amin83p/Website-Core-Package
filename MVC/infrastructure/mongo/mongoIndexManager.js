@@ -591,29 +591,115 @@ function indexOptionsMatch(existing, desired) {
     && Boolean(existing.sparse) === Boolean(desired.sparse);
 }
 
+const REPAIRABLE_INDEX_NAMES_BY_COLLECTION = Object.freeze({
+  sections: ['idx_sections_id'],
+  operations: ['idx_operations_id'],
+  schoolLibraryLocations: ['idx_school_library_locations_org_code'],
+  schoolBooks: ['idx_school_books_org_isbn']
+});
+
+function getIndexFieldNames(index = {}) {
+  const key = index?.key && typeof index.key === 'object' ? index.key : {};
+  return Object.keys(key).filter(Boolean);
+}
+
+function buildSparseIndexMatch(fields = []) {
+  const clauses = fields
+    .map((field) => ({ [field]: { $exists: true } }));
+  return clauses.length ? { $or: clauses } : null;
+}
+
+function buildDuplicateKeyPipeline(index = {}) {
+  const fields = getIndexFieldNames(index);
+  if (!fields.length) return [];
+
+  const pipeline = [];
+  if (index.partialFilterExpression && typeof index.partialFilterExpression === 'object') {
+    pipeline.push({ $match: index.partialFilterExpression });
+  } else if (index.sparse === true) {
+    const sparseMatch = buildSparseIndexMatch(fields);
+    if (sparseMatch) pipeline.push({ $match: sparseMatch });
+  }
+
+  const groupId = {};
+  fields.forEach((field, indexNo) => {
+    groupId[`f${indexNo}`] = `$${field}`;
+  });
+
+  pipeline.push(
+    { $group: { _id: groupId, count: { $sum: 1 } } },
+    { $match: { count: { $gt: 1 } } },
+    { $limit: 5 }
+  );
+  return pipeline;
+}
+
+function summarizeDuplicateKeySamples(samples = []) {
+  return (Array.isArray(samples) ? samples : [])
+    .map((sample) => stableStringify(sample?._id || {}))
+    .join('; ');
+}
+
+async function assertUniqueIndexRepairSafe(collection, collectionName, desired) {
+  if (!desired?.unique) return;
+  if (!collection || typeof collection.aggregate !== 'function') {
+    throw new Error(`Cannot verify duplicate keys before repairing unique index ${desired?.name || ''} on ${collectionName}.`);
+  }
+
+  const pipeline = buildDuplicateKeyPipeline(desired);
+  if (!pipeline.length) {
+    throw new Error(`Cannot verify duplicate keys for index ${desired?.name || ''} on ${collectionName}; index key is empty.`);
+  }
+
+  const duplicateSamples = await collection.aggregate(pipeline, { allowDiskUse: false }).toArray();
+  if (!duplicateSamples.length) return;
+
+  throw new Error(
+    `Cannot repair ${collectionName}.${desired.name} as a unique index because duplicate keys exist: ${summarizeDuplicateKeySamples(duplicateSamples)}`
+  );
+}
+
 async function repairKnownIndexOptionDrift(collection, collectionName, indexes, verbose) {
   if (!collection || typeof collection.listIndexes !== 'function' || typeof collection.dropIndex !== 'function') return [];
-  const repairableIndexes = {
-    schoolLibraryLocations: 'idx_school_library_locations_org_code',
-    schoolBooks: 'idx_school_books_org_isbn'
-  };
-  const repairableIndexName = repairableIndexes[collectionName];
-  if (!repairableIndexName) return [];
-  const desired = (Array.isArray(indexes) ? indexes : []).find((index) => index?.name === repairableIndexName);
-  if (!desired) return [];
+  const repairableIndexNames = REPAIRABLE_INDEX_NAMES_BY_COLLECTION[collectionName] || [];
+  if (!repairableIndexNames.length) return [];
 
   const existingIndexes = await collection.listIndexes().toArray();
-  const existing = (Array.isArray(existingIndexes) ? existingIndexes : []).find((index) => index?.name === desired.name);
-  if (!existing || indexOptionsMatch(existing, desired)) return [];
+  const desiredByName = new Map(
+    (Array.isArray(indexes) ? indexes : [])
+      .filter((index) => repairableIndexNames.includes(index?.name))
+      .map((index) => [index.name, index])
+  );
+  const repairs = [];
 
-  await collection.dropIndex(desired.name);
-  if (verbose) {
-    startupLogger.warn('MONGOINDEX', 'REPAIR', 'Dropped stale index before recreating with current options.', {
-      collection: collectionName,
-      index: desired.name
-    });
+  for (const name of repairableIndexNames) {
+    const desired = desiredByName.get(name);
+    if (!desired) continue;
+    const existing = (Array.isArray(existingIndexes) ? existingIndexes : []).find((index) => index?.name === desired.name);
+    if (!existing || indexOptionsMatch(existing, desired)) continue;
+    repairs.push(desired);
   }
-  return [desired.name];
+
+  if (!repairs.length) return [];
+
+  for (const desired of repairs) {
+    // eslint-disable-next-line no-await-in-loop
+    await assertUniqueIndexRepairSafe(collection, collectionName, desired);
+  }
+
+  const repairedNames = [];
+  for (const desired of repairs) {
+    // eslint-disable-next-line no-await-in-loop
+    await collection.dropIndex(desired.name);
+    repairedNames.push(desired.name);
+    if (verbose) {
+      startupLogger.warn('MONGOINDEX', 'REPAIR', 'Dropped stale index before recreating with current options.', {
+        collection: collectionName,
+        index: desired.name
+      });
+    }
+  }
+  return repairedNames;
 }
 
 function getIndexDefinitions(options = {}) {

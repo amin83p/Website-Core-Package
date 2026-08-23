@@ -2,8 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/debugController');
+const pageDiagnosticsCtrl = require('../controllers/pageDiagnosticsController');
 const { requireAuth } = require('../middleware/authMiddleware');
-const { requireAccessAny } = require('../middleware/accessMiddleware');
+const { requireAccess, requireAccessAny } = require('../middleware/accessMiddleware');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
 const multer = require('multer');
@@ -28,6 +29,12 @@ const DEBUG_ACCESS_REQUIREMENTS = [
 function requireDebugAccess() {
   return requireAccessAny(DEBUG_ACCESS_REQUIREMENTS, OPERATIONS.READ);
 }
+
+router.get('/client-diagnostics/page-presence',
+  requireAuth,
+  requireAccess(SECTIONS.PAGE_DIAGNOSTICS, OPERATIONS.READ_ALL),
+  pageDiagnosticsCtrl.fetchPagePresence
+);
 
 router.get('/', requireAuth, requireDebugAccess(), ctrl.showDebugHub);
 // Route to display the debugger page

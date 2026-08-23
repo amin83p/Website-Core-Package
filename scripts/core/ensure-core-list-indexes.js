@@ -16,6 +16,32 @@ function readJsonFileSafe(filePath) {
   }
 }
 
+function loadLocalEnvFile() {
+  const envPath = path.join(__dirname, '..', '..', '.env');
+  if (!fs.existsSync(envPath)) return;
+
+  const raw = fs.readFileSync(envPath, 'utf8');
+  raw.split(/\r?\n/).forEach((line) => {
+    const trimmed = String(line || '').trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx <= 0) return;
+
+    const key = trimmed.slice(0, eqIdx).trim();
+    if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) return;
+
+    let value = trimmed.slice(eqIdx + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  });
+}
+
 function parseArgs(argv = []) {
   const out = {};
   for (let i = 0; i < argv.length; i += 1) {
@@ -137,6 +163,7 @@ async function runEnsureCoreListIndexes(options = {}) {
 }
 
 async function main() {
+  loadLocalEnvFile();
   await runEnsureCoreListIndexes();
 }
 
@@ -149,6 +176,7 @@ if (require.main === module) {
 
 module.exports = {
   runEnsureCoreListIndexes,
-  TARGET_COLLECTIONS
+  TARGET_COLLECTIONS,
+  loadLocalEnvFile
 };
 

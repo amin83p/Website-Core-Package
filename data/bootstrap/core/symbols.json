@@ -804,6 +804,23 @@
     }
   },
   {
+    "id": "SYM_SYSTEM_090",
+    "name": "PAGE_DIAGNOSTICS",
+    "orgId": "SYSTEM",
+    "tags": [
+      "PAGE_DIAGNOSTICS",
+      "862452"
+    ],
+    "type": "class",
+    "value": "bi bi-speedometer2",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-22T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-22T00:00:00.000Z"
+    }
+  },
+  {
     "id": "SYM_SYSTEM_120",
     "name": "SYSTEM_PACKAGE_MANAGER",
     "type": "class",

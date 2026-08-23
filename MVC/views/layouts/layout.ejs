@@ -115,6 +115,20 @@
   <% } %>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <% if (typeof canUsePageDiagnostics !== 'undefined' && canUsePageDiagnostics) { %>
+    <script>
+      window.__PAGE_DIAGNOSTICS__ = {
+        enabled: true,
+        endpoint: '/debug/client-diagnostics/page-presence',
+        currentPath: <%- JSON.stringify((typeof originalUrl !== 'undefined' && originalUrl) ? String(originalUrl).split(/[?#]/)[0] : '') %>,
+        requestId: <%- JSON.stringify(typeof requestId !== 'undefined' ? requestId : '') %>,
+        buildVersion: <%- JSON.stringify(typeof buildVersionShort !== 'undefined' ? buildVersionShort : '') %>,
+        runtime: <%- JSON.stringify(typeof pageDiagnosticsRuntime !== 'undefined' && pageDiagnosticsRuntime ? pageDiagnosticsRuntime : { kind: 'server', nodeEnv: '', isProduction: false }) %>
+      };
+    </script>
+    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnosticsHealth.js') : '/scripts/pageDiagnosticsHealth.js' %>"></script>
+    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnostics.js') : '/scripts/pageDiagnostics.js' %>"></script>
+  <% } %>
   <% if (typeof orgTimeZone !== 'undefined' && orgTimeZone) { %>
     <script>
       window.__APP_ORG_DATETIME__ = {

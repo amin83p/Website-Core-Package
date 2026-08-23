@@ -1,6 +1,7 @@
 // MVC/middleware/sessionEnforcement.js
 const dataService = require('../services/dataService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
+const { isHtmlNavigationRequest, sanitizeCurrentPath } = require('../utils/pagePathUtils');
 
 async function enforceSession(req, res, next) {
     try {
@@ -44,11 +45,28 @@ async function enforceSession(req, res, next) {
             return res.redirect('/login?warning=Session timed out due to inactivity.');
         }
 
-        // 6. Update Heartbeat (Throttled to 1 min)
+        // 6. Update Heartbeat (Throttled to 1 min) and current page for diagnostics.
         if ((now - lastActive) > 60 * 1000) {
-            await dataService.updateData('sessions', sessionId, {
-                lastActivityAt: now.toISOString()
-            }, SYSTEM_CONTEXT);
+            const updates = { lastActivityAt: now.toISOString() };
+            if (isHtmlNavigationRequest(req)) {
+                const currentPath = sanitizeCurrentPath(req.originalUrl || req.url || req.path || '');
+                if (currentPath) {
+                    updates.currentPath = currentPath;
+                    updates.currentPathUpdatedAt = now.toISOString();
+                }
+            }
+            await dataService.updateData('sessions', sessionId, updates, SYSTEM_CONTEXT);
+            Object.assign(session, updates);
+        } else if (isHtmlNavigationRequest(req)) {
+            const currentPath = sanitizeCurrentPath(req.originalUrl || req.url || req.path || '');
+            if (currentPath && currentPath !== sanitizeCurrentPath(session.currentPath || '')) {
+                const updates = {
+                    currentPath,
+                    currentPathUpdatedAt: now.toISOString()
+                };
+                await dataService.updateData('sessions', sessionId, updates, SYSTEM_CONTEXT);
+                Object.assign(session, updates);
+            }
         }
 
         // ✅ FIX: Use a unique name to avoid breaking express-session
