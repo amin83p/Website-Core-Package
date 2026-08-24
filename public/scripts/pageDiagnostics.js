@@ -720,6 +720,13 @@
     `;
   }
 
+  function openDiagnosticsModal() {
+    const modal = ensureModal();
+    renderDiagnosticsModal();
+    loadPresence();
+    global.bootstrap?.Modal?.getOrCreateInstance(modal)?.show();
+  }
+
   function ensureButton() {
     const host = document.querySelector('.header-side-controls');
     if (!host) return null;
@@ -733,12 +740,13 @@
       button.setAttribute('aria-label', 'Open page diagnostics');
       button.title = 'Page diagnostics';
       renderButtonContent(button);
+    }
+
+    if (button.dataset.pageDiagnosticsWired !== '1') {
       button.addEventListener('click', () => {
-        const modal = ensureModal();
-        renderDiagnosticsModal();
-        loadPresence();
-        global.bootstrap?.Modal?.getOrCreateInstance(modal)?.show();
+        openDiagnosticsModal();
       });
+      button.dataset.pageDiagnosticsWired = '1';
     }
 
     const autosaveButton = document.getElementById('schoolAutosaveSideControl');
@@ -761,10 +769,22 @@
     observer.observe(host, { childList: true });
   }
 
+  function onReady(callback) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', callback);
+      return;
+    }
+    callback();
+  }
+
   installConsoleCapture();
   installFetchCapture();
 
-  document.addEventListener('DOMContentLoaded', () => {
+  global.PageDiagnostics = {
+    open: openDiagnosticsModal
+  };
+
+  onReady(() => {
     ensureButton();
     installButtonObserver();
     setTimeout(ensureButton, 0);

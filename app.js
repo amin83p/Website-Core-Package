@@ -471,7 +471,7 @@ app.use((req, res, next) => {
   res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
   res.locals.requestId = String(req.requestId || '').trim();
   res.locals.originalUrl = String(req.originalUrl || req.url || '').trim();
-  res.locals.pageDiagnosticsRuntime = resolvePageDiagnosticsRuntime(req);
+  res.locals.pageDiagnosticsRuntime = null;
   res.locals.staticAssetUrl = (assetPath) => buildStaticAssetUrl(assetPath, res.locals.buildVersionShort);
   res.locals.canUseAdminAuthenticator = Boolean(
     req.user && adminAuthorityService.hasAnyAdminPrivilege(req.user)
@@ -486,6 +486,9 @@ app.use((req, res, next) => {
     res.locals.canViewActiveUsers = canViewActiveUsers;
     res.locals.canUsePageDiagnostics = canUsePageDiagnostics;
     res.locals.pageDiagnosticsEnabled = canUsePageDiagnostics && req.user.pageDiagnosticsEnabled !== false;
+    if (canUsePageDiagnostics) {
+      res.locals.pageDiagnosticsRuntime = resolvePageDiagnosticsRuntime(req);
+    }
   }
   next();
 });

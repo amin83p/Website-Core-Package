@@ -11,7 +11,7 @@ const { normalizeOrgRoles, getPrimaryOrgRole } = require('../utils/orgContextUti
 const { idsEqual, toPublicId, toStorageId } = require('../utils/idAdapter');
 const userRepository = require('../repositories/userRepository');
 const { evaluateUserEntitlement } = require('./security/entitlementService');
-const { evaluateAccess } = require('./security/accessControl');
+const accessUiService = require('./security/accessUiService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const {
   resolveOrganizationTimezoneFromRow,
@@ -89,24 +89,21 @@ function resolvePageDiagnosticsEnabled(canUsePageDiagnostics, userSettings = {},
     return !(pageDiagnostics && typeof pageDiagnostics === 'object' && pageDiagnostics.enabled === false);
 }
 
-async function canAccessCachedLayoutTarget(userContext, sectionId, operationId) {
-    try {
-        const result = await evaluateAccess({
-            user: userContext,
-            sectionId,
-            operationId,
-            ipAddress: ''
-        });
-        return result?.allowed === true;
-    } catch (_) {
-        return false;
-    }
-}
-
-async function buildCachedLayoutAccess(userContext, userSettings = {}, legacyPreferences = {}) {
+async function buildCachedLayoutAccess(userContext, userSettings = {}, legacyPreferences = {}, options = {}) {
+    const syntheticReq = {
+        user: userContext,
+        cookies: options.cookies && typeof options.cookies === 'object' ? options.cookies : {},
+        ip: String(options.ip || '').trim()
+    };
     const [canViewActiveUsers, canUsePageDiagnostics] = await Promise.all([
-        canAccessCachedLayoutTarget(userContext, SECTIONS.ACTIVE_USERS, OPERATIONS.READ_ALL),
-        canAccessCachedLayoutTarget(userContext, SECTIONS.PAGE_DIAGNOSTICS, OPERATIONS.READ_ALL)
+        accessUiService.canAccessTarget(syntheticReq, {
+            sectionId: SECTIONS.ACTIVE_USERS,
+            operationId: OPERATIONS.READ_ALL
+        }),
+        accessUiService.canAccessTarget(syntheticReq, {
+            sectionId: SECTIONS.PAGE_DIAGNOSTICS,
+            operationId: OPERATIONS.READ_ALL
+        })
     ]);
     return {
         canViewActiveUsers,
@@ -533,7 +530,9 @@ async function hydrateUserContextFromToken(token, decoded) {
     preferences: legacyPreferences,
     userSettings: userSettings
   };
-  const layoutAccess = await buildCachedLayoutAccess(baseUserContext, userSettings, legacyPreferences);
+  const layoutAccess = await buildCachedLayoutAccess(baseUserContext, userSettings, legacyPreferences, {
+    cookies: { auth_token: token }
+  });
 
   return {
     ...baseUserContext,

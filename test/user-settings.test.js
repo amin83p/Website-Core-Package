@@ -178,7 +178,7 @@ test('page diagnostics preference writes userSettings instead of users preferenc
   assert.doesNotMatch(controllerSource, /updateData\('users'/);
   assert.match(authSource, /loadSafeUserSettings/);
   assert.match(authSource, /userSettings:/);
-  assert.match(appSource, /req\.user\?\.userSettings\?\.pageDiagnostics/);
+  assert.match(appSource, /req\.user\.pageDiagnosticsEnabled !== false/);
 });
 
 test('user settings seed and migration scripts are guarded and idempotent', () => {

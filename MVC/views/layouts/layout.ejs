@@ -145,17 +145,22 @@
     <script>
       window.__PAGE_DIAGNOSTICS__ = {
         enabled: true,
+        lazy: true,
         endpoint: '/debug/client-diagnostics/page-presence',
+        presencePingEndpoint: '/debug/client-diagnostics/page-presence/ping',
         preferenceEndpoint: <%- JSON.stringify(typeof pageDiagnosticsPreferenceEndpoint !== 'undefined' ? pageDiagnosticsPreferenceEndpoint : '/debug/client-diagnostics/preference') %>,
         csrfToken: <%- JSON.stringify(typeof csrfToken !== 'undefined' ? csrfToken : '') %>,
         currentPath: <%- JSON.stringify((typeof originalUrl !== 'undefined' && originalUrl) ? String(originalUrl).split(/[?#]/)[0] : '') %>,
         requestId: <%- JSON.stringify(typeof requestId !== 'undefined' ? requestId : '') %>,
         buildVersion: <%- JSON.stringify(typeof buildVersionShort !== 'undefined' ? buildVersionShort : '') %>,
-        runtime: <%- JSON.stringify(typeof pageDiagnosticsRuntime !== 'undefined' && pageDiagnosticsRuntime ? pageDiagnosticsRuntime : { kind: 'server', nodeEnv: '', isProduction: false }) %>
+        runtime: <%- JSON.stringify(typeof pageDiagnosticsRuntime !== 'undefined' && pageDiagnosticsRuntime ? pageDiagnosticsRuntime : { kind: 'server', nodeEnv: '', isProduction: false }) %>,
+        scriptUrls: {
+          health: <%- JSON.stringify(typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnosticsHealth.js') : '/scripts/pageDiagnosticsHealth.js') %>,
+          main: <%- JSON.stringify(typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnostics.js') : '/scripts/pageDiagnostics.js') %>
+        }
       };
     </script>
-    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnosticsHealth.js') : '/scripts/pageDiagnosticsHealth.js' %>"></script>
-    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnostics.js') : '/scripts/pageDiagnostics.js' %>"></script>
+    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnosticsLoader.js') : '/scripts/pageDiagnosticsLoader.js' %>"></script>
   <% } else if (layoutCanUsePageDiagnostics) { %>
     <script>
       (function () {

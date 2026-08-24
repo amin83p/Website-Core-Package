@@ -60,7 +60,7 @@ test('session current path updates are throttled between heartbeat writes', () =
   }, '/profile', now, { heartbeatDue: true }), true);
 });
 
-test('current path tracking only runs for cached diagnostics or active-users flags', () => {
+test('navigation never auto-tracks current path for any user flags', () => {
   const baseRequest = {
     method: 'GET',
     originalUrl: '/dashboard',
@@ -75,19 +75,19 @@ test('current path tracking only runs for cached diagnostics or active-users fla
   assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
     ...baseRequest,
     user: { canUsePageDiagnostics: true, pageDiagnosticsEnabled: true }
-  }), true);
+  }), false);
   assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
     ...baseRequest,
     user: { uiAccess: { canViewActiveUsers: true } }
-  }), true);
+  }), false);
   assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
     ...baseRequest,
     originalUrl: '/scripts/main.js',
-    user: { canUsePageDiagnostics: true, pageDiagnosticsEnabled: true }
+    user: { uiAccess: { canViewActiveUsers: true } }
   }), false);
 });
 
-test('post-auth current path tracker skips writes when diagnostics is disabled', async () => {
+test('post-auth current path tracker never writes on navigation', async () => {
   const originalUpdateData = dataService.updateData;
   const calls = [];
   dataService.updateData = async (...args) => {
@@ -102,7 +102,7 @@ test('post-auth current path tracker skips writes when diagnostics is disabled',
         originalUrl: '/dashboard',
         headers: { accept: 'text/html' },
         userSession: { id: 'SID123', currentPath: '', currentPathUpdatedAt: '' },
-        user: { canUsePageDiagnostics: true, pageDiagnosticsEnabled: false }
+        user: { canUsePageDiagnostics: true, pageDiagnosticsEnabled: true }
       }, {}, resolve);
     });
     assert.equal(calls.length, 0);
@@ -113,9 +113,28 @@ test('post-auth current path tracker skips writes when diagnostics is disabled',
         originalUrl: '/dashboard',
         headers: { accept: 'text/html' },
         userSession: { id: 'SID123', currentPath: '', currentPathUpdatedAt: '' },
-        user: { canUsePageDiagnostics: true, pageDiagnosticsEnabled: true }
+        user: { canViewActiveUsers: true }
       }, {}, resolve);
     });
+    assert.equal(calls.length, 0);
+  } finally {
+    dataService.updateData = originalUpdateData;
+  }
+});
+
+test('updateSessionCurrentPath still writes when invoked explicitly', async () => {
+  const originalUpdateData = dataService.updateData;
+  const calls = [];
+  dataService.updateData = async (...args) => {
+    calls.push(args);
+    return { ok: true };
+  };
+
+  try {
+    const updated = await sessionEnforcement.updateSessionCurrentPath({
+      userSession: { id: 'SID123', currentPath: '', currentPathUpdatedAt: '' }
+    }, '/dashboard');
+    assert.equal(updated, true);
     assert.equal(calls.length, 1);
     assert.equal(calls[0][0], 'sessions');
     assert.equal(calls[0][1], 'SID123');

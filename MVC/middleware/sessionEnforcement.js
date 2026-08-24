@@ -1,7 +1,7 @@
 // MVC/middleware/sessionEnforcement.js
 const dataService = require('../services/dataService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
-const { isHtmlNavigationRequest, sanitizeCurrentPath } = require('../utils/pagePathUtils');
+const { sanitizeCurrentPath } = require('../utils/pagePathUtils');
 
 const CURRENT_PATH_UPDATE_THROTTLE_MS = 3 * 60 * 1000;
 const PUBLIC_STATIC_PREFIXES = Object.freeze([
@@ -49,17 +49,30 @@ function shouldUpdateCurrentPath(session = {}, currentPath = '', now = new Date(
     return (now - lastUpdated) >= CURRENT_PATH_UPDATE_THROTTLE_MS;
 }
 
-function hasCachedUiFlag(user, key) {
-    return user?.[key] === true || user?.uiAccess?.[key] === true;
+function shouldTrackCurrentPathForRequest(req) {
+    return false;
 }
 
-function shouldTrackCurrentPathForRequest(req) {
-    if (!isHtmlNavigationRequest(req)) return false;
-    const user = req?.user;
-    if (!user) return false;
-    const diagnosticsEnabled = hasCachedUiFlag(user, 'canUsePageDiagnostics') && user.pageDiagnosticsEnabled !== false;
-    const activeUsersNeedsPresence = hasCachedUiFlag(user, 'canViewActiveUsers');
-    return diagnosticsEnabled || activeUsersNeedsPresence;
+async function updateSessionCurrentPath(req, currentPath = '') {
+    const session = req?.userSession || {};
+    const sessionId = String(session.id || '').trim();
+    if (!sessionId) return false;
+
+    const sanitizedPath = sanitizeCurrentPath(
+        currentPath || req?.originalUrl || req?.url || req?.path || ''
+    );
+    if (!sanitizedPath) return false;
+
+    const now = new Date();
+    if (!shouldUpdateCurrentPath(session, sanitizedPath, now)) return true;
+
+    const updates = {
+        currentPath: sanitizedPath,
+        currentPathUpdatedAt: now.toISOString()
+    };
+    await dataService.updateData('sessions', sessionId, updates, SYSTEM_CONTEXT);
+    Object.assign(session, updates);
+    return true;
 }
 
 async function enforceSession(req, res, next) {
@@ -128,20 +141,7 @@ async function enforceSession(req, res, next) {
 async function trackCurrentPathAfterAuth(req, res, next) {
     try {
         if (!shouldTrackCurrentPathForRequest(req)) return next();
-        const session = req.userSession || {};
-        const sessionId = String(session.id || '').trim();
-        if (!sessionId) return next();
-
-        const now = new Date();
-        const currentPath = sanitizeCurrentPath(req.originalUrl || req.url || req.path || '');
-        if (!shouldUpdateCurrentPath(session, currentPath, now)) return next();
-
-        const updates = {
-            currentPath,
-            currentPathUpdatedAt: now.toISOString()
-        };
-        await dataService.updateData('sessions', sessionId, updates, SYSTEM_CONTEXT);
-        Object.assign(session, updates);
+        await updateSessionCurrentPath(req);
         return next();
     } catch (error) {
         console.error('Session Current Path Tracking Error:', error);
@@ -155,3 +155,4 @@ module.exports.isPublicStaticAssetRequest = isPublicStaticAssetRequest;
 module.exports.shouldUpdateCurrentPath = shouldUpdateCurrentPath;
 module.exports.shouldTrackCurrentPathForRequest = shouldTrackCurrentPathForRequest;
 module.exports.trackCurrentPathAfterAuth = trackCurrentPathAfterAuth;
+module.exports.updateSessionCurrentPath = updateSessionCurrentPath;

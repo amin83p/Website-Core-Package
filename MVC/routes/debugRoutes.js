@@ -36,6 +36,12 @@ router.get('/client-diagnostics/page-presence',
   pageDiagnosticsCtrl.fetchPagePresence
 );
 
+router.post('/client-diagnostics/page-presence/ping',
+  requireAuth,
+  requireAccess(SECTIONS.PAGE_DIAGNOSTICS, OPERATIONS.READ_ALL),
+  pageDiagnosticsCtrl.pingPagePresence
+);
+
 router.post('/client-diagnostics/preference',
   requireAuth,
   requireAccess(SECTIONS.PAGE_DIAGNOSTICS, OPERATIONS.READ_ALL),

@@ -57,10 +57,13 @@ test('PAGE_DIAGNOSTICS is declared as a core access section and symbol', () => {
   }
 });
 
-test('layout only loads page diagnostics for the page diagnostics permission flag', () => {
+test('layout lazy-loads page diagnostics scripts through the loader', () => {
   const layout = read('MVC/views/layouts/layout.ejs');
   assert.match(layout, /canUsePageDiagnostics/);
   assert.match(layout, /__PAGE_DIAGNOSTICS__/);
+  assert.match(layout, /lazy:\s*true/);
+  assert.match(layout, /presencePingEndpoint/);
+  assert.match(layout, /\/debug\/client-diagnostics\/page-presence\/ping/);
   assert.match(layout, /\/debug\/client-diagnostics\/page-presence/);
   assert.match(layout, /\/debug\/client-diagnostics\/preference/);
   assert.match(layout, /pageDiagnosticsEnabled/);
@@ -68,10 +71,11 @@ test('layout only loads page diagnostics for the page diagnostics permission fla
   assert.match(layout, /csrfToken/);
   assert.match(layout, /pageDiagnosticsRuntime/);
   assert.match(layout, /runtime:/);
-  assert.match(layout, /\/scripts\/pageDiagnosticsHealth\.js/);
-  assert.match(layout, /\/scripts\/pageDiagnostics\.js/);
-  assert.ok(layout.indexOf('/scripts/pageDiagnosticsHealth.js') < layout.indexOf('/scripts/pageDiagnostics.js'));
-  assert.ok(layout.indexOf('/scripts/pageDiagnostics.js') < layout.indexOf('/scripts/main.js'));
+  assert.match(layout, /scriptUrls/);
+  assert.match(layout, /\/scripts\/pageDiagnosticsLoader\.js/);
+  assert.doesNotMatch(layout, /<script src="[^"]*pageDiagnosticsHealth\.js/);
+  assert.doesNotMatch(layout, /<script src="[^"]*pageDiagnostics\.js/);
+  assert.ok(layout.indexOf('/scripts/pageDiagnosticsLoader.js') < layout.indexOf('/scripts/main.js'));
   assert.match(layout, /layoutCanUsePageDiagnostics && layoutPageDiagnosticsEnabled/);
   assert.doesNotMatch(layout, /\/scripts\/pageDiagnosticsToggle\.js/);
   assert.doesNotMatch(layout, /RAILWAY_PROJECT_ID|RAILWAY_SERVICE_ID|RAILWAY_DEPLOYMENT_ID|RAILWAY_REPLICA_ID/);
@@ -85,6 +89,7 @@ test('page diagnostics layout templates compile', () => {
 
 test('page diagnostics client keeps diagnostics local and fetches only page presence', () => {
   const source = read('public/scripts/pageDiagnostics.js');
+  const loader = read('public/scripts/pageDiagnosticsLoader.js');
   assert.match(source, /window\.onerror/);
   assert.match(source, /unhandledrejection/);
   assert.match(source, /installFetchCapture/);
@@ -95,7 +100,11 @@ test('page diagnostics client keeps diagnostics local and fetches only page pres
   assert.match(source, /Diagnostics are active for this account\./);
   assert.match(source, /JSON\.stringify\(\{ enabled \}\)/);
   assert.match(source, /global\.location\.reload\(\)/);
+  assert.match(source, /global\.PageDiagnostics/);
   assert.doesNotMatch(source, /localStorage|sessionStorage/);
+  assert.match(loader, /page-presence\/ping/);
+  assert.match(loader, /loadDiagnosticsBundle/);
+  assert.match(loader, /PageDiagnostics\.open/);
 });
 
 test('page diagnostics disabled state renders side icon and inline re-enable handler', () => {
@@ -103,6 +112,7 @@ test('page diagnostics disabled state renders side icon and inline re-enable han
   const header = read('MVC/views/partials/header.ejs');
   assert.match(header, /pageDiagnosticsSideControl/);
   assert.match(header, /page-diagnostics-side-control--off/);
+  assert.match(header, /page-diagnostics-side-control[^-]/);
   assert.match(layout, /pageDiagnosticsToggleModal/);
   assert.match(layout, /Diagnostics are off for this account, so full page diagnostics scripts are not loaded\./);
   assert.match(layout, /method:\s*'POST'/);
@@ -118,11 +128,14 @@ test('page diagnostics preference endpoint is permission-protected and boolean-o
   const authSource = read('MVC/services/authService.js');
 
   assert.match(routeSource, /router\.post\('\/client-diagnostics\/preference'/);
+  assert.match(routeSource, /router\.post\('\/client-diagnostics\/page-presence\/ping'/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.PAGE_DIAGNOSTICS,\s*OPERATIONS\.READ_ALL\)/);
   assert.match(routeSource, /pageDiagnosticsCtrl\.updatePreference/);
+  assert.match(routeSource, /pageDiagnosticsCtrl\.pingPagePresence/);
   assert.match(controllerSource, /typeof enabled !== 'boolean'/);
   assert.match(controllerSource, /pageDiagnostics\.enabled/);
   assert.match(controllerSource, /userSettingsService\.setSetting/);
+  assert.match(controllerSource, /updateSessionCurrentPath/);
   assert.doesNotMatch(controllerSource, /getDataById\('users'/);
   assert.doesNotMatch(controllerSource, /updateData\('users'/);
   assert.match(controllerSource, /invalidateAuthContextForUser\(userId\)/);
@@ -142,8 +155,10 @@ test('page diagnostics and active-users layout flags are cached in auth context'
   assert.match(appSource, /res\.locals\.canUsePageDiagnostics = canUsePageDiagnostics/);
   assert.match(appSource, /res\.locals\.canViewActiveUsers = canViewActiveUsers/);
   assert.doesNotMatch(appSource, /accessUiService\.canAccessTarget/);
-  assert.match(authSource, /evaluateAccess/);
+  assert.match(authSource, /accessUiService\.canAccessTarget/);
   assert.match(authSource, /pageDiagnosticsEnabled: resolvePageDiagnosticsEnabled/);
+  assert.match(appSource, /res\.locals\.pageDiagnosticsRuntime = null/);
+  assert.match(appSource, /if \(canUsePageDiagnostics\) \{\s*\n\s*res\.locals\.pageDiagnosticsRuntime = resolvePageDiagnosticsRuntime\(req\)/);
 });
 
 test('page diagnostics health is green when server signals are healthy', () => {

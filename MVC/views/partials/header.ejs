@@ -394,7 +394,18 @@
                 </button>
             <% } %>
 
-            <% if (typeof canUsePageDiagnostics !== 'undefined' && canUsePageDiagnostics && !(typeof pageDiagnosticsEnabled === 'undefined' || pageDiagnosticsEnabled)) { %>
+            <% if (typeof canUsePageDiagnostics !== 'undefined' && canUsePageDiagnostics && (typeof pageDiagnosticsEnabled === 'undefined' || pageDiagnosticsEnabled)) { %>
+                <button
+                    type="button"
+                    id="pageDiagnosticsSideControl"
+                    class="header-settings-toggle header-side-control-btn page-diagnostics-side-control"
+                    aria-label="Open page diagnostics"
+                    data-no-wait="true"
+                    title="Page diagnostics"
+                >
+                    <i class="bi bi-speedometer2" aria-hidden="true"></i>
+                </button>
+            <% } else if (typeof canUsePageDiagnostics !== 'undefined' && canUsePageDiagnostics) { %>
                 <button
                     type="button"
                     id="pageDiagnosticsSideControl"

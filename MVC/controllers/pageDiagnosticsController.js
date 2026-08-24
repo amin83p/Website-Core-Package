@@ -2,6 +2,7 @@ const activeUsersService = require('../services/security/activeUsersService');
 const userSettingsService = require('../services/userSettingsService');
 const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 const { sanitizeCurrentPath } = require('../utils/pagePathUtils');
+const { updateSessionCurrentPath } = require('../middleware/sessionEnforcement');
 
 async function fetchPagePresence(req, res) {
   try {
@@ -105,7 +106,35 @@ async function updatePreference(req, res) {
   }
 }
 
+async function pingPagePresence(req, res) {
+  try {
+    const currentPath = sanitizeCurrentPath(
+      req.body?.path || req.query?.path || req.body?.currentPath || req.query?.currentPath || ''
+    );
+    if (!currentPath) {
+      return res.json({
+        status: 'success',
+        updated: false,
+        currentPath: ''
+      });
+    }
+
+    const updated = await updateSessionCurrentPath(req, currentPath);
+    return res.json({
+      status: 'success',
+      updated,
+      currentPath
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to update page presence.'
+    });
+  }
+}
+
 module.exports = {
   fetchPagePresence,
+  pingPagePresence,
   updatePreference
 };
