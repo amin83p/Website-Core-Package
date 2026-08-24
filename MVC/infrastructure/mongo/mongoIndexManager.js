@@ -74,7 +74,6 @@ const INDEX_DEFINITIONS = Object.freeze({
   ],
   orgPolicies: [
     { key: { id: 1 }, options: { name: 'idx_org_policies_id' } },
-    { key: { orgId: 1 }, options: { name: 'idx_org_policies_org_id' } },
     { key: { orgId: 1 }, options: { name: 'idx_org_policies_org_unique', unique: true } },
     { key: { active: 1 }, options: { name: 'idx_org_policies_active' } },
     { key: { 'audit.lastUpdateDateTime': -1 }, options: { name: 'idx_org_policies_last_update_dt' } }
@@ -226,6 +225,7 @@ const INDEX_DEFINITIONS = Object.freeze({
   sessions: [
     { key: { id: 1 }, options: { name: 'idx_sessions_id' } },
     { key: { userId: 1, status: 1 }, options: { name: 'idx_sessions_user_status' } },
+    { key: { absoluteExpiry: 1 }, options: { name: 'idx_sessions_absolute_expiry' } },
     { key: { userId: 1, expiresAt: 1 }, options: { name: 'idx_sessions_user_expires_at' } },
     { key: { expiresAt: 1 }, options: { name: 'idx_sessions_expiresAt' } }
   ],
