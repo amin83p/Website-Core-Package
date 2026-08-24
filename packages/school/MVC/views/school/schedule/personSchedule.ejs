@@ -1124,6 +1124,7 @@
 
 <%- include('partials/tablePages-start', {
   title: 'Master Schedule Viewer',
+  sectionsPageClass: 'master-schedule-viewer-page',
   newUrl: null,
   newLabel: null,
   user,
@@ -1293,6 +1294,10 @@
       </div>
     </div>
   </div>
+</div>
+
+<div id="scheduleStageModalRoot">
+<%- include('school/partials/sessionEnrollmentStageModal') %>
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
@@ -1823,8 +1828,174 @@ document.addEventListener('DOMContentLoaded', () => {
         hideEmptyDays: false,
         isAdminViewer: canSelectAnyPerson,
         verticalDayWidthUserAdjusted: false,
-        horizontalSliderUserAdjusted: false
+        horizontalSliderUserAdjusted: false,
+        suppressGridClick: false
     };
+
+    const SCHEDULE_STAGE_DURATION_CHIPS = [0.5, 1, 1.5, 2, 2.5, 3];
+    let scheduleStageModalBound = false;
+    let scheduleStageContext = null;
+
+    function nearestScheduleStageDurationChip(hours) {
+        const value = Number(hours || 0);
+        let best = SCHEDULE_STAGE_DURATION_CHIPS[0];
+        let bestDiff = Infinity;
+        SCHEDULE_STAGE_DURATION_CHIPS.forEach((chip) => {
+            const diff = Math.abs(chip - value);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = chip;
+            }
+        });
+        return best;
+    }
+
+    function getScheduleStageModalEl() {
+        return document.getElementById('sessionEnrollmentStageModal');
+    }
+
+    function hideScheduleStageModal() {
+        const modalEl = getScheduleStageModalEl();
+        scheduleStageContext = null;
+        if (!modalEl) return;
+        modalEl.classList.add('d-none');
+        modalEl.classList.remove('show');
+        modalEl.style.display = 'none';
+        modalEl.setAttribute('aria-hidden', 'true');
+        const createBtn = document.getElementById('btn_sessionEnrollmentStageCreate');
+        if (createBtn) {
+            createBtn.disabled = false;
+            createBtn.removeAttribute('title');
+        }
+    }
+
+    function showScheduleStageModal() {
+        const modalEl = getScheduleStageModalEl();
+        if (!modalEl) return;
+        modalEl.classList.add('session-enrollment-stage-standalone');
+        if (modalEl.parentElement !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+        modalEl.classList.remove('d-none');
+        modalEl.classList.add('show');
+        modalEl.style.display = 'flex';
+        modalEl.setAttribute('aria-hidden', 'false');
+        const createBtn = document.getElementById('btn_sessionEnrollmentStageCreate');
+        if (createBtn) {
+            createBtn.disabled = true;
+            createBtn.title = 'Session creation from Master Schedule is not enabled yet';
+        }
+        const countDisplay = document.getElementById('sessionEnrollmentStageCountDisplay');
+        if (countDisplay && typeof countDisplay.focus === 'function') {
+            countDisplay.focus();
+        }
+    }
+
+    function syncScheduleStageCountDisplay(count) {
+        const normalized = Math.max(1, Math.min(24, Math.round(Number(count) || 4)));
+        const display = document.getElementById('sessionEnrollmentStageCountDisplay');
+        if (display) display.textContent = String(normalized);
+        const modalEl = getScheduleStageModalEl();
+        modalEl?.querySelectorAll('[data-stage-count]').forEach((btn) => {
+            const chip = Number(btn.getAttribute('data-stage-count'));
+            btn.classList.toggle('active', chip === normalized);
+        });
+    }
+
+    function openScheduleStageModal(context) {
+        if (!context) return;
+        scheduleStageContext = context;
+        initScheduleStageModal();
+        const contextEl = document.getElementById('sessionEnrollmentStageContext');
+        if (contextEl && scheduleCalendarCore) {
+            const dateLabel = scheduleCalendarCore.formatDayHeaderLong(context.date);
+            const timeLabel = String(context.startTimeLabel || context.startTime24 || '').trim();
+            contextEl.textContent = `${dateLabel} · Start ${timeLabel}`;
+        }
+        const modalEl = getScheduleStageModalEl();
+        const durationHours = nearestScheduleStageDurationChip(context.durationHours);
+        modalEl?.querySelectorAll('[data-stage-duration]').forEach((btn) => {
+            const hours = Number(btn.getAttribute('data-stage-duration'));
+            btn.classList.toggle('active', hours === durationHours);
+        });
+        const anchorDow = new Date(`${context.date}T12:00:00`).getDay();
+        modalEl?.querySelectorAll('[data-stage-weekday]').forEach((btn) => {
+            const dow = Number(btn.getAttribute('data-stage-weekday'));
+            btn.classList.toggle('active', dow === anchorDow);
+        });
+        syncScheduleStageCountDisplay(4);
+        const warningEl = document.getElementById('sessionEnrollmentStageCapacityWarning');
+        if (warningEl) {
+            warningEl.classList.add('d-none');
+            warningEl.textContent = '';
+        }
+        showScheduleStageModal();
+    }
+
+    function initScheduleStageModal() {
+        if (scheduleStageModalBound) return;
+        scheduleStageModalBound = true;
+        const modalEl = getScheduleStageModalEl();
+        if (!modalEl) return;
+
+        modalEl.addEventListener('click', (event) => {
+            if (event.target.closest('#btn_sessionEnrollmentStageCreate')) {
+                event.preventDefault();
+                if (typeof uiAlert === 'function') {
+                    uiAlert('Session creation from Master Schedule is not enabled yet.', 'Stage Sessions');
+                }
+                return;
+            }
+            if (event.target.closest('[data-stage-dismiss]')) {
+                hideScheduleStageModal();
+                return;
+            }
+            if (!event.target.closest('.session-enrollment-stage-panel')) {
+                event.stopPropagation();
+            }
+        });
+
+        modalEl.querySelectorAll('[data-stage-duration]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                modalEl.querySelectorAll('[data-stage-duration]').forEach((row) => row.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        modalEl.querySelectorAll('[data-stage-weekday]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                btn.classList.toggle('active');
+                if (!modalEl.querySelectorAll('[data-stage-weekday].active').length) btn.classList.add('active');
+            });
+        });
+
+        document.getElementById('btn_sessionEnrollmentStageCountDown')?.addEventListener('click', () => {
+            const display = document.getElementById('sessionEnrollmentStageCountDisplay');
+            const current = Number(display?.textContent || 4);
+            syncScheduleStageCountDisplay(current - 1);
+        });
+
+        document.getElementById('btn_sessionEnrollmentStageCountUp')?.addEventListener('click', () => {
+            const display = document.getElementById('sessionEnrollmentStageCountDisplay');
+            const current = Number(display?.textContent || 4);
+            syncScheduleStageCountDisplay(current + 1);
+        });
+
+        modalEl.querySelectorAll('[data-stage-count]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                syncScheduleStageCountDisplay(Number(btn.getAttribute('data-stage-count') || 1));
+            });
+        });
+    }
+
+    function bindScheduleDragCreate(container, mode) {
+        if (!container || !scheduleCalendarCore?.bindCalendarDragCreate) return;
+        scheduleCalendarCore.bindCalendarDragCreate(container, {
+            enabled: mode === 'verticalTimeline' && scheduleState.isAdminViewer === true,
+            onDragComplete: openScheduleStageModal,
+            setSuppressGridClick: (value) => { scheduleState.suppressGridClick = value === true; }
+        });
+    }
 
     function saveScheduleViewMode(mode) {
         const normalized = resolveScheduleViewMode(mode);
@@ -2970,6 +3141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
         } else {
             scheduleWeekGridLayoutAfterRender(mode);
+            bindScheduleDragCreate(container, mode);
         }
         setSchedulePrintEnabled(true);
     }
@@ -3645,6 +3817,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('visualDisplayArea').addEventListener('click', (e) => {
+        if (scheduleState.suppressGridClick) {
+            scheduleState.suppressGridClick = false;
+            return;
+        }
         if (e.target.closest('.event-block, .vertical-event-block')) return; 
 
         const dayEl = e.target.closest('.cal-day.active, .cal-day.conflict, .cal-day.leave');

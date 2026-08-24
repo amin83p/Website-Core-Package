@@ -1,4 +1,9 @@
-<div class="sections-page">
+<%
+  const resolvedSectionsPageClass = (typeof sectionsPageClass !== 'undefined' && sectionsPageClass !== null)
+    ? String(sectionsPageClass).trim()
+    : '';
+%>
+<div class="sections-page<%= resolvedSectionsPageClass ? ' ' + resolvedSectionsPageClass : '' %>">
   <div id="process-data">
     <span id="urlRef" data-id="<%= typeof newUrl !== 'undefined' && newUrl != null ? newUrl : '' %>" hidden></span>
     <span id="user-id" data-id="<%= user.id %>" hidden></span>

@@ -9,16 +9,31 @@ function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
 }
 
-test('main.css defines percentage-based page width modes', () => {
+test('main.css defines standard sections-page width for most pages', () => {
   const source = read('public/styles/main.css');
-  assert.match(source, /--app-page-max-width:\s*min\(70%/);
+  assert.match(source, /--sections-page-max-width:\s*min\(1400px/);
   assert.match(source, /\.sections-page\s*\{[^}]*max-width:\s*var\(--sections-page-max-width\)/s);
-  assert.match(source, /main\.container\s*\{[^}]*max-width:\s*var\(--app-page-max-width\)/s);
+  assert.doesNotMatch(source, /--sections-page-max-width:\s*var\(--app-page-max-width\)/);
+});
+
+test('main.css defines pixel-based wide and full modes for sections pages', () => {
+  const source = read('public/styles/main.css');
   assert.match(source, /html\.app-page-width-wide/);
   assert.match(source, /html\.app-page-width-full/);
-  assert.match(source, /--app-page-max-width:\s*min\(80%/);
-  assert.match(source, /--app-page-max-width:\s*min\(90%/);
-  assert.match(source, /html\.app-page-width-wide main\.container/);
+  assert.match(source, /html\.app-page-width-wide[\s\S]*--sections-page-max-width:\s*min\(1640px/s);
+  assert.match(source, /html\.app-page-width-full[\s\S]*--sections-page-max-width:\s*min\(90%/s);
+  assert.match(source, /html\.app-page-width-wide main\.container[\s\S]*max-width:\s*100%/s);
+  assert.match(source, /html\.app-page-width-wide main\.container[\s\S]*width:\s*100%/s);
+  assert.match(source, /html\.app-page-width-full main\.container[\s\S]*min\(90%/s);
+});
+
+test('main.css scopes percentage widths to Master Schedule Viewer only', () => {
+  const source = read('public/styles/main.css');
+  assert.match(source, /\.master-schedule-viewer-page/);
+  assert.match(source, /--master-schedule-viewer-max-width:\s*min\(70%/);
+  assert.match(source, /html\.app-page-width-wide \.master-schedule-viewer-page[\s\S]*min\(80%/s);
+  assert.match(source, /html\.app-page-width-full \.master-schedule-viewer-page[\s\S]*min\(90%/s);
+  assert.match(source, /main\.container:has\(\.master-schedule-viewer-page\)/);
 });
 
 test('layout.ejs early-applies stored page width class', () => {
@@ -55,7 +70,12 @@ test('wide page width mode uses the same left gutter as full mode', () => {
   const source = read('public/styles/main.css');
   assert.match(source, /html\.app-page-width-wide[\s\S]*--app-side-controls-gutter:\s*64px/s);
   assert.match(source, /html\.app-page-width-wide main\.container[\s\S]*padding-left/s);
-  assert.match(source, /html\.app-page-width-wide[\s\S]*min\(80%, calc\(100vw - 32px - var\(--app-side-controls-gutter\)\)\)/s);
+  assert.match(source, /html\.app-page-width-wide[\s\S]*min\(1640px/s);
+});
+
+test('Master Schedule Viewer marks its sections-page wrapper', () => {
+  const source = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(source, /sectionsPageClass:\s*'master-schedule-viewer-page'/);
 });
 
 test('academic ledger pages inherit global sections-page width', () => {

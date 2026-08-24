@@ -89,10 +89,8 @@
   --table-stripe-bg: #ffffff; 
   
   /* --- Page layout width --- */
-  --app-page-width-percent: 70%;
+  --sections-page-max-width: min(1400px, calc(100vw - 32px - var(--app-side-controls-gutter)));
   --app-side-controls-gutter: 0px;
-  --app-page-max-width: min(70%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-  --sections-page-max-width: var(--app-page-max-width);
   
 }
 
@@ -138,29 +136,62 @@ body.header-layout-compact main {
   width: 100%;
 }
 
-main.container {
-  width: var(--app-page-max-width);
-  max-width: var(--app-page-max-width);
-  margin-left: auto;
-  margin-right: auto;
-}
-
 html.app-page-width-wide {
-  --app-page-width-percent: 80%;
+  --sections-page-max-width: min(1640px, calc(100vw - 32px - var(--app-side-controls-gutter)));
   --app-side-controls-gutter: 64px;
-  --app-page-max-width: min(80%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-  --sections-page-max-width: var(--app-page-max-width);
 }
 
 html.app-page-width-full {
-  --app-page-width-percent: 90%;
+  --sections-page-max-width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
   --app-side-controls-gutter: 64px;
-  --app-page-max-width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-  --sections-page-max-width: var(--app-page-max-width);
 }
 
 html.app-page-width-wide main.container,
 html.app-page-width-full main.container {
+  max-width: 100%;
+  width: 100%;
+  padding-left: calc(var(--spacing-md) + var(--app-side-controls-gutter));
+}
+
+html.app-page-width-full main.container {
+  max-width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Master Schedule Viewer — percentage-based width (Display Settings) */
+.master-schedule-viewer-page {
+  --master-schedule-viewer-max-width: min(70%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  max-width: var(--master-schedule-viewer-max-width);
+}
+
+main.container:has(.master-schedule-viewer-page) {
+  width: var(--master-schedule-viewer-max-width, min(70%, calc(100vw - 32px - var(--app-side-controls-gutter))));
+  max-width: var(--master-schedule-viewer-max-width, min(70%, calc(100vw - 32px - var(--app-side-controls-gutter))));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+html.app-page-width-wide .master-schedule-viewer-page {
+  --app-side-controls-gutter: 64px;
+  --master-schedule-viewer-max-width: min(80%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+}
+
+html.app-page-width-wide main.container:has(.master-schedule-viewer-page) {
+  width: min(80%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  max-width: min(80%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  padding-left: calc(var(--spacing-md) + var(--app-side-controls-gutter));
+}
+
+html.app-page-width-full .master-schedule-viewer-page {
+  --app-side-controls-gutter: 64px;
+  --master-schedule-viewer-max-width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+}
+
+html.app-page-width-full main.container:has(.master-schedule-viewer-page) {
+  width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  max-width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
   padding-left: calc(var(--spacing-md) + var(--app-side-controls-gutter));
 }
 

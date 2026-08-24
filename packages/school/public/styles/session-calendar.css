@@ -357,6 +357,45 @@
   opacity: 1;
 }
 
+.session-cal-drag-preview {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  background: rgba(25, 135, 84, 0.18);
+  border: 2px solid #198754;
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 1px rgba(25, 135, 84, 0.25);
+  pointer-events: none;
+  z-index: 9;
+  display: none;
+}
+
+.session-cal-drag-info {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 9.5rem;
+  max-width: calc(100% - 12px);
+  padding: 0.45rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  color: #0f5132;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(25, 135, 84, 0.45);
+  border-radius: 0.45rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  pointer-events: none;
+  z-index: 13;
+  opacity: 0;
+}
+
+.session-cal-day-grid.is-drag-active .session-cal-drag-info {
+  opacity: 1;
+}
+
 .session-cal-day-cell .session-cal-day-grid {
   cursor: crosshair;
 }
@@ -1191,6 +1230,12 @@
 
 .session-enrollment-stage-overlay.d-none {
   display: none !important;
+}
+
+.session-enrollment-stage-overlay.session-enrollment-stage-standalone {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
 }
 
 .session-enrollment-stage-backdrop {

@@ -646,6 +646,251 @@
     return isSnappedTimeOccupiedOnDay(trackEl, snappedOffset);
   }
 
+  function formatDurationHrsMins(totalMinutes) {
+    const mins = Math.max(0, Math.round(Number(totalMinutes) || 0));
+    const hours = Math.floor(mins / 60);
+    const remainder = mins % 60;
+    const parts = [];
+    if (hours > 0) parts.push(`${hours} Hr${hours === 1 ? '' : 's'}`);
+    if (remainder > 0) parts.push(`${remainder} Mins`);
+    if (!parts.length) return '0 Mins';
+    return parts.join(' ');
+  }
+
+  function computeVerticalDragRange(startOffset, endOffset) {
+    const anchorOffset = Math.max(0, Math.min(TOTAL_MINUTES, Number(startOffset) || 0));
+    let end = Math.max(0, Math.min(TOTAL_MINUTES, Number(endOffset) || 0));
+    if (end <= anchorOffset) {
+      end = Math.min(TOTAL_MINUTES, anchorOffset + TIMELINE_SNAP_MINUTES);
+    }
+    let durationMinutes = end - anchorOffset;
+    durationMinutes = Math.max(TIMELINE_SNAP_MINUTES, durationMinutes);
+    if (anchorOffset + durationMinutes > TOTAL_MINUTES) {
+      durationMinutes = TOTAL_MINUTES - anchorOffset;
+    }
+    const finalEndOffset = anchorOffset + durationMinutes;
+    return {
+      anchorOffset,
+      endOffset: finalEndOffset,
+      durationMinutes,
+      durationHours: durationMinutes / 60
+    };
+  }
+
+  function isSpanOccupiedOnDay(dayCell, startOffset, endOffset) {
+    if (!dayCell) return true;
+    const startMin = timelineMinutesFromOffset(startOffset);
+    const endMin = timelineMinutesFromOffset(endOffset);
+    const sessions = dayCell.querySelectorAll('.session-cal-positioned-session[data-timeline-start][data-timeline-end]');
+    for (const el of sessions) {
+      const sessionStart = Number(el.dataset.timelineStart);
+      const sessionEnd = Number(el.dataset.timelineEnd);
+      if (Number.isFinite(sessionStart) && Number.isFinite(sessionEnd) && sessionStart < endMin && sessionEnd > startMin) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function buildVerticalDragOverlayHtml() {
+    return '<div class="session-cal-drag-preview" aria-hidden="true"></div><div class="session-cal-drag-info" aria-hidden="true"></div>';
+  }
+
+  function buildVerticalDragContext(verticalRow, dayCell, anchorSnappedOffset, currentClientY) {
+    if (!verticalRow || !dayCell || dayCell.classList.contains('is-out-of-range')) return null;
+    const date = normalizeDateOnly(dayCell.getAttribute('data-cal-date'));
+    if (!date) return null;
+    const daysRow = verticalRow.querySelector('.session-cal-days-row');
+    if (!daysRow) return null;
+    const trackRect = daysRow.getBoundingClientRect();
+    const y = currentClientY - trackRect.top;
+    const snappedEnd = snapTimelineOffsetMinutesForClick(offsetMinutesFromGridY(y, trackRect.height));
+    const range = computeVerticalDragRange(anchorSnappedOffset, snappedEnd);
+    const occupied = isSpanOccupiedOnDay(dayCell, range.anchorOffset, range.endOffset);
+    const startMin = timelineMinutesFromOffset(range.anchorOffset);
+    return {
+      mode: 'vertical',
+      date,
+      snappedOffsetMinutes: range.anchorOffset,
+      endOffsetMinutes: range.endOffset,
+      startTime24: minutesToTime24(startMin),
+      startTimeLabel: formatSnappedTimelineLabel(range.anchorOffset),
+      durationMinutes: range.durationMinutes,
+      durationHours: range.durationHours,
+      durationLabel: formatDurationHrsMins(range.durationMinutes),
+      occupied
+    };
+  }
+
+  function resolveVerticalDragContext(container, anchorClientX, anchorClientY, currentClientY, target) {
+    if (!container || !target || typeof target.closest !== 'function') return null;
+    if (isPointerOverSessionUi(target)) return null;
+    const anchor = resolveGridClickContext(container, anchorClientX, anchorClientY, target);
+    if (!anchor || anchor.mode !== 'vertical') return null;
+    const verticalRow = target.closest('.session-cal-time-track');
+    if (!verticalRow || !container.contains(verticalRow)) return null;
+    const dayGrid = target.closest('.session-cal-day-grid');
+    const dayCell = dayGrid
+      ? dayGrid.closest('.session-cal-day-cell')
+      : verticalRow.querySelector(`.session-cal-day-cell[data-cal-date="${anchor.date}"]`);
+    if (!dayCell) return null;
+    const context = buildVerticalDragContext(verticalRow, dayCell, anchor.snappedOffsetMinutes, currentClientY);
+    if (!context || context.occupied) return null;
+    return context;
+  }
+
+  function clearDragOverlays(container) {
+    if (!container) return;
+    container.querySelectorAll('.session-cal-day-grid.is-drag-active').forEach((grid) => {
+      grid.classList.remove('is-drag-active');
+      const preview = grid.querySelector('.session-cal-drag-preview');
+      const info = grid.querySelector('.session-cal-drag-info');
+      if (preview) {
+        preview.style.display = 'none';
+        preview.style.top = '';
+        preview.style.height = '';
+      }
+      if (info) info.textContent = '';
+    });
+  }
+
+  function updateDragOverlay(dayGrid, context) {
+    if (!dayGrid || !context) return;
+    const preview = dayGrid.querySelector('.session-cal-drag-preview');
+    const info = dayGrid.querySelector('.session-cal-drag-info');
+    if (!preview || !info) return;
+    const topPct = (context.snappedOffsetMinutes / TOTAL_MINUTES) * 100;
+    const heightPct = (context.durationMinutes / TOTAL_MINUTES) * 100;
+    preview.style.display = 'block';
+    preview.style.top = `${topPct}%`;
+    preview.style.height = `${heightPct}%`;
+    info.innerHTML = `Start Time: ${escapeHtml(context.startTimeLabel)}<br>Session Duration: ${escapeHtml(context.durationLabel)}`;
+    dayGrid.classList.add('is-drag-active');
+  }
+
+  function bindCalendarDragCreate(container, options = {}) {
+    if (!container) return;
+    container._calendarDragCreateOptions = options;
+    if (container.dataset.dragCreateBound === '1') return;
+    container.dataset.dragCreateBound = '1';
+
+    let dragState = null;
+
+    function getOptions() {
+      return container._calendarDragCreateOptions || {};
+    }
+
+    function detachDocumentListeners() {
+      document.removeEventListener('pointermove', onDocumentPointerMove);
+      document.removeEventListener('pointerup', onDocumentPointerUp);
+      document.removeEventListener('pointercancel', onDocumentPointerUp);
+    }
+
+    function finishDrag(pointerId) {
+      if (!dragState) return null;
+      try {
+        dragState.dayGrid?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      detachDocumentListeners();
+      const state = dragState;
+      dragState = null;
+      clearVerticalTimeHover(container);
+      clearDragOverlays(container);
+      return state;
+    }
+
+    function onDocumentPointerMove(event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const opts = getOptions();
+      if (!opts.enabled) return;
+      clearVerticalTimeHover(container);
+      const context = buildVerticalDragContext(
+        dragState.verticalRow,
+        dragState.dayCell,
+        dragState.anchorSnappedOffset,
+        event.clientY
+      );
+      if (!context) return;
+      if (event.clientY > dragState.anchorClientY + 5) dragState.dragged = true;
+      dragState.lastContext = context;
+      updateDragOverlay(dragState.dayGrid, context);
+      if (typeof opts.onDragUpdate === 'function') opts.onDragUpdate(context);
+    }
+
+    function onDocumentPointerUp(event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const opts = getOptions();
+      const state = finishDrag(event.pointerId);
+      if (!state || !opts.enabled) return;
+
+      let context = state.lastContext;
+      if (!state.dragged) {
+        const clickRange = computeVerticalDragRange(state.anchorSnappedOffset, state.anchorSnappedOffset + 60);
+        if (!isSpanOccupiedOnDay(state.dayCell, clickRange.anchorOffset, clickRange.endOffset)) {
+          const startMin = timelineMinutesFromOffset(clickRange.anchorOffset);
+          context = {
+            mode: 'vertical',
+            date: state.anchorContext.date,
+            snappedOffsetMinutes: clickRange.anchorOffset,
+            endOffsetMinutes: clickRange.endOffset,
+            startTime24: minutesToTime24(startMin),
+            startTimeLabel: formatSnappedTimelineLabel(clickRange.anchorOffset),
+            durationMinutes: 60,
+            durationHours: 1,
+            durationLabel: formatDurationHrsMins(60),
+            occupied: false
+          };
+        }
+      }
+
+      if (!context || context.occupied) {
+        if (typeof opts.onDragCancelled === 'function') opts.onDragCancelled();
+        return;
+      }
+
+      if (typeof opts.setSuppressGridClick === 'function') opts.setSuppressGridClick(true);
+      if (typeof opts.onDragComplete === 'function') opts.onDragComplete(context);
+    }
+
+    container.addEventListener('pointerdown', (event) => {
+      const opts = getOptions();
+      if (!opts.enabled) return;
+      const grid = event.target.closest('.session-cal-day-grid');
+      if (!grid || !container.contains(grid)) return;
+      const verticalRow = event.target.closest('.session-cal-time-track');
+      if (!verticalRow) return;
+      if (isPointerOverSessionUi(event.target)) return;
+
+      const anchor = resolveGridClickContext(container, event.clientX, event.clientY, event.target);
+      if (!anchor || anchor.mode !== 'vertical') return;
+
+      const dayCell = grid.closest('.session-cal-day-cell');
+      if (!dayCell) return;
+
+      event.preventDefault();
+      dragState = {
+        pointerId: event.pointerId,
+        dayGrid: grid,
+        dayCell,
+        verticalRow,
+        anchorClientX: event.clientX,
+        anchorClientY: event.clientY,
+        anchorSnappedOffset: anchor.snappedOffsetMinutes,
+        anchorContext: anchor,
+        dragged: false,
+        lastContext: null
+      };
+
+      try {
+        grid.setPointerCapture(event.pointerId);
+      } catch (_) {}
+
+      document.addEventListener('pointermove', onDocumentPointerMove);
+      document.addEventListener('pointerup', onDocumentPointerUp);
+      document.addEventListener('pointercancel', onDocumentPointerUp);
+    });
+  }
+
   function clearVerticalTimeHover(container) {
     if (!container) return;
     container.querySelectorAll('.session-cal-time-track.is-time-hover').forEach((row) => {
@@ -836,6 +1081,7 @@
         <div class="session-cal-day-grid">
           ${buildHourGridBackgroundHtml()}
           ${sessionsHtml}
+          ${buildVerticalDragOverlayHtml()}
         </div>
       </div>
     `;
@@ -1523,6 +1769,13 @@
     buildRotationWeekdayOrder,
     generateRotatingWeekdaySessions,
     resolveGridClickContext,
-    isPointerOverSessionUi
+    isPointerOverSessionUi,
+    formatDurationHrsMins,
+    computeVerticalDragRange,
+    isSpanOccupiedOnDay,
+    buildVerticalDragContext,
+    resolveVerticalDragContext,
+    bindCalendarDragCreate,
+    clearDragOverlays
   };
 })(typeof window !== 'undefined' ? window : global);
