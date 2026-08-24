@@ -1396,6 +1396,12 @@ async function installPackageRegistryDeclarations(context = {}, options = {}) {
 
   await installEntityDeclarations(manifest, summary, context, deps, options);
   await installUploadFolderDeclarations(manifest, summary, deps);
+  try {
+    const { invalidateAllCatalogs } = require('./cache/sectionsOperationsCatalogCacheService');
+    invalidateAllCatalogs();
+  } catch (_) {
+    // ignore
+  }
   return summary;
 }
 
@@ -1411,6 +1417,12 @@ async function removePackageRegistryDeclarations(context = {}, options = {}) {
 
   await removeOrDisableEntityDeclarations(manifest, summary, deps, { ...options, action });
   await removeOrDisableUploadFolderDeclarations(manifest, summary, deps, { ...options, action });
+  try {
+    const { invalidateAllCatalogs } = require('./cache/sectionsOperationsCatalogCacheService');
+    invalidateAllCatalogs();
+  } catch (_) {
+    // ignore
+  }
   return summary;
 }
 
@@ -1525,6 +1537,12 @@ function createLoaderHooks(options = {}) {
             drifts: summary.sectionTopologyDrifts
           });
         }
+      }
+      try {
+        const { invalidateAllCatalogs } = require('./cache/sectionsOperationsCatalogCacheService');
+        invalidateAllCatalogs();
+      } catch (_) {
+        // ignore
       }
       return summary;
     },

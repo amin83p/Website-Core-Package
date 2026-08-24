@@ -40,6 +40,9 @@ function loadLocalEnvFile() {
 
 loadLocalEnvFile();
 
+const requestPerfTracer = require('./MVC/utils/requestPerfTracer');
+requestPerfTracer.installDataHooks();
+
 const socketService = require('./MVC/services/socketService');
 // app.js (or wherever you define middleware)
 const logger = require('./MVC/utils/logger');
@@ -409,12 +412,12 @@ app.use((req, res, next) => {
 });
 
 // 3. Enforce Session Limits (Reads cookies)
-app.use(sessionEnforcement);
+app.use(requestPerfTracer.wrapMiddleware('session-enforcement', sessionEnforcement));
 //Middle wares
 ///const {userAuth} = require('./MVC/middleware/authMiddleware');
 const {timeCheckMiddleware} = require('./MVC/middleware/timeCheckMiddleware');
 //app.use(userAuth);
-app.use(timeCheckMiddleware);
+app.use(requestPerfTracer.wrapMiddleware('time-check', timeCheckMiddleware));
 //
 // --- Custom Middleware Stack ---
 
@@ -445,6 +448,8 @@ app.use((req, res, next) => {
   }, next);
 });
 
+app.use(requestPerfTracer.initMiddleware);
+
 // 1. Logger
 app.use((req, res, next) => {
   const ext = req.url.split('.').pop().toLowerCase();
@@ -456,12 +461,12 @@ app.use((req, res, next) => {
 
 // 2. Soft Auth (Populate req.user if token exists, but don't block)
 app.use(createRequestPathTimingMiddleware('authenticated-html'));
-app.use(softAuth); 
-app.use(sessionEnforcement.trackCurrentPathAfterAuth);
-app.use(orgTimezoneLocals);
-app.use(dataBackendRecoveryMiddleware.exposeBackendStatus);
-app.use(chatAccessLocals);
-app.use((req, res, next) => {
+app.use(requestPerfTracer.wrapMiddleware('soft-auth', softAuth));
+app.use(requestPerfTracer.wrapMiddleware('track-current-path', sessionEnforcement.trackCurrentPathAfterAuth));
+app.use(requestPerfTracer.wrapMiddleware('org-timezone-locals', orgTimezoneLocals));
+app.use(requestPerfTracer.wrapMiddleware('data-backend-status', dataBackendRecoveryMiddleware.exposeBackendStatus));
+app.use(requestPerfTracer.wrapMiddleware('chat-access-locals', chatAccessLocals));
+app.use(requestPerfTracer.wrapMiddleware('app-locals', (req, res, next) => {
   res.locals.appBrand = appBrandingService.getBrand();
   res.locals.appContact = appBrandingService.getContact();
   res.locals.appContactPage = appBrandingService.getContactPage();
@@ -491,12 +496,13 @@ app.use((req, res, next) => {
     }
   }
   next();
-});
-app.use(dataBackendRecoveryMiddleware.enforceRecoveryMode);
+}));
+app.use(requestPerfTracer.wrapMiddleware('recovery-mode', dataBackendRecoveryMiddleware.enforceRecoveryMode));
 // 3. Site Policy Enforcer (Maintenance Mode, Global Bans)
-app.use(enforceSitePolicy);
+app.use(requestPerfTracer.wrapMiddleware('site-policy', enforceSitePolicy));
 // 4. Phase 1 request-rate monitor (non-blocking by default)
-app.use(requestRatePhaseOne);
+app.use(requestPerfTracer.wrapMiddleware('request-rate', requestRatePhaseOne));
+app.use(requestPerfTracer.markHandlerMiddleware);
 //
 
 //------routing------

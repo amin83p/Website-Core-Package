@@ -13,9 +13,12 @@ const {
   validateDashboardKey,
   validateModuleOrder
 } = require('../utils/dashboardModuleOrder');
-
-const DASHBOARD_ALL_SECTIONS_CACHE_TTL_MS = 60 * 1000;
-const dashboardAllSectionsCache = new Map();
+const sectionsOperationsCatalogCacheService = require('../services/cache/sectionsOperationsCatalogCacheService');
+const {
+  buildDashboardAllSectionsCacheKey,
+  readDashboardAllSectionsCache,
+  writeDashboardAllSectionsCache
+} = require('../services/cache/dashboardFilteredSectionsCacheService');
 
 function isNavigatorSection(section) {
   return section?.navigatorSection === true;
@@ -235,44 +238,13 @@ function applyDashboardSectionSearchSort(rows = [], { q = '', sort = 'name_asc' 
   return list;
 }
 
-function buildDashboardAllSectionsCacheKey(user = null) {
-  const safeUser = user && typeof user === 'object' ? user : {};
-  const userId = String(safeUser.id || '').trim() || 'ANON';
-  const activeOrgId = String(safeUser.activeOrgId || '').trim() || 'NO_ORG';
-  const role = String(safeUser.role || '').trim() || 'NO_ROLE';
-  const accessProfileId = String(safeUser.accessProfileId || '').trim() || 'NO_ACCESS_PROFILE';
-  const orgAccessProfileId = String(safeUser.orgAccessProfileId || '').trim() || 'NO_ORG_ACCESS_PROFILE';
-  const systemAccessProfileId = String(safeUser.systemAccessProfileId || '').trim() || 'NO_SYSTEM_ACCESS_PROFILE';
-  const virtualFlag = safeUser.isVirtualSuperAdmin ? 'VSA1' : 'VSA0';
-  return [userId, activeOrgId, role, accessProfileId, orgAccessProfileId, systemAccessProfileId, virtualFlag].join('|');
-}
-
-function readDashboardAllSectionsCache(cacheKey) {
-  if (!cacheKey) return null;
-  const cached = dashboardAllSectionsCache.get(cacheKey);
-  if (!cached) return null;
-  if (cached.expiresAt <= Date.now()) {
-    dashboardAllSectionsCache.delete(cacheKey);
-    return null;
-  }
-  return Array.isArray(cached.rows) ? cached.rows.slice() : [];
-}
-
-function writeDashboardAllSectionsCache(cacheKey, rows) {
-  if (!cacheKey) return;
-  dashboardAllSectionsCache.set(cacheKey, {
-    rows: Array.isArray(rows) ? rows.slice() : [],
-    expiresAt: Date.now() + DASHBOARD_ALL_SECTIONS_CACHE_TTL_MS
-  });
-}
-
 async function getAllAccessibleOperationalSectionsMapped(user) {
   const cacheKey = buildDashboardAllSectionsCacheKey(user);
   const cachedRows = readDashboardAllSectionsCache(cacheKey);
   if (cachedRows) return cachedRows;
 
   const [allSections, contextSymbols] = await Promise.all([
-    dataService.fetchData('sections', {}, user),
+    sectionsOperationsCatalogCacheService.getSectionsForUser(user),
     dataService.getContextSymbols(user)
   ]);
 
@@ -321,7 +293,7 @@ async function showDashboard(req, res) {
   try {
     // 1. Fetch Data
     const [allSections, contextSymbols, sectionCategories, firstRunBootstrap] = await Promise.all([
-        dataService.fetchData('sections', {}, req.user),
+        sectionsOperationsCatalogCacheService.getSectionsForUser(req.user),
         // ✅ USE NEW DEDICATED FUNCTION
         dataService.getContextSymbols(req.user),
         dataService.getSectionCategories(),
@@ -418,7 +390,7 @@ async function showDashboard(req, res) {
 async function getQuickMenu(req, res) {
   try {
     const [allSections, contextSymbols] = await Promise.all([
-        dataService.fetchData('sections', {}, req.user),
+        sectionsOperationsCatalogCacheService.getSectionsForUser(req.user),
         // ✅ USE NEW DEDICATED FUNCTION
         dataService.getContextSymbols(req.user) 
     ]);
@@ -605,7 +577,7 @@ function buildStartMenuTreeNodes(accessibleSections) {
 async function getStartMenu(req, res) {
   try {
     const [allSections, contextSymbols] = await Promise.all([
-      dataService.fetchData('sections', {}, req.user),
+      sectionsOperationsCatalogCacheService.getSectionsForUser(req.user),
       dataService.getContextSymbols(req.user)
     ]);
 
@@ -787,7 +759,7 @@ async function showSectionNav(req, res) {
     const rawKey = rawParam != null ? decodeURIComponent(String(rawParam)) : '';
 
     const [allSections, contextSymbols] = await Promise.all([
-      dataService.fetchData('sections', {}, req.user),
+      sectionsOperationsCatalogCacheService.getSectionsForUser(req.user),
       dataService.getContextSymbols(req.user)
     ]);
 
@@ -859,7 +831,7 @@ async function showSectionSubDashboard(req, res) {
     }
 
     const [allSections, contextSymbols] = await Promise.all([
-      dataService.fetchData('sections', {}, req.user),
+      sectionsOperationsCatalogCacheService.getSectionsForUser(req.user),
       dataService.getContextSymbols(req.user)
     ]);
 
@@ -970,7 +942,7 @@ async function getDashboardSection(homeURL, user) {
     const path = String(homeURL).trim().replace(/\/+$/, '') || '/';
     try {
         const [allSections, contextSymbols] = await Promise.all([
-            dataService.fetchData('sections', {}, user),
+            sectionsOperationsCatalogCacheService.getSectionsForUser(user),
             dataService.getContextSymbols(user)
         ]);
         const section = (allSections || []).find(s => {

@@ -89,7 +89,10 @@
   --table-stripe-bg: #ffffff; 
   
   /* --- Page layout width --- */
-  --sections-page-max-width: 1200px;
+  --app-page-width-percent: 70%;
+  --app-side-controls-gutter: 0px;
+  --app-page-max-width: min(70%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  --sections-page-max-width: var(--app-page-max-width);
   
 }
 
@@ -135,20 +138,29 @@ body.header-layout-compact main {
   width: 100%;
 }
 
+main.container {
+  width: var(--app-page-max-width);
+  max-width: var(--app-page-max-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+
 html.app-page-width-wide {
-  --sections-page-max-width: min(1640px, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  --app-page-width-percent: 80%;
   --app-side-controls-gutter: 64px;
+  --app-page-max-width: min(80%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  --sections-page-max-width: var(--app-page-max-width);
 }
 
 html.app-page-width-full {
-  --sections-page-max-width: min(100%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  --app-page-width-percent: 90%;
   --app-side-controls-gutter: 64px;
+  --app-page-max-width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
+  --sections-page-max-width: var(--app-page-max-width);
 }
 
 html.app-page-width-wide main.container,
 html.app-page-width-full main.container {
-  max-width: 100%;
-  width: 100%;
   padding-left: calc(var(--spacing-md) + var(--app-side-controls-gutter));
 }
 

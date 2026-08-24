@@ -16,7 +16,7 @@ const activeJobs = {};
  * @param {(record: any, context: any) => Promise<void>} [config.validateRecord]
  * @param {(req: any) => any} [config.buildContext]
  */
-function createImportController({ processRecord, validateRecord, buildContext }) {
+function createImportController({ processRecord, validateRecord, buildContext, onImportComplete }) {
   if (!processRecord) {
     throw new Error('processRecord is required in createImportController()');
   }
@@ -203,6 +203,13 @@ function createImportController({ processRecord, validateRecord, buildContext })
               message: 'Import Complete! Report saved.',
               downloadUrl: downloadUrl // Modal uses this to show "Download Log" button
             });
+            if (typeof onImportComplete === 'function') {
+              try {
+                await onImportComplete(context, { successCount, errorCount, total: records.length });
+              } catch (callbackError) {
+                console.error('[ImportController] onImportComplete failed:', callbackError);
+              }
+            }
           }
 
           cleanup(jobId);

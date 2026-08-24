@@ -386,6 +386,29 @@ async function listSchoolPersonRecords(reqUser, { q = '', query = {}, requireSch
     return payload?.allRows || payload?.rows || [];
 }
 
+async function getSchoolPersonRecordById(personId, reqUser) {
+    const normalizedPersonId = normalizeId(personId);
+    if (!normalizedPersonId) return null;
+    try {
+        const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
+        const dataService = requireCoreModule('MVC/services/dataService');
+        const row = await dataService.getDataById('persons', normalizedPersonId, reqUser, {
+            enrichment: { includeSchoolRoles: false }
+        });
+        if (row) {
+            return {
+                ...row,
+                id: normalizeId(row.id || row.personId || normalizedPersonId)
+            };
+        }
+    } catch (_) {}
+    const persons = await listSchoolPersonRecords(reqUser, {
+        q: normalizedPersonId,
+        query: { q: normalizedPersonId, limit: 50 }
+    }).catch(() => []);
+    return (Array.isArray(persons) ? persons : []).find((row) => idsEqual(row?.id, normalizedPersonId) || idsEqual(row?._id, normalizedPersonId)) || null;
+}
+
 function rowBelongsToActiveOrg(row = {}, activeOrgId = '') {
     const orgId = normalizeId(activeOrgId);
     if (!orgId) return true;
@@ -496,22 +519,24 @@ async function buildScheduleViewerAccess(reqUser = {}) {
     };
 }
 
-async function buildScheduleRoleOptionsForPerson({ personId, activeOrgId, reqUser }) {
+async function buildScheduleRoleOptionsForPerson({ personId, activeOrgId, reqUser, students, teachers, staffRows, persons } = {}) {
     const normalizedPersonId = normalizeId(personId);
     const roleMap = new Map();
     if (!normalizedPersonId) return [];
 
     try {
-        const [students, teachers, staffRows] = await Promise.all([
-            schoolDataService.fetchAllData('students', {}, reqUser),
-            schoolDataService.fetchAllData('teachers', {}, reqUser),
-            schoolDataService.fetchAllData('staff', {}, reqUser),
-        ]);
+        const [studentRows, teacherRows, staffList] = (students || teachers || staffRows)
+            ? [students || [], teachers || [], staffRows || []]
+            : await Promise.all([
+                schoolDataService.fetchAllData('students', {}, reqUser),
+                schoolDataService.fetchAllData('teachers', {}, reqUser),
+                schoolDataService.fetchAllData('staff', {}, reqUser),
+            ]);
 
         [
-            { key: 'student', rows: students },
-            { key: 'teacher', rows: teachers },
-            { key: 'staff', rows: staffRows },
+            { key: 'student', rows: studentRows },
+            { key: 'teacher', rows: teacherRows },
+            { key: 'staff', rows: staffList },
         ].forEach(({ key, rows }) => {
             const hasLinkedRow = (Array.isArray(rows) ? rows : []).some((row) => (
                 idsEqual(row?.personId, normalizedPersonId)
@@ -525,8 +550,11 @@ async function buildScheduleRoleOptionsForPerson({ personId, activeOrgId, reqUse
     }
 
     try {
-        const persons = await listSchoolPersonRecords(reqUser, { query: { limit: 1000 } });
-        const person = (Array.isArray(persons) ? persons : []).find((row) => idsEqual(row?.id, normalizedPersonId) || idsEqual(row?._id, normalizedPersonId)) || null;
+        const personList = Array.isArray(persons)
+            ? persons
+            : await listSchoolPersonRecords(reqUser, { query: { limit: 1000 } });
+        const person = (Array.isArray(personList) ? personList : []).find((row) => idsEqual(row?.id, normalizedPersonId) || idsEqual(row?._id, normalizedPersonId))
+            || await getSchoolPersonRecordById(normalizedPersonId, reqUser);
         const orgRoles = person ? extractPersonRolesInOrg(person, activeOrgId) : [];
         (Array.isArray(orgRoles) ? orgRoles : []).forEach((roleToken) => {
             const role = normalizeScheduleRole(roleToken);
@@ -1324,17 +1352,11 @@ function summarizeTimesheetHoursForEvents(events, statusMap) {
 }
 
 async function getPersonById(personId, reqUser) {
-    const targetPersonId = normalizeId(personId);
-    if (!targetPersonId) return null;
-    const persons = await listSchoolPersonRecords(reqUser, {
-        q: targetPersonId,
-        query: { q: targetPersonId, limit: 1000 }
-    });
-    return (persons || []).find((row) => idsEqual(row?.id, targetPersonId)) || null;
+    return getSchoolPersonRecordById(personId, reqUser);
 }
 
 async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqUser, activeOrgId, statusMap = null, accessContext = {} }) {
-    const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents, allPersons, allEnrollmentPeriods] = await Promise.all([
+    const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents, allEnrollmentPeriods] = await Promise.all([
         schoolDataService.getStudentIndex(),
         schoolDataService.getTeacherIndex(),
         schoolDataService.fetchAllData('classes', {}, reqUser, accessContext),
@@ -1342,7 +1364,6 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
         schoolRepositories.reportTemplates.list({ query: {}, scope: { canViewAll: true } }),
         schoolDataService.fetchAllData('teachers', {}, reqUser, accessContext),
         schoolDataService.fetchAllData('students', {}, reqUser, accessContext),
-        listSchoolPersonRecords(reqUser, { query: { limit: 1000 } }).catch(() => []),
         activeOrgId
             ? schoolDataService.getClassEnrollmentPeriodsByOrg(activeOrgId, reqUser, accessContext).catch(() => [])
             : schoolDataService.fetchAllData('classEnrollmentPeriods', {}, reqUser, accessContext).catch(() => [])
@@ -1364,9 +1385,7 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
             .filter(([id]) => Boolean(id))
     );
 
-    const person = (Array.isArray(allPersons) ? allPersons : [])
-        .find((row) => idsEqual(row?.id, normalizedPersonId) || idsEqual(row?._id, normalizedPersonId))
-        || await getPersonById(normalizedPersonId, reqUser);
+    const person = await getSchoolPersonRecordById(normalizedPersonId, reqUser);
     const personName = buildPersonDisplayName(person, normalizedPersonId);
     const personOrgRoles = extractPersonRolesInOrg(person, activeOrgId);
     const instructorRoleLabel =
@@ -1487,13 +1506,13 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
     const schedulePersonNameById = await buildSchedulePersonNameById({
         reqUser,
         students: allStudents,
-        persons: allPersons,
+        persons: [person].filter(Boolean),
         enrollmentPeriods: allEnrollmentPeriods,
         classes: allClasses
     });
     const resolveSoloStudentForSession = buildSoloStudentResolver({
         students: allStudents,
-        persons: allPersons,
+        persons: [person].filter(Boolean),
         enrollmentPeriods: allEnrollmentPeriods,
         classes: [...classMap.values()],
         activeOrgId,
@@ -1643,7 +1662,7 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
     sortEventsChronologically(events);
     markOverlappingEvents(events);
 
-    return { events, personName, personOrgRoles };
+    return { events, personName, personOrgRoles, allStudents, allTeachers, person };
 }
 
 async function showMySchedulePage(req, res) {
@@ -1843,7 +1862,14 @@ async function getPersonSchedule(req, res) {
         });
 
         const availableRoles = viewerScheduleAccess.canSelectAnyPerson
-            ? await buildScheduleRoleOptionsForPerson({ personId: effectivePersonId, activeOrgId, reqUser: req.user })
+            ? await buildScheduleRoleOptionsForPerson({
+                personId: effectivePersonId,
+                activeOrgId,
+                reqUser: req.user,
+                students: personResult?.allStudents,
+                teachers: personResult?.allTeachers,
+                persons: personResult?.person ? [personResult.person] : []
+            })
             : (Array.isArray(viewerScheduleAccess.availableRoles) ? viewerScheduleAccess.availableRoles : []);
 
         const events = filterEventsWithCasesIfRequested(filterScheduleEventsForRole(personResult?.events, effectiveRole), req.query).map((event) => {

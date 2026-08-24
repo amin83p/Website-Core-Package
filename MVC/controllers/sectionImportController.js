@@ -66,6 +66,10 @@ const sectionsImportController = createImportController({
   downloadRouteBase: '/sections/import/report',
   processRecord: processSectionRecord,
   buildContext,
+  onImportComplete: async () => {
+    const { invalidateSectionsCatalog } = require('../services/cache/sectionsOperationsCatalogCacheService');
+    invalidateSectionsCatalog();
+  }
 });
 
 module.exports = sectionsImportController;

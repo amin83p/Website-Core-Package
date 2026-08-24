@@ -1,5 +1,6 @@
 // MVC/controllers/sectionController.js
 const dataService = require('../services/dataService');
+const { invalidateSectionsCatalog } = require('../services/cache/sectionsOperationsCatalogCacheService');
 const { buildDataServiceQuery, inferSearchableFields, isAjax } = require('../utils/generalTools');
 const settingService = require('../services/settingService');
 const dashboardController = require('./dashboardController');
@@ -176,6 +177,7 @@ async function addSection(req, res) {
     await validateOperationsExistence(section.operations, req.user);
 
     const results = await dataService.addData('sections',section, req.user);
+    invalidateSectionsCatalog();
 
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success',results, message: 'Section saved successfully.' });
@@ -243,6 +245,7 @@ async function editSection(req, res) {
     await validateOperationsExistence(updates.operations, req.user);
 
     const results = await dataService.updateData('sections',req.params.id, updates, req.user);
+    invalidateSectionsCatalog();
 
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', message: 'Section saved successfully.', results });
@@ -296,6 +299,7 @@ async function getSectionTemplate(req, res) {
 async function deleteSection(req, res) {
   try {
     const results = await dataService.deleteData('sections',req.params.id, req.user);
+    invalidateSectionsCatalog();
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', message: 'Section deleted successfully.', results });
     } 

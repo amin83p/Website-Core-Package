@@ -143,3 +143,78 @@ test('updateSessionCurrentPath still writes when invoked explicitly', async () =
     dataService.updateData = originalUpdateData;
   }
 });
+
+const sessionRecordCacheService = require('../MVC/services/cache/sessionRecordCacheService');
+
+test('loadSessionRecord returns cached session without database read', async () => {
+  const sessionId = 'CACHE_HIT_SESSION';
+  const sessionRow = {
+    id: sessionId,
+    lastActivityAt: new Date().toISOString(),
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: new Date(Date.now() + 3600000).toISOString()
+  };
+
+  sessionRecordCacheService.clearSessionRecordCache();
+  sessionRecordCacheService.set(sessionId, sessionRow);
+
+  const originalGetDataById = dataService.getDataById;
+  let getDataByIdCalls = 0;
+  dataService.getDataById = async (...args) => {
+    getDataByIdCalls += 1;
+    return originalGetDataById(...args);
+  };
+
+  try {
+    const loaded = await sessionEnforcement.loadSessionRecord(sessionId);
+    assert.equal(getDataByIdCalls, 0);
+    assert.equal(loaded?.id, sessionId);
+  } finally {
+    dataService.getDataById = originalGetDataById;
+    sessionRecordCacheService.clearSessionRecordCache();
+  }
+});
+
+test('loadSessionRecord tombstone rejects without database read', async () => {
+  const sessionId = 'REVOKED_SESSION';
+  sessionRecordCacheService.clearSessionRecordCache();
+  sessionRecordCacheService.markRevoked(sessionId);
+
+  const originalGetDataById = dataService.getDataById;
+  let getDataByIdCalls = 0;
+  dataService.getDataById = async (...args) => {
+    getDataByIdCalls += 1;
+    return originalGetDataById(...args);
+  };
+
+  try {
+    const loaded = await sessionEnforcement.loadSessionRecord(sessionId);
+    assert.equal(loaded, null);
+    assert.equal(getDataByIdCalls, 0);
+  } finally {
+    dataService.getDataById = originalGetDataById;
+    sessionRecordCacheService.clearSessionRecordCache();
+  }
+});
+
+test('sessionRecordCacheService evaluates idle and absolute expiry', () => {
+  const now = new Date('2026-08-23T12:00:00.000Z');
+
+  assert.equal(sessionRecordCacheService.isSessionExpired({
+    lastActivityAt: '2026-08-23T11:50:00.000Z',
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: '2026-08-24T12:00:00.000Z'
+  }, now), false);
+
+  assert.equal(sessionRecordCacheService.isSessionExpired({
+    lastActivityAt: '2026-08-23T10:00:00.000Z',
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: '2026-08-24T12:00:00.000Z'
+  }, now), true);
+
+  assert.equal(sessionRecordCacheService.isSessionExpired({
+    lastActivityAt: '2026-08-23T11:50:00.000Z',
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: '2026-08-23T11:00:00.000Z'
+  }, now), true);
+});

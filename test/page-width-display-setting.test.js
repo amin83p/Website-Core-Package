@@ -9,12 +9,15 @@ function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
 }
 
-test('main.css defines page width CSS variable and html modifier classes', () => {
+test('main.css defines percentage-based page width modes', () => {
   const source = read('public/styles/main.css');
-  assert.match(source, /--sections-page-max-width:\s*1200px/);
+  assert.match(source, /--app-page-max-width:\s*min\(70%/);
   assert.match(source, /\.sections-page\s*\{[^}]*max-width:\s*var\(--sections-page-max-width\)/s);
+  assert.match(source, /main\.container\s*\{[^}]*max-width:\s*var\(--app-page-max-width\)/s);
   assert.match(source, /html\.app-page-width-wide/);
   assert.match(source, /html\.app-page-width-full/);
+  assert.match(source, /--app-page-max-width:\s*min\(80%/);
+  assert.match(source, /--app-page-max-width:\s*min\(90%/);
   assert.match(source, /html\.app-page-width-wide main\.container/);
 });
 
@@ -52,7 +55,7 @@ test('wide page width mode uses the same left gutter as full mode', () => {
   const source = read('public/styles/main.css');
   assert.match(source, /html\.app-page-width-wide[\s\S]*--app-side-controls-gutter:\s*64px/s);
   assert.match(source, /html\.app-page-width-wide main\.container[\s\S]*padding-left/s);
-  assert.match(source, /html\.app-page-width-wide[\s\S]*calc\(100vw - 32px - var\(--app-side-controls-gutter\)\)/s);
+  assert.match(source, /html\.app-page-width-wide[\s\S]*min\(80%, calc\(100vw - 32px - var\(--app-side-controls-gutter\)\)\)/s);
 });
 
 test('academic ledger pages inherit global sections-page width', () => {

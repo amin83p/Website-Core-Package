@@ -4,6 +4,7 @@ const effectiveAccessResolverService = require('./security/effectiveAccessResolv
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
 const { invalidateAuthContextForSession } = require('./cache/authContextCacheService');
+const sessionRecordCacheService = require('./cache/sessionRecordCacheService');
 
 /**
  * =============================================================================
@@ -95,6 +96,7 @@ async function cleanupExpiredSessions(userId) {
         if (!isExpired && (now - lastActive) > idleLimitMs) isExpired = true;
 
         if (isExpired) {
+            sessionRecordCacheService.markRevoked(session.id);
             deletePromises.push(dataService.deleteData('sessions', session.id, SYSTEM_CONTEXT));
         }
     }
@@ -131,13 +133,20 @@ async function createSession(user, orgId, deviceInfo, tokenSignature) {
         }]
     };
 
-    return await dataService.addData('sessions', newSession, SYSTEM_CONTEXT);
+    const created = await dataService.addData('sessions', newSession, SYSTEM_CONTEXT);
+    sessionRecordCacheService.set(tokenSignature, newSession);
+    return created;
 }
 
 async function touchSession(sessionId) {
+    const now = new Date().toISOString();
     await dataService.updateData('sessions', sessionId, {
-        lastActivityAt: new Date().toISOString()
+        lastActivityAt: now
     }, SYSTEM_CONTEXT);
+    const cached = sessionRecordCacheService.get(sessionId);
+    if (cached && !cached.revoked) {
+        sessionRecordCacheService.set(sessionId, { ...cached, lastActivityAt: now });
+    }
 }
 
 /**
@@ -209,6 +218,14 @@ async function validateOrgSwitch(user, currentSessionId, targetOrgId) {
         orgHistory: history
     }, SYSTEM_CONTEXT);
 
+    const updatedSession = {
+        ...currentSession,
+        currentOrgId: targetOrgId,
+        idleTimeoutMinutes: Number(limits.idleTimeoutMins),
+        orgHistory: history
+    };
+    sessionRecordCacheService.set(currentSessionId, updatedSession);
+
     return { allowed: true };
 }
 
@@ -223,6 +240,7 @@ async function terminateSession(sessionId) {
       }
     }
     const result = await dataService.deleteData('sessions', normalizedSessionId, SYSTEM_CONTEXT);
+    sessionRecordCacheService.markRevoked(normalizedSessionId);
     if (session?.userId) {
       invalidateAuthContextForSession(session.userId, normalizedSessionId);
     }

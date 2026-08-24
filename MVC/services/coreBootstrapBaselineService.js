@@ -642,6 +642,21 @@ async function apply(options = {}) {
 
   firstRunBootstrapService.clearBootstrapStateCache();
 
+  if (!dryRun) {
+    const touchedCatalog = entityReports.some((row) => (
+      (row?.entityType === 'sections' || row?.entityType === 'operations') &&
+      Number(row?.created || 0) > 0
+    ));
+    if (touchedCatalog) {
+      try {
+        const { invalidateAllCatalogs } = require('./cache/sectionsOperationsCatalogCacheService');
+        invalidateAllCatalogs();
+      } catch (_) {
+        // ignore
+      }
+    }
+  }
+
   const durationMs = Date.now() - startTime;
   const status = failedTotal > 0 ? 'partial_success' : 'success';
 

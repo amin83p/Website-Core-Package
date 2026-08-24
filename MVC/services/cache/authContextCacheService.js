@@ -81,6 +81,12 @@ function clearAllRequestCaches() {
     // ignore
   }
   try {
+    const sectionsOperationsCatalogCacheService = require('./sectionsOperationsCatalogCacheService');
+    sectionsOperationsCatalogCacheService.clearSectionsOperationsCatalogCache();
+  } catch (_) {
+    // ignore
+  }
+  try {
     const accessUiService = require('../security/accessUiService');
     if (accessUiService && typeof accessUiService.clearUiAccessCache === 'function') {
       accessUiService.clearUiAccessCache();

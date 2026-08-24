@@ -1,5 +1,6 @@
 // MVC/controllers/operationController.js
 const dataService = require('../services/dataService');
+const { invalidateOperationsCatalog } = require('../services/cache/sectionsOperationsCatalogCacheService');
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const OPERATION_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'name', 'active', 'system', 'trackState', 'keepActive'],
@@ -103,6 +104,7 @@ async function addOperation(req, res) {
     const operation = buildOperationFromBody(req.body, reqUserId);
 
     const result = await dataService.addData('operations', operation, req.user);
+    invalidateOperationsCatalog();
     
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', result, message: 'Operation saved successfully.' });
@@ -146,6 +148,7 @@ async function editOperation(req, res) {
     const updates = buildOperationFromBody(req.body, reqUserId, existing);
 
     const result = await dataService.updateData('operations', req.params.id, updates, req.user);
+    invalidateOperationsCatalog();
     
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', result, message: 'Operation saved successfully.' });
@@ -163,6 +166,7 @@ async function editOperation(req, res) {
 async function deleteOperation(req, res) {
   try {
     const result = await dataService.deleteData('operations',req.params.id);
+    invalidateOperationsCatalog();
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', result, message: 'Operation deleted successfully.' });
     }

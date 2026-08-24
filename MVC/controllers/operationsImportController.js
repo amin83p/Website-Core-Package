@@ -37,7 +37,11 @@ const operationsImportController = createImportController({
     await dataService.addData('operations', operationItem, { id: userId });
   },
   
-  downloadRouteBase: '/operations/import/report'
+  downloadRouteBase: '/operations/import/report',
+  onImportComplete: async () => {
+    const { invalidateOperationsCatalog } = require('../services/cache/sectionsOperationsCatalogCacheService');
+    invalidateOperationsCatalog();
+  }
 });
 
 module.exports = operationsImportController;
