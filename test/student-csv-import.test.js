@@ -30,7 +30,42 @@ test('studentImportController uses preview and process endpoints and admission s
   assert.match(source, /admitNewPersonAndStudentFromRecord/);
   assert.match(source, /validateImportRecord/);
   assert.match(source, /buildContext/);
+  assert.match(source, /programRegistrationApplyService/);
+  assert.match(source, /parseProgramRegistrationSelectionRows/);
+  assert.match(source, /canCreateOrgScopedItem.*program registrations/);
   assert.doesNotMatch(source, /personMode.*existing/);
+});
+
+test('student import modal includes programs step and continue flow', () => {
+  const modal = read('packages/school/MVC/views/school/student/modal_StudentImport.ejs');
+  assert.match(modal, /id="studentImportProgramsContent"/);
+  assert.match(modal, /id="studentImportContinueBtn"/);
+  assert.match(modal, /id="studentImportBackBtn"/);
+  assert.match(modal, /Step 4/);
+  assert.match(modal, /programRegistrationSelections/);
+  assert.match(modal, /GenericPickerPresets\.program/);
+});
+
+test('layout includes GenericPicker when student import modal is enabled', () => {
+  const layout = read('MVC/views/layouts/layout.ejs');
+  assert.match(layout, /includeModal_StudentImport[\s\S]*modal_GenericPicker/);
+});
+
+test('validateProgramSelectionsForStudent rejects registration before enrollment', () => {
+  const { validateProgramSelectionsForStudent } = require('../packages/school/MVC/utils/programRegistrationSelectionUtils');
+  const selections = [{
+    programId: 'prog-1',
+    registrationDate: '2025-12-01',
+    externalReference: '',
+    note: ''
+  }];
+  assert.throws(
+    () => validateProgramSelectionsForStudent(selections, '2026-01-01'),
+    /on or after the Admission Date/i
+  );
+  const normalized = validateProgramSelectionsForStudent(selections, '2025-01-01');
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].programId, 'prog-1');
 });
 
 test('studentPersonAdmissionService rejects personId and applies create defaults', () => {
@@ -56,6 +91,7 @@ test('studentPersonAdmissionService rejects personId and applies create defaults
 test('student directory enables file import modal like other core list pages', () => {
   const controller = read('packages/school/MVC/controllers/school/studentController.js');
   assert.match(controller, /includeModal_StudentImport:\s*Boolean\(canCreateStudents\)/);
+  assert.match(controller, /canCreateProgramRegistrations/);
   assert.match(controller, /newUrl:\s*'school\/students'/);
   assert.match(controller, /newLabel:\s*canCreateStudents\s*\?\s*'Admit Student'/);
 
