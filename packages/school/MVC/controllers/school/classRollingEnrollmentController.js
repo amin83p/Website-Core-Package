@@ -8,7 +8,7 @@ const dataService = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const indexService = require('../../services/school/schoolIndexService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
-const settingService = requireCoreModule('MVC/services/settingService'); // أ¢إ“â€¦ Use Dynamic Service
+const settingService = requireCoreModule('MVC/services/settingService'); // Use Dynamic Service
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
@@ -38,6 +38,8 @@ const classEnrollmentSessionApplicabilityService = require('../../services/schoo
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
 const rollingEnrollmentWorkspaceService = require('../../services/school/rollingEnrollmentWorkspaceService');
 const rollingEnrollmentFunderService = require('../../services/school/rollingEnrollmentFunderService');
+const clbPlacementPriorCreditService = require('../../services/school/clbPlacementPriorCreditService');
+const studentProgramPriorSubjectController = require('./studentProgramPriorSubjectController');
 const rollingEnrollmentPeriodFilterService = require('../../services/school/rollingEnrollmentPeriodFilterService');
 const rollingEnrollmentExcelExportService = require('../../services/school/rollingEnrollmentExcelExportService');
 const rollingEnrollmentEngineService = require('../../services/school/rollingEnrollmentEngineService');
@@ -169,7 +171,7 @@ function normalizeClassRegistrationMode(value, fallback = 'term_based') {
 }
 
 /**
- * Rolling classes: final grade uses only attendance + assignments (sessionsأ¢â‚¬â„¢ gradebooks,
+ * Rolling classes: final grade uses only attendance + assignments (sessions' gradebooks,
  * quizzes, and assignments roll into the assignments bucket in the grades matrix). Midterm
  * and final exam weights are not applicable and must be zero.
  */
@@ -1567,7 +1569,7 @@ function buildRollingEnrollmentProgramChoices(classData) {
     const termCode = String(row?.termCode || '').trim();
     let label = programName || programId;
     if (programCode) label += ` (${programCode})`;
-    label += termId ? ` â€” ${termName || termCode || termId}` : ' â€” Any term';
+    label += termId ? ` — ${termName || termCode || termId}` : ' — Any term';
     out.push({
       programId,
       termId: termId || '',
@@ -1722,7 +1724,7 @@ async function resolveProgramRegistrationDateForRollingPreview(req, student, pro
 
 /**
  * Rolling enrollment: program/term come from the student's active program (and when required, term)
- * registrations that intersect the class allowedProgramTerms â€” not from a free-form program picker.
+ * registrations that intersect the class allowedProgramTerms — not from a free-form program picker.
  * Optional body.programRegistrationId disambiguates when multiple program registrations match.
  */
 async function resolveRollingEnrollmentProgramFromStudentRegistrations(req, classData, student, body = {}) {
@@ -1959,10 +1961,19 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
     programRegistrationDate
   });
 
+  const missingSubjects = extractRollingMissingPrerequisiteSubjects(preview, subjectCatalogMap);
   return {
     ...preview,
-    missingSubjects: extractRollingMissingPrerequisiteSubjects(preview, subjectCatalogMap),
-    repairProgramId: pid
+    missingSubjects,
+    repairProgramId: pid,
+    clbPlacement: clbPlacementPriorCreditService.buildClbPlacementSlice({
+      student,
+      program,
+      missingSubjects,
+      subjectCatalogMap,
+      classSubjectIds: Array.isArray(preview.subjectIds) ? preview.subjectIds : [],
+      prerequisitesSatisfied: preview.status !== 'error'
+    })
   };
 }
 
@@ -2145,6 +2156,12 @@ async function buildRollingEnrollmentPrerequisitePayload(req, classData, student
       conflicts: null,
       conflictStudentPersonId: null,
       conflictStudentLabel: null
+    },
+    clbPlacement: prereqPreview.clbPlacement || {
+      hasCurrentClb: false,
+      normalizedLevels: [],
+      matchedSubjectCount: 0,
+      canApplyPlacement: false
     }
   };
 }
@@ -2241,8 +2258,94 @@ async function buildRollingEnrollmentEligibilityPayload(req, classData, student,
       conflicts: prereqPreview.conflicts || null,
       conflictStudentPersonId: prereqPreview.conflictStudentPersonId || null,
       conflictStudentLabel: prereqPreview.conflictStudentLabel || null
+    },
+    clbPlacement: prereqPreview.clbPlacement || {
+      hasCurrentClb: false,
+      normalizedLevels: [],
+      matchedSubjectCount: 0,
+      canApplyPlacement: false
     }
   };
+}
+
+async function applyRollingClbPlacementCredits(req, res) {
+  try {
+    const classId = toPublicId(req.params?.classId || req.body?.classId || '');
+    const studentIds = parseShortcutIdArray(req.body?.studentIds);
+    const studentId = toPublicId(req.body?.studentId || studentIds[0] || '');
+    if (!classId) throw new Error('classId is required.');
+    if (!studentId) throw new Error('studentId is required.');
+
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const student = await schoolDataService.getDataById('students', studentId, req.user);
+    if (!student) throw new Error('Student not found.');
+    if (!idsEqual(student?.orgId, classData?.orgId)) {
+      throw new Error('Student organization does not match the class organization.');
+    }
+
+    await applyRollingEnrollmentResolutionFromRegistrations(req, classData, student);
+    const programId = toPublicId(req.body?.programId || '');
+    const termId = toPublicId(req.body?.termId || '');
+    const startDate = String(req.body?.startDate || req.query?.startDate || '').trim();
+    if (!programId) throw new Error('Program is required.');
+
+    const program = await schoolDataService.getDataById('programs', programId, req.user);
+    if (!program) throw new Error('Program could not be loaded for CLB placement.');
+
+    const prereqPreview = await buildRollingEnrollmentPrerequisitePreview(
+      req,
+      classData,
+      student,
+      programId,
+      termId,
+      startDate
+    );
+
+    const subjectsResult = await schoolDataService.fetchAllData('subjects', {}, req.user);
+    const subjectCatalogMap = new Map(
+      (Array.isArray(subjectsResult) ? subjectsResult : [])
+        .filter((s) => idsEqual(s?.orgId, classData?.orgId))
+        .map((s) => [toPublicId(s?.id), s])
+    );
+
+    const placement = clbPlacementPriorCreditService.suggestPlacementSubjectIds({
+      student,
+      program,
+      missingSubjectIds: (prereqPreview.missingSubjects || []).map((row) => toPublicId(row?.id)),
+      subjectCatalog: subjectCatalogMap
+    });
+
+    if (!placement.entry || !placement.normalizedLevels.length) {
+      throw new Error('Student has no valid Current CLB levels for placement.');
+    }
+    if (!placement.subjectIds.length) {
+      throw new Error('No CLB placement prior credits match missing prerequisites for this enrollment.');
+    }
+
+    req.body.studentId = studentId;
+    req.body.programId = programId;
+    req.body.subjectIds = placement.subjectIds;
+    req.body.source = 'placement';
+    req.body.evidenceNote = clbPlacementPriorCreditService.buildPlacementEvidenceNote(
+      placement.entry,
+      placement.normalizedLevels
+    );
+
+    const result = await studentProgramPriorSubjectController.createPriorCredits(req);
+    return res.json({
+      ...result,
+      placement: {
+        normalizedLevels: placement.normalizedLevels,
+        matchedSubjectIds: placement.matchedSubjectIds,
+        clbCurrent: placement.entry?.current || {},
+        recordedAt: placement.entry?.recordedAt || ''
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
 }
 
 async function previewRollingEnrollmentEligibility(req, res) {
@@ -4892,6 +4995,7 @@ module.exports = {
   buildRollingEnrollmentExportRows,
   exportRollingEnrollmentExcel,
   previewRollingEnrollmentEligibility,
+  applyRollingClbPlacementCredits,
   assertRollingProgramRegistrationShortcutContext,
   previewClassEnrollmentWithTransactions,
   createClassEnrollmentWithTransactions,

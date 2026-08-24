@@ -160,11 +160,14 @@ async function buildSessionReportViewerContext({
   classId,
   sessionRoster = [],
   reqUser,
-  isReportAdminViewer = false
+  isReportAdminViewer = false,
+  prefetchedStudents = null
 } = {}) {
   const cleanClassId = String(classId || '').trim();
   const currentUserPersonId = String(reqUser?.personId || '').trim();
-  const students = await schoolDataService.fetchAllData('students', {}, reqUser);
+  const students = Array.isArray(prefetchedStudents)
+    ? prefetchedStudents
+    : await schoolDataService.fetchAllData('students', {}, reqUser);
   const ownedStudentIds = new Set(
     (Array.isArray(students) ? students : [])
       .filter((row) => idsEqual(row?.personId, currentUserPersonId))
@@ -206,7 +209,9 @@ async function buildSessionRosterReconciliation({
   sessionId,
   sessionDate = '',
   sessionRoster = [],
-  reqUser
+  reqUser,
+  prefetchedStudents = null,
+  prefetchedClass = null
 } = {}) {
   const cleanClassId = String(classId || '').trim();
   const cleanSessionId = String(sessionId || '').trim();
@@ -218,7 +223,14 @@ async function buildSessionRosterReconciliation({
 
   const [reportAssignments, allRows] = await Promise.all([
     schoolDataService.fetchData('reportAssignments', { classId__eq: cleanClassId }, reqUser),
-    reportViewService.buildInstanceListRows({ reqUser, sessionFilter: cleanSessionId, sessionDateFilter: sessionDate })
+    reportViewService.buildInstanceListRows({
+      reqUser,
+      sessionFilter: cleanSessionId,
+      sessionDateFilter: sessionDate,
+      classIds: [cleanClassId],
+      prefetchedStudents,
+      prefetchedClass
+    })
   ]);
 
   const sessionRows = (Array.isArray(allRows) ? allRows : [])
@@ -304,7 +316,9 @@ async function buildSessionReportInstanceRows({
   sessionDate = '',
   reqUser,
   viewerContext = null,
-  sessionRoster = []
+  sessionRoster = [],
+  prefetchedStudents = null,
+  prefetchedClass = null
 } = {}) {
   const cleanClassId = String(classId || '').trim();
   const cleanSessionId = String(sessionId || '').trim();
@@ -314,10 +328,18 @@ async function buildSessionReportInstanceRows({
     classId: cleanClassId,
     sessionRoster,
     reqUser,
-    isReportAdminViewer: false
+    isReportAdminViewer: false,
+    prefetchedStudents
   });
 
-  const allRows = await reportViewService.buildInstanceListRows({ reqUser });
+  const allRows = await reportViewService.buildInstanceListRows({
+    reqUser,
+    sessionFilter: cleanSessionId,
+    sessionDateFilter: sessionDate,
+    classIds: [cleanClassId],
+    prefetchedStudents,
+    prefetchedClass
+  });
   const sessionContext = { sessionId: cleanSessionId, sessionDate };
 
   const visibleRows = (Array.isArray(allRows) ? allRows : [])

@@ -38,7 +38,7 @@ const rollingEnrollmentMutationActionState = {
   allowInactiveTokenFallback: true
 };
 
-/** Final grades: teachers (gradebook), dept admins, or class admins â€” OR access. */
+/** Final grades: teachers (gradebook), dept admins, or class admins — OR access. */
 function requireAnyOfAccess(pairs) {
   return async (req, res, next) => {
     try {
@@ -358,6 +358,13 @@ router.post('/api/:classId/rolling-prior-subject-credits/batch',
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.assertRollingProgramRegistrationShortcutContext,
   studentProgramPriorSubjectCtrl.createBatch);
+
+router.post('/api/:classId/rolling-prior-subject-credits/apply-placement',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.assertRollingProgramRegistrationShortcutContext,
+  rollingCtrl.applyRollingClbPlacementCredits);
 
 router.post('/api/enrollment-periods/preview-create',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),

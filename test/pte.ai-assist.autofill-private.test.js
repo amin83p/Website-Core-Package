@@ -403,7 +403,7 @@ test('parseAiSuggestionPayload keeps listening mcq single structured options and
         ],
         correctOptionKey: 'B',
         allowReplay: true,
-        explanation: 'Option B directly reflects the speakerâ€™s main point.'
+        explanation: 'Option B directly reflects the speaker's main point.'
       },
       scoring: {
         method: 'auto_objective',

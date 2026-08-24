@@ -65,7 +65,10 @@
           <td>
              <div class="small">
                 <span class="badge bg-light text-secondary border me-1"><%= item.configuration?.credits || 0 %> Credits</span>
-                <span class="badge bg-light text-secondary border"><%= item.configuration?.defaultHours || 0 %> Hrs</span>
+                <span class="badge bg-light text-secondary border me-1"><%= item.configuration?.defaultHours || 0 %> Hrs</span>
+                <% if (item.configuration?.clb?.level) { %>
+                <span class="badge bg-info text-dark border">CLB <%= item.configuration.clb.level %></span>
+                <% } %>
              </div>
           </td>
 

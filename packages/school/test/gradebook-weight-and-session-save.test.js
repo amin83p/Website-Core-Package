@@ -77,12 +77,26 @@ test('sessionManager saves gradebooks with weight and total points fields', () =
   assert.match(sessionManagerSource, /payload\.gradebooks = JSON\.stringify\(gradebooksState\)/);
   assert.match(sessionManagerSource, /gbModalWeight/);
   assert.match(sessionManagerSource, /gbGradePercentContribution/);
+  assert.match(sessionManagerSource, /gbFormatWeightContribution/);
   assert.match(sessionManagerSource, /Worth <strong>/);
   assert.match(sessionManagerSource, /of grade/);
   assert.match(sessionManagerSource, /periodGradebookOtherWeightTotal/);
   assert.doesNotMatch(sessionManagerSource, /gbWeightedContribution/);
   assert.match(sessionManagerSource, /gbModalAttachmentsList/);
   assert.match(sessionManagerSource, /String\(g\.id\) === String\(editId\)/);
+});
+
+test('sessionManager attendance roster includes order column and name sort', () => {
+  assert.match(sessionManagerSource, /attendance-order-cell/);
+  assert.match(sessionManagerSource, /id="attendanceSortName"/);
+  assert.match(sessionManagerSource, /sortAttendanceRosterByName/);
+  assert.match(sessionManagerSource, /refreshAttendanceOrderNumbers/);
+});
+
+test('sessionManager details modal supports removable excuse attachment chip', () => {
+  assert.match(sessionManagerSource, /renderExcuseAttachmentPreview/);
+  assert.match(sessionManagerSource, /att-excuse-chip-remove/);
+  assert.match(sessionManagerSource, /excuseAttachmentId/);
 });
 
 test('normalizeSessionGradebooksFromRequest keeps explicit weight distinct from auto default', () => {

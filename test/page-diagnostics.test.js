@@ -97,7 +97,10 @@ test('page diagnostics client keeps diagnostics local and fetches only page pres
   assert.match(source, /page-diagnostics-health-card/);
   assert.match(source, /data-page-diagnostics-health/);
   assert.match(source, /pageDiagnosticsEnabledSwitch/);
-  assert.match(source, /Diagnostics are active for this account\./);
+  assert.match(source, /pageDiagnosticsPreferenceHelp/);
+  assert.match(source, /pageDiagnosticsCopyBtn/);
+  assert.match(source, /copyDiagnosticsSnapshot/);
+  assert.match(source, /JSON\.stringify\(buildSnapshot\(\), null, 2\)/);
   assert.match(source, /JSON\.stringify\(\{ enabled \}\)/);
   assert.match(source, /global\.location\.reload\(\)/);
   assert.match(source, /global\.PageDiagnostics/);
@@ -114,6 +117,8 @@ test('page diagnostics disabled state renders side icon and inline re-enable han
   assert.match(header, /page-diagnostics-side-control--off/);
   assert.match(header, /page-diagnostics-side-control[^-]/);
   assert.match(layout, /pageDiagnosticsToggleModal/);
+  assert.match(layout, /page-diagnostics-modal-header-actions/);
+  assert.match(layout, /page-diagnostics-header-switch/);
   assert.match(layout, /Diagnostics are off for this account, so full page diagnostics scripts are not loaded\./);
   assert.match(layout, /method:\s*'POST'/);
   assert.match(layout, /JSON\.stringify\(\{ enabled \}\)/);

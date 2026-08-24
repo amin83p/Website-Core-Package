@@ -1434,6 +1434,104 @@ function rowMatchesInstanceFilters(row = {}, filters = {}) {
   return true;
 }
 
+function shouldUseScopedReportListLoad(instanceFilters = {}) {
+  return Boolean(
+    instanceFilters.sessionId
+    || (Array.isArray(instanceFilters.classIds) && instanceFilters.classIds.length)
+    || instanceFilters.assignmentId
+  );
+}
+
+async function loadReportListSourceData(reqUser, instanceFilters = {}, options = {}) {
+  const prefetchedStudents = Array.isArray(options.prefetchedStudents) ? options.prefetchedStudents : null;
+  const prefetchedClass = options.prefetchedClass && typeof options.prefetchedClass === 'object'
+    ? options.prefetchedClass
+    : null;
+  const scopedClassId = Array.isArray(instanceFilters.classIds) && instanceFilters.classIds.length
+    ? toPublicId(instanceFilters.classIds[0])
+    : '';
+  const scopedSessionId = toPublicId(instanceFilters.sessionId || '');
+
+  if (!shouldUseScopedReportListLoad(instanceFilters)) {
+    const [allInstances, allAssignments, allTemplates, classes, students, teachers] = await Promise.all([
+      listAllReportInstances(reqUser),
+      listAllReportAssignments(reqUser),
+      listAllReportTemplates(reqUser),
+      schoolDataService.fetchAllData('classes', {}, reqUser),
+      prefetchedStudents || schoolDataService.fetchAllData('students', {}, reqUser),
+      schoolDataService.fetchAllData('teachers', {}, reqUser)
+    ]);
+    return {
+      allInstances,
+      allAssignments,
+      allTemplates,
+      classes,
+      students,
+      teachers
+    };
+  }
+
+  const instanceQuery = { page: 1, limit: 10000 };
+  const assignmentQuery = { page: 1, limit: 10000 };
+  if (scopedClassId) {
+    instanceQuery.classId__eq = scopedClassId;
+    assignmentQuery.classId__eq = scopedClassId;
+  }
+  if (scopedSessionId) instanceQuery.sessionId__eq = scopedSessionId;
+
+  const classLoadPromise = prefetchedClass
+    ? Promise.resolve([prefetchedClass])
+    : (scopedClassId
+      ? schoolDataService.getDataById('classes', scopedClassId, reqUser).then((row) => (row ? [row] : []))
+      : schoolDataService.fetchAllData('classes', {}, reqUser));
+
+  const [allInstances, allAssignments, classes, students] = await Promise.all([
+    schoolDataService.fetchData('reportInstances', instanceQuery, reqUser),
+    schoolDataService.fetchData('reportAssignments', assignmentQuery, reqUser),
+    classLoadPromise,
+    prefetchedStudents || schoolDataService.fetchAllData('students', {}, reqUser)
+  ]);
+
+  const templateIdSet = new Set();
+  [...(Array.isArray(allInstances) ? allInstances : []), ...(Array.isArray(allAssignments) ? allAssignments : [])].forEach((row) => {
+    const templateId = toPublicId(row?.templateId);
+    if (templateId) templateIdSet.add(templateId);
+  });
+
+  const allTemplatesRaw = await listAllReportTemplates(reqUser);
+  const allTemplates = templateIdSet.size
+    ? (Array.isArray(allTemplatesRaw) ? allTemplatesRaw : []).filter((row) => templateIdSet.has(toPublicId(row?.id)))
+    : [];
+
+  const teacherIdSet = new Set();
+  const collectTeacherId = (value) => {
+    const id = toPublicId(value);
+    if (id) teacherIdSet.add(id);
+  };
+  [...(Array.isArray(allInstances) ? allInstances : []), ...(Array.isArray(allAssignments) ? allAssignments : [])].forEach((row) => {
+    collectTeacherId(row?.teacherId);
+    (Array.isArray(row?.teacherIds) ? row.teacherIds : []).forEach(collectTeacherId);
+  });
+
+  const allTeachersRaw = await schoolDataService.fetchAllData('teachers', {}, reqUser);
+  const allTeachers = teacherIdSet.size
+    ? (Array.isArray(allTeachersRaw) ? allTeachersRaw : []).filter((row) => {
+      const teacherId = toPublicId(row?.id);
+      const personId = toPublicId(row?.personId);
+      return teacherIdSet.has(teacherId) || teacherIdSet.has(personId);
+    })
+    : [];
+
+  return {
+    allInstances: Array.isArray(allInstances) ? allInstances : [],
+    allAssignments: Array.isArray(allAssignments) ? allAssignments : [],
+    allTemplates,
+    classes: Array.isArray(classes) ? classes : [],
+    students: Array.isArray(students) ? students : [],
+    teachers: allTeachers
+  };
+}
+
 async function buildInstanceListRows({
   reqUser,
   assignmentFilter = '',
@@ -1449,8 +1547,10 @@ async function buildInstanceListRows({
   dueDateStart = '',
   dueDateEnd = '',
   status = '',
-  q = ''
-}) {
+  q = '',
+  prefetchedStudents = null,
+  prefetchedClass = null
+} = {}) {
   const instanceFilters = buildInstanceScheduleFilters({
     assignmentFilter,
     assignmentRowFilter,
@@ -1466,14 +1566,16 @@ async function buildInstanceListRows({
     dueDateEnd,
     status
   });
-  const [allInstances, allAssignments, allTemplates, classes, students, teachers] = await Promise.all([
-    listAllReportInstances(reqUser),
-    listAllReportAssignments(reqUser),
-    listAllReportTemplates(reqUser),
-    schoolDataService.fetchAllData('classes', {}, reqUser),
-    schoolDataService.fetchAllData('students', {}, reqUser),
-    schoolDataService.fetchAllData('teachers', {}, reqUser)
-  ]);
+  const loaded = await loadReportListSourceData(reqUser, instanceFilters, {
+    prefetchedStudents,
+    prefetchedClass
+  });
+  const allInstances = loaded.allInstances;
+  const allAssignments = loaded.allAssignments;
+  const allTemplates = loaded.allTemplates;
+  const classes = loaded.classes;
+  const students = loaded.students;
+  const teachers = loaded.teachers;
   const participantTokens = [];
   filterRecordsByOrg(allInstances, reqUser).forEach((row) => {
     const teacherId = toPublicId(row?.teacherId);
@@ -2041,6 +2143,7 @@ module.exports = {
   buildAssignmentFormContext,
   buildInstanceListRows,
   buildInstanceScheduleFilters,
+  loadReportListSourceData,
   rowMatchesInstanceFilters,
   resolveInstanceReportDueDate,
   buildReportReviewNavigator,

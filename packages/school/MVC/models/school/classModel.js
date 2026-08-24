@@ -432,7 +432,7 @@ async function clearEnrollmentsByOrg(orgId, options = {}) {
 }
 
 /**
- * Deletes classes_storage/<classId>/ for each id (ENOENT ignored). Does not use fileQueue â€” safe to call from mongo cleanup.
+ * Deletes classes_storage/<classId>/ for each id (ENOENT ignored). Does not use fileQueue — safe to call from mongo cleanup.
  */
 async function removePhysicalClassStorageByClassIds(classIds) {
   const ids = (Array.isArray(classIds) ? classIds : [])

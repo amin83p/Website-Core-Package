@@ -20,6 +20,7 @@ const {
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const schoolFileService = require('../../services/school/schoolFileService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
+const subjectModel = require('../../models/school/subjectModel');
 
 // Helpers
 function parseData(input) {
@@ -40,16 +41,18 @@ function buildSubjectFromBody(body, reqUserId, activeOrgId) {
   const attachments = parseData(body.attachments) || [];
   const feeRules = parseData(body.feeRules) || [];
   const defaultScoreRules = parseData(body.defaultScoreRules) || {};
+  const code = (body.code || '').trim();
+  const title = (body.title || '').trim();
 
   return {
     orgId: String(activeOrgId || '').trim(),
-    code: (body.code || '').trim(),
-    title: (body.title || '').trim(),
+    code,
+    title,
     status: (body.status || 'draft'),
     description: (body.description || '').trim(),
     
     academicUnit,
-    configuration,
+    configuration: subjectModel.normalizeConfiguration(configuration, { code, title }),
     prerequisites,
     attachments,
     feeRules,

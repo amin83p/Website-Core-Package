@@ -27,13 +27,11 @@ test('main.css defines pixel-based wide and full modes for sections pages', () =
   assert.match(source, /html\.app-page-width-full main\.container[\s\S]*min\(90%/s);
 });
 
-test('main.css scopes percentage widths to Master Schedule Viewer only', () => {
+test('main.css does not scope special percentage widths to Master Schedule Viewer', () => {
   const source = read('public/styles/main.css');
-  assert.match(source, /\.master-schedule-viewer-page/);
-  assert.match(source, /--master-schedule-viewer-max-width:\s*min\(70%/);
-  assert.match(source, /html\.app-page-width-wide \.master-schedule-viewer-page[\s\S]*min\(80%/s);
-  assert.match(source, /html\.app-page-width-full \.master-schedule-viewer-page[\s\S]*min\(90%/s);
-  assert.match(source, /main\.container:has\(\.master-schedule-viewer-page\)/);
+  assert.doesNotMatch(source, /\.master-schedule-viewer-page/);
+  assert.doesNotMatch(source, /--master-schedule-viewer-max-width/);
+  assert.doesNotMatch(source, /main\.container:has\(\.master-schedule-viewer-page\)/);
 });
 
 test('layout.ejs early-applies stored page width class', () => {
@@ -73,9 +71,10 @@ test('wide page width mode uses the same left gutter as full mode', () => {
   assert.match(source, /html\.app-page-width-wide[\s\S]*min\(1640px/s);
 });
 
-test('Master Schedule Viewer marks its sections-page wrapper', () => {
+test('Master Schedule Viewer uses standard sections-page wrapper', () => {
   const source = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(source, /sectionsPageClass:\s*'master-schedule-viewer-page'/);
+  assert.match(source, /include\('partials\/tablePages-start'/);
+  assert.doesNotMatch(source, /sectionsPageClass:\s*'master-schedule-viewer-page'/);
 });
 
 test('academic ledger pages inherit global sections-page width', () => {

@@ -223,17 +223,21 @@ async function buildSuggestionsForSession({
   };
 }
 
-async function loadSessionOutlineContext(reqUser, { classId, sessionId, roster = [], skillIds = null }) {
+async function loadSessionOutlineContext(reqUser, { classId, sessionId, roster = [], skillIds = null, prefetchedSessions = null } = {}) {
   const orgId = String(reqUser?.activeOrgId || reqUser?.organizationId || reqUser?.orgId || '').trim();
   if (!orgId) return null;
 
   await teachingOutlineCatalogService.ensureOrgTeachingOutlineDefaults(orgId, reqUser?.id || 'SYSTEM');
 
+  const sessionsPromise = Array.isArray(prefetchedSessions)
+    ? Promise.resolve(prefetchedSessions)
+    : schoolDataService.getClassSessions(classId, reqUser);
+
   const [levels, templates, items, sessions] = await Promise.all([
     schoolDataService.fetchAllData('teachingOutlineLevels', {}, reqUser),
     schoolDataService.fetchAllData('teachingOutlineSectionTemplates', {}, reqUser),
     schoolDataService.fetchAllData('teachingOutlineItems', {}, reqUser),
-    schoolDataService.getClassSessions(classId, reqUser)
+    sessionsPromise
   ]);
 
   const orgLevels = teachingOutlineCatalogService.listActiveLevels(

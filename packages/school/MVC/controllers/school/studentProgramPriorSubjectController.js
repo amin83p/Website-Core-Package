@@ -51,7 +51,7 @@ function subjectLabelMapFromList(subjectRows) {
   (Array.isArray(subjectRows) ? subjectRows : []).forEach((s) => {
     const id = toPublicId(s?.id);
     if (!id) return;
-    m.set(id, [s.code, s.name].filter(Boolean).join(' â€” ') || id);
+    m.set(id, [s.code, s.name].filter(Boolean).join(' — ') || id);
   });
   return m;
 }
@@ -117,11 +117,11 @@ async function buildEnrichedPriorRowsForOrg(reqUser, activeOrgId) {
       if (stu) {
         const person = personById.get(toPublicId(stu.personId));
         const name = buildPersonName(person);
-        studentLabel = [name || stu.localId || sid, sid].filter(Boolean).join(' â€” ');
+        studentLabel = [name || stu.localId || sid, sid].filter(Boolean).join(' — ');
       }
       const prog = programById.get(pid);
       const programLabel = prog
-        ? [prog.code, prog.name].filter(Boolean).join(' â€” ') || pid
+        ? [prog.code, prog.name].filter(Boolean).join(' — ') || pid
         : pid;
       const subjectLabel = subjectLabelById.get(subId) || subId;
       return {
@@ -224,7 +224,7 @@ exports.listStudentRegisteredPrograms = async (req, res) => {
       if (p && idsEqual(p.orgId, activeOrgId)) {
         programs.push({
           id: toPublicId(p.id),
-          label: [p.code, p.name].filter(Boolean).join(' â€” ') || p.id
+          label: [p.code, p.name].filter(Boolean).join(' — ') || p.id
         });
       }
     }
@@ -383,6 +383,8 @@ exports.createBatch = async (req, res) => {
   }
 };
 
+exports.createPriorCredits = createPriorCredits;
+
 exports.createFromForm = async (req, res) => {
   try {
     const result = await createPriorCredits(req);
@@ -451,7 +453,7 @@ async function deletePriorRecordCore(req, res, rawId) {
   } catch (snapErr) {
     const msg = `Deleted, but snapshot rebuild failed: ${String(snapErr?.message || snapErr)}`;
     if (isAjax(req)) {
-      // GET /delete/:id is used by main.js â€” it only removes the row when status === 'success'.
+      // GET /delete/:id is used by main.js — it only removes the row when status === 'success'.
       if (req.method === 'GET') {
         return res.json({ status: 'success', message: 'Prior credit removed.', warning: msg });
       }
@@ -463,7 +465,7 @@ async function deletePriorRecordCore(req, res, rawId) {
   return res.redirect('/school/programs/prior-subject-credits');
 }
 
-/** GET â€¦/prior-subject-credits/delete/:id â€” used by main.js global delete (table row removal). */
+/** GET …/prior-subject-credits/delete/:id — used by main.js global delete (table row removal). */
 exports.deleteRecordByIdParam = async (req, res) => {
   try {
     return await deletePriorRecordCore(req, res, req.params.id);

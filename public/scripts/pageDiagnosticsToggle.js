@@ -79,17 +79,17 @@
             <h5 class="modal-title fw-bold text-dark mb-0">
               <i class="bi bi-speedometer2 me-2"></i>Page Diagnostics
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="page-diagnostics-modal-header-actions ms-auto">
+              <div class="form-check form-switch mb-0 page-diagnostics-header-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="pageDiagnosticsToggleSwitch" data-no-wait="true" aria-label="Page diagnostics on or off">
+                <label class="form-check-label small fw-semibold" for="pageDiagnosticsToggleSwitch">On</label>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
           </div>
           <div class="modal-body">
-            <div class="page-diagnostics-preference-panel">
-              <div class="form-check form-switch mb-1">
-                <input class="form-check-input" type="checkbox" role="switch" id="pageDiagnosticsToggleSwitch" data-no-wait="true">
-                <label class="form-check-label fw-semibold" for="pageDiagnosticsToggleSwitch">Page Diagnostics</label>
-              </div>
-              <div class="small text-muted">Diagnostics are off for this account, so full page diagnostics scripts are not loaded.</div>
-              <div class="alert alert-danger d-none mt-3 mb-0" id="pageDiagnosticsToggleError"></div>
-            </div>
+            <div class="small text-muted">Diagnostics are off for this account, so full page diagnostics scripts are not loaded.</div>
+            <div class="alert alert-danger d-none mt-3 mb-0" id="pageDiagnosticsToggleError"></div>
           </div>
         </div>
       </div>

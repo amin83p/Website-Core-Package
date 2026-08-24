@@ -1099,7 +1099,16 @@ const schoolRepositories = {
     update: subjectModel.updateSubject,
     remove: subjectModel.deleteSubject,
     defaultSearchFields: ['id', 'name', 'code', 'description'],
-    assignmentScopeKind: 'catalog'
+    assignmentScopeKind: 'catalog',
+    replaceObjectFields: ['configuration'],
+    normalizePayload: (data, id) => {
+      const payload = { ...(data || {}) };
+      payload.configuration = subjectModel.normalizeConfiguration(
+        payload.configuration || {},
+        { code: payload.code, title: payload.title }
+      );
+      return payload;
+    }
   }),
   classes: createSchoolRepository({
     entityName: 'classes',

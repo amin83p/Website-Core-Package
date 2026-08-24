@@ -8,7 +8,7 @@ const dataService = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const indexService = require('../../services/school/schoolIndexService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
-const settingService = requireCoreModule('MVC/services/settingService'); // أ¢إ“â€¦ Use Dynamic Service
+const settingService = requireCoreModule('MVC/services/settingService'); // Use Dynamic Service
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
@@ -290,7 +290,7 @@ function normalizeClassRegistrationMode(value, fallback = 'term_based') {
 }
 
 /**
- * Rolling classes: final grade uses only attendance + assignments (sessionsأ¢â‚¬â„¢ gradebooks,
+ * Rolling classes: final grade uses only attendance + assignments (sessions' gradebooks,
  * quizzes, and assignments roll into the assignments bucket in the grades matrix). Midterm
  * and final exam weights are not applicable and must be zero.
  */
@@ -1208,6 +1208,20 @@ function normalizeSessionContentOrder(raw = []) {
         .filter(Boolean)));
 }
 
+async function cleanupRemovedExcuseAttachments(existingRoster, incomingRoster) {
+    const existing = Array.isArray(existingRoster) ? existingRoster : [];
+    const incoming = Array.isArray(incomingRoster) ? incomingRoster : [];
+    for (const incRec of incoming) {
+        const incomingPersonId = cleanPersonId(incRec?.personId);
+        const existRec = existing.find((row) => idsEqual(row.personId, incomingPersonId)) || {};
+        const hadAttachment = existRec.excuseAttachment && typeof existRec.excuseAttachment === 'object';
+        const incomingClears = incRec.excuseAttachment !== undefined && !incRec.excuseAttachment;
+        if (hadAttachment && incomingClears) {
+            await schoolFileService.deleteAttachmentFile(existRec.excuseAttachment).catch(() => {});
+        }
+    }
+}
+
 function sortSessionContentItemsByOrder(items = [], order = []) {
     const orderMap = new Map((Array.isArray(order) ? order : []).map((id, index) => [String(id || '').trim(), index]));
     return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
@@ -1220,7 +1234,14 @@ function sortSessionContentItemsByOrder(items = [], order = []) {
     });
 }
 
-async function resolveSessionRosterPersonIds({ classData, session, reqUser, students = [] } = {}) {
+async function resolveSessionRosterPersonIds({
+    classData,
+    session,
+    reqUser,
+    students = [],
+    prefetchedSessions = null,
+    prefetchedPeriodRows = null
+} = {}) {
     const activeOrgId = String(reqUser?.activeOrgId || classData?.orgId || '').trim();
     const sessionDate = normalizeDateOnlyValue(session?.date);
     const rosterStatuses = getClassRegistrationModeKey(classData) === 'rolling'
@@ -1234,10 +1255,12 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
     );
 
     if (getClassRegistrationModeKey(classData) === 'rolling') {
-        const [periodRows, allSessions] = await Promise.all([
-            schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser),
-            schoolDataService.getClassSessions(classData?.id, reqUser)
-        ]);
+        const periodRows = Array.isArray(prefetchedPeriodRows)
+            ? prefetchedPeriodRows
+            : await schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser);
+        const allSessions = Array.isArray(prefetchedSessions)
+            ? prefetchedSessions
+            : await schoolDataService.getClassSessions(classData?.id, reqUser);
         const effectiveSessions = Array.isArray(allSessions) && allSessions.length ? allSessions : [session];
         const statusMapForApplicability = await sessionStatusPolicyService.getStatusMap(classData?.orgId || activeOrgId, { includeInactive: true });
         const applicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
@@ -1272,7 +1295,8 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
         return {
             personIds,
             source: 'canonical_session_applicability',
-            applicabilityByPersonId
+            applicabilityByPersonId,
+            periodRows: Array.isArray(periodRows) ? periodRows : []
         };
     }
 
@@ -1411,7 +1435,15 @@ async function loadSessionRosterIdentityData(reqUser) {
     };
 }
 
-async function buildEnrichedSessionRosterForMutation({ classData, session, reqUser, prefetchedPersons = null, prefetchedStudents = null }) {
+async function buildEnrichedSessionRosterForMutation({
+    classData,
+    session,
+    reqUser,
+    prefetchedPersons = null,
+    prefetchedStudents = null,
+    prefetchedSessions = null,
+    prefetchedPeriodRows = null
+}) {
     const hasPrefetch = Array.isArray(prefetchedPersons) && Array.isArray(prefetchedStudents);
     const identityData = hasPrefetch
         ? { persons: prefetchedPersons, students: prefetchedStudents }
@@ -1427,7 +1459,9 @@ async function buildEnrichedSessionRosterForMutation({ classData, session, reqUs
         classData,
         session: workingSession,
         reqUser,
-        students
+        students,
+        prefetchedSessions,
+        prefetchedPeriodRows
     });
     const activePersonIds = rosterResolution?.personIds instanceof Set ? rosterResolution.personIds : new Set();
     const activeApplicabilityByPersonId = rosterResolution?.applicabilityByPersonId instanceof Map ? rosterResolution.applicabilityByPersonId : new Map();
@@ -2685,7 +2719,7 @@ function assertRollingClassHasAllowedProgramOrThrow(classPayload) {
     const rows = Array.isArray(classPayload?.allowedProgramTerms) ? classPayload.allowedProgramTerms : [];
     const hasProgram = rows.some((r) => toPublicId(r?.programId));
     if (!hasProgram) {
-        throw new Error('Rolling classes require at least one program on the Program Terms tab. Add a program without a term, or a full programأ¢â‚¬â€œterm pair. This is required for academic ledger and enrollment defaults.');
+        throw new Error('Rolling classes require at least one program on the Program Terms tab. Add a program without a term, or a full program–term pair. This is required for academic ledger and enrollment defaults.');
     }
 }
 
@@ -3693,6 +3727,7 @@ async function saveSession1(req, res) {
                 sessionMinutesSave1
             );
             const matrixPolicySave1 = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave1);
+            await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster);
             sessions[sessionIndex].roster = incomingRoster.map(incRec => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
@@ -3780,6 +3815,13 @@ async function saveSession1(req, res) {
 
 // --- SESSION EXECUTION & ATTENDANCE ---
 
+function logManageSessionStep(req, label, startMs) {
+    if (process.env.NODE_ENV === 'production') return;
+    const requestId = String(req?.requestId || '').trim();
+    const elapsedMs = Date.now() - Number(startMs || 0);
+    console.log(`[manageSession][${requestId || 'no-id'}] ${label}: ${elapsedMs}ms`);
+}
+
 async function manageSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -3829,19 +3871,30 @@ async function manageSession(req, res) {
             : '';
 
         // --- Lock Security Check ---
-        const isSessionLocked = session.locked === true || String(session.locked) === 'true';
-        let canOverride = await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_CLASSES,
-            OPERATIONS.UPDATE,
-            { section: { id: SECTIONS.SCHOOL_CLASSES } }
-        );
-        const canOverrideMakeupDuration = await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_SESSIONS,
-            OPERATIONS.UPDATE,
-            { section: { id: SECTIONS.SCHOOL_SESSIONS } }
-        );
+        const manageSessionStart = Date.now();
+        const isRollingClass = getClassRegistrationModeKey(classData) === 'rolling';
+        const [canOverride, canOverrideMakeupDuration, canDeleteStudentCases] = await Promise.all([
+            adminAuthorityService.isAdminForRequestAsync(
+                req.user,
+                SECTIONS.SCHOOL_CLASSES,
+                OPERATIONS.UPDATE,
+                { section: { id: SECTIONS.SCHOOL_CLASSES } }
+            ),
+            adminAuthorityService.isAdminForRequestAsync(
+                req.user,
+                SECTIONS.SCHOOL_SESSIONS,
+                OPERATIONS.UPDATE,
+                { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+            ),
+            adminAuthorityService.isAdminForRequestAsync(
+                req.user,
+                SECTIONS.SCHOOL_SESSIONS,
+                OPERATIONS.DELETE,
+                { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+            )
+        ]);
+        const canDeleteSession = canDeleteStudentCases;
+        logManageSessionStep(req, 'admin_checks', manageSessionStart);
         const makeupSummary = makeupSessionAllocationService.buildMakeupAllocationSummary({
             classId,
             originalSession: session,
@@ -3873,30 +3926,32 @@ async function manageSession(req, res) {
                 found: true
             };
         })();
-        const canDeleteStudentCases = await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_SESSIONS,
-            OPERATIONS.DELETE,
-            { section: { id: SECTIONS.SCHOOL_SESSIONS } }
-        );
-        const canDeleteSession = canDeleteStudentCases;
-        
+        const isSessionLocked = session.locked === true || String(session.locked) === 'true';
         const isReadOnly = !canEditSession || (isSessionLocked && !canOverride);
 
-        // 2. Prefetch identity+student datasets once and reuse for roster enrichment.
-        const [allSubjects, rosterIdentityData] = await Promise.all([
+        // 2. Prefetch identity, subjects, and enrollment periods once; reuse across roster, reports, outline, and locks.
+        const prefetchStart = Date.now();
+        const [allSubjects, rosterIdentityData, enrollmentPeriodRows] = await Promise.all([
             schoolDataService.fetchAllData('subjects', {}, req.user),
-            loadSessionRosterIdentityData(req.user)
+            loadSessionRosterIdentityData(req.user),
+            isRollingClass
+                ? schoolDataService.getClassEnrollmentPeriodsByClassId(classId, req.user)
+                : Promise.resolve(null)
         ]);
+        logManageSessionStep(req, 'prefetch', prefetchStart);
 
         // 3. Resolve effective session roster (same rules as Manage Session display)
+        const rosterStart = Date.now();
         session.roster = await buildEnrichedSessionRosterForMutation({
             classData,
             session,
             reqUser: req.user,
             prefetchedPersons: rosterIdentityData.persons,
-            prefetchedStudents: rosterIdentityData.students
+            prefetchedStudents: rosterIdentityData.students,
+            prefetchedSessions: sessions,
+            prefetchedPeriodRows: enrollmentPeriodRows
         });
+        logManageSessionStep(req, 'roster', rosterStart);
 
         // 4. Build curriculum subjects for class curriculum panel
         const classSubjects = (classData.curriculum?.subjects || []).map(subMap => {
@@ -3916,27 +3971,84 @@ async function manageSession(req, res) {
         );
 
         const isReportAdminViewer = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL);
-        const sessionReportViewerContext = await sessionReportInstanceService.buildSessionReportViewerContext({
-            classId,
-            sessionRoster: session.roster,
-            reqUser: req.user,
-            isReportAdminViewer
-        });
-        const sessionReportInstanceRows = await sessionReportInstanceService.buildSessionReportInstanceRows({
-            classId,
-            sessionId,
-            sessionDate: session?.date,
-            reqUser: req.user,
-            viewerContext: sessionReportViewerContext,
-            sessionRoster: session.roster
-        });
-        const sessionRosterReconciliation = await sessionReportInstanceService.buildSessionRosterReconciliation({
-            classId,
-            sessionId,
-            sessionDate: session?.date,
-            sessionRoster: session.roster,
-            reqUser: req.user
-        });
+        const orgIdForPolicies = classData?.orgId || getActiveOrgIdOrThrow(req.user);
+
+        const parallelStart = Date.now();
+        const [
+            sessionReportViewerContext,
+            orgPolicyCatalogMs,
+            canViewSchoolSettings,
+            canOpenAttendanceMatrix,
+            conductRatingScaleResolved,
+            autosavePolicyResolved,
+            sessionStudentCases,
+            sessionSkillPolicy,
+            reportAssignmentCreateAccess
+        ] = await Promise.all([
+            sessionReportInstanceService.buildSessionReportViewerContext({
+                classId,
+                sessionRoster: session.roster,
+                reqUser: req.user,
+                isReportAdminViewer,
+                prefetchedStudents: rosterIdentityData.students
+            }),
+            attendanceMatrixPolicyModel.getPolicyCatalogForOrg(orgIdForPolicies),
+            userCanViewSchoolSettings(req.user, req.ip),
+            userCanOpenAttendanceMatrix(req.user, req.ip),
+            conductRatingScalePolicyModel.getPolicyForOrg(orgIdForPolicies),
+            autosavePolicyModel.getPolicyForOrg(orgIdForPolicies),
+            sessionStudentCaseService.listCasesForSession({
+                classId,
+                sessionId,
+                reqUser: req.user
+            }),
+            loadSessionSkillPolicy(classData, session, req.user),
+            accessService.evaluateAccess({
+                user: req.user,
+                sectionId: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
+                operationId: OPERATIONS.CREATE,
+                ipAddress: req.ip
+            }).catch(() => null)
+        ]);
+        logManageSessionStep(req, 'parallel_context', parallelStart);
+
+        const assignedOutlineSkillIds = sessionSkillPolicy.selectable
+            .filter((skill) => skill.supportsTeachingOutline === true)
+            .map((skill) => skill.id);
+        const outlinePromise = assignedOutlineSkillIds.length
+            ? teachingOutlineSuggestionService.loadSessionOutlineContext(req.user, {
+                classId,
+                sessionId,
+                roster: session.roster || [],
+                skillIds: assignedOutlineSkillIds,
+                prefetchedSessions: sessions
+            }).catch(() => null)
+            : Promise.resolve(null);
+
+        const reportsStart = Date.now();
+        const [sessionReportInstanceRows, sessionRosterReconciliation, teachingOutlineContext] = await Promise.all([
+            sessionReportInstanceService.buildSessionReportInstanceRows({
+                classId,
+                sessionId,
+                sessionDate: session?.date,
+                reqUser: req.user,
+                viewerContext: sessionReportViewerContext,
+                sessionRoster: session.roster,
+                prefetchedStudents: rosterIdentityData.students,
+                prefetchedClass: classData
+            }),
+            sessionReportInstanceService.buildSessionRosterReconciliation({
+                classId,
+                sessionId,
+                sessionDate: session?.date,
+                sessionRoster: session.roster,
+                reqUser: req.user,
+                prefetchedStudents: rosterIdentityData.students,
+                prefetchedClass: classData
+            }),
+            outlinePromise
+        ]);
+        logManageSessionStep(req, 'reports_outline', reportsStart);
         const sessionContext = {
             classId,
             sessionId,
@@ -3965,12 +4077,7 @@ async function manageSession(req, res) {
                     );
                 });
             });
-        const reportAssignmentCreateAccess = await accessService.evaluateAccess({
-            user: req.user,
-            sectionId: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
-            operationId: OPERATIONS.CREATE,
-            ipAddress: req.ip
-        }).catch(() => null);
+        const reportAssignmentCreateAccessResolved = reportAssignmentCreateAccess;
 
         const sessionConductReportPeriod = sessionConductService.resolveReportPeriodForSession(
             sessionReportViewerContext.assignmentMap,
@@ -3994,9 +4101,6 @@ async function manageSession(req, res) {
             sessionConductReportPeriod.dueDate
         );
 
-        const orgPolicyCatalogMs = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
-            classData?.orgId || getActiveOrgIdOrThrow(req.user)
-        );
         const sessionMinutesMs = attendanceMatrixMetricsService.scheduledMinutesFromSession(
             session,
             attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes
@@ -4015,37 +4119,6 @@ async function manageSession(req, res) {
                 enabledAttendanceStatuses
             )
         }));
-        const canViewSchoolSettings = await userCanViewSchoolSettings(req.user, req.ip);
-        const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
-        const conductRatingScaleResolved = await conductRatingScalePolicyModel.getPolicyForOrg(
-            classData?.orgId || getActiveOrgIdOrThrow(req.user)
-        );
-        const autosavePolicyResolved = await autosavePolicyModel.getPolicyForOrg(
-            classData?.orgId || getActiveOrgIdOrThrow(req.user)
-        );
-        const sessionStudentCases = await sessionStudentCaseService.listCasesForSession({
-            classId,
-            sessionId,
-            reqUser: req.user
-        });
-        const sessionSkillPolicy = await loadSessionSkillPolicy(classData, session, req.user);
-        const assignedOutlineSkillIds = sessionSkillPolicy.selectable
-            .filter((skill) => skill.supportsTeachingOutline === true)
-            .map((skill) => skill.id);
-
-        let teachingOutlineContext = null;
-        if (assignedOutlineSkillIds.length) {
-            try {
-                teachingOutlineContext = await teachingOutlineSuggestionService.loadSessionOutlineContext(req.user, {
-                    classId,
-                    sessionId,
-                    roster: session.roster || [],
-                    skillIds: assignedOutlineSkillIds
-                });
-            } catch (_outlineErr) {
-                teachingOutlineContext = null;
-            }
-        }
 
         const sessionCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
         const viewerPersonId = String(req.user?.personId || '').trim();
@@ -4060,11 +4133,11 @@ async function manageSession(req, res) {
         );
 
         let enrollmentLockedAttendancePersonIds = [];
-        if (getClassRegistrationModeKey(classData) === 'rolling') {
-            const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, req.user);
+        if (isRollingClass) {
+            const periodRows = Array.isArray(enrollmentPeriodRows) ? enrollmentPeriodRows : [];
             const lockedSessionId = toPublicId(session.sessionId || session.id);
             const locked = new Set();
-            (Array.isArray(periodRows) ? periodRows : []).forEach((period) => {
+            periodRows.forEach((period) => {
                 enrollmentSessionMarksService.getMarksMap(period).forEach((mark, sid) => {
                     if (sid === lockedSessionId && mark.locked && period.personId) {
                         locked.add(toPublicId(period.personId));
@@ -4074,6 +4147,7 @@ async function manageSession(req, res) {
             enrollmentLockedAttendancePersonIds = [...locked];
         }
 
+        logManageSessionStep(req, 'total', manageSessionStart);
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,
@@ -4086,7 +4160,7 @@ async function manageSession(req, res) {
             sessionRosterReconciliation,
             hasSessionReportsAssigned,
             sessionHasConductRequiredReports,
-            canAssignSessionReports: Boolean(reportAssignmentCreateAccess?.allowed),
+            canAssignSessionReports: Boolean(reportAssignmentCreateAccessResolved?.allowed),
             conductPrefillByPersonId,
             sessionConductReportPeriod,
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
@@ -4976,6 +5050,7 @@ async function saveSession(req, res) {
             const matrixPolicySave = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave);
             const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
+            await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster);
             originalSession.roster = incomingRoster.map((incRec) => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 if (!incomingPersonId) return null;

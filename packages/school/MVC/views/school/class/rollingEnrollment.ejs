@@ -467,8 +467,8 @@
               </table>
             </div>
           </div>
-          <div class="row g-2 mt-2">
-            <div class="col-md-6">
+          <div class="row g-2 mt-2 align-items-start enroll-meta-inputs-row">
+            <div class="col-md-3">
               <label class="form-label" for="inp_funder">Funder</label>
               <select id="inp_funder" class="form-select">
                 <option value="self" selected>Self Fund</option>
@@ -476,9 +476,9 @@
                 <option value="<%= String(funder.id || '') %>"><%= String(funder.label || funder.id || '') %></option>
                 <% }); %>
               </select>
-              <div class="form-text compact-help">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
+              <div class="form-text compact-help mb-0 mt-1">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-2">
               <label class="form-label">Status</label>
               <select id="inp_status" class="form-select">
                 <option value="active" selected>Active</option>
@@ -486,10 +486,10 @@
                 <option value="waiting_list">Waiting list</option>
               </select>
             </div>
-          </div>
-          <div class="mt-2">
-            <label class="form-label">Reason Start</label>
-            <textarea id="inp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
+            <div class="col-md-7">
+              <label class="form-label">Reason Start</label>
+              <textarea id="inp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
+            </div>
           </div>
           <div class="alert alert-light border small mb-0 mt-3 text-secondary">
             <div class="fw-semibold text-dark mb-1">Tips</div>
@@ -895,6 +895,38 @@
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
         <button type="button" class="btn btn-success btn-sm" id="btn_priorRepairSave"><i class="bi bi-check2-circle me-1"></i>Save Selected Credits</button>
         <button type="button" class="btn btn-outline-success btn-sm" id="btn_priorRepairRetry"><i class="bi bi-arrow-clockwise me-1"></i>Retry Eligibility</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="clbPlacementInsightModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-info-circle me-1"></i>CLB &amp; Prerequisite Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Student</label>
+            <input type="text" id="clbInsight_studentLabel" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Program</label>
+            <input type="text" id="clbInsight_programLabel" class="form-control bg-light" readonly>
+          </div>
+        </div>
+        <div class="fw-semibold mb-2">Latest Current CLB</div>
+        <div id="clbInsight_currentClb" class="mb-3 small text-muted">No CLB data available.</div>
+        <div class="fw-semibold mb-2">This class&rsquo;s subjects</div>
+        <div id="clbInsight_classSubjects" class="mb-3 small text-muted">No class subjects to display.</div>
+        <div id="clbInsight_summary" class="alert alert-info border py-2 mb-0 small"></div>
+      </div>
+      <div class="modal-footer flex-wrap gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-success btn-sm" id="btn_clbInsightRetry"><i class="bi bi-arrow-clockwise me-1"></i>Retry Eligibility</button>
       </div>
     </div>
   </div>
@@ -1731,6 +1763,7 @@
   const chargeModalEl = qs('enrollmentChargeModal');
   const programShortcutModalEl = qs('programRegistrationShortcutModal');
   const priorCreditRepairModalEl = qs('priorCreditRepairModal');
+  const clbPlacementInsightModalEl = qs('clbPlacementInsightModal');
   const enrollmentSessionListModalEl = qs('enrollmentSessionListModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
 
@@ -1806,6 +1839,7 @@
   const chargeModal = createModalController(chargeModalEl);
   const programShortcutModal = createModalController(programShortcutModalEl);
   const priorCreditRepairModal = createModalController(priorCreditRepairModalEl);
+  const clbPlacementInsightModal = createModalController(clbPlacementInsightModalEl);
   const enrollmentSessionListModal = createModalController(enrollmentSessionListModalEl);
   const addButton = qs('btn_addPeriod');
   let approvedCloseStatusPayload = null;
@@ -1922,6 +1956,105 @@
     );
   }
 
+  function renderClbPlacementInsightButtonHtml(clbPlacement) {
+    const clb = (clbPlacement && typeof clbPlacement === 'object') ? clbPlacement : {};
+    if (!clb.hasInsight) return '';
+    return '<div class="mt-2">'
+      + '<button type="button" class="btn btn-sm btn-outline-secondary" id="btn_openClbPlacementInsight">'
+      + '<i class="bi bi-info-circle me-1"></i>CLB &amp; prerequisite details'
+      + '</button>'
+      + '</div>';
+  }
+
+  function populateClbPlacementInsightModal(clbPlacement, options = {}) {
+    const clb = (clbPlacement && typeof clbPlacement === 'object') ? clbPlacement : {};
+    const eligible = options.eligible === true;
+    const student = getSelectedShortcutStudent();
+    const resolved = lastRollingEligibility?.resolved || {};
+    const skillLabels = {
+      listening: 'Listening',
+      speaking: 'Speaking',
+      reading: 'Reading',
+      writing: 'Writing'
+    };
+
+    if (qs('clbInsight_studentLabel')) {
+      qs('clbInsight_studentLabel').value = student.label || student.id || '';
+    }
+    if (qs('clbInsight_programLabel')) {
+      qs('clbInsight_programLabel').value = String(resolved.label || resolved.programId || '').trim();
+    }
+
+    const currentBox = qs('clbInsight_currentClb');
+    if (currentBox) {
+      if (!clb.currentClb) {
+        currentBox.innerHTML = '<div class="text-muted">No Current CLB recorded.</div>';
+      } else {
+        const current = clb.currentClb.current || {};
+        const bySkill = clb.currentClb.normalizedBySkill || {};
+        const rows = ['listening', 'speaking', 'reading', 'writing'].map((skill) => {
+          const raw = String(current[skill] || '').trim() || '—';
+          const norm = bySkill[skill] !== undefined && bySkill[skill] !== null ? String(bySkill[skill]) : '—';
+          return '<tr><td class="fw-semibold">' + htmlEscape(skillLabels[skill]) + '</td>'
+            + '<td>' + htmlEscape(raw) + '</td>'
+            + '<td class="text-muted">' + htmlEscape(norm !== '—' ? '→ ' + norm : '—') + '</td></tr>';
+        }).join('');
+        const levels = Array.isArray(clb.currentClb.normalizedLevels) ? clb.currentClb.normalizedLevels.join(', ') : '';
+        const recordedAt = String(clb.currentClb.recordedAt || '').trim();
+        currentBox.innerHTML = '<div class="mb-2">'
+          + '<div><span class="fw-semibold">Recorded:</span> ' + htmlEscape(recordedAt || '—') + '</div>'
+          + (levels ? '<div><span class="fw-semibold">Normalized levels:</span> ' + htmlEscape(levels) + '</div>' : '')
+          + '</div>'
+          + '<table class="table table-sm table-bordered mb-0 bg-white"><thead><tr>'
+          + '<th>Skill</th><th>Current</th><th>Normalized</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      }
+    }
+
+    const classSubjectsBox = qs('clbInsight_classSubjects');
+    if (classSubjectsBox) {
+      const classSubjects = Array.isArray(clb.classSubjects) ? clb.classSubjects : [];
+      if (!classSubjects.length) {
+        classSubjectsBox.innerHTML = '<div class="text-muted">No CLB-configured subjects on this class.</div>';
+      } else {
+        classSubjectsBox.innerHTML = classSubjects.map((row) => {
+          const label = [row.code, row.title].filter(Boolean).join(' — ') || row.id;
+          const clbPart = row.clbLevel !== null && row.clbLevel !== undefined
+            ? 'CLB ' + row.clbLevel
+            : 'No CLB level';
+          const matchPart = row.clbLevel !== null
+            ? (row.matchesStudentLevels
+              ? '<span class="badge bg-success-subtle text-success border">Matches student levels</span>'
+              : '<span class="badge bg-light text-secondary border">Outside student levels</span>')
+            : '';
+          return '<div class="border rounded bg-white p-2 mb-2">'
+            + '<div class="fw-semibold">' + htmlEscape(label) + '</div>'
+            + '<div class="text-muted">' + htmlEscape(clbPart) + '</div>'
+            + (matchPart ? '<div class="mt-1">' + matchPart + '</div>' : '')
+            + '</div>';
+        }).join('');
+      }
+    }
+
+    const summaryBox = qs('clbInsight_summary');
+    if (summaryBox) {
+      const summary = String(clb.qualificationSummary || '').trim();
+      summaryBox.textContent = summary
+        || (eligible
+          ? 'Prerequisites for this class are satisfied for the selected start date.'
+          : 'Review prerequisite requirements and CLB alignment.');
+    }
+  }
+
+  async function openClbPlacementInsightModal() {
+    const clb = lastRollingEligibility?.clbPlacement || {};
+    if (!clb.hasInsight) {
+      await showMsg('CLB Details', 'info', 'No CLB or prerequisite insight is available for this eligibility result.');
+      return;
+    }
+    populateClbPlacementInsightModal(clb, { eligible: lastRollingEligibility?.eligible === true });
+    clbPlacementInsightModal?.show();
+  }
+
   function getPriorRepairPrerequisite() {
     const prereq = lastRollingEligibility?.prerequisite || {};
     return {
@@ -1937,13 +2070,17 @@
       ? lastRollingEligibility.prerequisite.issues.map((item) => htmlEscape(item)).join('<br>')
       : htmlEscape(message || 'Prerequisites are not satisfied for this class.');
     if (!repair.missingSubjects.length) {
-      setRollingRegistrationPanelHtml('<div class="text-danger small">' + issue + '</div>');
+      setRollingRegistrationPanelHtml(
+        '<div class="text-danger small">' + issue + '</div>'
+        + renderClbPlacementInsightButtonHtml(lastRollingEligibility?.clbPlacement)
+      );
       return;
     }
     if (!canCreatePriorSubjectCredits || lastRollingEligibility?.prerequisite?.canCreatePriorCredits === false) {
       setRollingRegistrationPanelHtml(
         '<div class="text-danger small mb-2">' + issue + '</div>' +
         '<div class="alert alert-warning border py-2 mb-0 small">You need Prior Subject Credits create access to add prerequisite credits from here.</div>'
+        + renderClbPlacementInsightButtonHtml(lastRollingEligibility?.clbPlacement)
       );
       return;
     }
@@ -1953,9 +2090,71 @@
         '<button type="button" class="btn btn-sm btn-warning" id="btn_openPriorCreditRepair">' +
           '<i class="bi bi-mortarboard me-1"></i>Fix Prerequisites / Add Prior Credits' +
         '</button>' +
+        (function () {
+          const clb = lastRollingEligibility?.clbPlacement || {};
+          const canApply = clb.canApplyPlacement === true
+            && canCreatePriorSubjectCredits
+            && lastRollingEligibility?.prerequisite?.canCreatePriorCredits !== false;
+          if (!canApply) return '';
+          return '<button type="button" class="btn btn-sm btn-primary" id="btn_applyClbPlacementCredits">' +
+            '<i class="bi bi-lightning-charge me-1"></i>Apply CLB Placement Credits' +
+          '</button>';
+        })() +
         '<span class="small text-muted">' + htmlEscape(String(repair.missingSubjects.length)) + ' suggested prerequisite credit' + (repair.missingSubjects.length === 1 ? '' : 's') + '.</span>' +
       '</div>'
+      + renderClbPlacementInsightButtonHtml(lastRollingEligibility?.clbPlacement)
     );
+  }
+
+  async function applyClbPlacementCredits() {
+    if (shortcutActionInProgress) return;
+    const student = getSelectedShortcutStudent();
+    const repair = getPriorRepairPrerequisite();
+    const clb = lastRollingEligibility?.clbPlacement || {};
+    if (!student.id || !repair.programId) {
+      await showMsg('Missing Context', 'warning', 'Student and program are required before applying CLB placement credits.');
+      return;
+    }
+    if (!clb.canApplyPlacement) {
+      await showMsg('CLB Placement', 'info', 'No CLB placement credits are available for the current eligibility result.');
+      return;
+    }
+    shortcutActionInProgress = true;
+    try {
+      showBusy('Applying CLB placement prior credits...');
+      const startDate = String(qs('inp_startDate')?.value || '').trim();
+      const result = await requestJson(
+        '/school/classes/api/' + encodeURIComponent(classId) + '/rolling-prior-subject-credits/apply-placement',
+        'POST',
+        {
+          studentId: student.id,
+          studentIds: [student.id],
+          programId: repair.programId,
+          startDate
+        }
+      );
+      if (!result) return;
+      const errorList = Array.isArray(result.errors) ? result.errors : [];
+      const createdCount = Number(result.createdCount || 0);
+      const skippedCount = Number(result.skippedDuplicateCount || 0);
+      const placementLevels = Array.isArray(result.placement?.normalizedLevels)
+        ? result.placement.normalizedLevels.join(', ')
+        : '';
+      const statusIcon = errorList.length ? 'warning' : 'success';
+      const message = [
+        `Applied CLB placement for levels ${placementLevels || 'n/a'}.`,
+        `Created ${createdCount} prior subject credit${createdCount === 1 ? '' : 's'}.`,
+        skippedCount ? `Skipped ${skippedCount} duplicate credit${skippedCount === 1 ? '' : 's'}.` : '',
+        errorList.length ? errorList.map((row) => `${row.subjectId || 'Subject'}: ${row.message || 'Save failed.'}`).join('<br>') : ''
+      ].filter(Boolean).join('<br>');
+      await showMsg('CLB Placement Credits', statusIcon, message || 'CLB placement prior credits were applied.');
+      await refreshRollingEligibility();
+    } catch (error) {
+      await showMsg('CLB Placement Failed', 'error', error?.message || 'Unable to apply CLB placement credits.');
+    } finally {
+      hideBusy();
+      shortcutActionInProgress = false;
+    }
   }
 
   function renderPriorRepairSubjectList(subjects) {
@@ -2550,6 +2749,7 @@
       if (capacityWarningHtml) inner += capacityWarningHtml;
       if (otherWarnings) inner += '<div class="text-warning small mt-1">' + otherWarnings + '</div>';
       if (ok && !issuesHtml && !conflictIssue) inner += '<div class="text-success small mt-1">Prerequisites satisfied for this start date.</div>';
+      inner += renderClbPlacementInsightButtonHtml(data.clbPlacement);
       setRollingRegistrationPanelHtml(inner);
       return;
     }
@@ -6186,6 +6386,20 @@
       return;
     }
 
+    const applyClbPlacementBtn = event.target.closest('#btn_applyClbPlacementCredits');
+    if (applyClbPlacementBtn) {
+      event.preventDefault();
+      applyClbPlacementCredits();
+      return;
+    }
+
+    const openClbInsightBtn = event.target.closest('#btn_openClbPlacementInsight');
+    if (openClbInsightBtn) {
+      event.preventDefault();
+      openClbPlacementInsightModal();
+      return;
+    }
+
     const manageSessionsBtn = event.target.closest('.btn-row-manage-sessions');
     if (manageSessionsBtn) {
       closeAllActionMenus();
@@ -6295,6 +6509,7 @@
   qs('btn_shortcutRetry')?.addEventListener('click', retryProgramRegistrationShortcutEligibility);
   qs('btn_priorRepairSave')?.addEventListener('click', savePriorCreditRepair);
   qs('btn_priorRepairRetry')?.addEventListener('click', refreshRollingEligibility);
+  qs('btn_clbInsightRetry')?.addEventListener('click', refreshRollingEligibility);
   qs('btn_priorRepairSelectAll')?.addEventListener('click', () => {
     document.querySelectorAll('.prior-repair-subject').forEach((input) => { input.checked = true; });
   });

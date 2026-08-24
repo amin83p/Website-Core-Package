@@ -6,6 +6,9 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { isValidFeeCategory } = require('./feeCategoryCatalog');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
+const { parseLowerClbBandFromText } = require('../../utils/clbSubjectBandParser');
+
+const CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/subjects.json');
 const legacyStorageBasePath = path.join(resolveCoreRoot(), 'data/school/subjects_storage');
@@ -133,6 +136,65 @@ function normalizeDefaultScoreRules(inputRules) {
   };
 }
 
+function parseOptionalClbLevel(value, label = 'CLB level') {
+  if (value === '' || value === undefined || value === null) return null;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 12) {
+    throw new Error(`${label} must be an integer between 1 and 12.`);
+  }
+  return n;
+}
+
+function normalizeConfiguration(input, { code = '', title = '' } = {}) {
+  const base = (input && typeof input === 'object' && !Array.isArray(input)) ? input : {};
+  const out = {
+    defaultHours: Number.isFinite(Number(base.defaultHours)) ? Number(base.defaultHours) : 45,
+    credits: Number.isFinite(Number(base.credits)) ? Number(base.credits) : 3,
+    level: String(base.level || 'Beginner').trim() || 'Beginner',
+    deliveryMethod: String(base.deliveryMethod || 'Hybrid').trim() || 'Hybrid'
+  };
+
+  const clbInput = (base.clb && typeof base.clb === 'object' && !Array.isArray(base.clb)) ? base.clb : {};
+  let clbLevel = parseOptionalClbLevel(clbInput.level, 'CLB level');
+  const skillsInput = (clbInput.skills && typeof clbInput.skills === 'object' && !Array.isArray(clbInput.skills))
+    ? clbInput.skills
+    : {};
+  const skills = {};
+  CLB_SKILLS.forEach((skill) => {
+    skills[skill] = parseOptionalClbLevel(skillsInput[skill], `CLB ${skill} level`);
+  });
+
+  if (clbLevel !== null) {
+    CLB_SKILLS.forEach((skill) => {
+      if (skills[skill] === null) skills[skill] = clbLevel;
+    });
+  }
+
+  const hasAnyClb = clbLevel !== null || CLB_SKILLS.some((skill) => skills[skill] !== null);
+  if (!hasAnyClb) {
+    const band = parseLowerClbBandFromText(code) ?? parseLowerClbBandFromText(title);
+    if (band !== null) {
+      clbLevel = band;
+      CLB_SKILLS.forEach((skill) => {
+        skills[skill] = band;
+      });
+    }
+  }
+
+  if (clbLevel !== null || CLB_SKILLS.some((skill) => skills[skill] !== null)) {
+    if (clbLevel === null) {
+      const skillLevels = CLB_SKILLS.map((skill) => skills[skill]).filter((n) => n !== null);
+      clbLevel = skillLevels.length ? Math.min(...skillLevels) : null;
+    }
+    out.clb = {
+      level: clbLevel,
+      skills
+    };
+  }
+
+  return out;
+}
+
 function normalizeFeeRules(inputRules) {
   if (!Array.isArray(inputRules)) return [];
 
@@ -200,7 +262,8 @@ async function addSubject(item) {
     item.id = generateSubjectId(dCode);
     item.feeRules = normalizeFeeRules(item.feeRules);
     item.defaultScoreRules = normalizeDefaultScoreRules(item.defaultScoreRules);
-    
+    item.configuration = normalizeConfiguration(item.configuration, { code: item.code, title: item.title });
+
     const validity = validateData(item);
     if (!validity.isValid) throw new Error(validity.errors.join('\n'));
     assertUniqueInOrg(list, item);
@@ -223,6 +286,7 @@ async function updateSubject(id, updates) {
     const merged = { ...current, ...updates };
     merged.feeRules = normalizeFeeRules(merged.feeRules);
     merged.defaultScoreRules = normalizeDefaultScoreRules(merged.defaultScoreRules);
+    merged.configuration = normalizeConfiguration(merged.configuration, { code: merged.code, title: merged.title });
 
     const validity = validateData(merged);
     if (!validity.isValid) throw new Error(validity.errors.join('\n'));
@@ -287,7 +351,8 @@ module.exports = {
   updateSubject,
   deleteSubject,
   clearStorageByOrg,
-  normalizeDefaultScoreRules
+  normalizeDefaultScoreRules,
+  normalizeConfiguration
 };
 
 

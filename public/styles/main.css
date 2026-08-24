@@ -160,41 +160,6 @@ html.app-page-width-full main.container {
   margin-right: auto;
 }
 
-/* Master Schedule Viewer — percentage-based width (Display Settings) */
-.master-schedule-viewer-page {
-  --master-schedule-viewer-max-width: min(70%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-  max-width: var(--master-schedule-viewer-max-width);
-}
-
-main.container:has(.master-schedule-viewer-page) {
-  width: var(--master-schedule-viewer-max-width, min(70%, calc(100vw - 32px - var(--app-side-controls-gutter))));
-  max-width: var(--master-schedule-viewer-max-width, min(70%, calc(100vw - 32px - var(--app-side-controls-gutter))));
-  margin-left: auto;
-  margin-right: auto;
-}
-
-html.app-page-width-wide .master-schedule-viewer-page {
-  --app-side-controls-gutter: 64px;
-  --master-schedule-viewer-max-width: min(80%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-}
-
-html.app-page-width-wide main.container:has(.master-schedule-viewer-page) {
-  width: min(80%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-  max-width: min(80%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-  padding-left: calc(var(--spacing-md) + var(--app-side-controls-gutter));
-}
-
-html.app-page-width-full .master-schedule-viewer-page {
-  --app-side-controls-gutter: 64px;
-  --master-schedule-viewer-max-width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-}
-
-html.app-page-width-full main.container:has(.master-schedule-viewer-page) {
-  width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-  max-width: min(90%, calc(100vw - 32px - var(--app-side-controls-gutter)));
-  padding-left: calc(var(--spacing-md) + var(--app-side-controls-gutter));
-}
-
 /* ==========================================================================
    3. TYPOGRAPHY & UTILITIES
    ========================================================================== */
@@ -491,6 +456,25 @@ a.header-side-control-btn {
 }
 
 .page-diagnostics-preference-panel .form-check-input {
+  cursor: pointer;
+}
+
+.page-diagnostics-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.page-diagnostics-header-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0;
+}
+
+.page-diagnostics-header-switch .form-check-input {
+  margin-left: 0;
   cursor: pointer;
 }
 

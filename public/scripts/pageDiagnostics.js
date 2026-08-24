@@ -317,6 +317,7 @@
   function buildSnapshot() {
     return {
       capturedAt: new Date().toISOString(),
+      startedAt: state.startedAt,
       page: {
         title: document.title || '',
         path: getCurrentPath(),
@@ -326,13 +327,39 @@
         runtime: getRuntimeConfig(),
         userAgent: global.navigator?.userAgent || ''
       },
+      endpoints: {
+        presence: String(config.endpoint || '').trim(),
+        presencePing: String(config.presencePingEndpoint || '').trim(),
+        preference: String(config.preferenceEndpoint || '').trim()
+      },
       health: evaluateCurrentHealth(),
       navigation: getNavigationTiming(),
       resources: getResourceSummary(),
       console: state.consoleEntries,
       requests: state.requestEntries,
-      presence: state.presence
+      presence: state.presence,
+      presenceError: state.presenceError,
+      presenceErrorStatus: state.presenceErrorStatus,
+      presenceLoading: state.presenceLoading
     };
+  }
+
+  async function copyDiagnosticsSnapshot() {
+    const text = JSON.stringify(buildSnapshot(), null, 2);
+    if (global.navigator?.clipboard?.writeText) {
+      await global.navigator.clipboard.writeText(text);
+      return;
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', 'readonly');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) throw new Error('Clipboard unavailable.');
   }
 
   function renderHealthSummary(health) {
@@ -531,21 +558,24 @@
     modal.innerHTML = `
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
         <div class="modal-content border-0 shadow-lg rounded-3">
-          <div class="modal-header bg-light border-bottom gap-3 flex-wrap">
+          <div class="modal-header bg-light border-bottom">
             <h5 class="modal-title fw-bold text-dark mb-0">
               <i class="bi bi-speedometer2 me-2"></i>Page Diagnostics
             </h5>
-            <div class="page-diagnostics-preference-panel page-diagnostics-preference-panel--inline ms-auto">
-              <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" role="switch" id="pageDiagnosticsEnabledSwitch" data-no-wait="true" checked>
-                <label class="form-check-label fw-semibold" for="pageDiagnosticsEnabledSwitch">Page Diagnostics</label>
+            <div class="page-diagnostics-modal-header-actions ms-auto">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="pageDiagnosticsCopyBtn" data-no-wait="true" title="Copy all diagnostics for debugging">
+                <i class="bi bi-clipboard me-1"></i>Copy
+              </button>
+              <div class="form-check form-switch mb-0 page-diagnostics-header-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="pageDiagnosticsEnabledSwitch" data-no-wait="true" checked aria-label="Page diagnostics on or off">
+                <label class="form-check-label small fw-semibold" for="pageDiagnosticsEnabledSwitch">On</label>
               </div>
-              <div class="small text-muted">Diagnostics are active for this account.</div>
-              <div class="small text-danger d-none" id="pageDiagnosticsPreferenceError"></div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
+            <div class="small text-muted mb-3" id="pageDiagnosticsPreferenceHelp">Diagnostics are active for this account.</div>
+            <div class="small text-danger d-none mb-3" id="pageDiagnosticsPreferenceError"></div>
             <ul class="nav nav-tabs" role="tablist">
               <li class="nav-item" role="presentation"><button class="nav-link active" id="pdOverviewTab" data-bs-toggle="tab" data-bs-target="#pdOverviewPane" type="button" role="tab">Overview</button></li>
               <li class="nav-item" role="presentation"><button class="nav-link" id="pdConsoleTab" data-bs-toggle="tab" data-bs-target="#pdConsolePane" type="button" role="tab">Console</button></li>
@@ -567,9 +597,6 @@
               </button>
               <button type="button" class="btn btn-outline-secondary btn-sm" id="pageDiagnosticsRefreshBtn" data-no-wait="true">
                 <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-              </button>
-              <button type="button" class="btn btn-primary btn-sm" id="pageDiagnosticsCopyBtn" data-no-wait="true">
-                <i class="bi bi-clipboard me-1"></i>Copy Snapshot
               </button>
             </div>
           </div>
@@ -593,11 +620,8 @@
 
     document.getElementById('pageDiagnosticsCopyBtn')?.addEventListener('click', async () => {
       try {
-        if (!global.navigator?.clipboard || typeof global.navigator.clipboard.writeText !== 'function') {
-          throw new Error('Clipboard unavailable.');
-        }
-        await global.navigator.clipboard.writeText(JSON.stringify(buildSnapshot(), null, 2));
-        setStatus('Snapshot copied.');
+        await copyDiagnosticsSnapshot();
+        setStatus('Copied to clipboard.');
       } catch (_) {
         setStatus('Copy failed.');
       }

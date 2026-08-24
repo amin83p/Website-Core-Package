@@ -125,6 +125,49 @@
            </div>
 
            <hr>
+           <h6 class="fw-bold text-primary mb-3">CLB Placement</h6>
+           <div class="form-text small mb-3">Used for CLB placement prior credits during enrollment. Lower band from codes like EAL-CLB5-6 is 5.</div>
+           <div class="row">
+              <div class="col-md-3 mb-3">
+                 <label class="form-label">CLB Level (lower band)</label>
+                 <input type="number" id="inp_clb_level" class="form-control size-md" min="1" max="12" step="1" placeholder="Optional">
+              </div>
+              <div class="col-md-9 mb-3 d-flex align-items-end">
+                 <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_clb_apply_to_skills">
+                    <i class="bi bi-arrow-down-circle me-1"></i>Apply CLB level to all skills
+                 </button>
+              </div>
+           </div>
+           <div class="table-responsive border rounded bg-white mb-3">
+              <table class="table table-sm align-middle mb-0">
+                 <thead class="table-light">
+                    <tr>
+                       <th style="width: 180px;">Skill</th>
+                       <th>CLB Level (1–12)</th>
+                    </tr>
+                 </thead>
+                 <tbody>
+                    <tr>
+                       <td class="fw-semibold">Listening</td>
+                       <td><input type="number" id="inp_clb_listening" class="form-control form-control-sm" min="1" max="12" step="1" placeholder="Optional"></td>
+                    </tr>
+                    <tr>
+                       <td class="fw-semibold">Speaking</td>
+                       <td><input type="number" id="inp_clb_speaking" class="form-control form-control-sm" min="1" max="12" step="1" placeholder="Optional"></td>
+                    </tr>
+                    <tr>
+                       <td class="fw-semibold">Reading</td>
+                       <td><input type="number" id="inp_clb_reading" class="form-control form-control-sm" min="1" max="12" step="1" placeholder="Optional"></td>
+                    </tr>
+                    <tr>
+                       <td class="fw-semibold">Writing</td>
+                       <td><input type="number" id="inp_clb_writing" class="form-control form-control-sm" min="1" max="12" step="1" placeholder="Optional"></td>
+                    </tr>
+                 </tbody>
+              </table>
+           </div>
+
+           <hr>
            <h6 class="fw-bold text-primary mb-3">Prerequisites</h6>
            <div class="mb-3">
               <label class="form-label">Required Subject Codes (Comma separated)</label>
@@ -257,6 +300,67 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('inp_level').value = dConf.level || 'Beginner';
     document.getElementById('inp_delivery').value = dConf.deliveryMethod || 'Hybrid';
     document.getElementById('inp_prereq').value = (dPre || []).join(', ');
+
+    const dClb = (dConf && dConf.clb && typeof dConf.clb === 'object') ? dConf.clb : {};
+    const dClbSkills = (dClb.skills && typeof dClb.skills === 'object') ? dClb.skills : {};
+    document.getElementById('inp_clb_level').value = dClb.level ?? '';
+    document.getElementById('inp_clb_listening').value = dClbSkills.listening ?? '';
+    document.getElementById('inp_clb_speaking').value = dClbSkills.speaking ?? '';
+    document.getElementById('inp_clb_reading').value = dClbSkills.reading ?? '';
+    document.getElementById('inp_clb_writing').value = dClbSkills.writing ?? '';
+
+    function parseLowerClbBandFromClientText(text) {
+        const s = String(text || '').trim();
+        if (!s) return null;
+        const match = s.match(/CLB[\s-]*(\d{1,2})/i);
+        if (!match) return null;
+        const n = Number(match[1]);
+        if (!Number.isInteger(n) || n < 1 || n > 12) return null;
+        return n;
+    }
+
+    function isClbConfigEmpty() {
+        const levelRaw = String(document.getElementById('inp_clb_level').value || '').trim();
+        return !levelRaw
+            && !String(document.getElementById('inp_clb_listening').value || '').trim()
+            && !String(document.getElementById('inp_clb_speaking').value || '').trim()
+            && !String(document.getElementById('inp_clb_reading').value || '').trim()
+            && !String(document.getElementById('inp_clb_writing').value || '').trim();
+    }
+
+    function applyClbBandSuggestionFromCodeTitle() {
+        if (!isClbConfigEmpty()) return;
+        const code = document.querySelector('input[name="code"]')?.value || '';
+        const title = document.querySelector('input[name="title"]')?.value || '';
+        const band = parseLowerClbBandFromClientText(code) ?? parseLowerClbBandFromClientText(title);
+        if (band === null) return;
+        document.getElementById('inp_clb_level').value = band;
+        ['inp_clb_listening', 'inp_clb_speaking', 'inp_clb_reading', 'inp_clb_writing'].forEach((id) => {
+            document.getElementById(id).value = band;
+        });
+    }
+
+    function applyClbLevelToAllSkills() {
+        const levelRaw = String(document.getElementById('inp_clb_level').value || '').trim();
+        if (!levelRaw) return;
+        const band = Number(levelRaw);
+        if (!Number.isInteger(band) || band < 1 || band > 12) return;
+        ['inp_clb_listening', 'inp_clb_speaking', 'inp_clb_reading', 'inp_clb_writing'].forEach((id) => {
+            document.getElementById(id).value = band;
+        });
+    }
+
+    function readOptionalClbInput(id) {
+        const raw = String(document.getElementById(id)?.value || '').trim();
+        if (!raw) return null;
+        const n = Number(raw);
+        return Number.isInteger(n) ? n : null;
+    }
+
+    document.getElementById('btn_clb_apply_to_skills')?.addEventListener('click', applyClbLevelToAllSkills);
+    document.querySelector('input[name="code"]')?.addEventListener('input', applyClbBandSuggestionFromCodeTitle);
+    document.querySelector('input[name="title"]')?.addEventListener('input', applyClbBandSuggestionFromCodeTitle);
+
     document.getElementById('inp_defaultMinPassingScore').value = defaultScoreRulesState.minPassingScore ?? '';
     document.getElementById('inp_defaultMinPassingAverage').value = defaultScoreRulesState.minPassingAverage ?? '';
     document.getElementById('chk_defaultMustPass').checked = defaultScoreRulesState.mustPass === true;
@@ -286,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (msg.includes('department') || msg.includes('academic unit')) return activateTab('#tab-academic');
         if (msg.includes('fee rule') || msg.includes('fee category') || msg.includes('validto') || msg.includes('validfrom') || msg.includes('currency') || msg.includes('amount')) return activateTab('#tab-fees');
         if (msg.includes('passing score') || msg.includes('passing average') || msg.includes('compensation') || msg.includes('default minimum')) return activateTab('#tab-scoreRules');
-        if (msg.includes('hours') || msg.includes('credits') || msg.includes('delivery') || msg.includes('prerequisite') || msg.includes('level')) return activateTab('#tab-config');
+        if (msg.includes('hours') || msg.includes('credits') || msg.includes('delivery') || msg.includes('prerequisite') || msg.includes('level') || msg.includes('clb')) return activateTab('#tab-config');
         if (msg.includes('title') || msg.includes('code') || msg.includes('status') || msg.includes('description')) return activateTab('#tab-general');
     }
 
@@ -307,6 +411,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('inp_credits').value = configuration.credits ?? 3;
         document.getElementById('inp_level').value = configuration.level || 'Beginner';
         document.getElementById('inp_delivery').value = configuration.deliveryMethod || 'Hybrid';
+        const templateClb = (configuration.clb && typeof configuration.clb === 'object') ? configuration.clb : {};
+        const templateClbSkills = (templateClb.skills && typeof templateClb.skills === 'object') ? templateClb.skills : {};
+        document.getElementById('inp_clb_level').value = templateClb.level ?? '';
+        document.getElementById('inp_clb_listening').value = templateClbSkills.listening ?? '';
+        document.getElementById('inp_clb_speaking').value = templateClbSkills.speaking ?? '';
+        document.getElementById('inp_clb_reading').value = templateClbSkills.reading ?? '';
+        document.getElementById('inp_clb_writing').value = templateClbSkills.writing ?? '';
         document.getElementById('inp_prereq').value = Array.isArray(template.prerequisites) ? template.prerequisites.join(', ') : '';
 
         const rules = template.defaultScoreRules || {};
@@ -568,6 +679,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 level: document.getElementById('inp_level').value,
                 deliveryMethod: document.getElementById('inp_delivery').value
             };
+            const clbLevel = readOptionalClbInput('inp_clb_level');
+            const clbSkills = {
+                listening: readOptionalClbInput('inp_clb_listening'),
+                speaking: readOptionalClbInput('inp_clb_speaking'),
+                reading: readOptionalClbInput('inp_clb_reading'),
+                writing: readOptionalClbInput('inp_clb_writing')
+            };
+            const hasClbSkill = Object.values(clbSkills).some((value) => value !== null);
+            if (clbLevel !== null || hasClbSkill) {
+                conf.clb = {
+                    level: clbLevel,
+                    skills: clbSkills
+                };
+            }
             document.getElementById('hid_configuration').value = JSON.stringify(conf);
 
             const rawPre = document.getElementById('inp_prereq').value;

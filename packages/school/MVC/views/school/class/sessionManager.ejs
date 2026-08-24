@@ -199,6 +199,35 @@
         font-weight: 600;
         border-radius: 999px;
     }
+    #attendanceTable th.attendance-order-col,
+    #attendanceTable td.attendance-order-cell {
+        width: 3rem;
+        min-width: 3rem;
+        max-width: 3rem;
+        text-align: center;
+        vertical-align: middle;
+    }
+    #attendanceTable .sortable-att-name {
+        cursor: pointer;
+        user-select: none;
+    }
+    #attendanceTable .sortable-att-name:hover {
+        color: var(--bs-primary);
+    }
+    #attendanceTable .sortable-att-name .attendance-sort-icon {
+        font-size: 0.75rem;
+        opacity: 0.65;
+    }
+    .attendance-excuse-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        max-width: 100%;
+    }
+    .attendance-excuse-chip .btn-close {
+        font-size: 0.55rem;
+        padding: 0.15rem;
+    }
     .btn-check[value="info"]:checked + .student-case-severity-label--info {
         background-color: #0d6efd;
         border-color: #0d6efd;
@@ -1959,18 +1988,20 @@
                             <table class="table table-hover align-middle mb-0" id="attendanceTable">
                                 <thead class="table-light position-sticky top-0" style="z-index: 1;">
                                     <tr>
-                                        <th class="ps-4">Student Name</th>
+                                        <th class="attendance-order-col ps-3" title="Row order">#</th>
+                                        <th class="ps-2 sortable-att-name" id="attendanceSortName" title="Click to sort A–Z or Z–A">Student Name <i class="bi bi-arrow-down-up attendance-sort-icon" aria-hidden="true"></i></th>
                                         <th style="min-width: 280px;">Attendance Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <% if (session.roster.length === 0) { %>
-                                        <tr><td colspan="2" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
+                                        <tr><td colspan="3" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
                                     <% } else { %>
                                         <% session.roster.forEach((student, i) => { %>
                                             <% const rowDisabledAttr = (isReadOnly || enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) ? 'disabled' : ''; %>
                                             <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
-                                                <td class="ps-4 fw-bold align-middle">
+                                                <td class="attendance-order-cell text-muted small ps-3"><%= i + 1 %></td>
+                                                <td class="ps-2 fw-bold align-middle">
                                                     <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                                                     <% if (enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) { %>
                                                         <i class="bi bi-lock-fill text-secondary ms-1" title="Enrollment office locked this session as N/A"></i>
@@ -3180,6 +3211,11 @@ function syncModalTimingExcuseControls() {
 }
 
 function captureDetailsModalFormSnapshot() {
+    const personId = String(document.getElementById('modalPersonId')?.value || '').trim();
+    const details = personId && typeof window.getAttendanceDetails === 'function'
+        ? window.getAttendanceDetails(personId)
+        : null;
+    const excuseAttachment = details?.excuseAttachment || null;
     return {
         late: String(document.getElementById('modalLateMins')?.value || '').trim(),
         leave: String(document.getElementById('modalLeaveMins')?.value || '').trim(),
@@ -3188,6 +3224,8 @@ function captureDetailsModalFormSnapshot() {
         absenceExcused: modalAbsenceExcused === true,
         excuse: String(document.getElementById('modalExcuseRef')?.value || '').trim(),
         excuseFileSelected: Boolean(document.getElementById('modalExcuseFile')?.files?.length),
+        excuseAttachmentId: String(excuseAttachment?.id || '').trim(),
+        hasExcuseAttachment: Boolean(excuseAttachment),
         commentDraft: String(document.getElementById('inp_newComment')?.value || '').trim(),
         mentionCount: Array.isArray(currentMentions) ? currentMentions.length : 0
     };
@@ -3204,6 +3242,8 @@ function isDetailsModalDirty() {
         current.absenceExcused !== detailsModalSnapshot.absenceExcused ||
         current.excuse !== detailsModalSnapshot.excuse ||
         current.excuseFileSelected !== detailsModalSnapshot.excuseFileSelected ||
+        current.excuseAttachmentId !== detailsModalSnapshot.excuseAttachmentId ||
+        current.hasExcuseAttachment !== detailsModalSnapshot.hasExcuseAttachment ||
         current.commentDraft !== detailsModalSnapshot.commentDraft ||
         current.mentionCount !== detailsModalSnapshot.mentionCount
     );
@@ -3272,6 +3312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
+    const sessionReadOnly = <%- jsonForScript(!!isReadOnly) %>;
     const sessionCanManageClassConduct = <%- jsonForScript(Boolean(canManageReportClassConductFlag)) %>;
     const sessionCanManageCoTeachers = <%- jsonForScript(Boolean(typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true)) %>;
     const sessionCanToggleCoTeacherEdit = <%- jsonForScript(Boolean(typeof canToggleCoTeacherEdit !== 'undefined' && canToggleCoTeacherEdit === true)) %>;
@@ -3379,10 +3420,66 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateModalExcusePastePreview(file) {
-        const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
-        if (!excusePreview || !file) return;
-        excusePreview.innerHTML = `<span class="text-success"><i class="bi bi-paperclip me-1"></i>${attendanceAttachmentEscape(file.name)} (ready to apply)</span>`;
+        renderExcuseAttachmentPreview(file ? { name: file.name, pending: true } : null);
     }
+
+    function renderExcuseAttachmentPreview(attachment, emptyText = '<span class="text-muted">No file attached.</span>') {
+        const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
+        if (!excusePreview) return;
+        const removable = !sessionReadOnly;
+        if (!attachment) {
+            excusePreview.innerHTML = emptyText;
+            return;
+        }
+        if (attachment.pending) {
+            const label = attendanceAttachmentEscape(attachment.name || 'Selected file');
+            const removeBtn = removable
+                ? `<button type="button" class="btn-close att-excuse-chip-remove" title="Remove file" aria-label="Remove file"></button>`
+                : '';
+            excusePreview.innerHTML = `<span class="badge rounded-pill bg-light text-dark border attendance-excuse-chip"><i class="bi bi-paperclip me-1"></i><span class="text-success">${label} (ready to apply)</span>${removeBtn}</span>`;
+            const removeEl = excusePreview.querySelector('.att-excuse-chip-remove');
+            if (removeEl) {
+                removeEl.addEventListener('click', () => {
+                    const fileInput = document.getElementById('modalExcuseFile');
+                    if (fileInput) fileInput.value = '';
+                    renderExcuseAttachmentPreview(null);
+                });
+            }
+            return;
+        }
+        excusePreview.innerHTML = renderAttendanceAttachmentChip(attachment, { removable });
+        bindAttendanceAttachmentChipRemove(excusePreview);
+    }
+
+    function renderAttendanceAttachmentChip(attachment, { removable = false } = {}) {
+        const att = parseAttendanceAttachment(attachment);
+        if (!att) return '';
+        const href = att.dataUrl || att.url || att.uploadUrl || att.storagePath || att.path || '';
+        const label = attendanceAttachmentEscape(att.name || att.originalName || 'Attached file');
+        const link = href
+            ? `<a href="${attendanceAttachmentEscape(href)}" target="_blank" rel="noopener" class="text-decoration-none">${label}</a>`
+            : `<span class="text-muted">${label}</span>`;
+        const removeBtn = removable
+            ? `<button type="button" class="btn-close att-excuse-chip-remove" title="Remove file" aria-label="Remove file"></button>`
+            : '';
+        return `<span class="badge rounded-pill bg-light text-dark border attendance-excuse-chip"><i class="bi bi-paperclip me-1"></i>${link}${removeBtn}</span>`;
+    }
+
+    function bindAttendanceAttachmentChipRemove(hostEl) {
+        if (!hostEl) return;
+        const btn = hostEl.querySelector('.att-excuse-chip-remove');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const personId = String(document.getElementById('modalPersonId')?.value || '').trim();
+            if (!personId) return;
+            const details = getAttendanceDetails(personId);
+            details.excuseAttachment = null;
+            const fileInput = document.getElementById('modalExcuseFile');
+            if (fileInput) fileInput.value = '';
+            renderExcuseAttachmentPreview(null);
+        });
+    }
+
     function renderAttendanceAttachmentLink(attachment, emptyText = '') {
         const att = parseAttendanceAttachment(attachment);
         if (!att) return emptyText;
@@ -3392,6 +3489,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.parseAttendanceAttachment = parseAttendanceAttachment;
     window.renderAttendanceAttachmentLink = renderAttendanceAttachmentLink;
+    window.renderExcuseAttachmentPreview = renderExcuseAttachmentPreview;
 
     function sessionEscapeMessage(value) {
         return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -8284,6 +8382,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${wPct.toFixed(1)}%`;
     }
 
+    function gbFormatWeightContribution(score, total, weightPercent) {
+        const defined = weightPercent != null && Number(weightPercent) > 0
+            ? `${Number(weightPercent).toFixed(1)}%`
+            : '—';
+        if (weightPercent == null || !Number.isFinite(Number(weightPercent)) || Number(weightPercent) <= 0) {
+            return defined === '—' ? '—' : `— / ${defined}`;
+        }
+        if (score === null || score === undefined || Number.isNaN(Number(score))) {
+            return `— / ${defined}`;
+        }
+        const acquired = gbGradePercentContribution(score, total, weightPercent);
+        if (acquired === '—') return `— / ${defined}`;
+        return `${acquired} / ${defined}`;
+    }
+
     function gbNormalizeIncoming(list) {
         const arr = Array.isArray(list) ? list : [];
         return arr.map((gb) => {
@@ -8455,7 +8568,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pctCell = inp.closest('tr')?.querySelector('.gb-pct');
                 const wtCell = inp.closest('tr')?.querySelector('.gb-wt-pct');
                 if (pctCell) pctCell.textContent = gbFormatPct(n, total);
-                if (wtCell) wtCell.textContent = gbGradePercentContribution(n, total, gbExplicitWeight(gb));
+                if (wtCell) wtCell.textContent = gbFormatWeightContribution(n, total, gbExplicitWeight(gb));
                 markSessionAutosaveGradebookDirty();
             });
         });
@@ -8520,7 +8633,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             min="0" max="${total}" step="any" ${gbReadOnly ? 'disabled' : ''} value="${gbEscapeHtml(val)}" placeholder="—">
                     </td>
                     <td class="gb-pct small text-nowrap">${gbFormatPct(sc, total)}</td>
-                    <td class="gb-wt-pct small text-nowrap">${gbGradePercentContribution(sc, total, explicitWeight)}</td>
+                    <td class="gb-wt-pct small text-nowrap">${gbFormatWeightContribution(sc, total, explicitWeight)}</td>
                 </tr>`;
                 }).join('')
                 : `<tr><td colspan="4" class="text-muted small ps-3 py-2">No students on the attendance roster yet. Add enrollments to enter scores; saved activities and settings are shown below.</td></tr>`;
@@ -8544,7 +8657,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${gb.activityContent ? `<div class="gb-activity-body mb-3">${gbEscapeHtml(gb.activityContent)}</div>` : '<p class="small text-muted mb-3 fst-italic">No activity description.</p>'}
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered align-middle mb-0">
-                                <thead class="table-light"><tr><th class="ps-3">Student</th><th style="min-width:120px;">${gbEscapeHtml(gradeHeader)}</th><th style="min-width:72px;" title="Score as percent of this activity's total points">%</th><th style="min-width:72px;" title="Percent of the final grade earned on this activity (activity % × weight % ÷ 100)">W%</th></tr></thead>
+                                <thead class="table-light"><tr><th class="ps-3">Student</th><th style="min-width:120px;">${gbEscapeHtml(gradeHeader)}</th><th style="min-width:72px;" title="Score as percent of this activity's total points">%</th><th style="min-width:96px;" title="Earned weight / defined weight (% of final grade)">Weight</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                         </div>
@@ -8586,7 +8699,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const pctCell = row.querySelector('.gb-pct');
                     const wtCell = row.querySelector('.gb-wt-pct');
                     if (pctCell) pctCell.textContent = gbFormatPct(n, total);
-                    if (wtCell) wtCell.textContent = gbGradePercentContribution(n, total, gbExplicitWeight(gb));
+                    if (wtCell) wtCell.textContent = gbFormatWeightContribution(n, total, gbExplicitWeight(gb));
                 }
                 markSessionAutosaveGradebookDirty();
             });
@@ -8800,6 +8913,39 @@ document.addEventListener('DOMContentLoaded', () => {
         markSessionAutosaveGradebookDirty();
     }
 
+    let attendanceNameSortDir = 'asc';
+
+    function refreshAttendanceOrderNumbers() {
+        document.querySelectorAll('#attendanceTable .roster-row .attendance-order-cell').forEach((cell, index) => {
+            cell.textContent = String(index + 1);
+        });
+    }
+
+    function sortAttendanceRosterByName(dir) {
+        const tbody = document.querySelector('#attendanceTable tbody');
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('.roster-row'));
+        if (!rows.length) return;
+        rows.sort((a, b) => {
+            const nameA = String(a.getAttribute('data-student-name') || '').trim();
+            const nameB = String(b.getAttribute('data-student-name') || '').trim();
+            const cmp = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+            return dir === 'desc' ? -cmp : cmp;
+        });
+        rows.forEach((row) => tbody.appendChild(row));
+        refreshAttendanceOrderNumbers();
+    }
+
+    function updateAttendanceSortHeader() {
+        const header = document.getElementById('attendanceSortName');
+        if (!header) return;
+        const icon = header.querySelector('.attendance-sort-icon');
+        if (!icon) return;
+        icon.className = attendanceNameSortDir === 'desc'
+            ? 'bi bi-sort-alpha-down attendance-sort-icon'
+            : 'bi bi-sort-alpha-up attendance-sort-icon';
+    }
+
     function refreshAttendanceStatusSummary() {
         const counts = {
             present: 0,
@@ -8840,6 +8986,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const attendanceTableEl = document.getElementById('attendanceTable');
     if (attendanceTableEl) {
+        sortAttendanceRosterByName('asc');
+        updateAttendanceSortHeader();
+        const attendanceSortNameEl = document.getElementById('attendanceSortName');
+        if (attendanceSortNameEl) {
+            attendanceSortNameEl.addEventListener('click', () => {
+                attendanceNameSortDir = attendanceNameSortDir === 'asc' ? 'desc' : 'asc';
+                sortAttendanceRosterByName(attendanceNameSortDir);
+                updateAttendanceSortHeader();
+            });
+        }
         attendanceTableEl.addEventListener('change', (e) => {
             if (!e.target || !e.target.classList.contains('att-radio')) return;
             const row = e.target.closest('.roster-row');
@@ -9323,8 +9479,9 @@ function openDetailsModal(personId, name) {
         const excuseAttachment = details.excuseAttachment || null;
         const excuseFileInput = document.getElementById('modalExcuseFile');
         if (excuseFileInput) excuseFileInput.value = '';
-        const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
-        if (excusePreview) excusePreview.innerHTML = window.renderAttendanceAttachmentLink(excuseAttachment, '<span class="text-muted">No file attached.</span>');
+        if (typeof window.renderExcuseAttachmentPreview === 'function') {
+            window.renderExcuseAttachmentPreview(excuseAttachment);
+        }
 
         const comments = Array.isArray(details.comments) ? details.comments : [];
         const thread = document.getElementById('det_commentsThread');
