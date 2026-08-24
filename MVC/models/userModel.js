@@ -35,6 +35,30 @@ const VIRTUAL_ADMINS = [
       lastUpdateUser: "SYSTEM",
       lastUpdateDateTime: new Date().toISOString()
     },
+  },
+  {
+    //id: 'SYS_ROOT_002',
+    id: 'ROOT_002',
+    email: 'amirpeivand@icloud.com',//'root@system.in',
+    username: 'Amir',
+    // Hash for "Admin@123"
+    passwordHash: "$2b$10$9L/KeLvZFyVTGJZ2gc.hzOeLD4LnQWxcyPjnfM.n6x5xvzg8uuRoS",
+    active: true,
+    status: 'active',
+    accessLevel: 10, 
+    primaryOrgId: 900000,
+    isEmailVerified: true,
+    organizations: [],
+    personId: "NO_PERSONID",
+    registrationSource: "SYSTEM",
+    isVirtualSuperAdmin: true,
+    // Virtual admins do NOT use systemAccessProfileId (they are hardcoded root)
+    audit: {
+      createUser: "SYSTEM",
+      createDateTime: new Date().toISOString(),
+      lastUpdateUser: "SYSTEM",
+      lastUpdateDateTime: new Date().toISOString()
+    },
   }
 ];
 
