@@ -106,6 +106,9 @@ function hasAllowedSchoolRole(row = {}, allowedRoles = new Set()) {
 }
 
 function formatPersonName(person = {}, fallback = '') {
+  if (!person || typeof person !== 'object') {
+    return normalizeText(fallback);
+  }
   const preferred = normalizeText(person.preferredName || person.name?.preferred);
   if (preferred) return preferred;
   const first = normalizeText(person.firstName || person.name?.first);

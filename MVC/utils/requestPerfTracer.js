@@ -1,8 +1,5 @@
 const { getRequestContext, mergeRequestContext } = require('./requestContextStore');
 
-const DEBUG_SESSION_ID = 'a4ed36';
-const DEBUG_INGEST_URL = 'http://127.0.0.1:7806/ingest/c7fa1798-3774-4efe-9724-2848436aa81e';
-
 function isEnabledFlag(value) {
   return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
 }
@@ -223,27 +220,6 @@ function roundMs(value) {
   return Math.round(Number(value) * 10) / 10;
 }
 
-function emitDebugLog(summary, hypothesisId = 'PERF') {
-  // #region agent log
-  fetch(DEBUG_INGEST_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': DEBUG_SESSION_ID
-    },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION_ID,
-      runId: 'request-perf',
-      hypothesisId,
-      location: 'requestPerfTracer.js:finalize',
-      message: 'request-perf-summary',
-      data: summary,
-      timestamp: Date.now()
-    })
-  }).catch(() => {});
-  // #endregion
-}
-
 function finalize(req, res) {
   const summary = buildSummary(req, res);
   if (!summary) return;
@@ -251,16 +227,6 @@ function finalize(req, res) {
   console.info(
     `[request-perf] ${summary.method} ${summary.path} ${summary.statusCode} total=${summary.totalMs}ms preView=${summary.preViewMs}ms handler=${summary.handlerMs}ms view=${summary.viewRenderMs}ms data=${summary.dataOps.totalMs}ms`
   );
-
-  const topPhase = Object.entries(summary.phases)
-    .filter(([key]) => key !== 'view-render')
-    .sort((a, b) => b[1] - a[1])[0];
-  const topData = summary.dataOps.top[0];
-  const hypothesisId = topPhase && topPhase[1] >= (topData?.totalMs || 0)
-    ? `H-${topPhase[0]}`
-    : (topData ? `H-data-${topData.entity}` : 'PERF');
-
-  emitDebugLog(summary, hypothesisId);
 }
 
 function wrapMiddleware(phase, middleware) {

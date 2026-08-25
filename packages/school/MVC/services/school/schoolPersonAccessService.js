@@ -36,6 +36,9 @@ function readNamePart(person = {}, key = '') {
 }
 
 function formatPersonName(person = {}, fallback = '') {
+  if (!person || typeof person !== 'object') {
+    return normalizeText(fallback);
+  }
   const preferred = readNamePart(person, 'preferred');
   if (preferred) return preferred;
   const first = readNamePart(person, 'first');

@@ -248,7 +248,8 @@
     `<a href="/school/classes/${encClassId}/cycle-rollover" class="btn btn-filled btn-warning btn-md mb-2"><i class="bi bi-arrow-repeat me-1"></i> Cycle Rollover</a>`
   ];
   const rollingOptionalBtnsBeforePrint = [
-    `<button type="button" id="btn_openAddEnrollmentModal" class="btn btn-filled btn-add btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-plus-circle me-1"></i>New Enrollment</button>`
+    `<button type="button" id="btn_openAddEnrollmentModal" class="btn btn-filled btn-add btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-plus-circle me-1"></i>New Enrollment</button>`,
+    `<button type="button" id="btn_openGroupEnrollmentModal" class="btn btn-filled btn-primary btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-people-fill me-1"></i>Group Enrollment</button>`
   ];
 %>
 
@@ -675,6 +676,148 @@
   </div>
 </div>
 
+<div class="modal fade" id="groupEnrollmentModal" tabindex="-1" aria-labelledby="groupEnrollmentModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="groupEnrollmentModalLabel"><i class="bi bi-people-fill me-1"></i>Group Enrollment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="border rounded bg-light-subtle p-3 mb-3">
+          <div class="fw-semibold small text-primary mb-2">Add student to enrollment list</div>
+          <input type="hidden" id="grp_studentId">
+          <div class="mb-2">
+            <label class="form-label" for="grp_studentLabel">Student *</label>
+            <div class="input-group">
+              <input type="text" id="grp_studentLabel" class="form-control bg-white" placeholder="Type at least 2 characters to search students..." autocomplete="off">
+              <button type="button" class="btn btn-outline-primary" id="btn_pickGroupEntryStudent" aria-label="Pick student"><i class="bi bi-person-vcard"></i></button>
+            </div>
+          </div>
+          <div class="row g-2 enroll-cap-inputs-row">
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" for="grp_startDate">Start Date *</label>
+              <input type="date" id="grp_startDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" for="grp_endDate">End Date</label>
+              <input type="date" id="grp_endDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %>>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" for="grp_targetSessionCount">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
+              <input type="number" id="grp_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" for="grp_targetHours">Number of Hours <span class="text-muted fw-normal">(optional)</span></label>
+              <input type="number" id="grp_targetHours" class="form-control" min="0.25" step="0.25" placeholder="e.g. 20">
+            </div>
+          </div>
+          <div class="row g-1 mt-1 enroll-cap-hints-row">
+            <div class="col-lg-3 col-md-6 d-none d-lg-block"></div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0" id="grp_hint_endDate">Used with start date when no session or hour target is set.</div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0">Count sessions until target is reached. Cannot be combined with hour target.</div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0">Allocate sessions by total hours. Cannot be combined with session target.</div>
+            </div>
+          </div>
+          <div class="row g-2 mt-2 align-items-start enroll-meta-inputs-row">
+            <div class="col-md-3">
+              <label class="form-label" for="grp_funder">Funder</label>
+              <select id="grp_funder" class="form-select">
+                <option value="self" selected>Self Fund</option>
+                <% (Array.isArray(funderOptions) ? funderOptions : []).forEach((funder) => { %>
+                <option value="<%= String(funder.id || '') %>"><%= String(funder.label || funder.id || '') %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label" for="grp_status">Status</label>
+              <select id="grp_status" class="form-select">
+                <option value="active" selected>Active</option>
+                <option value="to_be_confirmed">To be Confirmed</option>
+                <option value="waiting_list">Waiting list</option>
+              </select>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label" for="grp_reasonStart">Reason Start</label>
+              <textarea id="grp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
+            </div>
+          </div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" value="1" id="grp_autoResolveSubjects">
+            <label class="form-check-label" for="grp_autoResolveSubjects">Auto Resolve the Subjects</label>
+          </div>
+          <div class="form-text compact-help mb-2">When enabled, applies CLB placement prior credits for missing prerequisites covered by the student&apos;s Current CLB levels, then enrolls if prerequisites are satisfied.</div>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btn_addGroupEnrollmentEntry">
+            <i class="bi bi-plus-circle me-1"></i>Add to List
+          </button>
+        </div>
+        <div class="mb-0">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            <label class="form-label mb-0">Queued students</label>
+            <span class="small text-muted" id="groupEnrollmentQueueCount">0 students</span>
+          </div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Student</th>
+                  <th>Start</th>
+                  <th>Target</th>
+                  <th>Funder</th>
+                  <th>Status</th>
+                  <th>Auto Resolve</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="groupEnrollmentStudentsTbody">
+                <tr><td colspan="7" class="text-center text-muted py-3">No students queued. Add a student above.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_completeGroupEnrollment">
+          <i class="bi bi-check2-circle me-1"></i>Complete Enrollment
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="groupEnrollmentResultsModal" tabindex="-1" aria-labelledby="groupEnrollmentResultsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="groupEnrollmentResultsModalLabel"><i class="bi bi-clipboard-check me-1"></i>Group Enrollment Results</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-light border small mb-3" id="groupEnrollmentResultsSummary" role="status">No results yet.</div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr><th>Student</th><th>Status</th><th>Details</th></tr>
+            </thead>
+            <tbody id="groupEnrollmentResultsTbody">
+              <tr><td colspan="3" class="text-center text-muted py-3">No results.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="programRegistrationShortcutModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -854,7 +997,10 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="alert alert-warning border small">
+        <div id="priorRepair_groupAlert" class="alert alert-info border small d-none">
+          Group enrollment is paused for this student. Add prerequisite credits below, then click Retry Enrollment to continue.
+        </div>
+        <div id="priorRepair_defaultAlert" class="alert alert-warning border small">
           These suggested credits are based on the current Rolling Enrollment eligibility result. Select only the credits you want to record, save them, then eligibility will be checked again.
         </div>
         <div class="row g-2 mb-3">
@@ -892,9 +1038,10 @@
         </div>
       </div>
       <div class="modal-footer flex-wrap gap-2">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn_priorRepairClose" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-warning btn-sm d-none" id="btn_priorRepairSkipStudent">Skip Student</button>
         <button type="button" class="btn btn-success btn-sm" id="btn_priorRepairSave"><i class="bi bi-check2-circle me-1"></i>Save Selected Credits</button>
-        <button type="button" class="btn btn-outline-success btn-sm" id="btn_priorRepairRetry"><i class="bi bi-arrow-clockwise me-1"></i>Retry Eligibility</button>
+        <button type="button" class="btn btn-outline-success btn-sm" id="btn_priorRepairRetry"><i class="bi bi-arrow-clockwise me-1"></i><span id="priorRepair_retryLabel">Retry Eligibility</span></button>
       </div>
     </div>
   </div>
@@ -1322,12 +1469,25 @@
   function setFunderSelectValue(selectId, periodRow) {
     const el = qs(selectId);
     if (!el) return;
+    setFunderSelectElementValue(el, periodRow);
+  }
+
+  function setFunderSelectElementValue(selectEl, periodRow) {
+    if (!selectEl) return;
     const funderId = String(periodRow?.funderId || '').trim();
     if (funderId && funderId.toLowerCase() !== 'self' && funderLabelById.has(funderId)) {
-      el.value = funderId;
+      selectEl.value = funderId;
       return;
     }
-    el.value = 'self';
+    selectEl.value = 'self';
+  }
+
+  function resolveFunderSelectionFromElement(selectEl) {
+    const value = String(selectEl?.value || 'self').trim() || 'self';
+    if (!value || value.toLowerCase() === 'self') {
+      return { funderId: 'self', funderType: 'self' };
+    }
+    return { funderId: value, funderType: 'funder' };
   }
 
   function collectAttachedEnrollmentTransactionIds(periodRow) {
@@ -1400,6 +1560,10 @@
   let enrollWizardSkippedAddSessions = false;
   let lastConflictReview = null;
   let conflictReviewHasConflicts = false;
+  let groupEnrollmentStudents = [];
+  let groupEnrollmentEditingIndex = -1;
+  let groupPrerequisiteRepairContext = null;
+  let groupEnrollmentInProgress = false;
 
   const qs = (id) => document.getElementById(id);
   const tbody = qs('tbody_periods');
@@ -1534,7 +1698,39 @@
     if (sourceInputId === 'edit_targetHours' && hasTargetHours('edit_targetHours')) {
       if (editSessionInput) editSessionInput.value = '';
     }
+    const grpSessionInput = qs('grp_targetSessionCount');
+    const grpHoursInput = qs('grp_targetHours');
+    if (sourceInputId === 'grp_targetSessionCount' && hasTargetSessionCount('grp_targetSessionCount')) {
+      if (grpHoursInput) grpHoursInput.value = '';
+    }
+    if (sourceInputId === 'grp_targetHours' && hasTargetHours('grp_targetHours')) {
+      if (grpSessionInput) grpSessionInput.value = '';
+    }
     applyEnrollmentCapUi();
+    applyGroupEnrollmentCapUi();
+  }
+
+  function applyGroupQueueEditCapMutualExclusion(index, sourceField = '') {
+    const container = qs('groupEnrollmentStudentsTbody')?.querySelector(`[data-group-edit-row="${index}"]`);
+    if (!container) return;
+    const sessionInput = container.querySelector('[data-group-edit-field="targetSessionCount"]');
+    const hoursInput = container.querySelector('[data-group-edit-field="targetHours"]');
+    if (sourceField === 'targetSessionCount' && normalizeTargetSessionCountValue(sessionInput?.value) > 0) {
+      if (hoursInput) hoursInput.value = '';
+    }
+    if (sourceField === 'targetHours' && normalizeTargetHoursValue(hoursInput?.value) > 0) {
+      if (sessionInput) sessionInput.value = '';
+    }
+  }
+
+  function applyGroupEnrollmentCapUi() {
+    const capSet = hasTargetSessionCount('grp_targetSessionCount') || hasTargetHours('grp_targetHours');
+    const hintEnd = qs('grp_hint_endDate');
+    if (hintEnd) {
+      hintEnd.textContent = capSet
+        ? 'Ignored when a session or hour target is set.'
+        : 'Used with start date when no session or hour target is set.';
+    }
   }
 
   function applyEnrollmentCapUi() {
@@ -1765,6 +1961,8 @@
   const priorCreditRepairModalEl = qs('priorCreditRepairModal');
   const clbPlacementInsightModalEl = qs('clbPlacementInsightModal');
   const enrollmentSessionListModalEl = qs('enrollmentSessionListModal');
+  const groupEnrollmentModalEl = qs('groupEnrollmentModal');
+  const groupEnrollmentResultsModalEl = qs('groupEnrollmentResultsModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
 
   function createModalController(modalEl) {
@@ -1841,6 +2039,8 @@
   const priorCreditRepairModal = createModalController(priorCreditRepairModalEl);
   const clbPlacementInsightModal = createModalController(clbPlacementInsightModalEl);
   const enrollmentSessionListModal = createModalController(enrollmentSessionListModalEl);
+  const groupEnrollmentModal = createModalController(groupEnrollmentModalEl);
+  const groupEnrollmentResultsModal = createModalController(groupEnrollmentResultsModalEl);
   const addButton = qs('btn_addPeriod');
   let approvedCloseStatusPayload = null;
 
@@ -2055,13 +2255,108 @@
     clbPlacementInsightModal?.show();
   }
 
-  function getPriorRepairPrerequisite() {
-    const prereq = lastRollingEligibility?.prerequisite || {};
+  function getPriorRepairFromEligibility(eligibility = {}) {
+    const prereq = eligibility?.prerequisite || {};
     return {
       missingSubjects: Array.isArray(prereq.missingSubjects) ? prereq.missingSubjects : [],
-      programId: String(prereq.repairProgramId || lastRollingEligibility?.resolved?.programId || '').trim(),
-      programLabel: String(lastRollingEligibility?.resolved?.label || prereq.repairProgramId || lastRollingEligibility?.resolved?.programId || '').trim()
+      programId: String(prereq.repairProgramId || eligibility?.resolved?.programId || '').trim(),
+      programLabel: String(eligibility?.resolved?.label || prereq.repairProgramId || eligibility?.resolved?.programId || '').trim()
     };
+  }
+
+  function getPriorRepairPrerequisite() {
+    return getPriorRepairFromEligibility(lastRollingEligibility);
+  }
+
+  function isGroupPrerequisiteRepairable(prereqPayload = {}) {
+    if (!prereqPayload || prereqPayload.eligible === true) return false;
+    const prereq = prereqPayload.prerequisite || {};
+    const missingSubjects = Array.isArray(prereq.missingSubjects) ? prereq.missingSubjects : [];
+    if (!missingSubjects.length) return false;
+    if (!canCreatePriorSubjectCredits || prereq.canCreatePriorCredits === false) return false;
+    const issues = Array.isArray(prereq.issues) ? prereq.issues : [];
+    if (issues.some(isStudentConflictMessage)) return false;
+    if (issues.some(isMissingProgramRegistrationMessage)) return false;
+    if (issues.some(isMissingTermRegistrationMessage)) return false;
+    return true;
+  }
+
+  function syncPriorRepairModalGroupModeUi(isGroupMode = false) {
+    const groupAlert = qs('priorRepair_groupAlert');
+    const defaultAlert = qs('priorRepair_defaultAlert');
+    const skipBtn = qs('btn_priorRepairSkipStudent');
+    const closeBtn = qs('btn_priorRepairClose');
+    const retryLabel = qs('priorRepair_retryLabel');
+    if (groupAlert) groupAlert.classList.toggle('d-none', !isGroupMode);
+    if (defaultAlert) defaultAlert.classList.toggle('d-none', isGroupMode);
+    if (skipBtn) skipBtn.classList.toggle('d-none', !isGroupMode);
+    if (closeBtn) closeBtn.classList.toggle('d-none', isGroupMode);
+    if (retryLabel) retryLabel.textContent = isGroupMode ? 'Retry Enrollment' : 'Retry Eligibility';
+  }
+
+  function populatePriorCreditRepairModal(student = {}, repair = {}, options = {}) {
+    const evidenceDefault = options.groupMode
+      ? 'Added from Group Enrollment prerequisite repair'
+      : 'Added from Rolling Enrollment prerequisite repair';
+    if (qs('priorRepair_studentLabel')) qs('priorRepair_studentLabel').value = student.label || student.id || '';
+    if (qs('priorRepair_programLabel')) qs('priorRepair_programLabel').value = repair.programLabel || repair.programId || '';
+    if (qs('priorRepair_source')) qs('priorRepair_source').value = 'manual_waiver';
+    if (qs('priorRepair_evidenceNote')) qs('priorRepair_evidenceNote').value = evidenceDefault;
+    renderPriorRepairSubjectList(repair.missingSubjects);
+    syncPriorRepairModalGroupModeUi(options.groupMode === true);
+  }
+
+  function finishGroupPrerequisiteRepair(action = 'skip') {
+    const ctx = groupPrerequisiteRepairContext;
+    if (!ctx) return;
+    groupPrerequisiteRepairContext = null;
+    syncPriorRepairModalGroupModeUi(false);
+    if (priorCreditRepairModalEl && bootstrapApi?.Modal) {
+      bootstrapApi.Modal.getOrCreateInstance(priorCreditRepairModalEl, { backdrop: true, keyboard: true });
+    }
+    priorCreditRepairModal?.hide();
+    if (typeof ctx.resolve === 'function') ctx.resolve(action);
+  }
+
+  async function refreshGroupPrerequisiteRepairSubjects() {
+    const ctx = groupPrerequisiteRepairContext;
+    if (!ctx?.entry?.id) return;
+    const settings = groupEnrollmentSettingsFromEntry(ctx.entry);
+    const prereq = await fetchGroupStudentPrerequisites(ctx.entry.id, settings.startDate);
+    if (!prereq) return;
+    ctx.prereq = prereq;
+    const repair = getPriorRepairFromEligibility(prereq);
+    renderPriorRepairSubjectList(repair.missingSubjects);
+    if (qs('priorRepair_programLabel') && repair.programLabel) {
+      qs('priorRepair_programLabel').value = repair.programLabel;
+    }
+  }
+
+  function waitForGroupPrerequisiteRepair(entry, prereq, index, total) {
+    const repair = getPriorRepairFromEligibility(prereq);
+    populatePriorCreditRepairModal(
+      { id: entry.id, label: entry.label || entry.id },
+      repair,
+      { groupMode: true }
+    );
+    return new Promise((resolve) => {
+      groupPrerequisiteRepairContext = {
+        entry,
+        index,
+        total,
+        prereq,
+        resolve
+      };
+      if (priorCreditRepairModalEl && bootstrapApi?.Modal) {
+        const instance = bootstrapApi.Modal.getOrCreateInstance(priorCreditRepairModalEl, {
+          backdrop: 'static',
+          keyboard: false
+        });
+        instance.show();
+      } else {
+        priorCreditRepairModal?.show();
+      }
+    });
   }
 
   function renderPriorCreditRepairPanel(message) {
@@ -2193,11 +2488,10 @@
       await showMsg('No Suggestions', 'info', 'No missing prerequisite subjects were found in the latest eligibility result.');
       return;
     }
-    if (qs('priorRepair_studentLabel')) qs('priorRepair_studentLabel').value = student.label || student.id || '';
-    if (qs('priorRepair_programLabel')) qs('priorRepair_programLabel').value = repair.programLabel || repair.programId || '';
-    if (qs('priorRepair_source')) qs('priorRepair_source').value = 'manual_waiver';
-    if (qs('priorRepair_evidenceNote')) qs('priorRepair_evidenceNote').value = 'Added from Rolling Enrollment prerequisite repair';
-    renderPriorRepairSubjectList(repair.missingSubjects);
+    populatePriorCreditRepairModal(student, repair, { groupMode: false });
+    if (priorCreditRepairModalEl && bootstrapApi?.Modal) {
+      bootstrapApi.Modal.getOrCreateInstance(priorCreditRepairModalEl, { backdrop: true, keyboard: true });
+    }
     priorCreditRepairModal?.show();
   }
 
@@ -2245,9 +2539,14 @@
   }
 
   async function savePriorCreditRepair() {
-    if (shortcutActionInProgress) return;
-    const student = getSelectedShortcutStudent();
-    const repair = getPriorRepairPrerequisite();
+    const groupCtx = groupPrerequisiteRepairContext;
+    if (!groupCtx && shortcutActionInProgress) return;
+    const student = groupCtx
+      ? { id: groupCtx.entry.id, label: groupCtx.entry.label || groupCtx.entry.id }
+      : getSelectedShortcutStudent();
+    const repair = groupCtx
+      ? getPriorRepairFromEligibility(groupCtx.prereq)
+      : getPriorRepairPrerequisite();
     const subjectIds = getSelectedPriorRepairSubjectIds();
     if (!student.id || !repair.programId) {
       await showMsg('Missing Context', 'warning', 'Student and program are required before adding prior credits.');
@@ -2257,7 +2556,7 @@
       await showMsg('Select Subjects', 'warning', 'Select at least one suggested prerequisite subject.');
       return;
     }
-    shortcutActionInProgress = true;
+    if (!groupCtx) shortcutActionInProgress = true;
     try {
       showBusy('Saving prior subject credits...');
       const result = await requestJson('/school/classes/api/' + encodeURIComponent(classId) + '/rolling-prior-subject-credits/batch', 'POST', {
@@ -2279,13 +2578,25 @@
         errorList.length ? errorList.map((row) => `${row.subjectId || 'Subject'}: ${row.message || 'Save failed.'}`).join('<br>') : ''
       ].filter(Boolean).join('<br>');
       await showMsg('Prior Credits Saved', statusIcon, message || 'Prior subject credits were saved.');
-      await refreshRollingEligibility();
+      if (groupCtx) {
+        await refreshGroupPrerequisiteRepairSubjects();
+      } else {
+        await refreshRollingEligibility();
+      }
     } catch (error) {
       await showMsg('Prior Credits Failed', 'error', error.message || 'Unable to save prior subject credits.');
     } finally {
-      shortcutActionInProgress = false;
+      if (!groupCtx) shortcutActionInProgress = false;
       hideBusy();
     }
+  }
+
+  async function handlePriorRepairRetry() {
+    if (groupPrerequisiteRepairContext) {
+      finishGroupPrerequisiteRepair('retry');
+      return;
+    }
+    await refreshRollingEligibility();
   }
 
   function renderShortcutPreviewHtml(rows, message) {
@@ -2846,6 +3157,618 @@
     }
   }
 
+  function formatGroupStudentLabel(item = {}) {
+    const id = String(item?.id || '').trim();
+    const firstName = String(item?.firstName || item?.name?.first || '').trim();
+    const lastName = String(item?.lastName || item?.name?.last || '').trim();
+    const personName = [firstName, lastName].filter(Boolean).join(' ').trim() || String(item?.name || '').trim();
+    const studentNum = String(item?.studentNumber || '').trim();
+    return studentNum ? `${personName} (${studentNum})` : (personName || id);
+  }
+
+  function groupEnrollmentSettingsFromEntry(entry = {}) {
+    return {
+      startDate: String(entry.startDate || '').trim(),
+      endDate: String(entry.endDate || '').trim(),
+      status: String(entry.status || 'active').trim(),
+      funderType: String(entry.funderType || 'self').trim(),
+      funderId: String(entry.funderId || 'self').trim(),
+      reasonStart: String(entry.reasonStart || '').trim(),
+      targetSessionCount: String(entry.targetSessionCount || '').trim(),
+      targetHours: String(entry.targetHours || '').trim()
+    };
+  }
+
+  function formatGroupEnrollmentCapSummary(entry = {}) {
+    const sessionCount = normalizeTargetSessionCountValue(entry.targetSessionCount);
+    const hours = normalizeTargetHoursValue(entry.targetHours);
+    if (sessionCount > 0) return `${sessionCount} sessions`;
+    if (hours > 0) return `${hours} hrs`;
+    const endDate = String(entry.endDate || '').trim();
+    if (endDate) return `End ${endDate}`;
+    return 'Date window';
+  }
+
+  function syncGroupEnrollmentCompleteButton() {
+    const completeBtn = qs('btn_completeGroupEnrollment');
+    if (completeBtn) completeBtn.disabled = groupEnrollmentStudents.length === 0;
+    const countEl = qs('groupEnrollmentQueueCount');
+    if (countEl) {
+      countEl.textContent = `${groupEnrollmentStudents.length} student${groupEnrollmentStudents.length === 1 ? '' : 's'}`;
+    }
+  }
+
+  function buildGroupFunderOptionsHtml(selectedFunderId = '') {
+    const source = qs('grp_funder');
+    if (!source) return '<option value="self">Self Fund</option>';
+    const selected = String(selectedFunderId || '').trim();
+    return Array.from(source.options).map((opt) => {
+      const val = String(opt.value || '');
+      const isSelected = selected && val === selected || (!selected && val === 'self');
+      return '<option value="' + htmlEscape(val) + '"' + (isSelected ? ' selected' : '') + '>'
+        + htmlEscape(String(opt.textContent || val))
+        + '</option>';
+    }).join('');
+  }
+
+  function buildGroupEnrollmentDateInputAttrs(kind = 'start') {
+    const parts = [];
+    const cycleStart = String(cycleWindow?.startDate || '').trim();
+    const cycleEnd = String(cycleWindow?.endDate || '').trim();
+    if (cycleStart) parts.push('min="' + htmlEscape(cycleStart) + '"');
+    if (kind === 'start' && cycleEnd) parts.push('max="' + htmlEscape(cycleEnd) + '"');
+    return parts.join(' ');
+  }
+
+  function buildGroupEnrollmentEditRowHtml(row = {}, index = 0) {
+    const status = String(row.status || 'active');
+    const funderOptionsHtml = buildGroupFunderOptionsHtml(String(row.funderId || 'self'));
+    const startDateAttrs = buildGroupEnrollmentDateInputAttrs('start');
+    const endDateAttrs = buildGroupEnrollmentDateInputAttrs('end');
+    return '<tr class="group-enrollment-edit-row table-light">'
+      + '<td colspan="7" class="p-3" data-group-edit-row="' + String(index) + '">'
+      + '<div class="row g-2">'
+      + '<div class="col-md-3 col-lg-2">'
+      + '<label class="form-label small mb-1">Start Date *</label>'
+      + '<input type="date" class="form-control form-control-sm" data-group-edit-field="startDate" value="' + htmlEscape(String(row.startDate || '')) + '" ' + startDateAttrs + '>'
+      + '</div>'
+      + '<div class="col-md-3 col-lg-2">'
+      + '<label class="form-label small mb-1">End Date</label>'
+      + '<input type="date" class="form-control form-control-sm" data-group-edit-field="endDate" value="' + htmlEscape(String(row.endDate || '')) + '" ' + endDateAttrs + '>'
+      + '</div>'
+      + '<div class="col-md-3 col-lg-2">'
+      + '<label class="form-label small mb-1">Sessions</label>'
+      + '<input type="number" class="form-control form-control-sm" data-group-edit-field="targetSessionCount" min="1" step="1" placeholder="e.g. 10" value="' + htmlEscape(String(row.targetSessionCount || '')) + '">'
+      + '</div>'
+      + '<div class="col-md-3 col-lg-2">'
+      + '<label class="form-label small mb-1">Hours</label>'
+      + '<input type="number" class="form-control form-control-sm" data-group-edit-field="targetHours" min="0.25" step="0.25" placeholder="e.g. 20" value="' + htmlEscape(String(row.targetHours || '')) + '">'
+      + '</div>'
+      + '<div class="col-md-4 col-lg-2">'
+      + '<label class="form-label small mb-1">Funder</label>'
+      + '<select class="form-select form-select-sm" data-group-edit-field="funder">' + funderOptionsHtml + '</select>'
+      + '</div>'
+      + '<div class="col-md-4 col-lg-2">'
+      + '<label class="form-label small mb-1">Status</label>'
+      + '<select class="form-select form-select-sm" data-group-edit-field="status">'
+      + '<option value="active"' + (status === 'active' ? ' selected' : '') + '>Active</option>'
+      + '<option value="to_be_confirmed"' + (status === 'to_be_confirmed' ? ' selected' : '') + '>To be Confirmed</option>'
+      + '<option value="waiting_list"' + (status === 'waiting_list' ? ' selected' : '') + '>Waiting list</option>'
+      + '</select>'
+      + '</div>'
+      + '<div class="col-12">'
+      + '<label class="form-label small mb-1">Reason Start</label>'
+      + '<textarea class="form-control form-control-sm" rows="2" data-group-edit-field="reasonStart" placeholder="Optional start note">' + htmlEscape(String(row.reasonStart || '')) + '</textarea>'
+      + '</div>'
+      + '<div class="col-12">'
+      + '<div class="form-check">'
+      + '<input class="form-check-input" type="checkbox" data-group-edit-field="autoResolveSubjects" value="1"' + (row.autoResolveSubjects ? ' checked' : '') + '>'
+      + '<label class="form-check-label small">Auto Resolve the Subjects</label>'
+      + '</div>'
+      + '</div>'
+      + '<div class="col-12 d-flex flex-wrap gap-2">'
+      + '<button type="button" class="btn btn-primary btn-sm" data-group-queue-save="' + String(index) + '">Save</button>'
+      + '<button type="button" class="btn btn-outline-secondary btn-sm" data-group-queue-cancel="' + String(index) + '">Cancel</button>'
+      + '</div>'
+      + '</div>'
+      + '</td>'
+      + '</tr>';
+  }
+
+  function collectGroupEnrollmentEntryFromEditRow(index) {
+    const container = qs('groupEnrollmentStudentsTbody')?.querySelector(`[data-group-edit-row="${index}"]`);
+    if (!container) return null;
+    const funderSelect = container.querySelector('[data-group-edit-field="funder"]');
+    const funder = resolveFunderSelectionFromElement(funderSelect);
+    const sessionInput = container.querySelector('[data-group-edit-field="targetSessionCount"]');
+    const hoursInput = container.querySelector('[data-group-edit-field="targetHours"]');
+    return {
+      startDate: String(container.querySelector('[data-group-edit-field="startDate"]')?.value || '').trim(),
+      endDate: String(container.querySelector('[data-group-edit-field="endDate"]')?.value || '').trim(),
+      status: String(container.querySelector('[data-group-edit-field="status"]')?.value || 'active').trim(),
+      funderType: funder.funderType,
+      funderId: funder.funderId,
+      reasonStart: String(container.querySelector('[data-group-edit-field="reasonStart"]')?.value || '').trim(),
+      targetSessionCount: normalizeTargetSessionCountValue(sessionInput?.value) > 0
+        ? String(sessionInput?.value || '').trim()
+        : '',
+      targetHours: normalizeTargetHoursValue(hoursInput?.value) > 0
+        ? String(hoursInput?.value || '').trim()
+        : '',
+      autoResolveSubjects: container.querySelector('[data-group-edit-field="autoResolveSubjects"]')?.checked === true
+    };
+  }
+
+  function startGroupEnrollmentQueueEdit(index) {
+    if (!Number.isFinite(index) || index < 0 || index >= groupEnrollmentStudents.length) return;
+    groupEnrollmentEditingIndex = index;
+    renderGroupEnrollmentStudents();
+  }
+
+  function cancelGroupEnrollmentQueueEdit() {
+    groupEnrollmentEditingIndex = -1;
+    renderGroupEnrollmentStudents();
+  }
+
+  async function saveGroupEnrollmentQueueRow(index) {
+    const idx = Number(index);
+    if (!Number.isFinite(idx) || idx < 0 || idx >= groupEnrollmentStudents.length) return;
+    const current = groupEnrollmentStudents[idx];
+    const partial = collectGroupEnrollmentEntryFromEditRow(idx);
+    if (!partial) return;
+    const entry = {
+      ...partial,
+      id: String(current.id || '').trim(),
+      label: String(current.label || current.id || '').trim()
+    };
+    const validationIssue = validateGroupEnrollmentEntry(entry);
+    if (validationIssue) {
+      await showMsg('Validation', 'warning', validationIssue);
+      return;
+    }
+    groupEnrollmentStudents[idx] = entry;
+    groupEnrollmentEditingIndex = -1;
+    renderGroupEnrollmentStudents();
+  }
+
+  function renderGroupEnrollmentStudents() {
+    const tbody = qs('groupEnrollmentStudentsTbody');
+    if (!tbody) return;
+    if (!groupEnrollmentStudents.length) {
+      groupEnrollmentEditingIndex = -1;
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No students queued. Add a student above.</td></tr>';
+      syncGroupEnrollmentCompleteButton();
+      return;
+    }
+    if (groupEnrollmentEditingIndex >= groupEnrollmentStudents.length) {
+      groupEnrollmentEditingIndex = -1;
+    }
+    tbody.innerHTML = groupEnrollmentStudents.map((row, index) => {
+      const autoResolveLabel = row.autoResolveSubjects
+        ? '<span class="badge bg-success-subtle text-success border">On</span>'
+        : '<span class="text-muted small">Off</span>';
+      const summaryRow = '<tr>'
+        + '<td>' + htmlEscape(row.label || row.id) + '</td>'
+        + '<td class="small">' + htmlEscape(String(row.startDate || '')) + '</td>'
+        + '<td class="small">' + htmlEscape(formatGroupEnrollmentCapSummary(row)) + '</td>'
+        + '<td class="small">' + htmlEscape(resolveFunderDisplayLabel(row)) + '</td>'
+        + '<td class="small">' + htmlEscape(formatPeriodStatusLabel(row.status || 'active')) + '</td>'
+        + '<td>' + autoResolveLabel + '</td>'
+        + '<td class="text-end">'
+        + '<div class="d-inline-flex gap-1">'
+        + '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-group-student-edit="' + String(index) + '" aria-label="Edit student enrollment">'
+        + '<i class="bi bi-pencil"></i>'
+        + '</button>'
+        + '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" data-group-student-remove="' + String(index) + '" aria-label="Remove student">'
+        + '<i class="bi bi-x-lg"></i>'
+        + '</button>'
+        + '</div>'
+        + '</td>'
+        + '</tr>';
+      const editRow = groupEnrollmentEditingIndex === index
+        ? buildGroupEnrollmentEditRowHtml(row, index)
+        : '';
+      return summaryRow + editRow;
+    }).join('');
+    tbody.querySelectorAll('[data-group-student-edit]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.getAttribute('data-group-student-edit'));
+        startGroupEnrollmentQueueEdit(idx);
+      });
+    });
+    tbody.querySelectorAll('[data-group-student-remove]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.getAttribute('data-group-student-remove'));
+        if (!Number.isFinite(idx) || idx < 0 || idx >= groupEnrollmentStudents.length) return;
+        if (groupEnrollmentEditingIndex === idx) {
+          groupEnrollmentEditingIndex = -1;
+        } else if (groupEnrollmentEditingIndex > idx) {
+          groupEnrollmentEditingIndex -= 1;
+        }
+        groupEnrollmentStudents.splice(idx, 1);
+        renderGroupEnrollmentStudents();
+      });
+    });
+    tbody.querySelectorAll('[data-group-queue-save]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.getAttribute('data-group-queue-save'));
+        saveGroupEnrollmentQueueRow(idx);
+      });
+    });
+    tbody.querySelectorAll('[data-group-queue-cancel]').forEach((btn) => {
+      btn.addEventListener('click', () => cancelGroupEnrollmentQueueEdit());
+    });
+    tbody.querySelectorAll('[data-group-edit-field="targetSessionCount"]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const container = input.closest('[data-group-edit-row]');
+        const idx = Number(container?.getAttribute('data-group-edit-row'));
+        if (Number.isFinite(idx)) applyGroupQueueEditCapMutualExclusion(idx, 'targetSessionCount');
+      });
+    });
+    tbody.querySelectorAll('[data-group-edit-field="targetHours"]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const container = input.closest('[data-group-edit-row]');
+        const idx = Number(container?.getAttribute('data-group-edit-row'));
+        if (Number.isFinite(idx)) applyGroupQueueEditCapMutualExclusion(idx, 'targetHours');
+      });
+    });
+    syncGroupEnrollmentCompleteButton();
+  }
+
+  function clearGroupEnrollmentEntryStudent() {
+    if (qs('grp_studentId')) qs('grp_studentId').value = '';
+    if (qs('grp_studentLabel')) qs('grp_studentLabel').value = '';
+  }
+
+  function prefillGroupEnrollmentEntryForm(entry = {}) {
+    if (qs('grp_startDate')) qs('grp_startDate').value = String(entry.startDate || '');
+    if (qs('grp_endDate')) qs('grp_endDate').value = String(entry.endDate || '');
+    if (qs('grp_targetSessionCount')) qs('grp_targetSessionCount').value = String(entry.targetSessionCount || '');
+    if (qs('grp_targetHours')) qs('grp_targetHours').value = String(entry.targetHours || '');
+    if (qs('grp_status')) qs('grp_status').value = String(entry.status || 'active');
+    if (qs('grp_reasonStart')) qs('grp_reasonStart').value = String(entry.reasonStart || '');
+    if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = entry.autoResolveSubjects === true;
+    setFunderSelectValue('grp_funder', {
+      funderId: String(entry.funderId || 'self'),
+      funderType: String(entry.funderType || 'self')
+    });
+    applyGroupEnrollmentCapUi();
+  }
+
+  function collectGroupEnrollmentEntryFromForm() {
+    const funder = resolveFunderSelectionFromSelect('grp_funder');
+    return {
+      id: String(qs('grp_studentId')?.value || '').trim(),
+      label: String(qs('grp_studentLabel')?.value || '').trim(),
+      startDate: String(qs('grp_startDate')?.value || '').trim(),
+      endDate: String(qs('grp_endDate')?.value || '').trim(),
+      status: String(qs('grp_status')?.value || 'active').trim(),
+      funderType: funder.funderType,
+      funderId: funder.funderId,
+      reasonStart: String(qs('grp_reasonStart')?.value || '').trim(),
+      targetSessionCount: hasTargetSessionCount('grp_targetSessionCount')
+        ? String(qs('grp_targetSessionCount')?.value || '').trim()
+        : '',
+      targetHours: hasTargetHours('grp_targetHours')
+        ? String(qs('grp_targetHours')?.value || '').trim()
+        : '',
+      autoResolveSubjects: qs('grp_autoResolveSubjects')?.checked === true
+    };
+  }
+
+  function validateGroupEnrollmentEntry(entry = {}) {
+    if (!String(entry.id || '').trim()) return 'Select a student.';
+    if (!String(entry.startDate || '').trim()) return 'Start Date is required.';
+    const sessionCount = normalizeTargetSessionCountValue(entry.targetSessionCount);
+    const hours = normalizeTargetHoursValue(entry.targetHours);
+    if (sessionCount > 0 && hours > 0) return 'Set either a session target or an hour target, not both.';
+    const cycleIssue = validateCycleEnrollmentDates(entry.startDate);
+    if (cycleIssue) return cycleIssue;
+    return '';
+  }
+
+  async function addGroupEnrollmentEntry() {
+    const entry = collectGroupEnrollmentEntryFromForm();
+    const validationIssue = validateGroupEnrollmentEntry(entry);
+    if (validationIssue) {
+      await showMsg('Validation', 'warning', validationIssue);
+      return;
+    }
+    if (groupEnrollmentStudents.some((row) => String(row.id) === String(entry.id))) {
+      await showMsg('Duplicate student', 'warning', 'This student is already in the enrollment list.');
+      return;
+    }
+    groupEnrollmentStudents.push({ ...entry });
+    renderGroupEnrollmentStudents();
+    prefillGroupEnrollmentEntryForm(entry);
+    clearGroupEnrollmentEntryStudent();
+    qs('grp_studentLabel')?.focus();
+  }
+
+  function clearGroupEnrollmentForm() {
+    groupEnrollmentStudents = [];
+    groupEnrollmentEditingIndex = -1;
+    groupPrerequisiteRepairContext = null;
+    renderGroupEnrollmentStudents();
+    clearGroupEnrollmentEntryStudent();
+    if (qs('grp_startDate')) qs('grp_startDate').value = '';
+    if (qs('grp_endDate')) qs('grp_endDate').value = '';
+    if (qs('grp_targetSessionCount')) qs('grp_targetSessionCount').value = '';
+    if (qs('grp_targetHours')) qs('grp_targetHours').value = '';
+    if (qs('grp_status')) qs('grp_status').value = 'active';
+    if (qs('grp_reasonStart')) qs('grp_reasonStart').value = '';
+    if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = false;
+    setFunderSelectValue('grp_funder', { funderId: 'self', funderType: 'self' });
+    applyGroupEnrollmentCapUi();
+  }
+
+  function inferGroupEnrollmentMode(settings = {}) {
+    if (normalizeTargetHoursValue(settings.targetHours) > 0) return 'hour_cap';
+    if (normalizeTargetSessionCountValue(settings.targetSessionCount) > 0) return 'session_cap';
+    return 'date_window';
+  }
+
+  function validateGroupEnrollmentQueue() {
+    if (!groupEnrollmentStudents.length) return 'Add at least one student to the enrollment list.';
+    return '';
+  }
+
+  function buildGroupEnginePayload(studentId, settings = {}) {
+    const enrollmentMode = inferGroupEnrollmentMode(settings);
+    const payload = {
+      classId,
+      students: [{ studentId: String(studentId || '').trim() }],
+      enrollmentMode,
+      startDate: settings.startDate,
+      endDate: settings.endDate,
+      status: settings.status,
+      funderType: settings.funderType,
+      funderId: settings.funderId,
+      reasonStart: settings.reasonStart,
+      sessionCountPolicy: 'all_non_na'
+    };
+    if (normalizeTargetSessionCountValue(settings.targetSessionCount) > 0) {
+      payload.targetSessionCount = normalizeTargetSessionCountValue(settings.targetSessionCount);
+    }
+    if (normalizeTargetHoursValue(settings.targetHours) > 0) {
+      payload.targetHours = normalizeTargetHoursValue(settings.targetHours);
+    }
+    return payload;
+  }
+
+  async function fetchGroupStudentPrerequisites(studentId, startDate) {
+    const result = await requestJson(
+      `/school/classes/api/${encodeURIComponent(classId)}/rolling-enrollment-prerequisites`,
+      'POST',
+      { studentId, startDate }
+    );
+    return result?.data || null;
+  }
+
+  function renderGroupEnrollmentResults(results = []) {
+    const tbody = qs('groupEnrollmentResultsTbody');
+    const summary = qs('groupEnrollmentResultsSummary');
+    if (!tbody) return;
+    const list = Array.isArray(results) ? results : [];
+    const succeeded = list.filter((row) => row.ok).length;
+    const failed = list.length - succeeded;
+    if (summary) {
+      summary.textContent = list.length
+        ? `${succeeded} succeeded, ${failed} failed (${list.length} total).`
+        : 'No results.';
+    }
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No results.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map((row) => {
+      const statusBadge = row.ok
+        ? '<span class="badge bg-success-subtle text-success border">Success</span>'
+        : '<span class="badge bg-danger-subtle text-danger border">Failed</span>';
+      let details = row.ok
+        ? (row.period?.id ? `Period ${htmlEscape(String(row.period.id))}` : htmlEscape(String(row.message || 'Enrolled')))
+        : htmlEscape(String(row.error || 'Enrollment failed.'));
+      if (row.ok && String(row.mode || '').toLowerCase() === 'chargeable') {
+        details += ' · Draft created';
+      }
+      return '<tr>'
+        + '<td>' + htmlEscape(row.label || row.studentId || '') + '</td>'
+        + '<td>' + statusBadge + '</td>'
+        + '<td class="small">' + details + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  async function runGroupEnrollmentForStudent(entry, index, total) {
+    const label = String(entry?.label || entry?.id || '').trim();
+    const progressLabel = `${label} (${index + 1}/${total})`;
+    const settings = groupEnrollmentSettingsFromEntry(entry);
+    const autoResolve = entry?.autoResolveSubjects === true;
+    let prereq = await fetchGroupStudentPrerequisites(entry.id, settings.startDate);
+    if (autoResolve && prereq?.clbPlacement?.canApplyPlacement && prereq?.resolved?.programId) {
+      showBusy(`Applying CLB placement credits for ${progressLabel}...`);
+      try {
+        await requestJson(
+          `/school/classes/api/${encodeURIComponent(classId)}/rolling-prior-subject-credits/apply-placement`,
+          'POST',
+          {
+            studentId: entry.id,
+            studentIds: [entry.id],
+            programId: String(prereq.resolved.programId || '').trim(),
+            startDate: settings.startDate
+          }
+        );
+        prereq = await fetchGroupStudentPrerequisites(entry.id, settings.startDate);
+      } catch (error) {
+        return {
+          studentId: entry.id,
+          label,
+          ok: false,
+          error: error?.message || 'CLB placement prior credits could not be applied.'
+        };
+      }
+    }
+    if (!prereq || prereq.eligible !== true) {
+      if (isGroupPrerequisiteRepairable(prereq)) {
+        return {
+          studentId: entry.id,
+          label,
+          ok: false,
+          repairable: true,
+          prereq
+        };
+      }
+      const issues = Array.isArray(prereq?.prerequisite?.issues) ? prereq.prerequisite.issues : [];
+      const msg = issues.length
+        ? issues.join('; ')
+        : String(prereq?.message || 'Prerequisites are not satisfied for this student.');
+      return { studentId: entry.id, label, ok: false, error: msg };
+    }
+    showBusy(`Enrolling ${progressLabel}...`);
+    const enginePayload = buildGroupEnginePayload(entry.id, settings);
+    const result = await requestJson(
+      `/school/classes/api/${encodeURIComponent(classId)}/rolling-enrollment/execute`,
+      'POST',
+      enginePayload
+    );
+    if (!result) {
+      return { studentId: entry.id, label, ok: false, error: 'Enrollment request failed.' };
+    }
+    const engineData = result.data && typeof result.data === 'object' ? result.data : {};
+    const row = Array.isArray(engineData.results)
+      ? engineData.results.find((resultRow) => String(resultRow?.studentId || '') === String(entry.id))
+      : null;
+    if (!row || row.ok !== true) {
+      return {
+        studentId: entry.id,
+        label,
+        ok: false,
+        error: String(row?.error || result.message || 'Enrollment failed.')
+      };
+    }
+    return {
+      studentId: entry.id,
+      label,
+      ok: true,
+      message: String(result.message || 'Enrollment completed.'),
+      period: row.period || result.period || null,
+      academicLedger: row.academicLedger || result.academicLedger || null,
+      mode: String(row.mode || '').trim()
+    };
+  }
+
+  async function runGroupEnrollment() {
+    if (groupEnrollmentInProgress) return;
+    const validationIssue = validateGroupEnrollmentQueue();
+    if (validationIssue) {
+      await showMsg('Validation', 'warning', validationIssue);
+      return;
+    }
+    if (cycleWindow?.isClosedForNewEnrollment) {
+      await showMsg('Cycle closed', 'warning', 'This cycle is closed for new enrollment.');
+      return;
+    }
+    const students = groupEnrollmentStudents.slice();
+    const results = [];
+    groupEnrollmentInProgress = true;
+    const completeBtn = qs('btn_completeGroupEnrollment');
+    if (completeBtn) completeBtn.disabled = true;
+    try {
+      for (let i = 0; i < students.length; i += 1) {
+        const entry = students[i];
+        let studentDone = false;
+        while (!studentDone) {
+          showBusy(`Checking prerequisites for ${entry.label || entry.id} (${i + 1}/${students.length})...`);
+          try {
+            const outcome = await runGroupEnrollmentForStudent(entry, i, students.length);
+            if (outcome.repairable) {
+              hideBusy();
+              const action = await waitForGroupPrerequisiteRepair(
+                entry,
+                outcome.prereq,
+                i,
+                students.length
+              );
+              if (action === 'retry') {
+                continue;
+              }
+              const skipMsg = Array.isArray(outcome.prereq?.prerequisite?.issues) && outcome.prereq.prerequisite.issues.length
+                ? outcome.prereq.prerequisite.issues.join('; ')
+                : String(outcome.prereq?.message || 'Prerequisites are not satisfied for this student.');
+              results.push({
+                studentId: entry.id,
+                label: entry.label || entry.id,
+                ok: false,
+                error: skipMsg
+              });
+            } else {
+              results.push(outcome);
+            }
+            studentDone = true;
+          } catch (error) {
+            results.push({
+              studentId: entry.id,
+              label: entry.label || entry.id,
+              ok: false,
+              error: error?.message || 'Enrollment failed.'
+            });
+            studentDone = true;
+          }
+        }
+      }
+      groupEnrollmentModal?.hide();
+      renderGroupEnrollmentResults(results);
+      groupEnrollmentResultsModal?.show();
+      await loadRows();
+    } catch (error) {
+      await showMsg('Group Enrollment Failed', 'error', error?.message || 'Unable to complete group enrollment.');
+    } finally {
+      groupEnrollmentInProgress = false;
+      groupPrerequisiteRepairContext = null;
+      if (completeBtn) completeBtn.disabled = false;
+      hideBusy();
+    }
+  }
+
+  function pickGroupEntryStudent(searchTerm = '') {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showMsg('Picker Unavailable', 'warning', 'Student picker is not loaded on this page.');
+      return;
+    }
+    if (isGenericPickerOpen()) return;
+    GenericPicker.open(GenericPickerPresets.student({
+      title: 'Select Student',
+      searchTerm,
+      placeholder: 'Search students, then select one...',
+      searchFields: 'id,firstName,lastName,name.first,name.last,studentNumber,personId',
+      context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: (selected) => {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        const id = String(item?.id || '').trim();
+        if (!id) return;
+        if (qs('grp_studentId')) qs('grp_studentId').value = id;
+        if (qs('grp_studentLabel')) qs('grp_studentLabel').value = formatGroupStudentLabel(item);
+      }
+    }));
+  }
+
+  async function openGroupEnrollmentModal() {
+    const opener = qs('btn_openGroupEnrollmentModal');
+    if (opener && opener.disabled) return;
+    if (!Array.isArray(enrollmentProgramChoices) || !enrollmentProgramChoices.length) {
+      await showMsg(
+        'Programs not configured',
+        'warning',
+        'This class has no allowed programs. Add at least one program on the class Program / terms tab, then try again.'
+      );
+      return;
+    }
+    clearGroupEnrollmentForm();
+    groupEnrollmentModal?.show();
+  }
+
   async function openAddEnrollmentModal() {
     const opener = qs('btn_openAddEnrollmentModal');
     if (opener && opener.disabled) return;
@@ -3068,7 +3991,8 @@
   let rollingBusyToken = null;
 
   function showBusy(message = 'Please wait...') {
-    rollingBusyDepth += 1;
+    const isNewOverlay = !rollingBusyToken;
+    if (isNewOverlay) rollingBusyDepth += 1;
     if (typeof window.showLoading === 'function') {
       if (!rollingBusyToken) {
         rollingBusyToken = window.showLoading({
@@ -6476,6 +7400,23 @@
   });
 
   qs('btn_openAddEnrollmentModal')?.addEventListener('click', openAddEnrollmentModal);
+  qs('btn_openGroupEnrollmentModal')?.addEventListener('click', openGroupEnrollmentModal);
+  qs('btn_pickGroupEntryStudent')?.addEventListener('click', () => pickGroupEntryStudent(qs('grp_studentLabel')?.value || ''));
+  qs('btn_addGroupEnrollmentEntry')?.addEventListener('click', addGroupEnrollmentEntry);
+  qs('btn_completeGroupEnrollment')?.addEventListener('click', runGroupEnrollment);
+  qs('grp_studentLabel')?.addEventListener('input', (event) => {
+    if (isGenericPickerOpen()) return;
+    const input = event.target;
+    const value = String(input?.value || '').trim();
+    if (String(qs('grp_studentId')?.value || '').trim()) {
+      clearGroupEnrollmentEntryStudent();
+    }
+    if (value.length >= 2) {
+      pickGroupEntryStudent(value);
+    }
+  });
+  qs('grp_targetSessionCount')?.addEventListener('input', () => applyEnrollmentCapMutualExclusion('grp_targetSessionCount'));
+  qs('grp_targetHours')?.addEventListener('input', () => applyEnrollmentCapMutualExclusion('grp_targetHours'));
   addEnrollmentModalEl?.addEventListener('shown.bs.modal', () => {
     qs('inp_studentLabel')?.focus();
   });
@@ -6508,7 +7449,8 @@
   qs('btn_shortcutApprove')?.addEventListener('click', approveProgramRegistrationShortcutDraft);
   qs('btn_shortcutRetry')?.addEventListener('click', retryProgramRegistrationShortcutEligibility);
   qs('btn_priorRepairSave')?.addEventListener('click', savePriorCreditRepair);
-  qs('btn_priorRepairRetry')?.addEventListener('click', refreshRollingEligibility);
+  qs('btn_priorRepairRetry')?.addEventListener('click', handlePriorRepairRetry);
+  qs('btn_priorRepairSkipStudent')?.addEventListener('click', () => finishGroupPrerequisiteRepair('skip'));
   qs('btn_clbInsightRetry')?.addEventListener('click', refreshRollingEligibility);
   qs('btn_priorRepairSelectAll')?.addEventListener('click', () => {
     document.querySelectorAll('.prior-repair-subject').forEach((input) => { input.checked = true; });
