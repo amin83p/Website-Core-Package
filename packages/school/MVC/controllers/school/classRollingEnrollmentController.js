@@ -1961,15 +1961,22 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
     programRegistrationDate
   });
 
-  const missingSubjects = extractRollingMissingPrerequisiteSubjects(preview, subjectCatalogMap);
+  const allMissingSubjects = extractRollingMissingPrerequisiteSubjects(preview, subjectCatalogMap);
+  const { clbSatisfiedMissingSubjects, missingSubjects } = clbPlacementPriorCreditService.partitionMissingSubjectsByClbCoverage(
+    allMissingSubjects,
+    student,
+    subjectCatalogMap
+  );
   return {
     ...preview,
     missingSubjects,
+    clbSatisfiedMissingSubjects,
     repairProgramId: pid,
     clbPlacement: clbPlacementPriorCreditService.buildClbPlacementSlice({
       student,
       program,
       missingSubjects,
+      clbSatisfiedMissingSubjects,
       subjectCatalogMap,
       classSubjectIds: Array.isArray(preview.subjectIds) ? preview.subjectIds : [],
       prerequisitesSatisfied: preview.status !== 'error'
@@ -2310,10 +2317,13 @@ async function applyRollingClbPlacementCredits(req, res) {
         .map((s) => [toPublicId(s?.id), s])
     );
 
+    const placementMissingIds = (Array.isArray(prereqPreview.clbSatisfiedMissingSubjects) ? prereqPreview.clbSatisfiedMissingSubjects : [])
+      .map((row) => toPublicId(row?.id))
+      .filter(Boolean);
     const placement = clbPlacementPriorCreditService.suggestPlacementSubjectIds({
       student,
       program,
-      missingSubjectIds: (prereqPreview.missingSubjects || []).map((row) => toPublicId(row?.id)),
+      missingSubjectIds: placementMissingIds,
       subjectCatalog: subjectCatalogMap
     });
 

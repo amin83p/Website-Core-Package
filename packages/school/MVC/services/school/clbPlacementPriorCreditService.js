@@ -73,6 +73,64 @@ function getSubjectClbLevel(subject) {
   return n;
 }
 
+/**
+ * Per-skill CLB levels for a subject, falling back to band level for unset skills.
+ * @param {object} subject
+ * @returns {Record<string, number>|null}
+ */
+function getSubjectClbSkillLevels(subject) {
+  const clb = subject?.configuration?.clb;
+  if (!clb || typeof clb !== 'object') return null;
+  const bandLevel = getSubjectClbLevel(subject);
+  const skillsInput = (clb.skills && typeof clb.skills === 'object' && !Array.isArray(clb.skills))
+    ? clb.skills
+    : {};
+  const levels = {};
+  CLB_SKILLS.forEach((skill) => {
+    const raw = skillsInput[skill];
+    if (raw === '' || raw === undefined || raw === null) {
+      levels[skill] = bandLevel;
+    } else {
+      const n = Number(raw);
+      levels[skill] = (Number.isInteger(n) && n >= 1 && n <= 12) ? n : null;
+    }
+  });
+  if (!CLB_SKILLS.some((skill) => levels[skill] !== null)) return null;
+  return levels;
+}
+
+/**
+ * Skills on the subject where the student is below the required CLB level.
+ * @param {object} subject
+ * @param {Record<string, number>} bySkill
+ * @returns {string[]}
+ */
+function getUnsatisfiedClbSkills(subject, bySkill) {
+  const required = getSubjectClbSkillLevels(subject);
+  if (!required) return CLB_SKILLS.slice();
+  const unsatisfied = [];
+  CLB_SKILLS.forEach((skill) => {
+    const req = required[skill];
+    if (req === null) return;
+    const studentLevel = bySkill[skill];
+    if (studentLevel === undefined || studentLevel === null || studentLevel < req) {
+      unsatisfied.push(skill);
+    }
+  });
+  return unsatisfied;
+}
+
+/**
+ * @param {object} subject
+ * @param {Record<string, number>} bySkill
+ * @returns {boolean}
+ */
+function isSubjectSatisfiedByStudentClb(subject, bySkill) {
+  const required = getSubjectClbSkillLevels(subject);
+  if (!required) return false;
+  return getUnsatisfiedClbSkills(subject, bySkill).length === 0;
+}
+
 function getProgramSubjectIds(program) {
   const rows = Array.isArray(program?.subjects) ? program.subjects : [];
   return rows
@@ -93,6 +151,29 @@ function toSubjectCatalogMap(subjectCatalog) {
 }
 
 /**
+ * @param {object[]} missingSubjects
+ * @param {object} student
+ * @param {Map|Array} subjectCatalog
+ * @returns {{ clbSatisfiedMissingSubjects: object[], missingSubjects: object[] }}
+ */
+function partitionMissingSubjectsByClbCoverage(missingSubjects, student, subjectCatalog) {
+  const { bySkill } = buildNormalizedCurrentClbMaps(student);
+  const catalogMap = toSubjectCatalogMap(subjectCatalog);
+  const clbSatisfiedMissingSubjects = [];
+  const stillMissingSubjects = [];
+  (Array.isArray(missingSubjects) ? missingSubjects : []).forEach((row) => {
+    const id = String(row?.id || row?.subjectId || '').trim();
+    const subject = catalogMap.get(id);
+    if (isSubjectSatisfiedByStudentClb(subject, bySkill)) {
+      clbSatisfiedMissingSubjects.push(row);
+    } else {
+      stillMissingSubjects.push(row);
+    }
+  });
+  return { clbSatisfiedMissingSubjects, missingSubjects: stillMissingSubjects };
+}
+
+/**
  * @param {object} params
  * @returns {{ subjectIds: string[], entry: object|null, normalizedLevels: number[], matchedSubjectIds: string[] }}
  */
@@ -102,8 +183,8 @@ function suggestPlacementSubjectIds({
   missingSubjectIds,
   subjectCatalog
 }) {
-  const { entry, levelSet } = buildNormalizedCurrentClbMaps(student);
-  if (!entry || levelSet.size === 0) {
+  const { entry, bySkill } = buildNormalizedCurrentClbMaps(student);
+  if (!entry || Object.keys(bySkill).length === 0) {
     return { subjectIds: [], entry, normalizedLevels: [], matchedSubjectIds: [] };
   }
 
@@ -119,12 +200,11 @@ function suggestPlacementSubjectIds({
   programIds.forEach((subjectId) => {
     if (!missingSet.has(subjectId)) return;
     const subject = catalogMap.get(subjectId);
-    const clbLevel = getSubjectClbLevel(subject);
-    if (clbLevel === null) return;
-    if (levelSet.has(clbLevel)) matched.push(subjectId);
+    if (!isSubjectSatisfiedByStudentClb(subject, bySkill)) return;
+    matched.push(subjectId);
   });
 
-  const normalizedLevels = [...levelSet].sort((a, b) => a - b);
+  const normalizedLevels = [...new Set(Object.values(bySkill))].sort((a, b) => a - b);
   return {
     subjectIds: matched,
     entry,
@@ -153,7 +233,7 @@ function buildPlacementEvidenceNote(clbEntry, normalizedLevels = []) {
   return `CLB placement (Current): ${parts.join(' ')} recorded ${recordedAt} → levels ${levels}`;
 }
 
-function buildClassSubjectInsightRow(subjectId, catalogMap, levelSet) {
+function buildClassSubjectInsightRow(subjectId, catalogMap, bySkill) {
   const id = String(subjectId || '').trim();
   const subject = catalogMap.get(id);
   const clbLevel = getSubjectClbLevel(subject);
@@ -162,7 +242,7 @@ function buildClassSubjectInsightRow(subjectId, catalogMap, levelSet) {
     code: String(subject?.code || '').trim(),
     title: String(subject?.title || '').trim(),
     clbLevel,
-    matchesStudentLevels: clbLevel !== null && levelSet.has(clbLevel)
+    matchesStudentLevels: isSubjectSatisfiedByStudentClb(subject, bySkill)
   };
 }
 
@@ -201,27 +281,28 @@ function buildClbPlacementSlice({
   student,
   program,
   missingSubjects,
+  clbSatisfiedMissingSubjects = [],
   subjectCatalogMap,
   classSubjectIds = [],
   prerequisitesSatisfied = false
 }) {
-  const missingIds = (Array.isArray(missingSubjects) ? missingSubjects : [])
+  const placementMissingIds = (Array.isArray(clbSatisfiedMissingSubjects) ? clbSatisfiedMissingSubjects : [])
     .map((row) => String(row?.id || row?.subjectId || '').trim())
     .filter(Boolean);
   const result = suggestPlacementSubjectIds({
     student,
     program,
-    missingSubjectIds: missingIds,
+    missingSubjectIds: placementMissingIds,
     subjectCatalog: subjectCatalogMap
   });
-  const { entry, bySkill, levelSet } = buildNormalizedCurrentClbMaps(student);
+  const { entry, bySkill } = buildNormalizedCurrentClbMaps(student);
   const normalizedLevels = result.normalizedLevels.length
     ? result.normalizedLevels
-    : [...levelSet].sort((a, b) => a - b);
+    : [...new Set(Object.values(bySkill))].sort((a, b) => a - b);
   const hasCurrentClb = entry !== null && normalizedLevels.length > 0;
   const catalogMap = toSubjectCatalogMap(subjectCatalogMap);
   const classSubjects = (Array.isArray(classSubjectIds) ? classSubjectIds : [])
-    .map((subjectId) => buildClassSubjectInsightRow(subjectId, catalogMap, levelSet));
+    .map((subjectId) => buildClassSubjectInsightRow(subjectId, catalogMap, bySkill));
 
   const programIds = getProgramSubjectIds(program);
   let matchedProgramSubjectCount = 0;
@@ -231,7 +312,7 @@ function buildClbPlacementSlice({
     const clbLevel = getSubjectClbLevel(subject);
     if (clbLevel === null) return;
     hasProgramClbSubjects = true;
-    if (levelSet.has(clbLevel)) matchedProgramSubjectCount += 1;
+    if (isSubjectSatisfiedByStudentClb(subject, bySkill)) matchedProgramSubjectCount += 1;
   });
 
   const hasClbClassSubjects = classSubjects.some((row) => row.clbLevel !== null);
@@ -249,15 +330,25 @@ function buildClbPlacementSlice({
     }
     : null;
 
+  const clbSatisfiedRows = (Array.isArray(clbSatisfiedMissingSubjects) ? clbSatisfiedMissingSubjects : [])
+    .map((row) => ({
+      id: String(row?.id || row?.subjectId || '').trim(),
+      label: String(row?.label || '').trim(),
+      reason: String(row?.reason || '').trim()
+    }))
+    .filter((row) => row.id);
+
   return {
     hasCurrentClb,
     normalizedLevels,
     matchedSubjectCount: result.subjectIds.length,
+    placementSubjectIds: result.matchedSubjectIds,
     canApplyPlacement: hasCurrentClb && result.subjectIds.length > 0,
     hasInsight,
     currentClb,
     classSubjects,
     matchedProgramSubjectCount,
+    clbSatisfiedMissingSubjects: clbSatisfiedRows,
     prerequisitesSatisfied: prerequisitesSatisfied === true,
     qualificationSummary: buildQualificationSummary({
       prerequisitesSatisfied,
@@ -276,6 +367,10 @@ module.exports = {
   buildNormalizedCurrentClbMaps,
   buildNormalizedCurrentClbLevelSet,
   getSubjectClbLevel,
+  getSubjectClbSkillLevels,
+  getUnsatisfiedClbSkills,
+  isSubjectSatisfiedByStudentClb,
+  partitionMissingSubjectsByClbCoverage,
   suggestPlacementSubjectIds,
   buildPlacementEvidenceNote,
   buildClbPlacementSlice

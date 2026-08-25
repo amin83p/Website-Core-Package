@@ -69,7 +69,7 @@ test('normalizeClbLevelToken strips +/- from student CLB tokens', () => {
   assert.equal(clbPlacementPriorCreditService.normalizeClbLevelToken(''), null);
 });
 
-test('suggestPlacementSubjectIds matches program subjects by clb.level in student level set', () => {
+test('suggestPlacementSubjectIds matches missing subjects when all skills meet band requirements', () => {
   const student = {
     clbLevelHistory: [{
       id: 'clb_1',
@@ -103,7 +103,147 @@ test('suggestPlacementSubjectIds matches program subjects by clb.level in studen
   });
 
   assert.deepEqual(result.normalizedLevels, [1, 2, 3, 4]);
-  assert.deepEqual(result.subjectIds, ['SUB_1', 'SUB_2']);
+  assert.deepEqual(result.subjectIds, ['SUB_1']);
+});
+
+test('suggestPlacementSubjectIds credits lower bands when all student skills are at 7', () => {
+  const student = {
+    clbLevelHistory: [{
+      id: 'clb_1',
+      recordedAt: '2026-08-01T00:00:00.000Z',
+      current: {
+        listening: '7',
+        speaking: '7',
+        reading: '7',
+        writing: '7'
+      }
+    }]
+  };
+  const program = {
+    subjects: [
+      { subjectId: 'SUB_4' },
+      { subjectId: 'SUB_5' },
+      { subjectId: 'SUB_6' }
+    ]
+  };
+  const subjectCatalog = [
+    { id: 'SUB_4', configuration: { clb: { level: 4 } } },
+    { id: 'SUB_5', configuration: { clb: { level: 5 } } },
+    { id: 'SUB_6', configuration: { clb: { level: 6 } } }
+  ];
+
+  const result = clbPlacementPriorCreditService.suggestPlacementSubjectIds({
+    student,
+    program,
+    missingSubjectIds: ['SUB_4', 'SUB_5', 'SUB_6'],
+    subjectCatalog
+  });
+
+  assert.deepEqual(result.subjectIds, ['SUB_4', 'SUB_5', 'SUB_6']);
+});
+
+test('suggestPlacementSubjectIds does not credit band subjects when only writing is recorded', () => {
+  const student = {
+    clbLevelHistory: [{
+      id: 'clb_1',
+      recordedAt: '2026-08-01T00:00:00.000Z',
+      current: { writing: '7' }
+    }]
+  };
+  const program = {
+    subjects: [
+      { subjectId: 'SUB_4' },
+      { subjectId: 'SUB_5' },
+      { subjectId: 'SUB_6' }
+    ]
+  };
+  const subjectCatalog = [
+    { id: 'SUB_4', configuration: { clb: { level: 4 } } },
+    { id: 'SUB_5', configuration: { clb: { level: 5 } } },
+    { id: 'SUB_6', configuration: { clb: { level: 6 } } }
+  ];
+
+  const result = clbPlacementPriorCreditService.suggestPlacementSubjectIds({
+    student,
+    program,
+    missingSubjectIds: ['SUB_4', 'SUB_5', 'SUB_6'],
+    subjectCatalog
+  });
+
+  assert.deepEqual(result.subjectIds, []);
+});
+
+test('isSubjectSatisfiedByStudentClb handles mixed skills and per-skill overrides', () => {
+  const subjectBand4 = { configuration: { clb: { level: 4 } } };
+  const subjectBand5 = { configuration: { clb: { level: 5 } } };
+  const subjectBand5Writing6 = {
+    configuration: {
+      clb: {
+        level: 5,
+        skills: { listening: 5, speaking: 5, reading: 5, writing: 6 }
+      }
+    }
+  };
+  const bySkillMixed = { listening: 4, speaking: 4, reading: 4, writing: 7 };
+  const bySkillWriting5 = { listening: 5, speaking: 5, reading: 5, writing: 5 };
+
+  assert.equal(
+    clbPlacementPriorCreditService.isSubjectSatisfiedByStudentClb(subjectBand4, bySkillMixed),
+    true
+  );
+  assert.equal(
+    clbPlacementPriorCreditService.isSubjectSatisfiedByStudentClb(subjectBand5, bySkillMixed),
+    false
+  );
+  assert.equal(
+    clbPlacementPriorCreditService.isSubjectSatisfiedByStudentClb(subjectBand5Writing6, { writing: 7 }),
+    false
+  );
+  assert.equal(
+    clbPlacementPriorCreditService.isSubjectSatisfiedByStudentClb(subjectBand5Writing6, bySkillWriting5),
+    false
+  );
+  assert.equal(
+    clbPlacementPriorCreditService.isSubjectSatisfiedByStudentClb(
+      subjectBand5Writing6,
+      { listening: 5, speaking: 5, reading: 5, writing: 7 }
+    ),
+    true
+  );
+});
+
+test('partitionMissingSubjectsByClbCoverage splits CLB-satisfied prerequisites', () => {
+  const student = {
+    clbLevelHistory: [{
+      id: 'clb_1',
+      recordedAt: '2026-08-01T00:00:00.000Z',
+      current: {
+        listening: '7',
+        speaking: '7',
+        reading: '7',
+        writing: '7'
+      }
+    }]
+  };
+  const subjectCatalog = [
+    { id: 'SUB_4', configuration: { clb: { level: 4 } } },
+    { id: 'SUB_8', configuration: { clb: { level: 8 } } }
+  ];
+  const allMissing = [
+    { id: 'SUB_4', label: 'CLB 4' },
+    { id: 'SUB_8', label: 'CLB 8' }
+  ];
+
+  const partitioned = clbPlacementPriorCreditService.partitionMissingSubjectsByClbCoverage(
+    allMissing,
+    student,
+    subjectCatalog
+  );
+
+  assert.equal(partitioned.clbSatisfiedMissingSubjects.length, 1);
+  assert.equal(partitioned.clbSatisfiedMissingSubjects[0].id, 'SUB_4');
+  assert.equal(partitioned.missingSubjects.length, 1);
+  assert.equal(partitioned.missingSubjects[0].id, 'SUB_8');
 });
 
 test('getLatestCurrentClbEntry picks newest recordedAt row', () => {
@@ -166,6 +306,9 @@ test('buildClbPlacementSlice includes insight fields for class subjects and qual
     student,
     program,
     missingSubjects: [],
+    clbSatisfiedMissingSubjects: [
+      { id: 'SUB_5', label: 'EAL CLB 5-6' }
+    ],
     subjectCatalogMap,
     classSubjectIds: ['CLASS_SUB'],
     prerequisitesSatisfied: true
@@ -174,7 +317,10 @@ test('buildClbPlacementSlice includes insight fields for class subjects and qual
   assert.equal(slice.hasInsight, true);
   assert.equal(slice.hasCurrentClb, true);
   assert.deepEqual(slice.normalizedLevels, [5, 6]);
-  assert.equal(slice.matchedProgramSubjectCount, 2);
+  assert.equal(slice.matchedProgramSubjectCount, 1);
+  assert.equal(slice.matchedSubjectCount, 1);
+  assert.deepEqual(slice.placementSubjectIds, ['SUB_5']);
+  assert.equal(slice.canApplyPlacement, true);
   assert.equal(slice.prerequisitesSatisfied, true);
   assert.equal(slice.classSubjects.length, 1);
   assert.equal(slice.classSubjects[0].id, 'CLASS_SUB');
