@@ -196,17 +196,40 @@ app.locals.sessionStore = sessionStore;
 app.set('trust proxy', 1);
 
 app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
+const APP_STARTED_AT = new Date().toISOString();
 const BUILD_VERSION_CONFIG_PATH = path.join(__dirname, 'config', 'build-version.json');
 
-function readRepoBuildVersionValue() {
+function readRepoBuildMetadata() {
   try {
-    if (!fs.existsSync(BUILD_VERSION_CONFIG_PATH)) return '';
+    if (!fs.existsSync(BUILD_VERSION_CONFIG_PATH)) {
+      return { buildVersion: '', commitAt: '' };
+    }
     const parsed = JSON.parse(fs.readFileSync(BUILD_VERSION_CONFIG_PATH, 'utf8'));
-    if (!parsed || typeof parsed !== 'object') return '';
-    return String(parsed.buildVersion || '').trim();
+    if (!parsed || typeof parsed !== 'object') {
+      return { buildVersion: '', commitAt: '' };
+    }
+    return {
+      buildVersion: String(parsed.buildVersion || '').trim(),
+      commitAt: String(parsed.commitAt || parsed.builtAt || '').trim()
+    };
   } catch (_) {
-    return '';
+    return { buildVersion: '', commitAt: '' };
   }
+}
+
+function formatBuildVersionTimestamp(value = '', formatter) {
+  const token = String(value || '').trim();
+  if (!token) return '';
+  if (typeof formatter === 'function') {
+    try {
+      return String(formatter(token) || '').trim();
+    } catch (_) {
+      // fall through to locale formatting below
+    }
+  }
+  const parsed = Date.parse(token);
+  if (Number.isNaN(parsed)) return '';
+  return new Date(parsed).toLocaleString();
 }
 
 function cleanBuildVersionToken(value = '') {
@@ -218,17 +241,23 @@ function cleanBuildVersionToken(value = '') {
 function refreshBuildVersionLocals() {
   const settings = settingService.get();
   const buildVersionOverride = String(settings?.app?.buildVersionOverride || '').trim();
+  const repoBuildMetadata = readRepoBuildMetadata();
   app.locals.buildVersion = buildVersionResolver.resolveBuildVersion({
     buildVersionOverride,
-    repoBuildVersion: readRepoBuildVersionValue()
+    repoBuildVersion: repoBuildMetadata.buildVersion,
+    repoCommitAt: repoBuildMetadata.commitAt
   });
   app.locals.buildVersionShort = cleanBuildVersionToken(app.locals.buildVersion?.shortHash);
+  app.locals.buildVersionCommitAt = String(app.locals.buildVersion?.commitAt || '').trim();
+  app.locals.buildVersionStartedAt = APP_STARTED_AT;
   return app.locals.buildVersion;
 }
 
 app.locals.refreshBuildVersion = refreshBuildVersionLocals;
-app.locals.buildVersion = { shortHash: '', source: '' };
+app.locals.buildVersion = { shortHash: '', source: '', commitAt: '', commitAtSource: '' };
 app.locals.buildVersionShort = '';
+app.locals.buildVersionCommitAt = '';
+app.locals.buildVersionStartedAt = APP_STARTED_AT;
 app.locals.staticAssetUrl = (assetPath) => buildStaticAssetUrl(assetPath, app.locals.buildVersionShort);
 
 function resolveAppUiSettings() {
@@ -474,6 +503,17 @@ app.use(requestPerfTracer.wrapMiddleware('app-locals', (req, res, next) => {
   res.locals.publicMenuEndpointOptions = appBrandingService.getPublicMenuEndpointOptions();
   res.locals.appUiSettings = resolveAppUiSettings();
   res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
+  res.locals.buildVersionCommitAt = String(req.app?.locals?.buildVersionCommitAt || '').trim();
+  res.locals.buildVersionStartedAt = String(req.app?.locals?.buildVersionStartedAt || APP_STARTED_AT).trim();
+  res.locals.buildVersionCommitAtLabel = formatBuildVersionTimestamp(
+    res.locals.buildVersionCommitAt,
+    res.locals.formatOrgDateTime
+  );
+  res.locals.buildVersionStartedAtLabel = formatBuildVersionTimestamp(
+    res.locals.buildVersionStartedAt,
+    res.locals.formatOrgDateTime
+  );
+  res.locals.appEnvironment = String(process.env.NODE_ENV || 'development').trim();
   res.locals.requestId = String(req.requestId || '').trim();
   res.locals.originalUrl = String(req.originalUrl || req.url || '').trim();
   res.locals.pageDiagnosticsRuntime = null;

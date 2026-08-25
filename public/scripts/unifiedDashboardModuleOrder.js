@@ -9,11 +9,22 @@
     return String(module.id || module.href || module.title || '').trim();
   }
 
+  function normalizeKeyList(values) {
+    if (!Array.isArray(values)) return [];
+    const normalized = [];
+    const seen = new Set();
+    values.forEach((item) => {
+      const token = String(item || '').trim();
+      if (!token || seen.has(token)) return;
+      seen.add(token);
+      normalized.push(token);
+    });
+    return normalized;
+  }
+
   function applyModuleOrder(modules, savedOrder) {
     const list = Array.isArray(modules) ? modules.slice() : [];
-    const order = Array.isArray(savedOrder)
-      ? savedOrder.map((id) => String(id || '').trim()).filter(Boolean)
-      : [];
+    const order = normalizeKeyList(savedOrder);
     if (!order.length) return list;
 
     const byKey = new Map();
@@ -42,34 +53,57 @@
     return ordered;
   }
 
+  function applyHiddenModules(modules, hiddenModuleKeys, options = {}) {
+    const list = Array.isArray(modules) ? modules.slice() : [];
+    const hidden = new Set(normalizeKeyList(hiddenModuleKeys));
+    if (!hidden.size) return list;
+    if (options.includeHidden) return list;
+    return list.filter((module) => !hidden.has(getModuleKey(module)));
+  }
+
   function isSectionNavDashboardKey(key) {
     return SECTION_NAV_DASHBOARD_KEY_RE.test(String(key || '').trim());
   }
 
-  async function fetchModuleOrder(dashboardKey) {
+  async function fetchModuleLayout(dashboardKey) {
     const response = await fetch(`/dashboard/api/module-order/${encodeURIComponent(dashboardKey)}`, {
       headers: { 'x-ajax-request': 'true' }
     });
-    if (!response.ok) throw new Error('Failed to load module order.');
+    if (!response.ok) throw new Error('Failed to load module layout.');
     const data = await response.json();
-    if (data.status !== 'success') throw new Error(data.message || 'Failed to load module order.');
-    return Array.isArray(data.moduleOrder) ? data.moduleOrder : null;
+    if (data.status !== 'success') throw new Error(data.message || 'Failed to load module layout.');
+    return {
+      moduleOrder: Array.isArray(data.moduleOrder) ? data.moduleOrder : null,
+      hiddenModuleKeys: normalizeKeyList(data.hiddenModuleKeys)
+    };
   }
 
-  async function saveModuleOrder(dashboardKey, moduleOrder) {
+  async function fetchModuleOrder(dashboardKey) {
+    const layout = await fetchModuleLayout(dashboardKey);
+    return layout.moduleOrder;
+  }
+
+  async function saveModuleLayout(dashboardKey, layout = {}) {
+    const payload = {};
+    if (Array.isArray(layout.moduleOrder)) payload.moduleOrder = layout.moduleOrder;
+    if (Array.isArray(layout.hiddenModuleKeys)) payload.hiddenModuleKeys = layout.hiddenModuleKeys;
     const response = await fetch(`/dashboard/api/module-order/${encodeURIComponent(dashboardKey)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'x-ajax-request': 'true'
       },
-      body: JSON.stringify({ moduleOrder })
+      body: JSON.stringify(payload)
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || 'Failed to save module order.');
+      throw new Error(data.message || 'Failed to save module layout.');
     }
     return response.json();
+  }
+
+  async function saveModuleOrder(dashboardKey, moduleOrder, hiddenModuleKeys = []) {
+    return saveModuleLayout(dashboardKey, { moduleOrder, hiddenModuleKeys });
   }
 
   async function resetModuleOrderOnServer(dashboardKey) {
@@ -79,7 +113,7 @@
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || 'Failed to reset module order.');
+      throw new Error(data.message || 'Failed to reset module layout.');
     }
     return response.json();
   }
@@ -92,6 +126,7 @@
       getModules,
       setModules,
       getDefaultModules,
+      getLayoutPayload,
       onChange,
       canReorder
     } = options;
@@ -100,15 +135,16 @@
     let dragSrcEl = null;
 
     function scheduleSave() {
+      if (typeof getLayoutPayload !== 'function') return;
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(async () => {
         saveTimer = null;
         try {
-          const moduleOrder = getModules().map(getModuleKey).filter(Boolean);
-          if (!moduleOrder.length) return;
-          await saveModuleOrder(dashboardKey, moduleOrder);
+          const payload = getLayoutPayload();
+          if (!payload) return;
+          await saveModuleLayout(dashboardKey, payload);
         } catch (error) {
-          console.error('Module order auto-save failed:', error);
+          console.error('Module layout auto-save failed:', error);
         }
       }, SAVE_DEBOUNCE_MS);
     }
@@ -205,7 +241,7 @@
         handle.classList.toggle('is-disabled', disabled);
         handle.setAttribute(
           'title',
-          disabled ? 'Clear search to reorder modules' : 'Drag to reorder this module'
+          disabled ? 'Turn on Customize to reorder modules' : 'Drag to reorder this module'
         );
       });
     }
@@ -217,7 +253,7 @@
       }
       await resetModuleOrderOnServer(dashboardKey);
       setModules(getDefaultModules().slice());
-      if (typeof onChange === 'function') onChange();
+      if (typeof onChange === 'function') onChange({ reset: true });
     }
 
     return {
@@ -232,10 +268,14 @@
     SAVE_DEBOUNCE_MS,
     getModuleKey,
     applyModuleOrder,
+    applyHiddenModules,
     isSectionNavDashboardKey,
+    fetchModuleLayout,
     fetchModuleOrder,
+    saveModuleLayout,
     saveModuleOrder,
     resetModuleOrderOnServer,
-    createReorderManager
+    createReorderManager,
+    normalizeKeyList
   };
 })(typeof window !== 'undefined' ? window : global);

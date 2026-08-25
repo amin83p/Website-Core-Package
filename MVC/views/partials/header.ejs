@@ -273,10 +273,15 @@
 	                            <li><hr class="dropdown-divider m-0"></li>
 
 	                            <% if (typeof buildVersionShort !== 'undefined' && buildVersionShort) { %>
-	                              <li class="px-2 py-1">
-	                                <div class="dropdown-item-text rounded py-2 px-2 small text-muted">
-	                                  <i class="bi bi-git me-2"></i>Build: <code><%= buildVersionShort %></code>
-	                                </div>
+	                              <li class="p-2">
+	                                <button
+	                                  type="button"
+	                                  class="dropdown-item rounded py-2"
+	                                  data-bs-toggle="modal"
+	                                  data-bs-target="#aboutAppModal"
+	                                >
+	                                  <i class="bi bi-info-circle me-2 text-secondary"></i>About the app
+	                                </button>
 	                              </li>
 	                              <li><hr class="dropdown-divider m-0"></li>
 	                            <% } %>
@@ -421,6 +426,65 @@
             <% } %>
         </div>
     </header>
+
+    <% if (typeof buildVersionShort !== 'undefined' && buildVersionShort) { %>
+      <%
+        const aboutAppBackendStatus = (typeof backendStatus !== 'undefined' && backendStatus && typeof backendStatus === 'object')
+          ? backendStatus
+          : ((typeof dataBackend !== 'undefined' && dataBackend && typeof dataBackend === 'object') ? dataBackend : null);
+        const aboutAppBackendMode = aboutAppBackendStatus ? String(aboutAppBackendStatus.mode || '').trim() : '';
+        const aboutAppBackendRecovery = Boolean(aboutAppBackendStatus?.fallback?.active);
+        const aboutAppEnvironment = String(
+          (typeof appEnvironment !== 'undefined' && appEnvironment) ? appEnvironment : 'development'
+        ).trim();
+      %>
+      <div class="modal fade" id="aboutAppModal" tabindex="-1" aria-labelledby="aboutAppModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-0 shadow-lg rounded-3">
+            <div class="modal-header bg-light border-bottom">
+              <h5 class="modal-title fw-bold text-dark mb-0" id="aboutAppModalLabel">
+                <i class="bi bi-info-circle me-2" aria-hidden="true"></i><%= headerBrand.appName || 'Website Core' %>
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <% if (headerTagline) { %>
+                <p class="text-muted mb-3"><%= headerTagline %></p>
+              <% } %>
+              <dl class="row mb-0 small about-app-details">
+                <dt class="col-sm-4 text-muted">Build</dt>
+                <dd class="col-sm-8 mb-2"><code><%= buildVersionShort %></code></dd>
+                <% if (typeof buildVersionCommitAtLabel !== 'undefined' && buildVersionCommitAtLabel) { %>
+                  <dt class="col-sm-4 text-muted">Committed</dt>
+                  <dd class="col-sm-8 mb-2"><%= buildVersionCommitAtLabel %></dd>
+                <% } %>
+                <% if (typeof buildVersionStartedAtLabel !== 'undefined' && buildVersionStartedAtLabel) { %>
+                  <dt class="col-sm-4 text-muted">Running since</dt>
+                  <dd class="col-sm-8 mb-2"><%= buildVersionStartedAtLabel %></dd>
+                <% } %>
+                <% if (aboutAppBackendMode) { %>
+                  <dt class="col-sm-4 text-muted">Data backend</dt>
+                  <dd class="col-sm-8 mb-2">
+                    <%= aboutAppBackendMode %>
+                    <% if (aboutAppBackendRecovery) { %>
+                      <span class="badge text-bg-warning ms-1">recovery</span>
+                    <% } %>
+                  </dd>
+                <% } %>
+                <% if (aboutAppEnvironment) { %>
+                  <dt class="col-sm-4 text-muted">Environment</dt>
+                  <dd class="col-sm-8 mb-2"><%= aboutAppEnvironment %></dd>
+                <% } %>
+              </dl>
+              <p class="small text-muted mb-0 mt-3">
+                Build info helps support diagnose which version is running.
+                <a href="/about" class="ms-1">Learn more</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% } %>
 
     <style>
       #main-header:not(.header-minimized) .header-nav-row,

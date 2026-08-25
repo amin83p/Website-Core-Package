@@ -8,11 +8,12 @@ const packageNavigationService = require('../services/packageNavigationService')
 const { resolveSectionDisplayTitle } = require('../utils/sectionDisplay');
 const {
   applyModuleOrder,
-  buildDashboardOrderTableId,
-  extractModuleOrderFromSettings,
+  applyHiddenModules,
   validateDashboardKey,
-  validateModuleOrder
+  validateNavigationPreferences,
+  extractNavigationPreferences
 } = require('../utils/dashboardModuleOrder');
+const sectionNavigationPreferencesService = require('../services/sectionNavigationPreferencesService');
 const sectionsOperationsCatalogCacheService = require('../services/cache/sectionsOperationsCatalogCacheService');
 const {
   buildDashboardAllSectionsCacheKey,
@@ -967,8 +968,7 @@ function resolveModuleOrderContext(req) {
 
   return {
     dashboardKey: keyCheck.key,
-    userId,
-    tableId: buildDashboardOrderTableId(keyCheck.key)
+    userId
   };
 }
 
@@ -979,14 +979,17 @@ async function getModuleOrder(req, res) {
       return res.status(ctx.status).json({ status: 'error', message: ctx.error });
     }
 
-    const record = await dataService.getDataById(
-      'tableSettings',
-      { userId: ctx.userId, tableId: ctx.tableId },
-      req.user
+    const preferences = await sectionNavigationPreferencesService.getPreferences(
+      ctx.userId,
+      ctx.dashboardKey,
+      { reqUser: req.user }
     );
-    const moduleOrder = extractModuleOrderFromSettings(record?.settings);
 
-    return res.json({ status: 'success', moduleOrder });
+    return res.json({
+      status: 'success',
+      moduleOrder: preferences.moduleOrder,
+      hiddenModuleKeys: preferences.hiddenModuleKeys
+    });
   } catch (error) {
     console.error('getModuleOrder Error:', error);
     return res.status(500).json({ status: 'error', message: 'Failed to load module order.' });
@@ -1000,18 +1003,28 @@ async function saveModuleOrder(req, res) {
       return res.status(ctx.status).json({ status: 'error', message: ctx.error });
     }
 
-    const orderCheck = validateModuleOrder(req.body?.moduleOrder);
-    if (!orderCheck.ok) {
-      return res.status(400).json({ status: 'error', message: orderCheck.message });
+    const prefsCheck = validateNavigationPreferences(req.body || {});
+    if (!prefsCheck.ok) {
+      return res.status(400).json({ status: 'error', message: prefsCheck.message });
     }
 
-    await dataService.updateData('tableSettings', null, {
-      userId: ctx.userId,
-      tableId: ctx.tableId,
-      settings: { moduleOrder: orderCheck.moduleOrder }
-    }, req.user);
+    const saved = await sectionNavigationPreferencesService.savePreferences(
+      ctx.userId,
+      ctx.dashboardKey,
+      {
+        ...(prefsCheck.moduleOrder ? { moduleOrder: prefsCheck.moduleOrder } : {}),
+        hiddenModuleKeys: prefsCheck.hiddenModuleKeys
+      },
+      req.user,
+      { reqUser: req.user }
+    );
 
-    return res.json({ status: 'success', message: 'Module order saved.' });
+    return res.json({
+      status: 'success',
+      message: 'Module layout saved.',
+      moduleOrder: saved.moduleOrder,
+      hiddenModuleKeys: saved.hiddenModuleKeys
+    });
   } catch (error) {
     console.error('saveModuleOrder Error:', error);
     return res.status(500).json({ status: 'error', message: 'Failed to save module order.' });
@@ -1025,20 +1038,14 @@ async function resetModuleOrder(req, res) {
       return res.status(ctx.status).json({ status: 'error', message: ctx.error });
     }
 
-    const record = await dataService.getDataById(
-      'tableSettings',
-      { userId: ctx.userId, tableId: ctx.tableId },
-      req.user
+    await sectionNavigationPreferencesService.resetPreferences(
+      ctx.userId,
+      ctx.dashboardKey,
+      req.user,
+      { reqUser: req.user }
     );
-    if (record) {
-      await dataService.deleteData(
-        'tableSettings',
-        { userId: ctx.userId, tableId: ctx.tableId },
-        req.user
-      );
-    }
 
-    return res.json({ status: 'success', message: 'Module order reset.' });
+    return res.json({ status: 'success', message: 'Module layout reset.' });
   } catch (error) {
     console.error('resetModuleOrder Error:', error);
     return res.status(500).json({ status: 'error', message: 'Failed to reset module order.' });
@@ -1061,5 +1068,7 @@ module.exports = {
   filterMainDashboardSections,
   buildSectionOpenUrl,
   resolveSingleMainDashboardRedirect,
-  applyModuleOrder
+  applyModuleOrder,
+  applyHiddenModules,
+  extractNavigationPreferences
 };

@@ -183,22 +183,12 @@ window.GenericPicker = (function() {
         return `genericPicker.recent:${userId}:${orgId}:${key}`;
     }
 
-    function toSerializablePick(item) {
-        if (!item || typeof item !== 'object') return null;
-        try {
-            return JSON.parse(JSON.stringify(item));
-        } catch (_error) {
-            const id = String(item.id || item.personId || item.userId || '').trim();
-            if (!id) return null;
-            return {
-                id,
-                displayName: item.displayName || item.name || item.title || item.username || id,
-                name: item.name || item.displayName || item.title || id
-            };
-        }
-    }
-
-    function recentPickLabel(item) {
+    function resolveRecentPickDisplayName(item) {
+        if (!item || typeof item !== 'object') return '';
+        const firstName = String(item?.name?.first || item?.firstName || '').trim();
+        const lastName = String(item?.name?.last || item?.lastName || '').trim();
+        const fullName = `${firstName} ${lastName}`.trim();
+        if (fullName) return fullName;
         return String(
             item?.displayName
             || (typeof item?.name === 'string' ? item.name : '')
@@ -206,9 +196,31 @@ window.GenericPicker = (function() {
             || item?.username
             || item?.label
             || item?.identity?.displayName
-            || item?.id
-            || 'Item'
-        ).trim() || 'Item';
+            || ''
+        ).trim();
+    }
+
+    function toSerializablePick(item) {
+        if (!item || typeof item !== 'object') return null;
+        try {
+            const snapshot = JSON.parse(JSON.stringify(item));
+            const displayName = resolveRecentPickDisplayName(snapshot);
+            if (displayName) snapshot.displayName = displayName;
+            return snapshot;
+        } catch (_error) {
+            const id = String(item.id || item.personId || item.userId || '').trim();
+            if (!id) return null;
+            const displayName = resolveRecentPickDisplayName(item) || id;
+            return {
+                id,
+                displayName,
+                name: displayName
+            };
+        }
+    }
+
+    function recentPickLabel(item) {
+        return resolveRecentPickDisplayName(item) || String(item?.id || 'Item').trim() || 'Item';
     }
 
     function readRecentPicks(resourceKey, limit = RECENT_PICKS_LIMIT) {

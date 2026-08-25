@@ -83,6 +83,12 @@
   .rolling-enrollment-page tr.conflict-session-row > td {
     background-color: var(--bs-danger-bg-subtle, #f8d7da);
   }
+  .rolling-enrollment-page tr.rolling-period-row-ended > td {
+    background-color: var(--bs-secondary-bg-subtle, #e9ecef);
+  }
+  .rolling-enrollment-page tr.rolling-period-row-ended:hover > td {
+    background-color: var(--bs-secondary-bg-subtle, #dde2e6);
+  }
   #addEnrollmentPeriodModal .enroll-wizard-guide {
     margin-bottom: 1rem;
   }
@@ -4523,6 +4529,33 @@
     return ['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'active'].includes(s);
   }
 
+  const ENDED_ENROLLMENT_STATUSES = new Set([
+    'completed',
+    'withdrawn',
+    'cancelled',
+    'archived',
+    'void',
+    'error'
+  ]);
+
+  function isEndedEnrollmentRow(row = {}) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    if (ENDED_ENROLLMENT_STATUSES.has(status)) return true;
+
+    const completion = row?.sessionCompletion
+      || (row?.completionDate ? { date: row.completionDate } : null);
+    if (String(completion?.date || '').trim()) return true;
+
+    const explicitTargetSessionCount = normalizeTargetSessionCountValue(row?.targetSessionCount);
+    const explicitTargetHours = normalizeTargetHoursValue(row?.targetHours);
+    const hasEnrollmentTarget = explicitTargetSessionCount > 0 || explicitTargetHours > 0;
+    if (hasEnrollmentTarget) return false;
+
+    const endDate = String(row?.endDate || '').trim();
+    const today = orgTodayFallback();
+    return Boolean(endDate && today && endDate < today);
+  }
+
   function formatPeriodStatusLabel(status) {
     const s = String(status || '').trim().toLowerCase();
     if (s === 'to_be_confirmed') return 'To be Confirmed';
@@ -7236,6 +7269,7 @@
       const consumedSortValue = consumedDisplay || '';
       const remainingSortValue = remainingDisplay || '';
       const isVoid = status === 'void';
+      const rowClass = isEndedEnrollmentRow(row) ? 'rolling-period-row-ended' : '';
       const actionsMenuHtml = isVoid
         ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-details" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-eye me-1"></i>Details</button>`
         : `
@@ -7250,7 +7284,7 @@
                 ${canSyncAcademicLedger ? `<button type="button" class="btn btn-outline-info btn-sm btn-row-sync-ledger" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-bookmark me-1"></i>Sync academic ledger</button>` : ''}
                 <button type="button" class="btn btn-outline-danger btn-sm btn-row-remove" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-trash me-1"></i>${removeLabel}</button>`;
       return `
-        <tr>
+        <tr class="${rowClass}">
           <td class="ps-4" data-sort-value="${htmlEscape(studentSortValue)}">
             <div class="fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(studentDisplay.label, studentDisplay.recordId, { className: 'text-decoration-none fw-semibold' }) : htmlEscape(studentDisplay.label))}</div>
             <div class="x-small text-muted font-monospace">${htmlEscape(studentId)}</div>

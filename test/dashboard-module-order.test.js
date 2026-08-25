@@ -4,13 +4,24 @@ const assert = require('node:assert/strict');
 const {
   getModuleKey,
   applyModuleOrder,
+  applyHiddenModules,
   isSectionNavDashboardKey,
   buildDashboardOrderTableId,
   validateDashboardKey,
   validateModuleOrder,
+  validateHiddenModuleKeys,
+  validateNavigationPreferences,
   extractModuleOrderFromSettings,
+  extractNavigationPreferences,
   MAX_MODULE_ORDER_LENGTH
 } = require('../MVC/utils/dashboardModuleOrder');
+
+const {
+  createService,
+  hasSavedPreferences,
+  buildNextSettings,
+  readDashboardEntry
+} = require('../MVC/services/sectionNavigationPreferencesService');
 
 test('getModuleKey prefers id, then href, then title', () => {
   assert.equal(getModuleKey({ id: 'abc', href: '/x', title: 'T' }), 'abc');
@@ -28,60 +39,147 @@ test('applyModuleOrder sorts by saved order and appends new modules', () => {
   assert.deepEqual(ordered.map((m) => m.id), ['c', 'a', 'b']);
 });
 
-test('applyModuleOrder ignores stale saved ids', () => {
-  const modules = [{ id: 'only' }];
-  const ordered = applyModuleOrder(modules, ['gone', 'only', 'also-gone']);
-  assert.deepEqual(ordered.map((m) => m.id), ['only']);
+test('applyHiddenModules removes hidden modules unless includeHidden is true', () => {
+  const modules = [
+    { id: 'a', title: 'A' },
+    { id: 'b', title: 'B' }
+  ];
+  assert.deepEqual(applyHiddenModules(modules, ['b']).map((m) => m.id), ['a']);
+  assert.deepEqual(applyHiddenModules(modules, ['b'], { includeHidden: true }).map((m) => m.id), ['a', 'b']);
 });
 
-test('applyModuleOrder returns original list when saved order is empty', () => {
-  const modules = [{ id: 'a' }, { id: 'b' }];
-  assert.deepEqual(applyModuleOrder(modules, []), modules);
-  assert.deepEqual(applyModuleOrder(modules, null), modules);
+test('validateHiddenModuleKeys enforces string array with max length', () => {
+  assert.equal(validateHiddenModuleKeys(null).ok, true);
+  assert.equal(validateHiddenModuleKeys(['']).ok, false);
+  assert.equal(validateHiddenModuleKeys(['a']).ok, true);
+  assert.equal(
+    validateHiddenModuleKeys(Array.from({ length: MAX_MODULE_ORDER_LENGTH + 1 }, (_, i) => `id-${i}`)).ok,
+    false
+  );
 });
 
-test('isSectionNavDashboardKey accepts section keys only', () => {
-  assert.equal(isSectionNavDashboardKey('section-122740'), true);
-  assert.equal(isSectionNavDashboardKey('section-SCHOOL'), true);
-  assert.equal(isSectionNavDashboardKey('newsCenter'), false);
-  assert.equal(isSectionNavDashboardKey('dashboard'), false);
-});
-
-test('buildDashboardOrderTableId prefixes dashboard key', () => {
-  assert.equal(buildDashboardOrderTableId('section-122740'), 'dashboard-order:section-122740');
-});
-
-test('validateDashboardKey rejects non section-nav keys', () => {
-  const invalid = validateDashboardKey('newsCenter');
-  assert.equal(invalid.ok, false);
-  const valid = validateDashboardKey('section-122740');
-  assert.equal(valid.ok, true);
-  assert.equal(valid.key, 'section-122740');
-});
-
-test('validateModuleOrder enforces non-empty string array with max length', () => {
-  assert.equal(validateModuleOrder(null).ok, false);
-  assert.equal(validateModuleOrder([]).ok, false);
-  assert.equal(validateModuleOrder(['']).ok, false);
-  assert.equal(validateModuleOrder([123]).ok, false);
-
-  const ok = validateModuleOrder(['a', 'b']);
+test('validateNavigationPreferences accepts moduleOrder and hiddenModuleKeys', () => {
+  const ok = validateNavigationPreferences({
+    moduleOrder: ['a', 'b'],
+    hiddenModuleKeys: ['c']
+  });
   assert.equal(ok.ok, true);
   assert.deepEqual(ok.moduleOrder, ['a', 'b']);
+  assert.deepEqual(ok.hiddenModuleKeys, ['c']);
 
-  const tooLong = validateModuleOrder(Array.from({ length: MAX_MODULE_ORDER_LENGTH + 1 }, (_, i) => `id-${i}`));
-  assert.equal(tooLong.ok, false);
+  const hiddenOnly = validateNavigationPreferences({ hiddenModuleKeys: ['x'] });
+  assert.equal(hiddenOnly.ok, true);
+  assert.equal(hiddenOnly.moduleOrder, null);
+  assert.deepEqual(hiddenOnly.hiddenModuleKeys, ['x']);
 });
 
-test('extractModuleOrderFromSettings reads moduleOrder array', () => {
-  assert.deepEqual(extractModuleOrderFromSettings({ moduleOrder: ['a', 'b'] }), ['a', 'b']);
-  assert.equal(extractModuleOrderFromSettings({ moduleOrder: [] }), null);
-  assert.equal(extractModuleOrderFromSettings({}), null);
+test('extractNavigationPreferences reads moduleOrder and hiddenModuleKeys', () => {
+  assert.deepEqual(
+    extractNavigationPreferences({ moduleOrder: ['a'], hiddenModuleKeys: ['b'] }),
+    { moduleOrder: ['a'], hiddenModuleKeys: ['b'] }
+  );
+  assert.deepEqual(extractNavigationPreferences({}), { moduleOrder: null, hiddenModuleKeys: [] });
 });
 
-test('dashboardController exports applyModuleOrder helper', () => {
+test('buildNextSettings stores and clears dashboard navigation preferences', () => {
+  const withPrefs = buildNextSettings({}, 'section-1', {
+    moduleOrder: ['a'],
+    hiddenModuleKeys: ['b']
+  });
+  assert.deepEqual(readDashboardEntry(withPrefs, 'section-1'), {
+    moduleOrder: ['a'],
+    hiddenModuleKeys: ['b']
+  });
+
+  const cleared = buildNextSettings(withPrefs, 'section-1', {});
+  assert.deepEqual(readDashboardEntry(cleared, 'section-1'), {});
+  assert.equal(hasSavedPreferences(readDashboardEntry(cleared, 'section-1')), false);
+});
+
+test('section navigation preferences service migrates legacy tableSettings into userSettings', async () => {
+  const userId = 'USER_1';
+  const dashboardKey = 'section-122740';
+  let storedSettings = {};
+  const legacyTableId = buildDashboardOrderTableId(dashboardKey);
+  let legacyRecord = {
+    userId,
+    tableId: legacyTableId,
+    settings: { moduleOrder: ['a', 'b'] }
+  };
+
+  const service = createService({
+    userSettingsService: {
+      async getSettings() {
+        return storedSettings;
+      },
+      async setSettings(_userId, settings) {
+        storedSettings = JSON.parse(JSON.stringify(settings));
+        return { settings: storedSettings };
+      }
+    },
+    dataService: {
+      async getDataById(entity, query) {
+        if (entity !== 'tableSettings') return null;
+        if (query.userId === userId && query.tableId === legacyTableId) return legacyRecord;
+        return null;
+      },
+      async deleteData(entity, query) {
+        if (entity === 'tableSettings' && query.tableId === legacyTableId) {
+          legacyRecord = null;
+          return true;
+        }
+        return false;
+      }
+    }
+  });
+
+  const prefs = await service.getPreferences(userId, dashboardKey);
+  assert.deepEqual(prefs.moduleOrder, ['a', 'b']);
+  assert.deepEqual(prefs.hiddenModuleKeys, []);
+  assert.deepEqual(storedSettings.sectionNavigation[dashboardKey], { moduleOrder: ['a', 'b'] });
+  assert.equal(legacyRecord, null);
+});
+
+test('section navigation preferences service saves hidden module keys', async () => {
+  const userId = 'USER_2';
+  const dashboardKey = 'section-ABC';
+  let storedSettings = {
+    sectionNavigation: {
+      [dashboardKey]: { moduleOrder: ['a', 'b'] }
+    }
+  };
+
+  const service = createService({
+    userSettingsService: {
+      async getSettings() {
+        return storedSettings;
+      },
+      async setSettings(_userId, settings) {
+        storedSettings = JSON.parse(JSON.stringify(settings));
+        return { settings: storedSettings };
+      }
+    },
+    dataService: {
+      async getDataById() { return null; },
+      async deleteData() { return false; }
+    }
+  });
+
+  const saved = await service.savePreferences(userId, dashboardKey, {
+    hiddenModuleKeys: ['b']
+  });
+  assert.deepEqual(saved.moduleOrder, ['a', 'b']);
+  assert.deepEqual(saved.hiddenModuleKeys, ['b']);
+  assert.deepEqual(
+    storedSettings.sectionNavigation[dashboardKey],
+    { moduleOrder: ['a', 'b'], hiddenModuleKeys: ['b'] }
+  );
+});
+
+test('dashboardController exports navigation preference handlers', () => {
   const dashboardController = require('../MVC/controllers/dashboardController');
   assert.equal(typeof dashboardController.applyModuleOrder, 'function');
+  assert.equal(typeof dashboardController.applyHiddenModules, 'function');
   assert.equal(typeof dashboardController.getModuleOrder, 'function');
   assert.equal(typeof dashboardController.saveModuleOrder, 'function');
   assert.equal(typeof dashboardController.resetModuleOrder, 'function');

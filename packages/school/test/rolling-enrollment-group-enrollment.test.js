@@ -125,7 +125,8 @@ test('rolling enrollment view includes attendance report menu action and modals'
   assert.match(viewSource, /attendance-report-metric-excused/);
   assert.match(viewSource, /id="attendanceReport_lateExcused"/);
   assert.match(viewSource, /id="enrollmentAttendanceNaReasonsModal"/);
-  assert.match(viewSource, /function openEnrollmentAttendanceReportModal\(/);
+  assert.match(viewSource, /rolling-period-row-ended/);
+  assert.match(viewSource, /function isEndedEnrollmentRow\(/);
   assert.match(viewSource, /function fetchEnrollmentAttendanceReport\(/);
   assert.match(viewSource, /function renderEnrollmentAttendanceReport\(/);
   assert.match(viewSource, /function openEnrollmentAttendanceNaReasonsModal\(/);

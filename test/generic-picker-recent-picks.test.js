@@ -30,3 +30,13 @@ test('generic picker presets export inferName for recent resource keys', () => {
   assert.match(presets, /function inferName\(/);
   assert.match(presets, /inferName,/);
 });
+
+test('generic picker recent label resolves teacher first and last name', () => {
+  const picker = read('MVC/views/partials/modal_GenericPicker.ejs');
+
+  assert.match(picker, /function resolveRecentPickDisplayName/);
+  assert.match(picker, /item\?\.name\?\.first \|\| item\?\.firstName/);
+  assert.match(picker, /item\?\.name\?\.last \|\| item\?\.lastName/);
+  assert.match(picker, /resolveRecentPickDisplayName\(item\) \|\| String\(item\?\.id/);
+  assert.match(picker, /snapshot\.displayName = displayName/);
+});

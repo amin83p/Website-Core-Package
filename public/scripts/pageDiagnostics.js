@@ -324,6 +324,8 @@
         url: `${global.location.origin}${global.location.pathname}`,
         requestId: config.requestId || '',
         buildVersion: config.buildVersion || '',
+        buildVersionCommitAt: config.buildVersionCommitAt || '',
+        buildVersionStartedAt: config.buildVersionStartedAt || '',
         runtime: getRuntimeConfig(),
         userAgent: global.navigator?.userAgent || ''
       },
@@ -423,6 +425,8 @@
         <div><span>Path</span><code>${escapeHtml(getCurrentPath())}</code></div>
         <div><span>Request ID</span><code>${escapeHtml(config.requestId || '-')}</code></div>
         <div><span>Build</span><code>${escapeHtml(config.buildVersion || '-')}</code></div>
+        <div><span>Committed</span><code>${escapeHtml(config.buildVersionCommitAt || '-')}</code></div>
+        <div><span>Running since</span><code>${escapeHtml(config.buildVersionStartedAt || '-')}</code></div>
         <div><span>Runtime</span><code>${escapeHtml(health.runtimeLabel || '-')}</code></div>
         <div><span>Captured</span><code>${escapeHtml(formatTime(state.startedAt))}</code></div>
       </div>

@@ -11,6 +11,12 @@ const ENV_HASH_KEYS = [
   'RENDER_GIT_COMMIT'
 ];
 
+const ENV_COMMIT_AT_KEYS = [
+  'APP_BUILD_TIMESTAMP',
+  'RAILWAY_GIT_COMMIT_DATE',
+  'SOURCE_VERSION_DATE'
+];
+
 function cleanText(value, max = 4000) {
   const out = String(value || '').replace(/\0/g, '').trim();
   if (!out) return '';
@@ -32,17 +38,76 @@ function toShortHash(value = '') {
   return full.slice(-6);
 }
 
+function normalizeCommitAt(value = '') {
+  const token = cleanText(value, 4000);
+  if (!token) return '';
+  const parsed = Date.parse(token);
+  if (Number.isNaN(parsed)) return '';
+  return new Date(parsed).toISOString();
+}
+
+function resolveCommitAt(options = {}) {
+  const env = options?.env && typeof options.env === 'object' ? options.env : process.env;
+  const execSync = typeof options?.execSync === 'function' ? options.execSync : childExecSync;
+  const repoCommitAt = normalizeCommitAt(options?.repoCommitAt);
+
+  if (repoCommitAt) {
+    return {
+      commitAt: repoCommitAt,
+      commitAtSource: 'repo:config/build-version.json'
+    };
+  }
+
+  for (const key of ENV_COMMIT_AT_KEYS) {
+    const commitAt = normalizeCommitAt(env?.[key]);
+    if (commitAt) {
+      return {
+        commitAt,
+        commitAtSource: `env:${key}`
+      };
+    }
+  }
+
+  try {
+    const gitRaw = cleanText(execSync('git log -1 --format=%cI HEAD', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }), 4000);
+    const commitAt = normalizeCommitAt(gitRaw);
+    if (commitAt) {
+      return {
+        commitAt,
+        commitAtSource: 'git'
+      };
+    }
+  } catch (_) {
+    // ignore git fallback failure and return empty output below
+  }
+
+  return {
+    commitAt: '',
+    commitAtSource: ''
+  };
+}
+
 function resolveBuildVersion(options = {}) {
   const env = options?.env && typeof options.env === 'object' ? options.env : process.env;
   const execSync = typeof options?.execSync === 'function' ? options.execSync : childExecSync;
   const buildVersionOverride = cleanText(options?.buildVersionOverride, 4000);
   const repoBuildVersion = cleanText(options?.repoBuildVersion, 4000);
+  const commitAtResolution = resolveCommitAt({
+    env,
+    execSync,
+    repoCommitAt: options?.repoCommitAt
+  });
 
   const overrideShortHash = toShortHash(buildVersionOverride);
   if (overrideShortHash) {
     return {
       shortHash: overrideShortHash,
-      source: 'settings:app.buildVersionOverride'
+      source: 'settings:app.buildVersionOverride',
+      commitAt: commitAtResolution.commitAt,
+      commitAtSource: commitAtResolution.commitAtSource
     };
   }
 
@@ -50,7 +115,9 @@ function resolveBuildVersion(options = {}) {
   if (repoShortHash) {
     return {
       shortHash: repoShortHash,
-      source: 'repo:config/build-version.json'
+      source: 'repo:config/build-version.json',
+      commitAt: commitAtResolution.commitAt,
+      commitAtSource: commitAtResolution.commitAtSource
     };
   }
 
@@ -60,7 +127,9 @@ function resolveBuildVersion(options = {}) {
     if (shortHash) {
       return {
         shortHash,
-        source: `env:${key}`
+        source: `env:${key}`,
+        commitAt: commitAtResolution.commitAt,
+        commitAtSource: commitAtResolution.commitAtSource
       };
     }
   }
@@ -74,7 +143,9 @@ function resolveBuildVersion(options = {}) {
     if (shortHash) {
       return {
         shortHash,
-        source: 'git'
+        source: 'git',
+        commitAt: commitAtResolution.commitAt,
+        commitAtSource: commitAtResolution.commitAtSource
       };
     }
   } catch (_) {
@@ -83,11 +154,16 @@ function resolveBuildVersion(options = {}) {
 
   return {
     shortHash: '',
-    source: ''
+    source: '',
+    commitAt: commitAtResolution.commitAt,
+    commitAtSource: commitAtResolution.commitAtSource
   };
 }
 
 module.exports = {
   resolveBuildVersion,
-  ENV_HASH_KEYS
+  resolveCommitAt,
+  normalizeCommitAt,
+  ENV_HASH_KEYS,
+  ENV_COMMIT_AT_KEYS
 };

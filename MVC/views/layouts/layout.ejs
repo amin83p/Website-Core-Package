@@ -154,6 +154,8 @@
         currentPath: <%- JSON.stringify((typeof originalUrl !== 'undefined' && originalUrl) ? String(originalUrl).split(/[?#]/)[0] : '') %>,
         requestId: <%- JSON.stringify(typeof requestId !== 'undefined' ? requestId : '') %>,
         buildVersion: <%- JSON.stringify(typeof buildVersionShort !== 'undefined' ? buildVersionShort : '') %>,
+        buildVersionCommitAt: <%- JSON.stringify(typeof buildVersionCommitAt !== 'undefined' ? buildVersionCommitAt : '') %>,
+        buildVersionStartedAt: <%- JSON.stringify(typeof buildVersionStartedAt !== 'undefined' ? buildVersionStartedAt : '') %>,
         runtime: <%- JSON.stringify(typeof pageDiagnosticsRuntime !== 'undefined' && pageDiagnosticsRuntime ? pageDiagnosticsRuntime : { kind: 'server', nodeEnv: '', isProduction: false }) %>,
         scriptUrls: {
           health: <%- JSON.stringify(typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/pageDiagnosticsHealth.js') : '/scripts/pageDiagnosticsHealth.js') %>,

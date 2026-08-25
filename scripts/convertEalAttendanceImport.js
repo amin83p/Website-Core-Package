@@ -58,10 +58,18 @@ function normalizeLocalId(localId) {
 }
 
 function buildClassLabel(sheetName) {
-  const token = String(sheetName || '').trim();
-  if (/pm/i.test(token)) return `Taylor Reimer PM`;
-  if (/am/i.test(token)) return `Taylor Reimer AM`;
-  return token || 'Class';
+  return String(sheetName || '').trim() || 'Class';
+}
+
+function isLegendRow(localId, lastName, firstName) {
+  const id = String(localId || '').trim();
+  if (/^\d+$/.test(id) || /^[fp]\d+/i.test(id)) return false;
+  const ln = String(lastName || '').trim().toLowerCase();
+  const fn = String(firstName || '').trim().toLowerCase();
+  if (ln.includes('funded') || fn.includes('private') || ln === 'part-time' || fn === 'part-time') {
+    return true;
+  }
+  return /^[a-z]{1,3}$/i.test(id) && !/^\d+$/.test(id);
 }
 
 function extractClassName(worksheet) {
@@ -120,12 +128,13 @@ function parseSheetStudents(worksheet) {
     const lastName = values[headerIndexes.lastName]?.trim();
     const rawFirstName = values[headerIndexes.firstName]?.trim();
     if (!lastName || !rawFirstName) return;
+    const localId = normalizeLocalId(values[headerIndexes.localId]);
+    if (isLegendRow(localId, lastName, rawFirstName)) return;
     if (/^(last name|first name|tue|wed|thu|mon)$/i.test(lastName)) return;
     if (/^(last name|first name)$/i.test(rawFirstName)) return;
     if (/^part-time$/i.test(lastName)) return;
 
     const { firstName, preferredName } = parsePreferredName(rawFirstName);
-    const localId = normalizeLocalId(values[headerIndexes.localId]);
     const comment = headerIndexes.comment !== -1 ? values[headerIndexes.comment]?.trim() : '';
     const endDate = headerIndexes.endDate !== -1 ? values[headerIndexes.endDate]?.trim() : '';
     const clbCurrent = headerIndexes.clb !== -1 ? values[headerIndexes.clb]?.trim() : '';

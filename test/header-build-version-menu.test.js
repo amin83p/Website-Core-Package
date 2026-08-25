@@ -23,19 +23,48 @@ function renderHeader(locals = {}) {
   });
 }
 
-test('header shows build version row before Sign Out when buildVersionShort is provided', () => {
+test('header shows About the app menu item before Sign Out when buildVersionShort is provided', () => {
   const html = renderHeader({ buildVersionShort: 'abc123' });
-  const buildIndex = html.indexOf('Build: <code>abc123</code>');
+  const aboutIndex = html.indexOf('About the app');
   const signoutIndex = html.indexOf('Sign Out');
 
-  assert.ok(buildIndex >= 0, 'expected Build row to be rendered');
+  assert.ok(aboutIndex >= 0, 'expected About the app menu item to be rendered');
   assert.ok(signoutIndex >= 0, 'expected Sign Out row to be rendered');
-  assert.ok(buildIndex < signoutIndex, 'expected Build row to appear before Sign Out');
+  assert.ok(aboutIndex < signoutIndex, 'expected About the app to appear before Sign Out');
+  assert.match(html, /data-bs-target="#aboutAppModal"/);
 });
 
-test('header hides build version row when buildVersionShort is empty', () => {
+test('header shows committed and running-since labels in About modal when provided', () => {
+  const html = renderHeader({
+    buildVersionShort: 'abc123',
+    buildVersionCommitAtLabel: 'Aug 25, 2026 4:35 PM',
+    buildVersionStartedAtLabel: 'Aug 25, 2026 4:40 PM'
+  });
+
+  assert.match(html, /id="aboutAppModal"/);
+  assert.match(html, /<code>abc123<\/code>/);
+  assert.match(html, />Committed</);
+  assert.match(html, />Aug 25, 2026 4:35 PM</);
+  assert.match(html, />Running since</);
+  assert.match(html, />Aug 25, 2026 4:40 PM</);
+});
+
+test('header hides committed label in About modal when commit label is empty', () => {
+  const html = renderHeader({
+    buildVersionShort: 'abc123',
+    buildVersionCommitAtLabel: '',
+    buildVersionStartedAtLabel: 'Aug 25, 2026 4:40 PM'
+  });
+
+  assert.equal(html.includes('>Committed<'), false);
+  assert.match(html, />Running since</);
+  assert.match(html, />Aug 25, 2026 4:40 PM</);
+});
+
+test('header hides About the app menu item and modal when buildVersionShort is empty', () => {
   const html = renderHeader({ buildVersionShort: '' });
-  assert.equal(html.includes('Build: <code>'), false);
+  assert.equal(html.includes('About the app'), false);
+  assert.equal(html.includes('id="aboutAppModal"'), false);
 });
 
 test('header renders authenticated Main Menu after public menu divider', () => {
