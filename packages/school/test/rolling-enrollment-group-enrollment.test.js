@@ -67,17 +67,24 @@ test('group enrollment queue supports inline edit rows with save and cancel', ()
   assert.match(viewSource, /function applyGroupQueueEditCapMutualExclusion\(/);
 });
 
-test('group enrollment pauses for repairable prerequisite failures with prior credit repair modal', () => {
-  assert.match(viewSource, /groupPrerequisiteRepairContext/);
+test('group enrollment records repairable failures for results-modal resolution', () => {
+  assert.match(viewSource, /groupEnrollmentLastResults/);
+  assert.match(viewSource, /groupEnrollmentResultRepairContext/);
+  assert.match(viewSource, /function classifyGroupEnrollmentFailure\(/);
   assert.match(viewSource, /function isGroupPrerequisiteRepairable\(/);
   assert.match(viewSource, /function getPriorRepairFromEligibility\(/);
-  assert.match(viewSource, /function waitForGroupPrerequisiteRepair\(/);
-  assert.match(viewSource, /function finishGroupPrerequisiteRepair\(/);
-  assert.match(viewSource, /function refreshGroupPrerequisiteRepairSubjects\(/);
-  assert.match(viewSource, /repairable:\s*true/);
-  assert.match(viewSource, /btn_priorRepairSkipStudent/);
-  assert.match(viewSource, /handlePriorRepairRetry/);
-  assert.match(viewSource, /priorRepair_groupAlert/);
+  assert.match(viewSource, /function openGroupResultProgramRegistration\(/);
+  assert.match(viewSource, /function openGroupResultSubjectRepair\(/);
+  assert.match(viewSource, /function retryGroupEnrollmentResult\(/);
+  assert.match(viewSource, /function retryAllFailedGroupEnrollments\(/);
+  assert.match(viewSource, /function refreshGroupEnrollmentResultPrereq\(/);
+  assert.match(viewSource, /btn_groupRetryAllFailed/);
+  assert.match(viewSource, /btn-group-result-program-reg/);
+  assert.match(viewSource, /btn-group-result-subjects/);
+  assert.match(viewSource, /btn-group-result-complete/);
+  assert.match(viewSource, /<th>Actions<\/th>/);
+  assert.doesNotMatch(viewSource, /waitForGroupPrerequisiteRepair/);
+  assert.doesNotMatch(viewSource, /repairable:\s*true/);
 });
 
 test('group enrollment pipeline checks prerequisites, optional CLB apply, and executes per student', () => {
