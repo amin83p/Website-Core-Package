@@ -4,6 +4,7 @@ const router = express.Router();
 
 const ctrl = require('../controllers/personController');
 const personsImportCtrl = require('../controllers/personImportController');
+const personSimilarityCtrl = require('../controllers/personSimilarityController');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { requireAccess } = require('../middleware/accessMiddleware'); 
 const { trackActionState } = require('../middleware/actionStateMiddleware'); 
@@ -23,6 +24,13 @@ router.get('/join', ctrl.showPublicJoinForm);
 router.post('/join', ctrl.processPublicJoin);
 
 // CRUD
+
+router.get('/api/similar-matches',
+    requireAuth,
+    requireAccess(SECTIONS.PERSONS, OPERATIONS.READ_ALL),
+    trackActionState(SECTIONS.PERSONS, OPERATIONS.READ_ALL),
+    personSimilarityCtrl.listSimilarMatches
+);
 
 // List
 router.get('/', 

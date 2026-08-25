@@ -1,5 +1,7 @@
 // MVC/services/school/schoolIndexService.js
-const schoolDataService = require('./schoolDataService');
+function getSchoolDataService() {
+    return require('./schoolDataService');
+}
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 
@@ -26,8 +28,8 @@ function toStudentBucket(periodStatus = '') {
  */
 async function rebuildIndexesForClass(classId) {
     // 1. Load the Indexes directly from the Data Service
-    let teacherIndex = await schoolDataService.getTeacherIndex();
-    let studentIndex = await schoolDataService.getStudentIndex();
+    let teacherIndex = await getSchoolDataService().getTeacherIndex();
+    let studentIndex = await getSchoolDataService().getStudentIndex();
 
     // ✅ normalize bad shapes
     if (!teacherIndex || typeof teacherIndex !== 'object' || Array.isArray(teacherIndex)) teacherIndex = {};
@@ -51,14 +53,14 @@ async function rebuildIndexesForClass(classId) {
     }
 
     // 3. FETCH LATEST SOURCE OF TRUTH (Using System Context: null)
-    const classData = await schoolDataService.getDataById('classes', classId, null);
+    const classData = await getSchoolDataService().getDataById('classes', classId, null);
 
     // If the class exists and isn't cancelled, rebuild.
     if (classData && classData.status !== 'cancelled') {
         const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || '', { includeInactive: true });
         
         // --- A. REBUILD STUDENTS ---
-        const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, null);
+        const periodRows = await getSchoolDataService().getClassEnrollmentPeriodsByClassId(classId, null);
         const canonicalRows = Array.isArray(periodRows) ? periodRows : [];
         const personByStudentId = new Map();
 
@@ -71,7 +73,7 @@ async function rebuildIndexesForClass(classId) {
         });
 
         if (unresolvedStudentIds.size) {
-            const allStudents = await schoolDataService.fetchAllData('students', {}, null);
+            const allStudents = await getSchoolDataService().fetchAllData('students', {}, null);
             (Array.isArray(allStudents) ? allStudents : []).forEach((student) => {
                 const studentId = String(student?.id || '').trim();
                 if (!studentId || !unresolvedStudentIds.has(studentId)) return;
@@ -100,7 +102,7 @@ async function rebuildIndexesForClass(classId) {
         });
 
         // --- B. REBUILD TEACHERS ---
-        const sessions = await schoolDataService.getClassSessions(classId);
+        const sessions = await getSchoolDataService().getClassSessions(classId);
 
         sessions.forEach(session => {
             const excludeFromTeacherIndex = sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
@@ -128,8 +130,8 @@ async function rebuildIndexesForClass(classId) {
     }
 
     // 4. Save the freshly rebuilt indexes securely
-    await schoolDataService.saveTeacherIndex(teacherIndex);
-    await schoolDataService.saveStudentIndex(studentIndex);
+    await getSchoolDataService().saveTeacherIndex(teacherIndex);
+    await getSchoolDataService().saveStudentIndex(studentIndex);
 }
 
 module.exports = { rebuildIndexesForClass };

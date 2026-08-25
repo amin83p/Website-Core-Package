@@ -27,6 +27,7 @@ const {
     enrichPersonPickerRowsWithAccountState
 } = require('../../services/school/schoolPeopleDuplicateGuardService');
 const schoolPersonNameDuplicateService = require('../../services/school/schoolPersonNameDuplicateService');
+const schoolPersonSimilarityService = require('../../services/school/schoolPersonSimilarityService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
 const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
@@ -528,14 +529,18 @@ exports.listEligiblePersons = async (req, res) => {
 exports.listNameMatches = async (req, res) => {
   try {
     getActiveOrgIdOrThrow(req.user);
-    const firstName = String(req.query.first || req.query.firstName || '').trim();
-    const lastName = String(req.query.last || req.query.lastName || '').trim();
-    const matches = await schoolPersonNameDuplicateService.findExactNamePersonMatches({
+    const payload = await schoolPersonSimilarityService.buildNameMatchApiPayload({
       reqUser: req.user,
-      firstName,
-      lastName
+      firstName: String(req.query.first || req.query.firstName || '').trim(),
+      lastName: String(req.query.last || req.query.lastName || '').trim(),
+      middleName: String(req.query.middleName || '').trim(),
+      preferredName: String(req.query.preferredName || '').trim(),
+      email: String(req.query.email || '').trim(),
+      dateOfBirth: String(req.query.dateOfBirth || '').trim(),
+      phone: String(req.query.phone || '').trim(),
+      excludePersonId: String(req.query.excludePersonId || '').trim()
     });
-    return res.json({ status: 'success', matches });
+    return res.json({ status: 'success', ...payload });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
   }

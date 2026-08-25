@@ -931,6 +931,54 @@ document.addEventListener('DOMContentLoaded', () => {
     input.addEventListener('change', syncPersonProfileType);
   });
   syncPersonProfileType();
+
+  async function refreshPersonSimilarityAdvisory() {
+    const firstName = document.querySelector('.individual-profile-fields input[name="firstName"]')?.value?.trim();
+    const lastName = document.querySelector('.individual-profile-fields input[name="lastName"]')?.value?.trim();
+    const panelId = 'personSimilarNameAdvisory';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+      const anchor = document.querySelector('.individual-profile-fields');
+      if (!anchor) return;
+      panel = document.createElement('div');
+      panel.id = panelId;
+      panel.className = 'mt-2';
+      anchor.appendChild(panel);
+    }
+    if (!firstName || !lastName) {
+      panel.innerHTML = '';
+      panel.classList.add('d-none');
+      return;
+    }
+    const response = await fetch(`/persons/api/similar-matches?firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}`, {
+      headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+    });
+    if (!response.ok) {
+      panel.innerHTML = '';
+      panel.classList.add('d-none');
+      return;
+    }
+    const payload = await response.json().catch(() => ({}));
+    const matches = Array.isArray(payload?.matches) ? payload.matches : [];
+    if (!matches.length) {
+      panel.innerHTML = '';
+      panel.classList.add('d-none');
+      return;
+    }
+    const rows = matches.slice(0, 5).map((row) => {
+      const roles = (Array.isArray(row.roles) ? row.roles : [])
+        .map((role) => `<span class="badge text-bg-light border me-1">${String(role)}</span>`)
+        .join('');
+      return `<li class="mb-1"><strong>${String(row.displayName || '')}</strong> <span class="text-muted">(${Number(row.score || 0)}%)</span><br><span class="small text-muted">${String(row.email || 'no email')}</span> ${roles}</li>`;
+    }).join('');
+    panel.classList.remove('d-none');
+    panel.innerHTML = `<div class="alert alert-warning py-2 mb-0 small"><div class="fw-semibold mb-1">Similar people already in the system</div><ul class="mb-0 ps-3">${rows}</ul></div>`;
+  }
+
+  document.querySelectorAll('.individual-profile-fields input[name="firstName"], .individual-profile-fields input[name="lastName"]').forEach((input) => {
+    input.addEventListener('blur', () => refreshPersonSimilarityAdvisory());
+  });
+
   renderEmails(); renderPhones(); renderAddresses(); renderOrgs(); syncHidden(); renderPersonRoleSummary();
 
   // --- FORM SUBMIT ---

@@ -1,13 +1,12 @@
-const schoolPersonAccessService = require('./schoolPersonAccessService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const personSimilarityEngineService = requireCoreModule('MVC/services/person/personSimilarityEngineService');
+const schoolPersonSimilarityService = require('./schoolPersonSimilarityService');
 
 const NAME_DUPLICATE_WARNING_CODE = 'NAME_DUPLICATE_WARNING';
-const DEFAULT_MATCH_LIMIT = 10;
+const DEFAULT_MATCH_LIMIT = personSimilarityEngineService.DEFAULT_MATCH_LIMIT;
 
 function normalizeNamePart(value) {
-  return String(value || '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
+  return personSimilarityEngineService.normalizeNamePart(value);
 }
 
 function isNameDuplicateAcknowledged(body = {}) {
@@ -18,26 +17,7 @@ function isNameDuplicateAcknowledged(body = {}) {
 }
 
 function collectExactNameMatches(persons = [], firstName = '', lastName = '', limit = DEFAULT_MATCH_LIMIT) {
-  const firstNorm = normalizeNamePart(firstName);
-  const lastNorm = normalizeNamePart(lastName);
-  if (!firstNorm || !lastNorm) return [];
-
-  const max = Math.max(1, Number(limit) || DEFAULT_MATCH_LIMIT);
-  const matches = [];
-  for (const person of Array.isArray(persons) ? persons : []) {
-    const row = schoolPersonAccessService.toPickerRow(person);
-    if (normalizeNamePart(row.firstName) !== firstNorm) continue;
-    if (normalizeNamePart(row.lastName) !== lastNorm) continue;
-    matches.push({
-      personId: row.personId,
-      displayName: row.displayName,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      email: row.email
-    });
-    if (matches.length >= max) break;
-  }
-  return matches;
+  return personSimilarityEngineService.collectExactNameMatches(persons, firstName, lastName, limit);
 }
 
 async function findExactNamePersonMatches({
@@ -46,17 +26,26 @@ async function findExactNamePersonMatches({
   lastName = '',
   limit = DEFAULT_MATCH_LIMIT
 } = {}) {
-  const firstNorm = normalizeNamePart(firstName);
-  const lastNorm = normalizeNamePart(lastName);
-  if (!firstNorm || !lastNorm) return [];
-
-  const persons = await schoolPersonAccessService.listActiveOrgPersons({
+  return schoolPersonSimilarityService.findExactNamePersonMatches({
     reqUser,
-    q: '',
-    query: { limit: 5000 },
-    requireSchoolRole: false
+    firstName,
+    lastName,
+    limit
   });
-  return collectExactNameMatches(persons, firstName, lastName, limit);
+}
+
+async function findSimilarPersonMatches({
+  reqUser = null,
+  candidate = {},
+  minScore = personSimilarityEngineService.DEFAULT_MIN_SCORE,
+  limit = DEFAULT_MATCH_LIMIT
+} = {}) {
+  return schoolPersonSimilarityService.findSimilarPersonMatches({
+    reqUser,
+    candidate,
+    minScore,
+    limit
+  });
 }
 
 function buildNameDuplicateWarningError(matches = []) {
@@ -91,6 +80,7 @@ module.exports = {
   isNameDuplicateAcknowledged,
   collectExactNameMatches,
   findExactNamePersonMatches,
+  findSimilarPersonMatches,
   buildNameDuplicateWarningError,
   assertNoExactNameDuplicateOrThrow
 };

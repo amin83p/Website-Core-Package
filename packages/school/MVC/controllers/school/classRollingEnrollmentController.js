@@ -29,6 +29,7 @@ const programRegistrationDraftService = require('../../services/school/programRe
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
+const subjectPrerequisiteEngineService = require('../../services/school/subjectPrerequisiteEngineService');
 const registrationFinanceLifecycleService = require('../../services/school/registrationFinanceLifecycleService');
 const registrationStatusLifecycleService = require('../../services/school/registrationStatusLifecycleService');
 const academicLedgerService = require('../../services/school/academicLedgerService');
@@ -1617,10 +1618,18 @@ function buildRollingSubjectLabel(subject, fallbackId = '') {
 }
 
 function extractRollingMissingPrerequisiteSubjects(preview, subjectCatalogMap) {
-  const issues = Array.isArray(preview?.issues) ? preview.issues : [];
+  const repair = preview?.prerequisiteEvaluation?.repair;
+  if (repair && Array.isArray(repair.missingSubjects)) {
+    return repair.missingSubjects.map((row) => ({ ...row }));
+  }
+
+  const messages = [
+    ...(Array.isArray(preview?.issues) ? preview.issues : []),
+    ...(Array.isArray(preview?.warnings) ? preview.warnings : [])
+  ];
   const out = [];
   const seen = new Set();
-  issues.forEach((issue) => {
+  messages.forEach((issue) => {
     const message = String(issue || '').trim();
     const match = message.match(/^Missing prerequisite\(s\) for\s+([^:]+):\s+(.+?)\.?$/i);
     if (!match) return;
@@ -1961,34 +1970,40 @@ async function buildRollingEnrollmentPrerequisitePreview(req, classData, student
     programRegistrationDate
   });
 
-  const allMissingSubjects = extractRollingMissingPrerequisiteSubjects(preview, subjectCatalogMap);
-  const { clbSatisfiedMissingSubjects, missingSubjects } = clbPlacementPriorCreditService.partitionMissingSubjectsByClbCoverage(
-    allMissingSubjects,
+  const prerequisiteEvaluation = preview.prerequisiteEvaluation || subjectPrerequisiteEngineService.evaluateSubjectPrerequisitesCore({
+    classItem: classData,
+    program,
     student,
+    snapshot,
     subjectCatalogMap
-  );
+  });
+  const repair = prerequisiteEvaluation.repair || {};
+
   return {
     ...preview,
-    missingSubjects,
-    clbSatisfiedMissingSubjects,
+    missingSubjects: Array.isArray(repair.missingSubjects) ? repair.missingSubjects : [],
+    clbSatisfiedMissingSubjects: Array.isArray(repair.clbSatisfiedMissingSubjects) ? repair.clbSatisfiedMissingSubjects : [],
     repairProgramId: pid,
-    clbPlacement: clbPlacementPriorCreditService.buildClbPlacementSlice({
+    clbPlacement: repair.clbPlacement || clbPlacementPriorCreditService.buildClbPlacementSlice({
       student,
       program,
-      missingSubjects,
-      clbSatisfiedMissingSubjects,
+      missingSubjects: [],
+      clbSatisfiedMissingSubjects: [],
       subjectCatalogMap,
       classSubjectIds: Array.isArray(preview.subjectIds) ? preview.subjectIds : [],
-      prerequisitesSatisfied: preview.status !== 'error'
-    })
+      prerequisitesSatisfied: prerequisiteEvaluation.prerequisiteStatus === 'satisfied'
+    }),
+    enforcementMode: prerequisiteEvaluation.enforcementMode,
+    prerequisiteStatus: prerequisiteEvaluation.prerequisiteStatus
   };
 }
 
 async function assertRollingEnrollmentPrerequisitesOrThrow(req, classData, student, programId, termId, startDate) {
   const classPreview = await buildRollingEnrollmentPrerequisitePreview(req, classData, student, programId, termId, startDate);
+  subjectPrerequisiteEngineService.assertPrerequisitesForEnrollment(classPreview.prerequisiteEvaluation);
   if (classPreview.status === 'error') {
     const msg = (Array.isArray(classPreview.issues) ? classPreview.issues : []).filter(Boolean).join(' ');
-    throw new Error(msg || 'Enrollment prerequisites are not satisfied for this class and program.');
+    throw new Error(msg || 'Enrollment could not be completed for this class and program.');
   }
 }
 
@@ -2148,6 +2163,8 @@ async function buildRollingEnrollmentPrerequisitePayload(req, classData, student
     },
     prerequisite: {
       status: prereqPreview.status,
+      enforcementMode: prereqPreview.enforcementMode || prereqPreview.prerequisiteEvaluation?.enforcementMode || 'advisory',
+      prerequisiteStatus: prereqPreview.prerequisiteStatus || prereqPreview.prerequisiteEvaluation?.prerequisiteStatus || 'satisfied',
       issues: Array.isArray(prereqPreview.issues) ? prereqPreview.issues : [],
       warnings: Array.isArray(prereqPreview.warnings) ? prereqPreview.warnings : [],
       capacity: (prereqPreview.capacity && typeof prereqPreview.capacity === 'object')
@@ -2250,6 +2267,8 @@ async function buildRollingEnrollmentEligibilityPayload(req, classData, student,
     },
     prerequisite: {
       status: prereqPreview.status,
+      enforcementMode: prereqPreview.enforcementMode || prereqPreview.prerequisiteEvaluation?.enforcementMode || 'advisory',
+      prerequisiteStatus: prereqPreview.prerequisiteStatus || prereqPreview.prerequisiteEvaluation?.prerequisiteStatus || 'satisfied',
       issues: Array.isArray(prereqPreview.issues) ? prereqPreview.issues : [],
       warnings: Array.isArray(prereqPreview.warnings) ? prereqPreview.warnings : [],
       capacity: (prereqPreview.capacity && typeof prereqPreview.capacity === 'object')

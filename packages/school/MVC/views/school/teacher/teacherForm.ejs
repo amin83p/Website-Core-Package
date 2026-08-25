@@ -376,15 +376,63 @@
     });
   }
 
-  async function fetchExactNameMatches(firstName, lastName) {
+  async function fetchNameMatchPayload(firstName, lastName) {
     const first = String(firstName || '').trim();
     const last = String(lastName || '').trim();
-    if (!first || !last) return [];
+    if (!first || !last) return { exactMatches: [], similarMatches: [], matches: [] };
     const url = `/school/teachers/api/name-matches?first=${encodeURIComponent(first)}&last=${encodeURIComponent(last)}`;
     const response = await fetch(url, { headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' } });
-    if (!response.ok) return [];
+    if (!response.ok) return { exactMatches: [], similarMatches: [], matches: [] };
     const payload = await response.json().catch(() => ({}));
-    return Array.isArray(payload?.matches) ? payload.matches : [];
+    const exactMatches = Array.isArray(payload?.exactMatches)
+      ? payload.exactMatches
+      : (Array.isArray(payload?.matches) ? payload.matches : []);
+    const similarMatches = Array.isArray(payload?.similarMatches) ? payload.similarMatches : exactMatches;
+    return { exactMatches, similarMatches, matches: exactMatches };
+  }
+
+  async function fetchExactNameMatches(firstName, lastName) {
+    const payload = await fetchNameMatchPayload(firstName, lastName);
+    return payload.exactMatches;
+  }
+
+  function renderSimilarNameAdvisory(similarMatches = []) {
+    const panelId = 'teacherSimilarNameAdvisory';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+      const anchor = document.getElementById('inp_newPersonLastName')?.closest('.row')
+        || document.getElementById('newPersonBlock');
+      if (!anchor) return;
+      panel = document.createElement('div');
+      panel.id = panelId;
+      panel.className = 'mt-2';
+      anchor.parentNode?.insertBefore(panel, anchor.nextSibling);
+    }
+    const advisory = (Array.isArray(similarMatches) ? similarMatches : []).filter((row) => row.matchType !== 'exact');
+    if (!advisory.length) {
+      panel.innerHTML = '';
+      panel.classList.add('d-none');
+      return;
+    }
+    const rows = advisory.slice(0, 5).map((row) => {
+      const roles = (Array.isArray(row.roleLabels) && row.roleLabels.length ? row.roleLabels : row.schoolRoles || [])
+        .map((label) => `<span class="badge text-bg-light border me-1">${escapeTeacherHtml(label)}</span>`)
+        .join('');
+      return `<li class="mb-1"><strong>${escapeTeacherHtml(row.displayName || '')}</strong> <span class="text-muted">(${Number(row.score || 0)}%)</span><br><span class="small text-muted">${escapeTeacherHtml(row.email || 'no email')}</span> ${roles}</li>`;
+    }).join('');
+    panel.classList.remove('d-none');
+    panel.innerHTML = `<div class="alert alert-warning py-2 mb-0 small"><div class="fw-semibold mb-1">Similar people already in the system</div><ul class="mb-0 ps-3">${rows}</ul></div>`;
+  }
+
+  async function refreshSimilarNameAdvisory() {
+    const firstName = document.getElementById('inp_newPersonFirstName')?.value?.trim();
+    const lastName = document.getElementById('inp_newPersonLastName')?.value?.trim();
+    if (!firstName || !lastName) {
+      renderSimilarNameAdvisory([]);
+      return;
+    }
+    const payload = await fetchNameMatchPayload(firstName, lastName);
+    renderSimilarNameAdvisory(payload.similarMatches);
   }
 
   function readJsonSafe(rawValue, fallback) {
@@ -762,6 +810,10 @@
     const modeNew = document.getElementById('personModeNew');
     if (modeExisting) modeExisting.addEventListener('change', () => { syncPersonModeUI(); refreshEditPersonButton(); });
     if (modeNew) modeNew.addEventListener('change', () => { syncPersonModeUI(); refreshEditPersonButton(); });
+    ['inp_newPersonFirstName', 'inp_newPersonLastName'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('blur', () => refreshSimilarNameAdvisory());
+    });
 
     function refreshEditPersonButton() {
       const btnEditPerson = document.getElementById('btnEditPersonProfile');

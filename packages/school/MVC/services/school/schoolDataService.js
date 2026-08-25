@@ -8,10 +8,22 @@ const { buildSchoolListScope, SCOPE_MODES } = require('./schoolDataScopeBuilder'
 const { normalizeQueryOptions } = requireCoreModule('MVC/utils/queryOptionsAdapter');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
-const classEnrollmentPeriodService = require('./classEnrollmentPeriodService');
-const classCycleService = require('./classCycleService');
-const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
-const examBuilderService = require('./examBuilderService');
+function getClassEnrollmentPeriodService() {
+  return require('./classEnrollmentPeriodService');
+}
+
+function getClassCycleService() {
+  return require('./classCycleService');
+}
+
+function getClassCycleEnrollmentPolicyService() {
+  return require('./classCycleEnrollmentPolicyService');
+}
+
+function getExamBuilderService() {
+  return require('./examBuilderService');
+}
+
 const { isVoidPolicy } = require('./schoolDeletionPolicyRegistry');
 const { buildVoidPatch, isVoidRecord } = require('../../models/school/voidRecordMetadata');
 const studentSystemIdMigrationLockService = require('./studentSystemIdMigrationLockService');
@@ -576,33 +588,33 @@ const schoolDataService = {
   getAccessibleExamAttempts: async (requestingUser) => schoolDataService.fetchAllData('examAttempts', {}, requestingUser),
   getAccessibleExamAnswers: async (requestingUser) => schoolDataService.fetchAllData('examAnswers', {}, requestingUser),
   createExamTemplate: async (input, requestingUser, options = {}) =>
-    examBuilderService.createTemplate(input, requestingUser, options),
+    getExamBuilderService().createTemplate(input, requestingUser, options),
   cloneExamTemplateAsRevision: async (sourceTemplateId, input, requestingUser, options = {}) =>
-    examBuilderService.cloneTemplateAsRevision(sourceTemplateId, input, requestingUser, options),
+    getExamBuilderService().cloneTemplateAsRevision(sourceTemplateId, input, requestingUser, options),
   createExamDraftRevision: async (templateId, input, requestingUser, options = {}) =>
-    examBuilderService.createDraftRevision(templateId, input, requestingUser, options),
+    getExamBuilderService().createDraftRevision(templateId, input, requestingUser, options),
   updateExamDraftRevision: async (revisionId, updates, requestingUser, options = {}) =>
-    examBuilderService.updateDraftRevision(revisionId, updates, requestingUser, options),
+    getExamBuilderService().updateDraftRevision(revisionId, updates, requestingUser, options),
   saveExamDraftQuestion: async (revisionId, questionInput, requestingUser, options = {}) =>
-    examBuilderService.saveDraftQuestion(revisionId, questionInput, requestingUser, options),
+    getExamBuilderService().saveDraftQuestion(revisionId, questionInput, requestingUser, options),
   deleteExamDraftQuestion: async (revisionId, questionId, requestingUser, options = {}) =>
-    examBuilderService.deleteDraftQuestion(revisionId, questionId, requestingUser, options),
+    getExamBuilderService().deleteDraftQuestion(revisionId, questionId, requestingUser, options),
   publishExamRevision: async (revisionId, payload, requestingUser, options = {}) =>
-    examBuilderService.publishRevision(revisionId, payload, requestingUser, options),
+    getExamBuilderService().publishRevision(revisionId, payload, requestingUser, options),
   createExamAllocation: async (input, requestingUser, options = {}) =>
-    examBuilderService.createAllocationForPublishedRevision(input, requestingUser, options),
+    getExamBuilderService().createAllocationForPublishedRevision(input, requestingUser, options),
   createExamAssignmentsForAllocation: async (input, requestingUser, options = {}) =>
-    examBuilderService.createAssignmentsForAllocation(input, requestingUser, options),
+    getExamBuilderService().createAssignmentsForAllocation(input, requestingUser, options),
   startExamAttempt: async (input, requestingUser, options = {}) =>
-    examBuilderService.startAttempt(input, requestingUser, options),
+    getExamBuilderService().startAttempt(input, requestingUser, options),
   saveExamAttemptAnswer: async (input, requestingUser, options = {}) =>
-    examBuilderService.saveAttemptAnswer(input, requestingUser, options),
+    getExamBuilderService().saveAttemptAnswer(input, requestingUser, options),
   submitExamAttempt: async (attemptId, input, requestingUser, options = {}) =>
-    examBuilderService.submitAttempt(attemptId, input, requestingUser, options),
+    getExamBuilderService().submitAttempt(attemptId, input, requestingUser, options),
   gradeExamAttemptAnswer: async (answerId, gradingInput, requestingUser, options = {}) =>
-    examBuilderService.gradeAttemptAnswer(answerId, gradingInput, requestingUser, options),
+    getExamBuilderService().gradeAttemptAnswer(answerId, gradingInput, requestingUser, options),
   getExamRevisionBundle: async (revisionId, requestingUser, options = {}) =>
-    examBuilderService.getRevisionBundle(revisionId, requestingUser, options),
+    getExamBuilderService().getRevisionBundle(revisionId, requestingUser, options),
   getAccessibleClasses: async (requestingUser) => schoolDataService.fetchAllData('classes', {}, requestingUser),
   getAccessibleHolidays: async (requestingUser) => schoolDataService.fetchAllData('holidays', {}, requestingUser),
   getAccessibleTerms: async (requestingUser) => schoolDataService.fetchAllData('terms', {}, requestingUser),
@@ -632,28 +644,30 @@ const schoolDataService = {
   getActiveClassEnrollmentPeriodsByStudentIdOnDate: async (studentId, onDate, requestingUser, options = {}) =>
     schoolRepositories.classEnrollmentPeriods.findActiveByStudentIdOnDate(studentId, onDate, options),
   createClassEnrollmentPeriod: async (input, requestingUser, options = {}) =>
-    classEnrollmentPeriodService.createPeriod(input, requestingUser, options),
+    getClassEnrollmentPeriodService().createPeriod(input, requestingUser, options),
   updateClassEnrollmentPeriod: async (periodId, input, requestingUser, options = {}) =>
-    classEnrollmentPeriodService.updatePeriod(periodId, input, requestingUser, options),
-  classCycleEnrollmentPolicyService,
+    getClassEnrollmentPeriodService().updatePeriod(periodId, input, requestingUser, options),
+  get classCycleEnrollmentPolicyService() {
+    return getClassCycleEnrollmentPolicyService();
+  },
   closeClassEnrollmentPeriod: async (periodId, input, requestingUser, options = {}) =>
-    classEnrollmentPeriodService.closePeriod(periodId, input, requestingUser, options),
+    getClassEnrollmentPeriodService().closePeriod(periodId, input, requestingUser, options),
   reopenClassEnrollmentPeriodViaNewPeriod: async (periodId, input, requestingUser, options = {}) =>
-    classEnrollmentPeriodService.reopenViaNewPeriod(periodId, input, requestingUser, options),
+    getClassEnrollmentPeriodService().reopenViaNewPeriod(periodId, input, requestingUser, options),
   checkClassEnrollmentPeriodOverlap: async (input, requestingUser, options = {}) =>
-    classEnrollmentPeriodService.checkOverlap(input, options),
+    getClassEnrollmentPeriodService().checkOverlap(input, options),
   evaluateClassEnrollmentReentryRules: async (input, requestingUser, options = {}) =>
-    classEnrollmentPeriodService.evaluateReentryRules(input, options),
+    getClassEnrollmentPeriodService().evaluateReentryRules(input, options),
   closeClassCycle: async (classId, input, requestingUser, options = {}) =>
-    classCycleService.closeCycle(classId, input, requestingUser, options),
+    getClassCycleService().closeCycle(classId, input, requestingUser, options),
   createNextClassCycleFromTemplate: async (classId, input, requestingUser, options = {}) =>
-    classCycleService.createNextCycleFromCurrentClassTemplate(classId, input, requestingUser, options),
+    getClassCycleService().createNextCycleFromCurrentClassTemplate(classId, input, requestingUser, options),
   previewNextClassCycleFromTemplate: async (classId, input, requestingUser, options = {}) =>
-    classCycleService.previewNextCycleFromCurrentClassTemplate(classId, input, options),
+    getClassCycleService().previewNextCycleFromCurrentClassTemplate(classId, input, options),
   carryForwardClassCycleStudents: async (input, requestingUser, options = {}) =>
-    classCycleService.carryForwardEligibleStudents(input, requestingUser, options),
+    getClassCycleService().carryForwardEligibleStudents(input, requestingUser, options),
   splitClassEnrollmentPeriodsForCycleBoundary: async (input, requestingUser, options = {}) =>
-    classCycleService.splitPeriodsCrossingCycleBoundary(input, requestingUser, options),
+    getClassCycleService().splitPeriodsCrossingCycleBoundary(input, requestingUser, options),
   getAccessibleStudents: async (requestingUser) => schoolDataService.fetchAllData('students', {}, requestingUser),
   getAccessiblePrograms: async (requestingUser) => schoolDataService.fetchAllData('programs', {}, requestingUser),
   getAccessibleTransactionDefinitions: async (requestingUser) => schoolDataService.fetchAllData('transactionDefinitions', {}, requestingUser),

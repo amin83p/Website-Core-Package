@@ -80,45 +80,59 @@ async function previewImport(req, res) {
       fileContent,
       { columns: true, skip_empty_lines: true, trim: true },
       async (err, records) => {
-        if (err) {
-          return res.status(400).json({ status: 'error', message: 'CSV Parse Error: ' + err.message });
-        }
-
-        const previewRows = [];
-        for (let i = 0; i < records.length; i++) {
-          const rawRow = records[i];
-          let rowData = null;
-          let error = null;
-          let duplicates = [];
-
-          try {
-            rowData = applyImportDefaults(rawRow, context);
-            validateImportRecord(rowData, context);
-
-            duplicates = await schoolPersonNameDuplicateService.findExactNamePersonMatches({
-              reqUser: req.user,
-              firstName: rowData.firstName,
-              lastName: rowData.lastName
-            });
-          } catch (e) {
-            error = e.message;
+        try {
+          if (err) {
+            return res.status(400).json({ status: 'error', message: 'CSV Parse Error: ' + err.message });
           }
 
-          previewRows.push({
-            index: i,
-            raw: rawRow,
-            data: rowData,
-            error,
-            duplicates
-          });
-        }
+          const previewRows = [];
+          for (let i = 0; i < records.length; i++) {
+            const rawRow = records[i];
+            let rowData = null;
+            let error = null;
+            let duplicates = [];
+            let similarMatches = [];
 
-        return res.json({
-          status: 'success',
-          rows: previewRows,
-          orgToday: context.orgToday,
-          defaultAdmissionDate: resolveDefaultAdmissionDate(context.orgToday)
-        });
+            try {
+              rowData = applyImportDefaults(rawRow, context);
+              validateImportRecord(rowData, context);
+
+              similarMatches = await schoolPersonNameDuplicateService.findSimilarPersonMatches({
+                reqUser: req.user,
+                candidate: {
+                  firstName: rowData.firstName,
+                  lastName: rowData.lastName,
+                  middleName: rowData.middleName,
+                  preferredName: rowData.preferredName,
+                  email: rowData.email,
+                  dateOfBirth: rowData.dateOfBirth,
+                  phone: rowData.phone
+                }
+              });
+              duplicates = similarMatches.filter((match) => match.matchType === 'exact');
+            } catch (e) {
+              error = e.message;
+            }
+
+            previewRows.push({
+              index: i,
+              raw: rawRow,
+              data: rowData,
+              error,
+              duplicates,
+              similarMatches
+            });
+          }
+
+          return res.json({
+            status: 'success',
+            rows: previewRows,
+            orgToday: context.orgToday,
+            defaultAdmissionDate: resolveDefaultAdmissionDate(context.orgToday)
+          });
+        } catch (previewError) {
+          return res.status(500).json({ status: 'error', message: previewError.message });
+        }
       }
     );
   } catch (error) {

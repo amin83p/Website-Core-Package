@@ -72,6 +72,7 @@ test('group enrollment records repairable failures for results-modal resolution'
   assert.match(viewSource, /groupEnrollmentResultRepairContext/);
   assert.match(viewSource, /function classifyGroupEnrollmentFailure\(/);
   assert.match(viewSource, /function isGroupPrerequisiteRepairable\(/);
+  assert.match(viewSource, /function isAdvisoryPrerequisiteEnforcement\(/);
   assert.match(viewSource, /function getPriorRepairFromEligibility\(/);
   assert.match(viewSource, /function openGroupResultProgramRegistration\(/);
   assert.match(viewSource, /function openGroupResultSubjectRepair\(/);

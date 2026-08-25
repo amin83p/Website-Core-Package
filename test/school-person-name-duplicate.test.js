@@ -20,9 +20,14 @@ test('collectExactNameMatches matches case-insensitive first+last only', () => {
   ];
 
   const matches = service.collectExactNameMatches(persons, 'Maria', 'Alvarenga');
-  assert.deepEqual(matches.map((row) => row.personId), ['P1', 'P2']);
-  assert.equal(matches[0].email, 'a@example.com');
-  assert.equal(matches[0].displayName, 'Maria Alvarenga');
+  assert.deepEqual(matches.map((row) => row.personId).sort(), ['P1', 'P2']);
+  const p1 = matches.find((row) => row.personId === 'P1');
+  assert.equal(p1?.email, 'a@example.com');
+  assert.equal(p1?.displayName, 'Maria Alvarenga');
+});
+
+test('findSimilarPersonMatches is exposed from duplicate service', () => {
+  assert.equal(typeof service.findSimilarPersonMatches, 'function');
 });
 
 test('collectExactNameMatches returns empty for incomplete names', () => {
@@ -50,11 +55,12 @@ test('buildNameDuplicateWarningError sets 409 NAME_DUPLICATE_WARNING', () => {
   assert.equal(error.details.matches.length, 1);
 });
 
-test('student/teacher/staff routes wire api/name-matches with CREATE access', () => {
+test('student/teacher/staff/funder routes wire api/name-matches with CREATE access', () => {
   const roots = [
     ['packages/school/MVC/routes/studentRoutes.js', 'SCHOOL_STUDENTS'],
     ['packages/school/MVC/routes/teacherRoutes.js', 'SCHOOL_TEACHERS'],
-    ['packages/school/MVC/routes/staffRoutes.js', 'SCHOOL_STAFF']
+    ['packages/school/MVC/routes/staffRoutes.js', 'SCHOOL_STAFF'],
+    ['packages/school/MVC/routes/funderRoutes.js', 'SCHOOL_FUNDERS']
   ];
 
   for (const [relativePath, section] of roots) {
@@ -76,7 +82,17 @@ test('student/teacher/staff controllers expose listNameMatches and soft-gate', (
     assert.match(source, /exports\.listNameMatches\s*=/);
     assert.match(source, /assertNoExactNameDuplicateOrThrow/);
     assert.match(source, /isNameDuplicateAcknowledged/);
+    assert.match(source, /buildNameMatchApiPayload/);
   }
+});
+
+test('funder controller exposes listNameMatches API', () => {
+  const source = fs.readFileSync(
+    path.join(process.cwd(), 'packages/school/MVC/controllers/school/funderController.js'),
+    'utf8'
+  );
+  assert.match(source, /exports\.listNameMatches\s*=/);
+  assert.match(source, /buildNameMatchApiPayload/);
 });
 
 test('student/teacher/staff forms include name-duplicate confirm helpers', () => {
@@ -87,8 +103,10 @@ test('student/teacher/staff forms include name-duplicate confirm helpers', () =>
   ];
   for (const relativePath of forms) {
     const source = fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
+    assert.match(source, /fetchNameMatchPayload/);
     assert.match(source, /fetchExactNameMatches/);
     assert.match(source, /confirmNameDuplicateMatches/);
+    assert.match(source, /refreshSimilarNameAdvisory/);
     assert.match(source, /acknowledgeNameDuplicate/);
     assert.match(source, /NAME_DUPLICATE_WARNING/);
   }

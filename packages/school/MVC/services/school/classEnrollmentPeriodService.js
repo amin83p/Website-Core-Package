@@ -4,6 +4,8 @@ const classEnrollmentPolicyService = require('./classEnrollmentPolicyService');
 const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
+const registrationIntegrityService = require('./registrationIntegrityService');
+const subjectPrerequisiteEngineService = require('./subjectPrerequisiteEngineService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 
@@ -280,6 +282,24 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
       const aptRow = apt.find((row) => toPublicId(row?.programId));
       if (!inferredProgramId) inferredProgramId = toPublicId(aptRow?.programId);
       if (!inferredTermId) inferredTermId = toPublicId(aptRow?.termId);
+    }
+  }
+
+  const registrationMode = registrationIntegrityService.normalizeClassRegistrationMode(classRow.registrationMode);
+  if (registrationMode === 'term_based') {
+    const programIdForPrereq = toPublicId(input.programId) || inferredProgramId;
+    const termIdForPrereq = toPublicId(input.termId) || inferredTermId;
+    if (programIdForPrereq) {
+      const prerequisiteEvaluation = await subjectPrerequisiteEngineService.evaluateSubjectPrerequisites({
+        studentId,
+        programId: programIdForPrereq,
+        classId: classRow.id,
+        termId: termIdForPrereq,
+        effectiveDate: startDate,
+        reqUser: requestingUser,
+        classItem: classRow
+      });
+      subjectPrerequisiteEngineService.assertPrerequisitesForEnrollment(prerequisiteEvaluation);
     }
   }
 

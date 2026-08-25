@@ -672,6 +672,65 @@
     else button.disabled = false;
   });
 
+  async function fetchNameMatchPayload(firstName, lastName) {
+    const first = String(firstName || '').trim();
+    const last = String(lastName || '').trim();
+    if (!first || !last) return { exactMatches: [], similarMatches: [], matches: [] };
+    const response = await fetch(`/school/funders/api/name-matches?first=${encodeURIComponent(first)}&last=${encodeURIComponent(last)}`, {
+      headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+    });
+    if (!response.ok) return { exactMatches: [], similarMatches: [], matches: [] };
+    const payload = await response.json().catch(() => ({}));
+    const exactMatches = Array.isArray(payload?.exactMatches)
+      ? payload.exactMatches
+      : (Array.isArray(payload?.matches) ? payload.matches : []);
+    const similarMatches = Array.isArray(payload?.similarMatches) ? payload.similarMatches : exactMatches;
+    return { exactMatches, similarMatches, matches: exactMatches };
+  }
+
+  function renderSimilarNameAdvisory(similarMatches = []) {
+    const panelId = 'funderSimilarNameAdvisory';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+      const anchor = document.getElementById('inp_newPersonLastName')?.closest('.row') || newBlock;
+      if (!anchor) return;
+      panel = document.createElement('div');
+      panel.id = panelId;
+      panel.className = 'mt-2';
+      anchor.parentNode?.insertBefore(panel, anchor.nextSibling);
+    }
+    const advisory = (Array.isArray(similarMatches) ? similarMatches : []).filter((row) => row.matchType !== 'exact');
+    if (!advisory.length) {
+      panel.innerHTML = '';
+      panel.classList.add('d-none');
+      return;
+    }
+    const rows = advisory.slice(0, 5).map((row) => {
+      const roles = (Array.isArray(row.roleLabels) && row.roleLabels.length ? row.roleLabels : row.schoolRoles || [])
+        .map((label) => `<span class="badge text-bg-light border me-1">${escapeHtml(label)}</span>`)
+        .join('');
+      return `<li class="mb-1"><strong>${escapeHtml(row.displayName || '')}</strong> <span class="text-muted">(${Number(row.score || 0)}%)</span><br><span class="small text-muted">${escapeHtml(row.email || 'no email')}</span> ${roles}</li>`;
+    }).join('');
+    panel.classList.remove('d-none');
+    panel.innerHTML = `<div class="alert alert-warning py-2 mb-0 small"><div class="fw-semibold mb-1">Similar people already in the system</div><ul class="mb-0 ps-3">${rows}</ul></div>`;
+  }
+
+  async function refreshSimilarNameAdvisory() {
+    const firstName = document.getElementById('inp_newPersonFirstName')?.value?.trim();
+    const lastName = document.getElementById('inp_newPersonLastName')?.value?.trim();
+    if (!firstName || !lastName) {
+      renderSimilarNameAdvisory([]);
+      return;
+    }
+    const payload = await fetchNameMatchPayload(firstName, lastName);
+    renderSimilarNameAdvisory(payload.similarMatches);
+  }
+
+  ['inp_newPersonFirstName', 'inp_newPersonLastName'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('blur', () => refreshSimilarNameAdvisory());
+  });
+
   syncPersonMode();
   syncAccountMode();
   renderRoleSummary();

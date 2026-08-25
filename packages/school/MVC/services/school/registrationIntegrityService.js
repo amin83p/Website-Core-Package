@@ -1,4 +1,6 @@
-const schoolDataService = require('./schoolDataService');
+function getSchoolDataService() {
+  return require('./schoolDataService');
+}
 const schoolRepositories = require('../../repositories/school');
 const postingPolicyService = require('./postingPolicyService');
 const academicSnapshotService = require('./academicSnapshotService');
@@ -13,6 +15,10 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const { buildVoidPatch } = require('../../models/school/voidRecordMetadata');
 const registrationFinanceLifecycleService = require('./registrationFinanceLifecycleService');
+
+function getSubjectPrerequisiteEngineService() {
+  return require('./subjectPrerequisiteEngineService');
+}
 
 function normalizeStatus(status) {
   return String(status || '').trim().toLowerCase();
@@ -35,7 +41,7 @@ async function assertStudentLeaveDoesNotOverlapClass({ classItem, student, reqUs
   const classId = toPublicId(classItem?.id);
   if (!personId || !classId) return;
 
-  const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+  const sessions = await getSchoolDataService().getClassSessions(classId, reqUser);
   const windows = (Array.isArray(sessions) ? sessions : [])
     .map((session, index) => ({
       sessionIndex: index,
@@ -139,7 +145,7 @@ async function discoverRollingClassEnrollmentLedgerEntryIds({
   const query = { page: 1 };
   if (normalizedStudentId) query.studentId__eq = normalizedStudentId;
   if (normalizedClassId) query.classId__eq = normalizedClassId;
-  const rows = await schoolDataService.fetchData('academicLedger', query, reqUser, options);
+  const rows = await getSchoolDataService().fetchData('academicLedger', query, reqUser, options);
   return (Array.isArray(rows) ? rows : [])
     .filter((row) => entryMatchesRollingClassEnrollmentLedger(row, { periodId, classId, studentId }))
     .map((row) => toPublicId(row?.id))
@@ -155,7 +161,7 @@ async function reconcileOrphanedClassEnrollmentLedgerForClass({
   const normalizedClassId = toPublicId(classId);
   if (!normalizedClassId) return { voidedEntryIds: [], issues: [] };
 
-  const rows = await schoolDataService.fetchData('academicLedger', { page: 1, classId__eq: normalizedClassId }, reqUser, options);
+  const rows = await getSchoolDataService().fetchData('academicLedger', { page: 1, classId__eq: normalizedClassId }, reqUser, options);
   const candidates = (Array.isArray(rows) ? rows : []).filter((row) =>
     String(row?.entryType || '') === 'class_enrolled' && normalizeStatus(row?.status) !== 'void'
   );
@@ -169,12 +175,12 @@ async function reconcileOrphanedClassEnrollmentLedgerForClass({
     let keepEntry = false;
 
     if (periodId) {
-      const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, reqUser, options);
+      const period = await getSchoolDataService().getDataById('classEnrollmentPeriods', periodId, reqUser, options);
       keepEntry = periodStillNeedsClassEnrolledLedger(period, normalizedClassId);
     } else {
       const studentId = toPublicId(row?.studentId);
       if (studentId) {
-        const periods = await schoolDataService.getClassEnrollmentPeriodsByStudentId(studentId, reqUser, options);
+        const periods = await getSchoolDataService().getClassEnrollmentPeriodsByStudentId(studentId, reqUser, options);
         keepEntry = (Array.isArray(periods) ? periods : []).some((period) =>
           periodStillNeedsClassEnrolledLedger(period, normalizedClassId)
         );
@@ -208,7 +214,7 @@ async function reconcileOrphanedClassEnrollmentLedgerForOrg(orgId, reqUser, opti
   const normalizedOrgId = String(orgId || '').trim();
   if (!normalizedOrgId) return { voidedEntryIds: [], issues: [], classIdsProcessed: 0 };
 
-  const rows = await schoolDataService.fetchData(
+  const rows = await getSchoolDataService().fetchData(
     'academicLedger',
     { page: 1, orgId__eq: normalizedOrgId },
     reqUser,
@@ -247,7 +253,7 @@ async function previewOrphanedClassEnrollmentLedgerForOrg(orgId, reqUser, option
   const normalizedOrgId = String(orgId || '').trim();
   if (!normalizedOrgId) return [];
 
-  const rows = await schoolDataService.fetchData(
+  const rows = await getSchoolDataService().fetchData(
     'academicLedger',
     { page: 1, orgId__eq: normalizedOrgId },
     reqUser,
@@ -267,13 +273,13 @@ async function previewOrphanedClassEnrollmentLedgerForOrg(orgId, reqUser, option
 
     if (periodId) {
       // eslint-disable-next-line no-await-in-loop
-      const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, reqUser, options);
+      const period = await getSchoolDataService().getDataById('classEnrollmentPeriods', periodId, reqUser, options);
       keepEntry = periodStillNeedsClassEnrolledLedger(period, normalizedClassId);
     } else {
       const studentId = toPublicId(row?.studentId);
       if (studentId) {
         // eslint-disable-next-line no-await-in-loop
-        const periods = await schoolDataService.getClassEnrollmentPeriodsByStudentId(studentId, reqUser, options);
+        const periods = await getSchoolDataService().getClassEnrollmentPeriodsByStudentId(studentId, reqUser, options);
         keepEntry = (Array.isArray(periods) ? periods : []).some((period) =>
           periodStillNeedsClassEnrolledLedger(period, normalizedClassId)
         );
@@ -550,9 +556,11 @@ const registrationIntegrityService = {
   isInactiveRegistrationStatus,
   isApprovedProgramRegistrationStatus,
   isActiveTermStatus,
+  getRelevantClassSubjects,
+  normalizeClassRegistrationMode,
 
   async getProgramInOrgOrThrow(programId, activeOrgId, reqUser) {
-    const program = await schoolDataService.getDataById('programs', programId, reqUser);
+    const program = await getSchoolDataService().getDataById('programs', programId, reqUser);
     if (!program) throw new Error('Program not found or inaccessible.');
     if (!idsEqual(program.orgId, activeOrgId)) {
       throw new Error('Program is outside the active organization.');
@@ -603,7 +611,7 @@ const registrationIntegrityService = {
     ignoreRegistrationId = '',
     reqUser
   }) {
-    const student = await schoolDataService.getDataById('students', studentId, reqUser);
+    const student = await getSchoolDataService().getDataById('students', studentId, reqUser);
     if (!student) throw new Error('Student not found or inaccessible.');
 
     const issues = [];
@@ -646,7 +654,7 @@ const registrationIntegrityService = {
       };
     }
 
-    const program = await schoolDataService.getDataById('programs', programRegistration.programId, reqUser);
+    const program = await getSchoolDataService().getDataById('programs', programRegistration.programId, reqUser);
     if (!program) {
       issues.push('Program could not be resolved from the selected registration.');
       return {
@@ -675,7 +683,7 @@ const registrationIntegrityService = {
       };
     }
 
-    const term = await schoolDataService.getDataById('terms', termId, reqUser);
+    const term = await getSchoolDataService().getDataById('terms', termId, reqUser);
     const termRow = resolveProgramTermRow(program, termId);
     if (!term || !termRow) {
       issues.push('Selected term is not configured on the chosen program.');
@@ -938,7 +946,6 @@ const registrationIntegrityService = {
       return preview;
     }
 
-    const passedSubjects = new Set(asIdArray(snapshot?.results?.passedSubjects));
     relevantSubjects.forEach((subjectRef) => {
       preview.subjectIds.push(subjectRef.subjectId);
       preview.subjectLabels.push(`${subjectRef.subjectCode} - ${subjectRef.subjectName}`);
@@ -950,13 +957,23 @@ const registrationIntegrityService = {
       } else {
         selectedSubjectOwners.set(subjectRef.subjectId, preview.classId);
       }
-
-      const missingPrerequisites = subjectRef.prerequisites.filter((preId) => !passedSubjects.has(preId));
-      if (missingPrerequisites.length) {
-        preview.status = 'error';
-        preview.issues.push(`Missing prerequisite(s) for ${subjectRef.subjectCode || subjectRef.subjectId}: ${missingPrerequisites.join(', ')}.`);
-      }
     });
+
+    const prerequisiteEvaluation = getSubjectPrerequisiteEngineService().evaluateSubjectPrerequisitesCore({
+      classItem,
+      program,
+      student,
+      snapshot,
+      subjectCatalogMap
+    });
+    preview.prerequisiteEvaluation = prerequisiteEvaluation;
+    if (prerequisiteEvaluation.issues.length) {
+      preview.status = 'error';
+      preview.issues.push(...prerequisiteEvaluation.issues);
+    }
+    if (prerequisiteEvaluation.warnings.length) {
+      preview.warnings.push(...prerequisiteEvaluation.warnings);
+    }
 
     const classPricing = buildClassPricingSnapshot({
       classItem,
@@ -1013,7 +1030,7 @@ const registrationIntegrityService = {
     options = {}
   }) {
     const businessToday = todayISO(orgToday || options.orgToday || reqUser?.orgToday);
-    const classItem = await schoolDataService.getDataById('classes', classId, reqUser);
+    const classItem = await getSchoolDataService().getDataById('classes', classId, reqUser);
     if (!classItem) throw new Error(`Class ${classId} not found.`);
 
     const activeExistingResult = await classEnrollmentReadService.hasActiveEnrollmentForStudentInClass({
@@ -1040,7 +1057,7 @@ const registrationIntegrityService = {
       warnings: Array.isArray(classPreview?.pricing?.warnings) ? classPreview.pricing.warnings : []
     };
 
-    const created = await schoolDataService.createClassEnrollmentPeriod({
+    const created = await getSchoolDataService().createClassEnrollmentPeriod({
       orgId: String(classItem?.orgId || '').trim(),
       classId: String(classId || '').trim(),
       studentId: String(student?.id || '').trim(),
@@ -1156,7 +1173,7 @@ const registrationIntegrityService = {
 
     if ((includeClassEnrollmentRollback || includeRosterRollback) && !enrollmentRows.length && registrationId) {
       try {
-        const classesResult = await schoolDataService.fetchAllData('classes', {}, reqUser);
+        const classesResult = await getSchoolDataService().fetchAllData('classes', {}, reqUser);
         const classes = classesResult?.data || classesResult || [];
         const discovery = await classEnrollmentReadService.discoverClassEnrollmentRowsByRegistrationId({
           registrationId,
@@ -1229,7 +1246,7 @@ const registrationIntegrityService = {
         const enrollmentId = String(enrollmentEntry?.enrollmentId || '').trim();
         if (!classId || !enrollmentId) continue;
         try {
-          await schoolDataService.closeClassEnrollmentPeriod(enrollmentId, {
+          await getSchoolDataService().closeClassEnrollmentPeriod(enrollmentId, {
             status: 'cancelled',
             endDate: businessToday,
             reasonEnd: reason || `Rollback of ${memoLabel} ${registrationId}`

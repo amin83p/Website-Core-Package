@@ -33,6 +33,8 @@ test('studentImportController uses preview and process endpoints and admission s
   assert.match(source, /programRegistrationApplyService/);
   assert.match(source, /parseProgramRegistrationSelectionRows/);
   assert.match(source, /canCreateOrgScopedItem.*program registrations/);
+  assert.match(source, /findSimilarPersonMatches/);
+  assert.match(source, /similarMatches/);
   assert.doesNotMatch(source, /personMode.*existing/);
 });
 

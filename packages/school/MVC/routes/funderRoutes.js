@@ -5,6 +5,7 @@ const { requireAuth, requireAccess, trackActionState, SECTIONS, OPERATIONS } = r
 
 router.use(requireAuth);
 router.get('/', requireAccess(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.READ_ALL), trackActionState(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.READ_ALL), ctrl.listFunders);
+router.get('/api/name-matches', requireAccess(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.CREATE), trackActionState(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }), ctrl.listNameMatches);
 router.get('/api/eligible-persons', requireAccess(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.CREATE), trackActionState(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }), ctrl.listEligiblePersons);
 router.get('/api/eligible-accounts', requireAccess(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.READ_ALL), trackActionState(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }), ctrl.listEligibleAccounts);
 router.get('/new', requireAccess(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.CREATE), trackActionState(SECTIONS.SCHOOL_FUNDERS, OPERATIONS.CREATE), ctrl.showForm);

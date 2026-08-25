@@ -10,10 +10,10 @@
   const nextCycleClassId = String(lifecycle.nextClass?.id || c.nextClassId || '').trim();
   const nextCycleClassTitle = String(lifecycle.nextClass?.title || '').trim();
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
-  const initialRowsJson = JSON.stringify(Array.isArray(periodRows) ? periodRows : []);
-  const studentOptionsJson = JSON.stringify(Array.isArray(studentOptions) ? studentOptions : []);
-  const funderOptionsJson = JSON.stringify(Array.isArray(funderOptions) ? funderOptions : []);
-  const enrollmentProgramChoicesJson = JSON.stringify(Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : []);
+  const initialRowsJson = JSON.stringify(Array.isArray(periodRows) ? periodRows : []).replace(/</g, '\\u003c');
+  const studentOptionsJson = JSON.stringify(Array.isArray(studentOptions) ? studentOptions : []).replace(/</g, '\\u003c');
+  const funderOptionsJson = JSON.stringify(Array.isArray(funderOptions) ? funderOptions : []).replace(/</g, '\\u003c');
+  const enrollmentProgramChoicesJson = JSON.stringify(Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : []).replace(/</g, '\\u003c');
   const canCreateProgramRegistrationsJson = JSON.stringify(Boolean(typeof canCreateProgramRegistrations !== 'undefined' && canCreateProgramRegistrations));
   const canCreatePriorSubjectCreditsJson = JSON.stringify(Boolean(typeof canCreatePriorSubjectCredits !== 'undefined' && canCreatePriorSubjectCredits));
   const classInstructors = Array.isArray(c.instructors) ? c.instructors : [];
@@ -21,7 +21,7 @@
   const defaultTeacherJson = JSON.stringify({
     teacherId: String(defaultInstructor?.personId || '').trim(),
     teacherName: String(defaultInstructor?.name || '').trim()
-  });
+  }).replace(/</g, '\\u003c');
   const rollingFilters = (typeof filters !== 'undefined' && filters && typeof filters === 'object') ? filters : {};
   const hasRollingFiltersAppliedFlag = typeof hasRollingFiltersApplied !== 'undefined' && hasRollingFiltersApplied === true;
   const rollingEnrollmentGroupOptions = Array.isArray(typeof enrollmentGroupOptions !== 'undefined' ? enrollmentGroupOptions : null)
@@ -2289,8 +2289,11 @@
     return getPriorRepairFromEligibility(lastRollingEligibility);
   }
 
+  function isAdvisoryPrerequisiteEnforcement(prereq = {}) {
+    return String(prereq.enforcementMode || 'advisory').trim().toLowerCase() === 'advisory';
+  }
+
   function isGroupPrerequisiteRepairable(prereqPayload = {}) {
-    if (!prereqPayload || prereqPayload.eligible === true) return false;
     const prereq = prereqPayload.prerequisite || {};
     const missingSubjects = Array.isArray(prereq.missingSubjects) ? prereq.missingSubjects : [];
     if (!missingSubjects.length) return false;
@@ -2299,6 +2302,9 @@
     if (issues.some(isStudentConflictMessage)) return false;
     if (issues.some(isMissingProgramRegistrationMessage)) return false;
     if (issues.some(isMissingTermRegistrationMessage)) return false;
+    if (prereqPayload.eligible === true) {
+      return isAdvisoryPrerequisiteEnforcement(prereq);
+    }
     return true;
   }
 
@@ -2396,28 +2402,37 @@
     syncGroupEnrollmentResultsChrome();
   }
 
-  function renderPriorCreditRepairPanel(message) {
+  function renderPriorCreditRepairPanel(message, options = {}) {
     const repair = getPriorRepairPrerequisite();
-    const issue = (Array.isArray(lastRollingEligibility?.prerequisite?.issues) && lastRollingEligibility.prerequisite.issues.length)
-      ? lastRollingEligibility.prerequisite.issues.map((item) => htmlEscape(item)).join('<br>')
-      : htmlEscape(message || 'Prerequisites are not satisfied for this class.');
+    const advisory = options.advisory === true || isAdvisoryPrerequisiteEnforcement(lastRollingEligibility?.prerequisite);
+    const prereqWarnings = Array.isArray(lastRollingEligibility?.prerequisite?.warnings)
+      ? lastRollingEligibility.prerequisite.warnings
+      : [];
+    const issue = prereqWarnings.length
+      ? prereqWarnings.map((item) => htmlEscape(item)).join('<br>')
+      : ((Array.isArray(lastRollingEligibility?.prerequisite?.issues) && lastRollingEligibility.prerequisite.issues.length)
+        ? lastRollingEligibility.prerequisite.issues.map((item) => htmlEscape(item)).join('<br>')
+        : htmlEscape(message || (advisory
+          ? 'Prerequisite warnings were found for this class. Enrollment is allowed, but prior credits may be needed.'
+          : 'Prerequisites are not satisfied for this class.')));
+    const alertClass = advisory ? 'text-warning' : 'text-danger';
     if (!repair.missingSubjects.length) {
       setRollingRegistrationPanelHtml(
-        '<div class="text-danger small">' + issue + '</div>'
+        '<div class="' + alertClass + ' small">' + issue + '</div>'
         + renderClbPlacementInsightButtonHtml(lastRollingEligibility?.clbPlacement)
       );
       return;
     }
     if (!canCreatePriorSubjectCredits || lastRollingEligibility?.prerequisite?.canCreatePriorCredits === false) {
       setRollingRegistrationPanelHtml(
-        '<div class="text-danger small mb-2">' + issue + '</div>' +
+        '<div class="' + alertClass + ' small mb-2">' + issue + '</div>' +
         '<div class="alert alert-warning border py-2 mb-0 small">You need Prior Subject Credits create access to add prerequisite credits from here.</div>'
         + renderClbPlacementInsightButtonHtml(lastRollingEligibility?.clbPlacement)
       );
       return;
     }
     setRollingRegistrationPanelHtml(
-      '<div class="text-danger small mb-2">' + issue + '</div>' +
+      '<div class="' + alertClass + ' small mb-2">' + issue + '</div>' +
       '<div class="d-flex flex-wrap align-items-center gap-2">' +
         '<button type="button" class="btn btn-sm btn-warning" id="btn_openPriorCreditRepair">' +
           '<i class="bi bi-mortarboard me-1"></i>Fix Prerequisites / Add Prior Credits' +
@@ -3026,9 +3041,10 @@
     prereq.conflictStudentPersonId = null;
     prereq.conflictStudentLabel = null;
     const missingSubjects = Array.isArray(prereq.missingSubjects) ? prereq.missingSubjects : [];
+    const advisoryPrereq = isAdvisoryPrerequisiteEnforcement(prereq);
     const prereqBlocked = prereq.status === 'error'
       || (prereq.issues || []).length > 0
-      || missingSubjects.length > 0;
+      || (!advisoryPrereq && missingSubjects.length > 0);
     return {
       ...base,
       eligible: !prereqBlocked,
@@ -3134,8 +3150,10 @@
         .filter((text) => !isCapacityWarningText(text))
         .map((t) => htmlEscape(t))
         .join('<br>');
-      if (!ok && Array.isArray(data.prerequisite.missingSubjects) && data.prerequisite.missingSubjects.length) {
-        renderPriorCreditRepairPanel(data.message || (data.prerequisite.issues || []).join(' '));
+      const missingSubjects = Array.isArray(data.prerequisite.missingSubjects) ? data.prerequisite.missingSubjects : [];
+      const advisoryPrereq = isAdvisoryPrerequisiteEnforcement(data.prerequisite);
+      if (!ok && missingSubjects.length) {
+        renderPriorCreditRepairPanel(data.message || (data.prerequisite.issues || []).join(' '), { advisory: advisoryPrereq });
         return;
       }
       let inner = '<div class="fw-semibold text-dark">' + formatResolvedRegistrationLabel(data.resolved) + '</div>';
@@ -3143,7 +3161,18 @@
       if (conflictIssue) inner += renderStudentConflictHtml(conflictIssue);
       if (capacityWarningHtml) inner += capacityWarningHtml;
       if (otherWarnings) inner += '<div class="text-warning small mt-1">' + otherWarnings + '</div>';
-      if (ok && !issuesHtml && !conflictIssue) inner += '<div class="text-success small mt-1">Prerequisites satisfied for this start date.</div>';
+      if (ok && missingSubjects.length && advisoryPrereq) {
+        inner += '<div class="d-flex flex-wrap align-items-center gap-2 mt-2">'
+          + '<button type="button" class="btn btn-sm btn-outline-warning" id="btn_openPriorCreditRepair">'
+          + '<i class="bi bi-mortarboard me-1"></i>Review Prerequisite Credits'
+          + '</button>'
+          + '<span class="small text-muted">' + htmlEscape(String(missingSubjects.length)) + ' suggested prerequisite credit'
+          + (missingSubjects.length === 1 ? '' : 's') + '.</span>'
+          + '</div>';
+      }
+      if (ok && !issuesHtml && !conflictIssue && !otherWarnings && !(missingSubjects.length && advisoryPrereq)) {
+        inner += '<div class="text-success small mt-1">Prerequisites satisfied for this start date.</div>';
+      }
       inner += renderClbPlacementInsightButtonHtml(data.clbPlacement);
       setRollingRegistrationPanelHtml(inner);
       return;
@@ -6019,9 +6048,12 @@
     await refreshRollingEligibility();
     if (!lastRollingEligibility || lastRollingEligibility.eligible !== true) {
       const issues = lastRollingEligibility?.prerequisite?.issues || [];
-      const msg = issues.length > 0 
-        ? issues.join('\n') 
-        : 'The student must have an active program registration allowed for this class and meet prerequisites. Fix the issues shown under Program registration, then try again.';
+      const warnings = lastRollingEligibility?.prerequisite?.warnings || [];
+      const msg = issues.length > 0
+        ? issues.join('\n')
+        : (warnings.length > 0
+          ? warnings.join('\n')
+          : 'The student must have an active program registration allowed for this class and meet prerequisites. Fix the issues shown under Program registration, then try again.');
       await showMsg(
         'Not eligible',
         'warning',
@@ -6715,7 +6747,9 @@
   function renderRows() {
     closeAllActionMenus();
     const rows = Array.isArray(periodRows) ? [...periodRows] : [];
-    periodCount.textContent = `${rows.length} row${rows.length === 1 ? '' : 's'}`;
+    if (periodCount) {
+      periodCount.textContent = `${rows.length} row${rows.length === 1 ? '' : 's'}`;
+    }
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="' + String(periodTableColspan) + '" class="text-center py-4 text-muted">No enrollment periods found.</td></tr>';
       if (typeof window.reapplyCurrentTableSettings === 'function') {

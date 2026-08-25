@@ -1,5 +1,6 @@
 const schoolDataService = require('../../services/school/schoolDataService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const schoolPersonSimilarityService = require('../../services/school/schoolPersonSimilarityService');
 const schoolLinkedPersonProfileService = require('../../services/school/schoolLinkedPersonProfileService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
@@ -219,6 +220,26 @@ exports.listFunders = async (req, res) => {
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     return res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+};
+
+exports.listNameMatches = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const payload = await schoolPersonSimilarityService.buildNameMatchApiPayload({
+      reqUser: req.user,
+      firstName: String(req.query.first || req.query.firstName || '').trim(),
+      lastName: String(req.query.last || req.query.lastName || '').trim(),
+      middleName: String(req.query.middleName || '').trim(),
+      preferredName: String(req.query.preferredName || '').trim(),
+      email: String(req.query.email || '').trim(),
+      dateOfBirth: String(req.query.dateOfBirth || '').trim(),
+      phone: String(req.query.phone || '').trim(),
+      excludePersonId: String(req.query.excludePersonId || '').trim()
+    });
+    return res.json({ status: 'success', ...payload });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 };
 
