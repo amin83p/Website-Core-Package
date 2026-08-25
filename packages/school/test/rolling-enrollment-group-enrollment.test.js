@@ -112,3 +112,27 @@ test('rolling enrollment routes expose prerequisite and execute endpoints used b
   assert.match(routesSource, /rolling-enrollment\/execute/);
   assert.match(routesSource, /rolling-prior-subject-credits\/apply-placement/);
 });
+
+test('rolling enrollment view includes attendance report menu action and modals', () => {
+  assert.match(viewSource, /btn-row-attendance-report/);
+  assert.match(viewSource, /Attendance report/);
+  assert.match(viewSource, /id="enrollmentAttendanceReportModal"/);
+  assert.match(viewSource, /attendance-report-modal/);
+  assert.match(viewSource, /attendance-report-metric/);
+  assert.match(viewSource, /attendance-report-date-range/);
+  assert.match(viewSource, /attendance-report-slot-col1/);
+  assert.match(viewSource, /attendance-report-metric-standard/);
+  assert.match(viewSource, /attendance-report-metric-excused/);
+  assert.match(viewSource, /id="attendanceReport_lateExcused"/);
+  assert.match(viewSource, /id="enrollmentAttendanceNaReasonsModal"/);
+  assert.match(viewSource, /function openEnrollmentAttendanceReportModal\(/);
+  assert.match(viewSource, /function fetchEnrollmentAttendanceReport\(/);
+  assert.match(viewSource, /function renderEnrollmentAttendanceReport\(/);
+  assert.match(viewSource, /function openEnrollmentAttendanceNaReasonsModal\(/);
+  assert.match(viewSource, /function formatAttendanceReportDisplayDate\(/);
+});
+
+test('rolling enrollment routes expose attendance report endpoint', () => {
+  assert.match(routesSource, /attendance-report/);
+  assert.match(routesSource, /getEnrollmentPeriodAttendanceReport/);
+});

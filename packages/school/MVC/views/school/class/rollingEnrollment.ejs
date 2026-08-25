@@ -10,18 +10,38 @@
   const nextCycleClassId = String(lifecycle.nextClass?.id || c.nextClassId || '').trim();
   const nextCycleClassTitle = String(lifecycle.nextClass?.title || '').trim();
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
-  const initialRowsJson = JSON.stringify(Array.isArray(periodRows) ? periodRows : []).replace(/</g, '\\u003c');
-  const studentOptionsJson = JSON.stringify(Array.isArray(studentOptions) ? studentOptions : []).replace(/</g, '\\u003c');
-  const funderOptionsJson = JSON.stringify(Array.isArray(funderOptions) ? funderOptions : []).replace(/</g, '\\u003c');
-  const enrollmentProgramChoicesJson = JSON.stringify(Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : []).replace(/</g, '\\u003c');
-  const canCreateProgramRegistrationsJson = JSON.stringify(Boolean(typeof canCreateProgramRegistrations !== 'undefined' && canCreateProgramRegistrations));
-  const canCreatePriorSubjectCreditsJson = JSON.stringify(Boolean(typeof canCreatePriorSubjectCredits !== 'undefined' && canCreatePriorSubjectCredits));
+  function jsonForScript(value) {
+    return JSON.stringify(value)
+      .replace(/</g, '\\u003c')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
+  }
+  const initialRowsJson = jsonForScript(Array.isArray(periodRows) ? periodRows : []);
+  const studentOptionsJson = jsonForScript(Array.isArray(studentOptions) ? studentOptions : []);
+  const funderOptionsJson = jsonForScript(Array.isArray(funderOptions) ? funderOptions : []);
+  const enrollmentProgramChoicesJson = jsonForScript(Array.isArray(enrollmentProgramChoices) ? enrollmentProgramChoices : []);
+  const canCreateProgramRegistrationsJson = jsonForScript(Boolean(typeof canCreateProgramRegistrations !== 'undefined' && canCreateProgramRegistrations));
+  const canCreatePriorSubjectCreditsJson = jsonForScript(Boolean(typeof canCreatePriorSubjectCredits !== 'undefined' && canCreatePriorSubjectCredits));
   const classInstructors = Array.isArray(c.instructors) ? c.instructors : [];
   const defaultInstructor = classInstructors.find((row) => String(row?.status || '').trim().toLowerCase() === 'active') || classInstructors[0] || null;
-  const defaultTeacherJson = JSON.stringify({
+  const defaultTeacherJson = jsonForScript({
     teacherId: String(defaultInstructor?.personId || '').trim(),
     teacherName: String(defaultInstructor?.name || '').trim()
-  }).replace(/</g, '\\u003c');
+  });
+  const rollingClassDataJson = jsonForScript({
+    id: String(c.id || ''),
+    orgId: String(c.orgId || ''),
+    room: String(c.room || ''),
+    instructors: classInstructors
+  });
+  const orgTodayJson = jsonForScript(typeof orgToday !== 'undefined' ? orgToday : '');
+  const classIdJson = jsonForScript(String(c.id || ''));
+  const actionStateIdJson = jsonForScript(String(asid || ''));
+  const cycleStartDateJson = jsonForScript(cycleStartDate);
+  const cycleEndDateJson = jsonForScript(cycleEndDate);
+  const isClosedForNewEnrollmentJson = jsonForScript(Boolean(isClosedForNewEnrollment));
+  const canManageEnrollmentOfficeJson = jsonForScript(Boolean(typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice));
+  const isRollingJson = jsonForScript(Boolean(isRolling));
   const rollingFilters = (typeof filters !== 'undefined' && filters && typeof filters === 'object') ? filters : {};
   const hasRollingFiltersAppliedFlag = typeof hasRollingFiltersApplied !== 'undefined' && hasRollingFiltersApplied === true;
   const rollingEnrollmentGroupOptions = Array.isArray(typeof enrollmentGroupOptions !== 'undefined' ? enrollmentGroupOptions : null)
@@ -233,6 +253,227 @@
     font-size: 0.7rem;
     padding: 0.08rem 0.3rem;
     border-radius: 0.25rem;
+  }
+  .attendance-report-modal .attendance-report-hero {
+    border: 1px solid rgba(23, 50, 77, 0.12);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #f8fbff 0%, #fffaf0 100%);
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+  }
+  .attendance-report-modal .attendance-report-student {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: #17324d;
+    margin-bottom: 0.55rem;
+  }
+  .attendance-report-modal .attendance-report-student i {
+    color: var(--bs-primary);
+    font-size: 1.15rem;
+  }
+  .attendance-report-modal .attendance-report-date-range {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.65rem;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #17324d;
+  }
+  .attendance-report-modal .attendance-report-date-range span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .attendance-report-modal .attendance-report-date-range i.bi-calendar-event,
+  .attendance-report-modal .attendance-report-date-range i.bi-calendar-check {
+    color: var(--bs-primary);
+  }
+  .attendance-report-modal .attendance-report-enrollment-meta {
+    margin-top: 0.45rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .attendance-report-modal .attendance-report-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid rgba(23, 50, 77, 0.1);
+  }
+  .attendance-report-modal .attendance-report-controls-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .attendance-report-modal .attendance-report-section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7a89;
+    margin-bottom: 0.45rem;
+  }
+  .attendance-report-modal .attendance-report-metric {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    border: 1px solid rgba(23, 50, 77, 0.1);
+    border-radius: 0.85rem;
+    background: #f8fafc;
+    padding: 0.7rem 0.75rem;
+    height: 100%;
+  }
+  .attendance-report-modal .attendance-report-metric-featured {
+    background: linear-gradient(135deg, #eef4ff 0%, #f8fafc 100%);
+    border-color: rgba(13, 110, 253, 0.2);
+  }
+  .attendance-report-modal .attendance-report-metric-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: rgba(23, 50, 77, 0.08);
+    color: #17324d;
+    font-size: 1rem;
+  }
+  .attendance-report-modal .attendance-report-metric[data-tone="primary"] .attendance-report-metric-icon {
+    background: var(--bs-primary-bg-subtle, #cfe2ff);
+    color: var(--bs-primary);
+  }
+  .attendance-report-modal .attendance-report-metric[data-tone="success"] .attendance-report-metric-icon {
+    background: var(--bs-success-bg-subtle, #d1e7dd);
+    color: var(--bs-success);
+  }
+  .attendance-report-modal .attendance-report-metric[data-tone="danger"] .attendance-report-metric-icon {
+    background: var(--bs-danger-bg-subtle, #f8d7da);
+    color: var(--bs-danger);
+  }
+  .attendance-report-modal .attendance-report-metric[data-tone="info"] .attendance-report-metric-icon {
+    background: var(--bs-info-bg-subtle, #cff4fc);
+    color: var(--bs-info-text-emphasis, #055160);
+  }
+  .attendance-report-modal .attendance-report-metric[data-tone="warning"] .attendance-report-metric-icon {
+    background: var(--bs-warning-bg-subtle, #fff3cd);
+    color: var(--bs-warning-text-emphasis, #664d03);
+  }
+  .attendance-report-modal .attendance-report-metric[data-tone="secondary"] .attendance-report-metric-icon {
+    background: var(--bs-secondary-bg-subtle, #e2e3e5);
+    color: var(--bs-secondary);
+  }
+  .attendance-report-modal .attendance-report-metric-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #6b7a89;
+    line-height: 1.2;
+  }
+  .attendance-report-modal .attendance-report-metric-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: #17324d;
+  }
+  .attendance-report-modal .attendance-report-metric-featured .attendance-report-metric-value {
+    font-size: 1.75rem;
+  }
+  .attendance-report-modal .attendance-report-metric-sub {
+    font-size: 0.72rem;
+    color: #6b7a89;
+    margin-top: 0.15rem;
+  }
+  .attendance-report-modal .attendance-report-metric-actions {
+    margin-top: 0.2rem;
+  }
+  .attendance-report-modal .attendance-report-metric-excused {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--bs-success);
+    margin-top: 0.3rem;
+    line-height: 1.3;
+  }
+  .attendance-report-modal .attendance-report-metric-excused-sub {
+    font-weight: 500;
+    opacity: 0.9;
+  }
+  .attendance-report-modal .attendance-report-metric-grid {
+    --attendance-report-standard-height: 5.25rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+  }
+  @media (min-width: 768px) {
+    .attendance-report-modal .attendance-report-metric-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .attendance-report-modal .attendance-report-metric-standard {
+    min-height: var(--attendance-report-standard-height);
+  }
+  .attendance-report-modal .attendance-report-slot-col1 {
+    grid-column: 1;
+  }
+  .attendance-report-modal .attendance-report-slot-col2 {
+    grid-column: 2;
+  }
+  .attendance-report-modal .attendance-report-attendance-grid .attendance-report-present-slot {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    min-height: calc((var(--attendance-report-standard-height) * 2) + 0.5rem);
+  }
+  .attendance-report-modal .attendance-report-attendance-grid .attendance-report-slot-absent {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .attendance-report-modal .attendance-report-attendance-grid .attendance-report-slot-excused-absence {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .attendance-report-modal .attendance-report-attendance-grid .attendance-report-slot-acf {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .attendance-report-modal .attendance-report-attendance-grid .attendance-report-slot-excused-acf {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .attendance-report-modal .attendance-report-metric-tall {
+    height: 100%;
+    min-height: 100%;
+    align-items: center;
+  }
+  .attendance-report-modal .attendance-report-metric-tall .attendance-report-metric-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+  }
+  @media (max-width: 767.98px) {
+    .attendance-report-modal .attendance-report-slot-col1,
+    .attendance-report-modal .attendance-report-slot-col2,
+    .attendance-report-modal .attendance-report-attendance-grid .attendance-report-present-slot,
+    .attendance-report-modal .attendance-report-attendance-grid .attendance-report-slot-absent,
+    .attendance-report-modal .attendance-report-attendance-grid .attendance-report-slot-excused-absence,
+    .attendance-report-modal .attendance-report-attendance-grid .attendance-report-slot-acf,
+    .attendance-report-modal .attendance-report-attendance-grid .attendance-report-slot-excused-acf {
+      grid-column: auto;
+      grid-row: auto;
+      min-height: var(--attendance-report-standard-height);
+    }
+    .attendance-report-modal .attendance-report-metric-tall {
+      min-height: var(--attendance-report-standard-height);
+    }
   }
 </style>
 
@@ -946,6 +1187,198 @@
   </div>
 </div>
 
+<div class="modal fade attendance-report-modal" id="enrollmentAttendanceReportModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-clipboard-data me-2"></i>Attendance report</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="enrollmentAttendanceReportHeader" class="attendance-report-hero">
+          <div class="attendance-report-student">
+            <i class="bi bi-person-badge" aria-hidden="true"></i>
+            <span id="enrollmentAttendanceReportStudentLabel">-</span>
+          </div>
+          <div class="attendance-report-date-range">
+            <span><i class="bi bi-calendar-event" aria-hidden="true"></i><span id="enrollmentAttendanceReportStartDate">-</span></span>
+            <i class="bi bi-arrow-right text-muted" aria-hidden="true"></i>
+            <span><i class="bi bi-calendar-check" aria-hidden="true"></i><span id="enrollmentAttendanceReportReportDate">-</span></span>
+          </div>
+          <div class="attendance-report-enrollment-meta text-muted small">
+            <i class="bi bi-calendar-range" aria-hidden="true"></i>
+            <span id="enrollmentAttendanceReportEnrollmentMeta">-</span>
+          </div>
+        </div>
+        <div class="attendance-report-controls">
+          <div>
+            <label class="form-label small mb-1" for="enrollmentAttendanceReportDate">Report date</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-calendar3" aria-hidden="true"></i></span>
+              <input type="date" class="form-control" id="enrollmentAttendanceReportDate">
+            </div>
+          </div>
+          <div class="attendance-report-controls-actions">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btn_refreshEnrollmentAttendanceReport">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btn_usePeriodEndDateAttendanceReport">
+              <i class="bi bi-calendar-check me-1"></i>Use period end date
+            </button>
+            <span class="badge text-bg-light border d-none" id="badge_attendanceReportTargetSessions"></span>
+            <span class="badge text-bg-light border d-none" id="badge_attendanceReportTargetHours"></span>
+          </div>
+        </div>
+        <div id="enrollmentAttendanceReportLoading" class="text-center py-4 text-muted d-none">
+          <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+          Loading attendance report...
+        </div>
+        <div id="enrollmentAttendanceReportEmpty" class="alert alert-light border text-muted small d-none mb-0">
+          <i class="bi bi-calendar-x me-1"></i>No sessions found in this enrollment window for the selected report date.
+        </div>
+        <div id="enrollmentAttendanceReportContent" class="d-none">
+          <div class="mb-3">
+            <div class="attendance-report-section-title">Overview</div>
+            <div class="attendance-report-metric-grid">
+              <div class="attendance-report-metric attendance-report-metric-featured attendance-report-metric-standard attendance-report-slot-col1" data-tone="primary">
+                <div class="attendance-report-metric-icon"><i class="bi bi-collection" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">Total sessions</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_totalSessions">-</div>
+                </div>
+              </div>
+              <div class="attendance-report-metric attendance-report-metric-standard attendance-report-metric-unmarked attendance-report-slot-col2 d-none" data-tone="secondary">
+                <div class="attendance-report-metric-icon"><i class="bi bi-question-circle" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">Unmarked</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_unmarked">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <div class="attendance-report-section-title">Attendance</div>
+            <div class="attendance-report-metric-grid attendance-report-attendance-grid">
+              <div class="attendance-report-present-slot">
+                <div class="attendance-report-metric attendance-report-metric-tall" data-tone="success">
+                  <div class="attendance-report-metric-icon"><i class="bi bi-check-circle" aria-hidden="true"></i></div>
+                  <div class="attendance-report-metric-body">
+                    <div class="attendance-report-metric-label">Present</div>
+                    <div class="attendance-report-metric-value" id="attendanceReport_present">-</div>
+                  </div>
+                </div>
+              </div>
+              <div class="attendance-report-metric attendance-report-metric-standard attendance-report-slot-absent" data-tone="danger">
+                <div class="attendance-report-metric-icon"><i class="bi bi-x-circle" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">Absent</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_absent">-</div>
+                </div>
+              </div>
+              <div class="attendance-report-metric attendance-report-metric-standard attendance-report-slot-excused-absence" data-tone="info">
+                <div class="attendance-report-metric-icon"><i class="bi bi-shield-check" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">Excused absence</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_absentExcused">-</div>
+                </div>
+              </div>
+              <div class="attendance-report-metric attendance-report-metric-standard attendance-report-slot-acf" data-tone="secondary">
+                <div class="attendance-report-metric-icon"><i class="bi bi-camera-video-off" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">ACF</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_acf">-</div>
+                </div>
+              </div>
+              <div class="attendance-report-metric attendance-report-metric-standard attendance-report-slot-excused-acf" data-tone="secondary">
+                <div class="attendance-report-metric-icon"><i class="bi bi-slash-circle" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">Excused ACF</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_acfExcused">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3 attendance-report-section-timing">
+            <div class="attendance-report-section-title">Timing</div>
+            <div class="attendance-report-metric-grid">
+              <div class="attendance-report-metric attendance-report-metric-standard attendance-report-slot-col1" data-tone="warning">
+                <div class="attendance-report-metric-icon"><i class="bi bi-clock" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">Late</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_late">-</div>
+                  <div class="attendance-report-metric-sub d-none" id="attendanceReport_lateSub"></div>
+                  <div class="attendance-report-metric-excused d-none" id="attendanceReport_lateExcusedWrap">
+                    <i class="bi bi-shield-check me-1" aria-hidden="true"></i>Excused: <span id="attendanceReport_lateExcused">0</span><span class="attendance-report-metric-excused-sub d-none" id="attendanceReport_lateExcusedSub"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="attendance-report-metric attendance-report-metric-standard attendance-report-slot-col2" data-tone="warning">
+                <div class="attendance-report-metric-icon"><i class="bi bi-box-arrow-left" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">Left early</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_earlyLeave">-</div>
+                  <div class="attendance-report-metric-sub d-none" id="attendanceReport_earlyLeaveSub"></div>
+                  <div class="attendance-report-metric-excused d-none" id="attendanceReport_earlyLeaveExcusedWrap">
+                    <i class="bi bi-shield-check me-1" aria-hidden="true"></i>Excused: <span id="attendanceReport_earlyLeaveExcused">0</span><span class="attendance-report-metric-excused-sub d-none" id="attendanceReport_earlyLeaveExcusedSub"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="attendance-report-section-na">
+            <div class="attendance-report-section-title">N/A</div>
+            <div class="attendance-report-metric-grid">
+              <div class="attendance-report-metric attendance-report-metric-standard attendance-report-slot-col1" data-tone="secondary">
+                <div class="attendance-report-metric-icon"><i class="bi bi-slash-circle" aria-hidden="true"></i></div>
+                <div class="attendance-report-metric-body">
+                  <div class="attendance-report-metric-label">N/A</div>
+                  <div class="attendance-report-metric-value" id="attendanceReport_na">-</div>
+                  <div class="attendance-report-metric-actions">
+                    <button type="button" class="btn btn-link btn-sm p-0 d-none" id="btn_viewAttendanceReportNaReasons">View reasons</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="enrollmentAttendanceNaReasonsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i>N/A reasons</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Date</th>
+                <th>Reason</th>
+                <th class="pe-3">Source</th>
+              </tr>
+            </thead>
+            <tbody id="enrollmentAttendanceNaReasonsBody">
+              <tr><td colspan="3" class="text-center text-muted py-4">No N/A reasons recorded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="extensionEnrollmentModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -1431,23 +1864,18 @@
 
 <script>
 (() => {
-  const ORG_TODAY = <%- JSON.stringify(typeof orgToday !== 'undefined' ? orgToday : '') %>;
+  const ORG_TODAY = <%- orgTodayJson %>;
   function orgTodayFallback() {
     if (ORG_TODAY) return ORG_TODAY;
     return (window.AppOrgDateTime && window.AppOrgDateTime.today) ? String(window.AppOrgDateTime.today) : '';
   }
-  const classId = <%- JSON.stringify(String(c.id || '')) %>;
-  const rollingClassData = <%- JSON.stringify({
-    id: String(c.id || ''),
-    orgId: String(c.orgId || ''),
-    room: String(c.room || ''),
-    instructors: classInstructors
-  }) %>;
-  const actionStateId = <%- JSON.stringify(String(asid || '')) %>;
+  const classId = <%- classIdJson %>;
+  const rollingClassData = <%- rollingClassDataJson %>;
+  const actionStateId = <%- actionStateIdJson %>;
   const cycleWindow = {
-    startDate: <%- JSON.stringify(cycleStartDate) %>,
-    endDate: <%- JSON.stringify(cycleEndDate) %>,
-    isClosedForNewEnrollment: <%- JSON.stringify(Boolean(isClosedForNewEnrollment)) %>
+    startDate: <%- cycleStartDateJson %>,
+    endDate: <%- cycleEndDateJson %>,
+    isClosedForNewEnrollment: <%- isClosedForNewEnrollmentJson %>
   };
   const periodTableColspan = 10;
   const studentOptions = <%- studentOptionsJson %>;
@@ -1456,7 +1884,7 @@
   const enrollmentProgramChoices = <%- enrollmentProgramChoicesJson %>;
   const canCreateProgramRegistrations = <%- canCreateProgramRegistrationsJson %>;
   const canCreatePriorSubjectCredits = <%- canCreatePriorSubjectCreditsJson %>;
-  const canManageEnrollmentOffice = <%- JSON.stringify(Boolean(typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice)) %>;
+  const canManageEnrollmentOffice = <%- canManageEnrollmentOfficeJson %>;
   const defaultTeacher = <%- defaultTeacherJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
@@ -5195,7 +5623,7 @@
   }
 
   function isRollingClass() {
-    return <%= JSON.stringify(Boolean(isRolling)) %>;
+    return <%- isRollingJson %>;
   }
 
   function resetEnrollmentWizard() {
@@ -6811,6 +7239,7 @@
       const actionsMenuHtml = isVoid
         ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-details" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-eye me-1"></i>Details</button>`
         : `
+                <button type="button" class="btn btn-outline-primary btn-sm btn-row-attendance-report" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-clipboard-data me-1"></i>Attendance report</button>
                 <button type="button" class="btn btn-outline-primary btn-sm btn-row-edit" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
                 ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-manage-sessions" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-calendar-week me-1"></i>Manage enrollment sessions</button>` : ''}
                 ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-success btn-sm btn-row-extension" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-plus-circle me-1"></i>Extension enrollment</button>` : ''}
@@ -7446,6 +7875,211 @@
   window.addEventListener('resize', repositionOpenRowActionMenu);
   document.querySelector('.rolling-enrollment-page .table-scroll-wrapper')?.addEventListener('scroll', repositionOpenRowActionMenu, { passive: true });
 
+  let enrollmentAttendanceReportPeriodId = '';
+  let enrollmentAttendanceReportPayload = null;
+
+  function formatAttendanceReportDisplayDate(iso) {
+    const token = String(iso || '').trim();
+    if (!token || token === '-') return '-';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
+    const parts = token.split('-').map(Number);
+    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+    if (Number.isNaN(dt.getTime())) return token;
+    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function formatAttendanceReportMinutes(value) {
+    const minutes = Number(value || 0);
+    if (!Number.isFinite(minutes) || minutes <= 0) return '';
+    return `${minutes} min total`;
+  }
+
+  function formatAttendanceReportMetricValue(count) {
+    return String(Number(count || 0));
+  }
+
+  function formatAttendanceReportMetricSub(count, minutes) {
+    const sessionCount = Number(count || 0);
+    const minuteTotal = Number(minutes || 0);
+    if (sessionCount <= 0 || minuteTotal <= 0) return '';
+    return formatAttendanceReportMinutes(minuteTotal);
+  }
+
+  function setEnrollmentAttendanceReportLoading(isLoading) {
+    qs('enrollmentAttendanceReportLoading')?.classList.toggle('d-none', !isLoading);
+    if (isLoading) {
+      qs('enrollmentAttendanceReportContent')?.classList.add('d-none');
+      qs('enrollmentAttendanceReportEmpty')?.classList.add('d-none');
+    }
+  }
+
+  function renderEnrollmentAttendanceReport(payload = {}) {
+    const summary = payload?.summary && typeof payload.summary === 'object' ? payload.summary : {};
+    const period = payload?.period && typeof payload.period === 'object' ? payload.period : {};
+    const shortcuts = payload?.shortcuts && typeof payload.shortcuts === 'object' ? payload.shortcuts : {};
+    const studentLabel = String(payload?.studentLabel || '').trim() || '-';
+    const startDate = String(period.startDate || '').trim();
+    const endDate = String(period.endDate || '').trim();
+    const reportDate = String(payload?.reportDate || '').trim();
+
+    const studentLabelEl = qs('enrollmentAttendanceReportStudentLabel');
+    const startDateEl = qs('enrollmentAttendanceReportStartDate');
+    const reportDateEl = qs('enrollmentAttendanceReportReportDate');
+    const enrollmentMetaEl = qs('enrollmentAttendanceReportEnrollmentMeta');
+    if (studentLabelEl) studentLabelEl.textContent = studentLabel;
+    if (startDateEl) startDateEl.textContent = formatAttendanceReportDisplayDate(startDate || '-');
+    if (reportDateEl) reportDateEl.textContent = formatAttendanceReportDisplayDate(reportDate || '-');
+    if (enrollmentMetaEl) {
+      if (endDate) {
+        enrollmentMetaEl.textContent = `Enrollment ends ${formatAttendanceReportDisplayDate(endDate)}`;
+      } else if (Number(shortcuts.targetSessionCount || 0) > 0) {
+        enrollmentMetaEl.textContent = `Target: ${Number(shortcuts.targetSessionCount)} session${Number(shortcuts.targetSessionCount) === 1 ? '' : 's'}`;
+      } else if (Number(shortcuts.targetHours || 0) > 0) {
+        enrollmentMetaEl.textContent = `Target: ${Number(shortcuts.targetHours)} hour${Number(shortcuts.targetHours) === 1 ? '' : 's'}`;
+      } else {
+        enrollmentMetaEl.textContent = 'Open enrollment';
+      }
+    }
+    if (qs('enrollmentAttendanceReportDate') && reportDate) {
+      qs('enrollmentAttendanceReportDate').value = reportDate;
+    }
+
+    const endDateBtn = qs('btn_usePeriodEndDateAttendanceReport');
+    const targetSessionsBadge = qs('badge_attendanceReportTargetSessions');
+    const targetHoursBadge = qs('badge_attendanceReportTargetHours');
+    if (endDateBtn) {
+      endDateBtn.classList.toggle('d-none', !shortcuts.hasEndDate || !shortcuts.endDate);
+      endDateBtn.dataset.endDate = String(shortcuts.endDate || '');
+    }
+    if (targetSessionsBadge) {
+      const targetSessions = Number(shortcuts.targetSessionCount || 0);
+      const showTargetSessions = !shortcuts.hasEndDate && targetSessions > 0;
+      targetSessionsBadge.classList.toggle('d-none', !showTargetSessions);
+      if (showTargetSessions) targetSessionsBadge.textContent = `Target: ${targetSessions} session${targetSessions === 1 ? '' : 's'}`;
+    }
+    if (targetHoursBadge) {
+      const targetHours = Number(shortcuts.targetHours || 0);
+      const showTargetHours = !shortcuts.hasEndDate && Number(shortcuts.targetSessionCount || 0) <= 0 && targetHours > 0;
+      targetHoursBadge.classList.toggle('d-none', !showTargetHours);
+      if (showTargetHours) targetHoursBadge.textContent = `Target: ${targetHours} hour${targetHours === 1 ? '' : 's'}`;
+    }
+
+    const totalSessions = Number(summary.totalSessionsToDate || 0);
+    const unmarkedSessions = Number(summary.unmarkedSessions || 0);
+    const hasSessions = totalSessions > 0 || Number(summary.notApplicableSessions || 0) > 0;
+    qs('enrollmentAttendanceReportContent')?.classList.toggle('d-none', !hasSessions);
+    qs('enrollmentAttendanceReportEmpty')?.classList.toggle('d-none', hasSessions);
+    document.querySelector('.attendance-report-metric-unmarked')?.classList.toggle('d-none', unmarkedSessions <= 0);
+
+    const setText = (id, value) => {
+      const el = qs(id);
+      if (el) el.textContent = String(value);
+    };
+    const setSub = (id, value) => {
+      const el = qs(id);
+      if (!el) return;
+      const text = String(value || '').trim();
+      el.textContent = text;
+      el.classList.toggle('d-none', !text);
+    };
+    const setExcused = (wrapId, countId, subId, count, minutes) => {
+      const wrapEl = qs(wrapId);
+      const countEl = qs(countId);
+      const excusedCount = Number(count || 0);
+      if (countEl) countEl.textContent = formatAttendanceReportMetricValue(excusedCount);
+      if (wrapEl) wrapEl.classList.toggle('d-none', excusedCount <= 0);
+      const subText = formatAttendanceReportMetricSub(excusedCount, minutes);
+      const subEl = qs(subId);
+      if (subEl) {
+        subEl.textContent = subText ? ` (${subText})` : '';
+        subEl.classList.toggle('d-none', !subText);
+      }
+    };
+    setText('attendanceReport_totalSessions', totalSessions);
+    setText('attendanceReport_unmarked', unmarkedSessions);
+    setText('attendanceReport_present', Number(summary.presentOnly || 0));
+    setText('attendanceReport_absent', Number(summary.absent || 0));
+    setText('attendanceReport_absentExcused', Number(summary.absentExcused || 0));
+    setText('attendanceReport_late', formatAttendanceReportMetricValue(summary.lateSessions));
+    setSub('attendanceReport_lateSub', formatAttendanceReportMetricSub(summary.lateSessions, summary.lateMinutes));
+    setExcused('attendanceReport_lateExcusedWrap', 'attendanceReport_lateExcused', 'attendanceReport_lateExcusedSub', summary.lateExcusedSessions, summary.lateExcusedMinutes);
+    setText('attendanceReport_earlyLeave', formatAttendanceReportMetricValue(summary.earlyLeaveSessions));
+    setSub('attendanceReport_earlyLeaveSub', formatAttendanceReportMetricSub(summary.earlyLeaveSessions, summary.earlyLeaveMinutes));
+    setExcused('attendanceReport_earlyLeaveExcusedWrap', 'attendanceReport_earlyLeaveExcused', 'attendanceReport_earlyLeaveExcusedSub', summary.earlyLeaveExcusedSessions, summary.earlyLeaveExcusedMinutes);
+    setText('attendanceReport_acf', Number(summary.acf || 0));
+    setText('attendanceReport_acfExcused', Number(summary.acfExcused || 0));
+    setText('attendanceReport_na', Number(summary.notApplicableSessions || 0));
+
+    const naReasons = Array.isArray(payload?.naReasons) ? payload.naReasons : [];
+    const viewReasonsBtn = qs('btn_viewAttendanceReportNaReasons');
+    if (viewReasonsBtn) {
+      viewReasonsBtn.classList.toggle('d-none', naReasons.length === 0);
+      viewReasonsBtn.disabled = naReasons.length === 0;
+    }
+  }
+
+  function formatAttendanceReportNaSourceIcon(source) {
+    const token = String(source || '').trim().toLowerCase();
+    if (token === 'enrollment mark') return 'bi-journal-text';
+    if (token === 'attendance roster') return 'bi-clipboard-check';
+    return 'bi-info-circle';
+  }
+
+  function openEnrollmentAttendanceNaReasonsModal() {
+    const reasons = Array.isArray(enrollmentAttendanceReportPayload?.naReasons)
+      ? enrollmentAttendanceReportPayload.naReasons
+      : [];
+    const bodyEl = qs('enrollmentAttendanceNaReasonsBody');
+    if (!bodyEl) return;
+    if (!reasons.length) {
+      bodyEl.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">No N/A reasons recorded.</td></tr>';
+    } else {
+      bodyEl.innerHTML = reasons.map((row) => {
+        const source = String(row?.source || '-');
+        const sourceIcon = formatAttendanceReportNaSourceIcon(source);
+        return `<tr>
+        <td class="ps-3"><i class="bi bi-calendar3 me-1 text-muted" aria-hidden="true"></i>${htmlEscape(String(row?.date || '-'))}</td>
+        <td>${htmlEscape(String(row?.reason || '-'))}</td>
+        <td class="pe-3"><i class="bi ${sourceIcon} me-1 text-muted" aria-hidden="true"></i>${htmlEscape(source)}</td>
+      </tr>`;
+      }).join('');
+    }
+    const modalEl = document.getElementById('enrollmentAttendanceNaReasonsModal');
+    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+
+  async function fetchEnrollmentAttendanceReport(periodId, reportDate = '') {
+    const normalizedPeriodId = String(periodId || '').trim();
+    if (!normalizedPeriodId) return null;
+    setEnrollmentAttendanceReportLoading(true);
+    const query = reportDate ? `?reportDate=${encodeURIComponent(String(reportDate).trim())}` : '';
+    const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(normalizedPeriodId)}/attendance-report${query}`);
+    setEnrollmentAttendanceReportLoading(false);
+    if (!result || result.status !== 'success') return null;
+    enrollmentAttendanceReportPayload = result.data || {};
+    renderEnrollmentAttendanceReport(enrollmentAttendanceReportPayload);
+    return enrollmentAttendanceReportPayload;
+  }
+
+  async function openEnrollmentAttendanceReportModal(periodId) {
+    const modalEl = document.getElementById('enrollmentAttendanceReportModal');
+    if (!modalEl) return;
+    enrollmentAttendanceReportPeriodId = String(periodId || '').trim();
+    enrollmentAttendanceReportPayload = null;
+    const defaultDate = orgTodayFallback();
+    if (qs('enrollmentAttendanceReportDate')) qs('enrollmentAttendanceReportDate').value = defaultDate;
+    renderEnrollmentAttendanceReport({
+      studentLabel: '-',
+      period: {},
+      reportDate: defaultDate,
+      summary: {},
+      shortcuts: {},
+      naReasons: []
+    });
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    await fetchEnrollmentAttendanceReport(enrollmentAttendanceReportPeriodId, defaultDate);
+  }
+
   async function openEnrollmentSessionManagerModal(periodId) {
     if (!canManageEnrollmentOffice) return;
     const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
@@ -7576,6 +8210,18 @@
 
   qs('extension_kind')?.addEventListener('change', syncExtensionEnrollmentFields);
   qs('btn_confirmExtensionEnrollment')?.addEventListener('click', () => submitExtensionEnrollment());
+  qs('btn_refreshEnrollmentAttendanceReport')?.addEventListener('click', async () => {
+    if (!enrollmentAttendanceReportPeriodId) return;
+    const reportDate = String(qs('enrollmentAttendanceReportDate')?.value || '').trim() || orgTodayFallback();
+    await fetchEnrollmentAttendanceReport(enrollmentAttendanceReportPeriodId, reportDate);
+  });
+  qs('btn_usePeriodEndDateAttendanceReport')?.addEventListener('click', async () => {
+    const endDate = String(qs('btn_usePeriodEndDateAttendanceReport')?.dataset?.endDate || '').trim();
+    if (!endDate || !enrollmentAttendanceReportPeriodId) return;
+    if (qs('enrollmentAttendanceReportDate')) qs('enrollmentAttendanceReportDate').value = endDate;
+    await fetchEnrollmentAttendanceReport(enrollmentAttendanceReportPeriodId, endDate);
+  });
+  qs('btn_viewAttendanceReportNaReasons')?.addEventListener('click', () => openEnrollmentAttendanceNaReasonsModal());
 
   document.addEventListener('click', (event) => {
     const toggleBtn = event.target.closest('.rolling-row-actions-toggle');
@@ -7668,6 +8314,13 @@
     if (manageSessionsBtn) {
       closeAllActionMenus();
       openEnrollmentSessionManagerModal(manageSessionsBtn.getAttribute('data-period-id'));
+      return;
+    }
+
+    const attendanceReportBtn = event.target.closest('.btn-row-attendance-report');
+    if (attendanceReportBtn) {
+      closeAllActionMenus();
+      openEnrollmentAttendanceReportModal(attendanceReportBtn.getAttribute('data-period-id'));
       return;
     }
 
@@ -7878,7 +8531,7 @@
   addEnrollmentModalEl?.addEventListener('hidden.bs.modal', () => {
     if (enrollWizardStep === 'addSessions' || pendingStagedSessions.length) captureGapFormDraft();
   });
-  programRegistrationShortcutModalEl?.addEventListener('hidden.bs.modal', () => {
+  programShortcutModalEl?.addEventListener('hidden.bs.modal', () => {
     if (groupEnrollmentResultRepairContext?.mode === 'program') {
       groupEnrollmentResultRepairContext = null;
     }

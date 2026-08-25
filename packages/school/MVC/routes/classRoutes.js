@@ -447,6 +447,11 @@ router.get('/api/enrollment-periods/:periodId/session-window',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
   rollingCtrl.getEnrollmentPeriodSessionWindow);
 
+router.get('/api/enrollment-periods/:periodId/attendance-report',
+  requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.READ_ALL, { keepActive: true }),
+  rollingCtrl.getEnrollmentPeriodAttendanceReport);
+
 router.post('/api/enrollment-periods/:periodId/session-marks',
   requireAccess(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_CLASS_ENROLLMENT_PERIODS, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),

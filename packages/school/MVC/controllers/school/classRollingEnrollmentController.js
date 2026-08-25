@@ -45,6 +45,7 @@ const rollingEnrollmentPeriodFilterService = require('../../services/school/roll
 const rollingEnrollmentExcelExportService = require('../../services/school/rollingEnrollmentExcelExportService');
 const rollingEnrollmentEngineService = require('../../services/school/rollingEnrollmentEngineService');
 const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
+const rollingEnrollmentAttendanceReportService = require('../../services/school/rollingEnrollmentAttendanceReportService');
 const extensionEnrollmentService = require('../../services/school/extensionEnrollmentService');
 const sessionEnrollmentPickerService = require('../../services/school/sessionEnrollmentPickerService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
@@ -4986,6 +4987,45 @@ async function applyEnrollmentPeriodSessionMarks(req, res) {
   }
 }
 
+async function getEnrollmentPeriodAttendanceReport(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+
+    const report = await rollingEnrollmentAttendanceReportService.buildAttendanceReport({
+      periodId,
+      reportDate: req.query?.reportDate,
+      orgToday: resolveOrgTodayFromRequest(req),
+      generatedBy: String(req.user?.id || req.user?.userId || '').trim()
+    });
+
+    const students = await schoolDataService.fetchAllData('students', {}, req.user);
+    const student = (Array.isArray(students) ? students : []).find((row) => idsEqual(row?.id, report.studentId));
+    const personById = await schoolPersonAccessService.buildPersonByIdMap({
+      reqUser: req.user,
+      personIds: [student?.personId || report.personId].filter(Boolean)
+    });
+    const personId = toPublicId(student?.personId || report.personId);
+    const studentLabel = schoolPersonAccessService.formatPersonName(
+      personById.get(personId),
+      toPublicId(report.studentId)
+    );
+    const studentNumber = String(student?.studentNumber || '').trim();
+
+    return res.json({
+      status: 'success',
+      data: {
+        ...report,
+        studentLabel: studentNumber ? `${studentLabel} (${studentNumber})` : studentLabel
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function createExtensionEnrollmentPeriod(req, res) {
   try {
     const sourcePeriodId = toPublicId(req.params?.periodId);
@@ -5048,6 +5088,7 @@ module.exports = {
   previewClassEnrollmentStatusTransition,
   applyClassEnrollmentStatusTransition,
   getEnrollmentPeriodSessionWindow,
+  getEnrollmentPeriodAttendanceReport,
   applyEnrollmentPeriodSessionMarks,
   createExtensionEnrollmentPeriod,
   postEnrollmentSessionAlignment,
