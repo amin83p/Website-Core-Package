@@ -99,6 +99,8 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   libraryPolicies: { repository: schoolRepositories.libraryPolicies, allowSystemFallback: false },
   libraryLoans: { repository: schoolRepositories.libraryLoans, allowSystemFallback: false },
   libraryLocations: { repository: schoolRepositories.libraryLocations, allowSystemFallback: false },
+  bookAssignments: { repository: schoolRepositories.bookAssignments, allowSystemFallback: false },
+  bookCoveringReports: { repository: schoolRepositories.bookCoveringReports, allowSystemFallback: false },
   teachingOutlineLevels: { repository: schoolRepositories.teachingOutlineLevels, allowSystemFallback: true },
   teachingOutlineSectionTemplates: { repository: schoolRepositories.teachingOutlineSectionTemplates, allowSystemFallback: true },
   teachingOutlineItems: { repository: schoolRepositories.teachingOutlineItems, allowSystemFallback: true },

@@ -12,12 +12,15 @@ const libraryLoanModel = require('../MVC/models/school/libraryLoanModel');
 const libraryCirculationService = require('../MVC/services/school/libraryCirculationService');
 const libraryLocationModel = require('../MVC/models/school/libraryLocationModel');
 const libraryLocationService = require('../MVC/services/school/libraryLocationService');
+const bookAssignmentModel = require('../MVC/models/school/bookAssignmentModel');
 
 test('access constants declare library sections', () => {
   assert.equal(accessConstants.SCHOOL_SECTIONS.SCHOOL_LIBRARY, 'SCHOOL_LIBRARY');
   assert.equal(accessConstants.SECTIONS.SCHOOL_LIBRARY_COPIES, 'SCHOOL_LIBRARY_COPIES');
   assert.equal(accessConstants.SECTIONS.SCHOOL_LIBRARY_CIRCULATION, 'SCHOOL_LIBRARY_CIRCULATION');
   assert.equal(accessConstants.SECTIONS.SCHOOL_LIBRARY_LOCATIONS, 'SCHOOL_LIBRARY_LOCATIONS');
+  assert.equal(accessConstants.SECTIONS.SCHOOL_LIBRARY_BOOK_ASSIGNMENTS, 'SCHOOL_LIBRARY_BOOK_ASSIGNMENTS');
+  assert.equal(accessConstants.SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, 'SCHOOL_LIBRARY_BOOK_COVERING');
 });
 
 test('library copy model validates copy code uniqueness semantics', () => {
@@ -592,4 +595,65 @@ test('my library view exposes digital open action', () => {
   const view = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/library/myLibrary.ejs'), 'utf8');
   assert.match(view, /btn-open-digital/);
   assert.match(view, /api\/digital/);
+});
+
+test('book assignment routes and controller are registered', () => {
+  const mainRoute = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/routes/libraryMainRoute.js'), 'utf8');
+  const controller = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/controllers/school/bookAssignmentController.js'), 'utf8');
+  assert.match(mainRoute, /book-assignments/);
+  assert.match(controller, /listAssignments/);
+  assert.match(controller, /upsertForClass/);
+});
+
+test('book assignment model rejects duplicate class assignments', async () => {
+  const dataPath = path.join(ROOT, 'data/school/bookAssignments.json');
+  const backup = fs.readFileSync(dataPath, 'utf8');
+  try {
+    fs.writeFileSync(dataPath, JSON.stringify([
+      {
+        id: 'BKASG-TEST-1',
+        orgId: 'ORG-TEST',
+        classId: 'CLS-TEST',
+        status: 'active',
+        notes: '',
+        books: [{ bookId: 'BK-TEST', sortOrder: 100, notes: '', status: 'active' }],
+        audit: { createUser: 'TEST', createDateTime: '2026-01-01', lastUpdateUser: 'TEST', lastUpdateDateTime: '2026-01-01' }
+      }
+    ], null, 2));
+    await assert.rejects(
+      () => bookAssignmentModel.addBookAssignment({
+        orgId: 'ORG-TEST',
+        classId: 'CLS-TEST',
+        status: 'active',
+        books: [{ bookId: 'BK-OTHER', sortOrder: 10, notes: '', status: 'active' }]
+      }),
+      /already exists/
+    );
+  } finally {
+    fs.writeFileSync(dataPath, backup);
+  }
+});
+
+test('book assignment model rejects duplicate books in books array', () => {
+  assert.throws(() => {
+    bookAssignmentModel.sanitizeBookLines([
+      { bookId: 'BK-TEST', sortOrder: 10 },
+      { bookId: 'BK-TEST', sortOrder: 20 }
+    ]);
+  }, /Duplicate book/);
+});
+
+test('book assignment list and form views use class-centric books table', () => {
+  const listView = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/library/bookAssignmentList.ejs'), 'utf8');
+  const formView = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/library/bookAssignmentForm.ejs'), 'utf8');
+  assert.match(listView, /bookCount/);
+  assert.match(listView, /bookTitleSummary/);
+  assert.match(formView, /initialBooksPayload/);
+  assert.match(formView, /<%- initialBooksPayload %>/);
+  assert.match(formView, /max-width: 1400px/);
+  assert.match(formView, /coverPhotoUrl/);
+  assert.match(formView, /assignment-book-cover/);
+  assert.match(formView, /activeOrganizationScope/);
+  assert.match(formView, /btnAddBooks/);
+  assert.match(formView, /booksTable/);
 });

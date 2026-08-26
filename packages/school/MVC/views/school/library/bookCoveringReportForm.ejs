@@ -1,0 +1,433 @@
+<%
+  const item = reportItem || {};
+  const isEdit = !!item.id;
+  const isSubmitted = item.status === 'submitted';
+  const isReadOnly = Boolean(typeof reportReadOnly !== 'undefined' ? reportReadOnly : false);
+  const classId = selectedClassId || item.classId || '';
+  const classTitle = selectedClassTitle || classId;
+  const session = sessionSummary || null;
+  const initialEntriesPayload = JSON.stringify(item.entries || []).replace(/</g, '\\u003c');
+  const initialBooksPayload = JSON.stringify((assignedBooks || []).map((b) => ({
+    bookId: b.bookId || b.id || '',
+    bookAssignmentId: b.bookAssignmentId || b.id || '',
+    bookTitle: b.bookTitle || b.bookId || '',
+    bookIsbn: b.bookIsbn || '',
+    coverPhotoUrl: b.coverPhotoUrl || b.bookCoverPhoto?.url || '',
+    sortOrder: b.sortOrder || 0,
+    bookTableOfContents: b.bookTableOfContents || []
+  }))).replace(/</g, '\\u003c');
+  const sessionSummaryPayload = JSON.stringify(session || null).replace(/</g, '\\u003c');
+  const periodTypeHelpPayload = JSON.stringify(periodTypeHelp || {}).replace(/</g, '\\u003c');
+%>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-journal-richtext me-2"></i><%= isEdit ? 'Book Covering Report' : 'New Book Covering Report' %></h1>
+    <a href="/school/library/book-covering" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+  </div>
+
+  <% if (includeModal) { %><%- include('partials/modal_GenericPicker', { user }) %><% } %>
+  <%- include('school/library/partials/bookTocPickerModal') %>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <div id="coveringWizardGuide" class="mb-3">
+      <div class="wizard-progress mb-2"><div class="wizard-progress-bar" id="coveringWizardProgressBar"></div></div>
+      <div class="wizard-step-rail" id="coveringWizardStepRail"></div>
+      <div class="small text-muted mt-2" id="coveringWizardStepLabel"></div>
+    </div>
+
+    <form id="coveringReportForm" action="<%= isEdit ? '/school/library/book-covering/edit/' + item.id : '/school/library/book-covering/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="classId" id="hid_classId" value="<%= classId %>">
+      <input type="hidden" name="sessionId" id="hid_sessionId" value="<%= item.sessionId || '' %>">
+      <input type="hidden" name="teacherId" id="hid_teacherId" value="<%= item.teacherId || '' %>">
+      <input type="hidden" name="teacherName" id="hid_teacherName" value="<%= item.teacherName || '' %>">
+      <input type="hidden" name="entries" id="hid_entries" value="">
+      <input type="hidden" name="notes" id="hid_reportNotes" value="<%= item.notes || '' %>">
+      <input type="hidden" name="periodStartDate" id="hid_periodStartDate" value="<%= item.periodStartDate || '' %>">
+      <input type="hidden" name="periodEndDate" id="hid_periodEndDate" value="<%= item.periodEndDate || '' %>">
+
+      <% if (isSubmitted && !isReadOnly) { %>
+      <div class="alert alert-info border mb-3">
+        <i class="bi bi-info-circle me-1"></i> This report is submitted. You can still edit it until the linked session is locked.
+      </div>
+      <% } %>
+      <% if (isReadOnly) { %>
+      <div class="alert alert-warning border mb-3">
+        <i class="bi bi-lock-fill me-1"></i> This report cannot be edited because the linked session is locked.
+      </div>
+      <% } %>
+
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-4">
+          <div id="wizardStepContext" class="wizard-step-panel">
+            <section class="covering-wizard-section mb-4">
+              <div class="covering-wizard-section-head">
+                <div class="covering-wizard-section-icon"><i class="bi bi-mortarboard"></i></div>
+                <div>
+                  <h6 class="covering-wizard-section-title">Class & session</h6>
+                  <p class="covering-wizard-section-desc">Confirm which class and teacher this report belongs to.</p>
+                </div>
+              </div>
+              <div class="covering-wizard-section-body">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold">Class</label>
+                    <% if (isEdit) { %>
+                      <div class="covering-context-value" id="contextClassDisplay"><%= classTitle %></div>
+                    <% } else { %>
+                      <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickClass"><i class="bi bi-mortarboard me-1"></i> Select class</button>
+                        <div id="pickedClassLabel" class="small text-muted">
+                          <% if (classId) { %>Selected: <span class="fw-semibold text-dark"><%= classTitle %></span><% } else { %>No class selected yet.<% } %>
+                        </div>
+                      </div>
+                      <div class="covering-context-value<%= classId ? '' : ' covering-context-value--empty' %>" id="contextClassDisplay"><%= classId ? classTitle : 'Select a class to continue' %></div>
+                    <% } %>
+                    <% if (session && session.sessionId) { %>
+                    <div class="covering-linked-session mt-3">
+                      <div class="covering-linked-session-label"><i class="bi bi-calendar-event me-1"></i> Linked session</div>
+                      <div class="small mt-1">
+                        <% if (session.date) { %><span class="me-3"><i class="bi bi-calendar3 me-1"></i><%= session.date %></span><% } %>
+                        <% if (session.startTime || session.endTime) { %><span class="me-3"><i class="bi bi-clock me-1"></i><%= session.startTime || '' %><% if (session.endTime) { %> – <%= session.endTime %><% } %></span><% } %>
+                        <% if (session.label) { %><span><%= session.label %></span><% } %>
+                        <span class="font-monospace text-muted ms-2"><%= session.sessionId %></span>
+                      </div>
+                    </div>
+                    <% } %>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold">Teacher</label>
+                    <div class="covering-context-value" id="contextTeacherDisplay"><%= item.teacherName || '—' %></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="covering-wizard-section">
+              <div class="covering-wizard-section-head">
+                <div class="covering-wizard-section-icon covering-wizard-section-icon--period"><i class="bi bi-calendar-range"></i></div>
+                <div>
+                  <h6 class="covering-wizard-section-title">Reporting period</h6>
+                  <p class="covering-wizard-section-desc">Choose the period type and anchor date. The resolved dates appear on the selected option.</p>
+                </div>
+              </div>
+              <div class="covering-wizard-section-body">
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4">
+                    <label class="form-label fw-semibold" for="anchorDate">Anchor date</label>
+                    <input type="date" class="form-control" id="anchorDate" value="<%= anchorDate || item.periodStartDate || '' %>" <%= isReadOnly ? 'disabled' : '' %>>
+                    <div class="form-text">Sets the calendar window for the selected period type.</div>
+                  </div>
+                </div>
+                <div class="row g-3">
+                  <% (periodTypes || []).forEach((pt) => { %>
+                    <% const help = (periodTypeHelp && periodTypeHelp[pt]) || {}; %>
+                    <% const isSelectedPeriod = (item.periodType || 'daily') === pt; %>
+                    <% const resolvedLabel = isSelectedPeriod
+                      ? (item.periodStartDate || '—') + ((item.periodEndDate && item.periodEndDate !== item.periodStartDate) ? ' – ' + item.periodEndDate : '')
+                      : ''; %>
+                    <div class="col-md-6">
+                      <label class="period-type-option <%= isSelectedPeriod ? 'selected' : '' %>" data-period-type="<%= pt %>" for="periodType_<%= pt %>">
+                        <input type="radio" class="form-check-input period-type-option-radio" name="periodType" id="periodType_<%= pt %>" value="<%= pt %>" autocomplete="off" <%= isSelectedPeriod ? 'checked' : '' %> <%= isReadOnly ? 'disabled' : '' %>>
+                        <div class="period-type-option-content">
+                          <div class="fw-semibold"><%= help.label || pt %></div>
+                          <div class="small text-muted mt-1"><%= help.description || '' %></div>
+                          <div class="js-period-resolved-wrap mt-3 pt-2 border-top<%= isSelectedPeriod ? '' : ' d-none' %>">
+                            <div class="small text-muted">Resolved period</div>
+                            <div class="small fw-semibold text-primary js-period-resolved-label"><%= resolvedLabel %></div>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  <% }) %>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="wizardStepBooks" class="wizard-step-panel d-none">
+            <h6 class="fw-bold text-primary mb-2"><i class="bi bi-journal-check me-2"></i>Books you used</h6>
+            <p class="small text-muted mb-3">Select every assigned book you covered during this reporting period.</p>
+            <div id="wizardNoBooksMessage" class="alert alert-warning border d-none">No active book assignments for this class. Assign books in the library first.</div>
+            <div id="wizardBookGrid" class="covering-book-grid"></div>
+          </div>
+
+          <div id="wizardBookStepsHost"></div>
+
+          <div id="wizardStepFinish" class="wizard-step-panel d-none">
+            <h6 class="fw-bold text-primary mb-3"><i class="bi bi-check2-circle me-2"></i>Review and finish</h6>
+            <div id="finishSummaryPanel" class="border rounded p-3 bg-light mb-4"></div>
+            <div class="mb-0">
+              <label class="form-label fw-bold" for="overallReportNotes">Overall report note</label>
+              <p class="small text-muted">Optional comments about this reporting period (not tied to a single book).</p>
+              <textarea id="overallReportNotes" class="form-control" rows="4" maxlength="2000" <%= isReadOnly ? 'disabled' : '' %>><%= item.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <% if (!isReadOnly) { %>
+      <div class="covering-wizard-controls d-flex flex-wrap gap-2 justify-content-between align-items-center border rounded p-3 bg-light">
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="coveringWizardBack"><i class="bi bi-arrow-left me-1"></i> Back</button>
+        <div class="d-flex flex-wrap gap-2 ms-auto">
+          <a href="/school/library/book-covering" class="btn btn-secondary btn-sm">Cancel</a>
+          <button type="button" class="btn btn-outline-primary btn-sm d-none" id="coveringWizardSaveDraft">Save draft</button>
+          <button type="button" class="btn btn-primary btn-sm" id="coveringWizardNext">Next <i class="bi bi-arrow-right ms-1"></i></button>
+          <button type="button" class="btn btn-primary btn-sm d-none" id="coveringWizardSubmit">Submit report</button>
+        </div>
+      </div>
+      <% } %>
+    </form>
+  </div>
+</div>
+
+<style>
+  #coveringWizardGuide .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: none;
+  }
+  #coveringWizardGuide .wizard-step-rail::-webkit-scrollbar { display: none; }
+  #coveringWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+  }
+  #coveringWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #coveringWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #coveringWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #coveringWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  .covering-wizard-section {
+    border: 1px solid #dbe3ec;
+    border-radius: 14px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(23, 50, 77, 0.06);
+  }
+  .covering-wizard-section-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(180deg, #f8fafc 0%, #f3f6fa 100%);
+    border-bottom: 1px solid #e8edf3;
+  }
+  .covering-wizard-section-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e8f0f8;
+    color: #17324d;
+    flex: 0 0 40px;
+    font-size: 1.1rem;
+  }
+  .covering-wizard-section-icon--period {
+    background: #eef6ff;
+    color: #0b5ed7;
+  }
+  .covering-wizard-section-title {
+    margin: 0;
+    font-weight: 700;
+    color: #17324d;
+    font-size: 1rem;
+  }
+  .covering-wizard-section-desc {
+    margin: 0.2rem 0 0;
+    font-size: 0.875rem;
+    color: #6c7a89;
+  }
+  .covering-wizard-section-body {
+    padding: 1.25rem;
+  }
+  .covering-context-value {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 0.65rem 0.85rem;
+    font-weight: 600;
+    color: #17324d;
+    min-height: 42px;
+  }
+  .covering-context-value--empty {
+    color: #6c7a89;
+    font-weight: 500;
+  }
+  .covering-linked-session {
+    border: 1px dashed #c5d3e0;
+    border-radius: 10px;
+    background: #fbfcfe;
+    padding: 0.75rem 0.85rem;
+  }
+  .covering-linked-session-label {
+    font-weight: 600;
+    color: #17324d;
+    font-size: 0.875rem;
+  }
+  .period-type-option {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    border: 1px solid #dbe3ec;
+    border-radius: 12px;
+    padding: 1rem 1rem 0.95rem;
+    height: 100%;
+    cursor: pointer;
+    background: #fff;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 1px 2px rgba(23, 50, 77, 0.05);
+    margin-bottom: 0;
+  }
+  .period-type-option:hover {
+    border-color: #9eb8d4;
+    box-shadow: 0 4px 12px rgba(23, 50, 77, 0.1);
+    transform: translateY(-1px);
+  }
+  .period-type-option.selected {
+    border-color: var(--bs-primary) !important;
+    background: linear-gradient(180deg, rgba(13, 110, 253, 0.07) 0%, rgba(13, 110, 253, 0.02) 100%);
+    box-shadow: 0 4px 14px rgba(13, 110, 253, 0.14);
+  }
+  .period-type-option-radio {
+    margin-top: 0.15rem;
+    flex: 0 0 auto;
+  }
+  .period-type-option-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .covering-toc-selected-host {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 0.5rem 0.65rem;
+  }
+  .covering-toc-selected-list .covering-toc-selected-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #e8edf3;
+  }
+  .covering-toc-selected-list .covering-toc-selected-item:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .covering-toc-selected-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.875rem;
+    line-height: 1.35;
+  }
+  .covering-toc-selected-empty {
+    padding: 0.15rem 0;
+  }
+  .covering-book-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  .covering-book-pick-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    gap: 0.75rem;
+    padding: 1.25rem 1rem;
+    min-height: 240px;
+    cursor: pointer;
+    border-radius: 12px;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 1px 3px rgba(23, 50, 77, 0.08);
+  }
+  .covering-book-pick-card:hover {
+    border-color: #7fa8cc;
+    box-shadow: 0 6px 16px rgba(23, 50, 77, 0.12);
+    transform: translateY(-1px);
+  }
+  .covering-book-pick-card.selected {
+    border-color: var(--bs-primary) !important;
+    background: linear-gradient(180deg, rgba(13, 110, 253, 0.06) 0%, rgba(13, 110, 253, 0.02) 100%);
+    box-shadow: 0 4px 14px rgba(13, 110, 253, 0.18);
+  }
+  .covering-book-pick-card input {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    margin: 0;
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+  .covering-book-cover,
+  .covering-book-cover-placeholder {
+    width: 96px;
+    height: 128px;
+    flex: 0 0 auto;
+    object-fit: cover;
+    box-shadow: 0 4px 12px rgba(23, 50, 77, 0.15);
+  }
+  .covering-book-cover-placeholder {
+    font-size: 1.75rem;
+  }
+  .covering-book-pick-meta {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+  }
+  .covering-book-pick-meta .fw-semibold {
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+</style>
+
+<script src="/scripts/wizardStepRail.js"></script>
+<script src="/scripts/bookTocPicker.js"></script>
+<script src="/scripts/bookCoveringReportWizard.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.BookCoveringReportWizard) {
+    BookCoveringReportWizard.init({
+      form: document.getElementById('coveringReportForm'),
+      assignedBooks: <%- initialBooksPayload %>,
+      reportEntries: <%- initialEntriesPayload %>,
+      sessionSummary: <%- sessionSummaryPayload %>,
+      periodTypeHelp: <%- periodTypeHelpPayload %>,
+      classTitle: <%- JSON.stringify(classTitle || '') %>,
+      isEdit: <%- JSON.stringify(isEdit) %>,
+      isReadOnly: <%- JSON.stringify(isReadOnly) %>,
+      isSubmitted: <%- JSON.stringify(isSubmitted) %>
+    });
+  }
+});
+</script>

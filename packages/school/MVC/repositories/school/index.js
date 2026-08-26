@@ -18,6 +18,8 @@ const libraryPatronModel = require('../../models/school/libraryPatronModel');
 const libraryPolicyModel = require('../../models/school/libraryPolicyModel');
 const libraryLoanModel = require('../../models/school/libraryLoanModel');
 const libraryLocationModel = require('../../models/school/libraryLocationModel');
+const bookAssignmentModel = require('../../models/school/bookAssignmentModel');
+const bookCoveringReportModel = require('../../models/school/bookCoveringReportModel');
 const teachingOutlineLevelModel = require('../../models/school/teachingOutlineLevelModel');
 const teachingOutlineSectionTemplateModel = require('../../models/school/teachingOutlineSectionTemplateModel');
 const teachingOutlineItemModel = require('../../models/school/teachingOutlineItemModel');
@@ -1309,6 +1311,30 @@ const schoolRepositories = {
     defaultSearchFields: ['id', 'orgId', 'parentId', 'locationType', 'name', 'code'],
     allowSystemFallback: false,
     normalizePayload: normalizeLibraryLocationPayload
+  }),
+  bookAssignments: createSchoolRepository({
+    entityName: 'bookAssignments',
+    collectionName: 'schoolBookAssignments',
+    getAll: bookAssignmentModel.getAllBookAssignments,
+    getById: bookAssignmentModel.getBookAssignmentById,
+    create: bookAssignmentModel.addBookAssignment,
+    update: bookAssignmentModel.updateBookAssignment,
+    remove: bookAssignmentModel.deleteBookAssignment,
+    defaultSearchFields: ['id', 'orgId', 'classId', 'status', 'notes'],
+    allowSystemFallback: false
+  }),
+  bookCoveringReports: createSchoolRepository({
+    entityName: 'bookCoveringReports',
+    collectionName: 'schoolBookCoveringReports',
+    getAll: bookCoveringReportModel.getAllBookCoveringReports,
+    getById: bookCoveringReportModel.getBookCoveringReportById,
+    create: bookCoveringReportModel.addBookCoveringReport,
+    update: bookCoveringReportModel.updateBookCoveringReport,
+    remove: bookCoveringReportModel.deleteBookCoveringReport,
+    defaultSearchFields: ['id', 'orgId', 'classId', 'teacherId', 'sessionId', 'periodType', 'status', 'notes'],
+    dateFields: ['periodStartDate', 'periodEndDate', 'audit.createDateTime', 'audit.lastUpdateDateTime'],
+    allowSystemFallback: false,
+    assignmentScopeKind: 'teacherId'
   }),
   teachingOutlineLevels: createSchoolRepository({
     entityName: 'teachingOutlineLevels',
@@ -2758,6 +2784,8 @@ assertQueryableCrudRepository('schoolRepositories.libraryPatrons', schoolReposit
 assertQueryableCrudRepository('schoolRepositories.libraryPolicies', schoolRepositories.libraryPolicies);
 assertQueryableCrudRepository('schoolRepositories.libraryLoans', schoolRepositories.libraryLoans);
 assertQueryableCrudRepository('schoolRepositories.libraryLocations', schoolRepositories.libraryLocations);
+assertQueryableCrudRepository('schoolRepositories.bookAssignments', schoolRepositories.bookAssignments);
+assertQueryableCrudRepository('schoolRepositories.bookCoveringReports', schoolRepositories.bookCoveringReports);
 assertQueryableCrudRepository('schoolRepositories.timesheetPeriods', schoolRepositories.timesheetPeriods);
 assertQueryableCrudRepository('schoolRepositories.timesheets', schoolRepositories.timesheets);
 assertQueryableCrudRepository('schoolRepositories.studentProgramRegistrations', schoolRepositories.studentProgramRegistrations);

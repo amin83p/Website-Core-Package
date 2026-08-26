@@ -51,6 +51,7 @@ const activityService = require('../../services/school/activityService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
 const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
+const bookCoveringReportService = require('../../services/school/bookCoveringReportService');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const sessionIdService = require('../../services/school/sessionIdService');
 const sessionConductService = require('../../services/school/sessionConductService');
@@ -3907,7 +3908,7 @@ async function manageSession(req, res) {
         // --- Lock Security Check ---
         const manageSessionStart = Date.now();
         const isRollingClass = getClassRegistrationModeKey(classData) === 'rolling';
-        const [canOverride, canOverrideMakeupDuration, canDeleteStudentCases] = await Promise.all([
+        const [canOverride, canOverrideMakeupDuration, canDeleteSessionAdmin] = await Promise.all([
             adminAuthorityService.isAdminForRequestAsync(
                 req.user,
                 SECTIONS.SCHOOL_CLASSES,
@@ -3927,7 +3928,7 @@ async function manageSession(req, res) {
                 { section: { id: SECTIONS.SCHOOL_SESSIONS } }
             )
         ]);
-        const canDeleteSession = canDeleteStudentCases;
+        const canDeleteSession = canDeleteSessionAdmin;
         logManageSessionStep(req, 'admin_checks', manageSessionStart);
         const makeupSummary = makeupSessionAllocationService.buildMakeupAllocationSummary({
             classId,
@@ -4017,7 +4018,11 @@ async function manageSession(req, res) {
             autosavePolicyResolved,
             sessionStudentCases,
             sessionSkillPolicy,
-            reportAssignmentCreateAccess
+            reportAssignmentCreateAccess,
+            bookCoveringCreateAccess,
+            bookCoveringReadAccess,
+            bookCoveringDeleteAccess,
+            sessionStudentCaseDeleteAccess
         ] = await Promise.all([
             sessionReportInstanceService.buildSessionReportViewerContext({
                 classId,
@@ -4041,6 +4046,30 @@ async function manageSession(req, res) {
                 user: req.user,
                 sectionId: SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
                 operationId: OPERATIONS.CREATE,
+                ipAddress: req.ip
+            }).catch(() => null),
+            accessService.evaluateAccess({
+                user: req.user,
+                sectionId: SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING,
+                operationId: OPERATIONS.CREATE,
+                ipAddress: req.ip
+            }).catch(() => null),
+            accessService.evaluateAccess({
+                user: req.user,
+                sectionId: SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING,
+                operationId: OPERATIONS.READ_ALL,
+                ipAddress: req.ip
+            }).catch(() => null),
+            accessService.evaluateAccess({
+                user: req.user,
+                sectionId: SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING,
+                operationId: OPERATIONS.DELETE,
+                ipAddress: req.ip
+            }).catch(() => null),
+            accessService.evaluateAccess({
+                user: req.user,
+                sectionId: SECTIONS.SCHOOL_SESSIONS,
+                operationId: OPERATIONS.DELETE,
                 ipAddress: req.ip
             }).catch(() => null)
         ]);
@@ -4083,6 +4112,21 @@ async function manageSession(req, res) {
             outlinePromise
         ]);
         logManageSessionStep(req, 'reports_outline', reportsStart);
+        const canViewBookCoveringReport = Boolean(
+            bookCoveringReadAccess?.allowed || bookCoveringCreateAccess?.allowed
+        );
+        let sessionBookCoveringSummary = null;
+        if (canViewBookCoveringReport) {
+            try {
+                sessionBookCoveringSummary = await bookCoveringReportService.getSessionBookCoveringSummary(
+                    classData,
+                    session,
+                    req.user
+                );
+            } catch (_) {
+                sessionBookCoveringSummary = null;
+            }
+        }
         const sessionContext = {
             classId,
             sessionId,
@@ -4205,6 +4249,11 @@ async function manageSession(req, res) {
             hasSessionReportsAssigned,
             sessionHasConductRequiredReports,
             canAssignSessionReports: Boolean(reportAssignmentCreateAccessResolved?.allowed),
+            canCreateBookCoveringReport: Boolean(bookCoveringCreateAccess?.allowed),
+            canViewBookCoveringReport,
+            canDeleteBookCoveringReport: Boolean(bookCoveringDeleteAccess?.allowed),
+            hasSessionBookCoveringReport: Boolean(sessionBookCoveringSummary?.id),
+            sessionBookCoveringSummary,
             conductPrefillByPersonId,
             sessionConductReportPeriod,
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
@@ -4227,7 +4276,7 @@ async function manageSession(req, res) {
             makeupSummary,
             makeupOriginalSessionReference,
             canViewSchoolSettings,
-            canDeleteStudentCases,
+            canDeleteStudentCases: Boolean(sessionStudentCaseDeleteAccess?.allowed),
             canDeleteSession,
             sessionCoTeachers,
             canManageCoTeachers,
@@ -4301,6 +4350,98 @@ async function assignReportToSession(req, res) {
         return res.status(400).json({ status: 'error', message: error.message });
     }
 }
+
+async function getBookCoveringSummaryForSession(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+
+        const summary = await bookCoveringReportService.getSessionBookCoveringSummary(
+            classData,
+            session,
+            req.user
+        );
+
+        return res.json({
+            status: 'success',
+            summary: summary || null,
+            actionStateId: req.actionStateId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function deleteBookCoveringForSession(req, res) {
+    try {
+        const { id: classId, sessionId, reportId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+
+        const report = await schoolDataService.getDataById('bookCoveringReports', reportId, req.user);
+        if (!report) throw new Error('Book covering report not found.');
+        if (!idsEqual(report.classId, classId)) {
+            throw new Error('Book covering report does not belong to this class.');
+        }
+        if (String(report.sessionId || '').trim() && !idsEqual(report.sessionId, sessionId)) {
+            throw new Error('Book covering report is not linked to this session.');
+        }
+
+        await bookCoveringReportService.deleteReport(reportId, req.user);
+
+        return res.json({
+            status: 'success',
+            message: 'Book covering report deleted.',
+            summary: null,
+            actionStateId: req.actionStateId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function createBookCoveringForSession(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+
+        const result = await bookCoveringReportService.createDraftForSession({
+            classData,
+            session,
+            input: req.body || {},
+            reqUser: req.user
+        });
+
+        let summary = null;
+        if (result.report) {
+            summary = await bookCoveringReportService.buildReportSummary(result.report, req.user);
+        }
+
+        return res.json({
+            status: 'success',
+            message: result.message || 'Book covering report draft created.',
+            reportId: result.report?.id || '',
+            editUrl: result.editUrl || '',
+            summary,
+            alreadyExists: Boolean(result.alreadyExists),
+            actionStateId: req.actionStateId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 async function listSessionReportInstances(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -4444,15 +4585,6 @@ async function updateSessionStudentCaseStatus(req, res) {
 async function deleteSessionStudentCase(req, res) {
     try {
         const { id: classId, sessionId, caseId } = req.params;
-        const isAdmin = await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_SESSIONS,
-            OPERATIONS.DELETE,
-            { section: { id: SECTIONS.SCHOOL_SESSIONS } }
-        );
-        if (!isAdmin) {
-            return res.status(403).json({ status: 'error', message: 'Only administrators can delete student cases.' });
-        }
         await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         const deleted = await sessionStudentCaseService.deleteCase({
             classId,
@@ -5561,7 +5693,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, assignReportToSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

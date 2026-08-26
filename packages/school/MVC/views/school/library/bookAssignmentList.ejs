@@ -1,0 +1,78 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-book me-1"></i> School Library</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search by class, book titles, or status...',
+  fields: [
+    { name: 'status', label: 'Status', type: 'select', options: ['active', 'inactive', 'archived'] }
+  ]
+}) %>
+
+<% if (filterClassId) { %>
+  <div class="alert alert-info border">Filtered to class <span class="font-monospace"><%= filterClassId %></span></div>
+<% } %>
+<% if (filterBookId) { %>
+  <div class="alert alert-info border">Showing classes that include book <span class="font-monospace"><%= filterBookId %></span></div>
+<% } %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="classTitle">Class</th>
+        <th class="draggable" data-column="bookCount">Books</th>
+        <th class="draggable" data-column="status">Status</th>
+        <th class="draggable" data-column="notes">Class notes</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="5" class="text-center py-5 text-muted">No book assignments found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-semibold"><%= item.classTitle || item.classId %></div>
+            <div class="x-small text-muted font-monospace"><%= item.classId %></div>
+          </td>
+          <td>
+            <div class="fw-semibold"><%= item.bookCount || 0 %> book(s)</div>
+            <% if (item.bookTitleSummary) { %>
+              <div class="x-small text-muted" style="max-width: 420px;"><%= item.bookTitleSummary %></div>
+            <% } %>
+          </td>
+          <td><span class="badge <%= item.status === 'active' ? 'bg-success' : (item.status === 'archived' ? 'bg-dark' : 'bg-secondary') %>"><%= item.status %></span></td>
+          <td><%= item.notes || '—' %></td>
+          <td class="table-actions text-end pe-4">
+            <% if (typeof canCreate === 'undefined' || canCreate !== false) { %>
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Assignment actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/library/book-assignments/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <a href="/school/library/book-assignments/delete/<%= item.id %>" class="btn btn-outline-danger btn-sm" data-confirm-delete="true"><i class="bi bi-trash me-2"></i>Delete</a>
+              </div>
+            </div>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/tablePages-end') %>

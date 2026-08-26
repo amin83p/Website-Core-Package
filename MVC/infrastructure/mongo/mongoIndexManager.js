@@ -296,6 +296,26 @@ const INDEX_DEFINITIONS = Object.freeze({
       }
     }
   ],
+  schoolBookAssignments: [
+    { key: { id: 1 }, options: { name: 'idx_school_book_assignments_id', unique: true } },
+    { key: { orgId: 1, classId: 1 }, options: { name: 'idx_school_book_assignments_org_class', unique: true } },
+    { key: { orgId: 1, status: 1 }, options: { name: 'idx_school_book_assignments_org_status' } }
+  ],
+  schoolBookCoveringReports: [
+    { key: { id: 1 }, options: { name: 'idx_school_book_covering_reports_id', unique: true } },
+    { key: { orgId: 1, classId: 1, periodStartDate: 1 }, options: { name: 'idx_school_book_covering_reports_org_class_start' } },
+    { key: { orgId: 1, teacherId: 1, status: 1 }, options: { name: 'idx_school_book_covering_reports_org_teacher_status' } },
+  {
+    key: { orgId: 1, classId: 1, sessionId: 1, teacherId: 1 },
+    options: {
+      name: 'idx_school_book_covering_reports_org_class_session_teacher',
+      sparse: true,
+      partialFilterExpression: {
+        sessionId: { $exists: true, $type: 'string', $gt: '' }
+      }
+    }
+  }
+  ],
   schoolClassEnrollmentPeriods: [
     { key: { id: 1 }, options: { name: 'idx_school_class_enrollment_periods_id' } },
     { key: { orgId: 1, status: 1 }, options: { name: 'idx_school_class_enrollment_periods_org_status' } },

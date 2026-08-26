@@ -1,0 +1,40 @@
+<div class="modal fade" id="bookTocPickerModal" tabindex="-1" aria-labelledby="bookTocPickerModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="bookTocPickerModalLabel"><i class="bi bi-list-nested me-2"></i>Pick from table of contents</h5>
+          <div class="small text-muted" id="bookTocPickerSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="bookTocPickerTree" class="book-toc-picker-tree"></div>
+        <div id="bookTocPickerEmpty" class="text-center text-muted py-4 d-none">No table of contents entries for this book.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="bookTocPickerConfirmBtn">Apply selection</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .book-toc-picker-tree .toc-picker-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+  }
+  .book-toc-picker-tree .toc-picker-label {
+    flex: 1;
+    padding-left: calc(var(--toc-level, 0) * 16px);
+  }
+  .book-toc-picker-tree .toc-picker-pages {
+    font-size: 0.8rem;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+  }
+</style>

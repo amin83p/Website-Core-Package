@@ -1,0 +1,69 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_LIBRARY" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-book me-1"></i> School Library</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search by class, teacher, or period...',
+  fields: [
+    { name: 'status', label: 'Status', type: 'select', options: ['draft', 'submitted'] },
+    { name: 'periodType', label: 'Period', type: 'select', options: ['daily', 'weekly', 'biweekly', 'monthly'] }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="classTitle">Class</th>
+        <th class="draggable" data-column="periodType">Period</th>
+        <th class="draggable" data-column="periodStartDate">Dates</th>
+        <th class="draggable" data-column="teacherName">Teacher</th>
+        <th class="draggable" data-column="status">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="6" class="text-center py-5 text-muted">No book covering reports found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-semibold"><%= item.classTitle || item.classId %></div>
+            <% if (item.sessionId) { %><div class="x-small text-muted">Session <%= item.sessionId %></div><% } %>
+          </td>
+          <td><span class="badge bg-secondary"><%= item.periodType %></span></td>
+          <td><%= item.periodStartDate %><% if (item.periodEndDate && item.periodEndDate !== item.periodStartDate) { %> – <%= item.periodEndDate %><% } %></td>
+          <td><%= item.teacherName || item.teacherId || '—' %></td>
+          <td><span class="badge <%= item.status === 'submitted' ? 'bg-success' : 'bg-warning text-dark' %>"><%= item.status %></span></td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Book covering report actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/library/book-covering/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i><%= item.status === 'submitted' ? 'View' : 'Edit' %></a>
+                <% if (canDelete) { %>
+                <a href="/school/library/book-covering/delete/<%= item.id %>" class="btn btn-outline-danger btn-sm" data-confirm-delete="true"><i class="bi bi-trash me-2"></i>Delete</a>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/tablePages-end') %>

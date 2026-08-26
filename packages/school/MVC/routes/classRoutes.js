@@ -518,6 +518,17 @@ router.post('/:id/sessions/:sessionId/report-assignments',
   requireAccess(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE, sessionReportAssignmentActionState),
   classCtrl.assignReportToSession);
+router.get('/:id/sessions/:sessionId/book-covering-reports/summary',
+  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL),
+  classCtrl.getBookCoveringSummaryForSession);
+router.post('/:id/sessions/:sessionId/book-covering-reports',
+  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.CREATE, sessionReportAssignmentActionState),
+  classCtrl.createBookCoveringForSession);
+router.delete('/:id/sessions/:sessionId/book-covering-reports/:reportId',
+  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.DELETE, sessionReportAssignmentActionState),
+  classCtrl.deleteBookCoveringForSession);
 router.post('/:id/sessions/:sessionId/files/upload',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   upload('school-class-workspace', true).single('file'),

@@ -1029,6 +1029,12 @@
         },
         {
           "id": "446115"
+        },
+        {
+          "id": "446116"
+        },
+        {
+          "id": "446117"
         }
       ],
       "related": [],
@@ -1246,6 +1252,106 @@
       "mainDashboardDisplay": false,
       "navigatorSection": false,
       "homeURL": "/school/library/locations",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446116",
+      "name": "SCHOOL_LIBRARY_BOOK_ASSIGNMENTS",
+      "category": "SCHOOL",
+      "description": "Assign catalog books to classes for instructional covering reports.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/library/book-assignments",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446117",
+      "name": "SCHOOL_LIBRARY_BOOK_COVERING",
+      "category": "SCHOOL",
+      "description": "Teacher book covering reports for assigned class books by session or period.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/library/book-covering",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -4341,6 +4447,30 @@
       "tags": [
         "SCHOOL_LIBRARY_LOCATIONS",
         "446115"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_LIBRARY_BOOK_ASSIGNMENTS_001",
+      "name": "SCHOOL_LIBRARY_BOOK_ASSIGNMENTS",
+      "type": "class",
+      "value": "bi bi-journal-check",
+      "tags": [
+        "SCHOOL_LIBRARY_BOOK_ASSIGNMENTS",
+        "446116"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_LIBRARY_BOOK_COVERING_001",
+      "name": "SCHOOL_LIBRARY_BOOK_COVERING",
+      "type": "class",
+      "value": "bi bi-journal-richtext",
+      "tags": [
+        "SCHOOL_LIBRARY_BOOK_COVERING",
+        "446117"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true

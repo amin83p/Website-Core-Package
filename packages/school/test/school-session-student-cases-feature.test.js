@@ -35,7 +35,7 @@ test('class routes expose session student case endpoints under SCHOOL_SESSIONS',
   assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.READ_ALL\)/);
   assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.UPDATE\)/);
   assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.DELETE\)/);
-  assert.match(controller, /Only administrators can delete student cases/);
+  assert.match(controller, /sessionStudentCaseDeleteAccess/);
   assert.match(controller, /sessionStudentCaseService\.deleteCase/);
 });
 

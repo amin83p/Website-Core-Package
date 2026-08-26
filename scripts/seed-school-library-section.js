@@ -14,7 +14,9 @@ const CHILD_SECTIONS = [
   { id: '446112', name: 'SCHOOL_LIBRARY_PATRONS', homeURL: '/school/library/patrons', symbolId: 'SYM_SCHOOL_LIBRARY_PATRONS_001', icon: 'bi bi-person-vcard' },
   { id: '446113', name: 'SCHOOL_LIBRARY_CIRCULATION', homeURL: '/school/library/circulation', symbolId: 'SYM_SCHOOL_LIBRARY_CIRCULATION_001', icon: 'bi bi-arrow-left-right' },
   { id: '446114', name: 'SCHOOL_LIBRARY_POLICIES', homeURL: '/school/library/policies', symbolId: 'SYM_SCHOOL_LIBRARY_POLICIES_001', icon: 'bi bi-sliders' },
-  { id: '446115', name: 'SCHOOL_LIBRARY_LOCATIONS', homeURL: '/school/library/locations', symbolId: 'SYM_SCHOOL_LIBRARY_LOCATIONS_001', icon: 'bi bi-geo-alt' }
+  { id: '446115', name: 'SCHOOL_LIBRARY_LOCATIONS', homeURL: '/school/library/locations', symbolId: 'SYM_SCHOOL_LIBRARY_LOCATIONS_001', icon: 'bi bi-geo-alt' },
+  { id: '446116', name: 'SCHOOL_LIBRARY_BOOK_ASSIGNMENTS', homeURL: '/school/library/book-assignments', symbolId: 'SYM_SCHOOL_LIBRARY_BOOK_ASSIGNMENTS_001', icon: 'bi bi-journal-check' },
+  { id: '446117', name: 'SCHOOL_LIBRARY_BOOK_COVERING', homeURL: '/school/library/book-covering', symbolId: 'SYM_SCHOOL_LIBRARY_BOOK_COVERING_001', icon: 'bi bi-journal-richtext' }
 ];
 const BOOKS_HOME_URL = '/school/library/books';
 const BOOKS_SYMBOL = 'SYM_SCHOOL_BOOKS_001';

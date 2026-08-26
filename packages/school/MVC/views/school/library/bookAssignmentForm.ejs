@@ -1,0 +1,333 @@
+<%
+  const item = assignmentItem || {};
+  const isEdit = !!item.id;
+  const classId = selectedClassId || item.classId || '';
+  const classTitle = selectedClassTitle || classId;
+  const initialBooks = Array.isArray(item.books) ? item.books : [];
+  const lineStatuses = bookLineStatuses || ['active', 'inactive'];
+  const initialBooksPayload = JSON.stringify(initialBooks.map((b) => ({
+    bookId: b.bookId || '',
+    bookTitle: b.bookTitle || b.bookId || '',
+    bookIsbn: b.bookIsbn || '',
+    coverPhotoUrl: b.coverPhotoUrl || '',
+    sortOrder: b.sortOrder || 0,
+    notes: b.notes || '',
+    status: b.status || 'active'
+  }))).replace(/</g, '\\u003c');
+  const lineStatusesPayload = JSON.stringify(lineStatuses).replace(/</g, '\\u003c');
+%>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-journal-check me-2"></i><%= isEdit ? 'Edit Assignment' : 'New Book Assignment' %></h1>
+    <a href="/school/library/book-assignments" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+  </div>
+
+  <% if (includeModal) { %><%- include('partials/modal_GenericPicker', { user }) %><% } %>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="assignmentForm" action="<%= isEdit ? '/school/library/book-assignments/edit/' + item.id : '/school/library/book-assignments/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="classId" id="hid_classId" value="<%= classId %>">
+      <input type="hidden" name="books" id="hid_books" value="">
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-journal-check me-2"></i>Class assignment</h6>
+          <div class="small text-muted mt-1">One assignment per class. Add multiple catalog books with sort order and per-book notes.</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Class *</label>
+              <% if (isEdit) { %>
+                <div class="form-control size-md bg-light">
+                  <div class="fw-semibold"><%= classTitle %></div>
+                  <div class="x-small text-muted font-monospace"><%= classId %></div>
+                </div>
+              <% } else { %>
+                <div class="d-flex gap-2 flex-wrap align-items-start">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickClass"><i class="bi bi-mortarboard me-1"></i> Select class</button>
+                  <div id="pickedClassLabel" class="small text-muted pt-1">
+                    <% if (classId) { %>Selected: <span class="fw-semibold text-dark"><%= classTitle %></span><% } else { %>No class selected.<% } %>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold" for="status">Class status</label>
+              <select id="status" name="status" class="form-select size-md">
+                <% (assignmentStatuses || []).forEach((status) => { %>
+                  <option value="<%= status %>" <%= item.status === status ? 'selected' : '' %>><%= status %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold" for="notes">Class notes</label>
+              <textarea id="notes" name="notes" class="form-control" rows="2" maxlength="2000"><%= item.notes || '' %></textarea>
+            </div>
+          </div>
+
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="fw-bold m-0">Assigned books *</h6>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddBooks"><i class="bi bi-plus-lg me-1"></i> Add book</button>
+          </div>
+
+          <div class="table-scroll-wrapper border rounded">
+            <table class="table table-sm align-middle mb-0" id="booksTable">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Book</th>
+                  <th style="width: 110px;">Sort</th>
+                  <th>Notes</th>
+                  <th style="width: 120px;">Status</th>
+                  <th class="text-end pe-3" style="width: 120px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="booksTableBody">
+                <% if (!initialBooks.length) { %>
+                  <tr id="booksEmptyRow">
+                    <td colspan="5" class="text-center text-muted py-4">No books yet. Click “Add book” to pick from the catalog.</td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card-footer bg-white border-top d-flex gap-2 justify-content-end">
+          <a href="/school/library/book-assignments" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-check-lg me-1"></i> Save</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  const initialBooks = <%- initialBooksPayload %>;
+  const lineStatuses = <%- lineStatusesPayload %>;
+
+  const pickClassBtn = document.getElementById('btnPickClass');
+  const addBooksBtn = document.getElementById('btnAddBooks');
+  const hiddenClassId = document.getElementById('hid_classId');
+  const hiddenBooks = document.getElementById('hid_books');
+  const pickedClassLabel = document.getElementById('pickedClassLabel');
+  const tbody = document.getElementById('booksTableBody');
+  const form = document.getElementById('assignmentForm');
+  const isEdit = <%= isEdit ? 'true' : 'false' %>;
+
+  let bookRows = initialBooks.map((row) => ({
+    bookId: String(row.bookId || '').trim(),
+    bookTitle: String(row.bookTitle || row.bookId || '').trim(),
+    bookIsbn: String(row.bookIsbn || '').trim(),
+    coverPhotoUrl: String(row.coverPhotoUrl || '').trim(),
+    sortOrder: Number(row.sortOrder || 0) || 10,
+    notes: String(row.notes || ''),
+    status: String(row.status || 'active')
+  })).filter((row) => row.bookId);
+
+  function resolvePickerCoverPhotoUrl(item) {
+    return String(item?.coverPhotoUrl || item?.coverPhoto?.url || '').trim();
+  }
+
+  function renderBookCover(row) {
+    const url = String(row?.coverPhotoUrl || '').trim();
+    if (url) {
+      return '<img src="' + escapeHtml(url) + '" alt="" class="rounded border bg-white assignment-book-cover">';
+    }
+    return '<div class="rounded border bg-light text-muted d-flex align-items-center justify-content-center assignment-book-cover-placeholder"><i class="bi bi-book"></i></div>';
+  }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function nextSortOrder() {
+    if (!bookRows.length) return 10;
+    return Math.max(...bookRows.map((r) => Number(r.sortOrder || 0))) + 10;
+  }
+
+  function syncHiddenBooks() {
+    hiddenBooks.value = JSON.stringify(bookRows.map((row) => ({
+      bookId: row.bookId,
+      sortOrder: Number(row.sortOrder || 0),
+      notes: row.notes || '',
+      status: row.status || 'active'
+    })));
+  }
+
+  function renderBooksTable() {
+    tbody.innerHTML = '';
+    if (!bookRows.length) {
+      tbody.innerHTML = '<tr id="booksEmptyRow"><td colspan="5" class="text-center text-muted py-4">No books yet. Click “Add book” to pick from the catalog.</td></tr>';
+      syncHiddenBooks();
+      return;
+    }
+
+    bookRows.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      tr.dataset.bookId = row.bookId;
+      const statusOptions = lineStatuses.map((status) => (
+        '<option value="' + escapeHtml(status) + '"' + (row.status === status ? ' selected' : '') + '>' + escapeHtml(status) + '</option>'
+      )).join('');
+
+      tr.innerHTML = [
+        '<td class="ps-3">',
+        '<div class="d-flex align-items-center gap-2">',
+        renderBookCover(row),
+        '<div>',
+        '<div class="fw-semibold">' + escapeHtml(row.bookTitle || row.bookId) + '</div>',
+        row.bookIsbn ? '<div class="x-small text-muted font-monospace">' + escapeHtml(row.bookIsbn) + '</div>' : '',
+        '<div class="x-small text-muted font-monospace">' + escapeHtml(row.bookId) + '</div>',
+        '</div>',
+        '</div>',
+        '</td>',
+        '<td><input type="number" class="form-control form-control-sm book-sort" min="0" max="99999" value="' + escapeHtml(String(row.sortOrder || 0)) + '"></td>',
+        '<td><input type="text" class="form-control form-control-sm book-notes" maxlength="2000" value="' + escapeHtml(row.notes || '') + '"></td>',
+        '<td><select class="form-select form-select-sm book-status">' + statusOptions + '</select></td>',
+        '<td class="text-end pe-3">',
+        '<div class="btn-group btn-group-sm">',
+        '<button type="button" class="btn btn-outline-secondary btn-move-up" title="Move up"' + (index === 0 ? ' disabled' : '') + '><i class="bi bi-arrow-up"></i></button>',
+        '<button type="button" class="btn btn-outline-secondary btn-move-down" title="Move down"' + (index === bookRows.length - 1 ? ' disabled' : '') + '><i class="bi bi-arrow-down"></i></button>',
+        '<button type="button" class="btn btn-outline-danger btn-remove-book" title="Remove"><i class="bi bi-trash"></i></button>',
+        '</div>',
+        '</td>'
+      ].join('');
+
+      tr.querySelector('.book-sort')?.addEventListener('change', (event) => {
+        row.sortOrder = Number(event.target.value || 0);
+        syncHiddenBooks();
+      });
+      tr.querySelector('.book-notes')?.addEventListener('input', (event) => {
+        row.notes = String(event.target.value || '');
+        syncHiddenBooks();
+      });
+      tr.querySelector('.book-status')?.addEventListener('change', (event) => {
+        row.status = String(event.target.value || 'active');
+        syncHiddenBooks();
+      });
+      tr.querySelector('.btn-remove-book')?.addEventListener('click', () => {
+        bookRows = bookRows.filter((b) => b.bookId !== row.bookId);
+        renderBooksTable();
+      });
+      tr.querySelector('.btn-move-up')?.addEventListener('click', () => {
+        if (index <= 0) return;
+        const prev = bookRows[index - 1];
+        const curSort = Number(row.sortOrder || 0);
+        const prevSort = Number(prev.sortOrder || 0);
+        row.sortOrder = prevSort;
+        prev.sortOrder = curSort;
+        bookRows.sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+        renderBooksTable();
+      });
+      tr.querySelector('.btn-move-down')?.addEventListener('click', () => {
+        if (index >= bookRows.length - 1) return;
+        const next = bookRows[index + 1];
+        const curSort = Number(row.sortOrder || 0);
+        const nextSort = Number(next.sortOrder || 0);
+        row.sortOrder = nextSort;
+        next.sortOrder = curSort;
+        bookRows.sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+        renderBooksTable();
+      });
+
+      tbody.appendChild(tr);
+    });
+    syncHiddenBooks();
+  }
+
+  function showAssignmentMessage(message, title, icon) {
+    const payload = {
+      title: title || 'Check assignment',
+      icon: icon || 'warning',
+      message: String(message || ''),
+      buttons: [{ text: 'OK', class: 'btn-warning btn-sm' }]
+    };
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal(payload);
+    }
+    console.warn('showMessageModal unavailable for book assignment form.', payload);
+    return Promise.resolve(false);
+  }
+
+  function openPicker(presetName, onSelect, title, icon) {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showAssignmentMessage('The picker is not available on this page.', 'Picker unavailable', 'error');
+      return;
+    }
+    const context = typeof GenericPickerContexts?.activeOrganizationScope === 'function'
+      ? GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+      : null;
+    GenericPicker.open(GenericPickerPresets[presetName]({
+      title,
+      icon,
+      context,
+      onSelect
+    }));
+  }
+
+  function addBookFromPicker(item) {
+    const id = String(item?.id || '').trim();
+    if (!id) return false;
+    if (item?.orgId && hiddenClassId?.dataset?.orgId && String(item.orgId) !== String(hiddenClassId.dataset.orgId)) {
+      return false;
+    }
+    if (bookRows.some((row) => row.bookId === id)) return false;
+    bookRows.push({
+      bookId: id,
+      bookTitle: String(item.label || item.title || item.name || id).trim(),
+      bookIsbn: String(item.isbn || '').trim(),
+      coverPhotoUrl: resolvePickerCoverPhotoUrl(item),
+      sortOrder: nextSortOrder(),
+      notes: '',
+      status: 'active'
+    });
+    return true;
+  }
+
+  pickClassBtn?.addEventListener('click', () => {
+    openPicker('class', (item) => {
+      const id = String(item?.id || '').trim();
+      if (!id) return;
+      hiddenClassId.value = id;
+      const label = item.label || item.title || item.name || id;
+      pickedClassLabel.innerHTML = 'Selected: <span class="fw-semibold text-dark">' + escapeHtml(label) + '</span>';
+    }, 'Select Class', 'bi-mortarboard');
+  });
+
+  addBooksBtn?.addEventListener('click', () => {
+    openPicker('book', (item) => {
+      if (addBookFromPicker(item)) renderBooksTable();
+    }, 'Select Catalog Book', 'bi-journal-text');
+  });
+
+  form?.addEventListener('submit', async (event) => {
+    syncHiddenBooks();
+    if (!String(hiddenClassId?.value || '').trim()) {
+      event.preventDefault();
+      await showAssignmentMessage('Please select a class.', 'Class required');
+      return;
+    }
+    if (!bookRows.length) {
+      event.preventDefault();
+      await showAssignmentMessage('Please add at least one book to the assignment.', 'Books required');
+    }
+  });
+
+  renderBooksTable();
+})();
+</script>
+
+<style>
+  .assignment-book-cover,
+  .assignment-book-cover-placeholder {
+    width: 48px;
+    height: 64px;
+    flex: 0 0 48px;
+    object-fit: cover;
+  }
+</style>

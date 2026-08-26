@@ -242,5 +242,6 @@ module.exports = {
   addMinutes,
   createAssignmentForSession,
   resolveAllocatedHours,
-  resolveTeacherId
+  resolveTeacherId,
+  resolveTeacherName
 };
