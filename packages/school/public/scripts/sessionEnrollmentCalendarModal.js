@@ -14,7 +14,12 @@
     thirtyDays: '30 Days',
     month: 'Month',
     twoMonths: '2 Months',
-    threeMonths: '3 Months'
+    threeMonths: '3 Months',
+    fourMonths: '4 Months',
+    fiveMonths: '5 Months',
+    sixMonths: '6 Months',
+    wholeCycle: 'Whole Cycle',
+    custom: 'Custom'
   };
 
   let modalEl = null;
@@ -47,12 +52,7 @@
   }
 
   function resolveManageNaState(ev = {}) {
-    const sessionId = String(ev?.sessionId || '').trim();
-    const pending = state?.pendingMarkChanges?.get(sessionId);
-    if (pending?.action === 'mark_na') return 'pending';
-    if (pending?.action === 'unmark') return 'normal';
-    if (ev?.savedMarked || ev?.savedRosterNa) return 'saved';
-    return 'normal';
+    return core.resolveEnrollmentNaState(ev, state?.pendingMarkChanges);
   }
 
   function hasPendingMarkChanges() {
@@ -68,113 +68,93 @@
     ev.pendingNa = naState === 'pending';
   }
 
+  function hasPendingUnmarkOnly() {
+    if (!state?.pendingMarkChanges?.size) return false;
+    for (const change of state.pendingMarkChanges.values()) {
+      if (String(change?.action || '').toLowerCase() !== 'unmark') return false;
+    }
+    return true;
+  }
+
+  function canSavePendingMarks() {
+    const pendingCount = state?.pendingMarkChanges?.size || 0;
+    if (!pendingCount) return false;
+    const balance = getManageCapBalance();
+    if (!balance.enforced) return true;
+    if (hasPendingUnmarkOnly() && balance.requiredNaCount === 0 && balance.enforcedSessions) {
+      return true;
+    }
+    if (hasPendingUnmarkOnly() && balance.requiredNaHours <= 0 && balance.enforcedHours) {
+      return true;
+    }
+    if (balance.balanced) return true;
+    // Hour targets only require enough N/A hours (not an exact session count).
+    if (balance.enforcedHours
+      && balance.requiredNaHours > 0
+      && balance.naHours >= balance.requiredNaHours
+      && balance.expectedHours <= balance.targetHours) {
+      return true;
+    }
+    return false;
+  }
+
   function syncDoneButtonLabel() {
     const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
     if (!doneBtn || !isManageMode()) return;
+    if (state?.markSaveInFlight) {
+      doneBtn.disabled = true;
+      doneBtn.textContent = 'Saving...';
+      return;
+    }
     const pendingCount = state?.pendingMarkChanges?.size || 0;
-    const balance = getManageCapBalance();
-    if (!balance.enforced) {
-      doneBtn.disabled = false;
-      doneBtn.textContent = pendingCount ? `Save & close (${pendingCount})` : 'Done';
+    if (pendingCount > 0) {
+      const canSave = canSavePendingMarks();
+      doneBtn.disabled = !canSave;
+      doneBtn.textContent = `Save changes (${pendingCount})`;
+      const balance = getManageCapBalance();
+      doneBtn.title = doneBtn.disabled && balance.message ? balance.message : '';
       return;
     }
-    doneBtn.disabled = !balance.balanced;
-    if (!balance.balanced) {
-      doneBtn.textContent = balance.needLabel || 'Mark N/A to match target';
-      return;
-    }
-    doneBtn.textContent = pendingCount ? `Save & close (${pendingCount})` : 'Done';
+    doneBtn.disabled = false;
+    doneBtn.textContent = 'Close';
+    doneBtn.title = '';
   }
 
   function roundHours(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
   }
 
-  function getEffectiveNaSessionIds(overrideAction = null, overrideSessionId = '') {
-    const ids = new Set();
-    (Array.isArray(allEvents) ? allEvents : []).forEach((ev) => {
-      const sessionId = String(ev?.sessionId || '').trim();
-      if (!sessionId) return;
-      if (resolveManageNaState(ev) !== 'normal') ids.add(sessionId);
-    });
+  function getEffectiveNaSessionIds(overrideAction = null, overrideSessionId = '', pendingMap = null) {
+    const baseMap = pendingMap || state?.pendingMarkChanges;
+    const ids = core.getEffectiveNaSessionIdsFromPending(allEvents, baseMap);
     const targetId = String(overrideSessionId || '').trim();
     if (targetId && overrideAction === 'unmark') ids.delete(targetId);
     if (targetId && overrideAction === 'mark_na') ids.add(targetId);
     return ids;
   }
 
-  function getManageCapBalance(overrideAction = null, overrideSessionId = '') {
-    const targetSessions = Math.max(0, Math.floor(Number(state?.targetSessionCount) || 0));
-    const targetHours = roundHours(state?.targetHours || 0);
-    const enforcedSessions = targetSessions > 0;
-    const enforcedHours = !enforcedSessions && targetHours > 0;
-    const enforced = enforcedSessions || enforcedHours;
-    const events = Array.isArray(allEvents) ? allEvents : [];
-    const availableCount = events.length;
-    const availableHours = roundHours(events.reduce((sum, row) => sum + (Number(row?.durationHours) || 0), 0));
-    const naIds = getEffectiveNaSessionIds(overrideAction, overrideSessionId);
-    const naCount = naIds.size;
-    let naHours = 0;
-    events.forEach((row) => {
-      if (!naIds.has(String(row?.sessionId || '').trim())) return;
-      naHours = roundHours(naHours + (Number(row?.durationHours) || 0));
-    });
-    const expectedCount = Math.max(0, availableCount - naCount);
-    const expectedHours = roundHours(Math.max(0, availableHours - naHours));
-    const requiredNaCount = enforcedSessions && availableCount > targetSessions
-      ? availableCount - targetSessions
-      : 0;
-    const requiredNaHours = enforcedHours && availableHours > targetHours
-      ? roundHours(availableHours - targetHours)
-      : 0;
-
-    let balanced = true;
-    let message = '';
-    let needLabel = '';
-    if (enforcedSessions) {
-      balanced = expectedCount === targetSessions;
-      if (!balanced) {
-        if (expectedCount > targetSessions) {
-          const need = expectedCount - targetSessions;
-          message = `Select exactly ${requiredNaCount} session(s) to mark N/A (currently ${naCount}).`;
-          needLabel = `Need ${need} more N/A`;
+  function getManageCapBalance(overrideAction = null, overrideSessionId = '', pendingMap = null) {
+    let previewMap = pendingMap;
+    if (!previewMap && overrideAction && overrideSessionId) {
+      previewMap = core.clonePendingMap(state?.pendingMarkChanges);
+      const targetId = String(overrideSessionId || '').trim();
+      if (overrideAction === 'unmark') {
+        const ev = allEvents.find((row) => String(row?.sessionId || '').trim() === targetId);
+        if (ev?.savedMarked || ev?.savedRosterNa) {
+          previewMap.set(targetId, { action: 'unmark', note: '' });
         } else {
-          message = `Too many N/A marks: expected sessions would be ${expectedCount}, target is ${targetSessions}.`;
-          needLabel = `Unmark ${targetSessions - expectedCount} N/A`;
+          previewMap.delete(targetId);
         }
-      }
-    } else if (enforcedHours) {
-      balanced = expectedHours <= targetHours && (requiredNaHours <= 0 || naHours >= requiredNaHours);
-      if (expectedHours > targetHours) {
-        balanced = false;
-        const need = roundHours(expectedHours - targetHours);
-        message = `Select sessions totaling at least ${requiredNaHours} hour(s) to mark N/A (selected ${naHours} hr).`;
-        needLabel = `Need ${need}h more N/A`;
-      } else if (requiredNaHours > 0 && naHours < requiredNaHours) {
-        balanced = false;
-        message = `Select sessions totaling at least ${requiredNaHours} hour(s) to mark N/A (selected ${naHours} hr).`;
-        needLabel = `Need ${roundHours(requiredNaHours - naHours)}h more N/A`;
+      } else if (overrideAction === 'mark_na') {
+        previewMap.set(targetId, { action: 'mark_na', note: '' });
       }
     }
-
-    return {
-      enforced,
-      enforcedSessions,
-      enforcedHours,
-      balanced,
-      message,
-      needLabel: balanced ? 'Balanced' : needLabel,
-      targetSessions,
-      targetHours,
-      availableCount,
-      availableHours,
-      expectedCount,
-      expectedHours,
-      naCount,
-      naHours,
-      requiredNaCount,
-      requiredNaHours
-    };
+    return core.getEnrollmentCapBalance(
+      allEvents,
+      previewMap || state?.pendingMarkChanges,
+      state?.targetSessionCount,
+      state?.targetHours
+    );
   }
 
   function formatCapSummaryAmount(value, unit) {
@@ -192,14 +172,39 @@
       ? formatCapSummaryAmount(balance.expectedHours, 'Hrs')
       : formatCapSummaryAmount(balance.expectedCount, 'Sessions');
     const capClass = balance.balanced ? 'is-ok' : 'is-warn';
+    const bulkUnmarkRow = balance.requiredNaCount === 0 && balance.naCount > 0
+      ? `<tr><td colspan="3" class="pt-2 pb-0">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_stageAllEnrollmentNaUnmarks">
+            Stage unmark for all ${balance.naCount} N/A session(s)
+          </button>
+        </td></tr>`
+      : '';
     return ''
       + '<table class="session-enrollment-cap-summary-table table table-sm table-borderless mb-0">'
       +   '<tbody><tr>'
       +     `<td><span class="ses-sum-k">Target:</span> <strong class="ses-sum-v">${core.escapeHtml(targetValue)}</strong></td>`
       +     `<td><span class="ses-sum-k">Expected (Selected):</span> <strong class="ses-sum-v">${core.escapeHtml(expectedValue)}</strong></td>`
       +     `<td><span class="ses-sum-k">Cap:</span> <strong class="ses-sum-v ${capClass}">${core.escapeHtml(balance.needLabel)}</strong></td>`
-      +   '</tr></tbody>'
+      +   '</tr>'
+      +   bulkUnmarkRow
+      +   '</tbody>'
       + '</table>';
+  }
+
+  function stageAllSavedNaUnmarks() {
+    if (!state) return;
+    if (!state.pendingMarkChanges) state.pendingMarkChanges = new Map();
+    (Array.isArray(allEvents) ? allEvents : []).forEach((ev) => {
+      if (!ev?.savedMarked && !ev?.savedRosterNa) return;
+      const sessionId = String(ev?.sessionId || '').trim();
+      if (!sessionId) return;
+      state.pendingMarkChanges.set(sessionId, { action: 'unmark', note: '' });
+      syncEventNaFromPending(sessionId);
+    });
+    const scrollSnapshot = captureScrollPositions();
+    renderCalendar();
+    restoreScrollPositions(scrollSnapshot);
+    updateManageSummary();
   }
 
   function updateManageSummary() {
@@ -217,22 +222,64 @@
     syncDoneButtonLabel();
   }
 
+  function resolveEnrollmentWindowBounds() {
+    const minDate = core.normalizeDateOnly(state?.startDate || '');
+    let maxDate = core.normalizeDateOnly(state?.endDate || '');
+    if (!maxDate && Array.isArray(allEvents) && allEvents.length) {
+      const dates = allEvents
+        .map((row) => core.normalizeDateOnly(row?.date))
+        .filter(Boolean)
+        .sort();
+      maxDate = dates[dates.length - 1] || '';
+    }
+    if (!maxDate) {
+      maxDate = core.parseAnchorDate('');
+    }
+    return { minDate, maxDate };
+  }
+
+  function applyViewRange(nextRange = {}) {
+    if (!state) return;
+    const bounds = resolveEnrollmentWindowBounds();
+    const range = core.clampViewRangeToBounds(nextRange, bounds);
+    state.viewRange = range;
+    state.viewPreset = String(range.preset || state.viewPreset || 'week').trim();
+    state.anchorDate = range.anchorDate || range.startDate;
+    syncPresetButtons();
+  }
+
+  function computePresetViewRange(preset) {
+    const key = String(preset || 'week').trim();
+    const bounds = resolveEnrollmentWindowBounds();
+    const anchor = core.clampAnchorDate(
+      state?.anchorDate || state?.viewRange?.anchorDate || bounds.minDate || state?.startDate,
+      bounds.minDate
+    );
+    if (key === 'wholeCycle') {
+      return core.computeWholeCycleViewRange({
+        startDate: bounds.minDate || anchor,
+        endDate: bounds.maxDate || anchor
+      });
+    }
+    const monthPresets = new Set(['month', 'twoMonths', 'threeMonths', 'fourMonths', 'fiveMonths', 'sixMonths']);
+    const rangeAnchor = monthPresets.has(key) ? (bounds.minDate || anchor) : anchor;
+    return core.computeViewRange(key, rangeAnchor);
+  }
+
   function initManageModeViewRange() {
     if (!state) return;
-    const today = core.parseAnchorDate('');
-    const enrollmentStart = core.normalizeDateOnly(state.startDate || '');
-    const enrollmentEnd = core.normalizeDateOnly(state.endDate || '');
-    const rangeStart = enrollmentStart && today < enrollmentStart ? enrollmentStart : today;
+    const bounds = resolveEnrollmentWindowBounds();
+    const rangeStart = bounds.minDate || core.parseAnchorDate('');
     let rangeEnd = core.addDaysIso(rangeStart, 30);
-    if (enrollmentEnd && enrollmentEnd < rangeEnd) rangeEnd = enrollmentEnd;
+    if (bounds.maxDate && bounds.maxDate < rangeEnd) rangeEnd = bounds.maxDate;
     state.viewPreset = 'thirtyDays';
     state.anchorDate = rangeStart;
-    state.viewRange = {
+    state.viewRange = core.clampViewRangeToBounds({
       startDate: rangeStart,
       endDate: rangeEnd,
       preset: 'thirtyDays',
       anchorDate: rangeStart
-    };
+    }, bounds);
   }
 
   function syncModalChromeForMode() {
@@ -243,6 +290,7 @@
     const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
     const thirtyDaysBtn = qs('btn_sessionEnrollmentPresetThirtyDays');
     const legendBtn = qs('btn_sessionEnrollmentCalendarLegend');
+    const bulkNaBtn = qs('btn_sessionEnrollmentBulkNa');
     const studentBanner = qs('sessionEnrollmentCalendarStudentBanner');
     const dialogEl = modalEl?.querySelector('.modal-dialog') || qs('sessionEnrollmentCalendarModal')?.querySelector('.modal-dialog');
     const manage = isManageMode();
@@ -250,16 +298,20 @@
       titleEl.textContent = manage ? 'Manage enrollment sessions' : 'Select sessions';
     }
     if (hintEl) {
-      hintEl.classList.toggle('d-none', manage);
-      if (!manage) {
-        hintEl.textContent = 'Click empty grid space to stage sessions; click sessions to include or exclude.';
-      }
+      hintEl.classList.toggle('d-none', false);
+      hintEl.textContent = manage
+        ? 'Click sessions to stage N/A mark or unmark changes, then click Save changes.'
+        : 'Click empty grid space to stage sessions; click sessions to include or exclude.';
     }
     clearBtn?.classList.toggle('d-none', manage);
     saveBtn?.classList.toggle('d-none', manage);
     doneBtn?.classList.toggle('d-none', !manage);
     thirtyDaysBtn?.classList.toggle('d-none', !manage);
+    document.querySelectorAll('.session-enrollment-manage-preset').forEach((btn) => {
+      btn.classList.toggle('d-none', !manage);
+    });
     legendBtn?.classList.toggle('d-none', !manage);
+    bulkNaBtn?.classList.toggle('d-none', !manage);
     studentBanner?.classList.toggle('d-none', !manage);
     if (dialogEl) dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage);
     syncDoneButtonLabel();
@@ -678,7 +730,12 @@
         state.pendingMarkChanges.delete(sessionId);
       }
     } else {
-      state.pendingMarkChanges.set(sessionId, { action: 'mark_na', note: String(note || '').trim() });
+      const normalizedNote = String(note || '').trim();
+      if (!normalizedNote) {
+        showMarkFormError('Enter a note explaining why this session is N/A.');
+        return;
+      }
+      state.pendingMarkChanges.set(sessionId, { action: 'mark_na', note: normalizedNote });
     }
     syncEventNaFromPending(sessionId);
     hideMarkModalLayer();
@@ -686,6 +743,15 @@
     renderCalendar();
     restoreScrollPositions(scrollSnapshot);
     updateManageSummary();
+    syncDoneButtonLabel();
+  }
+
+  function formatManageSaveError(message = '') {
+    const text = String(message || '').trim();
+    if (/no n\/a session selection is required/i.test(text)) {
+      return 'No N/A sessions are required for this enrollment. Unmark all remaining N/A sessions, then save together.';
+    }
+    return text || 'Unable to update enrollment session marks.';
   }
 
   async function flushPendingMarks() {
@@ -705,7 +771,7 @@
       { changes }
     );
     if (!result || String(result?.status || '').toLowerCase() === 'error') {
-      throw new Error(result?.message || 'Unable to update enrollment session marks.');
+      throw new Error(formatManageSaveError(result?.message));
     }
     state.pendingMarkChanges.clear();
     return result;
@@ -739,9 +805,238 @@
     });
   }
 
+  function resolveBulkNaOverlayEl() {
+    const calendarModal = qs('sessionEnrollmentCalendarModal');
+    return calendarModal?.querySelector('#sessionEnrollmentBulkNaModal')
+      || qs('sessionEnrollmentBulkNaModal');
+  }
+
+  function isBulkNaOverlayOpen() {
+    const el = resolveBulkNaOverlayEl();
+    return Boolean(el && el.classList.contains('show') && !el.classList.contains('d-none'));
+  }
+
+  function hideBulkNaModalLayer() {
+    bulkNaModalEl = resolveBulkNaOverlayEl();
+    if (!bulkNaModalEl) {
+      setStageOverlayLock(false);
+      return;
+    }
+    bulkNaModalEl.classList.add('d-none');
+    bulkNaModalEl.classList.remove('show');
+    bulkNaModalEl.style.display = 'none';
+    bulkNaModalEl.setAttribute('aria-hidden', 'true');
+    setStageOverlayLock(false);
+  }
+
+  function showBulkNaModalLayer() {
+    const calendarModal = qs('sessionEnrollmentCalendarModal');
+    bulkNaModalEl = resolveBulkNaOverlayEl();
+    if (!bulkNaModalEl) return;
+    const dialog = calendarModal?.querySelector('.modal-dialog');
+    if (dialog && bulkNaModalEl.parentElement !== dialog) {
+      dialog.appendChild(bulkNaModalEl);
+    }
+    bulkNaModalEl.classList.remove('d-none');
+    bulkNaModalEl.classList.add('show');
+    bulkNaModalEl.style.display = 'flex';
+    bulkNaModalEl.setAttribute('aria-hidden', 'false');
+    setStageOverlayLock(true);
+    const focusTarget = bulkNaModalEl.querySelector('#sessionEnrollmentBulkNaStart, #sessionEnrollmentBulkNaNote');
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      focusTarget.focus();
+    }
+  }
+
+  function showBulkNaFormError(message) {
+    const errorEl = qs('sessionEnrollmentBulkNaError');
+    if (!errorEl) return;
+    errorEl.textContent = String(message || '').trim();
+    errorEl.classList.toggle('d-none', !errorEl.textContent);
+  }
+
+  function readBulkNaAction() {
+    const active = bulkNaModalEl?.querySelector('[data-bulk-na-action].active')
+      || document.querySelector('[data-bulk-na-action].active');
+    const action = String(active?.getAttribute('data-bulk-na-action') || bulkNaAction || 'mark_na').trim().toLowerCase();
+    return action === 'unmark' ? 'unmark' : 'mark_na';
+  }
+
+  function syncBulkNaActionButtons() {
+    const action = readBulkNaAction();
+    bulkNaAction = action;
+    document.querySelectorAll('[data-bulk-na-action]').forEach((btn) => {
+      const btnAction = String(btn.getAttribute('data-bulk-na-action') || '').trim().toLowerCase();
+      btn.classList.toggle('active', btnAction === action);
+    });
+    const noteWrap = qs('sessionEnrollmentBulkNaNoteWrap');
+    noteWrap?.classList.toggle('d-none', action === 'unmark');
+  }
+
+  function clampBulkNaDateInputs() {
+    const bounds = resolveEnrollmentWindowBounds();
+    const startInput = qs('sessionEnrollmentBulkNaStart');
+    const endInput = qs('sessionEnrollmentBulkNaEnd');
+    if (startInput && bounds.minDate) {
+      startInput.min = bounds.minDate;
+      startInput.max = bounds.maxDate || '';
+    }
+    if (endInput && bounds.minDate) {
+      endInput.min = bounds.minDate;
+      endInput.max = bounds.maxDate || '';
+    }
+    let start = core.normalizeDateOnly(startInput?.value);
+    let end = core.normalizeDateOnly(endInput?.value);
+    if (bounds.minDate && start && start < bounds.minDate) start = bounds.minDate;
+    if (bounds.maxDate && start && start > bounds.maxDate) start = bounds.maxDate;
+    if (bounds.minDate && end && end < bounds.minDate) end = bounds.minDate;
+    if (bounds.maxDate && end && end > bounds.maxDate) end = bounds.maxDate;
+    if (start && end && start > end) {
+      if (document.activeElement === endInput) start = end;
+      else end = start;
+    }
+    if (startInput && start) startInput.value = start;
+    if (endInput && end) endInput.value = end;
+    return { startDate: start, endDate: end };
+  }
+
+  function collectBulkNaSessionsForForm() {
+    const { startDate, endDate } = clampBulkNaDateInputs();
+    const action = readBulkNaAction();
+    if (!startDate || !endDate || startDate > endDate) return [];
+    return core.collectBulkNaSessions(allEvents, state?.pendingMarkChanges, startDate, endDate, action);
+  }
+
+  function buildBulkPendingPreview(sessions, action, note = '') {
+    return core.applyBulkPendingChanges(state?.pendingMarkChanges, sessions, action, note);
+  }
+
+  function refreshBulkNaPreview() {
+    syncBulkNaActionButtons();
+    const action = readBulkNaAction();
+    const sessions = collectBulkNaSessionsForForm();
+    const count = sessions.length;
+    const countEl = qs('sessionEnrollmentBulkNaCount');
+    const stageBtn = qs('btn_sessionEnrollmentBulkNaStage');
+    if (countEl) {
+      if (!count) {
+        countEl.textContent = action === 'unmark'
+          ? 'No N/A sessions in this date range.'
+          : 'No open sessions in this date range.';
+      } else {
+        countEl.textContent = action === 'unmark'
+          ? `${count} session(s) will be unmarked from N/A.`
+          : `${count} session(s) will be marked N/A.`;
+      }
+    }
+    if (stageBtn) stageBtn.disabled = count === 0;
+    showBulkNaFormError('');
+  }
+
+  function openBulkNaModal() {
+    if (!state || !isManageMode()) return;
+    bindBulkNaModalEvents();
+    bulkNaAction = 'mark_na';
+    const bounds = resolveEnrollmentWindowBounds();
+    const defaultStart = core.normalizeDateOnly(state?.viewRange?.startDate || bounds.minDate || state?.startDate);
+    const defaultEnd = core.normalizeDateOnly(state?.viewRange?.endDate || bounds.maxDate || state?.endDate || defaultStart);
+    const startInput = qs('sessionEnrollmentBulkNaStart');
+    const endInput = qs('sessionEnrollmentBulkNaEnd');
+    const noteInput = qs('sessionEnrollmentBulkNaNote');
+    if (startInput) startInput.value = defaultStart || '';
+    if (endInput) endInput.value = defaultEnd || '';
+    if (noteInput) noteInput.value = '';
+    document.querySelectorAll('[data-bulk-na-action]').forEach((btn) => {
+      btn.classList.toggle('active', String(btn.getAttribute('data-bulk-na-action') || '') === 'mark_na');
+    });
+    clampBulkNaDateInputs();
+    refreshBulkNaPreview();
+    showBulkNaModalLayer();
+  }
+
+  function stageBulkNaChanges() {
+    if (!state) return;
+    const action = readBulkNaAction();
+    const sessions = collectBulkNaSessionsForForm();
+    if (!sessions.length) {
+      showBulkNaFormError('No sessions match this date range and action.');
+      return;
+    }
+    const note = String(qs('sessionEnrollmentBulkNaNote')?.value || '').trim();
+    if (action === 'mark_na' && !note) {
+      showBulkNaFormError('Enter a note explaining why these sessions are N/A.');
+      return;
+    }
+    const previewMap = buildBulkPendingPreview(sessions, action, note);
+    const preview = getManageCapBalance(null, '', previewMap);
+    if (action === 'unmark') {
+      if (preview.enforcedSessions && preview.expectedCount > preview.targetSessions) {
+        showBulkNaFormError(preview.message || 'Unmarking would exceed the enrollment session target.');
+        return;
+      }
+      if (preview.enforcedHours && preview.expectedHours > preview.targetHours) {
+        showBulkNaFormError(preview.message || 'Unmarking would exceed the enrollment hour target.');
+        return;
+      }
+    }
+    if (!state.pendingMarkChanges) state.pendingMarkChanges = new Map();
+    state.pendingMarkChanges = previewMap;
+    allEvents.forEach((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      if (sessionId) syncEventNaFromPending(sessionId);
+    });
+    hideBulkNaModalLayer();
+    const scrollSnapshot = captureScrollPositions();
+    renderCalendar();
+    restoreScrollPositions(scrollSnapshot);
+    updateManageSummary();
+    syncDoneButtonLabel();
+  }
+
+  function bindBulkNaModalEvents() {
+    if (bulkNaModalBound) return;
+    bulkNaModalBound = true;
+    bindStackEscapeHandler();
+    bulkNaModalEl = resolveBulkNaOverlayEl();
+
+    bulkNaModalEl?.addEventListener('click', (event) => {
+      if (event.target.closest('#btn_sessionEnrollmentBulkNaStage')) {
+        event.preventDefault();
+        stageBulkNaChanges();
+        return;
+      }
+      const actionBtn = event.target.closest('[data-bulk-na-action]');
+      if (actionBtn) {
+        event.preventDefault();
+        bulkNaAction = String(actionBtn.getAttribute('data-bulk-na-action') || 'mark_na').trim().toLowerCase();
+        syncBulkNaActionButtons();
+        refreshBulkNaPreview();
+        return;
+      }
+      if (event.target.closest('[data-bulk-na-dismiss]')) {
+        hideBulkNaModalLayer();
+      }
+    });
+
+    ['sessionEnrollmentBulkNaStart', 'sessionEnrollmentBulkNaEnd', 'sessionEnrollmentBulkNaNote'].forEach((id) => {
+      qs(id)?.addEventListener('input', () => {
+        if (!isBulkNaOverlayOpen()) return;
+        refreshBulkNaPreview();
+      });
+      qs(id)?.addEventListener('change', () => {
+        if (!isBulkNaOverlayOpen()) return;
+        clampBulkNaDateInputs();
+        refreshBulkNaPreview();
+      });
+    });
+  }
+
   let markModalEl = null;
   let markContext = null;
   let markModalBound = false;
+  let bulkNaModalEl = null;
+  let bulkNaAction = 'mark_na';
+  let bulkNaModalBound = false;
   let manageSummaryMeta = null;
   const STAGE_COUNT_MIN = 1;
   const STAGE_COUNT_MAX = 52;
@@ -893,11 +1188,12 @@
 
   function handleEnrollmentModalStackEscape(event) {
     if (event.key !== 'Escape') return;
-    if (stageOverlayLockActive || isStageOverlayOpen() || isMarkOverlayOpen()) {
+    if (stageOverlayLockActive || isBulkNaOverlayOpen() || isStageOverlayOpen() || isMarkOverlayOpen()) {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      if (isMarkOverlayOpen()) hideMarkModalLayer();
+      if (isBulkNaOverlayOpen()) hideBulkNaModalLayer();
+      else if (isMarkOverlayOpen()) hideMarkModalLayer();
       else hideStageQuickModalLayer();
       return;
     }
@@ -1399,9 +1695,10 @@
   }
 
   function syncPresetButtons() {
+    const activePreset = String(state?.viewPreset || '').trim();
     document.querySelectorAll('[data-session-picker-preset]').forEach((btn) => {
       const preset = String(btn.getAttribute('data-session-picker-preset') || '').trim();
-      btn.classList.toggle('active', preset === state.viewPreset);
+      btn.classList.toggle('active', preset === activePreset && activePreset !== 'custom');
     });
     const rangeLabel = qs('sessionEnrollmentCalendarRangeLabel');
     if (rangeLabel && state.viewRange) {
@@ -1549,8 +1846,19 @@
     hostEl = qs('sessionEnrollmentCalendarHost');
     if (hostEl) hostEl.addEventListener('click', handleHostClick);
 
+    qs('sessionEnrollmentCalendarSummary')?.addEventListener('click', (event) => {
+      if (event.target.closest('#btn_stageAllEnrollmentNaUnmarks')) {
+        event.preventDefault();
+        stageAllSavedNaUnmarks();
+      }
+    });
+
     qs('btn_sessionEnrollmentCalendarLegend')?.addEventListener('click', () => {
       openEnrollmentSessionsLegendModal();
+    });
+
+    qs('btn_sessionEnrollmentBulkNa')?.addEventListener('click', () => {
+      openBulkNaModal();
     });
 
     document.querySelectorAll('[data-session-picker-preset]').forEach((btn) => {
@@ -1563,8 +1871,7 @@
           state.viewMode = 'vertical';
         }
         state.dayWidthUserAdjusted = false;
-        state.viewRange = core.computeViewRange(preset, state.viewRange?.anchorDate || state.anchorDate);
-        state.anchorDate = state.viewRange.anchorDate;
+        applyViewRange(computePresetViewRange(preset));
         syncViewModeButtons();
         fetchPickerData({ remote: false }).catch((err) => console.error(err));
       });
@@ -1588,19 +1895,28 @@
     qs('btn_sessionEnrollmentCalendarPrev')?.addEventListener('click', () => {
       if (!state) return;
       state.dayWidthUserAdjusted = false;
-      state.viewRange = core.clampViewRangeToEnrollmentStart(
-        core.shiftViewRange(state.viewRange, -1),
-        state.startDate
-      );
-      state.anchorDate = state.viewRange.anchorDate;
+      const bounds = resolveEnrollmentWindowBounds();
+      const shifted = core.shiftViewRange(state.viewRange, -1, bounds);
+      if (isManageMode()) {
+        applyViewRange(shifted);
+      } else {
+        state.viewRange = core.clampViewRangeToEnrollmentStart(shifted, state.startDate);
+        state.anchorDate = state.viewRange.anchorDate;
+      }
       fetchPickerData({ remote: false }).catch((err) => console.error(err));
     });
 
     qs('btn_sessionEnrollmentCalendarNext')?.addEventListener('click', () => {
       if (!state) return;
       state.dayWidthUserAdjusted = false;
-      state.viewRange = core.shiftViewRange(state.viewRange, 1);
-      state.anchorDate = state.viewRange.anchorDate;
+      const bounds = resolveEnrollmentWindowBounds();
+      const shifted = core.shiftViewRange(state.viewRange, 1, bounds);
+      if (isManageMode()) {
+        applyViewRange(shifted);
+      } else {
+        state.viewRange = shifted;
+        state.anchorDate = state.viewRange.anchorDate;
+      }
       fetchPickerData({ remote: false }).catch((err) => console.error(err));
     });
 
@@ -1608,7 +1924,11 @@
       if (!state) return;
       state.dayWidthUserAdjusted = false;
       state.anchorDate = core.clampAnchorDate(core.parseAnchorDate(''), state.startDate);
-      state.viewRange = core.computeViewRange(state.viewPreset, state.anchorDate);
+      if (isManageMode()) {
+        applyViewRange(computePresetViewRange(state.viewPreset));
+      } else {
+        state.viewRange = core.computeViewRange(state.viewPreset, state.anchorDate);
+      }
       fetchPickerData({ remote: false }).catch((err) => console.error(err));
     });
 
@@ -1632,34 +1952,37 @@
     });
 
     qs('btn_sessionEnrollmentCalendarDone')?.addEventListener('click', async () => {
-      if (!state) return;
+      if (!state || state.markSaveInFlight) return;
       const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
       const summaryEl = qs('sessionEnrollmentCalendarSummary');
       const onMarksChanged = state.onMarksChanged;
+      if (!hasPendingMarkChanges()) {
+        getModal()?.hide();
+        return;
+      }
       const balance = getManageCapBalance();
-      if (balance.enforced && !balance.balanced) {
+      if (!canSavePendingMarks()) {
         updateManageSummary();
         return;
       }
+      state.markSaveInFlight = true;
       if (doneBtn) doneBtn.disabled = true;
+      syncDoneButtonLabel();
       let saveResult = null;
       try {
-        if (hasPendingMarkChanges()) {
-          saveResult = await flushPendingMarks();
-        }
-        const refreshAfterHide = saveResult && typeof onMarksChanged === 'function';
-        if (refreshAfterHide) {
-          modalEl?.addEventListener('hidden.bs.modal', () => {
-            onMarksChanged(saveResult).catch((err) => console.error(err));
-          }, { once: true });
+        saveResult = await flushPendingMarks();
+        await fetchSessionWindowData({ reload: true });
+        if (typeof onMarksChanged === 'function') {
+          await onMarksChanged(saveResult);
         }
         getModal()?.hide();
       } catch (err) {
         if (summaryEl) {
-          summaryEl.classList.add('is-plain');
-          summaryEl.textContent = `Unable to save N/A marks: ${err?.message || 'Request failed.'}`;
+          summaryEl.classList.remove('d-none', 'is-plain');
+          summaryEl.innerHTML = `<div class="alert alert-warning py-2 mb-0 small">${core.escapeHtml(formatManageSaveError(err?.message))}</div>`;
         }
       } finally {
+        state.markSaveInFlight = false;
         syncDoneButtonLabel();
       }
     });
@@ -1682,6 +2005,7 @@
     modalEl?.addEventListener('hidden.bs.modal', () => {
       hideStageQuickModalLayer();
       hideMarkModalLayer();
+      hideBulkNaModalLayer();
       setStageOverlayLock(false);
       state = null;
       allEvents = [];
@@ -1762,7 +2086,8 @@
       onMarksChanged: options.onMarksChanged,
       requestJson: options.requestJson,
       pendingMarkChanges: new Map(),
-      sessionWindowLoaded: false
+      sessionWindowLoaded: false,
+      markSaveInFlight: false
     };
 
     syncModalChromeForMode();

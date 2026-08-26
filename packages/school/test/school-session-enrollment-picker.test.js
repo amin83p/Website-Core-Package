@@ -52,6 +52,44 @@ test('computeViewRange threeMonths covers three calendar months', () => {
   assert.equal(range.endDate, '2026-07-31');
 });
 
+test('computeViewRange fourMonths fiveMonths and sixMonths cover expected spans', () => {
+  const four = pickerService.computeViewRange('fourMonths', '2026-01-20');
+  assert.equal(four.startDate, '2026-01-01');
+  assert.equal(four.endDate, '2026-04-30');
+
+  const five = pickerService.computeViewRange('fiveMonths', '2026-01-20');
+  assert.equal(five.startDate, '2026-01-01');
+  assert.equal(five.endDate, '2026-05-31');
+
+  const six = pickerService.computeViewRange('sixMonths', '2026-01-20');
+  assert.equal(six.startDate, '2026-01-01');
+  assert.equal(six.endDate, '2026-06-30');
+});
+
+test('computeWholeCycleViewRange and computeCustomViewRange return enrollment spans', () => {
+  const whole = pickerService.computeWholeCycleViewRange({
+    startDate: '2026-01-10',
+    endDate: '2026-08-31'
+  });
+  assert.equal(whole.preset, 'wholeCycle');
+  assert.equal(whole.startDate, '2026-01-10');
+  assert.equal(whole.endDate, '2026-08-31');
+
+  const custom = pickerService.computeCustomViewRange('2026-02-01', '2026-03-15');
+  assert.equal(custom.preset, 'custom');
+  assert.equal(custom.startDate, '2026-02-01');
+  assert.equal(custom.endDate, '2026-03-15');
+});
+
+test('clampViewRangeToBounds keeps custom ranges inside enrollment window', () => {
+  const clamped = pickerService.clampViewRangeToBounds(
+    { startDate: '2026-01-01', endDate: '2026-12-31', preset: 'custom', anchorDate: '2026-01-01' },
+    { minDate: '2026-02-01', maxDate: '2026-08-31' }
+  );
+  assert.equal(clamped.startDate, '2026-02-01');
+  assert.equal(clamped.endDate, '2026-08-31');
+});
+
 test('summarizeSelection totals hours and date span', () => {
   const events = [
     { sessionId: 'SES_1', date: '2026-01-10', durationHours: 2 },
@@ -157,6 +195,13 @@ test('client SessionCalendarCore mirrors range math and grouping', () => {
   ]);
   assert.equal(grouped['2026-01-05'].length, 2);
   assert.equal(core.suggestViewModeForPreset('threeMonths'), 'vertical');
+  const fourMonthRange = core.computeViewRange('fourMonths', '2026-03-15');
+  assert.equal(fourMonthRange.startDate, '2026-03-01');
+  assert.equal(fourMonthRange.endDate, '2026-06-30');
+  const wholeCycle = core.computeWholeCycleViewRange({ startDate: '2026-01-01', endDate: '2026-06-30' });
+  assert.equal(wholeCycle.preset, 'wholeCycle');
+  const shiftedFour = core.shiftViewRange(fourMonthRange, 1);
+  assert.equal(shiftedFour.startDate, '2026-07-01');
   const shifted = core.shiftViewRange(range, 1);
   assert.equal(shifted.startDate, '2026-01-19');
 });
@@ -192,4 +237,97 @@ test('client SessionCalendarCore filters events and builds week blocks', () => {
   assert.equal(partialWeek.days.length, 7);
   assert.equal(partialWeek.days[0].inRange, false);
   assert.equal(partialWeek.days[partialWeek.days.length - 1].inRange, true);
+});
+
+function loadSessionCalendarCore() {
+  const scriptPath = path.join(__dirname, '../public/scripts/sessionCalendarCore.js');
+  const code = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(code, sandbox);
+  return sandbox.window.SessionCalendarCore;
+}
+
+test('collectBulkNaSessions filters by inclusive date range and action eligibility', () => {
+  const core = loadSessionCalendarCore();
+  const events = [
+    { sessionId: 'S1', date: '2026-01-05', durationHours: 1 },
+    { sessionId: 'S2', date: '2026-01-10', durationHours: 1, savedMarked: true },
+    { sessionId: 'S3', date: '2026-01-20', durationHours: 1 },
+    { sessionId: 'S4', date: '2026-02-01', durationHours: 1, savedRosterNa: true }
+  ];
+  const pending = new Map([['S1', { action: 'mark_na', note: 'pending' }]]);
+
+  const toMark = core.collectBulkNaSessions(events, pending, '2026-01-01', '2026-01-31', 'mark_na');
+  assert.deepEqual(toMark.map((row) => row.sessionId), ['S3']);
+
+  const toUnmark = core.collectBulkNaSessions(events, pending, '2026-01-01', '2026-01-31', 'unmark');
+  assert.deepEqual(toUnmark.map((row) => row.sessionId).sort(), ['S1', 'S2']);
+});
+
+test('applyBulkPendingChanges stages mark and unmark entries for bulk actions', () => {
+  const core = loadSessionCalendarCore();
+  const events = [
+    { sessionId: 'S1', date: '2026-01-05', durationHours: 1 },
+    { sessionId: 'S2', date: '2026-01-10', durationHours: 1, savedMarked: true }
+  ];
+  const pending = new Map();
+
+  const marked = core.applyBulkPendingChanges(pending, events, 'mark_na', 'Vacation');
+  assert.equal(marked.get('S1')?.action, 'mark_na');
+  assert.equal(marked.get('S1')?.note, 'Vacation');
+  assert.equal(marked.get('S2')?.action, 'mark_na');
+
+  const unmarked = core.applyBulkPendingChanges(marked, [events[1]], 'unmark', '');
+  assert.equal(unmarked.get('S2')?.action, 'unmark');
+  assert.equal(unmarked.has('S1'), true);
+});
+
+test('getEnrollmentCapBalance reflects bulk pending preview state', () => {
+  const core = loadSessionCalendarCore();
+  const events = [
+    { sessionId: 'S1', date: '2026-01-05', durationHours: 1 },
+    { sessionId: 'S2', date: '2026-01-10', durationHours: 1 },
+    { sessionId: 'S3', date: '2026-01-20', durationHours: 1 }
+  ];
+  const pending = core.applyBulkPendingChanges(new Map(), [events[0]], 'mark_na', 'Away');
+  const balance = core.getEnrollmentCapBalance(events, pending, 2, 0);
+  assert.equal(balance.requiredNaCount, 1);
+  assert.equal(balance.naCount, 1);
+  assert.equal(balance.balanced, true);
+
+  const overMarked = core.applyBulkPendingChanges(new Map(), events, 'mark_na', 'Away');
+  const overBalance = core.getEnrollmentCapBalance(events, overMarked, 2, 0);
+  assert.equal(overBalance.naCount, 3);
+  assert.equal(overBalance.balanced, false);
+});
+
+test('getEnrollmentCapBalance ignores roster-only N/A when counting enrollment marks', () => {
+  const core = loadSessionCalendarCore();
+  const events = [
+    { sessionId: 'S1', date: '2026-01-05', durationHours: 1, savedRosterNa: true },
+    { sessionId: 'S2', date: '2026-01-10', durationHours: 1 },
+    { sessionId: 'S3', date: '2026-01-20', durationHours: 1 }
+  ];
+  const pending = core.applyBulkPendingChanges(new Map(), [events[1]], 'mark_na', 'Away');
+  const balance = core.getEnrollmentCapBalance(events, pending, 2, 0);
+  assert.equal(balance.requiredNaCount, 1);
+  assert.equal(balance.naCount, 1);
+  assert.equal(balance.balanced, true);
+  assert.equal(core.resolveEnrollmentNaState(events[0], pending), 'saved');
+  assert.equal(core.resolveEnrollmentNaStateForCap(events[0], pending), 'normal');
+});
+
+test('getEnrollmentCapBalance treats under-target enrollments as optional N/A marks', () => {
+  const core = loadSessionCalendarCore();
+  const events = Array.from({ length: 72 }, (_, idx) => ({
+    sessionId: `S${idx + 1}`,
+    date: `2026-01-${String((idx % 28) + 1).padStart(2, '0')}`,
+    durationHours: 3
+  }));
+  const pending = core.applyBulkPendingChanges(new Map(), [events[0], events[1]], 'mark_na', 'Away');
+  const balance = core.getEnrollmentCapBalance(events, pending, 96, 0);
+  assert.equal(balance.insufficientSessions, true);
+  assert.equal(balance.gapCount, 24);
+  assert.equal(balance.balanced, true);
+  assert.equal(balance.naCount, 2);
 });

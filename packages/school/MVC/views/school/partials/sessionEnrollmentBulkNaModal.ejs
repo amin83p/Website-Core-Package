@@ -1,0 +1,41 @@
+<div id="sessionEnrollmentBulkNaModal" class="session-enrollment-stage-overlay d-none" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="sessionEnrollmentBulkNaModalTitle">
+  <div class="session-enrollment-stage-backdrop" data-bulk-na-dismiss="1" aria-hidden="true"></div>
+  <div class="session-enrollment-stage-panel card shadow">
+    <div class="card-header py-2 d-flex align-items-start justify-content-between gap-2">
+      <div>
+        <h5 class="card-title mb-0" id="sessionEnrollmentBulkNaModalTitle">Bulk N/A by date range</h5>
+        <div class="small text-muted">Stage mark or unmark changes for sessions in a date range.</div>
+      </div>
+      <button type="button" class="btn-close" data-bulk-na-dismiss="1" aria-label="Close"></button>
+    </div>
+    <div class="card-body py-2">
+      <div class="mb-3">
+        <div class="session-stage-label small text-muted mb-1">Action</div>
+        <div class="btn-group btn-group-sm w-100" role="group" aria-label="Bulk N/A action" id="sessionEnrollmentBulkNaActionGroup">
+          <button type="button" class="btn btn-outline-primary active" data-bulk-na-action="mark_na">Mark N/A</button>
+          <button type="button" class="btn btn-outline-primary" data-bulk-na-action="unmark">Unmark N/A</button>
+        </div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label small mb-1" for="sessionEnrollmentBulkNaStart">From</label>
+          <input type="date" class="form-control form-control-sm" id="sessionEnrollmentBulkNaStart">
+        </div>
+        <div class="col-6">
+          <label class="form-label small mb-1" for="sessionEnrollmentBulkNaEnd">To</label>
+          <input type="date" class="form-control form-control-sm" id="sessionEnrollmentBulkNaEnd">
+        </div>
+      </div>
+      <div class="small mb-2" id="sessionEnrollmentBulkNaCount" role="status">0 session(s) will be affected.</div>
+      <div id="sessionEnrollmentBulkNaNoteWrap" class="mb-2">
+        <label class="form-label small mb-1" for="sessionEnrollmentBulkNaNote">Note (required for N/A)</label>
+        <input type="text" class="form-control form-control-sm" id="sessionEnrollmentBulkNaNote" placeholder="Why are these sessions N/A?">
+      </div>
+      <div class="small text-danger d-none" id="sessionEnrollmentBulkNaError" role="alert"></div>
+    </div>
+    <div class="card-footer py-2 d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-secondary btn-sm" data-bulk-na-dismiss="1">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn_sessionEnrollmentBulkNaStage" disabled>Stage changes</button>
+    </div>
+  </div>
+</div>

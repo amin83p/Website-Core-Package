@@ -11,9 +11,15 @@ const VIEW_PRESETS = Object.freeze([
   'day',
   'week',
   'twoWeeks',
+  'thirtyDays',
   'month',
   'twoMonths',
-  'threeMonths'
+  'threeMonths',
+  'fourMonths',
+  'fiveMonths',
+  'sixMonths',
+  'wholeCycle',
+  'custom'
 ]);
 
 function normalizeDateOnly(value) {
@@ -70,9 +76,58 @@ function addMonthsIso(dateStr, months) {
   return `${y}-${m}-${d}`;
 }
 
-function computeViewRange(preset = 'week', anchorDate = '') {
+function computeMonthSpanViewRange(anchor, monthSpan, presetKey) {
+  const start = startOfMonth(anchor);
+  const endAnchor = addMonthsIso(start, monthSpan - 1);
+  return { startDate: start, endDate: endOfMonth(endAnchor), preset: presetKey, anchorDate: anchor };
+}
+
+function computeCustomViewRange(startDate = '', endDate = '') {
+  const start = normalizeDateOnly(startDate);
+  const end = normalizeDateOnly(endDate) || start;
+  const anchor = start || parseAnchorDate('');
+  const safeEnd = end >= anchor ? end : anchor;
+  return { startDate: anchor, endDate: safeEnd, preset: 'custom', anchorDate: anchor };
+}
+
+function computeWholeCycleViewRange({ startDate = '', endDate = '' } = {}) {
+  const start = normalizeDateOnly(startDate) || parseAnchorDate('');
+  const end = normalizeDateOnly(endDate) || start;
+  const safeEnd = end >= start ? end : start;
+  return { startDate: start, endDate: safeEnd, preset: 'wholeCycle', anchorDate: start };
+}
+
+function clampViewRangeToBounds(viewRange = {}, { minDate = '', maxDate = '' } = {}) {
+  const min = normalizeDateOnly(minDate);
+  const max = normalizeDateOnly(maxDate);
+  let start = normalizeDateOnly(viewRange?.startDate);
+  let end = normalizeDateOnly(viewRange?.endDate);
+  if (!start || !end) return viewRange;
+  if (min && start < min) start = min;
+  if (max && end > max) end = max;
+  if (min && end < min) end = min;
+  if (max && start > max) start = max;
+  if (end < start) end = start;
+  return {
+    ...viewRange,
+    startDate: start,
+    endDate: end,
+    anchorDate: normalizeDateOnly(viewRange?.anchorDate) || start
+  };
+}
+
+function computeViewRange(preset = 'week', anchorDate = '', options = {}) {
   const anchor = parseAnchorDate(anchorDate);
   const key = String(preset || 'week').trim();
+  if (key === 'custom') {
+    return computeCustomViewRange(options.startDate || anchor, options.endDate || anchor);
+  }
+  if (key === 'wholeCycle') {
+    return computeWholeCycleViewRange({
+      startDate: options.startDate || anchor,
+      endDate: options.endDate || anchor
+    });
+  }
   if (key === 'day') {
     return { startDate: anchor, endDate: anchor, preset: key, anchorDate: anchor };
   }
@@ -84,19 +139,27 @@ function computeViewRange(preset = 'week', anchorDate = '') {
     const start = addDaysIso(anchor, -((new Date(`${anchor}T00:00:00`).getDay() + 6) % 7));
     return { startDate: start, endDate: addDaysIso(start, 13), preset: key, anchorDate: anchor };
   }
+  if (key === 'thirtyDays') {
+    return { startDate: anchor, endDate: addDaysIso(anchor, 30), preset: key, anchorDate: anchor };
+  }
   if (key === 'month') {
     const start = startOfMonth(anchor);
     return { startDate: start, endDate: endOfMonth(anchor), preset: key, anchorDate: anchor };
   }
   if (key === 'twoMonths') {
-    const start = startOfMonth(anchor);
-    const endAnchor = addMonthsIso(start, 1);
-    return { startDate: start, endDate: endOfMonth(endAnchor), preset: key, anchorDate: anchor };
+    return computeMonthSpanViewRange(anchor, 2, key);
   }
   if (key === 'threeMonths') {
-    const start = startOfMonth(anchor);
-    const endAnchor = addMonthsIso(start, 2);
-    return { startDate: start, endDate: endOfMonth(endAnchor), preset: key, anchorDate: anchor };
+    return computeMonthSpanViewRange(anchor, 3, key);
+  }
+  if (key === 'fourMonths') {
+    return computeMonthSpanViewRange(anchor, 4, key);
+  }
+  if (key === 'fiveMonths') {
+    return computeMonthSpanViewRange(anchor, 5, key);
+  }
+  if (key === 'sixMonths') {
+    return computeMonthSpanViewRange(anchor, 6, key);
   }
   return { startDate: anchor, endDate: addDaysIso(anchor, 6), preset: 'week', anchorDate: anchor };
 }
@@ -378,6 +441,9 @@ async function buildEnrollmentSessionPickerPayload({
 module.exports = {
   VIEW_PRESETS,
   computeViewRange,
+  computeCustomViewRange,
+  computeWholeCycleViewRange,
+  clampViewRangeToBounds,
   summarizeSelection,
   filterEventsByViewRange,
   buildEnrollmentSessionPickerPayload,

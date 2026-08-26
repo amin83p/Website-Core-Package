@@ -8,7 +8,7 @@
   const TIMELINE_SNAP_MINUTES = 30;
   const TIMELINE_SNAP_THRESHOLD_MINUTES = 10;
 
-  const VIEW_PRESETS = ['day', 'week', 'twoWeeks', 'month', 'twoMonths', 'threeMonths'];
+  const VIEW_PRESETS = ['day', 'week', 'twoWeeks', 'thirtyDays', 'month', 'twoMonths', 'threeMonths', 'fourMonths', 'fiveMonths', 'sixMonths', 'wholeCycle', 'custom'];
   const VIEW_MODES = ['singleDay', 'vertical', 'timeline', 'month'];
 
   function escapeHtml(value) {
@@ -198,9 +198,68 @@
     `;
   }
 
-  function computeViewRange(preset = 'week', anchorDate = '') {
+  function computeMonthSpanViewRange(anchor, monthSpan, presetKey) {
+    const start = startOfMonth(anchor);
+    const endAnchor = addMonthsIso(start, monthSpan - 1);
+    return { startDate: start, endDate: endOfMonth(endAnchor), preset: presetKey, anchorDate: anchor };
+  }
+
+  function computeCustomViewRange(startDate = '', endDate = '') {
+    const start = normalizeDateOnly(startDate);
+    const end = normalizeDateOnly(endDate) || start;
+    const anchor = start || parseAnchorDate('');
+    const safeEnd = end >= anchor ? end : anchor;
+    return { startDate: anchor, endDate: safeEnd, preset: 'custom', anchorDate: anchor };
+  }
+
+  function computeWholeCycleViewRange({ startDate = '', endDate = '' } = {}) {
+    const start = normalizeDateOnly(startDate) || parseAnchorDate('');
+    const end = normalizeDateOnly(endDate) || start;
+    const safeEnd = end >= start ? end : start;
+    return { startDate: start, endDate: safeEnd, preset: 'wholeCycle', anchorDate: start };
+  }
+
+  function clampViewRangeToBounds(viewRange = {}, { minDate = '', maxDate = '' } = {}) {
+    const min = normalizeDateOnly(minDate);
+    const max = normalizeDateOnly(maxDate);
+    let start = normalizeDateOnly(viewRange?.startDate);
+    let end = normalizeDateOnly(viewRange?.endDate);
+    if (!start || !end) return viewRange;
+    if (min && start < min) start = min;
+    if (max && end > max) end = max;
+    if (min && end < min) end = min;
+    if (max && start > max) start = max;
+    if (end < start) end = start;
+    return {
+      ...viewRange,
+      startDate: start,
+      endDate: end,
+      anchorDate: normalizeDateOnly(viewRange?.anchorDate) || start
+    };
+  }
+
+  function viewRangeDayCount(viewRange = {}) {
+    const start = normalizeDateOnly(viewRange?.startDate);
+    const end = normalizeDateOnly(viewRange?.endDate);
+    if (!start || !end) return 1;
+    const startMs = new Date(`${start}T00:00:00`).getTime();
+    const endMs = new Date(`${end}T00:00:00`).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) return 1;
+    return Math.max(1, Math.round((endMs - startMs) / 86400000) + 1);
+  }
+
+  function computeViewRange(preset = 'week', anchorDate = '', options = {}) {
     const anchor = parseAnchorDate(anchorDate);
     const key = String(preset || 'week').trim();
+    if (key === 'custom') {
+      return computeCustomViewRange(options.startDate || anchor, options.endDate || anchor);
+    }
+    if (key === 'wholeCycle') {
+      return computeWholeCycleViewRange({
+        startDate: options.startDate || anchor,
+        endDate: options.endDate || anchor
+      });
+    }
     if (key === 'day') {
       return { startDate: anchor, endDate: anchor, preset: key, anchorDate: anchor };
     }
@@ -220,22 +279,36 @@
       return { startDate: start, endDate: endOfMonth(anchor), preset: key, anchorDate: anchor };
     }
     if (key === 'twoMonths') {
-      const start = startOfMonth(anchor);
-      const endAnchor = addMonthsIso(start, 1);
-      return { startDate: start, endDate: endOfMonth(endAnchor), preset: key, anchorDate: anchor };
+      return computeMonthSpanViewRange(anchor, 2, key);
     }
     if (key === 'threeMonths') {
-      const start = startOfMonth(anchor);
-      const endAnchor = addMonthsIso(start, 2);
-      return { startDate: start, endDate: endOfMonth(endAnchor), preset: key, anchorDate: anchor };
+      return computeMonthSpanViewRange(anchor, 3, key);
+    }
+    if (key === 'fourMonths') {
+      return computeMonthSpanViewRange(anchor, 4, key);
+    }
+    if (key === 'fiveMonths') {
+      return computeMonthSpanViewRange(anchor, 5, key);
+    }
+    if (key === 'sixMonths') {
+      return computeMonthSpanViewRange(anchor, 6, key);
     }
     return { startDate: anchor, endDate: addDaysIso(anchor, 6), preset: 'week', anchorDate: anchor };
   }
 
-  function shiftViewRange(viewRange = {}, direction = 1) {
+  function shiftViewRange(viewRange = {}, direction = 1, options = {}) {
     const preset = String(viewRange?.preset || 'week').trim();
     const anchor = parseAnchorDate(viewRange?.anchorDate);
     const dir = Number(direction) >= 0 ? 1 : -1;
+    if (preset === 'custom' || preset === 'wholeCycle') {
+      const dayCount = viewRangeDayCount(viewRange);
+      const shiftedStart = addDaysIso(normalizeDateOnly(viewRange?.startDate) || anchor, dir * dayCount);
+      const shifted = computeViewRange(preset, shiftedStart, {
+        startDate: shiftedStart,
+        endDate: addDaysIso(shiftedStart, dayCount - 1)
+      });
+      return clampViewRangeToBounds(shifted, options);
+    }
     if (preset === 'day') return computeViewRange(preset, addDaysIso(anchor, dir));
     if (preset === 'week') return computeViewRange(preset, addDaysIso(anchor, dir * 7));
     if (preset === 'twoWeeks') return computeViewRange(preset, addDaysIso(anchor, dir * 14));
@@ -243,6 +316,9 @@
     if (preset === 'month') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir));
     if (preset === 'twoMonths') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir * 2));
     if (preset === 'threeMonths') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir * 3));
+    if (preset === 'fourMonths') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir * 4));
+    if (preset === 'fiveMonths') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir * 5));
+    if (preset === 'sixMonths') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir * 6));
     return computeViewRange('week', addDaysIso(anchor, dir * 7));
   }
 
@@ -1259,7 +1335,7 @@
       return;
     }
     const buildCard = options?.buildListDayCardHtml;
-    let html = '<div class="single-day-list">';
+    let html = '<div class="session-cal-vertical-scroll"><div class="single-day-list">';
     dates.forEach((dateStr) => {
       const dateObj = new Date(`${dateStr}T00:00:00`);
       const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -1294,7 +1370,7 @@
         `;
       });
     });
-    html += '</div>';
+    html += '</div></div>';
     container.innerHTML = html;
   }
 
@@ -1708,6 +1784,202 @@
     return null;
   }
 
+  function getPendingChange(pendingMap, sessionId) {
+    const id = String(sessionId || '').trim();
+    if (!id || !pendingMap) return null;
+    if (typeof pendingMap.get === 'function') return pendingMap.get(id) || null;
+    return pendingMap[id] || null;
+  }
+
+  function resolveEnrollmentNaState(ev = {}, pendingMap = null) {
+    const sessionId = String(ev?.sessionId || '').trim();
+    const pending = getPendingChange(pendingMap, sessionId);
+    if (pending?.action === 'mark_na') return 'pending';
+    if (pending?.action === 'unmark') return 'normal';
+    if (ev?.savedMarked || ev?.savedRosterNa) return 'saved';
+    return 'normal';
+  }
+
+  function resolveEnrollmentNaStateForCap(ev = {}, pendingMap = null) {
+    const sessionId = String(ev?.sessionId || '').trim();
+    const pending = getPendingChange(pendingMap, sessionId);
+    if (pending?.action === 'mark_na') return 'pending';
+    if (pending?.action === 'unmark') return 'normal';
+    if (ev?.savedMarked) return 'saved';
+    return 'normal';
+  }
+
+  function isDateWithinInclusiveRange(date, startDate, endDate) {
+    const d = normalizeDateOnly(date);
+    const start = normalizeDateOnly(startDate);
+    const end = normalizeDateOnly(endDate);
+    if (!d || !start || !end || start > end) return false;
+    return d >= start && d <= end;
+  }
+
+  function collectBulkNaSessions(events, pendingMap, startDate, endDate, action) {
+    const normalizedAction = String(action || '').trim().toLowerCase();
+    return (Array.isArray(events) ? events : []).filter((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      const date = normalizeDateOnly(ev?.date);
+      if (!sessionId || !date) return false;
+      if (!isDateWithinInclusiveRange(date, startDate, endDate)) return false;
+      const naState = resolveEnrollmentNaState(ev, pendingMap);
+      if (normalizedAction === 'mark_na') return naState === 'normal';
+      if (normalizedAction === 'unmark') return naState !== 'normal';
+      return false;
+    });
+  }
+
+  function clonePendingMap(pendingMap) {
+    const next = new Map();
+    if (!pendingMap) return next;
+    if (typeof pendingMap.forEach === 'function') {
+      pendingMap.forEach((value, key) => {
+        next.set(key, { ...value });
+      });
+      return next;
+    }
+    Object.keys(pendingMap).forEach((key) => {
+      next.set(key, { ...pendingMap[key] });
+    });
+    return next;
+  }
+
+  function applyBulkPendingChanges(pendingMap, sessions, action, note = '') {
+    const next = clonePendingMap(pendingMap);
+    const normalizedAction = String(action || '').trim().toLowerCase();
+    const normalizedNote = String(note || '').trim();
+    (Array.isArray(sessions) ? sessions : []).forEach((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      if (!sessionId) return;
+      if (normalizedAction === 'mark_na') {
+        next.set(sessionId, { action: 'mark_na', note: normalizedNote });
+        return;
+      }
+      if (normalizedAction === 'unmark') {
+        if (ev?.savedMarked || ev?.savedRosterNa) {
+          next.set(sessionId, { action: 'unmark', note: '' });
+        } else {
+          next.delete(sessionId);
+        }
+      }
+    });
+    return next;
+  }
+
+  function getEffectiveNaSessionIdsFromPending(events, pendingMap) {
+    const ids = new Set();
+    (Array.isArray(events) ? events : []).forEach((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      if (!sessionId) return;
+      if (resolveEnrollmentNaStateForCap(ev, pendingMap) !== 'normal') ids.add(sessionId);
+    });
+    return ids;
+  }
+
+  function roundEnrollmentHours(value) {
+    return Math.round((Number(value) || 0) * 100) / 100;
+  }
+
+  function getEnrollmentCapBalance(events, pendingMap, targetSessionCount = 0, targetHours = 0) {
+    const targetSessions = Math.max(0, Math.floor(Number(targetSessionCount) || 0));
+    const targetHrs = roundEnrollmentHours(targetHours);
+    const enforcedSessions = targetSessions > 0;
+    const enforcedHours = !enforcedSessions && targetHrs > 0;
+    const enforced = enforcedSessions || enforcedHours;
+    const rows = Array.isArray(events) ? events : [];
+    const availableCount = rows.length;
+    const availableHours = roundEnrollmentHours(rows.reduce((sum, row) => sum + (Number(row?.durationHours) || 0), 0));
+    const naIds = getEffectiveNaSessionIdsFromPending(rows, pendingMap);
+    const naCount = naIds.size;
+    let naHours = 0;
+    rows.forEach((row) => {
+      if (!naIds.has(String(row?.sessionId || '').trim())) return;
+      naHours = roundEnrollmentHours(naHours + (Number(row?.durationHours) || 0));
+    });
+    const expectedCount = Math.max(0, availableCount - naCount);
+    const expectedHours = roundEnrollmentHours(Math.max(0, availableHours - naHours));
+    const requiredNaCount = enforcedSessions && availableCount > targetSessions
+      ? availableCount - targetSessions
+      : 0;
+    const requiredNaHours = enforcedHours && availableHours > targetHrs
+      ? roundEnrollmentHours(availableHours - targetHrs)
+      : 0;
+    const insufficientSessions = enforcedSessions && availableCount < targetSessions;
+    const insufficientHours = enforcedHours && availableHours < targetHrs;
+    const gapCount = insufficientSessions ? Math.max(0, targetSessions - availableCount) : 0;
+    const gapHours = insufficientHours ? roundEnrollmentHours(Math.max(0, targetHrs - availableHours)) : 0;
+
+    let balanced = true;
+    let message = '';
+    let needLabel = '';
+    if (enforcedSessions) {
+      if (insufficientSessions) {
+        balanced = true;
+        if (gapCount > 0) {
+          message = `Only ${availableCount} session(s) scheduled; target is ${targetSessions} (${gapCount} gap). N/A marks are optional.`;
+          needLabel = `${gapCount} session gap`;
+        }
+      } else {
+        balanced = expectedCount === targetSessions;
+        if (!balanced) {
+          if (expectedCount > targetSessions) {
+            const need = expectedCount - targetSessions;
+            message = `Select exactly ${requiredNaCount} session(s) to mark N/A (currently ${naCount}).`;
+            needLabel = `Need ${need} more N/A`;
+          } else {
+            message = `Too many N/A marks: expected sessions would be ${expectedCount}, target is ${targetSessions}.`;
+            needLabel = `Unmark ${targetSessions - expectedCount} N/A`;
+          }
+        }
+      }
+    } else if (enforcedHours) {
+      if (insufficientHours) {
+        balanced = true;
+        if (gapHours > 0) {
+          message = `Only ${availableHours} hr scheduled; target is ${targetHrs} hr (${gapHours} hr gap). N/A marks are optional.`;
+          needLabel = `${gapHours} hr gap`;
+        }
+      } else {
+        balanced = expectedHours <= targetHrs && (requiredNaHours <= 0 || naHours >= requiredNaHours);
+        if (expectedHours > targetHrs) {
+          balanced = false;
+          const need = roundEnrollmentHours(expectedHours - targetHrs);
+          message = `Select sessions totaling at least ${requiredNaHours} hour(s) to mark N/A (selected ${naHours} hr).`;
+          needLabel = `Need ${need}h more N/A`;
+        } else if (requiredNaHours > 0 && naHours < requiredNaHours) {
+          balanced = false;
+          message = `Select sessions totaling at least ${requiredNaHours} hour(s) to mark N/A (selected ${naHours} hr).`;
+          needLabel = `Need ${roundEnrollmentHours(requiredNaHours - naHours)}h more N/A`;
+        }
+      }
+    }
+
+    return {
+      enforced,
+      enforcedSessions,
+      enforcedHours,
+      balanced,
+      message,
+      needLabel: balanced ? (needLabel || 'Balanced') : needLabel,
+      targetSessions,
+      targetHours: targetHrs,
+      availableCount,
+      availableHours,
+      expectedCount,
+      expectedHours,
+      naCount,
+      naHours,
+      requiredNaCount,
+      requiredNaHours,
+      insufficientSessions,
+      insufficientHours,
+      gapCount,
+      gapHours
+    };
+  }
+
   global.SessionCalendarCore = {
     TIMELINE_START_HOUR,
     TIMELINE_END_HOUR,
@@ -1729,6 +2001,10 @@
     addDaysIso,
     mondayOfWeek,
     computeViewRange,
+    computeCustomViewRange,
+    computeWholeCycleViewRange,
+    clampViewRangeToBounds,
+    viewRangeDayCount,
     shiftViewRange,
     suggestViewModeForPreset,
     isWeekRowPreset,
@@ -1776,6 +2052,14 @@
     buildVerticalDragContext,
     resolveVerticalDragContext,
     bindCalendarDragCreate,
-    clearDragOverlays
+    clearDragOverlays,
+    resolveEnrollmentNaState,
+    resolveEnrollmentNaStateForCap,
+    isDateWithinInclusiveRange,
+    collectBulkNaSessions,
+    clonePendingMap,
+    applyBulkPendingChanges,
+    getEffectiveNaSessionIdsFromPending,
+    getEnrollmentCapBalance
   };
 })(typeof window !== 'undefined' ? window : global);

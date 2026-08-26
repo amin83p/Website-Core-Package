@@ -485,3 +485,33 @@ test('applySessionMarks without target still allows N/A marks', async () => {
     marksService.__resetDependenciesForTest();
   }
 });
+
+test('applySessionMarks allows optional N/A marks when scheduled sessions are below target', async () => {
+  const mocks = buildMocks({
+    period: {
+      id: periodId,
+      classId,
+      personId,
+      studentId: 'STU_001',
+      status: 'active',
+      startDate: '2026-01-01',
+      endDate: '2026-03-31',
+      targetSessionCount: 96,
+      enrollmentSessionMarks: [],
+      plannedNotApplicableSessionIds: []
+    },
+    sessions: threeWindowSessions()
+  });
+  marksService.__setDependenciesForTest({ repositories: mocks.repositories });
+  try {
+    const updated = await marksService.applySessionMarks(
+      periodId,
+      [{ sessionId: 'S1', action: 'mark_na', note: 'optional absence' }],
+      { id: 'USR_1' }
+    );
+    assert.deepEqual(updated.plannedNotApplicableSessionIds, ['S1']);
+    assert.equal(updated.enrollmentSessionMarks.length, 1);
+  } finally {
+    marksService.__resetDependenciesForTest();
+  }
+});

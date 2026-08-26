@@ -48,6 +48,47 @@
   max-height: none;
 }
 
+.session-enrollment-viewmode-group .schedule-view-icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.session-enrollment-viewmode-group .schedule-view-icon-btn .bi {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.session-enrollment-viewmode-group .schedule-view-icon-btn.active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(29, 78, 216, 0.25);
+}
+
+.session-enrollment-viewbar-controls .schedule-view-icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.session-enrollment-viewbar-controls .schedule-view-icon-btn .bi {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+#sessionEnrollmentCalendarModal .modal-footer {
+  gap: 0.5rem;
+}
+
 .session-cal-week-stack {
   display: flex;
   flex-direction: column;
@@ -1004,22 +1045,6 @@
 #sessionEnrollmentCalendarSummary {
   font-size: 0.85rem;
   flex-shrink: 0;
-}
-
-.session-enrollment-legend-icon-btn {
-  width: 2.25rem;
-  height: 2.25rem;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.session-enrollment-legend-icon-btn .bi {
-  font-size: 1.05rem;
-  line-height: 1;
 }
 
 .session-enrollment-student-banner {

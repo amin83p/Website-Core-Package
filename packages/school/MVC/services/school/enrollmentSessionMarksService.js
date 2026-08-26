@@ -182,16 +182,45 @@ async function applySessionMarks(periodId, changes = [], requestingUser = null, 
   );
   const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(period.targetSessionCount);
   const targetHours = classEnrollmentSessionApplicabilityService.normalizeTargetHours(period.targetHours);
+  const normalizedChanges = (Array.isArray(changes) ? changes : [])
+    .filter((row) => row && typeof row === 'object');
+  const hasMarkNaChange = normalizedChanges.some((row) => String(row?.action || '').toLowerCase() === 'mark_na');
+  const onlyUnmarkChanges = normalizedChanges.length > 0
+    && normalizedChanges.every((row) => String(row?.action || '').toLowerCase() === 'unmark');
+  const requiredNaCount = targetSessionCount > 0 && countableSessions.length > targetSessionCount
+    ? countableSessions.length - targetSessionCount
+    : 0;
+  const availableHours = countableSessions.reduce(
+    (sum, row) => sum + classEnrollmentSessionApplicabilityService.resolveSessionDurationHours(row),
+    0
+  );
+  const requiredNaHours = targetHours > 0 && availableHours > targetHours
+    ? classEnrollmentSessionApplicabilityService.roundTargetHours(availableHours - targetHours)
+    : 0;
+  const isUnderSessionTarget = targetSessionCount > 0 && countableSessions.length < targetSessionCount;
+  const isUnderHourTarget = targetHours > 0 && availableHours < targetHours;
+  const allowOptionalNaMarks = hasMarkNaChange && (isUnderSessionTarget || isUnderHourTarget);
+  const allowIncrementalUnmarkCleanup = plannedIds.length > 0
+    && onlyUnmarkChanges
+    && ((targetSessionCount > 0 && requiredNaCount === 0) || (targetHours > 0 && requiredNaHours <= 0));
+
   if (targetSessionCount > 0 || targetHours > 0) {
-    const validation = rollingEnrollmentSessionAlignmentService.validatePlannedNaSelection({
-      countableSessions,
-      targetSessionCount,
-      targetHours,
-      plannedNaSessionIds: plannedIds,
-      sessionsById
-    });
-    if (!validation.valid) {
-      throw new Error(validation.message || 'Enrollment session marks do not match the target.');
+    if (hasMarkNaChange
+      && !allowOptionalNaMarks
+      && ((targetSessionCount > 0 && requiredNaCount === 0) || (targetHours > 0 && requiredNaHours <= 0))) {
+      throw new Error('No N/A session selection is required for this enrollment.');
+    }
+    if (!allowIncrementalUnmarkCleanup && !allowOptionalNaMarks) {
+      const validation = rollingEnrollmentSessionAlignmentService.validatePlannedNaSelection({
+        countableSessions,
+        targetSessionCount,
+        targetHours,
+        plannedNaSessionIds: plannedIds,
+        sessionsById
+      });
+      if (!validation.valid) {
+        throw new Error(validation.message || 'Enrollment session marks do not match the target.');
+      }
     }
   }
 
