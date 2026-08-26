@@ -98,6 +98,9 @@ test('resolveEnrollmentFunderLabel prefers known funder name and Self Fund defau
 test('rolling enrollment New modal uses Funder select and removes free-text funder fields', () => {
   const view = read('packages/school/MVC/views/school/class/rollingEnrollment.ejs');
   assert.match(view, /id="inp_funder"/);
+  assert.match(view, /id="inp_claimNumber"/);
+  assert.match(view, /id="edit_claimNumber"/);
+  assert.match(view, /id="grp_claimNumber"/);
   assert.match(view, /Self Fund/);
   assert.match(view, /id="edit_funder"/);
   assert.match(view, /id="reentry_funder"/);

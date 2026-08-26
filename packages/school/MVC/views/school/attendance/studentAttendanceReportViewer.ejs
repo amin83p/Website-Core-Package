@@ -1817,6 +1817,15 @@
         else window.hideLoading({ force: true });
     }
 
+    function formatSarFetchError(error, fallback = 'Export failed.') {
+        const message = String(error?.message || '').trim();
+        if (!message) return fallback;
+        if (message === 'Failed to fetch') {
+            return 'Could not reach the server to export. Confirm the app is running, then try again.';
+        }
+        return message;
+    }
+
     async function runSarExport(format, targets = []) {
         const filters = validateSarFilters();
         if (!filters) return;
@@ -1829,6 +1838,7 @@
         try {
             const response = await fetch('/school/attendances/report/api/export', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     Accept: 'application/octet-stream, application/json',
@@ -1846,10 +1856,13 @@
 
             if (!response.ok) {
                 const payload = await response.json().catch(() => null);
-                throw new Error(payload?.message || 'Export failed.');
+                throw new Error(payload?.message || `Export failed (${response.status}).`);
             }
 
             const blob = await response.blob();
+            if (!blob || blob.size === 0) {
+                throw new Error('Export returned an empty file.');
+            }
             const disposition = response.headers.get('Content-Disposition') || '';
             const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
             const fileName = fileNameMatch?.[1] || `student_attendance_export_${filters.startDate}_${filters.endDate}`;
@@ -1862,6 +1875,8 @@
             link.remove();
             URL.revokeObjectURL(url);
             showReportMessage({ icon: 'success', message: 'Export downloaded successfully.' });
+        } catch (error) {
+            showReportMessage({ icon: 'error', message: formatSarFetchError(error) });
         } finally {
             hideSarExportWaiting(loadingToken);
         }
@@ -1894,15 +1909,20 @@
             params.set('studentIds', filters.studentIds.join(','));
 
             const response = await fetch(`/school/attendances/report/api/export-plan?${params.toString()}`, {
+                credentials: 'same-origin',
                 headers: { 'X-AJAX-Request': 'true' }
             });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                throw new Error(payload?.message || `Could not load export options (${response.status}).`);
+            }
             const payload = await response.json();
             if (payload.status !== 'success') {
                 throw new Error(payload.message || 'Could not load export options.');
             }
             renderSarExportPlan(payload.plan || {});
         } catch (error) {
-            showReportMessage({ icon: 'error', message: error.message || 'Could not load export options.' });
+            showReportMessage({ icon: 'error', message: formatSarFetchError(error, 'Could not load export options.') });
         } finally {
             loadingEl?.classList.add('d-none');
             if (exportBtn && canGenerateReport) exportBtn.disabled = false;

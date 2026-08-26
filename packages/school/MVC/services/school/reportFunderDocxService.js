@@ -94,7 +94,7 @@ function suggestDocxKeyForFunder({ template = {}, funderKey = '' } = {}) {
   return first ? first.funderKey : '';
 }
 
-function resolveStudentFunderForReportPeriod({
+function pickEnrollmentPeriodForReportWindow({
   periodRows = [],
   studentId = '',
   personId = '',
@@ -112,9 +112,7 @@ function resolveStudentFunderForReportPeriod({
     return mappedPersonId && idsEqual(mappedPersonId, pid);
   });
 
-  if (!matches.length) {
-    return { funderKey: '', funderType: '', funderId: '' };
-  }
+  if (!matches.length) return null;
 
   const ws = normalizeDateOnly(windowStart) || '0000-01-01';
   const we = normalizeDateOnly(windowEnd) || '9999-12-31';
@@ -126,7 +124,25 @@ function resolveStudentFunderForReportPeriod({
   const pool = (overlapping.length ? overlapping : matches).slice().sort((a, b) => (
     String(b?.startDate || '').localeCompare(String(a?.startDate || ''))
   ));
-  const chosen = pool[0] || null;
+  return pool[0] || null;
+}
+
+function resolveStudentFunderForReportPeriod({
+  periodRows = [],
+  studentId = '',
+  personId = '',
+  studentToPersonMap = null,
+  windowStart = '',
+  windowEnd = ''
+} = {}) {
+  const chosen = pickEnrollmentPeriodForReportWindow({
+    periodRows,
+    studentId,
+    personId,
+    studentToPersonMap,
+    windowStart,
+    windowEnd
+  });
   if (!chosen) return { funderKey: '', funderType: '', funderId: '' };
 
   const normalized = rollingEnrollmentFunderService.normalizeEnrollmentFunderSelection({
@@ -138,6 +154,11 @@ function resolveStudentFunderForReportPeriod({
     funderType: normalized.funderType,
     funderId: normalized.funderId
   };
+}
+
+function resolveEnrollmentClaimNumberForReportPeriod(params = {}) {
+  const chosen = pickEnrollmentPeriodForReportWindow(params);
+  return String(chosen?.claimNumber || '').trim();
 }
 
 async function loadActiveFunderOptions(reqUser, orgId) {
@@ -256,6 +277,8 @@ module.exports = {
   resolveDocxTemplateForFunder,
   suggestDocxKeyForFunder,
   resolveStudentFunderForReportPeriod,
+  pickEnrollmentPeriodForReportWindow,
+  resolveEnrollmentClaimNumberForReportPeriod,
   loadActiveFunderOptions,
   buildFunderPickerOptions,
   buildExportDocxSuggestions

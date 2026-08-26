@@ -91,9 +91,13 @@ function visualField(id, label, type = 'subheader') {
 function buildOverallAttendanceFields() {
   const fields = [
     visualField('__section_overall_attendance_context', 'Overall Attendance', 'section'),
+    baseField({ id: 'student_first_name', label: 'Student First Name', prefillKey: 'student_first_name' }),
+    baseField({ id: 'student_last_name', label: 'Student Last Name', prefillKey: 'student_last_name' }),
+    baseField({ id: 'student_names_initial', label: 'Student Names Initial', prefillKey: 'student_names_initial' }),
     baseField({ id: 'student_full_name', label: 'Student Name', prefillKey: 'student_full_name' }),
     baseField({ id: 'student_date_of_birth', label: 'Student Date of Birth', prefillKey: 'student_date_of_birth' }),
     baseField({ id: 'class_name', label: 'Class Name', prefillKey: 'class_name' }),
+    baseField({ id: 'report_date', label: 'Report Date', prefillKey: 'report_date' }),
     baseField({ id: 'report_period_start_date', label: 'Period Start Date', prefillKey: 'report_period_start_date' }),
     baseField({ id: 'report_period_due_date', label: 'Period Due Date', prefillKey: 'report_period_due_date' }),
     visualField('__section_overall_attendance_rows', 'Attendance Rows', 'section')
@@ -118,7 +122,7 @@ function buildOverallAttendanceFields() {
         id: `attendance_note_${suffix}`,
         label: `Note ${dayNo}`,
         prefillKey: `attendance_note_${suffix}`,
-        helpText: 'Absent, No Class, Not in the report date range, Late, Late Excused, Left Early, or Left Early Excused as applicable.'
+        helpText: 'Present, Absent, Absent Camera Off, Late, Late Excused, Left Early, Left Early Excused, Late - Left Early (with excused variants), No Class, Not in the report date range, or Not Marked as applicable.'
       }),
       visualField(`__row_break_attendance_${suffix}`, `End Attendance Day ${dayNo}`, 'row_break')
     );
@@ -129,9 +133,24 @@ function buildOverallAttendanceFields() {
 
 function buildWcbPdfFieldMap() {
   const map = {
-    student_full_name: 'Students Surname First Name Initial',
+    student_last_name: 'Students Surname',
+    student_first_name: 'Students Firstname',
+    student_names_initial: 'Students Initial',
     student_date_of_birth: 'Date of Birth ddmmyyyy',
-    report_period_due_date: 'Report Date ddmmyyyy'
+    report_date: 'Report Date ddmmyyyy',
+    report_period_month_name: 'Month attendend',
+    student_address_line1: 'Address',
+    student_city: 'CityTown',
+    student_province: 'Province',
+    student_postal_code: 'Postal Code',
+    student_id_at_funder: 'WCB Claim Number',
+    teacher_name: 'ESL Institution   Contact  Name',
+    student_phone_1_area: 'Area Telephone Number 1',
+    student_phone_1_part_a: 'Telephone Number 1a',
+    student_phone_1_part_b: 'Telephone Number 1b',
+    student_phone_2_area: 'Area Telephone Number_2',
+    student_phone_2_part_a: 'Telephone Number_2 a',
+    student_phone_2_part_b: 'Telephone Number_2b'
   };
   for (let dayNo = 1; dayNo <= 31; dayNo += 1) {
     const suffix = String(dayNo).padStart(2, '0');
@@ -194,10 +213,7 @@ async function main() {
     pdfTemplatesByFunder: Array.isArray(existing?.pdfTemplatesByFunder) && existing.pdfTemplatesByFunder.length
       ? existing.pdfTemplatesByFunder
       : template.pdfTemplatesByFunder,
-    pdfFieldMap: {
-      ...(template.pdfFieldMap || {}),
-      ...(existing?.pdfFieldMap || {})
-    },
+    pdfFieldMap: template.pdfFieldMap || existing?.pdfFieldMap || {},
     audit: {
       ...(existing?.audit || {}),
       ...template.audit,

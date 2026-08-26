@@ -79,6 +79,7 @@ async function createExtensionEnrollment({
     funderType: String(source.funderType || '').trim(),
     funderId: String(source.funderId || '').trim(),
     authorizationRef: String(source.authorizationRef || '').trim(),
+    claimNumber: String(source.claimNumber || '').trim(),
     enrollmentKind: 'extension',
     extensionOfPeriodId: source.id,
     reasonStart: `Extension (${kind}): ${note}`,

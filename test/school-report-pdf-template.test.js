@@ -61,7 +61,7 @@ test('PDF renderer fills mapped report values into form fields', async () => {
     instance,
     placeholders: {
       '{{attendance_presence_01}}': 'Y',
-      '{{attendance_note_01}}': 'Late Excused; Left Early Excused',
+      '{{attendance_note_01}}': 'Late Excused - Left Early Excused',
       '{{student_full_name}}': 'Alice Test',
       '{{report_period_due_date}}': '2026-07-31'
     },
@@ -72,9 +72,9 @@ test('PDF renderer fills mapped report values into form fields', async () => {
   const filledDoc = await PDFDocument.load(rendered.buffer);
   const form = filledDoc.getForm();
   assert.equal(form.getTextField('YN1').getText(), 'Y');
-  assert.equal(form.getTextField('NOTES1').getText(), 'Late Excused; Left Early Excused');
+  assert.equal(form.getTextField('NOTES1').getText(), 'Late Excused - Left Early Excused');
   assert.equal(form.getTextField('Students Surname First Name Initial').getText(), 'Alice Test');
-  assert.equal(form.getTextField('Report Date ddmmyyyy').getText(), '31072026');
+  assert.equal(form.getTextField('Report Date ddmmyyyy').getText(), '31/07/2026');
   assert.deepEqual(rendered.missingFields, []);
 });
 
@@ -161,6 +161,12 @@ test('report template form renders PDF field map JSON without HTML entity encodi
   const source = fs.readFileSync(path.resolve(__dirname, '../packages/school/MVC/views/school/report/templateForm.ejs'), 'utf8');
   assert.match(source, /id="pdfFieldMapEditor"[\s\S]*<%- JSON\.stringify\(initialPdfFieldMap, null, 2\)\.replace\(\/<\//);
   assert.doesNotMatch(source, /id="pdfFieldMapEditor"[\s\S]*<%= JSON\.stringify\(initialPdfFieldMap/);
+});
+
+test('formatPdfFieldValue formats ISO dates as dd/mm/yyyy for ddmmyyyy field names', () => {
+  assert.equal(reportPdfRenderService.formatPdfFieldValue('Date of Birth ddmmyyyy', '1990-05-15'), '15/05/1990');
+  assert.equal(reportPdfRenderService.formatPdfFieldValue('Report Date dd/mm/yyyy', '2026-07-31'), '31/07/2026');
+  assert.equal(reportPdfRenderService.formatPdfFieldValue('plain_field', '2026-07-31'), '2026-07-31');
 });
 
 test('buildPdfFieldMapFromPayload accepts plain objects only', () => {

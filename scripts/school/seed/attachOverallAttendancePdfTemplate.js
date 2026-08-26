@@ -31,9 +31,9 @@ const { PDFDocument } = require('pdf-lib');
 const TEMPLATE_ID = process.env.SCHOOL_OVERALL_ATTENDANCE_TEMPLATE_ID || 'RPTTPL-2026-OVERALL-ATTENDANCE';
 const ORG_ID = process.env.SCHOOL_REPORT_TEMPLATE_ORG_ID || process.env.ACTIVE_ORG_ID || '900000';
 const SOURCE_PDF = process.env.SCHOOL_OVERALL_ATTENDANCE_PDF_SOURCE
-  || 'C:\\Users\\Amin\\Downloads\\WCB Student Attendance Report - Rodriguez De Souza Marcello.pdf';
+  || path.join(process.env.USERPROFILE || '', 'Downloads', 'Chrome Downloads', 'WCB Student Attendance Report.pdf');
 const DEST_FILE_NAME = process.env.SCHOOL_OVERALL_ATTENDANCE_PDF_FILE_NAME
-  || 'WCB_Student_Attendance_Report_Rodriguez_De_Souza_Marcello.pdf';
+  || 'WCB_Student_Attendance_Report.pdf';
 const SYSTEM_USER_ID = process.env.SCHOOL_REPORT_TEMPLATE_SEED_USER || 'ROOT_001';
 
 async function main() {

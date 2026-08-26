@@ -455,7 +455,7 @@ function normalizeEngineResultToFile(engineResult, format, fileStem) {
   throw error;
 }
 
-function resolveClassTemplateId(student, classId, policy, overallTemplate) {
+function resolveClassTemplateId(policy) {
   return clean(policy.reportTemplateId);
 }
 
@@ -476,7 +476,7 @@ async function exportClassTarget(student, classId, format, ctx, reqUser) {
     throw error;
   }
 
-  const templateId = resolveClassTemplateId(student, classId, policy, overallTemplate);
+  const templateId = resolveClassTemplateId(policy);
   studentAttendanceReportExportFormatService.assertSarExportFormatAllowed(
     policy,
     'report',

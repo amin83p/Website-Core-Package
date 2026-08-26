@@ -13,6 +13,7 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtils');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const gradebookWeightService = require('./gradebookWeightService');
+const reportFunderDocxService = require('./reportFunderDocxService');
 
 const STUDENT_PHONE_TYPES = Object.freeze(['mobile', 'home', 'work', 'other']);
 const STUDENT_PHONE_TYPE_LABELS = Object.freeze({
@@ -26,6 +27,7 @@ const STUDENT_PHONE_PREFILL_KEY_PATTERNS = Object.freeze([
   /^student_phone_\d+$/,
   /^student_phone_\d+_label$/,
   /^student_phone_\d+_type$/,
+  /^student_phone_\d+_(area|part_a|part_b)$/,
   /^student_phone_(mobile|home|work|other)$/,
   /^student_phone_(mobile|home|work|other)_label$/
 ]);
@@ -93,6 +95,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'report_period_start_date', label: 'Report Period Start Date', description: 'Start date for report period-based calculations.' }),
     Object.freeze({ key: 'report_period_due_date', label: 'Report Period Due Date', description: 'End date for report period-based calculations.' }),
     Object.freeze({ key: 'report_period_days', label: 'Report Period Days', description: 'Total number of days in report period (inclusive).' }),
+    Object.freeze({ key: 'report_period_month_name', label: 'Report Period Month Name', description: 'Month name for the report period start date (for WCB attendance forms).' }),
     Object.freeze({ key: 'session_id', label: 'Session ID', description: 'Selected session id (if available).' }),
     Object.freeze({ key: 'session_date', label: 'Session Date', description: 'Selected session date.' }),
     Object.freeze({ key: 'session_start_time', label: 'Session Start Time', description: 'Selected session start time.' }),
@@ -142,6 +145,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_middle_name', label: 'Student Middle Name', description: 'Student middle name from person profile.' }),
     Object.freeze({ key: 'student_last_name', label: 'Student Last Name', description: 'Student last name from person profile.' }),
     Object.freeze({ key: 'student_full_name', label: 'Student Full Name', description: 'Student full name from person profile.' }),
+    Object.freeze({ key: 'student_names_initial', label: 'Student Names Initial', description: 'Middle initial when present; otherwise first and last name initials (for WCB PDF Initial field).' }),
     Object.freeze({ key: 'student_full_name_initial', label: 'Student Full Name Initial', description: 'Initials from student full name (first letter of each word).' }),
     Object.freeze({ key: 'student_preferred_name', label: 'Student Preferred Name', description: 'Student preferred display name.' }),
     Object.freeze({ key: 'student_active', label: 'Student Active', description: 'Whether student person profile is active.' }),
@@ -166,7 +170,8 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_funder_organization', label: 'Student Funder Organization', description: 'Funder organization from student registry.' }),
     Object.freeze({ key: 'student_funder_account_id', label: 'Student Funder Account ID', description: 'Funder account id from student registry.' }),
     Object.freeze({ key: 'student_student_account_id', label: 'Student Account ID', description: 'Student account id from student registry.' }),
-    Object.freeze({ key: 'student_id_at_funder', label: 'Student ID At Funder', description: 'Student id at funder from student registry.' }),
+    Object.freeze({ key: 'student_id_at_funder', label: 'Student ID At Funder', description: 'Student id at funder from student registry, or enrollment claim number when set on the overlapping enrollment period.' }),
+    Object.freeze({ key: 'enrollment_claim_number', label: 'Enrollment Claim Number', description: 'Claim number from the class enrollment period overlapping the report window.' }),
     Object.freeze({ key: 'student_self_fund', label: 'Student Self Fund', description: 'Whether student is self funded.' }),
     Object.freeze({ key: 'student_funder_note', label: 'Student Funder Note', description: 'Funder note from student registry.' }),
     Object.freeze({ key: 'student_record_notes', label: 'Student Record Notes', description: 'Notes from student registry record.' }),
@@ -1331,6 +1336,43 @@ function buildNameInitials(fullName) {
   return matches ? matches.join('') : '';
 }
 
+function buildStudentNamesInitial(nameParts = {}) {
+  const middle = String(nameParts?.middle || '').trim();
+  if (middle) {
+    return middle.length === 1 ? middle.toUpperCase() : middle.charAt(0).toUpperCase();
+  }
+  const first = String(nameParts?.first || '').trim();
+  const last = String(nameParts?.last || '').trim();
+  return [first, last]
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+}
+
+function formatReportPeriodMonthName(dateStr) {
+  const raw = String(dateStr || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+  const parsed = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('en-US', { month: 'long' });
+}
+
+function splitNorthAmericanPhoneParts(number) {
+  const digits = String(number || '').replace(/\D/g, '');
+  let area = '';
+  let local = digits;
+  if (digits.length === 11 && digits[0] === '1') {
+    area = digits.slice(1, 4);
+    local = digits.slice(4);
+  } else if (digits.length === 10) {
+    area = digits.slice(0, 3);
+    local = digits.slice(3);
+  }
+  const partA = local.length >= 3 ? local.slice(0, 3) : local;
+  const partB = local.length > 3 ? local.slice(3) : '';
+  return { area, part_a: partA, part_b: partB };
+}
+
 function getPersonDisplayName(person, fallback = '') {
   const parts = getPersonNameParts(person);
   return firstNonEmpty(parts.preferred, parts.full, fallback);
@@ -1397,6 +1439,10 @@ function buildStudentPhonePrefillFields(person) {
     out[`student_phone_${slot}`] = phone ? phone.number : '';
     out[`student_phone_${slot}_label`] = phone ? phone.label : '';
     out[`student_phone_${slot}_type`] = phone ? phone.type : '';
+    const split = splitNorthAmericanPhoneParts(phone?.number || '');
+    out[`student_phone_${slot}_area`] = split.area;
+    out[`student_phone_${slot}_part_a`] = split.part_a;
+    out[`student_phone_${slot}_part_b`] = split.part_b;
   }
   STUDENT_PHONE_TYPES.forEach((type) => {
     const match = phones.find((row) => row.type === type);
@@ -1536,33 +1582,38 @@ function isDateWithinRange(dateKey, startDate, dueDate) {
     && dateTs <= dueTs;
 }
 
+function formatOverallAttendanceLateNote(timing = {}) {
+  return `Late${timing?.lateExcused ? ' Excused' : ''}`;
+}
+
+function formatOverallAttendanceLeftEarlyNote(timing = {}) {
+  return `Left Early${timing?.earlyLeaveExcused ? ' Excused' : ''}`;
+}
+
 function buildOverallAttendanceNote(status, timing = {}) {
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) return '';
+  const { ATTENDANCE_STATUS } = attendanceMatrixMetricsService;
+  if (status === ATTENDANCE_STATUS.NOT_APPLICABLE) return '';
   if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return 'Not Marked';
 
   const lateMinutes = Number(timing?.lateMinutes || 0);
   const earlyLeaveMinutes = Number(timing?.earlyLeaveMinutes || 0);
-  const noteParts = [];
-  if (lateMinutes > 0 || (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE && earlyLeaveMinutes <= 0)) {
-    noteParts.push(`Late${timing?.lateExcused ? ' Excused' : ''}`);
+  const hasLate = lateMinutes > 0 || (status === ATTENDANCE_STATUS.LATE && earlyLeaveMinutes <= 0);
+  const hasEarly = earlyLeaveMinutes > 0;
+
+  if (hasLate && hasEarly) {
+    return `${formatOverallAttendanceLateNote(timing)} - ${formatOverallAttendanceLeftEarlyNote(timing)}`;
   }
-  if (earlyLeaveMinutes > 0) {
-    noteParts.push(`Left Early${timing?.earlyLeaveExcused ? ' Excused' : ''}`);
-  }
-  if (noteParts.length) return noteParts.join('; ');
+  if (hasLate) return formatOverallAttendanceLateNote(timing);
+  if (hasEarly) return formatOverallAttendanceLeftEarlyNote(timing);
+
   if (timing?.absenceExcused && attendanceMatrixMetricsService.isAbsentLikeStatus(status)) {
-    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
-      return 'Absent Camera Off (Excused)';
-    }
+    if (status === ATTENDANCE_STATUS.ACF) return 'Absent Camera Off Excused';
     return 'Absent Excused';
   }
-  if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED) return 'Absent Excused';
-  if (
-    status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT ||
-    status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF
-  ) {
-    return 'Absent';
-  }
+  if (status === ATTENDANCE_STATUS.EXCUSED) return 'Absent Excused';
+  if (status === ATTENDANCE_STATUS.ACF) return 'Absent Camera Off';
+  if (status === ATTENDANCE_STATUS.ABSENT) return 'Absent';
+  if (status === ATTENDANCE_STATUS.PRESENT || status === ATTENDANCE_STATUS.LATE) return 'Present';
   return '';
 }
 
@@ -2004,7 +2055,7 @@ function getLatestClbLevelEntry(studentRecord = {}) {
 
 async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = '', reqUser }) {
   const classIdForQuery = toPublicId(assignment.classId);
-  const [classData, sessions, students, persons, organizations, examAssignmentsForClass] = await Promise.all([
+  const [classData, sessions, students, persons, organizations, examAssignmentsForClass, enrollmentPeriodRows] = await Promise.all([
     schoolDataService.getDataById('classes', assignment.classId, reqUser),
     schoolDataService.getClassSessions(assignment.classId, reqUser),
     schoolDataService.fetchAllData('students', {}, reqUser),
@@ -2016,6 +2067,9 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     dataServiceGlobal.fetchData('organizations', {}, reqUser),
     classIdForQuery
       ? schoolDataService.fetchData('examAssignments', { classId__eq: classIdForQuery }, reqUser)
+      : Promise.resolve([]),
+    classIdForQuery
+      ? schoolDataService.getClassEnrollmentPeriodsByClassId(classIdForQuery, reqUser)
       : Promise.resolve([])
   ]);
   const session = sessions.find((row) => idsEqual(row.sessionId, assignment.sessionId)) ||
@@ -2035,6 +2089,20 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   const studentPersonId = toPublicId(studentId);
   const studentRecord = students.find((row) => idsEqual(row?.personId, studentPersonId)) || null;
   const studentPerson = persons.find((row) => idsEqual(row?.id, studentPersonId)) || null;
+  const studentToPersonMap = new Map();
+  (Array.isArray(students) ? students : []).forEach((row) => {
+    const sid = toPublicId(row?.id);
+    const pid = toPublicId(row?.personId);
+    if (sid && pid) studentToPersonMap.set(sid, pid);
+  });
+  const enrollmentClaimNumber = reportFunderDocxService.resolveEnrollmentClaimNumberForReportPeriod({
+    periodRows: enrollmentPeriodRows,
+    studentId: studentRecord?.id,
+    personId: studentPersonId,
+    studentToPersonMap,
+    windowStart: reportPeriod.startDate,
+    windowEnd: reportPeriod.dueDate
+  });
   const reportOrgId = toPublicId(classData?.orgId || assignment?.orgId || studentRecord?.orgId);
   const statusMap = await sessionStatusPolicyService.getStatusMap(reportOrgId || reqUser?.activeOrgId || '', { includeInactive: true });
   const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(reportOrgId || reqUser?.activeOrgId || '');
@@ -2128,6 +2196,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     report_period_start_date: reportPeriod.startDate,
     report_period_due_date: reportPeriod.dueDate,
     report_period_days: getRangeDaysInclusive(reportPeriod.startDate, reportPeriod.dueDate),
+    report_period_month_name: formatReportPeriodMonthName(reportPeriod.startDate),
     session_id: String(session?.sessionId || assignment.sessionId || ''),
     session_date: String(session?.date || assignment.sessionDate || ''),
     session_start_time: String(session?.startTime || ''),
@@ -2141,6 +2210,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_middle_name: studentNameParts.middle,
     student_last_name: studentNameParts.last,
     student_full_name: studentNameParts.full,
+    student_names_initial: buildStudentNamesInitial(studentNameParts),
     student_full_name_initial: buildNameInitials(studentNameParts.full),
     student_preferred_name: studentNameParts.preferred,
     student_active: studentPerson ? studentPerson?.active === true : '',
@@ -2164,7 +2234,8 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_funder_organization: String(studentRecord?.funderOrganization || ''),
     student_funder_account_id: String(studentRecord?.funderAccountId || ''),
     student_student_account_id: String(studentRecord?.studentAccountId || ''),
-    student_id_at_funder: String(studentRecord?.studentIdAtFunder || ''),
+    enrollment_claim_number: enrollmentClaimNumber,
+    student_id_at_funder: enrollmentClaimNumber || String(studentRecord?.studentIdAtFunder || ''),
     student_self_fund: studentRecord ? studentRecord?.selfFund === true : '',
     student_funder_note: String(studentRecord?.funderNote || ''),
     student_record_notes: String(studentRecord?.notes || ''),

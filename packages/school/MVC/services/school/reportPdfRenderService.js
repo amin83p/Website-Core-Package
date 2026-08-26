@@ -27,11 +27,18 @@ function toPdfSafeValue(value) {
   }
 }
 
+function formatIsoDateToDdMmYyyy(text) {
+  const match = String(text || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
 function formatPdfFieldValue(pdfFieldName, value) {
   const text = toPdfSafeValue(value);
-  if (/ddmmyyyy/i.test(String(pdfFieldName || ''))) {
-    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (match) return `${match[3]}${match[2]}${match[1]}`;
+  const fieldName = String(pdfFieldName || '');
+  if (/dd\s*\/\s*mm\s*\/\s*yyyy|ddmmyyyy/i.test(fieldName)) {
+    const formatted = formatIsoDateToDdMmYyyy(text);
+    if (formatted) return formatted;
   }
   return text;
 }
@@ -214,7 +221,13 @@ async function renderReportInstancePdf({
   } catch (_) {
     // Some third-party PDFs cannot regenerate every appearance stream; saved values still remain in the form data.
   }
-  if (flatten) form.flatten();
+  if (flatten) {
+    try {
+      form.flatten();
+    } catch (_) {
+      // Flattening can fail on some AcroForm PDFs; field values are still embedded in the saved file.
+    }
+  }
 
   const titlePart = sanitizeFileNamePart(template.title || template.id || 'template');
   const instancePart = sanitizeFileNamePart(instance.id || 'instance');
@@ -258,6 +271,8 @@ async function zipReportInstancePdfFiles(files = []) {
 module.exports = {
   normalizeTokenKey,
   toPdfSafeValue,
+  formatIsoDateToDdMmYyyy,
+  formatPdfFieldValue,
   resolveTemplateFilePath,
   readPdfTemplateBuffer,
   inspectPdfTemplateFields,

@@ -1282,9 +1282,16 @@ async function exportStudentAttendanceReport(req, res) {
             }
         };
         const result = await studentAttendanceReportGenerationService.exportStudentAttendanceReportSelections(fauxReq);
+        const buffer = Buffer.isBuffer(result.buffer)
+            ? result.buffer
+            : Buffer.from(result.buffer || []);
+        if (!buffer.length) {
+            throw new Error('Export completed but no file data was produced.');
+        }
         res.setHeader('Content-Type', result.contentType || 'application/octet-stream');
         res.setHeader('Content-Disposition', `attachment; filename="${String(result.fileName || 'student_attendance_export').replace(/"/g, '')}"`);
-        return res.send(result.buffer);
+        res.setHeader('Content-Length', String(buffer.length));
+        return res.send(buffer);
     } catch (error) {
         return res.status(Number(error?.statusCode) || 400).json({
             status: 'error',

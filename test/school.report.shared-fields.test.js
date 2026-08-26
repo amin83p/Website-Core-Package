@@ -422,6 +422,7 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts unmarked se
           assert.equal(snapshot.student_attendance_span_late, 2);
           assert.equal(snapshot.student_attendance_span_absent, 1);
           assert.equal(snapshot.student_attendance_span_percent, 83.33);
+          assert.equal(snapshot.report_period_month_name, 'June');
           assert.equal(snapshot.attendance_day_01, 1);
           assert.equal(snapshot.attendance_presence_01, 'X');
           assert.equal(snapshot.attendance_note_01, 'Not in the report date range');
@@ -430,10 +431,10 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts unmarked se
           assert.equal(snapshot.attendance_note_15, 'Not in the report date range');
           assert.equal(snapshot.attendance_day_16, 16);
           assert.equal(snapshot.attendance_presence_16, 'Y');
-          assert.equal(snapshot.attendance_note_16, '');
+          assert.equal(snapshot.attendance_note_16, 'Present');
           assert.equal(snapshot.attendance_day_17, 17);
           assert.equal(snapshot.attendance_presence_17, 'Y');
-          assert.equal(snapshot.attendance_note_17, 'Late Excused; Left Early Excused');
+          assert.equal(snapshot.attendance_note_17, 'Late Excused - Left Early Excused');
           assert.equal(snapshot.attendance_day_18, 18);
           assert.equal(snapshot.attendance_presence_18, '*');
           assert.equal(snapshot.attendance_note_18, 'Not Marked');
@@ -1050,10 +1051,168 @@ test('buildPrefillSnapshot resolves student name prefill from top-level person n
 
             assert.equal(snapshot.student_first_name, 'Ada');
             assert.equal(snapshot.student_middle_name, 'M');
+            assert.equal(snapshot.student_names_initial, 'M');
             assert.equal(snapshot.student_last_name, 'Lovelace');
             assert.equal(snapshot.student_full_name, 'Ada Lovelace');
             assert.equal(snapshot.student_preferred_name, 'Addie');
             assert.equal(snapshot.teacher_name, 'Teacher Top');
+          });
+        });
+      });
+    });
+  });
+});
+
+test('buildPrefillSnapshot exposes enrollment claim number and falls back student_id_at_funder', async () => {
+  const assignment = {
+    id: 'ASN-CLAIM',
+    orgId: '900000',
+    classId: 'CLASS-CLAIM',
+    sessionId: 'SES-CLAIM',
+    sessionDate: '2026-06-18',
+    reportStartDate: '2026-06-18',
+    reportDueDate: '2026-06-18',
+    teacherIds: ['TEACHER-CLAIM']
+  };
+  const sessions = [{
+    sessionId: 'SES-CLAIM',
+    date: '2026-06-18',
+    status: 'completed',
+    startTime: '09:00',
+    endTime: '10:00',
+    roster: [{ personId: 'STUDENT-CLAIM', attendance: 'present' }]
+  }];
+  const enrollmentPeriods = [{
+    id: 'CEP-1',
+    classId: 'CLASS-CLAIM',
+    studentId: 'STU-CLAIM',
+    startDate: '2026-06-01',
+    endDate: '2026-06-30',
+    status: 'active',
+    claimNumber: 'ENROLL-CLAIM-42'
+  }];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-CLAIM') {
+        return { id: 'CLASS-CLAIM', orgId: '900000', title: 'Claim Class' };
+      }
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    getClassEnrollmentPeriodsByClassId: async () => enrollmentPeriods,
+    fetchData: async (entityType) => {
+      if (entityType === 'examAssignments') return [];
+      return [];
+    },
+    fetchAllData: async (entityType) => {
+      if (entityType === 'students') {
+        return [{
+          id: 'STU-CLAIM',
+          orgId: '900000',
+          personId: 'STUDENT-CLAIM',
+          studentIdAtFunder: 'REGISTRY-OLD'
+        }];
+      }
+      return [];
+    }
+  }, async () => {
+    await withPatched(schoolIdentityLookupService, {
+      listSchoolPersonRecords: async () => ({
+        allRows: [
+          { id: 'TEACHER-CLAIM', firstName: 'Teacher', lastName: 'Claim' },
+          { id: 'STUDENT-CLAIM', firstName: 'Claim', lastName: 'Student' }
+        ]
+      })
+    }, async () => {
+      await withPatched(dataServiceGlobal, {
+        fetchData: async (entityType) => (entityType === 'organizations' ? [{ id: '900000', name: 'Org' }] : [])
+      }, async () => {
+        await withPatched(sessionStatusPolicyService, {
+          getStatusMap: async () => new Map()
+        }, async () => {
+          await withPatched(attendanceMatrixPolicyModel, {
+            getPolicyForOrg: async () => ({})
+          }, async () => {
+            const snapshot = await reportService.buildPrefillSnapshot({
+              assignment,
+              teacherId: 'TEACHER-CLAIM',
+              studentId: 'STUDENT-CLAIM',
+              reqUser: { id: 'USER-1', activeOrgId: '900000' }
+            });
+
+            assert.equal(snapshot.enrollment_claim_number, 'ENROLL-CLAIM-42');
+            assert.equal(snapshot.student_id_at_funder, 'ENROLL-CLAIM-42');
+
+            const catalog = reportService.getPrefillCatalog();
+            const studentKeys = catalog.studentOnly.map((row) => row.key);
+            assert.ok(studentKeys.includes('enrollment_claim_number'));
+          });
+        });
+      });
+    });
+  });
+});
+
+test('buildPrefillSnapshot uses registry student_id_at_funder when enrollment claim is empty', async () => {
+  const assignment = {
+    id: 'ASN-CLAIM-FALLBACK',
+    orgId: '900000',
+    classId: 'CLASS-CLAIM-FB',
+    sessionId: 'SES-CLAIM-FB',
+    sessionDate: '2026-06-18',
+    reportStartDate: '2026-06-18',
+    reportDueDate: '2026-06-18',
+    teacherIds: ['TEACHER-CLAIM']
+  };
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-CLAIM-FB') {
+        return { id: 'CLASS-CLAIM-FB', orgId: '900000', title: 'Claim FB Class' };
+      }
+      return null;
+    },
+    getClassSessions: async () => [],
+    getClassEnrollmentPeriodsByClassId: async () => [],
+    fetchData: async (entityType) => {
+      if (entityType === 'examAssignments') return [];
+      return [];
+    },
+    fetchAllData: async (entityType) => {
+      if (entityType === 'students') {
+        return [{
+          id: 'STU-CLAIM-FB',
+          orgId: '900000',
+          personId: 'STUDENT-CLAIM-FB',
+          studentIdAtFunder: 'REGISTRY-ONLY'
+        }];
+      }
+      return [];
+    }
+  }, async () => {
+    await withPatched(schoolIdentityLookupService, {
+      listSchoolPersonRecords: async () => ({
+        allRows: [{ id: 'STUDENT-CLAIM-FB', firstName: 'Fb', lastName: 'Student' }]
+      })
+    }, async () => {
+      await withPatched(dataServiceGlobal, {
+        fetchData: async (entityType) => (entityType === 'organizations' ? [{ id: '900000', name: 'Org' }] : [])
+      }, async () => {
+        await withPatched(sessionStatusPolicyService, {
+          getStatusMap: async () => new Map()
+        }, async () => {
+          await withPatched(attendanceMatrixPolicyModel, {
+            getPolicyForOrg: async () => ({})
+          }, async () => {
+            const snapshot = await reportService.buildPrefillSnapshot({
+              assignment,
+              studentId: 'STUDENT-CLAIM-FB',
+              reqUser: { id: 'USER-1', activeOrgId: '900000' }
+            });
+
+            assert.equal(snapshot.enrollment_claim_number, '');
+            assert.equal(snapshot.student_id_at_funder, 'REGISTRY-ONLY');
           });
         });
       });

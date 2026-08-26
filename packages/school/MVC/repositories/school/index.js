@@ -1454,6 +1454,7 @@ const schoolRepositories = {
       'funderType',
       'funderId',
       'authorizationRef',
+      'claimNumber',
       'reasonStart',
       'reasonEnd'
     ]

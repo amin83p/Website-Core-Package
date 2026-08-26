@@ -2532,7 +2532,7 @@ function buildClassEnrollmentCreatePayloadFromRequest(classData, req) {
     status: String(req.body?.status || '').trim(),
     funderType: funder.funderType,
     funderId: funder.funderId,
-    authorizationRef: '',
+    claimNumber: String(req.body?.claimNumber || '').trim(),
     reasonStart: String(req.body?.reasonStart || '').trim(),
     reasonEnd: String(req.body?.reasonEnd || '').trim(),
     targetSessionCount,
@@ -3527,7 +3527,9 @@ async function saveClassEnrollmentDraft(req, res) {
       status: nextStatus,
       funderType: funderSelection.funderType,
       funderId: funderSelection.funderId,
-      authorizationRef: '',
+      ...(req.body?.claimNumber !== undefined
+        ? { claimNumber: String(req.body.claimNumber || '').trim() }
+        : {}),
       reasonStart: String(req.body?.reasonStart || period?.reasonStart || '').trim(),
       targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || period?.targetSessionCount),
       targetHours: classEnrollmentSessionApplicabilityService.normalizeTargetHours(req.body?.targetHours || period?.targetHours),
@@ -3951,7 +3953,9 @@ async function approveClassEnrollmentDraft(req, res) {
       termId: termIdToStore,
       funderType: funderSelection.funderType,
       funderId: funderSelection.funderId,
-      authorizationRef: '',
+      ...(req.body?.claimNumber !== undefined
+        ? { claimNumber: String(req.body.claimNumber || '').trim() }
+        : {}),
       reasonStart: String(req.body?.reasonStart || period?.reasonStart || '').trim(),
       targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || period?.targetSessionCount),
       targetHours: classEnrollmentSessionApplicabilityService.normalizeTargetHours(req.body?.targetHours || period?.targetHours),
@@ -4156,7 +4160,9 @@ async function editClassEnrollmentPeriod(req, res) {
       status,
       funderType: funderSelection.funderType,
       funderId: funderSelection.funderId,
-      authorizationRef: '',
+      claimNumber: req.body?.claimNumber !== undefined
+        ? String(req.body.claimNumber || '').trim()
+        : String(periodRow?.claimNumber || '').trim(),
       reasonStart: String(req.body?.reasonStart || periodRow?.reasonStart || '').trim(),
       targetSessionCount,
       targetHours,
@@ -4506,7 +4512,7 @@ async function reopenClassEnrollmentPeriod(req, res) {
       status: 'draft',
       funderType: funderSelection.funderType,
       funderId: funderSelection.funderId,
-      authorizationRef: '',
+      claimNumber: String(req.body?.claimNumber || '').trim(),
       reasonStart: String(req.body?.reasonStart || '').trim(),
       reasonEnd: String(req.body?.reasonEnd || '').trim(),
       closeReason: String(req.body?.closeReason || '').trim(),

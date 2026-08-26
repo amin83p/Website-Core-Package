@@ -741,6 +741,10 @@
                 <option value="one_on_one">1 On 1</option>
               </select>
             </div>
+            <div class="col-md-2">
+              <label class="form-label" for="inp_claimNumber">Claim Number</label>
+              <input type="text" id="inp_claimNumber" class="form-control" maxlength="120" placeholder="Optional">
+            </div>
             <div class="col-md-5">
               <label class="form-label">Reason Start</label>
               <textarea id="inp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
@@ -1003,7 +1007,11 @@
                 <option value="one_on_one">1 On 1</option>
               </select>
             </div>
-            <div class="col-md-5">
+            <div class="col-md-2">
+              <label class="form-label" for="grp_claimNumber">Claim Number</label>
+              <input type="text" id="grp_claimNumber" class="form-control" maxlength="120" placeholder="Optional">
+            </div>
+            <div class="col-md-3">
               <label class="form-label" for="grp_reasonStart">Reason Start</label>
               <textarea id="grp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
             </div>
@@ -1680,6 +1688,10 @@
               <% }); %>
             </select>
             <div class="form-text compact-help" id="edit_funder_help">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="edit_claimNumber">Claim Number</label>
+            <input type="text" id="edit_claimNumber" class="form-control" maxlength="120" placeholder="Optional">
           </div>
           <div class="col-12">
             <label class="form-label">Reason Start</label>
@@ -2783,6 +2795,7 @@
       status: String(entry.status || 'active').trim(),
       funderType: String(entry.funderType || 'self').trim(),
       funderId: String(entry.funderId || 'self').trim(),
+      claimNumber: String(entry.claimNumber || '').trim(),
       reasonStart: String(entry.reasonStart || '').trim(),
       targetSessionCount: String(entry.targetSessionCount || '').trim(),
       targetHours: String(entry.targetHours || '').trim(),
@@ -3743,6 +3756,7 @@
       status: String(entry.status || 'active').trim(),
       funderType: String(entry.funderType || 'self').trim(),
       funderId: String(entry.funderId || 'self').trim(),
+      claimNumber: String(entry.claimNumber || '').trim(),
       reasonStart: String(entry.reasonStart || '').trim(),
       targetSessionCount: String(entry.targetSessionCount || '').trim(),
       targetHours: String(entry.targetHours || '').trim(),
@@ -4036,6 +4050,7 @@
     if (qs('grp_targetHours')) qs('grp_targetHours').value = String(entry.targetHours || '');
     if (qs('grp_status')) qs('grp_status').value = String(entry.status || 'active');
     if (qs('grp_reasonStart')) qs('grp_reasonStart').value = String(entry.reasonStart || '');
+    if (qs('grp_claimNumber')) qs('grp_claimNumber').value = String(entry.claimNumber || '');
     setSessionCapacitySelectValue('grp_sessionCapacityType', entry.sessionCapacityType);
     if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = entry.autoResolveSubjects === true;
     setFunderSelectValue('grp_funder', {
@@ -4055,6 +4070,7 @@
       status: String(qs('grp_status')?.value || 'active').trim(),
       funderType: funder.funderType,
       funderId: funder.funderId,
+      claimNumber: String(qs('grp_claimNumber')?.value || '').trim(),
       reasonStart: String(qs('grp_reasonStart')?.value || '').trim(),
       targetSessionCount: hasTargetSessionCount('grp_targetSessionCount')
         ? String(qs('grp_targetSessionCount')?.value || '').trim()
@@ -4108,6 +4124,7 @@
     if (qs('grp_targetHours')) qs('grp_targetHours').value = '';
     if (qs('grp_status')) qs('grp_status').value = 'active';
     if (qs('grp_reasonStart')) qs('grp_reasonStart').value = '';
+    if (qs('grp_claimNumber')) qs('grp_claimNumber').value = '';
     if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = false;
     setFunderSelectValue('grp_funder', { funderId: 'self', funderType: 'self' });
     setSessionCapacitySelectValue('grp_sessionCapacityType', 'group');
@@ -4139,6 +4156,7 @@
       status: settings.status,
       funderType: settings.funderType,
       funderId: settings.funderId,
+      claimNumber: settings.claimNumber,
       reasonStart: settings.reasonStart,
       sessionCountPolicy: 'all_non_na',
       sessionCapacityType: normalizeSessionCapacityTypeValue(settings.sessionCapacityType)
@@ -4916,7 +4934,7 @@
       status: String(qs('inp_status')?.value || 'active').trim(),
       funderType: funder.funderType,
       funderId: funder.funderId,
-      authorizationRef: '',
+      claimNumber: String(qs('inp_claimNumber')?.value || '').trim(),
       reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
       sessionCountPolicy: 'all_non_na',
       sessionCapacityType: readSessionCapacityTypeFromSelect('inp_sessionCapacityType'),
@@ -4961,6 +4979,7 @@
       status: base.status,
       funderType: base.funderType,
       funderId: base.funderId,
+      claimNumber: base.claimNumber,
       reasonStart: base.reasonStart,
       sessionCountPolicy: base.sessionCountPolicy,
       sessionCapacityType: base.sessionCapacityType,
@@ -6675,7 +6694,7 @@
       status: String(qs('charge_status')?.value || 'draft').trim().toLowerCase() || 'draft',
       funderType: funderType === 'self' ? 'self' : 'funder',
       funderId: funderType === 'self' || !funderId ? 'self' : funderId,
-      authorizationRef: '',
+      claimNumber: String(pendingEnrollmentPayload?.claimNumber || qs('inp_claimNumber')?.value || '').trim(),
       reasonStart: String(qs('inp_reasonStart')?.value || pendingEnrollmentPayload?.reasonStart || '').trim(),
       targetSessionCount: String(pendingEnrollmentPayload?.targetSessionCount || '').trim(),
       targetHours: String(pendingEnrollmentPayload?.targetHours || '').trim(),
@@ -7028,7 +7047,7 @@
         status: draftContext.status || 'draft',
         funderType: draftContext.funderType,
         funderId: draftContext.funderId,
-        authorizationRef: draftContext.authorizationRef,
+        claimNumber: draftContext.claimNumber,
         reasonStart: draftContext.reasonStart,
         targetSessionCount: draftContext.targetSessionCount,
         targetHours: draftContext.targetHours,
@@ -7075,7 +7094,7 @@
         status: draftContext.status,
         funderType: draftContext.funderType,
         funderId: draftContext.funderId,
-        authorizationRef: draftContext.authorizationRef,
+        claimNumber: draftContext.claimNumber,
         reasonStart: draftContext.reasonStart,
         targetSessionCount: draftContext.targetSessionCount,
         targetHours: draftContext.targetHours,
@@ -7120,7 +7139,7 @@
           : 'active',
         funderType: draftContext.funderType,
         funderId: draftContext.funderId,
-        authorizationRef: draftContext.authorizationRef,
+        claimNumber: draftContext.claimNumber,
         reasonStart: draftContext.reasonStart,
         targetSessionCount: draftContext.targetSessionCount,
         targetHours: draftContext.targetHours,
@@ -7172,7 +7191,7 @@
       status: String(row?.status || 'draft').trim().toLowerCase() || 'draft',
       funderType: funderType === 'self' ? 'self' : 'funder',
       funderId: funderType === 'self' || !funderId ? 'self' : funderId,
-      authorizationRef: '',
+      claimNumber: String(row?.claimNumber || '').trim(),
       reasonStart: String(row?.reasonStart || '').trim(),
       targetSessionCount: String(row?.targetSessionCount || '').trim(),
       sessionCountPolicy: String(row?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na'
@@ -7688,6 +7707,7 @@
     setFunderSelectValue('edit_funder', row);
     setEditFunderLocked(enrollmentHasAttachedTransactions(row));
     qs('edit_reasonStart').value = String(row?.reasonStart || '').trim();
+    if (qs('edit_claimNumber')) qs('edit_claimNumber').value = String(row?.claimNumber || '').trim();
     if (qs('edit_targetSessionCount')) qs('edit_targetSessionCount').value = row?.targetSessionCount ? String(row.targetSessionCount) : '';
     if (qs('edit_targetHours')) qs('edit_targetHours').value = row?.targetHours ? String(row.targetHours) : '';
     applyEnrollmentCapUi();
@@ -7710,7 +7730,6 @@
         status: 'draft',
         funderType: funder.funderType,
         funderId: funder.funderId,
-        authorizationRef: '',
         reasonStart: String(qs('reentry_reasonStart')?.value || '').trim()
       });
       if (!result) return;
@@ -7840,7 +7859,7 @@
         status: String(qs('edit_status')?.value || 'active').trim(),
         funderType: funder.funderType,
         funderId: funder.funderId,
-        authorizationRef: '',
+        claimNumber: String(qs('edit_claimNumber')?.value || '').trim(),
         reasonStart: String(qs('edit_reasonStart')?.value || '').trim(),
         sessionCountPolicy: 'all_non_na',
         sessionCapacityType: readSessionCapacityTypeFromSelect('edit_sessionCapacityType')
