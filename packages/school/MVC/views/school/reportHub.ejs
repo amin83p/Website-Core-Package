@@ -2422,6 +2422,21 @@
     return normalized.replace(/_/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
   }
 
+  function normalizeSessionStatusClassCapacity(value) {
+    const raw = String(value || 'both').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    if (raw === 'group') return 'group';
+    if (raw === 'one_on_one') return 'one_on_one';
+    return 'both';
+  }
+
+  function sessionStatusMatchesCapacityMode(meta, capacityMode) {
+    const mode = String(capacityMode || '').trim().toLowerCase();
+    if (!mode) return true;
+    const cap = normalizeSessionStatusClassCapacity(meta && meta.classCapacity);
+    if (cap === 'both') return true;
+    return cap === mode;
+  }
+
   function normalizeHubHexColor(value, fallback) {
     const raw = String(value || '').trim();
     const normalized = raw.startsWith('#') ? raw : '#' + raw;
@@ -3251,7 +3266,9 @@
     modal.querySelector('#hubEditSessionContext').innerHTML = '<strong>' + escapeHtml(row.className || row.classId || 'Class') + '</strong><div class="text-muted font-monospace">' + escapeHtml(row.sessionId || '') + '</div>';
     const statusSelect = modal.querySelector('#hubEditSessionStatus');
     const selectedStatus = normalizeSessionStatusCode(row.status || '');
-    const pickerMeta = (Array.isArray(hubSessionSelectableStatusMeta) ? hubSessionSelectableStatusMeta : hubSessionStatusMeta).slice();
+    const capacityMode = String(row.capacityMode || (row.isOneOnOne ? 'one_on_one' : 'group')).trim().toLowerCase();
+    let pickerMeta = (Array.isArray(hubSessionSelectableStatusMeta) ? hubSessionSelectableStatusMeta : hubSessionStatusMeta).slice();
+    pickerMeta = pickerMeta.filter(function (meta) { return sessionStatusMatchesCapacityMode(meta, capacityMode); });
     if (selectedStatus && !pickerMeta.some(function (meta) { return normalizeSessionStatusCode(meta && meta.code) === selectedStatus; })) {
       const lockedMeta = (Array.isArray(hubSessionStatusMeta) ? hubSessionStatusMeta : []).find(function (meta) {
         return normalizeSessionStatusCode(meta && meta.code) === selectedStatus;

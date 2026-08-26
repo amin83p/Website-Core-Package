@@ -47,6 +47,16 @@
               </select>
               <div class="form-text small">Users: teachers and session editors. Admins: school session administrators only.</div>
             </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="classCapacity">Class Capacity</label>
+              <select name="classCapacity" id="classCapacity" class="form-select size-md" required>
+                <% const capacityValue = String(item.classCapacity || 'both').trim().toLowerCase().replace(/[\s-]+/g, '_'); %>
+                <option value="both" <%= capacityValue !== 'group' && capacityValue !== 'one_on_one' ? 'selected' : '' %>>Both</option>
+                <option value="group" <%= capacityValue === 'group' ? 'selected' : '' %>>Group</option>
+                <option value="one_on_one" <%= capacityValue === 'one_on_one' ? 'selected' : '' %>>1 On 1</option>
+              </select>
+              <div class="form-text small">Controls which session types can select this status.</div>
+            </div>
             <div class="col-12">
               <label class="form-label fw-bold">Description</label>
               <textarea name="description" class="form-control" rows="2" placeholder="Explain the workflow meaning of this status..."><%= item.description || '' %></textarea>
@@ -303,6 +313,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setInputValue('input[name="label"]', source.label || '');
     setInputValue('input[name="sortOrder"]', Number(source.sortOrder || 0));
     setInputValue('#accessType', String(source.accessType || 'users').toLowerCase() === 'admins' ? 'admins' : 'users');
+    setInputValue('#classCapacity', (() => {
+      const raw = String(source.classCapacity || 'both').trim().toLowerCase().replace(/[\s-]+/g, '_');
+      if (raw === 'group') return 'group';
+      if (raw === 'one_on_one') return 'one_on_one';
+      return 'both';
+    })());
     setInputValue('textarea[name="description"]', source.description || '');
     setInputValue('input[name="timesheetFormula"]', source.timesheetFormula || 'duration');
     setCheckboxValue('#isFinal', source.isFinal, false);

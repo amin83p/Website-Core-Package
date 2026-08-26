@@ -7,6 +7,10 @@ const viewSource = fs.readFileSync(
   path.join(__dirname, '../MVC/views/school/class/rollingEnrollment.ejs'),
   'utf8'
 );
+const belowHeadingSource = fs.readFileSync(
+  path.join(__dirname, '../MVC/views/school/class/rollingEnrollmentBelowHeading.ejs'),
+  'utf8'
+);
 const routesSource = fs.readFileSync(
   path.join(__dirname, '../MVC/routes/classRoutes.js'),
   'utf8'
@@ -14,6 +18,12 @@ const routesSource = fs.readFileSync(
 
 test('rolling enrollment view includes group enrollment entry and modals', () => {
   assert.match(viewSource, /id="btn_openGroupEnrollmentModal"/);
+  assert.match(belowHeadingSource, /id="btn_openRollingClassPicker"/);
+  assert.match(viewSource, /function openRollingClassPicker\(/);
+  assert.match(viewSource, /GenericPickerPresets\.class\(/);
+  assert.match(viewSource, /itemFilter:/);
+  assert.match(viewSource, /registrationMode/);
+  assert.match(viewSource, /rolling-enrollment/);
   assert.match(viewSource, /Group Enrollment/);
   assert.match(viewSource, /id="groupEnrollmentModal"/);
   assert.match(viewSource, /id="groupEnrollmentResultsModal"/);
@@ -136,4 +146,18 @@ test('rolling enrollment view includes attendance report menu action and modals'
 test('rolling enrollment routes expose attendance report endpoint', () => {
   assert.match(routesSource, /attendance-report/);
   assert.match(routesSource, /getEnrollmentPeriodAttendanceReport/);
+});
+
+test('rolling enrollment modals include session capacity type fields and payloads', () => {
+  assert.match(viewSource, /id="inp_sessionCapacityType"/);
+  assert.match(viewSource, /id="grp_sessionCapacityType"/);
+  assert.match(viewSource, /id="edit_sessionCapacityType"/);
+  assert.match(viewSource, /sessionCapacityType/);
+  assert.match(viewSource, /function formatSessionCapacityTypeLabel\(/);
+  assert.match(viewSource, /readSessionCapacityTypeFromSelect\('inp_sessionCapacityType'\)/);
+  assert.match(viewSource, /readSessionCapacityTypeFromSelect\('grp_sessionCapacityType'\)/);
+  assert.match(viewSource, /readSessionCapacityTypeFromSelect\('edit_sessionCapacityType'\)/);
+  assert.match(viewSource, /setSessionCapacitySelectValue\('edit_sessionCapacityType'/);
+  assert.match(viewSource, /function submitEditPeriod\(/);
+  assert.match(viewSource, /data-column="sessionCapacity"/);
 });

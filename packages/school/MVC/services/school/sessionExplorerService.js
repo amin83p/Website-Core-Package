@@ -6,10 +6,11 @@ const schoolRecordAccessService = require('./schoolRecordAccessService');
 const teacherIdentityService = require('./teacherIdentityService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const makeupSessionAllocationService = require('./makeupSessionAllocationService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 
-const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function normalizeId(value) {
   return String(value || '').trim();
@@ -227,6 +228,13 @@ async function listSessions(req, query = {}) {
   const personById = await schoolPersonAccessService.buildPersonByIdMap({ reqUser: req.user });
   const allTeachers = await schoolDataService.fetchAllData('teachers', {}, req.user, accessContext).catch(() => []);
   const teacherPersonMap = teacherIdentityService.buildTeacherPersonMap(allTeachers);
+  const students = await schoolDataService.fetchAllData('students', {}, req.user, accessContext).catch(() => []);
+  const studentToPersonMap = new Map(
+    (Array.isArray(students) ? students : [])
+      .map((row) => [toPublicId(row?.id), toPublicId(row?.personId)])
+      .filter(([studentId, personId]) => Boolean(studentId && personId))
+  );
+  const sessionsByClassId = new Map();
   let rows = [];
 
   for (const classRow of classes) {
@@ -235,32 +243,54 @@ async function listSessions(req, query = {}) {
     const sessions = Array.isArray(serviceSessions) && serviceSessions.length
       ? serviceSessions
       : getEmbeddedClassSessions(classRow);
+    sessionsByClassId.set(String(classRow?.id || '').trim(), sessions);
+  }
 
-    (Array.isArray(sessions) ? sessions : []).forEach((session) => {
-      if (session?.notes === 'Holiday/Off') return;
+  const rollingApplicabilityByClassId = await classSessionCapacityService.buildRollingApplicabilityByClassId(classes, {
+    sessionsByClassId,
+    students,
+    activeOrgId,
+    reqUser
+  });
+
+  const enrollmentPeriodsByClassId = new Map();
+  await Promise.all(classes.map(async (classRow) => {
+    if (classSessionCapacityService.getClassRegistrationModeKey(classRow) !== 'rolling') return;
+    const classId = String(classRow?.id || '').trim();
+    if (!classId) return;
+    const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, req.user, accessContext);
+    enrollmentPeriodsByClassId.set(classId, Array.isArray(periods) ? periods : []);
+  }));
+
+  for (const classRow of classes) {
+    const sessions = sessionsByClassId.get(String(classRow?.id || '').trim()) || [];
+    const termEnrollmentCache = new Map();
+
+    for (const session of (Array.isArray(sessions) ? sessions : [])) {
+      if (session?.notes === 'Holiday/Off') continue;
       if (!schoolRecordAccessService.isSessionAccessible({
         classRow,
         session,
         access,
         context: 'list',
         teacherPersonMap
-      })) return;
+      })) continue;
 
-      if (filters.startDate && session.date < filters.startDate) return;
-      if (filters.endDate && session.date > filters.endDate) return;
-      if (filters.startTime && session.startTime < filters.startTime) return;
-      if (filters.endTime && session.startTime > filters.endTime) return;
+      if (filters.startDate && session.date < filters.startDate) continue;
+      if (filters.endDate && session.date > filters.endDate) continue;
+      if (filters.startTime && session.startTime < filters.startTime) continue;
+      if (filters.endTime && session.startTime > filters.endTime) continue;
 
       const sessionTeacherId = session?.delivery?.deliveredBy;
       const resolvedTeacherPersonId = teacherIdentityService.resolveTeacherPersonId(sessionTeacherId, teacherPersonMap);
       const coTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
       if (viewer.lockedTeacherPersonId
         && !teacherIdentityService.sessionDeliveredByMatchesPerson(session, viewer.lockedTeacherPersonId, teacherPersonMap)) {
-        return;
+        continue;
       }
       if (filters.teacherIds.length && !filters.teacherIds.some((teacherFilterId) => (
         teacherIdentityService.sessionDeliveredByMatchesPerson(session, teacherFilterId, teacherPersonMap)
-      ))) return;
+      ))) continue;
 
       const teacher = personById.get(String(resolvedTeacherPersonId || sessionTeacherId || '').trim());
       const teacherName = teacher
@@ -286,6 +316,18 @@ async function listSessions(req, query = {}) {
         ))
       );
 
+      // eslint-disable-next-line no-await-in-loop
+      const capacityContext = await classSessionCapacityService.resolveSessionOneOnOneContext({
+        classData: classRow,
+        session,
+        reqUser: req.user,
+        activeOrgId,
+        studentToPersonMap,
+        rollingApplicabilityByClassId,
+        termEnrollmentCache,
+        enrollmentPeriods: enrollmentPeriodsByClassId.get(String(classRow?.id || '').trim()) || null
+      });
+
       rows.push({
         id: sessionId,
         sessionId,
@@ -308,9 +350,12 @@ async function listSessions(req, query = {}) {
         makeup: session?.makeup && typeof session.makeup === 'object' ? session.makeup : null,
         makeupHistory: Array.isArray(session?.makeupHistory) ? session.makeupHistory : [],
         makeupSummary,
-        hasComments: (Array.isArray(session?.roster) ? session.roster : []).some((row) => row?.comments && row.comments.length > 0)
+        hasComments: (Array.isArray(session?.roster) ? session.roster : []).some((row) => row?.comments && row.comments.length > 0),
+        isOneOnOne: capacityContext.isOneOnOne === true,
+        capacityMode: capacityContext.capacityMode || 'group',
+        classMaxCapacity: capacityContext.classMaxCapacity || 0
       });
-    });
+    }
   }
 
   if (filters.status) {

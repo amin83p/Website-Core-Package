@@ -32,6 +32,14 @@ function sanitizeEnrollmentKind(value) {
   return ENROLLMENT_KINDS.has(token) ? token : 'standard';
 }
 
+function sanitizeSessionCapacityType(value, { defaultValue = 'group' } = {}) {
+  const normalized = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!normalized) return defaultValue === 'one_on_one' ? 'one_on_one' : 'group';
+  if (normalized === 'group') return 'group';
+  if (normalized === 'one_on_one' || normalized === '1_on_1' || normalized === 'oneonone') return 'one_on_one';
+  throw new Error('Session capacity type must be Group or 1 On 1.');
+}
+
 function sanitizeCycleAttendanceSummary(value) {
   if (!isPlainObject(value)) return null;
   const num = (field) => {
@@ -280,6 +288,7 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
     completionSessionId: sessionCap.completionSessionId,
     completionReason: sessionCap.completionReason,
     enrollmentKind: sanitizeEnrollmentKind(input.enrollmentKind),
+    sessionCapacityType: sanitizeSessionCapacityType(input.sessionCapacityType, { defaultValue: 'group' }),
     extensionOfPeriodId: cleanId(input.extensionOfPeriodId, { max: 80, allowEmpty: true }) || '',
     carriedForwardFromPeriodId: cleanId(input.carriedForwardFromPeriodId, { max: 80, allowEmpty: true }) || '',
     cycleAttendanceSummary: sanitizeCycleAttendanceSummary(input.cycleAttendanceSummary),
@@ -314,7 +323,11 @@ function generateId(existingIds) {
 async function getAllEnrollmentPeriods() {
   try {
     const data = await fs.readFile(dataPath, 'utf8');
-    return JSON.parse(data || '[]');
+    const rows = JSON.parse(data || '[]');
+    return rows.map((row) => ({
+      ...row,
+      sessionCapacityType: sanitizeSessionCapacityType(row?.sessionCapacityType, { defaultValue: 'group' })
+    }));
   } catch (error) {
     if (error.code === 'ENOENT') return [];
     throw new Error('Failed to retrieve class enrollment periods.');
@@ -482,6 +495,7 @@ module.exports = {
   PERIOD_STATUSES: Object.freeze([...PERIOD_STATUSES]),
   ENROLLMENT_KINDS: Object.freeze([...ENROLLMENT_KINDS]),
   sanitizeEnrollmentKind,
+  sanitizeSessionCapacityType,
   sanitizeCycleAttendanceSummary,
   sanitizeEnrollmentSessionMarks,
   sanitizeEnrollmentExtensions,

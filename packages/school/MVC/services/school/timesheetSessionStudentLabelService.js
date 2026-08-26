@@ -1,27 +1,16 @@
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
-const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
-const classEnrollmentReadService = require('./classEnrollmentReadService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
-const PERIOD_ENROLLMENT_STATUSES = Object.freeze([
-  'active',
-  'planned',
-  'to_be_confirmed',
-  'completed',
-  'withdrawn'
-]);
+const PERIOD_ENROLLMENT_STATUSES = classSessionCapacityService.PERIOD_ENROLLMENT_STATUSES;
 
 const OPTIONAL_BADGE_ATTENDANCE_STATUSES = new Set([
   'absent',
   'acf',
   'absent_camera_off'
 ]);
-
-function getClassRegistrationModeKey(classData) {
-  return String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
-}
 
 function buildStudentToPersonMap(students = []) {
   return new Map(
@@ -71,66 +60,6 @@ function resolveDepartmentCode(classData = {}, departmentCodeById = new Map()) {
   return String(departmentCodeById.get(departmentId) || '').trim();
 }
 
-function resolveClassMaxCapacity(classData = {}) {
-  const raw = classData?.enrollment?.maxCapacity ?? classData?.maxCapacity ?? 0;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function buildPeriodStudentContext(studentIds, {
-  studentToPersonMap = new Map(),
-  personNameMap = new Map()
-} = {}) {
-  const normalizedStudentIds = new Set(
-    Array.from(studentIds instanceof Set ? studentIds : [])
-      .map((studentId) => toPublicId(studentId))
-      .filter(Boolean)
-  );
-  const isOneOnOne = normalizedStudentIds.size === 1;
-  const singleStudentId = isOneOnOne ? Array.from(normalizedStudentIds)[0] : '';
-  const singleStudentPersonId = singleStudentId
-    ? toPublicId(studentToPersonMap.get(singleStudentId))
-    : '';
-  return {
-    studentIds: normalizedStudentIds,
-    isOneOnOne,
-    singleStudentId,
-    singleStudentPersonId,
-    singleStudentName: singleStudentPersonId
-      ? String(personNameMap.get(singleStudentPersonId) || '').trim()
-      : ''
-  };
-}
-
-async function buildPeriodClassStudentContextById(classRows = [], {
-  periodStartDate = '',
-  periodEndDate = '',
-  studentToPersonMap = new Map(),
-  personNameMap = new Map(),
-  activeOrgId = '',
-  reqUser
-} = {}) {
-  const out = new Map();
-  await Promise.all((Array.isArray(classRows) ? classRows : []).map(async (classData) => {
-    const classId = toPublicId(classData?.id);
-    if (!classId) return;
-    const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
-      classId,
-      classItem: classData,
-      reqUser,
-      activeOrgId,
-      startDate: periodStartDate,
-      endDate: periodEndDate,
-      canonicalStatuses: PERIOD_ENROLLMENT_STATUSES
-    });
-    out.set(classId, buildPeriodStudentContext(snapshot?.studentIds, {
-      studentToPersonMap,
-      personNameMap
-    }));
-  }));
-  return out;
-}
-
 function resolveSingleStudentAttendance(session = {}, context = {}) {
   if (context?.isOneOnOne !== true) return '';
   const candidateIds = [context?.singleStudentPersonId, context?.singleStudentId]
@@ -149,105 +78,39 @@ function shouldShowOptionalBadge({ isOneOnOne = false, attendance = '', makeUpRe
   return OPTIONAL_BADGE_ATTENDANCE_STATUSES.has(normalizeAttendance(attendance)) || makeUpRequired === true;
 }
 
-function resolveExpectedStudentPersonIdsForSession({
-  classData,
-  session,
-  studentToPersonMap,
-  statusMap,
-  rollingApplicability,
-  termEnrollmentPersonIds
-}) {
-  const forceNotApplicable = sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap(statusMap, {
-    status: session?.status,
-    notes: session?.notes
-  });
-  if (forceNotApplicable) return new Set();
-
-  if (getClassRegistrationModeKey(classData) === 'rolling') {
-    if (!rollingApplicability || !(rollingApplicability.personIds instanceof Set)) return new Set();
-    const personIds = new Set();
-    rollingApplicability.personIds.forEach((personId) => {
-      const state = classEnrollmentSessionApplicabilityService.getApplicabilityState(
-        rollingApplicability.stateByKey,
-        personId,
-        session,
-        session?.sessionId || session?.id
-      );
-      if (state?.expected === true) {
-        const normalizedPersonId = toPublicId(personId);
-        if (normalizedPersonId) personIds.add(normalizedPersonId);
-      }
-    });
-    return personIds;
-  }
-
-  return termEnrollmentPersonIds instanceof Set ? new Set(termEnrollmentPersonIds) : new Set();
-}
-
-async function buildRollingApplicabilityByClassId(classRows = [], {
-  sessionsByClassId = new Map(),
-  students = [],
+async function buildPeriodClassStudentContextById(classRows = [], {
+  periodStartDate = '',
+  periodEndDate = '',
+  studentToPersonMap = new Map(),
+  personNameMap = new Map(),
   activeOrgId = '',
   reqUser
 } = {}) {
-  const studentToPersonMap = buildStudentToPersonMap(students);
-  const rollingClasses = (Array.isArray(classRows) ? classRows : [])
-    .filter((row) => getClassRegistrationModeKey(row) === 'rolling');
+  const classEnrollmentReadService = require('./classEnrollmentReadService');
   const out = new Map();
-
-  await Promise.all(rollingClasses.map(async (classRow) => {
-    const classId = String(classRow?.id || '').trim();
+  await Promise.all((Array.isArray(classRows) ? classRows : []).map(async (classData) => {
+    const classId = toPublicId(classData?.id);
     if (!classId) return;
-    const sessions = sessionsByClassId.get(classId) || [];
-    const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser);
-    const statusMap = await sessionStatusPolicyService.getStatusMap(classRow?.orgId || activeOrgId, { includeInactive: true });
-    const applicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
-      sessions,
-      periodRows: Array.isArray(periodRows) ? periodRows : [],
-      studentToPersonMap,
-      activeOrgId,
-      orgId: classRow?.orgId || activeOrgId,
+    const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
+      classId,
+      classItem: classData,
       reqUser,
-      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
-      forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions)
+      activeOrgId,
+      startDate: periodStartDate,
+      endDate: periodEndDate,
+      canonicalStatuses: PERIOD_ENROLLMENT_STATUSES
     });
-    out.set(classId, applicability);
+    const context = classSessionCapacityService.buildEnrollmentStudentContext(snapshot?.studentIds, {
+      studentToPersonMap
+    });
+    out.set(classId, {
+      ...context,
+      singleStudentName: context.singleStudentPersonId
+        ? String(personNameMap.get(context.singleStudentPersonId) || '').trim()
+        : ''
+    });
   }));
-
   return out;
-}
-
-async function resolveTermEnrollmentPersonIdsForSession({
-  classData,
-  session,
-  studentToPersonMap,
-  activeOrgId,
-  reqUser,
-  enrollmentCache
-}) {
-  const sessionDate = String(session?.date || '').trim();
-  const classId = String(classData?.id || '').trim();
-  const cacheKey = `${classId}::${sessionDate}`;
-  if (enrollmentCache.has(cacheKey)) return enrollmentCache.get(cacheKey);
-
-  const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
-    classId,
-    classItem: classData,
-    reqUser,
-    activeOrgId,
-    sessionDates: sessionDate ? [sessionDate] : [],
-    startDate: sessionDate,
-    endDate: sessionDate,
-    canonicalStatuses: ['active']
-  });
-  const studentIds = snapshot?.studentIds instanceof Set ? snapshot.studentIds : new Set();
-  const personIds = new Set();
-  studentIds.forEach((studentId) => {
-    const pid = studentToPersonMap.get(toPublicId(studentId));
-    if (pid) personIds.add(pid);
-  });
-  enrollmentCache.set(cacheKey, personIds);
-  return personIds;
 }
 
 async function enrichClassSessionPayloadWithSingleStudentName(sessionPayload, {
@@ -264,8 +127,8 @@ async function enrichClassSessionPayloadWithSingleStudentName(sessionPayload, {
   if (!sessionPayload || !sessionRow || !classData) return sessionPayload;
   const classId = String(classData?.id || '').trim();
   let termEnrollmentPersonIds = new Set();
-  if (getClassRegistrationModeKey(classData) !== 'rolling') {
-    termEnrollmentPersonIds = await resolveTermEnrollmentPersonIdsForSession({
+  if (classSessionCapacityService.getClassRegistrationModeKey(classData) !== 'rolling') {
+    termEnrollmentPersonIds = await classSessionCapacityService.resolveTermEnrollmentPersonIdsForSession({
       classData,
       session: sessionRow,
       studentToPersonMap,
@@ -274,7 +137,7 @@ async function enrichClassSessionPayloadWithSingleStudentName(sessionPayload, {
       enrollmentCache: termEnrollmentCache
     });
   }
-  const applicablePersonIds = resolveExpectedStudentPersonIdsForSession({
+  const applicablePersonIds = classSessionCapacityService.resolveSessionEnrollmentPersonIds({
     classData,
     session: sessionRow,
     studentToPersonMap,
@@ -309,16 +172,18 @@ async function enrichClassLiveSessions({
   );
   const relevantClassRows = (Array.isArray(classRows) ? classRows : [])
     .filter((row) => targetClassIds.has(toPublicId(row?.id)));
-  const periodClassStudentContextById = await buildPeriodClassStudentContextById(relevantClassRows, {
-    periodStartDate,
-    periodEndDate,
-    studentToPersonMap,
-    personNameMap,
-    activeOrgId,
-    reqUser
-  });
   const departmentCodeById = buildDepartmentCodeMap(departments);
   const classMap = new Map(relevantClassRows.map((row) => [String(row?.id || '').trim(), row]));
+  const termEnrollmentCache = new Map();
+  const enrollmentPeriodsByClassId = new Map();
+
+  await Promise.all(relevantClassRows.map(async (classRow) => {
+    if (classSessionCapacityService.getClassRegistrationModeKey(classRow) !== 'rolling') return;
+    const classId = String(classRow?.id || '').trim();
+    if (!classId) return;
+    const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser);
+    enrollmentPeriodsByClassId.set(classId, Array.isArray(periods) ? periods : []);
+  }));
 
   const enriched = [];
   for (const item of liveSessionBuilders) {
@@ -327,8 +192,25 @@ async function enrichClassLiveSessions({
     const payload = { ...item.payload };
     if (classData && sessionRow) {
       const classId = toPublicId(classData?.id);
-      const context = periodClassStudentContextById.get(classId) || buildPeriodStudentContext(new Set());
-      const singleStudentAttendance = resolveSingleStudentAttendance(sessionRow, context);
+      const capacityContext = await classSessionCapacityService.resolveSessionOneOnOneContext({
+        classData,
+        session: sessionRow,
+        reqUser,
+        activeOrgId,
+        studentToPersonMap,
+        statusMap,
+        enrollmentPeriods: enrollmentPeriodsByClassId.get(classId) || null,
+        termEnrollmentCache
+      });
+      const singleStudentPersonId = toPublicId(capacityContext?.singleStudentPersonId);
+      const singleStudentName = singleStudentPersonId
+        ? String(personNameMap.get(singleStudentPersonId) || '').trim()
+        : '';
+      const singleStudentAttendance = resolveSingleStudentAttendance(sessionRow, {
+        isOneOnOne: capacityContext?.isOneOnOne === true,
+        singleStudentPersonId: capacityContext?.singleStudentPersonId || '',
+        singleStudentId: capacityContext?.singleStudentId || ''
+      });
       const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRow?.status, sessionRow?.notes);
       const statusDefinition = statusMap instanceof Map ? statusMap.get(normalizedStatus) : null;
       const makeUpRequired = statusDefinition?.makeUpRequired === true;
@@ -336,14 +218,15 @@ async function enrichClassLiveSessions({
         statusDefinition?.makeupDurationPercent,
         100
       );
-      const classMaxCapacity = resolveClassMaxCapacity(classData);
-      const isOneOnOne = context.isOneOnOne === true || classMaxCapacity === 1;
+      const classMaxCapacity = classSessionCapacityService.resolveClassMaxCapacity(classData);
+      const isOneOnOne = capacityContext?.isOneOnOne === true;
       payload.deliveryDepartmentCode = resolveDepartmentCode(classData, departmentCodeById);
       payload.classMaxCapacity = classMaxCapacity;
       payload.isOneOnOne = isOneOnOne;
-      payload.singleStudentId = context.singleStudentId || '';
-      payload.singleStudentPersonId = context.singleStudentPersonId || '';
-      payload.singleStudentName = context.singleStudentName || '';
+      payload.capacityMode = capacityContext?.capacityMode || 'group';
+      payload.singleStudentId = capacityContext?.singleStudentId || '';
+      payload.singleStudentPersonId = capacityContext?.singleStudentPersonId || '';
+      payload.singleStudentName = singleStudentName;
       payload.singleStudentAttendance = singleStudentAttendance;
       payload.makeUpRequired = makeUpRequired;
       payload.makeupDurationPercent = makeupDurationPercent;
@@ -367,18 +250,18 @@ async function enrichClassLiveSessions({
 
 module.exports = {
   PERIOD_ENROLLMENT_STATUSES,
-  getClassRegistrationModeKey,
+  getClassRegistrationModeKey: classSessionCapacityService.getClassRegistrationModeKey,
   buildStudentToPersonMap,
   buildPersonNameMap,
   normalizeAttendance,
   buildDepartmentCodeMap,
   resolveDepartmentCode,
-  resolveClassMaxCapacity,
-  buildPeriodStudentContext,
+  resolveClassMaxCapacity: classSessionCapacityService.resolveClassMaxCapacity,
+  buildPeriodStudentContext: classSessionCapacityService.buildEnrollmentStudentContext,
   buildPeriodClassStudentContextById,
   resolveSingleStudentAttendance,
   shouldShowOptionalBadge,
   resolveSingleStudentNameFromPersonIds,
-  resolveExpectedStudentPersonIdsForSession,
+  resolveExpectedStudentPersonIdsForSession: classSessionCapacityService.resolveSessionEnrollmentPersonIds,
   enrichClassLiveSessions
 };

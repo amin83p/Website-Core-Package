@@ -27,6 +27,7 @@ const {
 const transactionDefinitionPreviewService = require('../../services/school/transactionDefinitionPreviewService');
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const makeupSessionAllocationService = require('../../services/school/makeupSessionAllocationService');
 const skillCatalogService = require('../../services/school/skillCatalogService');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
@@ -1079,11 +1080,44 @@ function getActiveSessionStatusMeta(statusMeta = []) {
     return rows.length ? rows : (Array.isArray(statusMeta) ? statusMeta : []);
 }
 
-function getSelectableSessionStatusMeta(statusMeta = [], allowAdminStatuses = false) {
-    return sessionStatusPolicyService.filterSelectableStatusMeta(
+function getSelectableSessionStatusMeta(statusMeta = [], options = {}) {
+    const allowAdminStatuses = options?.allowAdminStatuses === true;
+    const capacityMode = String(options?.capacityMode || '').trim().toLowerCase();
+    let rows = sessionStatusPolicyService.filterSelectableStatusMeta(
         getActiveSessionStatusMeta(statusMeta),
         { allowAdminStatuses }
     );
+    if (capacityMode) {
+        rows = sessionStatusPolicyService.filterSelectableStatusMetaByCapacity(rows, { capacityMode });
+    }
+    return rows;
+}
+
+async function resolveSessionCapacityModeForClassSession({
+    classData,
+    session,
+    reqUser,
+    students = []
+} = {}) {
+    const studentToPersonMap = new Map(
+        (Array.isArray(students) ? students : [])
+            .map((row) => [toPublicId(row?.id), toPublicId(row?.personId)])
+            .filter(([studentId, personId]) => Boolean(studentId && personId))
+    );
+    const activeOrgId = getActiveOrgIdOrThrow(reqUser);
+    let enrollmentPeriods = null;
+    if (classSessionCapacityService.getClassRegistrationModeKey(classData) === 'rolling') {
+        enrollmentPeriods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser);
+    }
+    const context = await classSessionCapacityService.resolveSessionOneOnOneContext({
+        classData,
+        session,
+        reqUser,
+        activeOrgId,
+        studentToPersonMap,
+        enrollmentPeriods
+    });
+    return context?.capacityMode || 'group';
 }
 
 async function getSessionStatusMetaBundleForUser(orgId, reqUser) {
@@ -1091,7 +1125,7 @@ async function getSessionStatusMetaBundleForUser(orgId, reqUser) {
     const allowAdminStatuses = await schoolAdminAccessService.canSelectAdminSessionStatuses(reqUser);
     return {
         sessionStatusMeta,
-        selectableSessionStatusMeta: getSelectableSessionStatusMeta(sessionStatusMeta, allowAdminStatuses),
+        selectableSessionStatusMeta: getSelectableSessionStatusMeta(sessionStatusMeta, { allowAdminStatuses }),
         allowAdminStatuses
     };
 }
@@ -3828,7 +3862,7 @@ async function manageSession(req, res) {
         
         // 1. Fetch Core Data
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-        const { sessionStatusMeta, selectableSessionStatusMeta } = await getSessionStatusMetaBundleForUser(
+        const { sessionStatusMeta, selectableSessionStatusMeta, allowAdminStatuses } = await getSessionStatusMetaBundleForUser(
             classData?.orgId || getActiveOrgIdOrThrow(req.user),
             req.user
         );
@@ -4148,6 +4182,16 @@ async function manageSession(req, res) {
         }
 
         logManageSessionStep(req, 'total', manageSessionStart);
+        const sessionCapacityMode = await resolveSessionCapacityModeForClassSession({
+            classData,
+            session,
+            reqUser: req.user,
+            students: rosterIdentityData.students
+        });
+        const selectableSessionStatusMetaForSession = getSelectableSessionStatusMeta(
+            sessionStatusMeta,
+            { allowAdminStatuses, capacityMode: sessionCapacityMode }
+        );
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,
@@ -4164,7 +4208,8 @@ async function manageSession(req, res) {
             conductPrefillByPersonId,
             sessionConductReportPeriod,
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
-            selectableSessionStatusMeta,
+            selectableSessionStatusMeta: selectableSessionStatusMetaForSession,
+            sessionCapacityMode,
             defaultSessionStatusCode: resolveDefaultSessionStatusCode(sessionStatusMeta),
             prevSessionId,
             prevSessionDate,
@@ -4849,7 +4894,15 @@ async function saveSession(req, res) {
         sessionStatusPolicyService.assertStatusSelectableByAccess(
             normalizedStatus,
             statusMap,
-            { allowAdminStatuses: await schoolAdminAccessService.canSelectAdminSessionStatuses(req.user) }
+            {
+                allowAdminStatuses: await schoolAdminAccessService.canSelectAdminSessionStatuses(req.user),
+                capacityMode: await resolveSessionCapacityModeForClassSession({
+                    classData,
+                    session: originalSession,
+                    reqUser: req.user,
+                    students: await schoolDataService.fetchAllData('students', {}, req.user).catch(() => [])
+                })
+            }
         );
         const wasCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, originalSession);
         const willBeCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, {

@@ -1,31 +1,18 @@
-<%
-  const rc = typeof classData !== 'undefined' ? (classData || {}) : {};
-  const rLife = typeof lifecycleContext !== 'undefined' ? (lifecycleContext || {}) : {};
-  const rIsRolling = String(rc.registrationMode || '').trim().toLowerCase() === 'rolling';
-  const rCycleStart = String(rLife.cycleStartDate || rc.cycleStartDate || '').trim();
-  const rCycleEnd = String(rLife.cycleEndDate || rc.cycleEndDate || '').trim();
-  const rCycleClosed = rLife.isClosedForNewEnrollment === true
-    || rc.isClosedForNewEnrollment === true
-    || String(rLife.isClosedForNewEnrollment || rc.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true';
-%>
-<div class="text-muted small mb-2">
-  <span class="fw-semibold"><%= rc.title || rc.id %></span>
-  <span class="font-monospace ms-2"><%= rc.id || '' %></span>
-</div>
-<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-  <span class="badge <%= rIsRolling ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-light text-dark border' %>">
-    <%= rIsRolling ? 'Rolling' : 'Term-Based' %>
-  </span>
-  <span class="badge bg-info-subtle text-info border border-info-subtle">Active Periods: <%= Number(rLife.activePeriodCount || 0) %></span>
-  <span class="badge bg-light text-dark border">Open Periods: <%= Number(rLife.openPeriodCount || 0) %></span>
-  <% if (rIsRolling && rCycleStart) { %>
-    <span class="badge bg-light text-dark border">Cycle Start: <%= rCycleStart %></span>
-  <% } %>
-  <% if (rIsRolling && rCycleEnd) { %>
-    <span class="badge bg-light text-dark border">Cycle End: <%= rCycleEnd %></span>
-  <% } %>
-  <% if (rIsRolling && rCycleClosed) { %>
-    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed for new enrollment</span>
-  <% } %>
-  <span class="badge bg-light text-dark border ms-auto" id="lbl_periodCount">0 rows</span>
-</div>
+<%
+  const rc = typeof classData !== 'undefined' ? (classData || {}) : {};
+%>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+  <button type="button" class="btn btn-outline-primary btn-sm" id="btn_openRollingClassPicker" title="Pick another rolling class">
+    <i class="bi bi-book me-1"></i>Pick class
+  </button>
+  <span class="text-muted small">Switch to another rolling class</span>
+</div>
+<div class="mb-3">
+  <div class="fs-5 fw-bold text-dark lh-sm"><%= rc.title || rc.id %></div>
+  <% if (rc.title && rc.id) { %>
+    <div class="font-monospace text-muted small mt-1"><%= rc.id %></div>
+  <% } %>
+</div>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <span class="badge bg-light text-dark border ms-auto" id="lbl_periodCount">0 rows</span>
+</div>

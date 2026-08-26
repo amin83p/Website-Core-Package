@@ -85,6 +85,8 @@ function buildPayload(reqBody, { activeOrgId, userId }) {
     excludeFromStudentIndex: toBoolean(reqBody.excludeFromStudentIndex, false),
     active: toBoolean(reqBody.active, true),
     sortOrder: Number(reqBody.sortOrder || 0),
+    accessType: String(reqBody.accessType || 'users').trim(),
+    classCapacity: String(reqBody.classCapacity || 'both').trim(),
     colorBg: String(reqBody.colorBg || '').trim(),
     colorText: String(reqBody.colorText || '').trim(),
     colorBorder: String(reqBody.colorBorder || '').trim(),

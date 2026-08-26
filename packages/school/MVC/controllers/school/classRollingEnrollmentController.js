@@ -36,6 +36,7 @@ const academicLedgerService = require('../../services/school/academicLedgerServi
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
+const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
 const rollingEnrollmentWorkspaceService = require('../../services/school/rollingEnrollmentWorkspaceService');
 const rollingEnrollmentFunderService = require('../../services/school/rollingEnrollmentFunderService');
@@ -4159,7 +4160,11 @@ async function editClassEnrollmentPeriod(req, res) {
       reasonStart: String(req.body?.reasonStart || periodRow?.reasonStart || '').trim(),
       targetSessionCount,
       targetHours,
-      sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || periodRow?.sessionCountPolicy)
+      sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(req.body?.sessionCountPolicy || periodRow?.sessionCountPolicy),
+      sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+        req.body?.sessionCapacityType !== undefined ? req.body.sessionCapacityType : periodRow?.sessionCapacityType,
+        { defaultValue: 'group' }
+      )
     }, req.user);
     await refreshTargetSessionEnrollmentProgress({
       classData,

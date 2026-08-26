@@ -491,8 +491,7 @@
     `<a href="${dashHref || '#'}" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>`
   ];
   const rollingManageBtns = [
-    `<a href="/school/classes/edit/${encClassId}" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-pencil-square me-1"></i> Class Form</a>`,
-    `<a href="/school/classes/${encClassId}/cycle-rollover" class="btn btn-filled btn-warning btn-md mb-2"><i class="bi bi-arrow-repeat me-1"></i> Cycle Rollover</a>`
+    `<a href="/school/classes/edit/${encClassId}" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-pencil-square me-1"></i> Class Form</a>`
   ];
   const rollingOptionalBtnsBeforePrint = [
     `<button type="button" id="btn_openAddEnrollmentModal" class="btn btn-filled btn-add btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-plus-circle me-1"></i>New Enrollment</button>`,
@@ -609,6 +608,7 @@
           <th class="draggable text-center" data-column="remaining">Remaining <span class="sort-icon"></span></th>
           <th class="draggable" data-column="completion">Completion <span class="sort-icon"></span></th>
           <th class="draggable text-center" data-column="status">Period Status <span class="sort-icon"></span></th>
+          <th class="draggable text-center" data-column="sessionCapacity">Session Capacity <span class="sort-icon"></span></th>
           <th class="draggable" data-column="funder">Funder <span class="sort-icon"></span></th>
           <th class="text-end pe-4">Actions</th>
         </tr>
@@ -734,7 +734,14 @@
                 <option value="waiting_list">Waiting list</option>
               </select>
             </div>
-            <div class="col-md-7">
+            <div class="col-md-2">
+              <label class="form-label" for="inp_sessionCapacityType">Session Capacity</label>
+              <select id="inp_sessionCapacityType" class="form-select">
+                <option value="group" selected>Group</option>
+                <option value="one_on_one">1 On 1</option>
+              </select>
+            </div>
+            <div class="col-md-5">
               <label class="form-label">Reason Start</label>
               <textarea id="inp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
             </div>
@@ -989,7 +996,14 @@
                 <option value="waiting_list">Waiting list</option>
               </select>
             </div>
-            <div class="col-md-7">
+            <div class="col-md-2">
+              <label class="form-label" for="grp_sessionCapacityType">Session Capacity</label>
+              <select id="grp_sessionCapacityType" class="form-select">
+                <option value="group" selected>Group</option>
+                <option value="one_on_one">1 On 1</option>
+              </select>
+            </div>
+            <div class="col-md-5">
               <label class="form-label" for="grp_reasonStart">Reason Start</label>
               <textarea id="grp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
             </div>
@@ -1015,6 +1029,7 @@
                   <th>Student</th>
                   <th>Start</th>
                   <th>Target</th>
+                  <th>Capacity</th>
                   <th>Funder</th>
                   <th>Status</th>
                   <th>Auto Resolve</th>
@@ -1022,7 +1037,7 @@
                 </tr>
               </thead>
               <tbody id="groupEnrollmentStudentsTbody">
-                <tr><td colspan="7" class="text-center text-muted py-3">No students queued. Add a student above.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-3">No students queued. Add a student above.</td></tr>
               </tbody>
             </table>
           </div>
@@ -1650,6 +1665,13 @@
             </select>
           </div>
           <div class="col-md-6">
+            <label class="form-label" for="edit_sessionCapacityType">Session Capacity</label>
+            <select id="edit_sessionCapacityType" class="form-select">
+              <option value="group" selected>Group</option>
+              <option value="one_on_one">1 On 1</option>
+            </select>
+          </div>
+          <div class="col-md-6">
             <label class="form-label" for="edit_funder">Funder</label>
             <select id="edit_funder" class="form-select">
               <option value="self" selected>Self Fund</option>
@@ -1883,7 +1905,7 @@
     endDate: <%- cycleEndDateJson %>,
     isClosedForNewEnrollment: <%- isClosedForNewEnrollmentJson %>
   };
-  const periodTableColspan = 10;
+  const periodTableColspan = 11;
   const studentOptions = <%- studentOptionsJson %>;
   const funderOptions = <%- funderOptionsJson %>;
   const funderLabelById = new Map((Array.isArray(funderOptions) ? funderOptions : []).map((row) => [String(row.id || ''), String(row.label || row.id || '')]));
@@ -2764,6 +2786,7 @@
       reasonStart: String(entry.reasonStart || '').trim(),
       targetSessionCount: String(entry.targetSessionCount || '').trim(),
       targetHours: String(entry.targetHours || '').trim(),
+      sessionCapacityType: normalizeSessionCapacityTypeValue(entry.sessionCapacityType),
       autoResolveSubjects: entry.autoResolveSubjects === true
     };
   }
@@ -3722,7 +3745,8 @@
       funderId: String(entry.funderId || 'self').trim(),
       reasonStart: String(entry.reasonStart || '').trim(),
       targetSessionCount: String(entry.targetSessionCount || '').trim(),
-      targetHours: String(entry.targetHours || '').trim()
+      targetHours: String(entry.targetHours || '').trim(),
+      sessionCapacityType: normalizeSessionCapacityTypeValue(entry.sessionCapacityType)
     };
   }
 
@@ -3734,6 +3758,32 @@
     const endDate = String(entry.endDate || '').trim();
     if (endDate) return `End ${endDate}`;
     return 'Date window';
+  }
+
+  function normalizeSessionCapacityTypeValue(value) {
+    const token = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    if (token === 'one_on_one' || token === '1_on_1' || token === 'oneonone') return 'one_on_one';
+    return 'group';
+  }
+
+  function formatSessionCapacityTypeLabel(value) {
+    return normalizeSessionCapacityTypeValue(value) === 'one_on_one' ? '1 On 1' : 'Group';
+  }
+
+  function readSessionCapacityTypeFromSelect(selectId) {
+    const el = qs(selectId);
+    const value = String(el?.value || '').trim();
+    return normalizeSessionCapacityTypeValue(value || 'group');
+  }
+
+  function setSessionCapacitySelectValue(selectId, value) {
+    const el = qs(selectId);
+    if (!el) return;
+    const normalized = normalizeSessionCapacityTypeValue(value);
+    el.value = normalized;
+    if (el.value !== normalized) {
+      el.value = 'group';
+    }
   }
 
   function syncGroupEnrollmentCompleteButton() {
@@ -3769,11 +3819,12 @@
 
   function buildGroupEnrollmentEditRowHtml(row = {}, index = 0) {
     const status = String(row.status || 'active');
+    const sessionCapacityType = normalizeSessionCapacityTypeValue(row.sessionCapacityType);
     const funderOptionsHtml = buildGroupFunderOptionsHtml(String(row.funderId || 'self'));
     const startDateAttrs = buildGroupEnrollmentDateInputAttrs('start');
     const endDateAttrs = buildGroupEnrollmentDateInputAttrs('end');
     return '<tr class="group-enrollment-edit-row table-light">'
-      + '<td colspan="7" class="p-3" data-group-edit-row="' + String(index) + '">'
+      + '<td colspan="8" class="p-3" data-group-edit-row="' + String(index) + '">'
       + '<div class="row g-2">'
       + '<div class="col-md-3 col-lg-2">'
       + '<label class="form-label small mb-1">Start Date *</label>'
@@ -3801,6 +3852,13 @@
       + '<option value="active"' + (status === 'active' ? ' selected' : '') + '>Active</option>'
       + '<option value="to_be_confirmed"' + (status === 'to_be_confirmed' ? ' selected' : '') + '>To be Confirmed</option>'
       + '<option value="waiting_list"' + (status === 'waiting_list' ? ' selected' : '') + '>Waiting list</option>'
+      + '</select>'
+      + '</div>'
+      + '<div class="col-md-4 col-lg-2">'
+      + '<label class="form-label small mb-1">Session Capacity</label>'
+      + '<select class="form-select form-select-sm" data-group-edit-field="sessionCapacityType">'
+      + '<option value="group"' + (sessionCapacityType === 'group' ? ' selected' : '') + '>Group</option>'
+      + '<option value="one_on_one"' + (sessionCapacityType === 'one_on_one' ? ' selected' : '') + '>1 On 1</option>'
       + '</select>'
       + '</div>'
       + '<div class="col-12">'
@@ -3842,6 +3900,9 @@
       targetHours: normalizeTargetHoursValue(hoursInput?.value) > 0
         ? String(hoursInput?.value || '').trim()
         : '',
+      sessionCapacityType: normalizeSessionCapacityTypeValue(
+        container.querySelector('[data-group-edit-field="sessionCapacityType"]')?.value
+      ),
       autoResolveSubjects: container.querySelector('[data-group-edit-field="autoResolveSubjects"]')?.checked === true
     };
   }
@@ -3883,7 +3944,7 @@
     if (!tbody) return;
     if (!groupEnrollmentStudents.length) {
       groupEnrollmentEditingIndex = -1;
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No students queued. Add a student above.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No students queued. Add a student above.</td></tr>';
       syncGroupEnrollmentCompleteButton();
       return;
     }
@@ -3898,6 +3959,7 @@
         + '<td>' + htmlEscape(row.label || row.id) + '</td>'
         + '<td class="small">' + htmlEscape(String(row.startDate || '')) + '</td>'
         + '<td class="small">' + htmlEscape(formatGroupEnrollmentCapSummary(row)) + '</td>'
+        + '<td class="small">' + htmlEscape(formatSessionCapacityTypeLabel(row.sessionCapacityType)) + '</td>'
         + '<td class="small">' + htmlEscape(resolveFunderDisplayLabel(row)) + '</td>'
         + '<td class="small">' + htmlEscape(formatPeriodStatusLabel(row.status || 'active')) + '</td>'
         + '<td>' + autoResolveLabel + '</td>'
@@ -3974,6 +4036,7 @@
     if (qs('grp_targetHours')) qs('grp_targetHours').value = String(entry.targetHours || '');
     if (qs('grp_status')) qs('grp_status').value = String(entry.status || 'active');
     if (qs('grp_reasonStart')) qs('grp_reasonStart').value = String(entry.reasonStart || '');
+    setSessionCapacitySelectValue('grp_sessionCapacityType', entry.sessionCapacityType);
     if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = entry.autoResolveSubjects === true;
     setFunderSelectValue('grp_funder', {
       funderId: String(entry.funderId || 'self'),
@@ -3999,6 +4062,7 @@
       targetHours: hasTargetHours('grp_targetHours')
         ? String(qs('grp_targetHours')?.value || '').trim()
         : '',
+      sessionCapacityType: readSessionCapacityTypeFromSelect('grp_sessionCapacityType'),
       autoResolveSubjects: qs('grp_autoResolveSubjects')?.checked === true
     };
   }
@@ -4046,6 +4110,7 @@
     if (qs('grp_reasonStart')) qs('grp_reasonStart').value = '';
     if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = false;
     setFunderSelectValue('grp_funder', { funderId: 'self', funderType: 'self' });
+    setSessionCapacitySelectValue('grp_sessionCapacityType', 'group');
     applyGroupEnrollmentCapUi();
   }
 
@@ -4064,7 +4129,10 @@
     const enrollmentMode = inferGroupEnrollmentMode(settings);
     const payload = {
       classId,
-      students: [{ studentId: String(studentId || '').trim() }],
+      students: [{
+        studentId: String(studentId || '').trim(),
+        sessionCapacityType: normalizeSessionCapacityTypeValue(settings.sessionCapacityType)
+      }],
       enrollmentMode,
       startDate: settings.startDate,
       endDate: settings.endDate,
@@ -4072,7 +4140,8 @@
       funderType: settings.funderType,
       funderId: settings.funderId,
       reasonStart: settings.reasonStart,
-      sessionCountPolicy: 'all_non_na'
+      sessionCountPolicy: 'all_non_na',
+      sessionCapacityType: normalizeSessionCapacityTypeValue(settings.sessionCapacityType)
     };
     if (normalizeTargetSessionCountValue(settings.targetSessionCount) > 0) {
       payload.targetSessionCount = normalizeTargetSessionCountValue(settings.targetSessionCount);
@@ -4467,6 +4536,29 @@
     }
   }
 
+  function openRollingClassPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showMsg('Picker Unavailable', 'warning', 'Class picker is not loaded on this page.');
+      return;
+    }
+    if (isGenericPickerOpen()) return;
+    GenericPicker.open(GenericPickerPresets.class({
+      title: 'Select rolling class',
+      icon: 'bi-book',
+      placeholder: 'Search rolling classes...',
+      searchFields: 'id,title,status,registrationMode,deliveryDepartmentName',
+      context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      itemFilter: (item) => String(item?.registrationMode || '').trim().toLowerCase() === 'rolling',
+      onSelect: (item) => {
+        const nextId = String(item?.id || '').trim();
+        if (!nextId || nextId === String(classId || '').trim()) return;
+        window.location.href = `/school/classes/${encodeURIComponent(nextId)}/rolling-enrollment`;
+      }
+    }));
+  }
+
   function pickGroupEntryStudent(searchTerm = '') {
     if (!window.GenericPicker || !window.GenericPickerPresets) {
       showMsg('Picker Unavailable', 'warning', 'Student picker is not loaded on this page.');
@@ -4827,6 +4919,7 @@
       authorizationRef: '',
       reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
       sessionCountPolicy: 'all_non_na',
+      sessionCapacityType: readSessionCapacityTypeFromSelect('inp_sessionCapacityType'),
       plannedNotApplicableSessionIds: []
     };
     if (normalizeTargetSessionCountValue(caps.targetSessionCount) > 0) {
@@ -4870,6 +4963,7 @@
       funderId: base.funderId,
       reasonStart: base.reasonStart,
       sessionCountPolicy: base.sessionCountPolicy,
+      sessionCapacityType: base.sessionCapacityType,
       sessionsToCreate: pendingStagedSessions.map((row) => ({ ...row })),
       extendCycleEndDate: base.extendCycleEndDate === true || pendingGapBatch?.extendCycleEndDate === true
     };
@@ -5675,7 +5769,8 @@
     const startDate = String(qs('inp_startDate')?.value || '').trim() || '—';
     const status = String(qs('inp_status')?.value || 'active').trim();
     const funderSelect = qs('inp_funder');
-    const funderLabel = String(funderSelect?.options?.[funderSelect.selectedIndex]?.text || '').trim() || '—';
+      const funderLabel = String(funderSelect?.options?.[funderSelect.selectedIndex]?.text || '').trim() || '—';
+    const sessionCapacityLabel = formatSessionCapacityTypeLabel(readSessionCapacityTypeFromSelect('inp_sessionCapacityType'));
     const hourMode = hasTargetHours();
     const capType = hourMode ? 'Hour cap' : 'Session cap';
     const capValue = hourMode
@@ -5693,6 +5788,7 @@
         <div class="col-sm-6 col-md-4"><span class="text-muted">Start date</span><div class="fw-semibold">${htmlEscape(startDate)}</div></div>
         <div class="col-sm-6 col-md-4"><span class="text-muted">${htmlEscape(capType)}</span><div class="fw-semibold">${htmlEscape(capValue)}</div></div>
         <div class="col-sm-6 col-md-4"><span class="text-muted">Funder</span><div class="fw-semibold">${htmlEscape(funderLabel)}</div></div>
+        <div class="col-sm-6 col-md-4"><span class="text-muted">Session capacity</span><div class="fw-semibold">${htmlEscape(sessionCapacityLabel)}</div></div>
       </div>`;
   }
 
@@ -7251,6 +7347,8 @@
       const canSyncAcademicLedger = hasPostedTransactions || status === 'active';
       const removeLabel = hasPostedTransactions ? 'Rollback' : 'Delete';
       const funderLabel = resolveFunderDisplayLabel(row);
+      const sessionCapacityLabel = formatSessionCapacityTypeLabel(row?.sessionCapacityType);
+      const sessionCapacitySortValue = normalizeSessionCapacityTypeValue(row?.sessionCapacityType);
       const explicitTargetSessionCount = normalizeTargetSessionCountValue(row?.targetSessionCount);
       const explicitTargetHours = normalizeTargetHoursValue(row?.targetHours);
       const hasEnrollmentTarget = explicitTargetSessionCount > 0 || explicitTargetHours > 0;
@@ -7298,6 +7396,9 @@
           <td class="text-center" data-sort-value="${htmlEscape(status)}">
             <span class="badge ${badgeClass}">${htmlEscape(formatPeriodStatusLabel(status))}</span>
             <div class="x-small text-muted mt-1">Finance: ${htmlEscape(financialStatus)}</div>
+          </td>
+          <td class="text-center small" data-sort-value="${htmlEscape(sessionCapacitySortValue)}">
+            <span class="badge text-bg-light border">${htmlEscape(sessionCapacityLabel)}</span>
           </td>
           <td data-sort-value="${htmlEscape(String(funderLabel || '').toLowerCase())}">${htmlEscape(funderLabel)}</td>
           <td class="text-end table-actions pe-4">
@@ -7370,6 +7471,7 @@
     qs('inp_startDate').value = '';
     qs('inp_endDate').value = '';
     qs('inp_status').value = 'active';
+    setSessionCapacitySelectValue('inp_sessionCapacityType', 'group');
     setFunderSelectValue('inp_funder', { funderId: 'self', funderType: 'self' });
     qs('inp_reasonStart').value = '';
     if (qs('inp_targetSessionCount')) {
@@ -7582,6 +7684,7 @@
     qs('edit_startDate').value = String(row?.startDate || '').trim();
     qs('edit_endDate').value = String(row?.endDate || '').trim();
     qs('edit_status').value = String(row?.status || 'active').trim().toLowerCase() || 'active';
+    setSessionCapacitySelectValue('edit_sessionCapacityType', row?.sessionCapacityType);
     setFunderSelectValue('edit_funder', row);
     setEditFunderLocked(enrollmentHasAttachedTransactions(row));
     qs('edit_reasonStart').value = String(row?.reasonStart || '').trim();
@@ -7739,7 +7842,8 @@
         funderId: funder.funderId,
         authorizationRef: '',
         reasonStart: String(qs('edit_reasonStart')?.value || '').trim(),
-        sessionCountPolicy: 'all_non_na'
+        sessionCountPolicy: 'all_non_na',
+        sessionCapacityType: readSessionCapacityTypeFromSelect('edit_sessionCapacityType')
       };
       if (hasTargetSessionCount('edit_targetSessionCount')) {
         editPayload.targetSessionCount = String(qs('edit_targetSessionCount')?.value || '').trim();
@@ -8427,6 +8531,7 @@
   });
 
   qs('btn_openAddEnrollmentModal')?.addEventListener('click', openAddEnrollmentModal);
+  qs('btn_openRollingClassPicker')?.addEventListener('click', openRollingClassPicker);
   qs('btn_openGroupEnrollmentModal')?.addEventListener('click', openGroupEnrollmentModal);
   qs('btn_pickGroupEntryStudent')?.addEventListener('click', () => pickGroupEntryStudent(qs('grp_studentLabel')?.value || ''));
   qs('btn_addGroupEnrollmentEntry')?.addEventListener('click', addGroupEnrollmentEntry);

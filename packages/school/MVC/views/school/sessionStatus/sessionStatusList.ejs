@@ -20,7 +20,8 @@
     { name: 'active', label: 'Active', type: 'select', options: ['true', 'false'] },
     { name: 'isFinal', label: 'Final', type: 'select', options: ['true', 'false'] },
     { name: 'makeUpRequired', label: 'Make-up', type: 'select', options: ['true', 'false'] },
-    { name: 'accessType', label: 'Access Type', type: 'select', options: ['users', 'admins'] }
+    { name: 'accessType', label: 'Access Type', type: 'select', options: ['users', 'admins'] },
+    { name: 'classCapacity', label: 'Class Capacity', type: 'select', options: ['both', 'group', 'one_on_one'] }
   ]
 }) %>
 
@@ -34,6 +35,7 @@
         <th class="draggable" data-column="isFinal">Final</th>
         <th class="draggable" data-column="makeUpRequired">Make-up</th>
         <th class="draggable" data-column="accessType">Access</th>
+        <th class="draggable" data-column="classCapacity">Capacity</th>
         <th class="draggable" data-column="active">Active</th>
         <th class="draggable" data-column="sortOrder">Order</th>
         <th class="draggable" data-column="colors">Colors</th>
@@ -42,7 +44,7 @@
     </thead>
     <tbody>
       <% if (!data || data.length === 0) { %>
-        <tr><td colspan="10" class="text-center py-5 text-muted">No session statuses found.</td></tr>
+        <tr><td colspan="11" class="text-center py-5 text-muted">No session statuses found.</td></tr>
       <% } %>
       <% (data || []).forEach((item) => { %>
         <tr>
@@ -67,6 +69,15 @@
             <span class="badge <%= String(item.accessType || 'users').toLowerCase() === 'admins' ? 'bg-dark' : 'bg-info-subtle text-info-emphasis border' %>">
               <%= String(item.accessType || 'users').toLowerCase() === 'admins' ? 'Admins' : 'Users' %>
             </span>
+          </td>
+          <td>
+            <% const capLabel = (() => {
+              const raw = String(item.classCapacity || 'both').trim().toLowerCase().replace(/[\s-]+/g, '_');
+              if (raw === 'group') return 'Group';
+              if (raw === 'one_on_one') return '1 On 1';
+              return 'Both';
+            })(); %>
+            <span class="badge bg-light text-dark border"><%= capLabel %></span>
           </td>
           <td>
             <span class="badge <%= item.active ? 'bg-primary' : 'bg-danger' %>"><%= item.active ? 'Active' : 'Inactive' %></span>

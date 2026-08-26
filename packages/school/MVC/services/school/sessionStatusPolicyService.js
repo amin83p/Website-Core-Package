@@ -354,6 +354,22 @@ function normalizeAccessType(value) {
   return 'users';
 }
 
+function normalizeClassCapacity(value) {
+  const normalized = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!normalized) return 'both';
+  if (normalized === 'group') return 'group';
+  if (normalized === 'one_on_one' || normalized === '1_on_1' || normalized === 'oneonone') return 'one_on_one';
+  return 'both';
+}
+
+function statusMatchesCapacityMode(statusRow, capacityMode) {
+  const mode = String(capacityMode || '').trim().toLowerCase();
+  if (!mode || mode === 'both') return true;
+  const capacity = normalizeClassCapacity(statusRow?.classCapacity);
+  if (capacity === 'both') return true;
+  return capacity === mode;
+}
+
 function buildClientStatusMeta(definitions) {
   const list = Array.isArray(definitions) ? definitions : [];
   return list.map((row) => ({
@@ -369,6 +385,7 @@ function buildClientStatusMeta(definitions) {
     active: row?.active !== false,
     sortOrder: Number(row?.sortOrder || 0),
     accessType: normalizeAccessType(row?.accessType),
+    classCapacity: normalizeClassCapacity(row?.classCapacity),
     colorBg: String(row?.colorBg || '#e2e3e5'),
     colorText: String(row?.colorText || '#41464b'),
     colorBorder: String(row?.colorBorder || '#c6c8ca')
@@ -382,6 +399,13 @@ function filterSelectableStatusMeta(meta = [], options = {}) {
   return rows.filter((row) => normalizeAccessType(row?.accessType) !== 'admins');
 }
 
+function filterSelectableStatusMetaByCapacity(meta = [], options = {}) {
+  const capacityMode = String(options?.capacityMode || '').trim().toLowerCase();
+  if (!capacityMode) return Array.isArray(meta) ? meta.slice() : [];
+  const rows = Array.isArray(meta) ? meta : [];
+  return rows.filter((row) => statusMatchesCapacityMode(row, capacityMode));
+}
+
 function assertStatusSelectableByAccess(statusCode, statusMap = new Map(), options = {}) {
   const normalized = normalizeStatusCode(statusCode);
   if (!normalized) throw new Error('Session status is required.');
@@ -392,6 +416,10 @@ function assertStatusSelectableByAccess(statusCode, statusMap = new Map(), optio
   if (options.allowAdminStatuses === true) return;
   if (normalizeAccessType(row?.accessType) === 'admins') {
     throw new Error('This session status is restricted to school session administrators.');
+  }
+  const capacityMode = String(options?.capacityMode || '').trim().toLowerCase();
+  if (capacityMode && !statusMatchesCapacityMode(row, capacityMode)) {
+    throw new Error('This session status is not available for this session capacity type.');
   }
 }
 
@@ -423,7 +451,10 @@ module.exports = {
   calculateTimesheetHoursByMap,
   buildClientStatusMeta,
   normalizeAccessType,
+  normalizeClassCapacity,
+  statusMatchesCapacityMode,
   filterSelectableStatusMeta,
+  filterSelectableStatusMetaByCapacity,
   assertStatusSelectableByAccess,
   calculateTimesheetHours,
   normalizeMakeupDurationPercent,

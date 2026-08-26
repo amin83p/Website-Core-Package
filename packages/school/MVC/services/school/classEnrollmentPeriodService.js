@@ -4,6 +4,7 @@ const classEnrollmentPolicyService = require('./classEnrollmentPolicyService');
 const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
+const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const registrationIntegrityService = require('./registrationIntegrityService');
 const subjectPrerequisiteEngineService = require('./subjectPrerequisiteEngineService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -327,6 +328,7 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
     completionReason: sessionCap.completionReason,
     plannedNotApplicableSessionIds: rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(input.plannedNotApplicableSessionIds),
     enrollmentKind: input.enrollmentKind,
+    sessionCapacityType: input.sessionCapacityType,
     extensionOfPeriodId: toPublicId(input.extensionOfPeriodId),
     carriedForwardFromPeriodId: toPublicId(input.carriedForwardFromPeriodId),
     cycleAttendanceSummary: input.cycleAttendanceSummary,
@@ -538,6 +540,12 @@ async function updatePeriod(periodId, input = {}, requestingUser = null, options
     patch.plannedNotApplicableSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(input.plannedNotApplicableSessionIds);
   }
   if (input.enrollmentKind !== undefined) patch.enrollmentKind = input.enrollmentKind;
+  if (input.sessionCapacityType !== undefined) {
+    patch.sessionCapacityType = classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+      input.sessionCapacityType,
+      { defaultValue: 'group' }
+    );
+  }
   if (input.extensionOfPeriodId !== undefined) patch.extensionOfPeriodId = toPublicId(input.extensionOfPeriodId);
   if (input.carriedForwardFromPeriodId !== undefined) patch.carriedForwardFromPeriodId = toPublicId(input.carriedForwardFromPeriodId);
   if (input.cycleAttendanceSummary !== undefined) patch.cycleAttendanceSummary = input.cycleAttendanceSummary;

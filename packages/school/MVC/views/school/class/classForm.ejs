@@ -1216,11 +1216,39 @@ document.addEventListener('DOMContentLoaded', () => {
             ].join(';')
         };
     };
-    const buildStatusOptionsHtml = (currentStatusCode) => {
+    const buildStatusOptionsHtml = (currentStatusCode, sessionRow) => {
         const normalizedCurrent = normalizeStatusCode(currentStatusCode) || normalizeStatusCode(defaultSessionStatusCode) || 'scheduled';
-        const rows = Array.isArray(sessionStatusMeta) ? [...sessionStatusMeta] : [];
+        const maxCapacity = Number(enrollmentState?.maxCapacity || document.getElementById('inp_capacity')?.value || 0);
+        let capacityMode = 'group';
+        if (maxCapacity === 1) {
+            capacityMode = 'one_on_one';
+        } else {
+            const enrolledStudents = (Array.isArray(enrollmentState?.students) ? enrollmentState.students : [])
+                .filter((row) => {
+                    const status = String(row?.status || row?.enrollmentStatus || 'active').trim().toLowerCase();
+                    return !status || ['active', 'planned', 'to_be_confirmed', 'registered', 'completed', 'withdrawn'].includes(status);
+                })
+                .map((row) => String(row?.studentId || row?.id || '').trim())
+                .filter(Boolean);
+            const uniqueIds = new Set(enrolledStudents);
+            if (uniqueIds.size === 1) capacityMode = 'one_on_one';
+        }
+        const normalizeClassCapacity = (value) => {
+            const raw = String(value || 'both').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (raw === 'group') return 'group';
+            if (raw === 'one_on_one') return 'one_on_one';
+            return 'both';
+        };
+        const matchesCapacity = (row) => {
+            const cap = normalizeClassCapacity(row?.classCapacity);
+            if (cap === 'both') return true;
+            return cap === capacityMode;
+        };
+        let rows = Array.isArray(sessionStatusMeta) ? sessionStatusMeta.filter(matchesCapacity) : [];
         if (!rows.some((row) => normalizeStatusCode(row?.code) === normalizedCurrent)) {
-            rows.push({ code: normalizedCurrent, label: resolveSessionStatusLabel(normalizedCurrent), active: false });
+            const lockedRow = (sessionStatusDisplayMeta || []).find((row) => normalizeStatusCode(row?.code) === normalizedCurrent);
+            if (lockedRow) rows.unshift(lockedRow);
+            else rows.push({ code: normalizedCurrent, label: resolveSessionStatusLabel(normalizedCurrent), active: false });
         }
         return rows.map((row) => {
             const code = normalizeStatusCode(row?.code);
@@ -3496,7 +3524,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><input type="text" class="form-control form-control-sm border-0 bg-transparent session-input" data-index="${index}" data-field="notes" value="${ses.notes || ''}" placeholder="Notes..." ${lockedAttr}></td>
                 <td>
                     <div class="d-flex align-items-center gap-2">
-                        <select class="form-select form-select-sm border-0 bg-transparent session-input ${isCancelled ? 'fw-bold text-danger' : ''}" data-index="${index}" data-field="status" ${lockedAttr}>${buildStatusOptionsHtml(statusCode)}</select>
+                        <select class="form-select form-select-sm border-0 bg-transparent session-input ${isCancelled ? 'fw-bold text-danger' : ''}" data-index="${index}" data-field="status" ${lockedAttr}>${buildStatusOptionsHtml(statusCode, ses)}</select>
                         ${isLocked ? '<span class="badge bg-dark-subtle text-dark border"><i class="bi bi-lock-fill"></i></span>' : ''}
                     </div>
                 </td>

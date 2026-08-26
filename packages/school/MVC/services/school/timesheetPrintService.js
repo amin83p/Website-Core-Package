@@ -3,6 +3,7 @@
 const schoolDataService = require('./schoolDataService');
 const timesheetEffectiveEntryService = require('./timesheetEffectiveEntryService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const coreDataService = requireCoreModule('MVC/services/dataService');
 
@@ -378,20 +379,8 @@ function shapePrintEntry(entry = {}, lookups = {}) {
   };
 }
 
-function resolveClassMaxCapacity(classRow = {}) {
-  const raw = classRow?.enrollment?.maxCapacity ?? classRow?.maxCapacity ?? 0;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isDepartmentOneOnOneEntry(entry = {}, classRow = {}) {
-  if (entry?.isSchoolActivity === true || entry?.isActivity === true || cleanText(entry?.activityId)) return false;
-  const sessionId = cleanText(entry?.sessionId).toLowerCase();
-  if (sessionId.startsWith('act-')) return false;
-  const capacity = Number(entry?.classMaxCapacity ?? resolveClassMaxCapacity(classRow));
-  if (capacity === 1) return true;
-  return entry.isOneOnOne === true;
-}
+const resolveClassMaxCapacity = classSessionCapacityService.resolveClassMaxCapacity;
+const isDepartmentOneOnOneEntry = classSessionCapacityService.isDepartmentOneOnOneEntry;
 
 function isDepartmentOptionalClassEntry(entry = {}, classRow = {}) {
   if (!isDepartmentOneOnOneEntry(entry, classRow)) return false;

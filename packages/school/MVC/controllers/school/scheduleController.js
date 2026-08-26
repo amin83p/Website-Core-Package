@@ -16,6 +16,7 @@ const teacherIdentityService = require('../../services/school/teacherIdentitySer
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -25,8 +26,6 @@ const PERIOD_LABELS = Object.freeze({
     season: 'Seasonal',
     year: 'Yearly'
 });
-const SCHEDULE_SOLO_STUDENT_ENROLLMENT_STATUSES = new Set(['active', 'planned', 'to_be_confirmed', 'registered']);
-
 function normalizeId(value) {
     return String(value || '').trim();
 }
@@ -846,30 +845,6 @@ function resolveStudentNameFromSessionRoster(session = {}, soloStudent = {}) {
     return resolveEnrollmentStudentRowDisplayName(row);
 }
 
-function getClassScheduleCapacity(classRow = {}) {
-    const raw = classRow?.enrollment?.maxCapacity
-        ?? classRow?.maxCapacity
-        ?? classRow?.capacity
-        ?? classRow?.studentCapacity;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isSoloStudentEnrollmentStatus(value) {
-    const normalized = String(value || '').trim().toLowerCase();
-    return !normalized || SCHEDULE_SOLO_STUDENT_ENROLLMENT_STATUSES.has(normalized);
-}
-
-function scheduleEnrollmentPeriodContainsDate(row = {}, sessionDate = '') {
-    const date = normalizeId(sessionDate);
-    if (!date || !isSoloStudentEnrollmentStatus(row?.status)) return false;
-    const start = normalizeDateOnly(row?.startDate);
-    const end = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(row);
-    if (start && start > date) return false;
-    if (end && end < date) return false;
-    return true;
-}
-
 function buildSoloStudentResolver({
     students = [],
     persons = [],
@@ -909,46 +884,21 @@ function buildSoloStudentResolver({
             .map((student) => [normalizeId(student?.id || student?._id), student])
             .filter(([id]) => Boolean(id))
     );
-    const studentIdByPersonId = new Map(
-        (Array.isArray(students) ? students : [])
-            .map((student) => [normalizeId(student?.personId), normalizeId(student?.id || student?._id)])
-            .filter(([personId, studentId]) => Boolean(personId && studentId))
-    );
-    const canonicalByClassId = new Map();
-    (Array.isArray(enrollmentPeriods) ? enrollmentPeriods : []).forEach((row) => {
-        if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return;
-        const classId = normalizeId(row?.classId);
-        if (!classId) return;
-        if (!canonicalByClassId.has(classId)) canonicalByClassId.set(classId, []);
-        canonicalByClassId.get(classId).push(row);
+    const coreResolver = classSessionCapacityService.buildSoloStudentResolver({
+        students,
+        enrollmentPeriods,
+        classes,
+        activeOrgId,
+        normalizeId,
+        normalizeDateOnly
     });
 
     return function resolveSoloStudentForSession(classRow = {}, sessionDate = '') {
-        const classId = normalizeId(classRow?.id || classRow?._id);
-        if (!classId) return null;
-
-        const canonicalRows = canonicalByClassId.get(classId) || [];
-        let studentIds = [];
-        if (canonicalRows.length) {
-            studentIds = Array.from(new Set(
-                canonicalRows
-                    .filter((row) => scheduleEnrollmentPeriodContainsDate(row, sessionDate))
-                    .map((row) => normalizeId(row?.studentId))
-                    .filter(Boolean)
-            ));
-        } else {
-            studentIds = Array.from(new Set(
-                (Array.isArray(classRow?.enrollment?.students) ? classRow.enrollment.students : [])
-                    .filter((row) => isSoloStudentEnrollmentStatus(row?.status || row?.enrollmentStatus))
-                    .map((row) => normalizeId(row?.studentId || row?.id || row?._id) || studentIdByPersonId.get(normalizeId(row?.personId)) || '')
-                    .filter(Boolean)
-            ));
-        }
-
-        if (studentIds.length !== 1) return null;
-        const studentId = studentIds[0];
+        const result = coreResolver(classRow, sessionDate);
+        if (!result) return null;
+        const studentId = normalizeId(result.soloStudentId);
         const student = studentById.get(studentId) || { id: studentId };
-        const studentPersonId = normalizeId(student?.personId);
+        const studentPersonId = normalizeId(result.soloStudentPersonId || student?.personId);
         const enrollmentRow = (Array.isArray(classRow?.enrollment?.students) ? classRow.enrollment.students : [])
             .find((entry) => idsEqual(entry?.studentId || entry?.id || entry?._id, studentId));
         const enrollmentName = resolveEnrollmentStudentRowDisplayName(enrollmentRow);

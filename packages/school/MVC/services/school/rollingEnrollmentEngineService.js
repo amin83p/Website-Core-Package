@@ -6,6 +6,7 @@ const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSes
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const sessionConflictDetectionService = require('./sessionConflictDetectionService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -42,6 +43,10 @@ function inferEnrollmentModeFromFields(input = {}) {
 }
 
 function normalizeStudentEntries(input = {}) {
+  const defaultSessionCapacityType = classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+    input.sessionCapacityType,
+    { defaultValue: 'group' }
+  );
   if (Array.isArray(input.students) && input.students.length) {
     return input.students.map((row) => {
       const studentId = toPublicId(row?.studentId || '');
@@ -51,7 +56,11 @@ function normalizeStudentEntries(input = {}) {
         programId: toPublicId(row?.programId || ''),
         termId: toPublicId(row?.termId || ''),
         programRegistrationId: toPublicId(row?.programRegistrationId || ''),
-        notes: String(row?.notes || '').trim()
+        notes: String(row?.notes || '').trim(),
+        sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+          row?.sessionCapacityType || defaultSessionCapacityType,
+          { defaultValue: 'group' }
+        )
       };
     }).filter(Boolean);
   }
@@ -62,7 +71,8 @@ function normalizeStudentEntries(input = {}) {
     programId: toPublicId(input.programId || ''),
     termId: toPublicId(input.termId || ''),
     programRegistrationId: toPublicId(input.programRegistrationId || ''),
-    notes: String(input.notes || '').trim()
+    notes: String(input.notes || '').trim(),
+    sessionCapacityType: defaultSessionCapacityType
   }];
 }
 
@@ -132,6 +142,7 @@ function normalizeEnrollmentEngineRequest(input = {}) {
     sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(input.sessionCountPolicy),
     notes: String(input.notes || '').trim(),
     enrollmentSource: String(input.enrollmentSource || 'rolling_enrollment').trim(),
+    sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(input.sessionCapacityType, { defaultValue: 'group' }),
     allowOverlap: parseBoolean(input.allowOverlap, false),
     finance: input.finance && typeof input.finance === 'object' ? input.finance : null
   };
@@ -226,6 +237,10 @@ function buildEnrollmentPayloadForStudent(classData, normalized, student, studen
     programId: toPublicId(resolution.programId || studentEntry.programId || ''),
     termId: toPublicId(resolution.termId || studentEntry.termId || ''),
     enrollmentSource: normalized.enrollmentSource,
+    sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+      studentEntry.sessionCapacityType || normalized.sessionCapacityType,
+      { defaultValue: 'group' }
+    ),
     feeCategory: String(student?.feeCategory || '').trim(),
     notes: String(studentEntry.notes || normalized.notes || '').trim(),
     allowOverlap: normalized.allowOverlap

@@ -21,6 +21,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     active: true,
     sortOrder: 10,
     accessType: 'users',
+    classCapacity: 'both',
     colorBg: '#e7f1ff',
     colorText: '#084298',
     colorBorder: '#b6d4fe'
@@ -39,6 +40,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     active: true,
     sortOrder: 20,
     accessType: 'users',
+    classCapacity: 'both',
     colorBg: '#d1e7dd',
     colorText: '#0f5132',
     colorBorder: '#a3cfbb'
@@ -57,6 +59,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     active: true,
     sortOrder: 30,
     accessType: 'users',
+    classCapacity: 'both',
     colorBg: '#f8d7da',
     colorText: '#842029',
     colorBorder: '#f1aeb5'
@@ -75,6 +78,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     active: true,
     sortOrder: 40,
     accessType: 'users',
+    classCapacity: 'both',
     colorBg: '#fff3cd',
     colorText: '#664d03',
     colorBorder: '#ffe69c'
@@ -144,6 +148,15 @@ function cleanAccessType(v, { defaultValue = 'users' } = {}) {
   throw new Error('Access type must be Users or Admins.');
 }
 
+function cleanClassCapacity(v, { defaultValue = 'both' } = {}) {
+  const normalized = String(v || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!normalized) return defaultValue === 'group' ? 'group' : (defaultValue === 'one_on_one' ? 'one_on_one' : 'both');
+  if (normalized === 'both') return 'both';
+  if (normalized === 'group') return 'group';
+  if (normalized === 'one_on_one' || normalized === '1_on_1' || normalized === 'oneonone') return 'one_on_one';
+  throw new Error('Class capacity must be Both, Group, or 1 On 1.');
+}
+
 function cleanMakeupDurationPercent(v, { defaultValue = 100 } = {}) {
   if (v === undefined || v === null || v === '') return Number(defaultValue);
   const n = Number(v);
@@ -202,6 +215,7 @@ function normalizeStoredStatus(row) {
     active: cleanBoolean(row?.active, true),
     sortOrder: cleanNumber(row?.sortOrder, { min: 0, max: 9999, defaultValue: 100 }),
     accessType: cleanAccessType(row?.accessType, { defaultValue: 'users' }),
+    classCapacity: cleanClassCapacity(row?.classCapacity, { defaultValue: 'both' }),
     colorBg: cleanColor(row?.colorBg, '#E2E3E5'),
     colorText: cleanColor(row?.colorText, '#41464B'),
     colorBorder: cleanColor(row?.colorBorder, '#C6C8CA'),
@@ -242,6 +256,7 @@ function sanitizeInput(input, { isUpdate = false } = {}) {
     active: cleanBoolean(input.active, true),
     sortOrder: cleanNumber(input.sortOrder, { min: 0, max: 9999, defaultValue: 100 }),
     accessType: cleanAccessType(input.accessType, { defaultValue: 'users' }),
+    classCapacity: cleanClassCapacity(input.classCapacity, { defaultValue: 'both' }),
     colorBg: cleanColor(input.colorBg, '#E2E3E5'),
     colorText: cleanColor(input.colorText, '#41464B'),
     colorBorder: cleanColor(input.colorBorder, '#C6C8CA')

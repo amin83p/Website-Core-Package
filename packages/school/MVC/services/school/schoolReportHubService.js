@@ -7,6 +7,7 @@ const reportViewService = require('./reportViewService');
 const weeklyReportsHubService = require('./weeklyReportsHubService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
@@ -1381,10 +1382,29 @@ async function updateWorkspaceSession(input = {}, req = {}) {
     if (!normalizedStatus || !statusMap.has(normalizedStatus)) {
       throw new Error('Invalid session status.');
     }
+    const studentToPersonMap = new Map(
+      (await dataService.fetchAllData('students', {}, req.user).catch(() => []))
+        .map((row) => [toPublicId(row?.id), toPublicId(row?.personId)])
+        .filter(([studentId, personId]) => Boolean(studentId && personId))
+    );
+    let enrollmentPeriods = null;
+    if (classSessionCapacityService.getClassRegistrationModeKey(classRow) === 'rolling') {
+      enrollmentPeriods = await dataService.getClassEnrollmentPeriodsByClassId(classId, req.user);
+    }
     sessionStatusPolicyService.assertStatusSelectableByAccess(
       normalizedStatus,
       statusMap,
-      { allowAdminStatuses: await schoolAdminAccessService.canSelectAdminSessionStatuses(req.user) }
+      {
+        allowAdminStatuses: await schoolAdminAccessService.canSelectAdminSessionStatuses(req.user),
+        capacityMode: (await classSessionCapacityService.resolveSessionOneOnOneContext({
+          classData: classRow,
+          session,
+          reqUser: req.user,
+          activeOrgId: String(classRow?.orgId || req.user?.activeOrgId || '').trim(),
+          studentToPersonMap,
+          enrollmentPeriods
+        })).capacityMode
+      }
     );
   }
   const nextDate = normalizeDateOnly(input.date, 'date') || session.date;
