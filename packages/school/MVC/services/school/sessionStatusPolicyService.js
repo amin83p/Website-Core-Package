@@ -113,10 +113,18 @@ async function ensureOrgDefaultSessionStatuses(orgId, userId = 'SYSTEM') {
     query: { orgId__eq: targetOrgId },
     scope: { canViewAll: true }
   });
-  if ((existing || []).length > 0) return existing;
+  const orgRows = Array.isArray(existing) ? existing : [];
+  const existingCodes = new Set(
+    orgRows.map((row) => normalizeStatusCode(row?.code)).filter(Boolean)
+  );
+  const templatesToCreate = (DEFAULT_SESSION_STATUS_TEMPLATES || []).filter((tpl) => {
+    const code = normalizeStatusCode(tpl?.code);
+    return code && !existingCodes.has(code);
+  });
+  if (!templatesToCreate.length) return orgRows;
 
   const now = new Date().toISOString();
-  const defaults = (DEFAULT_SESSION_STATUS_TEMPLATES || []).map((tpl) => ({
+  const defaults = templatesToCreate.map((tpl) => ({
     id: generateStatusId(),
     orgId: targetOrgId,
     ...tpl,
@@ -141,7 +149,9 @@ async function ensureOrgDefaultSessionStatuses(orgId, userId = 'SYSTEM') {
   }
 
   clearStatusCache(targetOrgId);
-  if (created.length) return created;
+  if (created.length) {
+    return [...orgRows, ...created];
+  }
   return await schoolRepositories.sessionStatuses.list({
     query: { orgId__eq: targetOrgId },
     scope: { canViewAll: true }
@@ -212,6 +222,7 @@ function isSessionCompletionStatusByMap(statusMap, { status, notes = '' } = {}) 
   if (!definition) return normalizeSessionStatus(status, notes) === 'completed';
   return definition.isFinal === true
     && definition.makeUpRequired !== true
+    && definition.mergedSessionRequired !== true
     && definition.excludeFromAttendance !== true;
 }
 
@@ -223,6 +234,11 @@ function shouldForceNotApplicableAttendanceByMap(statusMap, { status, notes = ''
 function isMakeUpRequiredByMap(statusMap, { status, notes = '' } = {}) {
   const { definition } = resolveStatusDefinition(statusMap, { status, notes });
   return definition?.makeUpRequired === true;
+}
+
+function isMergedSessionRequiredByMap(statusMap, { status, notes = '' } = {}) {
+  const { definition } = resolveStatusDefinition(statusMap, { status, notes });
+  return definition?.mergedSessionRequired === true;
 }
 
 function shouldExcludeFromAttendanceByMap(statusMap, { status, notes = '' } = {}) {
@@ -379,6 +395,7 @@ function buildClientStatusMeta(definitions) {
     isFinal: row?.isFinal === true,
     makeUpRequired: row?.makeUpRequired === true,
     makeupDurationPercent: normalizeMakeupDurationPercent(row?.makeupDurationPercent, 100),
+    mergedSessionRequired: row?.mergedSessionRequired === true,
     excludeFromAttendance: row?.excludeFromAttendance === true,
     excludeFromTeacherIndex: row?.excludeFromTeacherIndex === true,
     excludeFromStudentIndex: row?.excludeFromStudentIndex === true,
@@ -443,6 +460,7 @@ module.exports = {
   isFinalStatusByMap,
   isSessionCompletionStatusByMap,
   isMakeUpRequiredByMap,
+  isMergedSessionRequiredByMap,
   shouldForceNotApplicableAttendanceByMap,
   buildForceNotApplicableAttendanceSessionKeys,
   shouldExcludeFromAttendanceByMap,

@@ -189,6 +189,19 @@
           </div>
 
           <div class="session-status-rule-group">
+            <div class="text-uppercase text-muted small fw-bold mb-3">Merged Session Policy</div>
+            <div class="session-status-rule-tile border rounded p-3 bg-light-subtle">
+              <div class="rule-tile-header">
+                <label class="rule-tile-label" for="mergedSessionRequired">Merged Session Required</label>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" id="mergedSessionRequired" name="mergedSessionRequired" value="true" <%= item.mergedSessionRequired ? 'checked' : '' %>>
+                </div>
+              </div>
+              <div class="form-text small mt-2 mb-0">When selected, opens a merge workflow so another teacher with a same-time session can take over this class.</div>
+            </div>
+          </div>
+
+          <div class="session-status-rule-group">
             <div class="text-uppercase text-muted small fw-bold mb-3">Attendance</div>
             <div class="row g-3">
               <div class="col-lg-6">

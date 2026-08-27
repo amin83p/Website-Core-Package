@@ -1397,9 +1397,15 @@
             : fallbackStatusCode;
         const currentSessionStatusMeta = displayStatusRows.find((row) => normalizeStatusCode(row?.code) === currentSessionStatus) || null;
         const isSessionCompleted = currentSessionStatusMeta
-            ? (currentSessionStatusMeta.isFinal === true && currentSessionStatusMeta.makeUpRequired !== true && currentSessionStatusMeta.excludeFromAttendance !== true)
+            ? (currentSessionStatusMeta.isFinal === true && currentSessionStatusMeta.makeUpRequired !== true && currentSessionStatusMeta.mergedSessionRequired !== true && currentSessionStatusMeta.excludeFromAttendance !== true)
             : currentSessionStatus === 'completed';
         const isMakeupRequiredInactive = currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
+        const isMergedSessionRow = session.merged && session.merged.isMergedSession === true;
+        const isMergedSessionInactive = currentSessionStatusMeta && currentSessionStatusMeta.mergedSessionRequired === true && !isMergedSessionRow;
+        const isInstructionalInactive = isMakeupRequiredInactive || isMergedSessionInactive;
+        const mergedPartnerReference = (typeof mergedPartnerSessionReference !== 'undefined' && mergedPartnerSessionReference && typeof mergedPartnerSessionReference === 'object')
+            ? mergedPartnerSessionReference
+            : null;
         const canCreateMakeupSession = Boolean(
             (typeof canCreateMakeupWhileLocked !== 'undefined' ? canCreateMakeupWhileLocked : !isReadOnly)
             && currentSessionStatusMeta
@@ -1415,7 +1421,7 @@
             : null;
         const originalSessionReferenceId = String(originalSessionReference?.sessionId || session?.makeup?.originalSessionId || '').trim();
         const canDeleteMakeupSessionsFlag = typeof canDeleteMakeupSessions !== 'undefined' && canDeleteMakeupSessions === true;
-        const workDisabledAttr = (isReadOnly || isMakeupRequiredInactive) ? 'disabled' : '';
+        const workDisabledAttr = (isReadOnly || isInstructionalInactive) ? 'disabled' : '';
         const attendanceMatrixHref = '/school/attendances?classId=' + encodeURIComponent(classData.id) + '&range=thisMonth';
         const gradesMatrixHref = '/school/grades-matrix?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
         const smRegMode = String(classData.registrationMode || 'term_based').trim().toLowerCase();
@@ -1706,7 +1712,7 @@
                                 <% }); %>
                             <% } %>
                         </div>
-                        <div class="form-text mt-1 mb-0">Co-teachers receive full session hours on their timesheets. Edit access is optional.</div>
+                        <div class="form-text mt-1 mb-0">Unpaid co-teachers appear on schedules but earn 0 timesheet hours. Paid co-teachers can use a lower paid-hours amount than the session duration.</div>
                     </div>
                     <div class="session-info-tile session-info-tile--location">
                         <label class="session-info-tile-label mb-0" for="sessionRoom">Location</label>
@@ -1796,6 +1802,31 @@
             </div>
         </div>
     <% } %>
+    <% if (isMergedSessionRow) { %>
+        <div class="alert alert-info border-info shadow-sm d-flex align-items-start mb-3">
+            <i class="bi bi-people-fill fs-3 me-3 text-info"></i>
+            <div class="flex-grow-1 min-w-0">
+                <h6 class="fw-bold mb-1">Merged session</h6>
+                <div class="small mb-2">This session was merged with another class at the same time. The merging teacher earns timesheet hours for both sessions.</div>
+                <% if (mergedPartnerReference && mergedPartnerReference.found) { %>
+                    <div class="small">
+                        <strong>Partner session:</strong>
+                        <a href="<%= mergedPartnerReference.manageUrl %>" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">
+                            <i class="bi bi-box-arrow-up-right me-1"></i><%= mergedPartnerReference.className || mergedPartnerReference.classId %> · <%= mergedPartnerReference.sessionId %>
+                        </a>
+                        <span class="text-muted"> · <%= mergedPartnerReference.date || '-' %> · <%= mergedPartnerReference.startTime || '-' %> – <%= mergedPartnerReference.endTime || '-' %></span>
+                    </div>
+                <% } else { %>
+                    <div class="small text-muted">Linked partner session could not be loaded.</div>
+                <% } %>
+                <% if (!isReadOnly) { %>
+                    <button type="button" class="btn btn-outline-info btn-sm mt-2" id="btnUndoSessionMerge">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Undo merge (restore Scheduled)
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    <% } %>
     <% if (isMakeupRequiredInactive) { %>
         <div class="alert alert-warning border-warning shadow-sm d-flex align-items-start mb-3">
             <i class="bi bi-calendar-plus fs-3 me-3 text-warning"></i>
@@ -1865,43 +1896,43 @@
                     <i class="bi bi-people-fill fs-5"></i><span class="session-manager-nav-label">Attendance</span>
                 </button>
                 <% if (canViewClassConductPanelFlag) { %>
-                <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
+                <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-emoji-smile fs-5"></i><span class="session-manager-nav-label">Class Conduct</span>
                 </button>
                 <% } %>
-                <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
+                <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-journal-text fs-5"></i><span class="session-manager-nav-label">Session &amp; notes</span>
                     <% const hasSessionNotes = String(session.notes || '').trim().length > 0; %>
                     <span id="sessionNotesNavBadge" class="badge rounded-pill session-nav-badge session-nav-badge--dot bg-danger<%= hasSessionNotes ? '' : ' d-none' %>" aria-hidden="<%= hasSessionNotes ? 'false' : 'true' %>" title="Session notes available">&nbsp;</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="curriculum" role="tab" aria-selected="false" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
+                <button type="button" class="session-manager-nav-item" data-session-panel="curriculum" role="tab" aria-selected="false" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-book fs-5"></i><span class="session-manager-nav-label">Curriculum</span>
                 </button>
                 <% if (canViewClassConductPanelFlag) { %>
-                <button type="button" class="session-manager-nav-item" data-session-panel="content" title="<%= isMakeupRequiredInactive ? 'Inactive original session' : 'Coming soon' %>" <%= isMakeupRequiredInactive ? 'disabled' : '' %>>
+                <button type="button" class="session-manager-nav-item" data-session-panel="content" title="<%= isInstructionalInactive ? 'Inactive original session' : 'Coming soon' %>" <%= isInstructionalInactive ? 'disabled' : '' %>>
                     <i class="bi bi-folder2-open fs-5"></i><span class="session-manager-nav-label">Content</span>
                 </button>
                 <% } %>
-                <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
+                <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-clipboard-check fs-5"></i><span class="session-manager-nav-label">Reports</span>
                     <span id="sessionReportsNavBadge" class="badge rounded-pill session-nav-badge d-none" aria-hidden="true"></span>
                 </button>
-                <% if (canViewBookCoveringReport && isMakeupRequiredInactive !== true) { %>
+                <% if (canViewBookCoveringReport && isInstructionalInactive !== true) { %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="book-covering" role="tab" aria-selected="false">
                     <i class="bi bi-journal-richtext fs-5"></i><span class="session-manager-nav-label">Book covering</span>
                     <span id="sessionBookCoveringNavBadge" class="badge rounded-pill session-nav-badge <%= sessionBookCoveringSummary?.status === 'submitted' ? 'bg-success' : 'bg-danger' %><%= hasSessionBookCoveringReport ? '' : ' d-none' %>" aria-hidden="<%= hasSessionBookCoveringReport ? 'false' : 'true' %>" title="<%= sessionBookCoveringSummary?.status === 'submitted' ? 'Book covering report submitted' : (hasSessionBookCoveringReport ? 'Book covering report draft' : 'Book covering report') %>"><%= hasSessionBookCoveringReport ? 'BR' : '' %></span>
                 </button>
                 <% } %>
-                <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isMakeupRequiredInactive ? 'disabled title="Inactive original session"' : '' %>>
+                <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-folder-check fs-5"></i><span class="session-manager-nav-label">Student Cases</span>
                 </button>
-                <button type="button" class="session-manager-nav-item" data-session-panel="gradebook" title="<%= isMakeupRequiredInactive ? 'Inactive original session' : 'Coming soon' %>" <%= isMakeupRequiredInactive ? 'disabled' : '' %>>
+                <button type="button" class="session-manager-nav-item" data-session-panel="gradebook" title="<%= isInstructionalInactive ? 'Inactive original session' : 'Coming soon' %>" <%= isInstructionalInactive ? 'disabled' : '' %>>
                     <i class="bi bi-journal-bookmark fs-5"></i><span class="session-manager-nav-label">Grade book</span>
                 </button>
             </nav>
         </aside>
 
-        <main class="session-manager-main <%= isMakeupRequiredInactive ? 'session-inactive-workspace' : '' %>">
+        <main class="session-manager-main <%= isInstructionalInactive ? 'session-inactive-workspace' : '' %>">
             <% if (isMakeupRequiredInactive) { %>
                 <div class="session-placeholder-card">
                     <i class="bi bi-calendar-plus fs-1 text-warning d-block mb-3"></i>
@@ -1912,6 +1943,14 @@
                     <% if (canCreateMakeupSession) { %>
                         <button type="button" class="btn btn-warning fw-bold" id="btnCreateMakeupSessionInline"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
                     <% } %>
+                </div>
+            <% } else if (isMergedSessionInactive) { %>
+                <div class="session-placeholder-card">
+                    <i class="bi bi-people-fill fs-1 text-info d-block mb-3"></i>
+                    <h5 class="fw-bold text-dark mb-2">Complete the merge workflow</h5>
+                    <p class="text-muted mb-3">
+                        Select <strong>Merged Session</strong> as the session status and choose a teacher with a matching same-time session to complete the merge.
+                    </p>
                 </div>
             <% } %>
             <div class="session-panel active" id="session-panel-attendance" role="tabpanel">
@@ -2173,7 +2212,7 @@
                         <div class="small text-muted mt-1">Select gradebook skills and note what you covered in this session.<% if (teachingOutlineContext && (teachingOutlineContext.suggestionsBySkill || teachingOutlineContext.levels)) { %> Use <strong>Session suggestions</strong> for roster-based teaching outline ideas.<% } %></div>
                     </div>
                     <div class="card-body">
-                        <% if (!isReadOnly && isMakeupRequiredInactive !== true) { %>
+                        <% if (!isReadOnly && isInstructionalInactive !== true) { %>
                         <div class="mb-3" id="skillsCoveredAddForm">
                             <div class="row g-2 align-items-start">
                                 <div class="col-12 col-md-3 col-lg-2">
@@ -2227,7 +2266,7 @@
                     </div>
                 </div>
                 <% } %>
-                <% if (!isReadOnly && isMakeupRequiredInactive !== true) { %>
+                <% if (!isReadOnly && isInstructionalInactive !== true) { %>
                 <div class="modal fade" id="outlinePickerModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-xl modal-dialog-scrollable">
                         <div class="modal-content">
@@ -2465,7 +2504,7 @@
             </div>
 
             <div class="session-panel" id="session-panel-book-covering" role="tabpanel">
-                <% if (canViewBookCoveringReport && isMakeupRequiredInactive !== true) { %>
+                <% if (canViewBookCoveringReport && isInstructionalInactive !== true) { %>
                 <div class="card border-0 shadow-sm mb-3" id="sessionBookCoveringCard">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
@@ -3370,7 +3409,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionCanCreateMakeup = <%- jsonForScript(Boolean(canCreateMakeupSession)) %>;
     const sessionCanDeleteMakeupSessions = <%- jsonForScript(typeof canDeleteMakeupSessions !== 'undefined' && canDeleteMakeupSessions === true) %>;
     const sessionCanOverrideMakeupDuration = <%- jsonForScript(Boolean(typeof canOverrideMakeupDuration !== 'undefined' && canOverrideMakeupDuration === true)) %>;
-    const sessionInstructionalInactive = <%- jsonForScript(Boolean(isMakeupRequiredInactive)) %>;
+    const sessionInstructionalInactive = <%- jsonForScript(Boolean(isInstructionalInactive)) %>;
+    const sessionIsMergedRow = <%- jsonForScript(Boolean(isMergedSessionRow)) %>;
+    const sessionMergedPartnerReference = <%- jsonForScript(mergedPartnerReference || null) %>;
     const sessionDefaultTeacherId = <%- jsonForScript(session.delivery?.deliveredBy || '') %>;
     const sessionDefaultTeacherName = <%- jsonForScript(session.delivery?.deliveredByName || '') %>;
     const sessionDefaultRoom = <%- jsonForScript(session.room || '') %>;
@@ -4234,6 +4275,225 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sessionCanCreateMakeup) {
         document.getElementById('btnCreateMakeupSession')?.addEventListener('click', openMakeupSessionModal);
         document.getElementById('btnCreateMakeupSessionInline')?.addEventListener('click', openMakeupSessionModal);
+    }
+
+    let pendingMergedStatusCode = '';
+
+    function ensureMergedSessionModal() {
+        let modal = document.getElementById('mergedSessionModal');
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'mergedSessionModal';
+        modal.tabIndex = -1;
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = [
+            '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+            '<div class="modal-content">',
+            '<div class="modal-header bg-info text-white">',
+            '<h5 class="modal-title fw-bold"><i class="bi bi-people-fill me-2"></i>Merge Session</h5>',
+            '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>',
+            '</div>',
+            '<div class="modal-body">',
+            '<div class="alert alert-light border small" id="mergedSessionContext"></div>',
+            '<input type="hidden" id="mergedSessionTeacherId">',
+            '<div class="row g-3">',
+            '<div class="col-md-8"><label class="form-label fw-bold">Merging teacher</label><div class="input-group"><input type="text" class="form-control bg-white" id="mergedSessionTeacherName" readonly><button type="button" class="btn btn-outline-primary" id="mergedSessionPickTeacher"><i class="bi bi-person-check"></i></button></div></div>',
+            '</div>',
+            '<div id="mergedSessionPreviewPanel" class="mt-3"></div>',
+            '</div>',
+            '<div class="modal-footer bg-light">',
+            '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>',
+            '<button type="button" class="btn btn-info fw-bold text-white" id="mergedSessionConfirm" disabled><i class="bi bi-check-circle me-1"></i>Confirm Merge</button>',
+            '</div>',
+            '</div>',
+            '</div>'
+        ].join('');
+        document.body.appendChild(modal);
+        modal.querySelector('#mergedSessionPickTeacher')?.addEventListener('click', function () {
+            if (!window.GenericPicker || !window.GenericPickerPresets) {
+                void sessionMessageBox({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.' });
+                return;
+            }
+            window.GenericPicker.open(window.GenericPickerPresets.teacher({
+                title: 'Select Merging Teacher',
+                placeholder: 'Search teachers...',
+                context: window.GenericPickerContexts
+                    ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+                    : undefined,
+                onSelect: function (item) {
+                    const id = String(item?.personId || item?.id || item?.value || '').trim();
+                    const name = String(item?.name || item?.label || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || id).trim();
+                    modal.querySelector('#mergedSessionTeacherId').value = id;
+                    modal.querySelector('#mergedSessionTeacherName').value = name;
+                    previewMergedSessionPartner();
+                }
+            }));
+        });
+        modal.querySelector('#mergedSessionConfirm')?.addEventListener('click', executeMergedSessionFromModal);
+        modal.addEventListener('hidden.bs.modal', () => {
+            pendingMergedStatusCode = '';
+        });
+        return modal;
+    }
+
+    function renderMergedSessionPreview(partner, errorMessage) {
+        const panel = document.getElementById('mergedSessionPreviewPanel');
+        const confirmBtn = document.getElementById('mergedSessionConfirm');
+        if (!panel) return;
+        if (errorMessage) {
+            panel.innerHTML = '<div class="alert alert-danger border small mb-0"><i class="bi bi-exclamation-octagon-fill me-1"></i>' + attendanceAttachmentEscape(errorMessage) + '</div>';
+            if (confirmBtn) confirmBtn.disabled = true;
+            return;
+        }
+        if (!partner) {
+            panel.innerHTML = '<div class="alert alert-light border small mb-0 text-muted">Select a teacher to preview the matching session on their schedule.</div>';
+            if (confirmBtn) confirmBtn.disabled = true;
+            return;
+        }
+        panel.innerHTML = '<div class="card border-info border-2"><div class="card-body">'
+            + '<h6 class="fw-bold text-info mb-2"><i class="bi bi-check-circle-fill me-1"></i>Matching session found</h6>'
+            + '<div class="small"><strong>Class:</strong> ' + attendanceAttachmentEscape(partner.classTitle || partner.className || partner.classId || '-') + '</div>'
+            + '<div class="small"><strong>Session:</strong> ' + attendanceAttachmentEscape(partner.sessionId || '-') + '</div>'
+            + '<div class="small"><strong>Date / time:</strong> ' + attendanceAttachmentEscape(partner.date || '-') + ' · ' + attendanceAttachmentEscape(partner.startTime || '-') + ' – ' + attendanceAttachmentEscape(partner.endTime || '-') + '</div>'
+            + '<div class="small"><strong>Status:</strong> ' + attendanceAttachmentEscape(partner.statusLabel || partner.status || '-') + '</div>'
+            + (partner.manageUrl ? '<div class="small mt-2"><a href="' + attendanceAttachmentEscape(partner.manageUrl) + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i>Open partner session</a></div>' : '')
+            + '</div></div>';
+        if (confirmBtn) confirmBtn.disabled = false;
+    }
+
+    let mergedSessionPreviewPartner = null;
+
+    async function previewMergedSessionPartner() {
+        const modal = document.getElementById('mergedSessionModal');
+        const teacherId = String(modal?.querySelector('#mergedSessionTeacherId')?.value || '').trim();
+        mergedSessionPreviewPartner = null;
+        if (!teacherId) {
+            renderMergedSessionPreview(null);
+            return;
+        }
+        try {
+            const response = await fetch('/school/classes/' + encodeURIComponent(sessionManagerClassId) + '/sessions/' + encodeURIComponent(sessionManagerSessionId) + '/merge/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ teacherId, actionStateId })
+            });
+            const result = await response.json().catch(() => ({ status: 'error', message: 'Unable to read server response.' }));
+            if (!response.ok || result.status !== 'success') {
+                renderMergedSessionPreview(null, result.message || 'This teacher cannot take over this session and merge it to their class.');
+                return;
+            }
+            mergedSessionPreviewPartner = result?.data?.partner || null;
+            if (!mergedSessionPreviewPartner) {
+                renderMergedSessionPreview(null, 'This teacher cannot take over this session and merge it to their class.');
+                return;
+            }
+            renderMergedSessionPreview(mergedSessionPreviewPartner);
+        } catch (error) {
+            renderMergedSessionPreview(null, error?.message || 'Could not preview merge partner.');
+        }
+    }
+
+    function openMergedSessionModal(statusCode) {
+        pendingMergedStatusCode = normalizeStatusCode(statusCode) || 'merged_session';
+        const modal = ensureMergedSessionModal();
+        modal.querySelector('#mergedSessionTeacherId').value = '';
+        modal.querySelector('#mergedSessionTeacherName').value = '';
+        mergedSessionPreviewPartner = null;
+        renderMergedSessionPreview(null);
+        modal.querySelector('#mergedSessionContext').innerHTML = '<strong>Source session:</strong> ' + attendanceAttachmentEscape(sessionManagerSessionId)
+            + '<div class="small text-muted mt-1">' + attendanceAttachmentEscape(sessionDefaultDate || '-') + ' · ' + attendanceAttachmentEscape(sessionDefaultStartTime || '-') + ' – ' + attendanceAttachmentEscape(sessionDefaultEndTime || '-') + '</div>'
+            + '<div class="small text-muted">Pick a teacher who has a session at the exact same start and end time.</div>';
+        if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+
+    async function executeMergedSessionFromModal() {
+        const modal = document.getElementById('mergedSessionModal');
+        const button = modal?.querySelector('#mergedSessionConfirm');
+        const oldHtml = button ? button.innerHTML : '';
+        const teacherId = String(modal?.querySelector('#mergedSessionTeacherId')?.value || '').trim();
+        const partner = mergedSessionPreviewPartner;
+        if (!teacherId || !partner?.classId || !partner?.sessionId) {
+            await sessionMessageBox({ title: 'Merge Incomplete', icon: 'warning', message: 'Select a teacher with a valid matching session before confirming.' });
+            return;
+        }
+        const payload = {
+            teacherId,
+            partnerClassId: partner.classId,
+            partnerSessionId: partner.sessionId,
+            mergedStatusCode: pendingMergedStatusCode || 'merged_session',
+            actionStateId
+        };
+        try {
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Merging...';
+            }
+            if (typeof window.showLoading === 'function') window.showLoading('Merging session...');
+            const response = await fetch('/school/classes/' + encodeURIComponent(sessionManagerClassId) + '/sessions/' + encodeURIComponent(sessionManagerSessionId) + '/merge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json().catch(() => ({ status: 'error', message: 'Unable to read server response.' }));
+            if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Could not merge session.');
+            if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).hide();
+            await sessionMessageBox({ title: 'Session Merged', icon: 'success', message: result.message || 'Session merged successfully.' });
+            window.location.reload();
+        } catch (error) {
+            await sessionMessageBox({ title: 'Merge Failed', icon: 'error', message: error?.message || 'Could not merge session.' });
+        } finally {
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+            if (button) {
+                button.innerHTML = oldHtml;
+                button.disabled = !mergedSessionPreviewPartner;
+            }
+        }
+    }
+
+    async function unmergeSessionFromManager() {
+        const proceed = await sessionConfirmBox({
+            title: 'Undo merge?',
+            icon: 'warning',
+            html: true,
+            message: '<p>This will restore this session to <strong>Scheduled</strong>, reinstate the original main teacher, remove the unpaid previous-teacher co-teacher row, and clear the partner link on both sessions.</p><p class="mb-0">Timesheet entries are not automatically adjusted.</p>',
+            confirmButton: 'Undo merge',
+            cancelButton: 'Cancel'
+        });
+        if (!proceed) return;
+        const button = document.getElementById('btnUndoSessionMerge');
+        const oldHtml = button ? button.innerHTML : '';
+        try {
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Undoing...';
+            }
+            if (typeof window.showLoading === 'function') window.showLoading('Undoing session merge...');
+            const response = await fetch('/school/classes/' + encodeURIComponent(sessionManagerClassId) + '/sessions/' + encodeURIComponent(sessionManagerSessionId) + '/merge/unmerge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ actionStateId })
+            });
+            const result = await response.json().catch(() => ({ status: 'error', message: 'Unable to read server response.' }));
+            if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Could not undo session merge.');
+            await sessionMessageBox({ title: 'Merge Undone', icon: 'success', message: result.message || 'Session restored to Scheduled.' });
+            window.location.reload();
+        } catch (error) {
+            await sessionMessageBox({ title: 'Undo Merge Failed', icon: 'error', message: error?.message || 'Could not undo session merge.' });
+        } finally {
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+            if (button) {
+                button.innerHTML = oldHtml;
+                button.disabled = false;
+            }
+        }
+    }
+
+    if (sessionIsMergedRow && sessionCanEditMetadata) {
+        document.getElementById('btnUndoSessionMerge')?.addEventListener('click', unmergeSessionFromManager);
     }
 
     if (sessionCanDeleteSession) {
@@ -6555,10 +6815,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const meta = resolveStatusMeta(statusCode);
         return Boolean(meta && meta.makeUpRequired === true);
     }
+    function isSessionStatusMergedRequired(statusCode) {
+        const meta = resolveStatusMeta(statusCode);
+        return Boolean(meta && meta.mergedSessionRequired === true);
+    }
     function isSessionCompletionStatus(statusCode) {
         const meta = resolveStatusMeta(statusCode);
         if (!meta) return normalizeStatusCode(statusCode) === 'completed';
-        return meta.isFinal === true && meta.makeUpRequired !== true && meta.excludeFromAttendance !== true;
+        return meta.isFinal === true && meta.makeUpRequired !== true && meta.mergedSessionRequired !== true && meta.excludeFromAttendance !== true;
     }
     function isReportRowSubmitted(row) {
         if (row?.isPending) return false;
@@ -6789,15 +7053,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
     });
 
+    function normalizeSessionCoTeacherPaidFlag(value) {
+        if (value === false || String(value || '').trim().toLowerCase() === 'false' || String(value || '').trim().toLowerCase() === 'unpaid') {
+            return false;
+        }
+        return true;
+    }
+
+    function parseSessionCoTeacherPaidHours(value) {
+        if (value === '' || value === null || value === undefined) return null;
+        const parsed = Number.parseFloat(value);
+        if (!Number.isFinite(parsed) || parsed < 0) return null;
+        return Number(Math.min(parsed, 24).toFixed(2));
+    }
+
+    function getCurrentSessionDurationHours() {
+        const start = String(document.getElementById('sessionStartTime')?.value || sessionDefaultStartTime || '').trim();
+        const end = String(document.getElementById('sessionEndTime')?.value || sessionDefaultEndTime || '').trim();
+        if (start && end && /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end)) {
+            const [sh, sm] = start.split(':').map(Number);
+            const [eh, em] = end.split(':').map(Number);
+            const minutes = ((eh * 60) + em) - ((sh * 60) + sm);
+            if (minutes > 0) return Number((minutes / 60).toFixed(2));
+        }
+        const fallback = Number(sessionOriginalDurationHours || 0);
+        return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+    }
+
+    function formatSessionCoTeacherPaymentLabel(row = {}) {
+        if (!row || row.paid === false) return 'Unpaid';
+        const hours = Number.parseFloat(row.paidHours);
+        if (Number.isFinite(hours)) return `Paid ${hours}h`;
+        return 'Paid (session duration)';
+    }
+
     function normalizeSessionCoTeacherRow(row = {}) {
         const personId = String(row?.personId || '').trim();
         if (!personId) return null;
-        return {
+        const paid = normalizeSessionCoTeacherPaidFlag(row.paid);
+        const parsedPaidHours = parseSessionCoTeacherPaidHours(row.paidHours);
+        const out = {
             personId,
             name: String(row?.name || personId).trim() || personId,
             roleLabel: String(row?.roleLabel || 'Co-Teacher').trim() || 'Co-Teacher',
-            canEdit: row?.canEdit === true
+            canEdit: row?.canEdit === true,
+            paid
         };
+        if (!paid) {
+            out.paidHours = 0;
+        } else if (parsedPaidHours !== null) {
+            out.paidHours = parsedPaidHours;
+        } else {
+            out.paidHours = getCurrentSessionDurationHours();
+        }
+        return out;
     }
 
     function getSessionMainTeacherIdForCoTeachers() {
@@ -6827,6 +7136,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 : (row.canEdit
                     ? '<span class="badge bg-success-subtle text-success border">Can edit</span>'
                     : '<span class="badge bg-light text-muted border">View only</span>');
+            const paymentHtml = canManage
+                ? `<div class="d-flex align-items-center gap-1 flex-wrap">
+                        <select class="form-select form-select-sm session-co-paid" style="max-width:6.5rem;">
+                            <option value="paid" ${row.paid !== false ? 'selected' : ''}>Paid</option>
+                            <option value="unpaid" ${row.paid === false ? 'selected' : ''}>Unpaid</option>
+                        </select>
+                        <input type="number" class="form-control form-control-sm session-co-paid-hours" step="0.25" min="0" max="24" style="max-width:4.5rem;" value="${row.paid === false ? '' : Number(row.paidHours || 0).toFixed(2)}" ${row.paid === false ? 'disabled' : ''} title="Paid hours">
+                   </div>`
+                : `<span class="badge bg-light text-muted border">${formatSessionCoTeacherPaymentLabel(row)}</span>`;
             const removeHtml = canManage
                 ? '<button type="button" class="btn btn-sm btn-outline-danger session-co-remove" title="Remove"><i class="bi bi-x"></i></button>'
                 : '';
@@ -6835,7 +7153,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="fw-semibold">${String(row.name || row.personId).replace(/</g, '&lt;')}</span>
                     <span class="text-muted"> · ${String(row.roleLabel || 'Co-Teacher').replace(/</g, '&lt;')}</span>
                 </div>
-                <div class="d-flex align-items-center gap-2 flex-shrink-0">${toggleHtml}${removeHtml}</div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">${paymentHtml}${toggleHtml}${removeHtml}</div>
             </div>`;
         }).join('');
     }
@@ -6885,7 +7203,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     return;
                 }
-                sessionCoTeachersState = [...(sessionCoTeachersState || []), { personId, name, roleLabel: 'Co-Teacher', canEdit: false }];
+                sessionCoTeachersState = [...(sessionCoTeachersState || []), {
+                    personId,
+                    name,
+                    roleLabel: 'Co-Teacher',
+                    canEdit: false,
+                    paid: true,
+                    paidHours: getCurrentSessionDurationHours()
+                }];
                 markSessionAutosaveMetadataDirty();
                 renderSessionCoTeachersList();
             }
@@ -6893,6 +7218,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('sessionCoTeachersList')?.addEventListener('change', function (event) {
+        const paidSelect = event.target.closest('.session-co-paid');
+        if (paidSelect && sessionCanManageCoTeachers) {
+            const rowEl = paidSelect.closest('.session-co-teacher-row');
+            const personId = String(rowEl?.getAttribute('data-person-id') || '').trim();
+            const isPaid = String(paidSelect.value || 'paid').trim().toLowerCase() !== 'unpaid';
+            const hoursInput = rowEl?.querySelector('.session-co-paid-hours');
+            if (hoursInput) {
+                hoursInput.disabled = !isPaid;
+                if (!isPaid) hoursInput.value = '';
+                else if (!hoursInput.value) hoursInput.value = Number(getCurrentSessionDurationHours()).toFixed(2);
+            }
+            sessionCoTeachersState = (sessionCoTeachersState || []).map((row) => {
+                if (String(row.personId) !== personId) return row;
+                return normalizeSessionCoTeacherRow({
+                    ...row,
+                    paid: isPaid,
+                    paidHours: isPaid ? (hoursInput?.value || getCurrentSessionDurationHours()) : 0
+                });
+            });
+            markSessionAutosaveMetadataDirty();
+            return;
+        }
+        const paidHoursInput = event.target.closest('.session-co-paid-hours');
+        if (paidHoursInput && sessionCanManageCoTeachers) {
+            const rowEl = paidHoursInput.closest('.session-co-teacher-row');
+            const personId = String(rowEl?.getAttribute('data-person-id') || '').trim();
+            sessionCoTeachersState = (sessionCoTeachersState || []).map((row) => (
+                String(row.personId) === personId
+                    ? normalizeSessionCoTeacherRow({ ...row, paid: true, paidHours: paidHoursInput.value })
+                    : row
+            ));
+            markSessionAutosaveMetadataDirty();
+            return;
+        }
         const toggle = event.target.closest('.session-co-can-edit');
         if (!toggle) return;
         if (!sessionCanToggleCoTeacherEdit) return;
@@ -6978,6 +7337,19 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', async () => {
                 if (wouldBlockCompletionStatus(code)) {
                     await showPendingReportsBlockModal(getUnsubmittedSessionReports());
+                    return;
+                }
+                if (isSessionStatusMergedRequired(code) && !sessionIsMergedRow) {
+                    if (sessionStatusModalInstance) sessionStatusModalInstance.hide();
+                    openMergedSessionModal(code);
+                    return;
+                }
+                if (sessionIsMergedRow && !isSessionStatusMergedRequired(code)) {
+                    await sessionMessageBox({
+                        title: 'Undo merge required',
+                        icon: 'warning',
+                        message: 'Use Undo merge to return this session to Scheduled. Changing status alone does not undo a merged session.'
+                    });
                     return;
                 }
                 statusSelect.value = code;
@@ -7340,7 +7712,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* --- Session content stream (manual content) --- */
-    const contentReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
+    const contentReadOnly = <%= JSON.stringify(!!isReadOnly || !!isInstructionalInactive) %>;
     let manualSessionContentState = <%- jsonForScript(sessionContentItems || []) %>;
     let sessionContentOrderState = <%- jsonForScript(sessionContentOrder || []) %>;
 
@@ -7609,7 +7981,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSessionContentList();
 
     /* --- Curriculum: skills covered this session --- */
-    const skillsCoveredReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
+    const skillsCoveredReadOnly = <%= JSON.stringify(!!isReadOnly || !!isInstructionalInactive) %>;
     const skillsCoveredCatalog = <%- jsonForScript(gradebookSkills || []) %>;
     const skillsCoveredLabelById = new Map(skillsCoveredCatalog.map((skill) => [skill.id, skill.label]));
     const CLB_SKILL_IDS = new Set(
@@ -8460,7 +8832,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderOutlineSuggestions();
 
     /* --- Session gradebook (multiple activities per session) --- */
-    const gbReadOnly = <%= JSON.stringify(!!isReadOnly || !!isMakeupRequiredInactive) %>;
+    const gbReadOnly = <%= JSON.stringify(!!isReadOnly || !!isInstructionalInactive) %>;
     const gbClassId = sessionManagerClassId;
     const gbSessionId = sessionManagerSessionId;
     const gradebookRoster = <%- jsonForScript((session.roster || []).map((r) => ({ personId: String(r.personId), name: r.name || 'Student' }))) %>;

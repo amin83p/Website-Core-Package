@@ -94,7 +94,7 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
           isFinalStatus
         });
         if (isBlockingNonFinal) return;
-        const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+        const formulaTimesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
           status: sessionRow?.status,
           notes: sessionRow?.notes,
           durationHours: rawDurationHours,
@@ -102,6 +102,14 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
         });
         const isCoTeacherSession = !sessionDeliveryTeamService.isPersonSessionMainTeacher(sessionRow, personId)
           && sessionDeliveryTeamService.isPersonOnSessionDelivery(sessionRow, personId);
+        const coTeacherEntry = isCoTeacherSession
+          ? sessionDeliveryTeamService.findCoTeacherEntry(sessionRow, personId)
+          : null;
+        const timesheetHours = sessionDeliveryTeamService.resolveCoTeacherTimesheetHours({
+          session: sessionRow,
+          personId,
+          formulaHours: formulaTimesheetHours
+        });
         liveSessionBuilders.push({
           classId: String(classRow?.id || ''),
           sessionRow,
@@ -123,8 +131,12 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
             isManual: false,
             isCoTeacherSession,
             coTeacherRoleLabel: isCoTeacherSession
-              ? String(sessionDeliveryTeamService.findCoTeacherEntry(sessionRow, personId)?.roleLabel || 'Co-Teacher')
+              ? String(coTeacherEntry?.roleLabel || 'Co-Teacher')
               : '',
+            coTeacherPaid: isCoTeacherSession ? coTeacherEntry?.paid !== false : false,
+            coTeacherPaidHours: isCoTeacherSession && coTeacherEntry?.paid !== false
+              ? (sessionDeliveryTeamService.normalizePaidHours(coTeacherEntry?.paidHours) ?? timesheetHours)
+              : 0,
             ...buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId)
           }, { period, isFinalStatus })
         });

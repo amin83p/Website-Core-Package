@@ -420,6 +420,10 @@ window.GenericPicker = (function() {
         });
         modalEl.addEventListener('hidden.bs.modal', () => {
             clearSearchDebounce();
+            modalEl.style.removeProperty('z-index');
+            document.querySelectorAll('.modal-backdrop.show').forEach((backdrop) => {
+                backdrop.style.removeProperty('z-index');
+            });
         });
         if (loadMoreBtn) {
             loadMoreBtn.addEventListener('click', () => {
@@ -928,6 +932,32 @@ window.GenericPicker = (function() {
         if (isMulti) updateAddSelectedUI();
     }
 
+    function elevatePickerAboveOpenModals() {
+        if (!modalEl) return null;
+        const openModals = Array.from(document.querySelectorAll('.modal.show'));
+        if (!openModals.length) {
+            modalEl.style.removeProperty('z-index');
+            return null;
+        }
+        let maxZ = 1050;
+        openModals.forEach((openModal) => {
+            const z = Number.parseInt(window.getComputedStyle(openModal).zIndex, 10);
+            if (Number.isFinite(z) && z > maxZ) maxZ = z;
+        });
+        const pickerZ = maxZ + 10;
+        document.body.appendChild(modalEl);
+        modalEl.style.setProperty('z-index', String(pickerZ), 'important');
+        const syncPickerBackdrop = () => {
+            const backdrops = document.querySelectorAll('.modal-backdrop.show');
+            const lastBackdrop = backdrops[backdrops.length - 1];
+            if (lastBackdrop) {
+                lastBackdrop.style.setProperty('z-index', String(pickerZ - 5), 'important');
+            }
+        };
+        modalEl.addEventListener('shown.bs.modal', syncPickerBackdrop, { once: true });
+        return pickerZ;
+    }
+
     init();
 
     return {
@@ -1021,6 +1051,7 @@ window.GenericPicker = (function() {
               inputEl.value = initialTerm;
             }
 
+            elevatePickerAboveOpenModals();
             bsModal.show();
 
             if (initialTerm.length >= 2) {

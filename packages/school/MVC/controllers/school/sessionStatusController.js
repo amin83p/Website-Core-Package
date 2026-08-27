@@ -80,6 +80,7 @@ function buildPayload(reqBody, { activeOrgId, userId }) {
     isFinal: toBoolean(reqBody.isFinal, false),
     makeUpRequired: toBoolean(reqBody.makeUpRequired, false),
     makeupDurationPercent: Number(reqBody.makeupDurationPercent || 100),
+    mergedSessionRequired: toBoolean(reqBody.mergedSessionRequired, false),
     excludeFromAttendance: toBoolean(reqBody.excludeFromAttendance, false),
     excludeFromTeacherIndex: toBoolean(reqBody.excludeFromTeacherIndex, false),
     excludeFromStudentIndex: toBoolean(reqBody.excludeFromStudentIndex, false),

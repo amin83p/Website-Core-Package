@@ -1720,7 +1720,7 @@ exports.viewTimesheet = async (req, res) => {
                         return;
                     }
                 }
-                const timesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+                const formulaTimesheetHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                     status: s.status,
                     notes: s.notes,
                     durationHours: rawDurationHours,
@@ -1728,6 +1728,14 @@ exports.viewTimesheet = async (req, res) => {
                 });
                 const isCoTeacherSession = !sessionDeliveryTeamService.isPersonSessionMainTeacher(s, teacherContext.targetTeacherId)
                     && sessionDeliveryTeamService.isPersonOnSessionDelivery(s, teacherContext.targetTeacherId);
+                const coTeacherEntry = isCoTeacherSession
+                    ? sessionDeliveryTeamService.findCoTeacherEntry(s, teacherContext.targetTeacherId)
+                    : null;
+                const timesheetHours = sessionDeliveryTeamService.resolveCoTeacherTimesheetHours({
+                    session: s,
+                    personId: teacherContext.targetTeacherId,
+                    formulaHours: formulaTimesheetHours
+                });
                 liveSessionBuilders.push({
                     classId: String(c.id || ''),
                     sessionRow: s,
@@ -1748,8 +1756,12 @@ exports.viewTimesheet = async (req, res) => {
                         room: s.room || '',
                         isCoTeacherSession,
                         coTeacherRoleLabel: isCoTeacherSession
-                            ? String(sessionDeliveryTeamService.findCoTeacherEntry(s, teacherContext.targetTeacherId)?.roleLabel || 'Co-Teacher')
+                            ? String(coTeacherEntry?.roleLabel || 'Co-Teacher')
                             : '',
+                        coTeacherPaid: isCoTeacherSession ? coTeacherEntry?.paid !== false : false,
+                        coTeacherPaidHours: isCoTeacherSession && coTeacherEntry?.paid !== false
+                            ? (sessionDeliveryTeamService.normalizePaidHours(coTeacherEntry?.paidHours) ?? timesheetHours)
+                            : 0,
                         ...deadlineClassification,
                         ...buildTimesheetMakeupMeta(s, c, sessionsByClassId)
                     }

@@ -1166,7 +1166,7 @@
     </div>
     <div class="collapse" id="scheduleFilterCollapse">
       <div class="card-body filter-panel p-3" id="scheduleFilterForm">
-        <% if (canSelectAnyPerson) { %>
+              <% if (canSelectAnyPerson) { %>
         <div class="schedule-filter-admin">
           <div class="schedule-filter-admin-row">
             <div class="schedule-filter-field">
@@ -1176,8 +1176,8 @@
                 <option value="student">Student</option>
                 <option value="staff">Staff</option>
                 <option value="">All roles</option>
-              </select>
-            </div>
+            </select>
+          </div>
             <div class="schedule-filter-field schedule-filter-people">
               <label>People</label>
               <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
@@ -1185,16 +1185,16 @@
               <div class="schedule-people-actions">
                 <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker" title="Select people">
                   <i class="bi bi-people-fill me-1"></i>Select people
-                </button>
+              </button>
                 <button type="button" class="btn btn-outline-secondary px-3" id="btn_clearPerson" title="Clear people" aria-label="Clear people">
-                  <i class="bi bi-x-lg"></i>
-                </button>
-              </div>
-            </div>
+                <i class="bi bi-x-lg"></i>
+              </button>
+          </div>
+          </div>
             <div class="schedule-filter-field">
               <label for="sch_startDate">Start date</label>
               <input type="date" id="sch_startDate" class="form-control schedule-date-input">
-            </div>
+          </div>
             <div class="schedule-filter-field">
               <label for="sch_endDate">End date</label>
               <input type="date" id="sch_endDate" class="form-control schedule-date-input">
@@ -1202,10 +1202,10 @@
             <div class="schedule-filter-field schedule-filter-cases">
               <label for="sch_hasCases">Cases</label>
               <div class="schedule-cases-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
+              <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
                 <label class="form-check-label" for="sch_hasCases">With cases only</label>
-              </div>
             </div>
+          </div>
           </div>
           <div class="schedule-quick-dates">
             <span class="schedule-quick-dates-label">Quick range</span>
@@ -1235,16 +1235,16 @@
             <div class="schedule-date-field">
               <label for="sch_startDate">Start date</label>
               <input type="date" id="sch_startDate" class="form-control schedule-date-input">
-            </div>
+      </div>
             <div class="schedule-date-field">
               <label for="sch_endDate">End date</label>
               <input type="date" id="sch_endDate" class="form-control schedule-date-input">
-            </div>
+    </div>
             <div class="schedule-date-action">
               <button type="button" id="btn_loadSchedule" class="btn btn-primary schedule-show-btn">
                 <i class="bi bi-arrow-clockwise me-1"></i> Show schedule
               </button>
-            </div>
+  </div>
           </div>
           <div class="schedule-quick-dates">
             <span class="schedule-quick-dates-label">Quick range</span>
@@ -1256,9 +1256,9 @@
               <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="month">This month</button>
               <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="season">Next 3 months</button>
               <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="year">This year</button>
-            </div>
-          </div>
         </div>
+      </div>
+    </div>
         <% } %>
 
       </div>
@@ -2326,7 +2326,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         if (mode === 'verticalTimeline') {
-            document.querySelector('.schedule-shell')?.style.setProperty('--schedule-day-width', `${resolved}px`);
+        document.querySelector('.schedule-shell')?.style.setProperty('--schedule-day-width', `${resolved}px`);
             const container = document.getElementById('visualDisplayArea');
             if (container) container.style.setProperty('--session-day-width', `${resolved}px`);
         }
@@ -2590,10 +2590,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="schedule-viewbar">
                 <div class="schedule-viewbar-row">
                     <div class="schedule-viewbar-row-left">
-                        <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
-                    </div>
+                    <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
+                </div>
                     <div class="schedule-viewbar-row-right schedule-viewbar-actions">
-                        ${switchButtons}
+                    ${switchButtons}
                         ${hideEmptyDaysButton}
                         <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-open-legend aria-label="Legend" title="Legend"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
                     </div>
@@ -3589,92 +3589,92 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildScheduleVerticalBlockInner(ev) {
         const scd = window.ScheduleCompletionDisplay;
-        const eventTitle = getEventTitle(ev);
-        const cssClass = scheduleEventRoleClass(ev);
-        const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
-        const blockClasses = scd
+                const eventTitle = getEventTitle(ev);
+                const cssClass = scheduleEventRoleClass(ev);
+                const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+                const blockClasses = scd
             ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
             : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
-        const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
-        const selectionKey = scheduleSessionSelectionKey(ev);
-        const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
-        const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
-        const selectionControl = scheduleSessionSelectHtml(ev);
-        const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
-        const detailsUrl = getEventDetailsUrl(ev);
-        const encodedDetailsUrl = encodeURIComponent(detailsUrl);
-        const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+                const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
+                const selectionKey = scheduleSessionSelectionKey(ev);
+                const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+                const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
+                const selectionControl = scheduleSessionSelectHtml(ev);
+                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
+                const detailsUrl = getEventDetailsUrl(ev);
+                const encodedDetailsUrl = encodeURIComponent(detailsUrl);
+                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
         const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
-        const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
-        const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
-        const soloStudentHtml = scheduleSoloStudentHtml(ev);
+                const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
+                const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
+                const soloStudentHtml = scheduleSoloStudentHtml(ev);
         return `
-            <div class="${blockClasses}${selectedClass}${unselectableClass}"
+                        <div class="${blockClasses}${selectedClass}${unselectableClass}" 
                  style="${mergeScheduleBlockLayoutStyle('position:absolute;inset:2px;', scan)}"
-                 data-schedule-session-key="${escapeHtml(selectionKey)}"
-                 data-tip="${escapeHtml(tipLabel)}"
-                 data-tip-bg="${escapeHtml(tipStyle.bg)}"
-                 data-tip-fg="${escapeHtml(tipStyle.fg)}"
-                 data-tip-border="${escapeHtml(tipStyle.border)}"
-                 aria-label="${escapeHtml(tipLabel)}"
-                 tabindex="0"
-                 ${clickHandler}>
-                 ${selectionControl}
-                 ${statusChip}
-                 <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
-                 ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
-                 <div class="event-meta x-small">
+                             data-schedule-session-key="${escapeHtml(selectionKey)}"
+                             data-tip="${escapeHtml(tipLabel)}"
+                             data-tip-bg="${escapeHtml(tipStyle.bg)}"
+                             data-tip-fg="${escapeHtml(tipStyle.fg)}"
+                             data-tip-border="${escapeHtml(tipStyle.border)}"
+                             aria-label="${escapeHtml(tipLabel)}"
+                             tabindex="0"
+                             ${clickHandler}>
+                             ${selectionControl}
+                             ${statusChip}
+                             <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
+                             ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
+                             <div class="event-meta x-small">
                     <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatScheduleClockRange(ev.start, ev.end))}</span>
-                    ${makeupBadge}
-                 </div>
-                 ${soloStudentHtml}
-            </div>
-        `;
+                                ${makeupBadge}
+                             </div>
+                             ${soloStudentHtml}
+                    </div>
+                `;
     }
 
     function buildScheduleHorizontalBlockInner(ev) {
         const scd = window.ScheduleCompletionDisplay;
-        const eventTitle = getEventTitle(ev);
-        const cssClass = scheduleEventRoleClass(ev);
-        const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
-        const blockClasses = scd
+                const eventTitle = getEventTitle(ev);
+                const cssClass = scheduleEventRoleClass(ev);
+                const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+                const blockClasses = scd
             ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
             : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
-        const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
-        const selectionKey = scheduleSessionSelectionKey(ev);
-        const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
-        const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
-        const selectionControl = scheduleSessionSelectHtml(ev);
-        const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
-        const detailsUrl = getEventDetailsUrl(ev);
-        const encodedDetailsUrl = encodeURIComponent(detailsUrl);
-        const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
-        const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
-        const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
-        const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
-        const soloStudentHtml = scheduleSoloStudentHtml(ev);
+                const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
+                const selectionKey = scheduleSessionSelectionKey(ev);
+                const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
+                const unselectableClass = selectionKey && !canSelectScheduleSession(ev) ? ' is-session-unselectable' : '';
+                const selectionControl = scheduleSessionSelectHtml(ev);
+                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
+                const detailsUrl = getEventDetailsUrl(ev);
+                const encodedDetailsUrl = encodeURIComponent(detailsUrl);
+                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+                const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
+                const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
+                const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
+                const soloStudentHtml = scheduleSoloStudentHtml(ev);
         return `
-            <div class="${blockClasses}${selectedClass}${unselectableClass}"
+                    <div class="${blockClasses}${selectedClass}${unselectableClass}"
                  style="${mergeScheduleBlockLayoutStyle('position:absolute;inset:2px 2px 2px 2px;', scan)}"
-                 data-schedule-session-key="${escapeHtml(selectionKey)}"
-                 data-tip="${escapeHtml(tipLabel)}"
-                 data-tip-bg="${escapeHtml(tipStyle.bg)}"
-                 data-tip-fg="${escapeHtml(tipStyle.fg)}"
-                 data-tip-border="${escapeHtml(tipStyle.border)}"
-                 aria-label="${escapeHtml(tipLabel)}"
-                 tabindex="0"
-                 ${clickHandler}>
-                 ${selectionControl}
-                 ${statusChip}
-                 <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
-                 ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
-                 <div class="event-meta x-small">
+                         data-schedule-session-key="${escapeHtml(selectionKey)}"
+                         data-tip="${escapeHtml(tipLabel)}"
+                         data-tip-bg="${escapeHtml(tipStyle.bg)}"
+                         data-tip-fg="${escapeHtml(tipStyle.fg)}"
+                         data-tip-border="${escapeHtml(tipStyle.border)}"
+                         aria-label="${escapeHtml(tipLabel)}"
+                         tabindex="0"
+                         ${clickHandler}>
+                         ${selectionControl}
+                         ${statusChip}
+                         <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
+                         ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
+                         <div class="event-meta x-small">
                     <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatScheduleClockRange(ev.start, ev.end))}</span>
-                    ${makeupBadge}
-                 </div>
-                 ${soloStudentHtml}
-            </div>
-        `;
+                            ${makeupBadge}
+                         </div>
+                         ${soloStudentHtml}
+                    </div>
+                `;
     }
 
     function buildSchedulePositionedBlockHtml(ev, layout = {}) {
@@ -3753,18 +3753,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCalendarView(eventsByDate, startStr, endStr, container) {
         const scd = window.ScheduleCompletionDisplay;
         let current = new Date(startStr + 'T00:00:00');
-        current.setDate(1);
-
+        current.setDate(1); 
+        
         const end = new Date(endStr + 'T00:00:00');
         end.setMonth(end.getMonth() + 1);
-        end.setDate(0);
+        end.setDate(0); 
 
         let html = '<div class="schedule-month-stack">';
         while (current <= end) {
             const year = current.getFullYear();
             const month = current.getMonth();
             const monthName = current.toLocaleString('default', { month: 'long', year: 'numeric' });
-            const firstDayIndex = new Date(year, month, 1).getDay();
+            const firstDayIndex = new Date(year, month, 1).getDay(); 
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             html += `
                 <div class="schedule-month-card">
@@ -3775,7 +3775,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             ['S','M','T','W','T','F','S'].forEach(d => html += `<div class="text-center x-small fw-bold text-muted mb-1">${d}</div>`);
             for(let i=0; i<firstDayIndex; i++) html += `<div class="cal-day empty"></div>`;
-
+            
             for(let d=1; d<=daysInMonth; d++) {
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                 const dayEvents = eventsByDate[dateStr] || [];
@@ -3784,7 +3784,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const count = dayEvents.length;
                 const reportMarker = dayEvents.some(isReportScheduleEvent) ? buildReportPriorityMarker(dayEvents.find(isReportScheduleEvent)) : '';
                 let classes = 'cal-day ';
-
+                
                 if (hasConflict) {
                     classes += 'conflict';
                 } else if (hasLeave) {
@@ -3810,7 +3810,7 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `</div></div></div></div>`;
             current.setMonth(current.getMonth() + 1);
         }
-
+        
         html += '</div>';
         container.innerHTML = html;
     }

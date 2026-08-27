@@ -29,6 +29,7 @@ const programRegistrationDraftService = require('../../services/school/programRe
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const makeupSessionAllocationService = require('../../services/school/makeupSessionAllocationService');
+const sessionMergeService = require('../../services/school/sessionMergeService');
 const skillCatalogService = require('../../services/school/skillCatalogService');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
@@ -2403,6 +2404,14 @@ function isMakeUpRequiredSessionByMap(statusMap, session = {}) {
     return resolved?.definition?.makeUpRequired === true;
 }
 
+function isMergedSessionRequiredSessionByMap(statusMap, session = {}) {
+    const resolved = sessionStatusPolicyService.resolveStatusDefinition(statusMap, {
+        status: session?.status,
+        notes: session?.notes
+    });
+    return resolved?.definition?.mergedSessionRequired === true;
+}
+
 async function assertSessionInstructionalActiveForRequest(classId, sessionId, req) {
     const reqUser = req?.user || req;
     const accessContext = req?.user ? buildRouteAccessContext(req) : {};
@@ -3961,6 +3970,40 @@ async function manageSession(req, res) {
                 found: true
             };
         })();
+        const mergedPartnerSessionReference = await (async () => {
+            if (!sessionMergeService.isMergedSessionRow(session)) return null;
+            const partnerClassId = toPublicId(session?.merged?.partnerClassId);
+            const partnerSessionId = toPublicId(session?.merged?.partnerSessionId);
+            if (!partnerClassId || !partnerSessionId) return null;
+            const partnerSessions = idsEqual(partnerClassId, classId)
+                ? sessions
+                : await schoolDataService.getClassSessions(partnerClassId, req.user).catch(() => []);
+            const partnerSession = (Array.isArray(partnerSessions) ? partnerSessions : [])
+                .find((row) => idsEqual(row?.sessionId || row?.id, partnerSessionId)) || null;
+            const partnerClassData = idsEqual(partnerClassId, classId)
+                ? classData
+                : await schoolDataService.getDataById('classes', partnerClassId, req.user).catch(() => null);
+            const className = String(partnerClassData?.title || partnerClassData?.name || partnerClassId || '').trim();
+            if (!partnerSession) {
+                return {
+                    classId: partnerClassId,
+                    className,
+                    sessionId: partnerSessionId,
+                    found: false,
+                    manageUrl: `/school/classes/${encodeURIComponent(String(partnerClassId))}/sessions/${encodeURIComponent(String(partnerSessionId))}`
+                };
+            }
+            return {
+                ...sessionMergeService.buildPartnerReference({
+                    classId: partnerClassId,
+                    session: partnerSession,
+                    classTitle: className,
+                    statusDefinitions: sessionStatusMeta
+                }),
+                className,
+                found: true
+            };
+        })();
         const isSessionLocked = session.locked === true || String(session.locked) === 'true';
         const isReadOnly = !canEditSession || (isSessionLocked && !canOverride);
 
@@ -4275,6 +4318,7 @@ async function manageSession(req, res) {
             canDeleteMakeupSessions: Boolean(canEditSession && !isReadOnly),
             makeupSummary,
             makeupOriginalSessionReference,
+            mergedPartnerSessionReference,
             canViewSchoolSettings,
             canDeleteStudentCases: Boolean(sessionStudentCaseDeleteAccess?.allowed),
             canDeleteSession,
@@ -4987,6 +5031,133 @@ async function createMakeupSession(req, res) {
     }
 }
 
+async function previewSessionMerge(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+
+        const mergingTeacherId = cleanPersonId(req.body?.teacherId || req.body?.mergingTeacherId);
+        if (!mergingTeacherId) throw new Error('Teacher is required.');
+
+        const partner = await sessionMergeService.findPartnerSessionForMerge({
+            orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+            sourceClassId: classId,
+            sourceSession: session,
+            mergingTeacherId,
+            reqUser: req.user
+        });
+
+        if (!partner) {
+            const failure = await sessionMergeService.explainPartnerSessionMergeFailure({
+                orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+                sourceClassId: classId,
+                sourceSession: session,
+                mergingTeacherId,
+                reqUser: req.user
+            });
+            return res.status(409).json({
+                status: 'error',
+                code: failure?.code || 'MERGE_PARTNER_NOT_FOUND',
+                message: failure?.message || 'This teacher cannot take over this session and merge it to their class.',
+                data: failure?.scan ? { scan: failure.scan } : undefined
+            });
+        }
+
+        return res.json({
+            status: 'success',
+            data: {
+                partner,
+                mergingTeacherId,
+                mergingTeacherName: await sessionMergeService.resolvePersonDisplayName(mergingTeacherId, req.user)
+            }
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: String(error?.code || ''),
+            message: error.message,
+            data: error?.data || undefined
+        });
+    }
+}
+
+async function executeSessionMerge(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+        schoolDependencyService.assertSessionNotTimesheetLocked(session, 'This session');
+
+        const mergingTeacherId = cleanPersonId(req.body?.teacherId || req.body?.mergingTeacherId);
+        const partnerClassId = toPublicId(req.body?.partnerClassId);
+        const partnerSessionId = toPublicId(req.body?.partnerSessionId);
+        const mergedStatusCode = sessionStatusPolicyService.normalizeStatusCode(
+            req.body?.mergedStatusCode || req.body?.status || 'merged_session'
+        );
+
+        const result = await sessionMergeService.executeSessionMerge({
+            sourceClassId: classId,
+            sourceSessionId: sessionId,
+            mergingTeacherId,
+            partnerClassId,
+            partnerSessionId,
+            mergedStatusCode,
+            reqUser: req.user
+        });
+
+        return res.json({
+            status: 'success',
+            message: 'Session merged successfully.',
+            data: result
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: String(error?.code || ''),
+            message: error.message,
+            data: error?.data || undefined
+        });
+    }
+}
+
+async function unmergeSession(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+        schoolDependencyService.assertSessionNotTimesheetLocked(session, 'This session');
+
+        const result = await sessionMergeService.executeSessionUnmerge({
+            sourceClassId: classId,
+            sourceSessionId: sessionId,
+            reqUser: req.user
+        });
+
+        return res.json({
+            status: 'success',
+            message: 'Session merge undone. Status restored to Scheduled and the original main teacher was reinstated.',
+            data: result
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: String(error?.code || ''),
+            message: error.message,
+            data: error?.data || undefined
+        });
+    }
+}
+
 async function saveSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -5036,6 +5207,37 @@ async function saveSession(req, res) {
                 })
             }
         );
+        const nextMergedSessionRequired = sessionStatusPolicyService.isMergedSessionRequiredByMap(statusMap, {
+            status: normalizedStatus,
+            notes: notes !== undefined ? String(notes || '').trim() : originalSession.notes
+        });
+        if (nextMergedSessionRequired && !sessionMergeService.isMergedSessionRow(originalSession)) {
+            const mergeMessage = 'This session status requires completing the merge workflow before it can be saved.';
+            if (req.headers['x-ajax-request']) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'MERGE_REQUIRED',
+                    message: mergeMessage
+                });
+            }
+            throw new Error(mergeMessage);
+        }
+        const leavingMergedSessionRow = sessionMergeService.isMergedSessionRow(originalSession)
+            && !sessionStatusPolicyService.isMergedSessionRequiredByMap(statusMap, {
+                status: normalizedStatus,
+                notes: notes !== undefined ? String(notes || '').trim() : originalSession.notes
+            });
+        if (leavingMergedSessionRow) {
+            const unmergeMessage = 'Use Undo merge to return this session to Scheduled. Changing status alone does not undo a merged session.';
+            if (req.headers['x-ajax-request']) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'UNMERGE_REQUIRED',
+                    message: unmergeMessage
+                });
+            }
+            throw new Error(unmergeMessage);
+        }
         const wasCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, originalSession);
         const willBeCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, {
             ...originalSession,
@@ -5693,7 +5895,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

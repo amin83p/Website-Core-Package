@@ -920,15 +920,15 @@
           <div class="tab-pane fade" id="bulk-tab-co" role="tabpanel" aria-labelledby="bulk-tab-co-btn">
             <p class="small text-muted mb-3">
               Check sessions in the Session Builder grid (left column, not the lock icon), add co-teachers below, then apply.
-              Co-teachers get full session hours when finalized. Grant edit access later on the session page.
+              Unpaid co-teachers still appear on schedules but earn 0 timesheet hours. Paid co-teachers can use a lower paid-hours amount than the session duration.
             </p>
             <div class="d-flex flex-wrap gap-2 mb-2">
               <button type="button" class="btn btn-sm btn-outline-secondary" id="bulk_selectMatchingSessionsBtn" title="Check all sessions matching Current Teacher / status / locked filters">
                 <i class="bi bi-check2-square me-1"></i>Select matching sessions in grid
               </button>
             </div>
-            <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-              <div class="flex-grow-1" style="min-width: 220px;">
+            <div class="row g-2 align-items-end mb-2">
+              <div class="col-md-6 col-lg-5">
                 <label class="form-label small mb-1">Add Co-Teacher</label>
                 <div class="input-group input-group-sm">
                   <input type="text" class="form-control" id="bulk_coTeacherName" placeholder="Pick a person..." readonly>
@@ -937,11 +937,30 @@
                 </div>
                 <input type="hidden" id="bulk_coTeacherId">
               </div>
-              <div style="min-width: 160px;">
+              <div class="col-md-4 col-lg-3">
                 <label class="form-label small mb-1">Role label</label>
                 <input type="text" class="form-control form-control-sm" id="bulk_coTeacherRole" value="Co-Teacher" maxlength="60">
               </div>
-              <button type="button" class="btn btn-sm btn-outline-primary" id="bulk_addCoTeacherToList"><i class="bi bi-plus-lg me-1"></i>Add to list</button>
+              <div class="col-md-2 col-lg-4 d-flex align-items-end">
+                <button type="button" class="btn btn-sm btn-outline-primary w-100" id="bulk_addCoTeacherToList"><i class="bi bi-plus-lg me-1"></i>Add to list</button>
+              </div>
+            </div>
+            <div class="row g-2 align-items-end mb-2" id="bulk_coTeacherPaymentRow">
+              <div class="col-md-6 col-lg-5">
+                <label class="form-label small mb-1" for="bulk_coTeacherPaid">Payment</label>
+                <select class="form-select form-select-sm" id="bulk_coTeacherPaid">
+                  <option value="paid" selected>Paid</option>
+                  <option value="unpaid">Unpaid</option>
+                </select>
+              </div>
+              <div class="col-md-4 col-lg-3">
+                <label class="form-label small mb-1" for="bulk_coTeacherPaidHours">Paid hours</label>
+                <input type="number" class="form-control form-control-sm" id="bulk_coTeacherPaidHours" step="0.25" min="0.5" placeholder="Session hours">
+              </div>
+              <div class="col-md-2 col-lg-4">
+                <div class="form-text mb-0" id="bulk_coTeacherPaidHoursHelp">Paid hours use the selected session duration. Mixed session lengths require Unpaid or a matching selection.</div>
+                <div class="small text-danger mt-1 d-none" id="bulk_coTeacherPaidHoursError"></div>
+              </div>
             </div>
             <div id="bulk_coTeacherList" class="border rounded p-2 bg-light small mb-2" style="min-height: 2.5rem;"></div>
             <div class="d-flex flex-wrap gap-2">
@@ -3490,8 +3509,18 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.className = rowAppearance.className;
             tr.style.cssText = rowAppearance.style;
             const coTeachers = Array.isArray(ses?.delivery?.coTeachers) ? ses.delivery.coTeachers : [];
+            const formatCoTeacherPaymentLabel = (row) => {
+                if (!row || row.paid === false) return 'Unpaid';
+                const hours = Number.parseFloat(row.paidHours);
+                if (Number.isFinite(hours)) return `Paid ${hours}h`;
+                return 'Paid';
+            };
             const coTeacherHint = coTeachers.length
-                ? `<div class="small text-muted mt-1"><i class="bi bi-people me-1"></i>${coTeachers.length} co-teacher${coTeachers.length === 1 ? '' : 's'}: ${coTeachers.map((row) => row.name || row.personId).filter(Boolean).slice(0, 3).join(', ')}${coTeachers.length > 3 ? '…' : ''}</div>`
+                ? `<div class="small text-muted mt-1"><i class="bi bi-people me-1"></i>${coTeachers.length} co-teacher${coTeachers.length === 1 ? '' : 's'}: ${coTeachers.map((row) => {
+                    const label = row.name || row.personId;
+                    const pay = formatCoTeacherPaymentLabel(row);
+                    return label ? `${label} (${pay})` : pay;
+                }).filter(Boolean).slice(0, 3).join(', ')}${coTeachers.length > 3 ? '…' : ''}</div>`
                 : '';
             const selectedAttr = ses._bulkSelected === true ? 'checked' : '';
             tr.innerHTML = `
@@ -3678,7 +3707,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         personId,
                         name: String(entry.name || entry.teacherName || personId).trim() || personId,
                         roleLabel: String(entry.roleLabel || entry.role || 'Co-Teacher').trim() || 'Co-Teacher',
-                        canEdit: entry.canEdit === true
+                        canEdit: entry.canEdit === true,
+                        paid: entry.paid !== false && String(entry.paid || '').trim().toLowerCase() !== 'unpaid' && String(entry.paid || '').trim().toLowerCase() !== 'false',
+                        paidHours: (() => {
+                            const paid = entry.paid !== false && String(entry.paid || '').trim().toLowerCase() !== 'unpaid' && String(entry.paid || '').trim().toLowerCase() !== 'false';
+                            if (!paid) return 0;
+                            const parsed = Number.parseFloat(entry.paidHours);
+                            if (Number.isFinite(parsed) && parsed >= 0) return Number(Math.min(parsed, 24).toFixed(2));
+                            return undefined;
+                        })()
                     };
                 })
                 .filter(Boolean)
@@ -4721,6 +4758,10 @@ if (bulkApplyBtn) bulkApplyBtn.addEventListener('click', applyBulkTeacherChange)
 const bulkCoTeacherName = document.getElementById('bulk_coTeacherName');
 const bulkCoTeacherId = document.getElementById('bulk_coTeacherId');
 const bulkCoTeacherRole = document.getElementById('bulk_coTeacherRole');
+const bulkCoTeacherPaid = document.getElementById('bulk_coTeacherPaid');
+const bulkCoTeacherPaidHours = document.getElementById('bulk_coTeacherPaidHours');
+const bulkCoTeacherPaidHoursHelp = document.getElementById('bulk_coTeacherPaidHoursHelp');
+const bulkCoTeacherPaidHoursError = document.getElementById('bulk_coTeacherPaidHoursError');
 const bulkPickCoTeacherBtn = document.getElementById('bulk_pickCoTeacher');
 const bulkClearCoTeacherPickBtn = document.getElementById('bulk_clearCoTeacherPick');
 const bulkAddCoTeacherToListBtn = document.getElementById('bulk_addCoTeacherToList');
@@ -4734,15 +4775,173 @@ const sessionsSelectAllCb = document.getElementById('sessionsSelectAll');
 const bulkSelectMatchingSessionsBtn = document.getElementById('bulk_selectMatchingSessionsBtn');
 let bulkCoTeacherDraft = [];
 
-function normalizeBulkCoTeacherRow(row = {}) {
+const BULK_CO_TEACHER_MIN_PAID_HOURS = 0.5;
+
+function normalizeBulkCoTeacherPaidFlag(value) {
+    if (value === false || String(value || '').trim().toLowerCase() === 'false' || String(value || '').trim().toLowerCase() === 'unpaid') {
+        return false;
+    }
+    return true;
+}
+
+function parseBulkCoTeacherPaidHours(value, maxHours = null) {
+    if (value === '' || value === null || value === undefined) return null;
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    const cap = Number.isFinite(Number(maxHours)) ? Number(maxHours) : 24;
+    return Number(Math.min(parsed, cap).toFixed(2));
+}
+
+function parseSessionDurationHours(session) {
+    return Number((Number.parseFloat(session?.durationHours) || 0).toFixed(2));
+}
+
+function summarizeSelectedSessionDurations() {
+    const selected = getSelectedSessionsForCoTeachers();
+    const hours = selected.map(parseSessionDurationHours);
+    const unique = [...new Set(hours)];
+    return {
+        selectedCount: selected.length,
+        hours,
+        uniqueHours: unique,
+        isUniform: unique.length <= 1,
+        sessionHours: unique.length === 1 ? unique[0] : null
+    };
+}
+
+function setBulkCoTeacherPaidHoursError(message = '') {
+    const text = String(message || '').trim();
+    if (bulkCoTeacherPaidHoursError) {
+        bulkCoTeacherPaidHoursError.textContent = text;
+        bulkCoTeacherPaidHoursError.classList.toggle('d-none', !text);
+    }
+}
+
+function syncBulkCoTeacherPaidHoursFromSelection() {
+    const isPaid = normalizeBulkCoTeacherPaidFlag(bulkCoTeacherPaid?.value || 'paid');
+    if (!isPaid) {
+        setBulkCoTeacherPaidHoursError('');
+        if (bulkCoTeacherPaidHoursHelp) {
+            bulkCoTeacherPaidHoursHelp.textContent = 'Unpaid co-teachers appear on schedules but earn 0 timesheet hours.';
+        }
+        if (bulkCoTeacherPaidHours) {
+            bulkCoTeacherPaidHours.disabled = true;
+            bulkCoTeacherPaidHours.value = '';
+            bulkCoTeacherPaidHours.removeAttribute('max');
+        }
+        return;
+    }
+
+    const summary = summarizeSelectedSessionDurations();
+    if (!summary.selectedCount) {
+        setBulkCoTeacherPaidHoursError('');
+        if (bulkCoTeacherPaidHoursHelp) {
+            bulkCoTeacherPaidHoursHelp.textContent = 'Select session(s) in the grid to set paid hours.';
+        }
+        if (bulkCoTeacherPaidHours) {
+            bulkCoTeacherPaidHours.disabled = true;
+            bulkCoTeacherPaidHours.value = '';
+            bulkCoTeacherPaidHours.removeAttribute('max');
+        }
+        return;
+    }
+
+    if (!summary.isUniform) {
+        setBulkCoTeacherPaidHoursError('Selected sessions have different durations. Choose sessions with the same length or use Unpaid.');
+        if (bulkCoTeacherPaidHoursHelp) {
+            bulkCoTeacherPaidHoursHelp.textContent = 'Paid bulk apply requires all selected sessions to share the same duration.';
+        }
+        if (bulkCoTeacherPaidHours) {
+            bulkCoTeacherPaidHours.disabled = true;
+            bulkCoTeacherPaidHours.value = '';
+            bulkCoTeacherPaidHours.removeAttribute('max');
+        }
+        return;
+    }
+
+    const sessionHours = Number(summary.sessionHours || 0);
+    setBulkCoTeacherPaidHoursError('');
+    if (bulkCoTeacherPaidHoursHelp) {
+        bulkCoTeacherPaidHoursHelp.textContent = `Set paid hours between ${BULK_CO_TEACHER_MIN_PAID_HOURS} and ${sessionHours.toFixed(2)} for the selected session(s).`;
+    }
+    if (bulkCoTeacherPaidHours) {
+        bulkCoTeacherPaidHours.disabled = false;
+        bulkCoTeacherPaidHours.min = String(BULK_CO_TEACHER_MIN_PAID_HOURS);
+        bulkCoTeacherPaidHours.max = String(sessionHours);
+        bulkCoTeacherPaidHours.step = '0.25';
+        const current = parseBulkCoTeacherPaidHours(bulkCoTeacherPaidHours.value, sessionHours);
+        bulkCoTeacherPaidHours.value = Number((current !== null ? current : sessionHours).toFixed(2));
+    }
+}
+
+function syncBulkCoTeacherPaidHoursUi() {
+    syncBulkCoTeacherPaidHoursFromSelection();
+}
+
+function validateBulkCoTeacherPaymentForSelection({ paid, paidHoursValue } = {}) {
+    const isPaid = normalizeBulkCoTeacherPaidFlag(paid);
+    if (!isPaid) {
+        return { ok: true, paidHours: 0 };
+    }
+
+    const summary = summarizeSelectedSessionDurations();
+    if (!summary.selectedCount) {
+        return { ok: false, message: 'Select one or more sessions in the Session Builder grid first.' };
+    }
+    if (!summary.isUniform) {
+        return {
+            ok: false,
+            message: 'Selected sessions have different durations. Choose sessions with the same length or use Unpaid.'
+        };
+    }
+
+    const sessionHours = Number(summary.sessionHours || 0);
+    const parsed = parseBulkCoTeacherPaidHours(paidHoursValue, sessionHours);
+    const paidHours = parsed !== null ? parsed : sessionHours;
+
+    if (sessionHours < BULK_CO_TEACHER_MIN_PAID_HOURS) {
+        return {
+            ok: false,
+            message: `Selected session duration (${sessionHours.toFixed(2)}h) is below the minimum paid increment (${BULK_CO_TEACHER_MIN_PAID_HOURS}h).`
+        };
+    }
+    if (paidHours < BULK_CO_TEACHER_MIN_PAID_HOURS || paidHours > sessionHours) {
+        return {
+            ok: false,
+            message: `Paid hours must be between ${BULK_CO_TEACHER_MIN_PAID_HOURS} and ${sessionHours.toFixed(2)} for the selected session(s).`
+        };
+    }
+
+    return { ok: true, paidHours, sessionHours };
+}
+
+function formatBulkCoTeacherPaymentLabel(row = {}) {
+    if (!row || row.paid === false) return 'Unpaid';
+    const hours = Number.parseFloat(row.paidHours);
+    if (Number.isFinite(hours)) return `Paid ${hours}h`;
+    return 'Paid (session duration)';
+}
+
+function normalizeBulkCoTeacherRow(row = {}, session = null) {
     const personId = String(row?.personId || '').trim();
     if (!personId) return null;
-    return {
+    const paid = normalizeBulkCoTeacherPaidFlag(row.paid);
+    const parsedPaidHours = parseBulkCoTeacherPaidHours(row.paidHours);
+    const out = {
         personId,
         name: String(row?.name || personId).trim() || personId,
         roleLabel: String(row?.roleLabel || 'Co-Teacher').trim() || 'Co-Teacher',
-        canEdit: row?.canEdit === true
+        canEdit: row?.canEdit === true,
+        paid
     };
+    if (!paid) {
+        out.paidHours = 0;
+    } else if (parsedPaidHours !== null) {
+        out.paidHours = parsedPaidHours;
+    } else if (session) {
+        out.paidHours = Number((Number.parseFloat(session?.durationHours) || 0).toFixed(2));
+    }
+    return out;
 }
 
 function getSelectedSessionsForCoTeachers() {
@@ -4765,6 +4964,7 @@ function renderBulkCoTeacherList() {
           <div>
             <span class="fw-semibold">${row.name || row.personId}</span>
             <span class="text-muted"> · ${row.roleLabel || 'Co-Teacher'}</span>
+            <span class="badge bg-light text-muted border ms-1">${formatBulkCoTeacherPaymentLabel(row)}</span>
             ${row.canEdit ? '<span class="badge bg-success-subtle text-success border ms-1">Can edit</span>' : ''}
           </div>
           <button type="button" class="btn btn-sm btn-outline-danger bulk-co-remove" data-index="${idx}" title="Remove"><i class="bi bi-x"></i></button>
@@ -4773,6 +4973,7 @@ function renderBulkCoTeacherList() {
 }
 
 function computeBulkCoTeacherPreview() {
+    syncBulkCoTeacherPaidHoursFromSelection();
     if (!bulkCoTeacherPreview) return;
     const selected = getSelectedSessionsForCoTeachers();
     bulkCoTeacherPreview.textContent = selected.length
@@ -4786,12 +4987,12 @@ function mergeCoTeachersOntoSession(session, incomingRows = [], { replace = fals
     const existing = replace ? [] : (Array.isArray(session.delivery.coTeachers) ? session.delivery.coTeachers : []);
     const map = new Map();
     existing.forEach((row) => {
-        const normalized = normalizeBulkCoTeacherRow(row);
+        const normalized = normalizeBulkCoTeacherRow(row, session);
         if (!normalized || normalized.personId === mainId) return;
         map.set(normalized.personId, normalized);
     });
     (Array.isArray(incomingRows) ? incomingRows : []).forEach((row) => {
-        const normalized = normalizeBulkCoTeacherRow(row);
+        const normalized = normalizeBulkCoTeacherRow(row, session);
         if (!normalized || normalized.personId === mainId) return;
         map.set(normalized.personId, { ...map.get(normalized.personId), ...normalized });
     });
@@ -4832,9 +5033,15 @@ if (bulkTabMainBtn) {
 if (bulkTabCoBtn) {
     bulkTabCoBtn.addEventListener('shown.bs.tab', () => {
         syncBulkModalFooterForTab(false);
+        syncBulkCoTeacherPaidHoursUi();
         computeBulkCoTeacherPreview();
     });
 }
+
+if (bulkCoTeacherPaid) {
+    bulkCoTeacherPaid.addEventListener('change', syncBulkCoTeacherPaidHoursUi);
+}
+syncBulkCoTeacherPaidHoursUi();
 
 if (bulkPickCoTeacherBtn) {
     bulkPickCoTeacherBtn.addEventListener('click', () => {
@@ -4870,6 +5077,15 @@ if (bulkAddCoTeacherToListBtn) {
             await uiAlert('Pick a co-teacher first.', 'Missing co-teacher');
             return;
         }
+        const paid = normalizeBulkCoTeacherPaidFlag(bulkCoTeacherPaid?.value || 'paid');
+        const paymentValidation = validateBulkCoTeacherPaymentForSelection({
+            paid,
+            paidHoursValue: bulkCoTeacherPaidHours?.value
+        });
+        if (!paymentValidation.ok) {
+            await uiAlert(paymentValidation.message, 'Payment validation');
+            return;
+        }
         if (bulkCoTeacherDraft.some((row) => row.personId === personId)) {
             await uiAlert('That person is already in the apply list.', 'Already added');
             return;
@@ -4878,9 +5094,18 @@ if (bulkAddCoTeacherToListBtn) {
             await uiAlert('A session can have at most 10 co-teachers.', 'Limit reached');
             return;
         }
-        bulkCoTeacherDraft.push({ personId, name, roleLabel, canEdit: false });
+        bulkCoTeacherDraft.push({
+            personId,
+            name,
+            roleLabel,
+            canEdit: false,
+            paid,
+            paidHours: paymentValidation.paidHours
+        });
         if (bulkCoTeacherId) bulkCoTeacherId.value = '';
         if (bulkCoTeacherName) bulkCoTeacherName.value = '';
+        if (bulkCoTeacherPaid) bulkCoTeacherPaid.value = 'paid';
+        syncBulkCoTeacherPaidHoursFromSelection();
         renderBulkCoTeacherList();
         computeBulkCoTeacherPreview();
     });
@@ -4906,6 +5131,18 @@ if (bulkApplyCoTeachersBtn) {
         if (!bulkCoTeacherDraft.length) {
             await uiAlert('Add at least one co-teacher to the apply list.', 'Empty list');
             return;
+        }
+        const paidDraftRows = bulkCoTeacherDraft.filter((row) => normalizeBulkCoTeacherPaidFlag(row.paid));
+        for (const row of paidDraftRows) {
+            const paymentValidation = validateBulkCoTeacherPaymentForSelection({
+                paid: true,
+                paidHoursValue: row.paidHours
+            });
+            if (!paymentValidation.ok) {
+                await uiAlert(`${row.name || row.personId}: ${paymentValidation.message}`, 'Payment validation');
+                return;
+            }
+            row.paidHours = paymentValidation.paidHours;
         }
         selected.forEach((session) => mergeCoTeachersOntoSession(session, bulkCoTeacherDraft, { replace: false }));
         renderSessions();

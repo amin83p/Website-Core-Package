@@ -15,6 +15,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     isFinal: false,
     makeUpRequired: false,
     makeupDurationPercent: 100,
+    mergedSessionRequired: false,
     excludeFromAttendance: false,
     excludeFromTeacherIndex: false,
     excludeFromStudentIndex: false,
@@ -34,6 +35,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     isFinal: true,
     makeUpRequired: false,
     makeupDurationPercent: 100,
+    mergedSessionRequired: false,
     excludeFromAttendance: false,
     excludeFromTeacherIndex: false,
     excludeFromStudentIndex: false,
@@ -53,6 +55,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     isFinal: true,
     makeUpRequired: false,
     makeupDurationPercent: 100,
+    mergedSessionRequired: false,
     excludeFromAttendance: true,
     excludeFromTeacherIndex: true,
     excludeFromStudentIndex: true,
@@ -72,6 +75,7 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     isFinal: true,
     makeUpRequired: true,
     makeupDurationPercent: 100,
+    mergedSessionRequired: false,
     excludeFromAttendance: true,
     excludeFromTeacherIndex: false,
     excludeFromStudentIndex: false,
@@ -82,6 +86,26 @@ const DEFAULT_SESSION_STATUS_TEMPLATES = Object.freeze([
     colorBg: '#fff3cd',
     colorText: '#664d03',
     colorBorder: '#ffe69c'
+  }),
+  Object.freeze({
+    code: 'merged_session',
+    label: 'Merged Session',
+    description: 'Session merged into another teacher\'s schedule at the same time; requires merge workflow.',
+    timesheetFormula: 'duration',
+    isFinal: true,
+    makeUpRequired: false,
+    makeupDurationPercent: 100,
+    mergedSessionRequired: true,
+    excludeFromAttendance: false,
+    excludeFromTeacherIndex: false,
+    excludeFromStudentIndex: false,
+    active: true,
+    sortOrder: 50,
+    accessType: 'users',
+    classCapacity: 'both',
+    colorBg: '#e8eaf6',
+    colorText: '#3f51b5',
+    colorBorder: '#c5cae9'
   })
 ]);
 
@@ -209,6 +233,7 @@ function normalizeStoredStatus(row) {
     isFinal: cleanBoolean(row?.isFinal, false),
     makeUpRequired: cleanBoolean(row?.makeUpRequired, false),
     makeupDurationPercent: cleanMakeupDurationPercent(row?.makeupDurationPercent, { defaultValue: 100 }),
+    mergedSessionRequired: cleanBoolean(row?.mergedSessionRequired, false),
     excludeFromAttendance: cleanBoolean(row?.excludeFromAttendance, false),
     excludeFromTeacherIndex: cleanBoolean(row?.excludeFromTeacherIndex, false),
     excludeFromStudentIndex: cleanBoolean(row?.excludeFromStudentIndex, false),
@@ -250,6 +275,7 @@ function sanitizeInput(input, { isUpdate = false } = {}) {
     isFinal: cleanBoolean(input.isFinal, false),
     makeUpRequired: cleanBoolean(input.makeUpRequired, false),
     makeupDurationPercent: cleanMakeupDurationPercent(input.makeupDurationPercent, { defaultValue: 100 }),
+    mergedSessionRequired: cleanBoolean(input.mergedSessionRequired, false),
     excludeFromAttendance: cleanBoolean(input.excludeFromAttendance, false),
     excludeFromTeacherIndex: cleanBoolean(input.excludeFromTeacherIndex, false),
     excludeFromStudentIndex: cleanBoolean(input.excludeFromStudentIndex, false),
@@ -303,12 +329,20 @@ async function ensureOrgDefaultSessionStatuses(orgId, userId = 'SYSTEM') {
   return queueWrite(async () => {
     const rows = await getAllSessionStatuses();
     const orgRows = rows.filter((row) => String(row.orgId) === String(targetOrgId));
-    if (orgRows.length > 0) return orgRows;
+    const existingCodes = new Set(
+      orgRows.map((row) => normalizeCode(row?.code)).filter(Boolean)
+    );
+    const templatesToCreate = DEFAULT_SESSION_STATUS_TEMPLATES.filter((tpl) => {
+      const code = normalizeCode(tpl?.code);
+      return code && !existingCodes.has(code);
+    });
+    if (!templatesToCreate.length) return orgRows;
 
-    const defaults = getDefaultStatusesForOrg(targetOrgId, userId);
+    const defaults = getDefaultStatusesForOrg(targetOrgId, userId)
+      .filter((row) => templatesToCreate.some((tpl) => normalizeCode(tpl.code) === normalizeCode(row.code)));
     const merged = [...rows, ...defaults];
     await fs.writeFile(dataPath, JSON.stringify(merged, null, 2));
-    return defaults;
+    return [...orgRows, ...defaults];
   });
 }
 

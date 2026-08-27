@@ -6,6 +6,7 @@ const leaveRequestService = require('./leaveRequestService');
 const activityService = require('./activityService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+const sessionMergeService = require('./sessionMergeService');
 const scheduleController = require('../../controllers/school/scheduleController');
 const schoolRepositories = require('../../repositories/school');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -396,6 +397,7 @@ async function detectSessionConflicts({
         if (!teacherDayMap.has(key)) teacherDayMap.set(key, []);
         teacherDayMap.get(key).push({
           classId: sourceClassId,
+          sessionId: toPublicId(sessionRow?.sessionId || sessionRow?.id),
           startTime,
           endTime
         });
@@ -555,7 +557,21 @@ async function detectSessionConflicts({
         if (Number.isNaN(existStart.getTime()) || Number.isNaN(existEnd.getTime())) return;
 
         if (newStart < existEnd && newEnd > existStart) {
-          const conflictClassTitle = classIdTitleMap.get(toPublicId(existingSes.classId)) || existingSes.classId;
+          const existingClassId = toPublicId(existingSes.classId);
+          const existingSessionId = toPublicId(existingSes.sessionId);
+          const existingSessionRows = classSessionsById.get(existingClassId) || [];
+          const existingFullSession = existingSessionId
+            ? existingSessionRows.find((row) => idsEqual(row?.sessionId || row?.id, existingSessionId))
+            : null;
+          if (existingFullSession && sessionMergeService.areMergeLinkedSessions(
+            ses,
+            classId,
+            existingFullSession,
+            existingClassId
+          )) {
+            return;
+          }
+          const conflictClassTitle = classIdTitleMap.get(existingClassId) || existingSes.classId;
           conflicts.push({
             sessionIndex: index,
             date: ses.date,
@@ -588,6 +604,7 @@ async function detectSessionConflicts({
         if (Number.isNaN(otherStart.getTime()) || Number.isNaN(otherEnd.getTime())) continue;
 
         if (newStart < otherEnd && newEnd > otherStart) {
+          if (sessionMergeService.areMergeLinkedSessions(ses, classId, otherSes, classId)) continue;
           conflicts.push({
             sessionIndex: index,
             date: ses.date,

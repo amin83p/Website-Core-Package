@@ -18,17 +18,42 @@ function normalizeRoleLabel(value) {
   return label || DEFAULT_ROLE_LABEL;
 }
 
+const MAX_PAID_HOURS = 24;
+
+function normalizePaidHours(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Number(Math.min(parsed, MAX_PAID_HOURS).toFixed(2));
+}
+
+function normalizeCoTeacherPaidFlag(value) {
+  if (value === false || String(value).trim().toLowerCase() === 'false' || String(value).trim().toLowerCase() === 'unpaid') {
+    return false;
+  }
+  return true;
+}
+
 function normalizeCoTeacherRow(row = {}, { mainTeacherId = '' } = {}) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
   const personId = cleanPersonId(row.personId || row.teacherId || row.id || row.deliveredBy);
   if (!personId) return null;
   if (mainTeacherId && idsEqual(personId, mainTeacherId)) return null;
-  return {
+  const paid = normalizeCoTeacherPaidFlag(row.paid);
+  const paidHoursRaw = normalizePaidHours(row.paidHours);
+  const out = {
     personId,
     name: normalizeId(row.name || row.teacherName || row.deliveredByName || personId),
     roleLabel: normalizeRoleLabel(row.roleLabel || row.role || row.title),
-    canEdit: row.canEdit === true
+    canEdit: row.canEdit === true,
+    paid
   };
+  if (!paid) {
+    out.paidHours = 0;
+  } else if (paidHoursRaw !== null) {
+    out.paidHours = paidHoursRaw;
+  }
+  return out;
 }
 
 function normalizeSessionCoTeachers(rawList = [], { mainTeacherId = '' } = {}) {
@@ -120,9 +145,31 @@ function applyCoTeachersToDelivery(delivery = {}, coTeachers = [], { mainTeacher
   return next;
 }
 
+function resolveCoTeacherTimesheetHours({
+  session = {},
+  personId = '',
+  formulaHours = 0,
+  teacherPersonMap = null
+} = {}) {
+  const formula = Number(parseFloat(formulaHours) || 0);
+  if (isPersonSessionMainTeacher(session, personId, teacherPersonMap)) {
+    return Number(formula.toFixed(2));
+  }
+  const coTeacher = findCoTeacherEntry(session, personId, teacherPersonMap);
+  if (!coTeacher) return Number(formula.toFixed(2));
+  if (coTeacher.paid === false) return 0;
+  if (formula <= 0) return 0;
+  const paidHours = normalizePaidHours(coTeacher.paidHours);
+  if (paidHours !== null) return paidHours;
+  return Number(formula.toFixed(2));
+}
+
 module.exports = {
   MAX_CO_TEACHERS,
+  MAX_PAID_HOURS,
   DEFAULT_ROLE_LABEL,
+  normalizePaidHours,
+  normalizeCoTeacherPaidFlag,
   normalizeCoTeacherRow,
   normalizeSessionCoTeachers,
   getSessionMainTeacherId,
@@ -133,5 +180,6 @@ module.exports = {
   isPersonSessionViewer,
   isPersonSessionEditor,
   findCoTeacherEntry,
-  applyCoTeachersToDelivery
+  applyCoTeachersToDelivery,
+  resolveCoTeacherTimesheetHours
 };

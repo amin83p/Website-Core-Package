@@ -110,10 +110,87 @@ test('timesheet and schedule paths include co-teacher delivery matching', () => 
   const timesheetEditor = readPackage('MVC/views/school/timesheet/timesheetEditor.ejs');
 
   assert.match(timesheetController, /isCoTeacherSession/);
+  assert.match(timesheetController, /resolveCoTeacherTimesheetHours/);
   assert.match(timesheetController, /isPersonOnSessionDelivery/);
   assert.match(scheduleController, /isPersonOnSessionDelivery/);
   assert.match(indexService, /getSessionDeliveryPersonIds/);
   assert.match(timesheetEditor, /isCoTeacherSession/);
+});
+
+test('normalizeSessionCoTeachers defaults paid to true for legacy rows', () => {
+  const rows = sessionDeliveryTeamService.normalizeSessionCoTeachers([
+    { personId: 'C1', name: 'Legacy' }
+  ], { mainTeacherId: 'MAIN' });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].paid, true);
+  assert.equal(rows[0].paidHours, undefined);
+});
+
+test('normalizeSessionCoTeachers stores unpaid and paid hour overrides', () => {
+  const rows = sessionDeliveryTeamService.normalizeSessionCoTeachers([
+    { personId: 'C1', name: 'Unpaid', paid: false, paidHours: 2 },
+    { personId: 'C2', name: 'Paid partial', paid: true, paidHours: 1.5 }
+  ], { mainTeacherId: 'MAIN' });
+  assert.equal(rows[0].paid, false);
+  assert.equal(rows[0].paidHours, 0);
+  assert.equal(rows[1].paid, true);
+  assert.equal(rows[1].paidHours, 1.5);
+});
+
+test('resolveCoTeacherTimesheetHours returns formula hours for main teacher', () => {
+  const session = {
+    delivery: {
+      deliveredBy: 'MAIN',
+      coTeachers: [{ personId: 'CO1', paid: false }]
+    }
+  };
+  assert.equal(sessionDeliveryTeamService.resolveCoTeacherTimesheetHours({
+    session,
+    personId: 'MAIN',
+    formulaHours: 2
+  }), 2);
+});
+
+test('resolveCoTeacherTimesheetHours returns zero for unpaid co-teacher', () => {
+  const session = {
+    delivery: {
+      deliveredBy: 'MAIN',
+      coTeachers: [{ personId: 'CO1', paid: false }]
+    }
+  };
+  assert.equal(sessionDeliveryTeamService.resolveCoTeacherTimesheetHours({
+    session,
+    personId: 'CO1',
+    formulaHours: 2
+  }), 0);
+});
+
+test('resolveCoTeacherTimesheetHours uses paidHours override for paid co-teacher', () => {
+  const session = {
+    delivery: {
+      deliveredBy: 'MAIN',
+      coTeachers: [{ personId: 'CO1', paid: true, paidHours: 1.5 }]
+    }
+  };
+  assert.equal(sessionDeliveryTeamService.resolveCoTeacherTimesheetHours({
+    session,
+    personId: 'CO1',
+    formulaHours: 2
+  }), 1.5);
+});
+
+test('resolveCoTeacherTimesheetHours zeroes cancelled sessions even with paidHours', () => {
+  const session = {
+    delivery: {
+      deliveredBy: 'MAIN',
+      coTeachers: [{ personId: 'CO1', paid: true, paidHours: 1.5 }]
+    }
+  };
+  assert.equal(sessionDeliveryTeamService.resolveCoTeacherTimesheetHours({
+    session,
+    personId: 'CO1',
+    formulaHours: 0
+  }), 0);
 });
 
 test('session builder and manager UI wire co-teacher controls', () => {
@@ -123,6 +200,13 @@ test('session builder and manager UI wire co-teacher controls', () => {
   const explorer = readPackage('MVC/services/school/sessionExplorerService.js');
 
   assert.match(classForm, /bulk_applyCoTeachersBtn/);
+  assert.match(classForm, /bulk_coTeacherPaid/);
+  assert.match(classForm, /bulk_coTeacherPaidHours/);
+  assert.match(classForm, /bulk_coTeacherPaymentRow/);
+  assert.match(classForm, /summarizeSelectedSessionDurations/);
+  assert.match(classForm, /validateBulkCoTeacherPaymentForSelection/);
+  assert.match(classForm, /BULK_CO_TEACHER_MIN_PAID_HOURS/);
+  assert.match(classForm, /bulk_coTeacherPaidHoursError/);
   assert.match(classForm, /bulk-tab-co/);
   assert.match(classForm, /bulk-tab-main/);
   assert.match(classForm, /getSelectedSessionsForCoTeachers/);
@@ -133,6 +217,8 @@ test('session builder and manager UI wire co-teacher controls', () => {
   assert.match(classForm, /coTeachers/);
   assert.match(sessionManager, /sessionCanManageCoTeachers/);
   assert.match(sessionManager, /session-co-can-edit/);
+  assert.match(sessionManager, /session-co-paid/);
+  assert.match(sessionManager, /session-co-paid-hours/);
   assert.match(sessionManager, /payload\.coTeachers/);
   assert.match(access, /isPersonSessionEditor/);
   assert.match(access, /viewSession/);
