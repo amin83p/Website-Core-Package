@@ -96,7 +96,8 @@ function sanitizeRow(input) {
         .filter(Boolean)
     )],
     overallInstanceId: cleanId(input.overallInstanceId, { allowEmpty: true }) || null,
-    selectedDocxKey: clean(input.selectedDocxKey, 100) || 'default'
+    selectedDocxKey: clean(input.selectedDocxKey, 100) || 'default',
+    selectedPdfKey: clean(input.selectedPdfKey, 100) || 'default'
   };
 }
 

@@ -262,6 +262,26 @@ async function rowExportDocx(req, res) {
   }
 }
 
+async function rowExportPdf(req, res) {
+  try {
+    const session = await overallReportManagementService.getManagementSession(req.params.id, req.user);
+    const row = overallReportManagementService.findSessionRow(session, req.params.studentId);
+    if (!row.overallInstanceId) throw new Error('Create an overall report for this student before exporting.');
+    const instance = await overallReportService.getOverallInstance(row.overallInstanceId, req.user);
+    const result = await overallReportService.generateStudentPdf({
+      instance,
+      studentId: req.params.studentId,
+      pdfKey: req.body.selectedPdfKey || req.body.pdfKey || row.selectedPdfKey || instance.selectedPdfKey,
+      reqUser: req.user
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.rendered.fileName}"`);
+    return res.send(result.rendered.buffer);
+  } catch (error) {
+    return sendError(req, res, error, 'Export Overall Report PDF');
+  }
+}
+
 async function rowExportPayload(req, res) {
   try {
     const session = await overallReportManagementService.getManagementSession(req.params.id, req.user);
@@ -301,6 +321,7 @@ module.exports = {
   createRowInstance,
   rowPreview,
   rowExportDocx,
+  rowExportPdf,
   rowExportPayload,
   deleteManagementSession
 };

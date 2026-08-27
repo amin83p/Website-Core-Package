@@ -250,7 +250,7 @@ async function listSessions(req, query = {}) {
     sessionsByClassId,
     students,
     activeOrgId,
-    reqUser
+    reqUser: req.user
   });
 
   const enrollmentPeriodsByClassId = new Map();

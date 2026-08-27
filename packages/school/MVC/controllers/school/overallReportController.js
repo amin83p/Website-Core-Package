@@ -8,6 +8,8 @@ const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const schoolDataService = require('../../services/school/schoolDataService');
 const reportViewService = require('../../services/school/reportViewService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
+const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
+const reportPdfRenderService = require('../../services/school/reportPdfRenderService');
 const overallReportService = require('../../services/school/overallReportService');
 const overallReportTemplateModel = require('../../models/school/overallReportTemplateModel');
 
@@ -164,11 +166,19 @@ async function saveTemplate(req, res) {
     const uploadedFiles = Array.isArray(req.files) ? req.files : [];
     const defaultFile = uploadedFiles.find((file) => String(file.fieldname) === 'docxTemplate');
     const docxTemplate = uploadedFileRecord(defaultFile) || existing?.docxTemplate || null;
+    const defaultPdfFile = uploadedFiles.find((file) => String(file.fieldname) === 'pdfTemplate');
+    const pdfTemplate = uploadedFileRecord(defaultPdfFile) || existing?.pdfTemplate || null;
     const docxTemplatesByFunder = reportViewService.buildDocxTemplatesByFunderFromUpload({
       body: req.body,
       existingTemplate: existing,
       uploadedFiles
     });
+    const pdfTemplatesByFunder = reportViewService.buildPdfTemplatesByFunderFromUpload({
+      body: req.body,
+      existingTemplate: existing,
+      uploadedFiles
+    });
+    const pdfFieldMap = reportViewService.buildPdfFieldMapFromPayload(req.body);
     const rawPayload = {
       ...(existing || {}),
       orgId,
@@ -182,6 +192,9 @@ async function saveTemplate(req, res) {
       placeholderMap: parseJson(req.body.placeholderMapJson, {}),
       docxTemplate,
       docxTemplatesByFunder,
+      pdfTemplate,
+      pdfTemplatesByFunder,
+      pdfFieldMap,
       audit: {
         ...(existing?.audit || {}),
         createUser: existing?.audit?.createUser || req.user?.id || '',
@@ -199,6 +212,33 @@ async function saveTemplate(req, res) {
     return res.redirect('/school/reports/overall-templates');
   } catch (error) {
     return sendError(req, res, error, 'Save Overall Report Template');
+  }
+}
+
+async function inspectTemplatePdfFields(req, res) {
+  try {
+    const orgId = activeOrgId(req.user);
+    const template = await schoolDataService.getDataById('overallReportTemplates', req.params.id, req.user);
+    if (!template || !idsEqual(template.orgId, orgId)) throw new Error('Overall report template not found.');
+    const selectedPdfKey = String(req.query.pdfKey || req.body?.pdfKey || 'default').trim();
+    const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({
+      template,
+      funderKey: selectedPdfKey || 'default'
+    });
+    if (!resolved.pdfTemplate) {
+      throw new Error('This overall report template has no PDF file configured. Upload a PDF template first.');
+    }
+    const inspected = await reportPdfRenderService.inspectPdfTemplateFields(resolved.pdfTemplate);
+    return res.json({
+      status: 'success',
+      templateId: template.id,
+      pdfKey: resolved.pdfKey,
+      label: resolved.label,
+      fields: inspected.fields,
+      filePath: inspected.filePath
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
@@ -221,6 +261,9 @@ async function copyTemplate(req, res) {
       placeholderMap: clonePlainValue(source.placeholderMap, {}),
       docxTemplate: clonePlainValue(source.docxTemplate, null),
       docxTemplatesByFunder: clonePlainValue(source.docxTemplatesByFunder, []),
+      pdfTemplate: clonePlainValue(source.pdfTemplate, null),
+      pdfTemplatesByFunder: clonePlainValue(source.pdfTemplatesByFunder, []),
+      pdfFieldMap: clonePlainValue(source.pdfFieldMap, {}),
       audit: {
         createUser: req.user?.id || '',
         createDateTime: now,
@@ -348,6 +391,7 @@ async function showCreateOverallReport(req, res) {
     let template = null;
     let sourceSlots = [];
     let docxOptions = [];
+    let pdfOptions = [];
     if (templateId) {
       template = await schoolDataService.getDataById('overallReportTemplates', templateId, req.user);
       if (!template || !idsEqual(template.orgId, activeOrgId(req.user))) {
@@ -365,12 +409,14 @@ async function showCreateOverallReport(req, res) {
         };
       });
       docxOptions = reportFunderDocxService.buildAvailableDocxOptions(template);
+      pdfOptions = reportFunderPdfService.buildAvailablePdfOptions(template);
     }
     return res.render('school/report/overallReportCreate', {
       title: 'Create Overall Report',
       template,
       sourceSlots,
       docxOptions,
+      pdfOptions,
       hasOverallFields: overallReportService.templateHasOverallFields(template || {}),
       instance: null,
       readOnly: false,
@@ -415,7 +461,8 @@ async function getTemplateApi(req, res) {
       },
       sourceSlots,
       hasOverallFields: overallReportService.templateHasOverallFields(template),
-      docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template)
+      docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
+      pdfOptions: reportFunderPdfService.buildAvailablePdfOptions(template)
     });
   } catch (error) {
     return sendError(req, res, error);
@@ -468,6 +515,7 @@ async function createOverallReport(req, res) {
         template,
         filters,
         selectedDocxKey: req.body.selectedDocxKey,
+        selectedPdfKey: req.body.selectedPdfKey,
         title: req.body.title,
         studentEntries,
         reqUser: req.user
@@ -489,6 +537,7 @@ async function createOverallReport(req, res) {
       template,
       sourceSelections,
       selectedDocxKey: req.body.selectedDocxKey,
+      selectedPdfKey: req.body.selectedPdfKey,
       title: req.body.title,
       reqUser: req.user
     });
@@ -522,6 +571,7 @@ async function showOverallReportEditor(req, res) {
         template,
         sourceSlots,
         docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
+        pdfOptions: reportFunderPdfService.buildAvailablePdfOptions(template),
         hasOverallFields: overallReportService.templateHasOverallFields(template),
         instance: workspace,
         readOnly: String(instance.status || '') !== 'draft',
@@ -536,11 +586,19 @@ async function showOverallReportEditor(req, res) {
       missingTokens: [],
       error: error.message
     }));
+    const template = instance.templateSnapshot || {};
+    const pdfExportPreview = reportFunderPdfService.templateHasAnyPdf(template)
+      ? await overallReportService.buildPdfExportPreview(instance).catch((error) => ({
+        ready: false,
+        error: error.message
+      }))
+      : null;
     return res.render('school/report/overallReportEditor', {
       title: instance.title || 'Overall Report',
       instance,
-      template: instance.templateSnapshot || {},
+      template,
       exportPreview,
+      pdfExportPreview,
       validation,
       includeModal: true,
       user: req.user,
@@ -561,6 +619,7 @@ async function saveOverallWorkspace(req, res) {
       studentEntries,
       title: req.body.title,
       selectedDocxKey: req.body.selectedDocxKey,
+      selectedPdfKey: req.body.selectedPdfKey,
       filters,
       reqUser: req.user
     });
@@ -762,9 +821,78 @@ async function deleteOverallReport(req, res) {
 async function exportPreview(req, res) {
   try {
     const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
-    return res.json({ status: 'success', ...(await overallReportService.buildExportPreview(instance)) });
+    const template = instance.templateSnapshot || {};
+    const docxPreview = await overallReportService.buildExportPreview(instance);
+    let pdfPreview = null;
+    if (reportFunderPdfService.templateHasAnyPdf(template)) {
+      pdfPreview = await overallReportService.buildPdfExportPreview(instance);
+    }
+    return res.json({ status: 'success', ...docxPreview, pdfPreview });
   } catch (error) {
     return sendError(req, res, error);
+  }
+}
+
+async function exportPdf(req, res) {
+  try {
+    const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const studentId = cleanParam(req.body.studentId || req.query.studentId);
+    const pdfKey = cleanParam(req.body.selectedPdfKey || req.body.pdfKey || instance.selectedPdfKey);
+    if (studentId || (instance.studentEntries || []).length > 1 || req.body.asZip === true || req.body.asZip === 'true') {
+      const result = await overallReportService.exportWorkspacePdf({
+        instance,
+        pdfKey,
+        studentId,
+        reqUser: req.user
+      });
+      if (result.zipBuffer) {
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        return res.send(result.zipBuffer);
+      }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.rendered.fileName}"`);
+      return res.send(result.rendered.buffer);
+    }
+    const result = await overallReportService.exportOverallReportPdf(instance, req.user);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.rendered.fileName}"`);
+    return res.send(result.rendered.buffer);
+  } catch (error) {
+    return sendError(req, res, error, 'Export Overall Report PDF');
+  }
+}
+
+async function generateStudentPdf(req, res) {
+  try {
+    const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const result = await overallReportService.generateStudentPdf({
+      instance,
+      studentId: req.params.studentId,
+      pdfKey: req.body.selectedPdfKey || req.body.pdfKey || instance.selectedPdfKey,
+      reqUser: req.user
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.rendered.fileName}"`);
+    return res.send(result.rendered.buffer);
+  } catch (error) {
+    return sendError(req, res, error, 'Generate Overall Report PDF');
+  }
+}
+
+async function exportPdfZip(req, res) {
+  try {
+    const instance = await overallReportService.getOverallInstance(req.params.id, req.user);
+    const result = await overallReportService.exportWorkspacePdfZip({
+      instance,
+      pdfKey: req.body.selectedPdfKey || req.body.pdfKey || instance.selectedPdfKey,
+      reqUser: req.user
+    });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+    return res.send(result.zipBuffer);
+  } catch (error) {
+    return sendError(req, res, error, 'Export Overall Report PDF Package');
   }
 }
 
@@ -807,6 +935,7 @@ module.exports = {
   listTemplates,
   showTemplateForm,
   saveTemplate,
+  inspectTemplatePdfFields,
   copyTemplate,
   deleteTemplate,
   sourceTemplates,
@@ -821,12 +950,15 @@ module.exports = {
   saveOverallWorkspace,
   studentPreview,
   generateStudentDocx,
+  generateStudentPdf,
   exportZip,
+  exportPdfZip,
   sourceUpdatePreview,
   sourceUpdateApply,
   resetDerivedOverride,
   lifecycle,
   deleteOverallReport,
   exportPreview,
-  exportDocx
+  exportDocx,
+  exportPdf
 };

@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const twoClassAttendanceMergeService = require('./twoClassAttendanceMergeService');
 
 const MAX_EXPRESSION_LENGTH = 240;
 const MAX_CALCULATION_EXPRESSION_LENGTH = 0; // 0 = no explicit length cap
@@ -178,6 +179,12 @@ function createHelperSet() {
       const rows = normalizePhoneRows(value);
       const match = rows.find((row) => row.type === wanted);
       return String(match?.number || '').trim();
+    },
+    twoClassPresence(amPresence, pmPresence) {
+      return twoClassAttendanceMergeService.mergeTwoClassPresence(amPresence, pmPresence);
+    },
+    twoClassNote(amPresence, amNote, pmPresence, pmNote) {
+      return twoClassAttendanceMergeService.mergeTwoClassNote(amPresence, amNote, pmPresence, pmNote);
     }
   });
 }

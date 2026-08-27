@@ -299,7 +299,8 @@ function buildOverallExportBlock(student, policy, overallTemplate, classRows) {
   const eligible = slots.length > 0
     && (necessarySlots.length === 0 || missingSlots.length === 0);
   const rawOverallMeta = {
-    hasDocx: overallReportService.templateHasAttachedDocx(overallTemplate)
+    hasDocx: overallReportService.templateHasAttachedDocx(overallTemplate),
+    hasPdf: overallReportService.templateHasAttachedPdf(overallTemplate)
   };
   const effectiveOverall = studentAttendanceReportExportFormatService.resolveEffectiveOverallExportFlags(
     policy,
@@ -312,6 +313,7 @@ function buildOverallExportBlock(student, policy, overallTemplate, classRows) {
     templateId,
     templateTitle,
     hasDocx: effectiveOverall.hasDocx,
+    hasPdf: effectiveOverall.hasPdf,
     hasPayload: effectiveOverall.hasPayload,
     eligible,
     missingSlots,
@@ -353,7 +355,8 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
   const overallTemplateSummaries = overallTemplates.map((template) => {
     const templateId = clean(template.id);
     const rawOverallMeta = {
-      hasDocx: overallReportService.templateHasAttachedDocx(template)
+      hasDocx: overallReportService.templateHasAttachedDocx(template),
+      hasPdf: overallReportService.templateHasAttachedPdf(template)
     };
     const effectiveOverall = studentAttendanceReportExportFormatService.resolveEffectiveOverallExportFlags(
       policy,
@@ -364,6 +367,7 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
       id: templateId,
       title: clean(template.title) || templateId,
       hasDocx: effectiveOverall.hasDocx,
+      hasPdf: effectiveOverall.hasPdf,
       hasPayload: effectiveOverall.hasPayload
     };
   });
@@ -385,6 +389,7 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
     overallReportTemplates: overallTemplateSummaries,
     overallBulkExportFormats: {
       hasDocx: overallTemplateSummaries.some((row) => row.hasDocx),
+      hasPdf: overallTemplateSummaries.some((row) => row.hasPdf),
       hasPayload: overallTemplateSummaries.some((row) => row.hasPayload !== false)
     },
     students: planStudents
@@ -559,11 +564,6 @@ function resolveEligibleOverallTemplateForTarget({ student, selectedClassIds, ov
 
 async function exportOverallTarget(student, selectedClassIds, overallTemplateId, format, ctx, reqUser) {
   const { startDate, endDate } = ctx;
-  if (format === 'pdf') {
-    const error = new Error('Overall reports do not support PDF export.');
-    error.statusCode = 400;
-    throw error;
-  }
 
   const {
     overallTemplate,
@@ -584,7 +584,7 @@ async function exportOverallTarget(student, selectedClassIds, overallTemplateId,
     studentIds: [clean(student.personId)],
     sourceRuns,
     overallTemplateId: chosenTemplateId,
-    format: format === 'json' ? 'json' : 'docx',
+    format: format === 'json' ? 'json' : (format === 'pdf' ? 'pdf' : 'docx'),
     docxMode: 'single'
   }, reqUser);
 
@@ -603,6 +603,28 @@ async function exportOverallTarget(student, selectedClassIds, overallTemplateId,
       fileName: `${safeFileToken(`${student.name || student.personId}_${overallTemplate.title || chosenTemplateId}`)}_overall_payload.json`,
       warnings: mergedWarnings
     };
+  }
+
+  if (format === 'pdf') {
+    if (overall.file?.buffer) {
+      return {
+        buffer: overall.file.buffer,
+        contentType: overall.contentType || 'application/pdf',
+        fileName: overall.file.fileName || `${safeFileToken(`${student.name || student.personId}_${overallTemplate.title || chosenTemplateId}`)}_overall.pdf`,
+        warnings: mergedWarnings
+      };
+    }
+    if (overall.buffer) {
+      return {
+        buffer: overall.buffer,
+        contentType: overall.contentType || 'application/pdf',
+        fileName: overall.fileName || `${safeFileToken(`${student.name || student.personId}_${overallTemplate.title || chosenTemplateId}`)}_overall.pdf`,
+        warnings: mergedWarnings
+      };
+    }
+    const error = new Error('Overall report engine did not produce a PDF file.');
+    error.statusCode = 400;
+    throw error;
   }
 
   if (overall.file?.buffer) {

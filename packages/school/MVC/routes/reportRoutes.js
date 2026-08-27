@@ -279,6 +279,11 @@ router.post('/overall-templates/edit/:id',
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, overallTemplateMutationActionState),
   overallCtrl.saveTemplate);
 
+router.get('/overall-templates/:id/pdf-fields',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  overallCtrl.inspectTemplatePdfFields);
+
 router.get('/overall-templates/delete/:id',
   requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE),
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE),
@@ -375,6 +380,16 @@ router.post('/overall-reports/:id/student/:studentId/generate',
   }),
   overallCtrl.generateStudentDocx);
 
+router.post('/overall-reports/:id/student/:studentId/generate-pdf',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.generateStudentPdf);
+
 router.post('/overall-reports/:id/export-zip',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT, {
@@ -384,6 +399,16 @@ router.post('/overall-reports/:id/export-zip',
     allowInactiveTokenFallback: true
   }),
   overallCtrl.exportZip);
+
+router.post('/overall-reports/:id/export-pdf-zip',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.exportPdfZip);
 
 router.get('/overall-reports/:id/source-update-preview',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
@@ -439,6 +464,16 @@ router.post('/overall-reports/:id/export',
     allowInactiveTokenFallback: true
   }),
   overallCtrl.exportDocx);
+
+router.post('/overall-reports/:id/export-pdf',
+  requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallCtrl.exportPdf);
 
 router.get('/overall-reports/delete/:id',
   requireAccess(OVERALL_REPORT_INSTANCE_SECTION, OPERATIONS.DELETE),
@@ -520,6 +555,15 @@ router.post('/overall-management/edit/:id/row/:studentId/export-docx',
     allowInactiveTokenFallback: true
   }),
   overallMgmtCtrl.rowExportDocx);
+
+router.post('/overall-management/edit/:id/row/:studentId/export-pdf',
+  requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.EXPORT),
+  trackActionState(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.EXPORT, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  overallMgmtCtrl.rowExportPdf);
 
 router.get('/overall-management/edit/:id/row/:studentId/export-payload',
   requireAccess(OVERALL_REPORT_MANAGEMENT_SECTION, OPERATIONS.EXPORT),

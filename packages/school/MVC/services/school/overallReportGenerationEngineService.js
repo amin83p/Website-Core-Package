@@ -2,6 +2,7 @@ const schoolDataService = require('./schoolDataService');
 const reportGenerationEngineService = require('./reportGenerationEngineService');
 const overallReportService = require('./overallReportService');
 const reportDocxRenderService = require('./reportDocxRenderService');
+const reportPdfRenderService = require('./reportPdfRenderService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -106,6 +107,7 @@ function buildOverallVirtualInstance(template, {
   answers = {},
   derivedOverrides = {},
   selectedDocxKey = 'default',
+  selectedPdfKey = 'default',
   filtersSnapshot = {}
 } = {}) {
   const cleanStudentId = String(studentId ?? '').trim();
@@ -117,6 +119,7 @@ function buildOverallVirtualInstance(template, {
     overallTemplateId: template?.id || '',
     overallTemplateVersion: template?.version,
     selectedDocxKey: clean(selectedDocxKey) || 'default',
+    selectedPdfKey: clean(selectedPdfKey) || 'default',
     templateSnapshot: template,
     sourceSelections: [],
     sourceValues,
@@ -242,6 +245,56 @@ async function renderVirtualOverallDocx(virtualInstance, docxKey = '') {
     fileName,
     docxKey: preview.docxKey
   };
+}
+
+async function renderVirtualOverallPdf(virtualInstance, pdfKey = '') {
+  const instance = { ...virtualInstance };
+  if (pdfKey) instance.selectedPdfKey = pdfKey;
+  const preview = await overallReportService.buildPdfExportPreview(instance);
+  if (!preview.ready) {
+    throw new Error('PDF export cancelled because the overall report has validation or calculation errors.');
+  }
+  const rendered = await reportPdfRenderService.renderReportInstancePdf({
+    template: instance.templateSnapshot,
+    instance,
+    placeholders: preview.placeholders,
+    mergedAnswers: instance.answers,
+    pdfTemplateOverride: preview.resolved.pdfTemplate
+  });
+  const safeStudent = clean(instance.studentName || instance.studentId || 'student').replace(/[^\w.-]+/g, '_');
+  const fileName = rendered.fileName?.includes(safeStudent)
+    ? rendered.fileName
+    : `${safeStudent || 'student'}_${rendered.fileName || 'overall.pdf'}`;
+  return {
+    ...rendered,
+    fileName,
+    pdfKey: preview.pdfKey
+  };
+}
+
+async function zipRenderedPdfFiles(files = []) {
+  const entries = (Array.isArray(files) ? files : [])
+    .filter((row) => row && row.buffer)
+    .map((row, index) => ({
+      fileName: String(row.fileName || `overall_${index + 1}.pdf`).replace(/[^\w.-]+/g, '_'),
+      buffer: row.buffer
+    }));
+  if (!entries.length) throw new Error('No PDF files were available to zip.');
+  const JSZip = require('jszip');
+  const zip = new JSZip();
+  const usedNames = new Set();
+  entries.forEach((entry, index) => {
+    let name = entry.fileName;
+    if (!name.toLowerCase().endsWith('.pdf')) name = `${name}.pdf`;
+    if (usedNames.has(name.toLowerCase())) {
+      const dot = name.lastIndexOf('.');
+      const stem = dot > 0 ? name.slice(0, dot) : name;
+      name = `${stem}_${index + 1}.pdf`;
+    }
+    usedNames.add(name.toLowerCase());
+    zip.file(name, entry.buffer);
+  });
+  return Buffer.from(await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
 }
 
 async function generateSourceBatch(request = {}, reqUser) {
@@ -384,11 +437,12 @@ async function generateOverallFromSourceBatch(request = {}, reqUser) {
   }
 
   const format = clean(request?.format || 'json').toLowerCase();
-  if (format !== 'json' && format !== 'docx') {
-    throw new Error('Invalid overall format. Use json or docx.');
+  if (format !== 'json' && format !== 'docx' && format !== 'pdf') {
+    throw new Error('Invalid overall format. Use json, docx, or pdf.');
   }
 
   const selectedDocxKey = clean(request?.selectedDocxKey) || 'default';
+  const selectedPdfKey = clean(request?.selectedPdfKey) || 'default';
   const docxModeRaw = clean(request?.docxMode).toLowerCase();
   const docxMode = docxModeRaw === 'zip' || docxModeRaw === 'consolidated'
     ? docxModeRaw
@@ -449,6 +503,43 @@ async function generateOverallFromSourceBatch(request = {}, reqUser) {
     return result;
   }
 
+  if (format === 'pdf') {
+    const rendered = [];
+    for (const entry of studentEntries) {
+      const selection = selectionByStudent.get(String(entry.studentId ?? '').trim()) || {};
+      const pdfKey = clean(selection.pdfKey) || selectedPdfKey;
+      const file = await renderVirtualOverallPdf(entry.virtualInstance, pdfKey);
+      rendered.push(file);
+      entry.file = file;
+    }
+
+    result.students = studentEntries.map((entry) => ({
+      studentId: entry.studentId,
+      studentName: entry.studentName,
+      file: entry.file
+    }));
+
+    if (docxMode === 'zip') {
+      const zipBuffer = await zipRenderedPdfFiles(rendered);
+      result.buffer = zipBuffer;
+      result.contentType = 'application/zip';
+      result.fileName = `${clean(overallTemplate.title || 'overall-report').replace(/[^\w.-]+/g, '_') || 'overall-report'}_pdf.zip`;
+      return result;
+    }
+
+    if (rendered.length === 1 || docxMode === 'single') {
+      result.file = rendered[0];
+      result.contentType = 'application/pdf';
+      return result;
+    }
+
+    const zipBuffer = await zipRenderedPdfFiles(rendered);
+    result.buffer = zipBuffer;
+    result.contentType = 'application/zip';
+    result.fileName = `${clean(overallTemplate.title || 'overall-report').replace(/[^\w.-]+/g, '_') || 'overall-report'}_pdf.zip`;
+    return result;
+  }
+
   const rendered = [];
   for (const entry of studentEntries) {
     const selection = selectionByStudent.get(String(entry.studentId ?? '').trim()) || {};
@@ -498,6 +589,7 @@ async function generateOverallPipeline(request = {}, reqUser) {
     sourceBatch,
     studentIds: request?.studentIds,
     selectedDocxKey: request?.selectedDocxKey,
+    selectedPdfKey: request?.selectedPdfKey,
     format: request?.format,
     docxMode: request?.docxMode,
     selections: request?.selections

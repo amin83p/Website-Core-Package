@@ -8,6 +8,7 @@ const DEFAULT_REPORT_EXPORT_FORMATS = Object.freeze({
 
 const DEFAULT_OVERALL_EXPORT_FORMATS = Object.freeze({
   docx: true,
+  pdf: true,
   payload: true
 });
 
@@ -43,6 +44,7 @@ function sanitizeExportFormatFlags(raw = {}, { kind = 'report' } = {}) {
   if (kind === 'overall') {
     return {
       docx: policyFlag(raw.docx, true),
+      pdf: policyFlag(raw.pdf, true),
       payload: policyFlag(raw.payload, true)
     };
   }
@@ -117,6 +119,7 @@ function resolveEffectiveOverallExportFlags(policy = {}, templateId = '', templa
   const flags = resolveTemplateExportFormats(policy, 'overall', templateId);
   return {
     hasDocx: Boolean(templateMeta.hasDocx) && flags.docx !== false,
+    hasPdf: Boolean(templateMeta.hasPdf) && flags.pdf !== false,
     hasPayload: flags.payload !== false
   };
 }
@@ -124,11 +127,6 @@ function resolveEffectiveOverallExportFlags(policy = {}, templateId = '', templa
 function assertSarExportFormatAllowed(policy = {}, kind = 'report', templateId = '', format = '') {
   const token = clean(format).toLowerCase();
   if (!['json', 'docx', 'pdf'].includes(token)) return;
-  if (kind === 'overall' && token === 'pdf') {
-    const error = new Error('Overall reports do not support PDF export.');
-    error.statusCode = 400;
-    throw error;
-  }
   if (!isSarExportFormatEnabled(policy, kind, templateId, token)) {
     const label = token === 'json' ? 'Payload' : token.toUpperCase();
     const error = new Error(`${label} export is disabled for this template in School Settings.`);

@@ -3,6 +3,7 @@
   const initialInstance = instance || null;
   const initialSourceSlots = Array.isArray(sourceSlots) ? sourceSlots : [];
   const initialDocxOptions = Array.isArray(docxOptions) ? docxOptions : [];
+  const initialPdfOptions = Array.isArray(pdfOptions) ? pdfOptions : [];
   const workspaceReadOnly = readOnly === true;
   const escJson = (value) => JSON.stringify(value ?? null).replace(/</g, '\\u003c');
 %>
@@ -53,6 +54,19 @@
           <select class="form-select" id="selectedDocxKey" <%= workspaceReadOnly ? 'disabled' : '' %>>
             <% initialDocxOptions.forEach((option) => { %>
               <option value="<%= option.key %>" <%= String(initialInstance?.selectedDocxKey || '') === String(option.key) ? 'selected' : '' %>>
+                <%= option.label %> &middot; <%= option.fileName %>
+              </option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="col-lg-4">
+          <label class="form-label fw-bold">Output PDF template</label>
+          <select class="form-select" id="selectedPdfKey" <%= workspaceReadOnly ? 'disabled' : '' %>>
+            <% if (!initialPdfOptions.length) { %>
+              <option value="default">No PDF configured</option>
+            <% } %>
+            <% initialPdfOptions.forEach((option) => { %>
+              <option value="<%= option.key %>" <%= String(initialInstance?.selectedPdfKey || 'default') === String(option.key) ? 'selected' : '' %>>
                 <%= option.label %> &middot; <%= option.fileName %>
               </option>
             <% }); %>
@@ -149,10 +163,16 @@
           <i class="bi bi-save me-1"></i>Save
         </button>
         <button type="button" class="btn btn-outline-primary btn-sm" id="btnExportZip" <%= initialInstance ? '' : 'disabled' %>>
-          <i class="bi bi-file-zip me-1"></i>Export (Download)
+          <i class="bi bi-file-zip me-1"></i>Export DOCX ZIP
         </button>
         <button type="button" class="btn btn-primary btn-sm" id="btnExportDocx" <%= initialInstance ? '' : 'disabled' %>>
-          <i class="bi bi-file-earmark-word me-1"></i>Export
+          <i class="bi bi-file-earmark-word me-1"></i>Export DOCX
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" id="btnExportPdfZip" <%= initialInstance && initialPdfOptions.length ? '' : 'disabled' %>>
+          <i class="bi bi-file-zip me-1"></i>Export PDF ZIP
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" id="btnExportPdf" <%= initialInstance && initialPdfOptions.length ? '' : 'disabled' %>>
+          <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
         </button>
       </div>
     </div>
@@ -205,6 +225,26 @@
   </div>
 </div>
 
+<div class="modal fade" id="exportPdfModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Export PDF Document</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label fw-bold">PDF template</label>
+        <select class="form-select" id="exportPdfKeySelect"></select>
+        <div class="form-text">Exports all included students using the selected PDF template (ZIP when more than one).</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btnConfirmExportPdf">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <input type="hidden" id="hid_actionStateId" value="<%= actionStateId || '' %>">
 
 <%- include('partials/modal_GenericPicker', { user }) %>
@@ -217,6 +257,7 @@
   let templateMeta = <%- escJson(initialTemplate ? { id: initialTemplate.id, title: initialTemplate.title, status: initialTemplate.status, version: initialTemplate.version } : null) %>;
   let sourceSlots = <%- escJson(initialSourceSlots) %>;
   let docxOptions = <%- escJson(initialDocxOptions) %>;
+  let pdfOptions = <%- escJson(initialPdfOptions) %>;
   let hasOverallFields = <%= hasOverallFields ? 'true' : 'false' %>;
   let instanceId = <%- escJson(initialInstance?.id || '') %>;
   let selectedStudents = <%- escJson((initialInstance?.filtersSnapshot?.studentIds || []).map((id) => ({ id, name: id }))) %>;
@@ -310,6 +351,33 @@
       if (String(option.key) === String(selectedKey || '')) opt.selected = true;
       selectEl.appendChild(opt);
     });
+  }
+
+  function fillPdfSelect(selectEl, selectedKey) {
+    if (!selectEl) return;
+    selectEl.innerHTML = '';
+    if (!pdfOptions?.length) {
+      const opt = document.createElement('option');
+      opt.value = 'default';
+      opt.textContent = 'No PDF configured';
+      selectEl.appendChild(opt);
+      return;
+    }
+    pdfOptions.forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = option.key;
+      opt.textContent = `${option.label} · ${option.fileName || ''}`.trim();
+      if (String(option.key) === String(selectedKey || 'default')) opt.selected = true;
+      selectEl.appendChild(opt);
+    });
+  }
+
+  function syncPdfExportButtons() {
+    const enabled = Boolean(instanceId && pdfOptions?.length);
+    const pdfZipBtn = document.getElementById('btnExportPdfZip');
+    const pdfBtn = document.getElementById('btnExportPdf');
+    if (pdfZipBtn) pdfZipBtn.disabled = !enabled;
+    if (pdfBtn) pdfBtn.disabled = !enabled;
   }
 
   function updateStudentSummary() {
@@ -431,6 +499,7 @@
     instanceId = instance.id;
     document.getElementById('btnExportZip').disabled = false;
     document.getElementById('btnExportDocx').disabled = false;
+    syncPdfExportButtons();
     const savedEntries = Array.isArray(instance.studentEntries) ? instance.studentEntries : [];
     if (!savedEntries.length) return;
     studentRows = savedEntries.map((entry) => ({
@@ -483,10 +552,13 @@
     templateMeta = payload.template;
     sourceSlots = payload.sourceSlots || [];
     docxOptions = payload.docxOptions || [];
+    pdfOptions = payload.pdfOptions || [];
     hasOverallFields = payload.hasOverallFields === true;
     document.getElementById('overallTemplateId').value = templateMeta.id;
     document.getElementById('overallTemplateTitle').value = templateMeta.title || '';
     fillDocxSelect(document.getElementById('selectedDocxKey'), document.getElementById('selectedDocxKey').value);
+    fillPdfSelect(document.getElementById('selectedPdfKey'), document.getElementById('selectedPdfKey')?.value || 'default');
+    syncPdfExportButtons();
     renderSourceChips();
     studentRows = [];
     renderTable();
@@ -570,7 +642,10 @@
       sourceSlots = payload.sourceSlots || sourceSlots;
       hasOverallFields = payload.hasOverallFields === true;
       docxOptions = payload.docxOptions || docxOptions;
+      pdfOptions = payload.pdfOptions || pdfOptions;
       fillDocxSelect(document.getElementById('selectedDocxKey'), document.getElementById('selectedDocxKey').value);
+      fillPdfSelect(document.getElementById('selectedPdfKey'), document.getElementById('selectedPdfKey')?.value || 'default');
+      syncPdfExportButtons();
       renderSourceChips();
       const previousSelections = new Map(
         studentRows.map((row) => [row.studentId, row.selectedBySlot || {}])
@@ -625,6 +700,7 @@
       body.set('templateId', templateMeta.id);
       body.set('title', document.getElementById('overallReportTitle').value || '');
       body.set('selectedDocxKey', document.getElementById('selectedDocxKey').value || 'default');
+      body.set('selectedPdfKey', document.getElementById('selectedPdfKey').value || 'default');
       body.set('studentEntriesJson', JSON.stringify(entries));
       body.set('filtersJson', JSON.stringify(getFiltersPayload()));
       body.set('actionStateId', actionStateId);
@@ -640,6 +716,7 @@
       if (payload.result) hydrateFromInstance(payload.result);
       document.getElementById('btnExportZip').disabled = false;
       document.getElementById('btnExportDocx').disabled = false;
+      syncPdfExportButtons();
       await showModal('Saved', payload.message || 'Overall report saved.', 'success');
       if (payload.redirect && !window.location.pathname.includes('/edit/')) {
         window.location.assign(payload.redirect);
@@ -775,6 +852,57 @@
     }
   }
 
+  async function exportPdfZip() {
+    if (!instanceId) {
+      await showModal('Save Required', 'Save the overall report before exporting.');
+      return;
+    }
+    try {
+      if (typeof showLoading === 'function') showLoading({ note: 'Building PDF ZIP package...' });
+      await downloadBinary(
+        `/school/reports/overall-reports/${encodeURIComponent(instanceId)}/export-pdf-zip`,
+        { selectedPdfKey: document.getElementById('selectedPdfKey').value || 'default' }
+      );
+    } catch (error) {
+      await showModal('Export Failed', error.message || 'Unable to export PDF package.', 'error');
+    } finally {
+      if (typeof hideLoading === 'function') hideLoading({ force: true });
+    }
+  }
+
+  function openExportPdfModal() {
+    if (!instanceId) {
+      showModal('Save Required', 'Save the overall report before exporting.');
+      return;
+    }
+    fillPdfSelect(document.getElementById('exportPdfKeySelect'), document.getElementById('selectedPdfKey').value);
+    const modalEl = document.getElementById('exportPdfModal');
+    if (window.bootstrap?.Modal && modalEl) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  async function confirmExportPdf() {
+    try {
+      if (typeof showLoading === 'function') showLoading({ note: 'Exporting PDF documents...' });
+      await downloadBinary(
+        `/school/reports/overall-reports/${encodeURIComponent(instanceId)}/export-pdf`,
+        {
+          selectedPdfKey: document.getElementById('exportPdfKeySelect').value || 'default',
+          asZip: 'true'
+        }
+      );
+      const modalEl = document.getElementById('exportPdfModal');
+      if (window.bootstrap?.Modal && modalEl) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+      }
+    } catch (error) {
+      await showModal('Export Failed', error.message || 'Unable to export PDF.', 'error');
+    } finally {
+      if (typeof hideLoading === 'function') hideLoading({ force: true });
+    }
+  }
+
   function openExportModal() {
     if (!instanceId) {
       showModal('Save Required', 'Save the overall report before exporting.');
@@ -820,8 +948,11 @@
   document.getElementById('btnLoadCandidates')?.addEventListener('click', loadCandidates);
   document.getElementById('btnSaveWorkspace')?.addEventListener('click', saveWorkspace);
   document.getElementById('btnExportZip')?.addEventListener('click', exportZip);
+  document.getElementById('btnExportPdfZip')?.addEventListener('click', exportPdfZip);
   document.getElementById('btnExportDocx')?.addEventListener('click', openExportModal);
+  document.getElementById('btnExportPdf')?.addEventListener('click', openExportPdfModal);
   document.getElementById('btnConfirmExportDocx')?.addEventListener('click', confirmExportDocx);
+  document.getElementById('btnConfirmExportPdf')?.addEventListener('click', confirmExportPdf);
   document.getElementById('btnSaveStudentPreview')?.addEventListener('click', savePreviewAnswers);
 
   document.getElementById('workspaceStudentsBody')?.addEventListener('change', (event) => {
@@ -852,6 +983,8 @@
 
   renderSourceChips();
   fillDocxSelect(document.getElementById('selectedDocxKey'), document.getElementById('selectedDocxKey').value);
+  fillPdfSelect(document.getElementById('selectedPdfKey'), document.getElementById('selectedPdfKey')?.value || 'default');
+  syncPdfExportButtons();
   updateStudentSummary();
   hydrateFromInstance(<%- escJson(initialInstance) %>);
   renderTable();

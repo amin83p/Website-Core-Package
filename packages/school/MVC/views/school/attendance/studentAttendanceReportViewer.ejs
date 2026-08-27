@@ -358,12 +358,15 @@
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                         <div>
                             <div class="fw-semibold small"><i class="bi bi-layers me-1 text-primary"></i>Overall report templates</div>
-                            <div class="small text-muted">Bulk export checked overall reports using each student's selected template (DOCX and payload).</div>
+                            <div class="small text-muted">Bulk export checked overall reports using each student's selected template (DOCX, PDF, and payload).</div>
                         </div>
                     </div>
                     <div class="sar-export-bulk-toolbar">
                         <button type="button" class="btn btn-outline-primary btn-sm js-sar-bulk-export" data-format="docx" data-export-scope="overall">
                             <i class="bi bi-filetype-docx me-1"></i>DOCX
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm js-sar-bulk-export" data-format="pdf" data-export-scope="overall">
+                            <i class="bi bi-filetype-pdf me-1"></i>PDF
                         </button>
                         <button type="button" class="btn btn-outline-secondary btn-sm js-sar-bulk-export" data-format="json" data-export-scope="overall">
                             <i class="bi bi-braces me-1"></i>Payload
@@ -1433,14 +1436,14 @@
     function buildSarFormatBadges(row = {}, exportType = 'class') {
         const badges = [];
         if (row.hasDocx) badges.push('<span class="badge bg-primary-subtle text-primary border sar-export-format-badge">DOCX</span>');
-        if (row.hasPdf && exportType === 'class') badges.push('<span class="badge bg-danger-subtle text-danger border sar-export-format-badge">PDF</span>');
+        if (row.hasPdf) badges.push('<span class="badge bg-danger-subtle text-danger border sar-export-format-badge">PDF</span>');
         if (row.hasPayload !== false) badges.push('<span class="badge bg-secondary-subtle text-secondary border sar-export-format-badge">Payload</span>');
         return badges.length ? `<div class="d-flex flex-wrap gap-1 mt-1">${badges.join('')}</div>` : '';
     }
 
     function buildSarFormatButtons(row = {}, exportType = 'class') {
         const hasDocx = Boolean(row.hasDocx);
-        const hasPdf = Boolean(row.hasPdf && exportType === 'class');
+        const hasPdf = Boolean(row.hasPdf);
         const hasPayload = row.hasPayload !== false;
         const buttons = [];
         if (hasDocx) {
@@ -1570,7 +1573,7 @@
         }
 
         if (badgesEl) {
-            badgesEl.innerHTML = eligible ? buildSarFormatBadges({ hasDocx: selectedOption.hasDocx, hasPdf: false, hasPayload: selectedOption.hasPayload }, 'overall') : '';
+            badgesEl.innerHTML = eligible ? buildSarFormatBadges({ hasDocx: selectedOption.hasDocx, hasPdf: selectedOption.hasPdf, hasPayload: selectedOption.hasPayload }, 'overall') : '';
         }
 
         if (statusEl) {
@@ -1583,7 +1586,7 @@
 
         if (actionsEl) {
             actionsEl.classList.toggle('d-none', !eligible);
-            actionsEl.innerHTML = eligible ? buildSarFormatButtons({ hasDocx: selectedOption.hasDocx, hasPdf: false, hasPayload: selectedOption.hasPayload }, 'overall') : '';
+            actionsEl.innerHTML = eligible ? buildSarFormatButtons({ hasDocx: selectedOption.hasDocx, hasPdf: selectedOption.hasPdf, hasPayload: selectedOption.hasPayload }, 'overall') : '';
             actionsEl.querySelectorAll('.js-sar-row-export').forEach((btn) => {
                 btn.disabled = !eligible || !(checkbox && checkbox.checked);
             });
@@ -1657,6 +1660,7 @@
             const templates = Array.isArray(plan.overallReportTemplates) ? plan.overallReportTemplates : [];
             return {
                 hasDocx: templates.some((row) => row.hasDocx),
+                hasPdf: templates.some((row) => row.hasPdf),
                 hasPayload: templates.some((row) => row.hasPayload !== false)
             };
         })();
@@ -1718,12 +1722,12 @@
                                         ${selectOptions}
                                     </select>
                                     <div class="small text-muted">Overall merged report</div>
-                                    <div class="js-sar-overall-badges">${initialEligible ? buildSarFormatBadges({ hasDocx: selectedOption.hasDocx, hasPdf: false, hasPayload: selectedOption.hasPayload }, 'overall') : ''}</div>
+                                    <div class="js-sar-overall-badges">${initialEligible ? buildSarFormatBadges({ hasDocx: selectedOption.hasDocx, hasPdf: selectedOption.hasPdf, hasPayload: selectedOption.hasPayload }, 'overall') : ''}</div>
                                     <div class="small text-warning js-sar-overall-status ${initialEligible ? 'd-none' : ''}">
                                         ${escapeHtml((options[0]?.warnings || []).join(' ') || 'Overall report not available for this student.')}
                                     </div>
                                     <div class="js-sar-overall-actions ${initialEligible ? '' : 'd-none'}">
-                                        ${initialEligible ? buildSarFormatButtons({ hasDocx: selectedOption.hasDocx, hasPdf: false, hasPayload: selectedOption.hasPayload }, 'overall') : ''}
+                                        ${initialEligible ? buildSarFormatButtons({ hasDocx: selectedOption.hasDocx, hasPdf: selectedOption.hasPdf, hasPayload: selectedOption.hasPayload }, 'overall') : ''}
                                     </div>
                                 </div>
                             </div>
@@ -1774,7 +1778,7 @@
                 const student = findSarExportStudent(studentId);
                 const overall = getOverallOptionById(student || {}, overallTemplateId);
                 if (!overall?.defined || !overallTemplateId) return;
-                if (normalizedFormat === 'pdf') return;
+                if (normalizedFormat === 'pdf' && !overall.hasPdf) return;
                 if (normalizedFormat === 'docx' && !overall.hasDocx) return;
                 if (normalizedFormat === 'json' && overall.hasPayload === false) return;
                 const classIds = [];

@@ -1,5 +1,6 @@
 <%
   const isEdit = Boolean(template?.id);
+  const initialPdfFieldMap = template?.pdfFieldMap || {};
   const sourceTemplateJson = JSON.stringify(sourceTemplates || []).replace(/</g, '\\u003c');
   const templateJson = JSON.stringify(template || {}).replace(/</g, '\\u003c');
   const funderOptionsJson = JSON.stringify(funderPickerOptions || []).replace(/</g, '\\u003c');
@@ -26,6 +27,7 @@
     <input type="hidden" name="sourceSlotsJson" id="sourceSlotsJson">
     <input type="hidden" name="schemaJson" id="schemaJson">
     <input type="hidden" name="placeholderMapJson" id="placeholderMapJson">
+    <input type="hidden" name="pdfFieldMapJson" id="pdfFieldMapJsonInput">
     <input type="hidden" name="nextSlotNumber" id="nextSlotNumber" value="<%= Number(template?.nextSlotNumber || 3) %>">
 
     <div class="card border-0 shadow-sm mb-3">
@@ -132,6 +134,41 @@
             <tr data-funder-key="<%= row.funderKey %>"><td><input type="hidden" name="funderDocxKeys" value="<%= row.funderKey %>"><input type="hidden" name="funderDocxLabels" value="<%= row.label %>"><%= row.label %></td><td><input class="form-control form-control-sm" type="file" name="funderDocxFile_<%= row.funderKey %>" accept=".docx"><% if (row.docxTemplate?.url) { %><a class="small" target="_blank" href="<%= row.docxTemplate.url %>">Current file</a><% } %></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder">Remove</button></td></tr>
           <% }); %>
         </tbody></table></div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0 fw-bold">PDF Templates</h5></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label fw-bold">Default PDF</label>
+            <input type="file" class="form-control" name="pdfTemplate" accept=".pdf">
+            <% if (template?.pdfTemplate?.url) { %><div class="small mt-1">Current: <a href="<%= template.pdfTemplate.url %>" target="_blank"><%= template.pdfTemplate.originalName || template.pdfTemplate.fileName %></a></div><% } %>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Add funder mapping</label>
+            <button type="button" class="btn btn-outline-primary w-100" id="btnAddFunderPdf"><i class="bi bi-search me-1"></i>Find Funder</button>
+            <div class="form-text">Search active funders and add each PDF mapping once.</div>
+          </div>
+        </div>
+        <div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>Funder</th><th>PDF</th><th></th></tr></thead><tbody id="funderPdfRows">
+          <% (template?.pdfTemplatesByFunder || []).forEach((row) => { %>
+            <tr data-funder-pdf-key="<%= row.funderKey %>"><td><input type="hidden" name="funderPdfKeys" value="<%= row.funderKey %>"><input type="hidden" name="funderPdfLabels" value="<%= row.label %>"><%= row.label %></td><td><input class="form-control form-control-sm" type="file" name="funderPdfFile_<%= row.funderKey %>" accept=".pdf"><% if (row.pdfTemplate?.url) { %><a class="small" target="_blank" href="<%= row.pdfTemplate.url %>">Current file</a><% } %></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder-pdf">Remove</button></td></tr>
+          <% }); %>
+        </tbody></table></div>
+        <div class="mt-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+            <label class="form-label fw-bold mb-0">PDF Field Map</label>
+            <% if (isEdit && (template?.pdfTemplate?.path || (Array.isArray(template?.pdfTemplatesByFunder) && template.pdfTemplatesByFunder.some((row) => row?.pdfTemplate?.path)))) { %>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnInspectPdfFields" data-template-id="<%= template.id %>">
+                <i class="bi bi-search me-1"></i>Inspect Saved PDF Fields
+              </button>
+            <% } %>
+          </div>
+          <textarea class="form-control font-monospace" id="pdfFieldMapEditor" rows="8" spellcheck="false"><%- JSON.stringify(initialPdfFieldMap, null, 2).replace(/</g, '\\u003c') %></textarea>
+          <div class="form-text">Map overall keys to exact PDF AcroForm field names. Example: <code>"O.attendance": "YN1"</code> or source keys like <code>"T1.student_name": "StudentName"</code>. You can also type placeholders like <code>{{O.attendance}}</code> directly into PDF text fields.</div>
+        </div>
       </div>
     </div>
 
@@ -1275,6 +1312,69 @@
     });
   });
   document.getElementById('funderRows').addEventListener('click', event => event.target.closest('.js-remove-funder')?.closest('tr')?.remove());
+  document.getElementById('btnAddFunderPdf').addEventListener('click', () => {
+    const existing = new Set([...document.querySelectorAll('[data-funder-pdf-key]')].map(row => String(row.dataset.funderPdfKey)));
+    const available = funderOptions.map(option => ({ ...option, id: String(option.id), title: option.label || option.name || option.id })).filter(option => !existing.has(option.id));
+    if (!available.length) { showReportModal({ title: 'No Funders Available', message: 'Every active funder is already mapped for PDF, or no active funders are available.' }); return; }
+    openLocalPicker({
+      title: 'Select Funder for PDF',
+      icon: 'bi-building',
+      placeholder: 'Search funders by name or id...',
+      localItems: available,
+      searchFields: 'id,label,title,name',
+      renderer: item => `<div><div class="fw-bold">${escapeHtml(item.label || item.title || item.id)}</div><div class="small text-muted"><code>${escapeHtml(item.id)}</code></div></div>`,
+      onSelect(item) {
+        const key = String(item.id); const label = String(item.label || item.title || key);
+        if (document.querySelector(`[data-funder-pdf-key="${CSS.escape(key)}"]`)) return;
+        document.getElementById('funderPdfRows').insertAdjacentHTML('beforeend', `<tr data-funder-pdf-key="${escapeHtml(key)}"><td><input type="hidden" name="funderPdfKeys" value="${escapeHtml(key)}"><input type="hidden" name="funderPdfLabels" value="${escapeHtml(label)}">${escapeHtml(label)}</td><td><input class="form-control form-control-sm" type="file" name="funderPdfFile_${escapeHtml(key)}" accept=".pdf"></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder-pdf">Remove</button></td></tr>`);
+      }
+    });
+  });
+  document.getElementById('funderPdfRows').addEventListener('click', event => event.target.closest('.js-remove-funder-pdf')?.closest('tr')?.remove());
+  document.getElementById('btnInspectPdfFields')?.addEventListener('click', async (event) => {
+    const btn = event.currentTarget;
+    const templateId = String(btn?.getAttribute('data-template-id') || '').trim();
+    if (!templateId) return;
+    const original = btn.innerHTML;
+    try {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Inspecting...';
+      const response = await fetch('/school/reports/overall-templates/' + encodeURIComponent(templateId) + '/pdf-fields', {
+        headers: { Accept: 'application/json', 'x-ajax-request': 'true' }
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.status === 'error') {
+        throw new Error(result.message || 'Unable to inspect saved PDF fields.');
+      }
+      const names = (Array.isArray(result.fields) ? result.fields : []).map((field) => String(field?.name || '').trim()).filter(Boolean);
+      const html = names.length
+        ? '<div class="text-start"><div class="small text-muted mb-2">Saved PDF fields for ' + escapeHtml(result.label || 'Default') + ':</div><pre class="small bg-light border rounded p-2 mb-0 text-wrap">' + escapeHtml(names.join('\n')) + '</pre></div>'
+        : 'No fillable PDF fields were found in the saved file.';
+      await showReportModal({ title: 'PDF Fields', icon: names.length ? 'info' : 'warning', message: html, html: true });
+    } catch (error) {
+      await showReportModal({ title: 'PDF Field Inspection Failed', icon: 'error', message: error?.message || 'Unable to inspect saved PDF fields.', buttonClass: 'btn-danger' });
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  });
+  function findDuplicateTopLevelJsonKeys(text) {
+    const trimmed = String(text || '').trim();
+    if (!trimmed) return [];
+    const seen = new Set();
+    const duplicates = [];
+    const keyPattern = /"((?:\\.|[^"\\])*)"\s*:/g;
+    let match;
+    while ((match = keyPattern.exec(trimmed)) !== null) {
+      let key = match[1];
+      try { key = JSON.parse('"' + key.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'); } catch (_) { /* keep raw */ }
+      const normalized = String(key).trim().toLowerCase();
+      if (!normalized) continue;
+      if (seen.has(normalized)) duplicates.push(key);
+      else seen.add(normalized);
+    }
+    return duplicates;
+  }
   function assertBalancedExpression(expression, label) {
     let depth = 0; let quote = ''; let escaped = false;
     for (const char of String(expression || '')) {
@@ -1357,6 +1457,38 @@
     document.getElementById('schemaJson').value = JSON.stringify({ version: Number(initial.schema?.version || 1), fields });
     document.getElementById('placeholderMapJson').value = JSON.stringify(Object.fromEntries(fields.filter(field => !isVisual(field)).map(field => [field.id, `{{O.${field.id}}}`])));
     document.getElementById('nextSlotNumber').value = nextSlot;
+
+    const pdfFieldMapEditor = document.getElementById('pdfFieldMapEditor');
+    const pdfFieldMapJsonInput = document.getElementById('pdfFieldMapJsonInput');
+    let pdfFieldMap = {};
+    const pdfMapText = String(pdfFieldMapEditor?.value || '').trim();
+    if (pdfMapText) {
+      const duplicateKeys = findDuplicateTopLevelJsonKeys(pdfMapText);
+      if (duplicateKeys.length) {
+        await showReportModal({
+          title: 'Duplicate PDF Field Map Keys',
+          icon: 'warning',
+          message: 'Each source key must appear only once. Duplicate key(s): ' + duplicateKeys.join(', '),
+          buttonClass: 'btn-warning'
+        });
+        return;
+      }
+      try {
+        pdfFieldMap = JSON.parse(pdfMapText);
+        if (!pdfFieldMap || Array.isArray(pdfFieldMap) || typeof pdfFieldMap !== 'object') {
+          throw new Error('PDF Field Map must be a JSON object.');
+        }
+      } catch (error) {
+        await showReportModal({
+          title: 'Invalid PDF Field Map',
+          icon: 'warning',
+          message: error?.message || 'PDF Field Map must be valid JSON.',
+          buttonClass: 'btn-warning'
+        });
+        return;
+      }
+    }
+    if (pdfFieldMapJsonInput) pdfFieldMapJsonInput.value = JSON.stringify(pdfFieldMap);
 
     const submitter = event.submitter || form.querySelector('button[type="submit"]');
     const originalHtml = submitter ? submitter.innerHTML : '';

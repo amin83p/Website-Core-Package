@@ -214,7 +214,8 @@ async function resolveStudentAttendanceReportLabels(policy = {}, reqUser) {
     overallReportTemplateLabels.push({
       id: overallId,
       label: studentAttendanceReportPolicyService.formatTemplateLabel(template, overallId),
-      hasDocx: overallReportService.templateHasAttachedDocx(template)
+      hasDocx: overallReportService.templateHasAttachedDocx(template),
+      hasPdf: overallReportService.templateHasAttachedPdf(template)
     });
   }
   return {

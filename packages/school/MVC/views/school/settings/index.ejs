@@ -682,12 +682,13 @@
                         <th style="width: 56px;">Order</th>
                         <th>Overall template</th>
                         <th style="width: 7rem;">DOCX</th>
+                        <th style="width: 7rem;">PDF</th>
                         <th style="width: 7rem;">Payload</th>
                         <% if (canUpdateFlag) { %><th class="text-end" style="width: 190px;">Actions</th><% } %>
                       </tr>
                     </thead>
                     <tbody id="sarOverallTemplatesBody">
-                      <tr><td colspan="<%= canUpdateFlag ? 5 : 4 %>" class="text-muted small py-3">No overall templates selected.</td></tr>
+                      <tr><td colspan="<%= canUpdateFlag ? 6 : 5 %>" class="text-muted small py-3">No overall templates selected.</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -1385,7 +1386,8 @@
         return {
           id,
           label: String(row?.label || row?.title || row?.templateTitle || id).trim() || id,
-          hasDocx: row?.hasDocx === true
+          hasDocx: row?.hasDocx === true,
+          hasPdf: row?.hasPdf === true
         };
       })
       .filter((row) => row.id)
@@ -1402,7 +1404,7 @@
   }
 
   function defaultOverallExportFormats() {
-    return { docx: true, payload: true };
+    return { docx: true, pdf: true, payload: true };
   }
 
   function ensureSarTemplateExportFormats() {
@@ -1450,6 +1452,7 @@
     if (!id) return;
     studentAttendanceReportPolicy.templateExportFormats.overall[id] = {
       docx: formats.docx !== false,
+      pdf: formats.pdf !== false,
       payload: formats.payload !== false
     };
   }
@@ -1466,9 +1469,11 @@
     }
     sarOverallTemplates.forEach((row) => {
       const docxInput = document.querySelector(`.js-sar-overall-export-docx[data-template-id="${CSS.escape(row.id)}"]`);
+      const pdfInput = document.querySelector(`.js-sar-overall-export-pdf[data-template-id="${CSS.escape(row.id)}"]`);
       const payloadInput = document.querySelector(`.js-sar-overall-export-payload[data-template-id="${CSS.escape(row.id)}"]`);
       setSarOverallExportFormats(row.id, {
         docx: docxInput ? docxInput.checked : getSarOverallExportFormats(row.id).docx !== false,
+        pdf: pdfInput ? pdfInput.checked : getSarOverallExportFormats(row.id).pdf !== false,
         payload: payloadInput ? payloadInput.checked : getSarOverallExportFormats(row.id).payload !== false
       });
     });
@@ -1520,7 +1525,7 @@
     if (!body) return;
     syncSarOverallTemplateInputs();
     if (!sarOverallTemplates.length) {
-      body.innerHTML = `<tr><td colspan="${canUpdate ? 5 : 4}" class="text-muted small py-3">No overall templates selected.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="${canUpdate ? 6 : 5}" class="text-muted small py-3">No overall templates selected.</td></tr>`;
       return;
     }
     body.innerHTML = sarOverallTemplates.map((row, index) => {
@@ -1537,6 +1542,11 @@
           <td>
             <div class="form-check form-switch mb-0">
               <input class="form-check-input js-sar-overall-export-docx" type="checkbox" data-template-id="${escapeHtml(row.id)}" ${formats.docx !== false ? 'checked' : ''} ${canUpdate && row.hasDocx ? '' : 'disabled'}>
+            </div>
+          </td>
+          <td>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input js-sar-overall-export-pdf" type="checkbox" data-template-id="${escapeHtml(row.id)}" ${formats.pdf !== false ? 'checked' : ''} ${canUpdate && row.hasPdf ? '' : 'disabled'}>
             </div>
           </td>
           <td>
@@ -1575,7 +1585,8 @@
     sarOverallTemplates = normalizeSarOverallTemplateRows([...sarOverallTemplates, {
       id,
       label,
-      hasDocx: item?.hasDocx === true || item?.hasAttachedDocx === true || Boolean(item?.docxTemplate?.path)
+      hasDocx: item?.hasDocx === true || item?.hasAttachedDocx === true || Boolean(item?.docxTemplate?.path),
+      hasPdf: item?.hasPdf === true || item?.hasAttachedPdf === true || Boolean(item?.hasPdfTemplate) || Boolean(item?.pdfTemplate?.path)
     }]);
     setSarOverallExportFormats(id, defaultOverallExportFormats());
     renderSarOverallTemplates();

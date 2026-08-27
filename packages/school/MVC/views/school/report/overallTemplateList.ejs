@@ -50,9 +50,13 @@
           </td>
           <td><%= (row.schema?.fields || []).filter((field) => !['section','subheader','row_break'].includes(field.type)).length %></td>
           <td>
-            <span class="badge bg-light text-dark border"><%= row.docxTemplate?.path ? 'Default' : 'No default' %></span>
+            <span class="badge bg-light text-dark border"><%= row.docxTemplate?.path ? 'DOCX' : 'No DOCX' %></span>
             <% if ((row.docxTemplatesByFunder || []).length) { %>
-              <span class="badge bg-info-subtle text-info-emphasis border"><%= row.docxTemplatesByFunder.length %> funder</span>
+              <span class="badge bg-info-subtle text-info-emphasis border"><%= row.docxTemplatesByFunder.length %> docx</span>
+            <% } %>
+            <span class="badge bg-light text-dark border"><%= row.pdfTemplate?.path ? 'PDF' : 'No PDF' %></span>
+            <% if ((row.pdfTemplatesByFunder || []).length) { %>
+              <span class="badge bg-info-subtle text-info-emphasis border"><%= row.pdfTemplatesByFunder.length %> pdf</span>
             <% } %>
           </td>
           <td class="table-actions pe-4">

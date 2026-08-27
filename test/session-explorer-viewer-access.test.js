@@ -99,10 +99,10 @@ test('session list view conditionally hides teacher picker for non-admin viewers
 test('session explorer service scopes class fetch with route access context', () => {
   assert.match(
     serviceSource,
-    /schoolDataService\.fetchData\('classes', \{\}, req\.user, accessContext\)/
+    /schoolDataService\.fetchAllData\('classes', \{\}, req\.user, accessContext\)/
   );
   assert.match(serviceSource, /getClassSessions\(classRow\.id, req\.user, accessContext\)/);
-  assert.match(serviceSource, /isSessionAccessible\(\{ classRow, session, access, context: 'list' \}\)/);
+  assert.match(serviceSource, /isSessionAccessible\(\{[\s\S]*context: 'list'/);
 });
 
 test('getClassSessions forwards optional accessContext', () => {
@@ -144,7 +144,7 @@ test('applyViewerTeacherFilters leaves admin filters unchanged', () => {
 });
 
 function swapAdminChecker(isAdmin) {
-  const adminPath = require.resolve('../MVC/services/adminChekersService');
+  const adminPath = require.resolve('../packages/school/MVC/services/school/schoolAdminAccessService');
   const originalAdmin = require(adminPath);
   const originalCache = require.cache[adminPath];
   require.cache[adminPath] = {
@@ -153,7 +153,7 @@ function swapAdminChecker(isAdmin) {
     loaded: true,
     exports: {
       ...originalAdmin,
-      isAdminForRequest: () => isAdmin
+      isSessionsAdminViewer: () => isAdmin
     }
   };
   delete require.cache[SERVICE_PATH];
@@ -192,7 +192,7 @@ test('listSessions passes accessContext to class fetch', async () => {
             buildPersonByIdMap: async () => new Map()
           }, async () => {
             await freshService.listSessions(buildReq(), {});
-            assert.deepEqual(captured.fetchAccessContext, { scopeId: 'SCP_DIV' });
+            assert.deepEqual(captured.fetchAccessContext, { scopeId: 'SCP_DIV', unbounded: true });
           });
         });
       });
@@ -243,6 +243,51 @@ test('listSessions ignores foreign teacher filter for locked non-admin teacher v
             assert.equal(result.data.length, 1);
             assert.equal(result.data[0].sessionId, 'SES_1');
             assert.equal(result.data[0].teacherId, 'PERSON_1');
+          });
+        });
+      });
+    });
+  } finally {
+    restore();
+  }
+});
+
+test('listSessions loads rolling class applicability without reqUser reference error', async () => {
+  const rollingClass = {
+    id: 'CLS_ROLL',
+    title: 'Rolling Class',
+    orgId: 'ORG_1',
+    registrationMode: 'rolling',
+    sessions: [buildSession({ sessionId: 'SES_ROLL', date: '2026-08-26', deliveredBy: 'PERSON_1' })]
+  };
+  const restore = swapAdminChecker(true);
+  const freshService = require(SERVICE_PATH);
+
+  try {
+    await withPatched(schoolDataService, {
+      buildRouteAccessContext: () => ({ scopeId: 'SCP_DIV' }),
+      fetchAllData: async (entityType) => {
+        if (entityType === 'classes') return [rollingClass];
+        return [];
+      },
+      getClassSessions: async () => rollingClass.sessions,
+      getClassEnrollmentPeriodsByClassId: async () => []
+    }, async () => {
+      await withPatched(sessionStatusPolicyService, {
+        getClientStatusMeta: async () => [{ code: 'scheduled' }]
+      }, async () => {
+        await withPatched(sessionStudentCaseService, {
+          listSessionCaseSummaries: async () => new Map()
+        }, async () => {
+          await withPatched(schoolPersonAccessService, {
+            buildPersonByIdMap: async () => new Map()
+          }, async () => {
+            const result = await freshService.listSessions(buildReq(), {
+              startDate: '2026-08-26',
+              endDate: '2026-08-26'
+            });
+            assert.equal(result.data.length, 1);
+            assert.equal(result.data[0].sessionId, 'SES_ROLL');
           });
         });
       });

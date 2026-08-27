@@ -373,6 +373,7 @@ async function createRowOverallInstance({ session, studentId, reqUser }) {
       statuses: session.addFilters?.statuses || ['submitted', 'locked']
     },
     selectedDocxKey: row.selectedDocxKey || 'default',
+    selectedPdfKey: row.selectedPdfKey || 'default',
     title: `${session.title} — ${row.studentName || studentId}`,
     studentEntries: [{
       studentId,

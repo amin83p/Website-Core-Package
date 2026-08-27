@@ -8,6 +8,8 @@ const reportService = require('./reportService');
 const reportRuleEngineService = require('./reportRuleEngineService');
 const reportDocxRenderService = require('./reportDocxRenderService');
 const reportFunderDocxService = require('./reportFunderDocxService');
+const reportFunderPdfService = require('./reportFunderPdfService');
+const reportPdfRenderService = require('./reportPdfRenderService');
 const overallReportTemplateModel = require('../../models/school/overallReportTemplateModel');
 const overallReportInstanceModel = require('../../models/school/overallReportInstanceModel');
 
@@ -569,9 +571,11 @@ async function createOverallInstance({
   template,
   sourceSelections,
   selectedDocxKey = 'default',
+  selectedPdfKey = 'default',
   title = '',
   reqUser,
-  allowMissingDocx = false
+  allowMissingDocx = false,
+  allowMissingPdf = true
 }) {
   if (String(template?.status || '').toLowerCase() !== 'active') {
     throw new Error('Only active overall report templates can create reports.');
@@ -622,6 +626,7 @@ async function createOverallInstance({
       throw new Error('Select an available Word template before creating the overall report.');
     }
   }
+  const resolvedPdf = resolveSelectedPdfKey(template, selectedPdfKey, { allowMissingPdf });
   const calculated = calculateAnswers({
     template,
     sourceValues,
@@ -640,6 +645,7 @@ async function createOverallInstance({
     title: clean(title) || `${template.title} - ${now.slice(0, 10)}`,
     status: 'draft',
     selectedDocxKey: resolvedDocx.docxKey,
+    selectedPdfKey: resolvedPdf.pdfKey,
     templateSnapshot: clone(template, {}),
     sourceSelections: normalizedSelections,
     sourceValues,
@@ -1034,6 +1040,39 @@ async function buildExportPreview(instance) {
   };
 }
 
+async function buildPdfExportPreview(instance) {
+  const template = instance.templateSnapshot || {};
+  const availablePdf = reportFunderPdfService.buildAvailablePdfOptions(template);
+  const selectedPdf = availablePdf.find((row) => (
+    idsEqual(row.key, instance.selectedPdfKey)
+    || String(row.key || '').toLowerCase() === String(instance.selectedPdfKey || '').toLowerCase()
+  ));
+  if (!selectedPdf) throw new Error('The selected overall report PDF template is unavailable.');
+  const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({
+    template,
+    funderKey: selectedPdf.key
+  });
+  if (!resolved.pdfTemplate) throw new Error('The selected overall report PDF template is unavailable.');
+  const payload = buildDocxPayloadDetailed(instance);
+  const validation = validateAnswers(template, instance.answers || {});
+  const calculation = findCalculationMismatches(instance);
+  return {
+    pdfKey: resolved.pdfKey,
+    pdfLabel: resolved.label,
+    fileName: resolved.pdfTemplate.originalName || resolved.pdfTemplate.fileName || '',
+    placeholders: payload.placeholders,
+    validation,
+    conversionDiagnostics: payload.conversionDiagnostics,
+    calculationDiagnostics: calculation.diagnostics,
+    calculationMismatches: calculation.mismatches,
+    ready: !hasBlockingValidationErrors(validation)
+      && !payload.conversionDiagnostics.length
+      && !calculation.diagnostics.length
+      && !calculation.mismatches.length,
+    resolved
+  };
+}
+
 async function exportOverallReport(instance, reqUser) {
   if (!COMPLETED_SOURCE_STATUSES.has(String(instance.status || '').toLowerCase())) {
     throw new Error('Submit or lock the overall report before exporting the final DOCX.');
@@ -1224,6 +1263,7 @@ async function loadOverallCreateCandidates({
     hasOverallFields: templateHasOverallFields(template),
     sourceSlots: slots,
     docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
+    pdfOptions: reportFunderPdfService.buildAvailablePdfOptions(template),
     filters: {
       startDate: clean(startDate),
       endDate: clean(endDate),
@@ -1314,6 +1354,33 @@ function resolveSelectedDocxKey(template, selectedDocxKey = 'default', { allowMi
   return resolvedDocx;
 }
 
+function resolveSelectedPdfKey(template, selectedPdfKey = 'default', { allowMissingPdf = true } = {}) {
+  const requestedPdfKey = clean(selectedPdfKey || 'default') || 'default';
+  const availablePdf = reportFunderPdfService.buildAvailablePdfOptions(template);
+  const selectedOption = availablePdf.find((row) => (
+    idsEqual(row.key, requestedPdfKey)
+    || String(row.key || '').toLowerCase() === requestedPdfKey.toLowerCase()
+  ));
+  if (!selectedOption) {
+    if (!allowMissingPdf) {
+      throw new Error('The selected overall report PDF template is unavailable.');
+    }
+    return {
+      pdfKey: requestedPdfKey,
+      label: requestedPdfKey,
+      pdfTemplate: null
+    };
+  }
+  const resolvedPdf = reportFunderPdfService.resolvePdfTemplateForFunder({
+    template,
+    funderKey: selectedOption.key
+  });
+  if (!resolvedPdf.pdfTemplate && !allowMissingPdf) {
+    throw new Error('Select an available PDF template before creating the overall report.');
+  }
+  return resolvedPdf;
+}
+
 function templateHasAttachedDocx(template = {}, docxKey = 'default') {
   const availableDocx = reportFunderDocxService.buildAvailableDocxOptions(template);
   const selectedOption = availableDocx.find((row) => (
@@ -1326,6 +1393,20 @@ function templateHasAttachedDocx(template = {}, docxKey = 'default') {
     funderKey: selectedOption.key
   });
   return Boolean(resolved?.docxTemplate);
+}
+
+function templateHasAttachedPdf(template = {}, pdfKey = 'default') {
+  const availablePdf = reportFunderPdfService.buildAvailablePdfOptions(template);
+  const selectedOption = availablePdf.find((row) => (
+    idsEqual(row.key, pdfKey)
+    || String(row.key || '').toLowerCase() === String(pdfKey || 'default').toLowerCase()
+  )) || availablePdf[0];
+  if (!selectedOption) return false;
+  const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({
+    template,
+    funderKey: selectedOption.key
+  });
+  return Boolean(resolved?.pdfTemplate);
 }
 
 async function buildNormalizedStudentEntries({
@@ -1355,6 +1436,7 @@ async function createOverallWorkspace({
   template,
   filters = {},
   selectedDocxKey = 'default',
+  selectedPdfKey = 'default',
   title = '',
   studentEntries = [],
   reqUser,
@@ -1373,6 +1455,7 @@ async function createOverallWorkspace({
     reqUser
   });
   const resolvedDocx = resolveSelectedDocxKey(template, selectedDocxKey, { allowMissingDocx });
+  const resolvedPdf = resolveSelectedPdfKey(template, selectedPdfKey, { allowMissingPdf: true });
   const now = new Date().toISOString();
   const record = overallReportInstanceModel.sanitizeInstance({
     orgId: template.orgId,
@@ -1381,6 +1464,7 @@ async function createOverallWorkspace({
     title: clean(title) || `${template.title} - ${now.slice(0, 10)}`,
     status: 'draft',
     selectedDocxKey: resolvedDocx.docxKey,
+    selectedPdfKey: resolvedPdf.pdfKey,
     templateSnapshot: clone(template, {}),
     filtersSnapshot,
     studentEntries: normalizedEntries,
@@ -1401,6 +1485,7 @@ async function saveOverallWorkspace({
   studentEntries = [],
   title = '',
   selectedDocxKey = '',
+  selectedPdfKey = '',
   filters = null,
   reqUser
 }) {
@@ -1419,10 +1504,12 @@ async function saveOverallWorkspace({
     reqUser
   });
   const resolvedDocx = resolveSelectedDocxKey(template, selectedDocxKey || instance.selectedDocxKey);
+  const resolvedPdf = resolveSelectedPdfKey(template, selectedPdfKey || instance.selectedPdfKey);
   const now = new Date().toISOString();
   return schoolDataService.updateData('overallReportInstances', instance.id, {
     title: clean(title) || instance.title,
     selectedDocxKey: resolvedDocx.docxKey,
+    selectedPdfKey: resolvedPdf.pdfKey,
     filtersSnapshot,
     studentEntries: normalizedEntries,
     revision: nextRevision(instance),
@@ -1680,6 +1767,194 @@ async function exportWorkspaceDocx({ instance, docxKey = '', studentId = '', req
   return exportWorkspaceZip({ instance, docxKey, reqUser });
 }
 
+async function renderEntryPdf(instance, entry, pdfKey, reqUser) {
+  const virtual = buildVirtualEntryInstance(instance, entry);
+  if (pdfKey) virtual.selectedPdfKey = pdfKey;
+  const preview = await buildPdfExportPreview(virtual);
+  if (hasBlockingValidationErrors(preview.validation) || preview.calculationMismatches.length || preview.calculationDiagnostics.length) {
+    throw new Error(`PDF export cancelled for ${entry.studentName || entry.studentId} because of validation or calculation errors.`);
+  }
+  const rendered = await reportPdfRenderService.renderReportInstancePdf({
+    template: virtual.templateSnapshot,
+    instance: virtual,
+    placeholders: preview.placeholders,
+    mergedAnswers: virtual.answers,
+    pdfTemplateOverride: preview.resolved.pdfTemplate
+  });
+  const safeStudent = clean(entry.studentName || entry.studentId || 'student').replace(/[^\w.-]+/g, '_');
+  const fileName = rendered.fileName?.includes(safeStudent)
+    ? rendered.fileName
+    : `${safeStudent}_${rendered.fileName || 'overall.pdf'}`;
+  const saved = await fileAssetStorage.saveBuffer({
+    scopeKey: instance.orgId,
+    relativeDir: 'school-reports/overall/generated',
+    fileName,
+    originalName: fileName,
+    mimeType: 'application/pdf',
+    buffer: rendered.buffer
+  });
+  const generatedDoc = {
+    fileName: saved.fileName || fileName,
+    path: saved.path || saved.url || '',
+    url: saved.url || '',
+    pdfKey: preview.pdfKey,
+    studentId: entry.studentId,
+    generatedAt: new Date().toISOString(),
+    generatedBy: reqUser?.id || '',
+    revision: Number(instance.revision || 1)
+  };
+  return { rendered: { ...rendered, fileName, buffer: rendered.buffer }, saved, generatedDoc, preview };
+}
+
+async function generateStudentPdf({ instance, studentId, pdfKey = '', reqUser }) {
+  const { workspace, entry } = findStudentEntry(instance, studentId);
+  const result = await renderEntryPdf(
+    workspace,
+    entry,
+    pdfKey || workspace.selectedPdfKey,
+    reqUser
+  );
+  const nextEntries = workspace.studentEntries.map((row) => (
+    idsEqual(row.studentId, studentId)
+      ? { ...row, generatedDocs: [...(row.generatedDocs || []), result.generatedDoc] }
+      : row
+  ));
+  const updated = await schoolDataService.updateData('overallReportInstances', instance.id, {
+    studentEntries: nextEntries,
+    generatedDocs: [...(instance.generatedDocs || []), result.generatedDoc],
+    revision: nextRevision(instance),
+    audit: {
+      ...(instance.audit || {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: new Date().toISOString()
+    }
+  }, reqUser);
+  return { ...result, instance: updated };
+}
+
+async function exportWorkspacePdfZip({ instance, pdfKey = '', reqUser }) {
+  const workspace = ensureWorkspaceShape(instance);
+  if (!workspace.studentEntries.length) throw new Error('This overall report has no students to export.');
+  const key = clean(pdfKey) || workspace.selectedPdfKey;
+  const files = [];
+  const generatedDocs = [];
+  let nextEntries = [...workspace.studentEntries];
+  for (const entry of workspace.studentEntries) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await renderEntryPdf(workspace, entry, key, reqUser);
+    files.push({ fileName: result.rendered.fileName, buffer: result.rendered.buffer });
+    generatedDocs.push(result.generatedDoc);
+    nextEntries = nextEntries.map((row) => (
+      idsEqual(row.studentId, entry.studentId)
+        ? { ...row, generatedDocs: [...(row.generatedDocs || []), result.generatedDoc] }
+        : row
+    ));
+  }
+  const zipBuffer = await reportPdfRenderService.zipReportInstancePdfFiles(files);
+  const zipName = `${clean(workspace.title || 'overall-report').replace(/[^\w.-]+/g, '_') || 'overall-report'}_pdf.zip`;
+  const saved = await fileAssetStorage.saveBuffer({
+    scopeKey: instance.orgId,
+    relativeDir: 'school-reports/overall/generated',
+    fileName: zipName,
+    originalName: zipName,
+    mimeType: 'application/zip',
+    buffer: zipBuffer
+  });
+  const packageDoc = {
+    fileName: saved.fileName || zipName,
+    path: saved.path || saved.url || '',
+    url: saved.url || '',
+    pdfKey: key,
+    generatedAt: new Date().toISOString(),
+    generatedBy: reqUser?.id || '',
+    revision: Number(instance.revision || 1)
+  };
+  const updated = await schoolDataService.updateData('overallReportInstances', instance.id, {
+    studentEntries: nextEntries,
+    generatedDocs: [...(instance.generatedDocs || []), ...generatedDocs, packageDoc],
+    revision: nextRevision(instance),
+    audit: {
+      ...(instance.audit || {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: new Date().toISOString()
+    }
+  }, reqUser);
+  return {
+    zipBuffer,
+    fileName: zipName,
+    generatedDocs,
+    packageDoc,
+    instance: updated
+  };
+}
+
+async function exportWorkspacePdf({ instance, pdfKey = '', studentId = '', reqUser }) {
+  if (studentId) {
+    return generateStudentPdf({ instance, studentId, pdfKey, reqUser });
+  }
+  return exportWorkspacePdfZip({ instance, pdfKey, reqUser });
+}
+
+async function exportOverallReportPdf(instance, reqUser) {
+  if (!COMPLETED_SOURCE_STATUSES.has(String(instance.status || '').toLowerCase())) {
+    throw new Error('Submit or lock the overall report before exporting the final PDF.');
+  }
+  const workspace = ensureWorkspaceShape(instance);
+  if (workspace.studentEntries.length > 1) {
+    return exportWorkspacePdfZip({ instance: workspace, pdfKey: instance.selectedPdfKey, reqUser });
+  }
+  const entryInstance = workspace.studentEntries.length === 1
+    ? buildVirtualEntryInstance(workspace, workspace.studentEntries[0])
+    : instance;
+  const preview = await buildPdfExportPreview(entryInstance);
+  if (!preview.ready) {
+    throw new Error('PDF export cancelled because the overall report has validation or calculation errors.');
+  }
+  const rendered = await reportPdfRenderService.renderReportInstancePdf({
+    template: entryInstance.templateSnapshot,
+    instance: entryInstance,
+    placeholders: preview.placeholders,
+    mergedAnswers: entryInstance.answers,
+    pdfTemplateOverride: preview.resolved.pdfTemplate
+  });
+  const saved = await fileAssetStorage.saveBuffer({
+    scopeKey: instance.orgId,
+    relativeDir: 'school-reports/overall/generated',
+    fileName: rendered.fileName,
+    originalName: rendered.fileName,
+    mimeType: 'application/pdf',
+    buffer: rendered.buffer
+  });
+  const generatedDoc = {
+    fileName: saved.fileName || rendered.fileName,
+    path: saved.path || saved.url || '',
+    url: saved.url || '',
+    pdfKey: preview.pdfKey,
+    studentId: workspace.studentEntries[0]?.studentId || '',
+    generatedAt: new Date().toISOString(),
+    generatedBy: reqUser?.id || '',
+    revision: Number(instance.revision || 1)
+  };
+  let nextStudentEntries = workspace.studentEntries;
+  if (nextStudentEntries.length === 1) {
+    nextStudentEntries = [{
+      ...nextStudentEntries[0],
+      generatedDocs: [...(nextStudentEntries[0].generatedDocs || []), generatedDoc]
+    }];
+  }
+  const updated = await schoolDataService.updateData('overallReportInstances', instance.id, {
+    studentEntries: nextStudentEntries,
+    generatedDocs: [...(instance.generatedDocs || []), generatedDoc],
+    revision: nextRevision(instance),
+    audit: {
+      ...(instance.audit || {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: new Date().toISOString()
+    }
+  }, reqUser);
+  return { rendered, saved, generatedDoc, instance: updated };
+}
+
 function buildOverallExportPayload(instance = {}) {
   const template = instance.templateSnapshot || {};
   const workspace = ensureWorkspaceShape(instance);
@@ -1692,6 +1967,7 @@ function buildOverallExportPayload(instance = {}) {
     overallTemplateId: instance.overallTemplateId,
     overallTemplateVersion: instance.overallTemplateVersion,
     selectedDocxKey: instance.selectedDocxKey,
+    selectedPdfKey: instance.selectedPdfKey,
     sourceSelections: entry?.sourceSelections || instance.sourceSelections || [],
     sourceValues: entry?.sourceValues || instance.sourceValues || {},
     answers: entry?.answers || instance.answers || {},
@@ -1720,11 +1996,15 @@ module.exports = {
   ensureWorkspaceShape,
   templateHasOverallFields,
   templateHasAttachedDocx,
+  templateHasAttachedPdf,
   previewStudentEntry,
   saveStudentAnswers,
   generateStudentDocx,
+  generateStudentPdf,
   exportWorkspaceZip,
+  exportWorkspacePdfZip,
   exportWorkspaceDocx,
+  exportWorkspacePdf,
   getOverallInstance,
   saveOverallAnswers,
   buildSourceUpdatePreview,
@@ -1737,8 +2017,11 @@ module.exports = {
   buildDocxPayloadDetailed,
   findCalculationMismatches,
   buildExportPreview,
+  buildPdfExportPreview,
   buildOverallExportPayload,
   exportOverallReport,
+  exportOverallReportPdf,
+  resolveSelectedPdfKey,
   formatMissingDocxTokenError,
   listDocxPlaceholderAliases
 };

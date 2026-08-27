@@ -39,6 +39,12 @@ test('sanitizeExportFormatFlags parses form-like boolean tokens', () => {
   });
   assert.deepEqual(exportFormatService.sanitizeExportFormatFlags({ docx: 'off', payload: 'yes' }, { kind: 'overall' }), {
     docx: false,
+    pdf: true,
+    payload: true
+  });
+  assert.deepEqual(exportFormatService.sanitizeExportFormatFlags({ docx: 'off', pdf: '0', payload: 'yes' }, { kind: 'overall' }), {
+    docx: false,
+    pdf: false,
     payload: true
   });
 });
@@ -69,8 +75,12 @@ test('resolveEffectiveOverallExportFlags gates docx by template files', () => {
     }
   };
   assert.deepEqual(
-    exportFormatService.resolveEffectiveOverallExportFlags(policy, 'overall-1', { hasDocx: false }),
-    { hasDocx: false, hasPayload: true }
+    exportFormatService.resolveEffectiveOverallExportFlags(policy, 'overall-1', { hasDocx: false, hasPdf: true }),
+    { hasDocx: false, hasPdf: true, hasPayload: true }
+  );
+  assert.deepEqual(
+    exportFormatService.resolveEffectiveOverallExportFlags(policy, 'overall-1', { hasDocx: false, hasPdf: false }),
+    { hasDocx: false, hasPdf: false, hasPayload: true }
   );
 });
 
@@ -86,8 +96,13 @@ test('assertSarExportFormatAllowed rejects disabled formats', () => {
     (error) => error.statusCode === 400 && /Payload export is disabled/i.test(error.message)
   );
   assert.throws(
-    () => exportFormatService.assertSarExportFormatAllowed(policy, 'overall', 'tpl-1', 'pdf'),
-    (error) => error.statusCode === 400 && /do not support PDF/i.test(error.message)
+    () => exportFormatService.assertSarExportFormatAllowed({
+      templateExportFormats: {
+        report: {},
+        overall: { 'overall-1': { docx: true, pdf: false, payload: true } }
+      }
+    }, 'overall', 'overall-1', 'pdf'),
+    (error) => error.statusCode === 400 && /PDF export is disabled/i.test(error.message)
   );
 });
 
@@ -152,5 +167,41 @@ test('buildOverallExportBlock omits payload when policy disables it', () => {
     classRows
   );
   assert.equal(block.hasDocx, true);
+  assert.equal(block.hasPdf, false);
   assert.equal(block.hasPayload, false);
+});
+
+test('buildOverallExportBlock exposes pdf when overall template has attached pdf', () => {
+  const policy = {
+    reportTemplateId: 'tpl-1',
+    overallReportTemplateId: 'overall-1',
+    templateExportFormats: {
+      report: {},
+      overall: { 'overall-1': { docx: true, pdf: true, payload: true } }
+    }
+  };
+  const overallTemplate = {
+    id: 'overall-1',
+    title: 'Overall',
+    docxTemplate: { path: '/tmp/overall.docx' },
+    pdfTemplate: { path: '/tmp/overall.pdf' },
+    sourceSlots: [{ slotKey: 'T1', requirement: 'necessary' }]
+  };
+  const classRows = [{
+    classId: 'c1',
+    className: 'Math',
+    slotIndex: 0,
+    templateId: 'tpl-1',
+    exportable: true,
+    warning: ''
+  }];
+  const block = generationService.buildOverallExportBlock(
+    { personId: 'p1' },
+    policy,
+    overallTemplate,
+    classRows
+  );
+  assert.equal(block.hasDocx, true);
+  assert.equal(block.hasPdf, true);
+  assert.equal(block.hasPayload, true);
 });

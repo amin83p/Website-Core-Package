@@ -245,6 +245,16 @@ function sanitizeTemplate(input, { existing = null, isUpdate = false } = {}) {
     input.docxTemplatesByFunder,
     existing?.docxTemplatesByFunder
   );
+  const pdfTemplate = reportTemplateModel.sanitizePdfTemplate(input.pdfTemplate)
+    || reportTemplateModel.sanitizePdfTemplate(existing?.pdfTemplate);
+  const pdfTemplatesByFunder = reportTemplateModel.sanitizePdfTemplatesByFunder(
+    input.pdfTemplatesByFunder,
+    existing?.pdfTemplatesByFunder
+  );
+  const pdfFieldMap = reportTemplateModel.sanitizePdfFieldMap(
+    input.pdfFieldMap,
+    normalizedSchema.schema
+  );
   const now = new Date().toISOString();
   const out = {
     orgId,
@@ -258,6 +268,9 @@ function sanitizeTemplate(input, { existing = null, isUpdate = false } = {}) {
     placeholderMap: normalizedSchema.placeholderMap,
     docxTemplate,
     docxTemplatesByFunder,
+    pdfTemplate,
+    pdfTemplatesByFunder,
+    pdfFieldMap,
     audit: {
       createUser: clean(input?.audit?.createUser || existing?.audit?.createUser, 80),
       createDateTime: clean(input?.audit?.createDateTime || existing?.audit?.createDateTime, 60) || now,

@@ -1000,6 +1000,7 @@ const schoolRepositories = {
     create: overallReportTemplateModel.addTemplate,
     update: overallReportTemplateModel.updateTemplate,
     remove: overallReportTemplateModel.deleteTemplate,
+    replaceObjectFields: ['placeholderMap', 'pdfFieldMap'],
     defaultSearchFields: ['id', 'orgId', 'title', 'status', 'description']
   }),
   overallReportInstances: createSchoolRepository({
