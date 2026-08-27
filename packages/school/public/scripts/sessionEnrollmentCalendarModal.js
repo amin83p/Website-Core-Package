@@ -856,16 +856,20 @@
   }
 
   function readBulkNaAction() {
-    const active = bulkNaModalEl?.querySelector('[data-bulk-na-action].active')
-      || document.querySelector('[data-bulk-na-action].active');
-    const action = String(active?.getAttribute('data-bulk-na-action') || bulkNaAction || 'mark_na').trim().toLowerCase();
+    const fromState = String(bulkNaAction || '').trim().toLowerCase();
+    if (fromState === 'unmark' || fromState === 'mark_na') return fromState;
+    const scope = bulkNaModalEl || qs('sessionEnrollmentBulkNaModal');
+    const active = scope?.querySelector('[data-bulk-na-action].active');
+    const action = String(active?.getAttribute('data-bulk-na-action') || 'mark_na').trim().toLowerCase();
     return action === 'unmark' ? 'unmark' : 'mark_na';
   }
 
-  function syncBulkNaActionButtons() {
-    const action = readBulkNaAction();
+  function syncBulkNaActionButtons(forcedAction = '') {
+    const raw = String(forcedAction || bulkNaAction || readBulkNaAction() || 'mark_na').trim().toLowerCase();
+    const action = raw === 'unmark' ? 'unmark' : 'mark_na';
     bulkNaAction = action;
-    document.querySelectorAll('[data-bulk-na-action]').forEach((btn) => {
+    const scope = bulkNaModalEl || qs('sessionEnrollmentBulkNaModal');
+    (scope ? scope.querySelectorAll('[data-bulk-na-action]') : document.querySelectorAll('[data-bulk-na-action]')).forEach((btn) => {
       const btnAction = String(btn.getAttribute('data-bulk-na-action') || '').trim().toLowerCase();
       btn.classList.toggle('active', btnAction === action);
     });
@@ -873,7 +877,7 @@
     noteWrap?.classList.toggle('d-none', action === 'unmark');
   }
 
-  function clampBulkNaDateInputs() {
+  function applyBulkNaInputBounds() {
     const bounds = resolveEnrollmentWindowBounds();
     const startInput = qs('sessionEnrollmentBulkNaStart');
     const endInput = qs('sessionEnrollmentBulkNaEnd');
@@ -885,15 +889,26 @@
       endInput.min = bounds.minDate;
       endInput.max = bounds.maxDate || '';
     }
-    let start = core.normalizeDateOnly(startInput?.value);
-    let end = core.normalizeDateOnly(endInput?.value);
+  }
+
+  function readBulkNaDateValues() {
+    const bounds = resolveEnrollmentWindowBounds();
+    let start = core.normalizeDateOnly(qs('sessionEnrollmentBulkNaStart')?.value);
+    let end = core.normalizeDateOnly(qs('sessionEnrollmentBulkNaEnd')?.value);
     if (bounds.minDate && start && start < bounds.minDate) start = bounds.minDate;
     if (bounds.maxDate && start && start > bounds.maxDate) start = bounds.maxDate;
     if (bounds.minDate && end && end < bounds.minDate) end = bounds.minDate;
     if (bounds.maxDate && end && end > bounds.maxDate) end = bounds.maxDate;
+    return { startDate: start, endDate: end };
+  }
+
+  function clampBulkNaDateInputs() {
+    applyBulkNaInputBounds();
+    const startInput = qs('sessionEnrollmentBulkNaStart');
+    const endInput = qs('sessionEnrollmentBulkNaEnd');
+    let { startDate: start, endDate: end } = readBulkNaDateValues();
     if (start && end && start > end) {
-      if (document.activeElement === endInput) start = end;
-      else end = start;
+      end = start;
     }
     if (startInput && start) startInput.value = start;
     if (endInput && end) endInput.value = end;
@@ -901,7 +916,7 @@
   }
 
   function collectBulkNaSessionsForForm() {
-    const { startDate, endDate } = clampBulkNaDateInputs();
+    const { startDate, endDate } = readBulkNaDateValues();
     const action = readBulkNaAction();
     if (!startDate || !endDate || startDate > endDate) return [];
     return core.collectBulkNaSessions(allEvents, state?.pendingMarkChanges, startDate, endDate, action);
@@ -949,6 +964,7 @@
     document.querySelectorAll('[data-bulk-na-action]').forEach((btn) => {
       btn.classList.toggle('active', String(btn.getAttribute('data-bulk-na-action') || '') === 'mark_na');
     });
+    applyBulkNaInputBounds();
     clampBulkNaDateInputs();
     refreshBulkNaPreview();
     showBulkNaModalLayer();
@@ -1008,8 +1024,9 @@
       const actionBtn = event.target.closest('[data-bulk-na-action]');
       if (actionBtn) {
         event.preventDefault();
-        bulkNaAction = String(actionBtn.getAttribute('data-bulk-na-action') || 'mark_na').trim().toLowerCase();
-        syncBulkNaActionButtons();
+        const nextAction = String(actionBtn.getAttribute('data-bulk-na-action') || 'mark_na').trim().toLowerCase();
+        bulkNaAction = nextAction === 'unmark' ? 'unmark' : 'mark_na';
+        syncBulkNaActionButtons(bulkNaAction);
         refreshBulkNaPreview();
         return;
       }
@@ -1018,16 +1035,27 @@
       }
     });
 
-    ['sessionEnrollmentBulkNaStart', 'sessionEnrollmentBulkNaEnd', 'sessionEnrollmentBulkNaNote'].forEach((id) => {
-      qs(id)?.addEventListener('input', () => {
-        if (!isBulkNaOverlayOpen()) return;
-        refreshBulkNaPreview();
-      });
-      qs(id)?.addEventListener('change', () => {
-        if (!isBulkNaOverlayOpen()) return;
-        clampBulkNaDateInputs();
-        refreshBulkNaPreview();
-      });
+    qs('sessionEnrollmentBulkNaStart')?.addEventListener('input', () => {
+      if (!isBulkNaOverlayOpen()) return;
+      refreshBulkNaPreview();
+    });
+    qs('sessionEnrollmentBulkNaStart')?.addEventListener('change', () => {
+      if (!isBulkNaOverlayOpen()) return;
+      clampBulkNaDateInputs();
+      refreshBulkNaPreview();
+    });
+    qs('sessionEnrollmentBulkNaEnd')?.addEventListener('input', () => {
+      if (!isBulkNaOverlayOpen()) return;
+      refreshBulkNaPreview();
+    });
+    qs('sessionEnrollmentBulkNaEnd')?.addEventListener('change', () => {
+      if (!isBulkNaOverlayOpen()) return;
+      clampBulkNaDateInputs();
+      refreshBulkNaPreview();
+    });
+    qs('sessionEnrollmentBulkNaNote')?.addEventListener('input', () => {
+      if (!isBulkNaOverlayOpen()) return;
+      refreshBulkNaPreview();
     });
   }
 
