@@ -5,6 +5,7 @@ const engineService = require('../MVC/services/school/rollingEnrollmentEngineSer
 const schoolDataService = require('../MVC/services/school/schoolDataService');
 const alignmentService = require('../MVC/services/school/rollingEnrollmentSessionAlignmentService');
 const sessionStatusPolicyService = require('../MVC/services/school/sessionStatusPolicyService');
+const enrollmentSessionMarksService = require('../MVC/services/school/enrollmentSessionMarksService');
 
 const classData = {
   id: 'CLS_ROLL_ENG_001',
@@ -223,6 +224,150 @@ test('rolling enrollment controller exposes execute endpoint and engine service'
   assert.match(controllerSource, /rollingEnrollmentEngineService\.execute/);
 });
 
+test('normalizeEnrollmentEngineRequest parses unmarkSessionIds', () => {
+  const normalized = engineService.normalizeEnrollmentEngineRequest({
+    classId: classData.id,
+    studentId: 'STU_001',
+    startDate: '2026-01-01',
+    sessionCapacityType: 'one_on_one',
+    unmarkSessionIds: ['SES_001', 'SES_002']
+  });
+  assert.deepEqual(normalized.unmarkSessionIds, ['SES_001', 'SES_002']);
+  assert.deepEqual(normalized.students[0].unmarkSessionIds, ['SES_001', 'SES_002']);
+});
+
+test('execute unmarks all class sessions for group enrollment', async (t) => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalGetSessions = schoolDataService.getClassSessions;
+  const originalCreate = schoolDataService.createClassEnrollmentPeriod;
+  const originalStatusMap = sessionStatusPolicyService.getStatusMap;
+  const originalClear = enrollmentSessionMarksService.clearRosterNaForSessions;
+
+  let clearedSessionIds = [];
+  schoolDataService.getDataById = async (collection, id) => {
+    if (collection === 'students' && id === 'STU_OK') {
+      return { id: 'STU_OK', orgId: classData.orgId, personId: 'PERSON_OK' };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    { id: 'SES_001', date: '2026-01-05' },
+    { id: 'SES_002', date: '2026-01-12' }
+  ]);
+  sessionStatusPolicyService.getStatusMap = async () => new Map([
+    ['scheduled', { code: 'scheduled', countable: true }]
+  ]);
+  schoolDataService.createClassEnrollmentPeriod = async () => ({
+    period: {
+      id: 'EP_001',
+      status: 'active',
+      studentId: 'STU_OK',
+      personId: 'PERSON_OK',
+      sessionCapacityType: 'group'
+    }
+  });
+  enrollmentSessionMarksService.clearRosterNaForSessions = async ({ sessionIds }) => {
+    clearedSessionIds = sessionIds.slice();
+    return { updatedCount: sessionIds.length };
+  };
+
+  t.after(() => {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.getClassSessions = originalGetSessions;
+    schoolDataService.createClassEnrollmentPeriod = originalCreate;
+    sessionStatusPolicyService.getStatusMap = originalStatusMap;
+    enrollmentSessionMarksService.clearRosterNaForSessions = originalClear;
+  });
+
+  const classWithSessions = {
+    ...classData,
+    sessions: [
+      { id: 'SES_001', date: '2026-01-05' },
+      { id: 'SES_002', date: '2026-01-12' }
+    ]
+  };
+
+  await engineService.execute({
+    classData: classWithSessions,
+    reqUser: { activeOrgId: classData.orgId },
+    rawRequest: {
+      classId: classData.id,
+      studentId: 'STU_OK',
+      enrollmentMode: 'date_window',
+      startDate: '2026-01-01',
+      status: 'active',
+      sessionCapacityType: 'group',
+      funder: { funderId: 'self', funderType: 'self' }
+    },
+    hooks: {
+      assertPrerequisites: async () => {}
+    }
+  });
+
+  assert.deepEqual(clearedSessionIds.sort(), ['SES_001', 'SES_002']);
+});
+
+test('execute unmarks selected sessions for one-on-one enrollment', async (t) => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalGetSessions = schoolDataService.getClassSessions;
+  const originalCreate = schoolDataService.createClassEnrollmentPeriod;
+  const originalStatusMap = sessionStatusPolicyService.getStatusMap;
+  const originalClear = enrollmentSessionMarksService.clearRosterNaForSessions;
+
+  let clearedSessionIds = [];
+  schoolDataService.getDataById = async (collection, id) => {
+    if (collection === 'students' && id === 'STU_OK') {
+      return { id: 'STU_OK', orgId: classData.orgId, personId: 'PERSON_OK' };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => [];
+  sessionStatusPolicyService.getStatusMap = async () => new Map([
+    ['scheduled', { code: 'scheduled', countable: true }]
+  ]);
+  schoolDataService.createClassEnrollmentPeriod = async () => ({
+    period: {
+      id: 'EP_002',
+      status: 'active',
+      studentId: 'STU_OK',
+      personId: 'PERSON_OK',
+      sessionCapacityType: 'one_on_one'
+    }
+  });
+  enrollmentSessionMarksService.clearRosterNaForSessions = async ({ sessionIds }) => {
+    clearedSessionIds = sessionIds.slice();
+    return { updatedCount: sessionIds.length };
+  };
+
+  t.after(() => {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.getClassSessions = originalGetSessions;
+    schoolDataService.createClassEnrollmentPeriod = originalCreate;
+    sessionStatusPolicyService.getStatusMap = originalStatusMap;
+    enrollmentSessionMarksService.clearRosterNaForSessions = originalClear;
+  });
+
+  await engineService.execute({
+    classData,
+    reqUser: { activeOrgId: classData.orgId },
+    rawRequest: {
+      classId: classData.id,
+      studentId: 'STU_OK',
+      enrollmentMode: 'date_window',
+      startDate: '2026-01-01',
+      status: 'active',
+      sessionCapacityType: 'one_on_one',
+      unmarkSessionIds: ['SES_010'],
+      funder: { funderId: 'self', funderType: 'self' }
+    },
+    hooks: {
+      assertPrerequisites: async () => {}
+    }
+  });
+
+  assert.deepEqual(clearedSessionIds, ['SES_010']);
+});
+
 test('rolling enrollment UI builds engine payload and calls execute endpoint', () => {
   const uiSource = require('fs').readFileSync(
     require('path').join(__dirname, '../MVC/views/school/class/rollingEnrollment.ejs'),
@@ -231,4 +376,5 @@ test('rolling enrollment UI builds engine payload and calls execute endpoint', (
   assert.match(uiSource, /buildRollingEnrollmentEnginePayload/);
   assert.match(uiSource, /rolling-enrollment\/execute/);
   assert.match(uiSource, /sessionsToCreate/);
+  assert.match(uiSource, /unmarkSessionIds/);
 });

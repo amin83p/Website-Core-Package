@@ -1111,6 +1111,35 @@ async function commitStagedSessions({
   };
 }
 
+function resolveAnticipatedFinishDate({
+  countableSessions = [],
+  targetSessionCount = 0,
+  targetHours = 0
+} = {}) {
+  const rows = (Array.isArray(countableSessions) ? countableSessions : [])
+    .map((row) => ({
+      date: normalizeDateOnly(row?.date || row?.session?.date || row?.sessionDate || ''),
+      durationHours: Number(row?.durationHours || 0)
+    }))
+    .filter((row) => row.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const sessionTarget = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(targetSessionCount);
+  if (sessionTarget > 0) {
+    if (rows.length < sessionTarget) return null;
+    return rows[sessionTarget - 1].date;
+  }
+
+  const hourTarget = classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours);
+  if (hourTarget > 0) {
+    const allocation = computeHourAllocation(rows, hourTarget);
+    if (!allocation.allocatedSessionCount || allocation.gapHours > 0) return null;
+    return rows[allocation.allocatedSessionCount - 1]?.date || null;
+  }
+
+  return null;
+}
+
 module.exports = {
   listSessionsInWindow,
   evaluateAlignment,
@@ -1145,5 +1174,6 @@ module.exports = {
   computeDurationHours,
   computeProposedCycleEndDate,
   computeLatestSessionDate,
-  assertEnrollmentSessionAlignmentForCreate
+  assertEnrollmentSessionAlignmentForCreate,
+  resolveAnticipatedFinishDate
 };

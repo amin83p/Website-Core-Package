@@ -670,10 +670,12 @@
             <div class="col-lg-3 col-md-6" id="wrap_inp_targetSessionCount">
               <label class="form-label">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
               <input type="number" id="inp_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
+              <div class="form-text compact-help text-success mb-0 d-none" id="hint_inp_targetSessionCount_finish"></div>
             </div>
             <div class="col-lg-3 col-md-6" id="wrap_inp_targetHours">
               <label class="form-label">Number of Hours <span class="text-muted fw-normal">(optional)</span></label>
               <input type="number" id="inp_targetHours" class="form-control" min="0.25" step="0.25" placeholder="e.g. 20">
+              <div class="form-text compact-help text-success mb-0 d-none" id="hint_inp_targetHours_finish"></div>
             </div>
           </div>
           <div class="row g-1 mt-1 enroll-cap-hints-row">
@@ -716,7 +718,7 @@
             </div>
           </div>
           <div class="row g-2 mt-2 align-items-start enroll-meta-inputs-row">
-            <div class="col-md-3">
+            <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label" for="inp_funder">Funder</label>
               <select id="inp_funder" class="form-select">
                 <option value="self" selected>Self Fund</option>
@@ -726,7 +728,7 @@
               </select>
               <div class="form-text compact-help mb-0 mt-1">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
             </div>
-            <div class="col-md-2">
+            <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label">Status</label>
               <select id="inp_status" class="form-select">
                 <option value="active" selected>Active</option>
@@ -734,25 +736,27 @@
                 <option value="waiting_list">Waiting list</option>
               </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label" for="inp_sessionCapacityType">Session Capacity</label>
               <select id="inp_sessionCapacityType" class="form-select">
                 <option value="group" selected>Group</option>
                 <option value="one_on_one">1 On 1</option>
               </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label" for="inp_claimNumber">Claim Number</label>
               <input type="text" id="inp_claimNumber" class="form-control" maxlength="120" placeholder="Optional">
             </div>
-            <div class="col-md-5">
+          </div>
+          <div class="row g-2 mt-1">
+            <div class="col-12">
               <label class="form-label">Reason Start</label>
               <textarea id="inp_reasonStart" class="form-control" rows="2" placeholder="Optional start note"></textarea>
             </div>
           </div>
           <div class="alert alert-light border small mb-0 mt-3 text-secondary">
             <div class="fw-semibold text-dark mb-1">Tips</div>
-            <p class="mb-1">When session or hour targets are set, use <strong>Next</strong> to review the enrollment. You can finalize immediately or optionally add sessions or mark sessions N/A on the review step.</p>
+            <p class="mb-1"><strong>Group</strong> enrollments finish on this step and unmark all class sessions for the student. <strong>1 On 1</strong> enrollments use <strong>Next</strong> to pick which sessions to unmark.</p>
             <p class="mb-0"><kbd>Alt</kbd>+<kbd>S</kbd> pick student, <kbd>Alt</kbd>+<kbd>A</kbd> primary action, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> from notes.</p>
           </div>
         </div>
@@ -871,6 +875,29 @@
             </div>
           </div>
             </div>
+          </div>
+        </div>
+
+        <div id="enrollWizardStepUnmarkSessions" class="d-none">
+          <div class="alert alert-info border small" id="unmarkSummaryText">Select sessions to clear from N/A to unmarked for this student.</div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btn_openUnmarkCalendarPicker"><i class="bi bi-calendar3 me-1"></i>Calendar picker</button>
+            <div class="small text-muted" id="unmarkSelectionCounter">Selected 0 session(s)</div>
+          </div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
+              </thead>
+              <tbody id="unmarkSessionsTbody">
+                <tr><td colspan="5" class="text-center text-muted py-3">No sessions loaded.</td></tr>
+              </tbody>
+              <tfoot class="table-light">
+                <tr>
+                  <td colspan="5" class="small py-2 text-secondary" id="unmarkSessionsTotals">Selected: 0 session(s), 0 Hrs</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
 
@@ -2018,6 +2045,7 @@
   let rollingEnrollmentWorkspace = null;
   let lastAlignmentResult = null;
   let pendingPlannedNaSessionIds = [];
+  let pendingUnmarkSessionIds = [];
   let pendingIncludedSessionIds = [];
   let pendingGapBatch = null;
   let pendingGapPreview = null;
@@ -2026,8 +2054,8 @@
   let gapFormDraft = null;
   let gapFormDraftTimer = null;
   let alignmentDebounceTimer = null;
-  let enrollWizardStep = 'form'; // form | addSessions | markNa | conflicts
-  let enrollWizardPath = null; // null | 'planA' | 'planB'
+  let enrollWizardStep = 'form'; // form | unmarkSessions | addSessions | markNa | conflicts
+  let enrollWizardPath = null; // null | 'oneOnOne' | 'planA' | 'planB'
   let enrollWizardSkippedAddSessions = false;
   let lastConflictReview = null;
   let conflictReviewHasConflicts = false;
@@ -3800,6 +3828,84 @@
     }
   }
 
+  function isGroupSessionCapacityEnrollment(selectId = 'inp_sessionCapacityType') {
+    return readSessionCapacityTypeFromSelect(selectId) === 'group';
+  }
+
+  function isOneOnOneSessionCapacityEnrollment(selectId = 'inp_sessionCapacityType') {
+    return readSessionCapacityTypeFromSelect(selectId) === 'one_on_one';
+  }
+
+  function resolveAnticipatedFinishDateClient(alignment = lastAlignmentResult) {
+    if (!alignment || !isGroupSessionCapacityEnrollment()) return null;
+    const countable = getCountableSessionsFromAlignment(alignment);
+    const sessionTarget = hasTargetSessionCount()
+      ? normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value)
+      : 0;
+    const hourTarget = hasTargetHours()
+      ? normalizeTargetHoursValue(qs('inp_targetHours')?.value)
+      : 0;
+    if (!sessionTarget && !hourTarget) return null;
+
+    const rows = countable
+      .map((row) => ({
+        date: String(row?.date || '').trim(),
+        durationHours: resolveSessionRowDurationHours(row)
+      }))
+      .filter((row) => row.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (sessionTarget > 0) {
+      if (rows.length < sessionTarget) return null;
+      return rows[sessionTarget - 1].date;
+    }
+
+    let accumulated = 0;
+    let lastDate = null;
+    for (const row of rows) {
+      accumulated = normalizeTargetHoursValue(accumulated + row.durationHours);
+      lastDate = row.date;
+      if (accumulated >= hourTarget) return lastDate;
+    }
+    return null;
+  }
+
+  function updateAnticipatedFinishHint(alignment = lastAlignmentResult) {
+    const sessionHint = qs('hint_inp_targetSessionCount_finish');
+    const hoursHint = qs('hint_inp_targetHours_finish');
+    const hideBoth = () => {
+      sessionHint?.classList.add('d-none');
+      hoursHint?.classList.add('d-none');
+    };
+    if (!isGroupSessionCapacityEnrollment() || !alignment) {
+      hideBoth();
+      return;
+    }
+    const finishDate = resolveAnticipatedFinishDateClient(alignment);
+    const label = finishDate ? `Anticipated finish: ${formatSessionDateWithDay(finishDate)}` : '';
+    if (hasTargetSessionCount() && sessionHint) {
+      if (finishDate) {
+        sessionHint.textContent = label;
+        sessionHint.classList.remove('d-none');
+      } else {
+        sessionHint.classList.add('d-none');
+      }
+      hoursHint?.classList.add('d-none');
+      return;
+    }
+    if (hasTargetHours() && hoursHint) {
+      if (finishDate) {
+        hoursHint.textContent = label;
+        hoursHint.classList.remove('d-none');
+      } else {
+        hoursHint.classList.add('d-none');
+      }
+      sessionHint?.classList.add('d-none');
+      return;
+    }
+    hideBoth();
+  }
+
   function syncGroupEnrollmentCompleteButton() {
     const completeBtn = qs('btn_completeGroupEnrollment');
     if (completeBtn) completeBtn.disabled = groupEnrollmentStudents.length === 0;
@@ -4958,6 +5064,9 @@
     if (pendingPlannedNaSessionIds.length) {
       payload.plannedNotApplicableSessionIds = pendingPlannedNaSessionIds.slice();
     }
+    if (pendingUnmarkSessionIds.length) {
+      payload.unmarkSessionIds = pendingUnmarkSessionIds.slice();
+    }
     return payload;
   }
 
@@ -4972,7 +5081,10 @@
     const base = collectEnrollmentPayloadFromForm();
     const enginePayload = {
       classId: base.classId,
-      students: [{ studentId: base.studentId }],
+      students: [{
+        studentId: base.studentId,
+        ...(pendingUnmarkSessionIds.length ? { unmarkSessionIds: pendingUnmarkSessionIds.slice() } : {})
+      }],
       enrollmentMode: inferEnrollmentModeFromForm(),
       startDate: base.startDate,
       endDate: base.endDate,
@@ -4990,6 +5102,9 @@
     if (base.targetHours) enginePayload.targetHours = base.targetHours;
     if (pendingPlannedNaSessionIds.length) {
       enginePayload.plannedNotApplicableSessionIds = pendingPlannedNaSessionIds.slice();
+    }
+    if (pendingUnmarkSessionIds.length) {
+      enginePayload.unmarkSessionIds = pendingUnmarkSessionIds.slice();
     }
     if (pendingGapBatch && !enginePayload.sessionsToCreate.length) {
       enginePayload.pendingGapBatch = { ...pendingGapBatch };
@@ -5573,8 +5688,11 @@
 
   function syncEnrollmentWizardPathFromCap() {
     if (enrollWizardStep !== 'form') return;
-    if (hasEnrollmentCap()) enrollWizardPath = 'planA';
-    else enrollWizardPath = null;
+    if (isOneOnOneSessionCapacityEnrollment()) {
+      enrollWizardPath = 'oneOnOne';
+      return;
+    }
+    enrollWizardPath = null;
   }
 
   function updateSessionCountHint(alignment) {
@@ -5585,7 +5703,10 @@
     const capSet = sessionTargetSet || hourTargetSet;
     if (capSet && enrollWizardStep === 'form') {
       hint.className = 'form-text compact-help text-muted mb-0';
-      hint.textContent = 'Recorded attendance after the start date counts toward the cap. Use Next to review and optionally manage sessions.';
+      hint.textContent = isOneOnOneSessionCapacityEnrollment()
+        ? 'Recorded attendance after the start date counts toward the cap. Use Next to pick sessions to unmark.'
+        : 'Recorded attendance after the start date counts toward the cap.';
+      updateAnticipatedFinishHint(alignment);
       updateViewSessionsButton(null);
       syncEnrollmentWizardPathFromCap();
       renderFormStepSessionTable();
@@ -5598,6 +5719,7 @@
       hint.textContent = capSet
         ? 'Recorded attendance after the start date counts toward the target. End Date is not used when a session or hour target is set.'
         : 'Set an end date to see how many countable sessions fall in the enrollment window.';
+      updateAnticipatedFinishHint(alignment);
       updateViewSessionsButton(lastAlignmentResult);
       syncEnrollmentWizardPathFromCap();
       renderFormStepSessionTable();
@@ -5611,6 +5733,7 @@
       const gap = Number(alignment.gapHours || Math.max(0, target - available));
       hint.className = 'form-text compact-help text-warning mb-0';
       hint.textContent = `Target is ${target} hr(s). Consumption is tracked from recorded attendance; only ${available} hr(s) are scheduled so far (${gap} hr gap). You can still enroll and add sessions later.`;
+      updateAnticipatedFinishHint(alignment);
       updateViewSessionsButton(alignment);
       syncEnrollmentWizardPathFromCap();
       renderFormStepSessionTable();
@@ -5624,6 +5747,7 @@
       const gap = Number(alignment.gapCount || Math.max(0, target - available));
       hint.className = 'form-text compact-help text-warning mb-0';
       hint.textContent = `Target is ${target} session(s). Consumption is tracked from recorded attendance; only ${available} scheduled session(s) exist (${gap} gap). You can still enroll and add sessions later.`;
+      updateAnticipatedFinishHint(alignment);
       updateViewSessionsButton(alignment);
       syncEnrollmentWizardPathFromCap();
       renderFormStepSessionTable();
@@ -5637,14 +5761,19 @@
         const available = Number(alignment.availableHours || 0);
         const excess = Number(alignment.requiredNaHours || Math.max(0, available - target));
         hint.className = 'form-text compact-help text-warning mb-0';
-        hint.textContent = `Target is ${target} hr(s) from the start date, but ${available} hr(s) are scheduled (${excess} hr over). Use Next to pick sessions and stage more if needed.`;
+        hint.textContent = isOneOnOneSessionCapacityEnrollment()
+          ? `Target is ${target} hr(s) from the start date, but ${available} hr(s) are scheduled (${excess} hr over). Use Next to pick sessions to unmark.`
+          : `Target is ${target} hr(s) from the start date, but ${available} hr(s) are scheduled (${excess} hr over).`;
       } else {
         const target = Number(alignment.targetSessionCount || alignment.effectiveTarget || 0);
         const available = Number(alignment.availableCount || 0);
         const excess = Number(alignment.requiredNaCount || Math.max(0, available - target));
         hint.className = 'form-text compact-help text-warning mb-0';
-        hint.textContent = `Target is ${target} session(s) from the start date, but ${available} exist (${excess} over). Use Next to pick sessions and stage more if needed.`;
+        hint.textContent = isOneOnOneSessionCapacityEnrollment()
+          ? `Target is ${target} session(s) from the start date, but ${available} exist (${excess} over). Use Next to pick sessions to unmark.`
+          : `Target is ${target} session(s) from the start date, but ${available} exist (${excess} over).`;
       }
+      updateAnticipatedFinishHint(alignment);
       updateViewSessionsButton(alignment);
       syncEnrollmentWizardPathFromCap();
       renderFormStepSessionTable();
@@ -5657,6 +5786,7 @@
     if (!capSet) {
       hint.className = 'form-text compact-help text-muted mb-0';
       hint.textContent = `${available} countable session(s) in this window.`;
+      updateAnticipatedFinishHint(alignment);
       updateViewSessionsButton(alignment);
       renderFormStepSessionTable();
       syncEnrollmentWizardPrimaryButton();
@@ -5671,6 +5801,7 @@
       hint.className = 'form-text compact-help text-success mb-0';
       hint.textContent = `Target: ${target || normalizeTargetSessionCountValue(qs('inp_targetSessionCount')?.value)} recorded attendance session(s) after the start date. N/A sessions do not count.`;
     }
+    updateAnticipatedFinishHint(alignment);
     updateViewSessionsButton(alignment);
     syncEnrollmentWizardPathFromCap();
     renderFormStepSessionTable();
@@ -5679,6 +5810,12 @@
   }
 
   function getEnrollmentWizardStepMeta() {
+    if (enrollWizardPath === 'oneOnOne') {
+      return [
+        { id: 'form', label: 'Enrollment' },
+        { id: 'unmarkSessions', label: 'Unmark Sessions' }
+      ];
+    }
     if (enrollWizardPath === 'planA') {
       const steps = [
         { id: 'form', label: 'Enrollment' },
@@ -5727,6 +5864,7 @@
   function setEnrollmentWizardStepVisibility() {
     qs('enrollWizardStepForm')?.classList.toggle('d-none', enrollWizardStep !== 'form');
     qs('enrollWizardStepAddSessions')?.classList.toggle('d-none', enrollWizardStep !== 'addSessions');
+    qs('enrollWizardStepUnmarkSessions')?.classList.toggle('d-none', enrollWizardStep !== 'unmarkSessions');
     qs('enrollWizardStepMarkNa')?.classList.toggle('d-none', enrollWizardStep !== 'markNa');
     qs('enrollWizardStepConflicts')?.classList.toggle('d-none', enrollWizardStep !== 'conflicts');
     qs('btn_enrollWizardBack')?.classList.toggle('d-none', enrollWizardStep === 'form');
@@ -5740,9 +5878,15 @@
     const iconPlus = '<i class="bi bi-plus-circle me-1"></i>';
     const iconNext = '<i class="bi bi-arrow-right me-1"></i>';
     if (enrollWizardStep === 'form') {
-      const needsNext = hasEnrollmentCap();
+      const needsNext = isOneOnOneSessionCapacityEnrollment();
       btn.innerHTML = needsNext ? `${iconNext}Next` : `${iconPlus}Add Enrollment Period`;
       if (isRollingClass()) btn.disabled = false;
+      return;
+    }
+    if (enrollWizardStep === 'unmarkSessions') {
+      const selectedCount = readSelectedUnmarkSessionIds().length;
+      btn.innerHTML = `${iconPlus}Add Enrollment Period`;
+      btn.disabled = selectedCount < 1;
       return;
     }
     if (enrollWizardStep === 'addSessions') {
@@ -5776,6 +5920,7 @@
     enrollWizardStep = 'form';
     enrollWizardPath = null;
     enrollWizardSkippedAddSessions = false;
+    pendingUnmarkSessionIds = [];
     lastConflictReview = null;
     conflictReviewHasConflicts = false;
     setEnrollmentWizardStepVisibility();
@@ -5854,6 +5999,72 @@
 
   function prepareAddSessionsStep(alignment) {
     prepareEnrollmentReviewStep(alignment);
+  }
+
+  function buildUnmarkSessionRows(alignment = lastAlignmentResult) {
+    const startDate = String(qs('inp_startDate')?.value || '').trim();
+    const fromAlignment = (Array.isArray(alignment?.sessions) ? alignment.sessions : [])
+      .filter((row) => row.inWindow !== false)
+      .map((row) => normalizeSessionRowForDisplay(row));
+    if (fromAlignment.length) return fromAlignment;
+    const workspaceSessions = Array.isArray(rollingEnrollmentWorkspace?.sessions)
+      ? rollingEnrollmentWorkspace.sessions
+      : [];
+    return workspaceSessions
+      .filter((row) => !startDate || String(row?.date || '').trim() >= startDate)
+      .map((row) => normalizeSessionRowForDisplay(row));
+  }
+
+  function prepareUnmarkSessionsStep(alignment) {
+    lastAlignmentResult = alignment || lastAlignmentResult;
+    const studentName = String(qs('inp_studentLabel')?.value || '').trim() || 'this student';
+    const summary = qs('unmarkSummaryText');
+    if (summary) {
+      summary.textContent = `Select sessions to clear from N/A to unmarked for ${studentName}. At least one session is required.`;
+    }
+    const preselected = pendingUnmarkSessionIds.length ? pendingUnmarkSessionIds.slice() : [];
+    renderUnmarkSessionTable(buildUnmarkSessionRows(alignment), preselected);
+  }
+
+  function renderUnmarkSessionTable(sessions = [], selectedIds = []) {
+    const rows = (Array.isArray(sessions) ? sessions : []).map((row) => normalizeSessionRowForDisplay(row));
+    renderSessionWindowTable(rows, 'unmarkSessionsTbody', {
+      unmarkToggle: true,
+      selectedUnmarkIds: selectedIds,
+      footerTotalsId: 'unmarkSessionsTotals'
+    });
+    updateUnmarkSelectionCounter();
+  }
+
+  function readSelectedUnmarkSessionIds() {
+    return Array.from(document.querySelectorAll('.unmark-session-toggle.is-selected'))
+      .map((btn) => String(btn.dataset?.sessionId || '').trim())
+      .filter(Boolean);
+  }
+
+  function readSelectedUnmarkSessionHours() {
+    let total = 0;
+    document.querySelectorAll('.unmark-session-toggle.is-selected').forEach((btn) => {
+      total = normalizeTargetHoursValue(total + Number(btn.dataset?.hours || 0));
+    });
+    return total;
+  }
+
+  function updateUnmarkTableFooter() {
+    const totalsEl = qs('unmarkSessionsTotals');
+    if (!totalsEl) return;
+    const selectedCount = readSelectedUnmarkSessionIds().length;
+    const selectedHours = readSelectedUnmarkSessionHours();
+    const hourLabel = selectedHours === 1 ? 'Hr' : 'Hrs';
+    totalsEl.textContent = `Selected: ${selectedCount} session(s), ${selectedHours} ${hourLabel}`;
+  }
+
+  function updateUnmarkSelectionCounter() {
+    const counter = qs('unmarkSelectionCounter');
+    const selectedCount = readSelectedUnmarkSessionIds().length;
+    if (counter) counter.textContent = `Selected ${selectedCount} session(s)`;
+    updateUnmarkTableFooter();
+    if (enrollWizardStep === 'unmarkSessions') syncEnrollmentWizardPrimaryButton();
   }
 
   function prepareMarkNaStep(alignment) {
@@ -5980,6 +6191,15 @@
       setEnrollmentWizardStepVisibility();
       return;
     }
+    if (enrollWizardStep === 'unmarkSessions') {
+      pendingUnmarkSessionIds = readSelectedUnmarkSessionIds();
+      enrollWizardStep = 'form';
+      enrollWizardPath = 'oneOnOne';
+      setEnrollmentWizardStepVisibility();
+      await runAlignmentRefresh({ showSpinner: false });
+      renderFormStepSessionTable();
+      return;
+    }
     if (enrollWizardStep === 'markNa') {
       pendingPlannedNaSessionIds = readSelectedNaSessionIds();
       enrollWizardStep = enrollWizardSkippedAddSessions ? 'form' : 'addSessions';
@@ -5990,7 +6210,7 @@
     if (enrollWizardStep === 'addSessions') {
       captureGapFormDraft();
       enrollWizardStep = 'form';
-      enrollWizardPath = hasEnrollmentCap() ? 'planA' : null;
+      enrollWizardPath = isOneOnOneSessionCapacityEnrollment() ? 'oneOnOne' : null;
       setEnrollmentWizardStepVisibility();
       await runAlignmentRefresh({ showSpinner: false });
       renderFormStepSessionTable();
@@ -6047,21 +6267,26 @@
     if (!tbodyEl) return;
     const rows = Array.isArray(sessions) ? sessions.map((row) => normalizeSessionRowForDisplay(row)) : [];
     const naToggle = options.naToggle === true;
+    const unmarkToggle = options.unmarkToggle === true;
     const enrollmentPick = options.enrollmentPick === true;
     const selectedNaIds = new Set(
       (Array.isArray(options.selectedNaIds) ? options.selectedNaIds : []).map((row) => String(row || '').trim()).filter(Boolean)
     );
+    const selectedUnmarkIds = new Set(
+      (Array.isArray(options.selectedUnmarkIds) ? options.selectedUnmarkIds : []).map((row) => String(row || '').trim()).filter(Boolean)
+    );
     const selectedEnrollmentIds = new Set(
       (Array.isArray(options.selectedEnrollmentIds) ? options.selectedEnrollmentIds : []).map((row) => String(row || '').trim()).filter(Boolean)
     );
-    const showActions = options.showActions === true || naToggle || enrollmentPick;
-    const highlightStaged = options.highlightStaged === true || (options.showActions === true && !naToggle && !enrollmentPick);
+    const showActions = options.showActions === true || naToggle || unmarkToggle || enrollmentPick;
+    const highlightStaged = options.highlightStaged === true || (options.showActions === true && !naToggle && !unmarkToggle && !enrollmentPick);
     const footerTotalsId = String(options.footerTotalsId || '').trim();
     const colSpan = showActions ? 5 : 4;
     if (!rows.length) {
       tbodyEl.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted py-3">No sessions in this enrollment window yet.</td></tr>`;
       if (footerTotalsId) {
         if (naToggle) updateNaTableFooter();
+        else if (unmarkToggle) updateUnmarkTableFooter();
         else updateSessionTableFooter([], footerTotalsId);
       }
       return;
@@ -6071,10 +6296,13 @@
       const hours = resolveSessionRowDurationHours(row);
       const staged = highlightStaged && isStagedSessionRow(row);
       const naSelected = naToggle && selectedNaIds.has(sessionId);
+      const unmarkSelected = unmarkToggle && selectedUnmarkIds.has(sessionId);
       const picked = enrollmentPick && selectedEnrollmentIds.has(sessionId);
       const rowClass = naSelected
         ? 'na-session-row-selected'
-        : (picked ? 'enrollment-session-row-selected' : (staged ? 'gap-session-row-staged' : ''));
+        : (unmarkSelected
+          ? 'unmark-session-row-selected'
+          : (picked ? 'enrollment-session-row-selected' : (staged ? 'gap-session-row-staged' : '')));
       const countableBadge = row.countable
         ? '<span class="badge bg-success-subtle text-success border">Yes</span>'
         : `<span class="badge bg-secondary-subtle text-secondary border" title="${htmlEscape(row.excludeReason || '')}">No</span>`;
@@ -6095,6 +6323,12 @@
         const btnLabel = isPicked ? 'Included' : 'Include';
         actionsCell = `<button type="button" class="${btnClass}" data-session-id="${htmlEscape(sessionId)}" data-hours="${hours}" title="Include this staged session in the enrollment">${btnLabel}</button>`
           + ` <button type="button" class="btn btn-sm btn-outline-danger btn-remove-staged" data-session-id="${htmlEscape(sessionId)}" title="Remove staged session"><i class="bi bi-trash"></i></button>`;
+      } else if (unmarkToggle) {
+        const btnClass = unmarkSelected
+          ? 'btn btn-sm btn-success unmark-session-toggle is-selected'
+          : 'btn btn-sm btn-outline-secondary unmark-session-toggle';
+        const btnLabel = unmarkSelected ? 'Unmarked' : 'Unmark';
+        actionsCell = `<button type="button" class="${btnClass}" data-session-id="${htmlEscape(sessionId)}" data-hours="${hours}" title="Clear N/A and unmark attendance for this session">${btnLabel}</button>`;
       } else if (naToggle) {
         const btnClass = naSelected
           ? 'btn btn-sm btn-success na-session-toggle is-selected'
@@ -6117,6 +6351,7 @@
     }).join('');
     if (footerTotalsId) {
       if (naToggle) updateNaTableFooter();
+      else if (unmarkToggle) updateUnmarkTableFooter();
       else updateSessionTableFooter(rows, footerTotalsId);
       if (enrollmentPick) updateEnrollmentPickCounter();
     } else if (tbodyId === 'gapSessionsTbody') {
@@ -6661,6 +6896,7 @@
       await loadRows();
       clearEntryDraft();
       pendingPlannedNaSessionIds = [];
+      pendingUnmarkSessionIds = [];
       pendingIncludedSessionIds = [];
       clearPendingGapBatch();
     } catch (error) {
@@ -7503,6 +7739,7 @@
     rollingEnrollmentWorkspace = null;
     lastAlignmentResult = null;
     pendingPlannedNaSessionIds = [];
+    pendingUnmarkSessionIds = [];
     pendingIncludedSessionIds = [];
     clearPendingGapBatch({ clearFormDraft: true });
     lastConflictReview = null;
@@ -7528,28 +7765,40 @@
   async function addPeriod() {
     if (enrollWizardStep === 'form') {
       readEnrollmentCapFields();
-      if (!hasEnrollmentCap()) {
-        await proceedWithEnrollmentAfterAlignment();
-        return;
-      }
       if (hasTargetSessionCount() && hasTargetHours()) {
         await showMsg('Validation', 'warning', 'Set either a session target or an hour target, not both.');
         return;
       }
-      const alignmentGate = await ensureEnrollmentSessionAlignment();
-      if (!alignmentGate.ok) return;
-      if (alignmentGate.nextStep === 'conflicts') {
-        enrollWizardPath = 'planA';
-        const loaded = await loadConflictReviewStep();
-        if (!loaded) return;
-        enrollWizardStep = 'conflicts';
-        setEnrollmentWizardStepVisibility();
+      if (isGroupSessionCapacityEnrollment()) {
+        if (hasEnrollmentCap()) {
+          const alignmentGate = await ensureEnrollmentSessionAlignment();
+          if (!alignmentGate.ok) return;
+        }
+        await proceedWithEnrollmentAfterAlignment();
         return;
       }
-      enrollWizardPath = 'planA';
-      prepareEnrollmentReviewStep(alignmentGate.alignment);
-      enrollWizardStep = 'addSessions';
+      const studentId = String(qs('inp_studentId')?.value || '').trim();
+      const startDate = String(qs('inp_startDate')?.value || '').trim();
+      if (!studentId || !startDate) {
+        await showMsg('Missing Required Fields', 'warning', 'Student and Start Date are required.');
+        return;
+      }
+      await runAlignmentRefresh({ showSpinner: !canUseLocalAlignment() });
+      enrollWizardPath = 'oneOnOne';
+      prepareUnmarkSessionsStep(lastAlignmentResult);
+      enrollWizardStep = 'unmarkSessions';
       setEnrollmentWizardStepVisibility();
+      return;
+    }
+
+    if (enrollWizardStep === 'unmarkSessions') {
+      const selected = readSelectedUnmarkSessionIds();
+      if (!selected.length) {
+        await showMsg('Validation', 'warning', 'Select at least one session to unmark.');
+        return;
+      }
+      pendingUnmarkSessionIds = selected.slice();
+      await proceedWithEnrollmentAfterAlignment();
       return;
     }
 
@@ -8250,6 +8499,7 @@
         classLabel: String(classId || '').trim(),
         startDate: String(row?.startDate || '').trim(),
         endDate: String(row?.endDate || '').trim(),
+        cycleEndDate: String(cycleWindow?.endDate || '').trim(),
         targetSessionCount: Number(row?.targetSessionCount || 0),
         targetHours: Number(row?.targetHours || 0),
         requestJson,
@@ -8634,6 +8884,13 @@
       runAlignmentRefresh({ showSpinner: false });
     }, 300);
   });
+  qs('inp_sessionCapacityType')?.addEventListener('change', () => {
+    pendingUnmarkSessionIds = [];
+    syncEnrollmentWizardPathFromCap();
+    updateSessionCountHint(lastAlignmentResult);
+    renderEnrollmentWizardStepIndicator();
+    syncEnrollmentWizardPrimaryButton();
+  });
   qs('edit_targetSessionCount')?.addEventListener('input', () => {
     applyEnrollmentCapMutualExclusion('edit_targetSessionCount');
   });
@@ -8645,6 +8902,7 @@
   qs('btn_viewEnrollmentSessions')?.addEventListener('click', openEnrollmentSessionCalendarModal);
   qs('btn_viewEnrollmentSessionsList')?.addEventListener('click', openEnrollmentSessionListModal);
   qs('btn_openNaCalendarPicker')?.addEventListener('click', openEnrollmentSessionCalendarModal);
+  qs('btn_openUnmarkCalendarPicker')?.addEventListener('click', openEnrollmentSessionListModal);
   qs('btn_gapPickTeacher')?.addEventListener('click', pickGapTeacher);
   qs('btn_gapAppendSessions')?.addEventListener('click', appendGapBatchSessions);
   qs('btn_gapClearStaged')?.addEventListener('click', async () => {
@@ -8685,6 +8943,17 @@
     const row = btn.closest('tr');
     if (row) row.classList.toggle('na-session-row-selected', selected);
     updateNaSelectionCounter();
+  });
+  qs('unmarkSessionsTbody')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('.unmark-session-toggle');
+    if (!btn) return;
+    const selected = btn.classList.toggle('is-selected');
+    btn.classList.toggle('btn-success', selected);
+    btn.classList.toggle('btn-outline-secondary', !selected);
+    btn.textContent = selected ? 'Unmarked' : 'Unmark';
+    const row = btn.closest('tr');
+    if (row) row.classList.toggle('unmark-session-row-selected', selected);
+    updateUnmarkSelectionCounter();
   });
   addEnrollmentModalEl?.addEventListener('hidden.bs.modal', () => {
     if (enrollWizardStep === 'addSessions' || pendingStagedSessions.length) captureGapFormDraft();

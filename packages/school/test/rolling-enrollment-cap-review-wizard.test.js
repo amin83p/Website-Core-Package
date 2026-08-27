@@ -30,56 +30,50 @@ function functionSource(name, nextName) {
   return viewSource.slice(start, end);
 }
 
-test('cap enrollment review step exposes summary card and optional session tools', () => {
-  assert.match(viewSource, /id="enrollCapReviewSummary"/);
-  assert.match(viewSource, /id="enrollCapReviewSummaryBody"/);
-  assert.match(viewSource, /id="enrollCapReviewContext"/);
-  assert.match(viewSource, /id="enrollCapOptionalSessionsPanel"/);
-  assert.match(viewSource, /id="enrollCapOptionalSessionsCollapse"/);
-  assert.match(viewSource, /Manage sessions \(optional\)/);
-});
-
-test('cap form step hides calendar controls and uses neutral alignment hint', () => {
-  const hint = functionSource('updateSessionCountHint', 'getEnrollmentWizardStepMeta');
-  const viewBtn = functionSource('updateViewSessionsButton', 'buildEnrollmentPickerBundleFromWorkspace');
-
-  assert.match(hint, /capSet && enrollWizardStep === 'form'/);
-  assert.match(hint, /Use Next to review and optionally manage sessions/);
-  assert.doesNotMatch(hint, /insufficient_sessions[\s\S]*enrollWizardStep === 'form'/);
-  assert.match(viewBtn, /hasEnrollmentCap\(\) && enrollWizardStep === 'form'/);
-  assert.match(viewBtn, /classList\.add\('d-none'\)/);
-});
-
-test('cap wizard step rail labels review instead of sessions', () => {
-  const meta = functionSource('getEnrollmentWizardStepMeta', 'renderEnrollmentWizardStepIndicator');
-  assert.match(meta, /id: 'addSessions', label: 'Review'/);
-  assert.doesNotMatch(meta, /id: 'addSessions', label: 'Sessions'/);
-});
-
-test('addPeriod advances cap enrollments to review step instead of saving immediately', () => {
+test('group enrollment finishes on form step without cap review wizard', () => {
   const addPeriod = functionSource('addPeriod', 'openCloseModal');
   const formBranch = addPeriod.match(/if \(enrollWizardStep === 'form'\) \{[\s\S]*?\n    \}/);
   assert.ok(formBranch, 'form branch should exist');
-  assert.match(formBranch[0], /alignmentGate[\s\S]*prepareEnrollmentReviewStep\(alignmentGate\.alignment\)/);
-  assert.match(formBranch[0], /enrollWizardStep = 'addSessions'/);
+  assert.match(formBranch[0], /isGroupSessionCapacityEnrollment\(\)/);
+  assert.match(formBranch[0], /proceedWithEnrollmentAfterAlignment\(\)/);
+  assert.doesNotMatch(formBranch[0], /enrollWizardStep = 'addSessions'/);
 });
 
-test('review step primary action finalizes without session-pick gating', () => {
+test('one-on-one enrollment advances to unmark sessions step', () => {
+  const addPeriod = functionSource('addPeriod', 'openCloseModal');
+  assert.match(addPeriod, /prepareUnmarkSessionsStep\(lastAlignmentResult\)/);
+  assert.match(addPeriod, /enrollWizardStep = 'unmarkSessions'/);
+  assert.match(addPeriod, /enrollWizardPath = 'oneOnOne'/);
+});
+
+test('wizard step meta exposes unmark step for one-on-one path', () => {
+  const meta = functionSource('getEnrollmentWizardStepMeta', 'renderEnrollmentWizardStepIndicator');
+  assert.match(meta, /enrollWizardPath === 'oneOnOne'/);
+  assert.match(meta, /id: 'unmarkSessions', label: 'Unmark Sessions'/);
+});
+
+test('form step shows Next only for one-on-one session capacity', () => {
   const syncBtn = functionSource('syncEnrollmentWizardPrimaryButton', 'isRollingClass');
-  const canContinue = functionSource('canContinueFromAddSessionsStep', 'validateEnrollmentPickForContinue');
-  const validate = functionSource('validateEnrollmentPickForContinue', 'updateEnrollmentPickCounter');
-
-  assert.match(syncBtn, /enrollWizardStep === 'addSessions'[\s\S]*Add Enrollment Period/);
-  assert.match(syncBtn, /enrollWizardStep === 'addSessions'[\s\S]*btn\.disabled = false/);
-  assert.match(canContinue, /if \(hasEnrollmentCap\(\)\) return true/);
-  assert.match(validate, /if \(hasEnrollmentCap\(\)\) return true/);
+  assert.match(syncBtn, /isOneOnOneSessionCapacityEnrollment\(\)/);
+  assert.doesNotMatch(syncBtn, /hasEnrollmentCap\(\)/);
 });
 
-test('prepareEnrollmentReviewStep renders summary without auto-including sessions', () => {
-  const prepare = functionSource('prepareEnrollmentReviewStep', 'prepareAddSessionsStep');
-  assert.match(prepare, /renderEnrollCapReviewSummary\(\)/);
-  assert.match(prepare, /renderEnrollCapReviewContext\(alignment\)/);
-  assert.match(prepare, /pendingIncludedSessionIds = \[\]/);
-  assert.doesNotMatch(prepare, /buildDefaultIncludedSessionIds/);
-  assert.match(prepare, /setGapStepNotice\(summaryNotice, \{ title: '', detail: '', visible: false/);
+test('unmark step primary action requires at least one selected session', () => {
+  const syncBtn = functionSource('syncEnrollmentWizardPrimaryButton', 'isRollingClass');
+  assert.match(syncBtn, /enrollWizardStep === 'unmarkSessions'/);
+  assert.match(syncBtn, /readSelectedUnmarkSessionIds\(\)/);
+  assert.match(syncBtn, /btn\.disabled = selectedCount < 1/);
+});
+
+test('group cap hint does not route through cap review Next copy', () => {
+  const hint = functionSource('updateSessionCountHint', 'getEnrollmentWizardStepMeta');
+  assert.match(hint, /isOneOnOneSessionCapacityEnrollment\(\)/);
+  assert.match(hint, /Use Next to pick sessions to unmark/);
+  assert.doesNotMatch(hint, /Use Next to review and optionally manage sessions/);
+});
+
+test('syncEnrollmentWizardPathFromCap routes one-on-one only', () => {
+  const syncPath = functionSource('syncEnrollmentWizardPathFromCap', 'updateSessionCountHint');
+  assert.match(syncPath, /enrollWizardPath = 'oneOnOne'/);
+  assert.doesNotMatch(syncPath, /enrollWizardPath = 'planA'/);
 });

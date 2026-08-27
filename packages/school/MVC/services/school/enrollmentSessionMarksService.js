@@ -358,6 +358,7 @@ function __resetDependenciesForTest() {
 module.exports = {
   buildSessionWindowPayload,
   applySessionMarks,
+  clearRosterNaForSessions,
   findLockedEnrollmentNaMark,
   getMarksMap,
   __setDependenciesForTest,

@@ -1,0 +1,54 @@
+<div id="sessionEnrollmentTimeSlotSelectModal" class="session-enrollment-stage-overlay d-none" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="sessionEnrollmentTimeSlotSelectModalTitle">
+  <div class="session-enrollment-stage-backdrop" data-time-slot-dismiss="1" aria-hidden="true"></div>
+  <div class="session-enrollment-stage-panel card shadow">
+    <div class="card-header py-2 d-flex align-items-start justify-content-between gap-2">
+      <div>
+        <h5 class="card-title mb-0" id="sessionEnrollmentTimeSlotSelectModalTitle">Select sessions</h5>
+        <div class="small text-muted">Stage mark or unmark changes for sessions with the same time window.</div>
+      </div>
+      <button type="button" class="btn-close" data-time-slot-dismiss="1" aria-label="Close"></button>
+    </div>
+    <div class="card-body py-2">
+      <div class="mb-3">
+        <div class="session-stage-label small text-muted mb-1">Time window</div>
+        <div class="fw-semibold" id="sessionEnrollmentTimeSlotWindowLabel">—</div>
+      </div>
+      <div class="mb-3">
+        <div class="session-stage-label small text-muted mb-1">Sessions of this type in class</div>
+        <div id="sessionEnrollmentTimeSlotTypeTotal">0</div>
+      </div>
+      <div class="mb-3">
+        <div class="session-stage-label small text-muted mb-1">Action</div>
+        <div class="btn-group btn-group-sm w-100" role="group" aria-label="Time slot action" id="sessionEnrollmentTimeSlotActionGroup">
+          <button type="button" class="btn btn-outline-primary active" data-time-slot-action="mark_na">Mark N/A</button>
+          <button type="button" class="btn btn-outline-primary" data-time-slot-action="unmark">Unmark N/A</button>
+        </div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label small mb-1" for="sessionEnrollmentTimeSlotStart">Start date</label>
+          <input type="date" class="form-control form-control-sm" id="sessionEnrollmentTimeSlotStart">
+        </div>
+        <div class="col-6">
+          <label class="form-label small mb-1" for="sessionEnrollmentTimeSlotEnd">End date</label>
+          <input type="date" class="form-control form-control-sm" id="sessionEnrollmentTimeSlotEnd">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small mb-1" for="sessionEnrollmentTimeSlotCount">Number of sessions</label>
+        <input type="number" class="form-control form-control-sm" id="sessionEnrollmentTimeSlotCount" min="1" step="1">
+        <div class="form-text compact-help mb-0" id="sessionEnrollmentTimeSlotCountHint">From the start date through the end date.</div>
+      </div>
+      <div class="small mb-2" id="sessionEnrollmentTimeSlotPreview" role="status">0 session(s) will be affected.</div>
+      <div id="sessionEnrollmentTimeSlotNoteWrap" class="mb-2">
+        <label class="form-label small mb-1" for="sessionEnrollmentTimeSlotNote">Note (required for N/A)</label>
+        <input type="text" class="form-control form-control-sm" id="sessionEnrollmentTimeSlotNote" placeholder="Why are these sessions N/A?">
+      </div>
+      <div class="small text-danger d-none" id="sessionEnrollmentTimeSlotError" role="alert"></div>
+    </div>
+    <div class="card-footer py-2 d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-secondary btn-sm" data-time-slot-dismiss="1">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn_sessionEnrollmentTimeSlotStage" disabled>Stage changes</button>
+    </div>
+  </div>
+</div>

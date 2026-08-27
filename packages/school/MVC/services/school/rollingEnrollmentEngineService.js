@@ -1,6 +1,7 @@
 'use strict';
 
 const schoolDataService = require('./schoolDataService');
+const enrollmentSessionMarksService = require('./enrollmentSessionMarksService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
@@ -47,6 +48,9 @@ function normalizeStudentEntries(input = {}) {
     input.sessionCapacityType,
     { defaultValue: 'group' }
   );
+  const defaultUnmarkSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
+    input.unmarkSessionIds
+  );
   if (Array.isArray(input.students) && input.students.length) {
     return input.students.map((row) => {
       const studentId = toPublicId(row?.studentId || '');
@@ -60,6 +64,9 @@ function normalizeStudentEntries(input = {}) {
         sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(
           row?.sessionCapacityType || defaultSessionCapacityType,
           { defaultValue: 'group' }
+        ),
+        unmarkSessionIds: rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
+          row?.unmarkSessionIds || defaultUnmarkSessionIds
         )
       };
     }).filter(Boolean);
@@ -72,7 +79,8 @@ function normalizeStudentEntries(input = {}) {
     termId: toPublicId(input.termId || ''),
     programRegistrationId: toPublicId(input.programRegistrationId || ''),
     notes: String(input.notes || '').trim(),
-    sessionCapacityType: defaultSessionCapacityType
+    sessionCapacityType: defaultSessionCapacityType,
+    unmarkSessionIds: defaultUnmarkSessionIds
   }];
 }
 
@@ -144,6 +152,7 @@ function normalizeEnrollmentEngineRequest(input = {}) {
     notes: String(input.notes || '').trim(),
     enrollmentSource: String(input.enrollmentSource || 'rolling_enrollment').trim(),
     sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(input.sessionCapacityType, { defaultValue: 'group' }),
+    unmarkSessionIds: rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(input.unmarkSessionIds),
     allowOverlap: parseBoolean(input.allowOverlap, false),
     finance: input.finance && typeof input.finance === 'object' ? input.finance : null
   };
@@ -355,6 +364,48 @@ async function materializeEnrollmentPlannedNa({ classData, period, student, reqU
   });
 }
 
+async function materializeEnrollmentSessionUnmarks({
+  classData,
+  period,
+  student,
+  studentEntry = {},
+  normalized = {},
+  reqUser
+} = {}) {
+  const sessionCapacityType = classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+    studentEntry?.sessionCapacityType || normalized?.sessionCapacityType || period?.sessionCapacityType,
+    { defaultValue: 'group' }
+  );
+  const personId = toPublicId(period?.personId || student?.personId || '');
+  if (!personId) return { updatedCount: 0, sessionIds: [] };
+
+  let sessionIds = [];
+  if (sessionCapacityType === 'group') {
+    let sessions = Array.isArray(classData?.sessions) ? classData.sessions : [];
+    if (!sessions.length) {
+      sessions = await schoolDataService.getClassSessions(classData?.id || period?.classId, reqUser);
+    }
+    sessionIds = (Array.isArray(sessions) ? sessions : [])
+      .map((session) => toPublicId(session?.sessionId || session?.id || ''))
+      .filter(Boolean);
+  } else {
+    sessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
+      studentEntry?.unmarkSessionIds || normalized?.unmarkSessionIds || []
+    );
+    if (!sessionIds.length) {
+      throw new Error('At least one session must be selected to unmark for 1-on-1 enrollment.');
+    }
+  }
+
+  if (!sessionIds.length) return { updatedCount: 0, sessionIds: [] };
+  return enrollmentSessionMarksService.clearRosterNaForSessions({
+    classId: classData?.id || period?.classId,
+    personId,
+    sessionIds,
+    requestingUser: reqUser
+  });
+}
+
 async function refreshTargetSessionEnrollmentProgress({ classData, period, reqUser } = {}) {
   if (!classData || !period) return [];
   const hasSessionCap = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(period.targetSessionCount) > 0;
@@ -411,6 +462,14 @@ async function enrollStudentNoCharge({
       classData: classAfter,
       period: createdPeriod,
       student,
+      reqUser
+    });
+    await materializeEnrollmentSessionUnmarks({
+      classData: classAfter,
+      period: createdPeriod,
+      student,
+      studentEntry,
+      normalized,
       reqUser
     });
     await refreshTargetSessionEnrollmentProgress({

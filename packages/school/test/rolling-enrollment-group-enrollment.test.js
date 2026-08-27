@@ -161,3 +161,23 @@ test('rolling enrollment modals include session capacity type fields and payload
   assert.match(viewSource, /function submitEditPeriod\(/);
   assert.match(viewSource, /data-column="sessionCapacity"/);
 });
+
+test('new enrollment period modal lays out meta fields evenly with full-width reason start', () => {
+  assert.match(viewSource, /enroll-meta-inputs-row/);
+  assert.match(viewSource, /col-12 col-md-6 col-lg-3[\s\S]*id="inp_funder"/);
+  assert.match(viewSource, /col-12 col-md-6 col-lg-3[\s\S]*id="inp_sessionCapacityType"/);
+  assert.match(viewSource, /col-12 col-md-6 col-lg-3[\s\S]*id="inp_claimNumber"/);
+  assert.match(viewSource, /id="inp_reasonStart"[\s\S]*textarea/);
+});
+
+test('group enrollment shows anticipated finish hints under cap inputs', () => {
+  assert.match(viewSource, /id="hint_inp_targetSessionCount_finish"/);
+  assert.match(viewSource, /id="hint_inp_targetHours_finish"/);
+  assert.match(viewSource, /function updateAnticipatedFinishHint\(/);
+  assert.match(viewSource, /function resolveAnticipatedFinishDateClient\(/);
+  assert.match(viewSource, /Anticipated finish:/);
+  assert.match(viewSource, /isGroupSessionCapacityEnrollment\(\)/);
+  assert.match(viewSource, /unmarkSessionIds/);
+  assert.match(viewSource, /id="enrollWizardStepUnmarkSessions"/);
+  assert.match(viewSource, /pendingUnmarkSessionIds/);
+});

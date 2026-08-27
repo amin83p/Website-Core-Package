@@ -6805,9 +6805,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCloseSessionManager = document.getElementById('btnCloseSessionManager');
     if (btnCloseSessionManager) {
         btnCloseSessionManager.addEventListener('click', async () => {
+            const hasUnsavedChanges = isSessionFormDirty() || isDetailsModalDirty();
+            const closeMessage = hasUnsavedChanges
+                ? 'Close this page? Unsaved changes will be lost unless you save first.'
+                : 'Close this page?';
             const ok = await confirmSessionNavigation(
                 'Close Manage Session?',
-                'Close this page? Unsaved changes will be lost unless you save first.',
+                closeMessage,
                 'Close'
             );
             if (!ok) return;

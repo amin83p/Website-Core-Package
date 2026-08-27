@@ -1494,6 +1494,75 @@
     return `${date}|${start}|${end}`;
   }
 
+  function normalizeSessionTimes(row = {}) {
+    const startRaw = String(row?.startTime || row?.start || '').trim();
+    const endRaw = String(row?.endTime || row?.end || '').trim();
+    const startMin = timeToMinutes(startRaw);
+    const endMin = timeToMinutes(endRaw);
+    return {
+      startTime: startRaw ? minutesToTime24(startMin) : '',
+      endTime: endRaw ? minutesToTime24(endMin) : ''
+    };
+  }
+
+  function sessionTimeWindowKey(row = {}) {
+    const { startTime, endTime } = normalizeSessionTimes(row);
+    if (!startTime || !endTime) return '';
+    return `${startTime}|${endTime}`;
+  }
+
+  function matchesSessionTimeWindow(ev = {}, startTime = '', endTime = '') {
+    const eventKey = sessionTimeWindowKey(ev);
+    const targetKey = sessionTimeWindowKey({ start: startTime, end: endTime });
+    return Boolean(eventKey && targetKey && eventKey === targetKey);
+  }
+
+  function countSessionsByTimeWindow(events = [], startTime = '', endTime = '') {
+    return (Array.isArray(events) ? events : []).filter((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      const date = normalizeDateOnly(ev?.date);
+      return sessionId && date && matchesSessionTimeWindow(ev, startTime, endTime);
+    }).length;
+  }
+
+  function countTimeSlotSessionsInRange(events = [], startTime = '', endTime = '', startDate = '', endDate = '') {
+    return (Array.isArray(events) ? events : []).filter((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      const date = normalizeDateOnly(ev?.date);
+      if (!sessionId || !date) return false;
+      if (!matchesSessionTimeWindow(ev, startTime, endTime)) return false;
+      return isDateWithinInclusiveRange(date, startDate, endDate);
+    }).length;
+  }
+
+  function collectTimeSlotSessions(events = [], pendingMap = null, options = {}) {
+    const times = normalizeSessionTimes({ start: options.startTime, end: options.endTime });
+    const startTime = times.startTime;
+    const endTime = times.endTime;
+    const startDate = normalizeDateOnly(options.startDate);
+    const endDate = normalizeDateOnly(options.endDate);
+    const action = String(options.action || '').trim().toLowerCase();
+    let limitCount = Number.parseInt(String(options.limitCount ?? ''), 10);
+    if (!Number.isFinite(limitCount) || limitCount <= 0) limitCount = 0;
+
+    let rows = (Array.isArray(events) ? events : []).filter((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      const date = normalizeDateOnly(ev?.date);
+      if (!sessionId || !date) return false;
+      if (!matchesSessionTimeWindow(ev, startTime, endTime)) return false;
+      if (!isDateWithinInclusiveRange(date, startDate, endDate)) return false;
+      const naState = resolveEnrollmentNaState(ev, pendingMap);
+      if (action === 'mark_na') return naState === 'normal';
+      if (action === 'unmark') return naState !== 'normal';
+      return false;
+    });
+    rows.sort((a, b) => normalizeDateOnly(a?.date).localeCompare(normalizeDateOnly(b?.date)));
+    if (limitCount > 0 && rows.length > limitCount) {
+      rows = rows.slice(0, limitCount);
+    }
+    return rows;
+  }
+
   function getSessionDate(row = {}) {
     return normalizeDateOnly(row?.date || row?.sessionDate || row?.startDate || '');
   }
@@ -2039,6 +2108,12 @@
     filterWeekDaysForDisplay,
     summarizeSelectionFromEvents,
     sessionScheduleKey,
+    sessionTimeWindowKey,
+    normalizeSessionTimes,
+    matchesSessionTimeWindow,
+    countSessionsByTimeWindow,
+    countTimeSlotSessionsInRange,
+    collectTimeSlotSessions,
     minutesToTime24,
     addDurationToTime,
     normalizeWeekdays,
