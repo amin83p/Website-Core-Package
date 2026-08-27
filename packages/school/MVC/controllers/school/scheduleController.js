@@ -16,7 +16,6 @@ const activityService = require('../../services/school/activityService');
 const teacherIdentityService = require('../../services/school/teacherIdentityService');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
-const sessionMergeService = require('../../services/school/sessionMergeService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
@@ -1092,6 +1091,9 @@ function isAllowedMergedSessionOverlap(leftEvent, rightEvent) {
         merged: rightEvent?.merged,
         mergedPartner: rightEvent?.mergedPartner
     };
+    // Lazy require avoids circular dependency:
+    // scheduleController -> sessionMergeService -> sessionConflictDetectionService -> scheduleController
+    const sessionMergeService = require('../../services/school/sessionMergeService');
     return sessionMergeService.areMergeLinkedSessions(
         sessionA,
         leftEvent?.classId,

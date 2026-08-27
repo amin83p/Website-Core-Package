@@ -309,3 +309,29 @@ test('conflict detection resolves delivery person ids for main and co-teachers',
   assert.match(conflictSource, /resolvedDeliveryPersonIds/);
   assert.match(conflictSource, /getSessionDeliveryPersonIds/);
 });
+
+test('schoolRecordAccessService access denied helpers return 403 errors', () => {
+  const denied = schoolRecordAccessService.createAccessDeniedError(
+    schoolRecordAccessService.CLASS_ACCESS_DENIED
+  );
+  assert.equal(denied.statusCode, 403);
+  assert.equal(denied.message, schoolRecordAccessService.CLASS_ACCESS_DENIED);
+  assert.equal(schoolRecordAccessService.isAccessDeniedError(denied), true);
+
+  assert.throws(
+    () => schoolRecordAccessService.assertSessionAccessible({
+      classRow: { id: 'CLS_1' },
+      session: sampleSession,
+      access: { scopeMode: SCOPE_MODES.ASSIGNMENT, personId: 'OTHER' },
+      context: 'manageSession'
+    }),
+    (error) => error.statusCode === 403
+      && error.message === schoolRecordAccessService.SESSION_ACCESS_DENIED
+  );
+});
+
+test('manageSession renders access denied instead of class-not-found 500', () => {
+  const source = readPackage('MVC/controllers/school/classController.js');
+  assert.match(source, /createAccessDeniedError\(schoolRecordAccessService\.CLASS_ACCESS_DENIED\)/);
+  assert.match(source, /renderSchoolPageError\(res, req, error\)/);
+});

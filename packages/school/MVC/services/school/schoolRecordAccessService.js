@@ -14,6 +14,22 @@ const ACTIVITY_WORK_SESSION_ACCESS_DENIED = 'You do not have access to this work
 const CLASS_ACCESS_DENIED = 'You do not have access to this class.';
 const DATA_ACCESS_DENIED = 'You do not have access to this record.';
 
+function createAccessDeniedError(message = DATA_ACCESS_DENIED) {
+  const error = new Error(message);
+  error.statusCode = 403;
+  return error;
+}
+
+function isAccessDeniedError(error) {
+  if (!error) return false;
+  if (Number(error.statusCode) === 403) return true;
+  const message = String(error.message || '').trim();
+  return message === SESSION_ACCESS_DENIED
+    || message === CLASS_ACCESS_DENIED
+    || message === DATA_ACCESS_DENIED
+    || message === ACTIVITY_WORK_SESSION_ACCESS_DENIED;
+}
+
 function readOwnerUserIds(record = {}) {
   return [
     record?.ownerUserId,
@@ -154,7 +170,7 @@ function isSessionAccessible({ classRow, session, access = {}, context = 'list',
 
 function assertClassAccessible(classRow, access = {}, message = CLASS_ACCESS_DENIED) {
   if (!isClassAccessible(classRow, access)) {
-    throw new Error(message);
+    throw createAccessDeniedError(message);
   }
 }
 
@@ -197,7 +213,7 @@ function assertActivityWorkSessionAccessible({
   message = ACTIVITY_WORK_SESSION_ACCESS_DENIED
 } = {}) {
   if (!isActivityWorkSessionAccessible({ activity, entry, access, context })) {
-    throw new Error(message);
+    throw createAccessDeniedError(message);
   }
 }
 
@@ -209,17 +225,17 @@ function assertSessionAccessible({
   message = SESSION_ACCESS_DENIED
 } = {}) {
   if (!isSessionAccessible({ classRow, session, access, context })) {
-    throw new Error(message);
+    throw createAccessDeniedError(message);
   }
 }
 
 function assertRecordAccessible(record, access = {}, message = DATA_ACCESS_DENIED) {
   if (access?.denyAll === true || access?.scopeMode === SCOPE_MODES.USER) {
-    throw new Error(message);
+    throw createAccessDeniedError(message);
   }
   if (isOrgWideScope(access)) return;
   if (!isClassAccessible(record, access)) {
-    throw new Error(message);
+    throw createAccessDeniedError(message);
   }
 }
 
@@ -228,6 +244,8 @@ module.exports = {
   ACTIVITY_WORK_SESSION_ACCESS_DENIED,
   CLASS_ACCESS_DENIED,
   DATA_ACCESS_DENIED,
+  createAccessDeniedError,
+  isAccessDeniedError,
   readOwnerUserIds,
   readSessionCreatorUserIds,
   isActiveInstructor,

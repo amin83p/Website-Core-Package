@@ -1451,12 +1451,17 @@
 
 .schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-day-width .session-cal-week-row {
   overflow: visible;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-day-width .session-cal-week-grid-vertical {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
 }
 
 .schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-day-width .session-cal-day-header-row,
@@ -1467,6 +1472,24 @@
 
 .schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-day-width .session-cal-days-row {
   flex: 0 0 auto;
+}
+
+.schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-track-height .session-cal-vertical-scroll {
+  overflow-y: hidden;
+}
+
+.schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-track-height .session-cal-week-row-timeline {
+  overflow: visible;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-track-height .session-cal-timeline-hover-shell {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .schedule-visual-area .session-cal-day-header.conflict {

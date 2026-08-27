@@ -1157,6 +1157,25 @@ function buildRouteAccessContext(req) {
     return schoolRecordAccessService.buildRouteAccessContext(req);
 }
 
+function renderSchoolPageError(res, req, error) {
+    if (schoolRecordAccessService.isAccessDeniedError(error)) {
+        return res.status(403).render('error', {
+            title: 'Access Denied',
+            statusCode: 403,
+            message: String(error?.message || schoolRecordAccessService.DATA_ACCESS_DENIED),
+            user: req.user
+        });
+    }
+    const statusCode = Number(error?.statusCode);
+    const status = Number.isFinite(statusCode) && statusCode >= 400 && statusCode < 600 ? statusCode : 500;
+    return res.status(status).render('error', {
+        title: status === 404 ? 'Not Found' : 'Error',
+        statusCode: status,
+        message: error.message,
+        user: req.user
+    });
+}
+
 function assertSessionScopeForRequest(req, classData, session, context = 'manageSession') {
     schoolRecordAccessService.assertSessionAccessible({
         classRow: classData,
@@ -1169,7 +1188,9 @@ function assertSessionScopeForRequest(req, classData, session, context = 'manage
 async function getClassByIdWithOrgCheck(classId, reqUser, accessContext = {}) {
     const activeOrgId = getActiveOrgIdOrThrow(reqUser);
     const classData = await schoolDataService.getDataById('classes', classId, reqUser, accessContext);
-    if (!classData) throw new Error('Class not found');
+    if (!classData) {
+        throw schoolRecordAccessService.createAccessDeniedError(schoolRecordAccessService.CLASS_ACCESS_DENIED);
+    }
     assertClassOrgAccess(classData, activeOrgId, reqUser);
     return { classData, activeOrgId };
 }
@@ -4347,7 +4368,7 @@ async function manageSession(req, res) {
             actionStateId: req.actionStateId
         });
     } catch (error) {
-        res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+        return renderSchoolPageError(res, req, error);
     }
 }
 

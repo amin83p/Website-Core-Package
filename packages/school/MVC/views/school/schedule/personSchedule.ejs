@@ -2461,6 +2461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (container) {
             container.classList.add('session-cal-auto-day-width');
             container.classList.remove('schedule-week-grid-manual-day-width');
+            container.classList.remove('schedule-week-grid-manual-track-height');
         }
     }
 
@@ -2527,6 +2528,8 @@ document.addEventListener('DOMContentLoaded', () => {
             saveScheduleSliderValueForMode(mode, resolved);
             if (mode === 'timeline') {
                 saveScheduleHorizontalSliderUserAdjusted(true);
+                const container = document.getElementById('visualDisplayArea');
+                container?.classList.add('schedule-week-grid-manual-track-height');
             } else if (mode === 'verticalTimeline') {
                 saveScheduleVerticalDayWidthUserAdjusted(true);
                 const container = document.getElementById('visualDisplayArea');
@@ -2683,6 +2686,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.classList.toggle('session-cal-auto-day-width', isVertical && !scheduleState.verticalDayWidthUserAdjusted);
         container.classList.toggle('schedule-cal-horizontal-mode', mode === 'timeline');
         container.classList.toggle('schedule-week-grid-manual-day-width', isVertical && scheduleState.verticalDayWidthUserAdjusted);
+        container.classList.toggle('schedule-week-grid-manual-track-height', mode === 'timeline' && scheduleState.horizontalSliderUserAdjusted);
         const layout = computeScheduleWeekGridLayout(mode, container);
         container.style.setProperty('--session-day-width', `${layout.dayWidth}px`);
         container.style.setProperty('--session-hour-height', `${layout.hourHeight}px`);
@@ -3671,6 +3675,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const slider = event.target.closest('#scheduleDayWidth');
         if (slider) {
             applyScheduleDayWidth(slider.value, { userInitiated: true });
+            const mode = normalizedScheduleViewMode();
+            if (mode === 'verticalTimeline' || mode === 'timeline') applyScheduleWeekGridLayout(mode);
         }
     });
     document.getElementById('legendContainer')?.addEventListener('change', (event) => {
