@@ -74,6 +74,32 @@ function getScoreFromMap(scores, personId) {
   return Number.isFinite(n) ? n : null;
 }
 
+function getCommentFromMap(scoreComments, personId) {
+  if (!scoreComments || typeof scoreComments !== 'object') return null;
+  const pid = String(personId);
+  let v = scoreComments[pid];
+  if (v === undefined) v = scoreComments[personId];
+  if (v == null || v === '') return null;
+  const s = String(v).trim();
+  return s || null;
+}
+
+function formatColumnWeightLabel(col) {
+  if (!col || typeof col !== 'object') return null;
+  const kind = String(col.kind || '').trim().toLowerCase();
+  const explicit = kind === 'gradebook' ? Number(col._explicitWeight) : NaN;
+  if (kind === 'gradebook' && Number.isFinite(explicit) && explicit > 0) {
+    return { text: `W ${explicit}%`, title: 'Percent of final grade' };
+  }
+  const weight = Number(col.weight);
+  const total = Number(col.totalScore);
+  const pts = Number.isFinite(weight) && weight > 0
+    ? weight
+    : (Number.isFinite(total) && total > 0 ? total : 0);
+  if (!pts) return null;
+  return { text: `${pts} pts`, title: 'Points used in category average weighting' };
+}
+
 function findGradebookItem(session, itemId) {
   const arr = Array.isArray(session.gradebooks) ? session.gradebooks : [];
   const byId = arr.find((g) => String(g?.id || '') === String(itemId));
@@ -132,6 +158,7 @@ function collectColumns(filteredSessions) {
         label: String(gb?.name || 'Activity').slice(0, 120),
         includeInGradeCalculation: gb?.includeInGradeCalculation !== false,
         weight: gradebookWeightService.resolveActivityWeight(gb),
+        _explicitWeight: Number(gb?.weight),
         totalScore: total > 0 ? total : 0
       });
     });
@@ -149,6 +176,7 @@ function collectColumns(filteredSessions) {
         itemId: id,
         label: String(q?.name || `Quiz ${idx + 1}`).slice(0, 120),
         includeInGradeCalculation: q?.includeInGradeCalculation !== false,
+        weight: gradebookWeightService.resolveActivityWeight(q),
         totalScore: total > 0 ? total : 0
       });
     });
@@ -166,6 +194,7 @@ function collectColumns(filteredSessions) {
         itemId: id,
         label: String(a?.name || `Assignment ${idx + 1}`).slice(0, 120),
         includeInGradeCalculation: a?.includeInGradeCalculation !== false,
+        weight: gradebookWeightService.resolveActivityWeight(a),
         totalScore: total > 0 ? total : 0
       });
     });
@@ -181,28 +210,22 @@ function pickPayload(session, col) {
   return null;
 }
 
-function computeFinalPercent(evaluation, attendancePct, assignmentsPct, midtermPct, finalExamPct) {
-  const w = evaluation.weights;
-  const parts = [];
-  if (Number(w.attendance) > 0 && attendancePct != null && !Number.isNaN(Number(attendancePct))) {
-    parts.push({ key: 'attendance', weight: Number(w.attendance), pct: Number(attendancePct) });
-  }
-  if (Number(w.assignments) > 0 && assignmentsPct != null && !Number.isNaN(Number(assignmentsPct))) {
-    parts.push({ key: 'assignments', weight: Number(w.assignments), pct: Number(assignmentsPct) });
-  }
-  if (Number(w.midterm) > 0 && midtermPct != null && !Number.isNaN(Number(midtermPct))) {
-    parts.push({ key: 'midterm', weight: Number(w.midterm), pct: Number(midtermPct) });
-  }
-  if (Number(w.finalExam) > 0 && finalExamPct != null && !Number.isNaN(Number(finalExamPct))) {
-    parts.push({ key: 'finalExam', weight: Number(w.finalExam), pct: Number(finalExamPct) });
-  }
-  const sumW = parts.reduce((s, p) => s + p.weight, 0);
-  if (!sumW) return { finalPercent: null, parts: [] };
-  const finalPercent = parts.reduce((s, p) => s + p.weight * p.pct, 0) / sumW;
-  return { finalPercent: Math.round(finalPercent * 100) / 100, parts };
+const { assignmentsCategoryAveragePercents, computeFinalPercent } = matrixRollupService;
+
+function parseIncludeAttendanceInFinal(value, defaultValue = false) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  const token = String(value).trim().toLowerCase();
+  if (token === 'true' || token === '1' || token === 'yes') return true;
+  if (token === 'false' || token === '0' || token === 'no') return false;
+  return defaultValue;
 }
 
-const { assignmentsCategoryAveragePercents } = matrixRollupService;
+function resolveIncludeAttendanceInFinal(query = {}, options = {}) {
+  if (options.includeAttendanceInFinal != null) {
+    return Boolean(options.includeAttendanceInFinal);
+  }
+  return parseIncludeAttendanceInFinal(query.includeAttendanceInFinal, false);
+}
 
 function buildGradesAttendanceRecord(stu, ses, ctx, rosterRecord) {
   const {
@@ -316,7 +339,7 @@ function buildGradesMatrixCell(stu, col, ctx, rosterMaps) {
   }
   const effective = col.includeInGradeCalculation === true && !absent && raw != null && total > 0;
 
-  return {
+  const cell = {
     score: absent ? null : raw,
     percent,
     absent,
@@ -324,6 +347,13 @@ function buildGradesMatrixCell(stu, col, ctx, rosterMaps) {
     effective,
     includeInGradeCalculation: col.includeInGradeCalculation
   };
+
+  if (!absent && col.kind === 'gradebook') {
+    const comment = getCommentFromMap(payload.scoreComments, stu.personId);
+    if (comment) cell.comment = comment;
+  }
+
+  return cell;
 }
 
 async function loadGradesMatrixSharedContext(req, query) {
@@ -512,6 +542,7 @@ async function showGradesMatrixPage(req, res) {
  */
 async function buildGradesMatrixPayload(req, query, options = {}) {
   const ctx = await loadGradesMatrixSharedContext(req, query);
+  const includeAttendanceInFinal = resolveIncludeAttendanceInFinal(query, options);
   const {
     classData,
     filteredSessions,
@@ -559,7 +590,8 @@ async function buildGradesMatrixPayload(req, query, options = {}) {
       attendancePct,
       assignmentsPct,
       null,
-      null
+      null,
+      { includeAttendanceInFinal }
     );
 
     return {
@@ -590,13 +622,15 @@ async function buildGradesMatrixPayload(req, query, options = {}) {
     matrix,
     enrollmentSource: String(enrollmentSnapshot?.source || 'canonical'),
     attendancePolicyNote: 'Attendance % uses the same session credit rules as the attendance matrix.',
+    includeAttendanceInFinal,
     window: buildPlan.window
   };
 
   return matrixRollupService.recomputeGradesMatrixRollups(payload, {
     classData,
     orgPolicyCatalog,
-    evaluation
+    evaluation,
+    includeAttendanceInFinal
   });
 }
 
@@ -607,6 +641,7 @@ async function getGradesMatrixData(req, res) {
       classId,
       startDate,
       endDate,
+      includeAttendanceInFinal: req.query.includeAttendanceInFinal,
       studentOffset: req.query.studentOffset,
       studentLimit: req.query.studentLimit,
       columnOffset: req.query.columnOffset,
@@ -659,7 +694,8 @@ async function postGradesRollups(req, res) {
       {
         classData,
         orgPolicyCatalog,
-        evaluation
+        evaluation,
+        includeAttendanceInFinal: parseIncludeAttendanceInFinal(req.body?.includeAttendanceInFinal, false)
       }
     );
     return res.json({ status: 'success', rollups });
@@ -672,5 +708,12 @@ module.exports = {
   showGradesMatrixPage,
   getGradesMatrixData,
   postGradesRollups,
-  buildGradesMatrixPayload
+  buildGradesMatrixPayload,
+  collectColumns,
+  buildGradesMatrixCell,
+  formatColumnWeightLabel,
+  getCommentFromMap,
+  computeFinalPercent,
+  parseIncludeAttendanceInFinal,
+  resolveIncludeAttendanceInFinal
 };

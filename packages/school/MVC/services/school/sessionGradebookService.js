@@ -5,6 +5,7 @@ const schoolFileService = require('./schoolFileService');
 
 const GRADEBOOK_ATTACHMENT_ROLES = new Set(['test', 'answer_sheet', 'other']);
 const MAX_GRADEBOOK_ATTACHMENTS = 10;
+const MAX_SCORE_COMMENT_LENGTH = 2000;
 
 function sanitizeGradebookAttachments(rawList) {
   if (!Array.isArray(rawList)) return [];
@@ -59,7 +60,9 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
 
     const gbId = String(gb.id || '').trim() || `gb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const rawScores = gb.scores && typeof gb.scores === 'object' ? gb.scores : {};
+    const rawScoreComments = gb.scoreComments && typeof gb.scoreComments === 'object' ? gb.scoreComments : {};
     const scores = {};
+    const scoreComments = {};
 
     for (const pid of personIds) {
       const att = attendanceByPerson.get(pid) || 'absent';
@@ -79,6 +82,12 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
       } else {
         scores[pid] = v;
       }
+
+      if (isAbsent) continue;
+      let comment = rawScoreComments[pid];
+      if (comment === undefined) comment = rawScoreComments[String(pid)];
+      comment = String(comment || '').trim().slice(0, MAX_SCORE_COMMENT_LENGTH);
+      if (comment) scoreComments[pid] = comment;
     }
 
     const existing = existingGradebookById.get(gbId);
@@ -102,6 +111,7 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
       activityContent: String(gb.activityContent || ''),
       includeInGradeCalculation: Boolean(gb.includeInGradeCalculation),
       scores,
+      scoreComments,
       attachments: sanitizeGradebookAttachments(gb.attachments)
     });
   }

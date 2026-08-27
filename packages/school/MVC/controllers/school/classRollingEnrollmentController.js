@@ -4839,7 +4839,7 @@ async function showEnrollmentOutcomesPage(req, res) {
         if (getClassRegistrationModeKey(classData) !== 'rolling') {
             return res.redirect(`/school/classes/${encodeURIComponent(classId)}/final-grades`);
         }
-        const matrixPayload = await gradesMatrixController.buildGradesMatrixPayload(req, { classId, startDate: '', endDate: '' });
+        const matrixPayload = await gradesMatrixController.buildGradesMatrixPayload(req, { classId, startDate: '', endDate: '' }, { includeAttendanceInFinal: true });
         const finalByPerson = new Map((matrixPayload.matrix || []).map((row) => [String(row.personId), row.finalPercent]));
         const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
         const students = await schoolDataService.fetchAllData('students', {}, req.user);

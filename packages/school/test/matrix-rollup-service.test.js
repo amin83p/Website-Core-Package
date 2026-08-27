@@ -95,10 +95,16 @@ test('grades rollups filter attendance records to displayed column sessions', ()
   const allColumns = matrixRollupService.recomputeGradesMatrixRollups({
     columns,
     matrix: [row]
-  }, { classData, orgPolicyCatalog, evaluation });
+  }, { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal: true });
   assert.equal(allColumns.matrix[0].attendancePct, 50);
   assert.equal(allColumns.matrix[0].assignmentsPct, 66.67);
   assert.equal(allColumns.matrix[0].finalPercent, 58.34);
+
+  const excludedAttendance = matrixRollupService.recomputeGradesMatrixRollups({
+    columns,
+    matrix: [row]
+  }, { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal: false });
+  assert.equal(excludedAttendance.matrix[0].finalPercent, 66.67);
 
   const oneColumn = matrixRollupService.recomputeGradesMatrixRollups({
     columns: [columns[0]],
@@ -106,7 +112,7 @@ test('grades rollups filter attendance records to displayed column sessions', ()
       ...row,
       cells: [row.cells[0]]
     }]
-  }, { classData, orgPolicyCatalog, evaluation });
+  }, { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal: true });
   assert.equal(oneColumn.matrix[0].attendancePct, 100);
   assert.equal(oneColumn.matrix[0].assignmentsPct, 80);
   assert.equal(oneColumn.matrix[0].finalPercent, 90);
@@ -156,7 +162,7 @@ test('summarizeGradesRollupsForRows matches recompute for displayed slice', () =
   const rollups = matrixRollupService.summarizeGradesRollupsForRows(
     students,
     columns,
-    { classData, orgPolicyCatalog, evaluation }
+    { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal: true }
   );
   assert.equal(rollups.p1.attendancePct, 100);
   assert.equal(rollups.p1.finalPercent, 100);

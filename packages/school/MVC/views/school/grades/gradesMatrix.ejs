@@ -32,6 +32,8 @@
   .gm-band-3 { background-color: #fff4e6 !important; }
   .gm-matrix-table th.gm-date-group { text-align: center; font-weight: 700; color: #334155; }
   .gm-matrix-table .gm-col-head { white-space: nowrap; max-width: 140px; }
+  .gm-col-weight { font-size: 0.7rem; color: #64748b; }
+  .gm-comment-btn { line-height: 1; vertical-align: middle; }
   .gm-eval-card { font-size: 0.85rem; }
   .schedule-shell .filter-panel {
     background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
@@ -113,7 +115,13 @@
             <label class="form-label" for="gm_endDate">End Date</label>
             <input type="date" id="gm_endDate" class="form-control size-md">
           </div>
-          <div class="col-12 col-lg-4 d-flex justify-content-lg-end gap-2 pt-lg-2">
+          <div class="col-lg-3 col-md-6 d-flex align-items-end">
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" role="switch" id="gm_includeAttendance">
+              <label class="form-check-label" for="gm_includeAttendance">Include attendance in final grade</label>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3 d-flex justify-content-lg-end gap-2 pt-lg-2">
             <button type="button" id="gm_btnReset" class="btn btn-outline-secondary btn-md">Reset</button>
             <button type="button" id="gm_btnLoad" class="btn btn-filled btn-primary btn-md">
               <i class="bi bi-funnel me-1"></i> Apply
@@ -163,6 +171,34 @@
   </div>
 </div>
 
+<div class="modal fade" id="gmCommentModal" tabindex="-1" aria-labelledby="gmCommentModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title fw-bold" id="gmCommentModalTitle"><i class="bi bi-chat-left-text me-2"></i>Activity comment</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="small text-muted mb-1">Student</div>
+          <div class="fw-semibold" id="gmCommentModalStudentName">—</div>
+        </div>
+        <div class="mb-3">
+          <div class="small text-muted mb-1">Activity</div>
+          <div class="fw-semibold text-primary" id="gmCommentModalActivityName">—</div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold" for="gmCommentModalText">Comment</label>
+          <textarea class="form-control" id="gmCommentModalText" rows="5" readonly></textarea>
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal_GenericPicker') %>
 <%- include('partials/tablePages-end') %>
 
@@ -197,6 +233,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
 
   window.currentGradesMatrixData = null;
+
+  function getGmIncludeAttendance() {
+    return Boolean(document.getElementById('gm_includeAttendance')?.checked);
+  }
+
+  function updateGmMatrixBlurb(isRollingClass, includeAttendance) {
+    const blurbMain = document.getElementById('gm_matrixBlurbMain');
+    if (!blurbMain) return;
+    if (includeAttendance) {
+      blurbMain.innerHTML = isRollingClass
+        ? '<strong>Final</strong> uses <strong>attendance</strong> and <strong>assignments</strong> weights (rolling classes). Assignments = points-weighted average of <em>included</em> session items (gradebooks, quizzes, assignments). Midterm and final exam weights do not apply.'
+        : '<strong>Final</strong> blends weights using attendance % and a points-weighted average of <em>included</em> assignment-category items (gradebooks, quizzes, assignments). Session items map to the assignments bucket; midterm/final exam weights on the class apply when those components are wired into this view.';
+      return;
+    }
+    blurbMain.innerHTML = isRollingClass
+      ? '<strong>Final</strong> uses <strong>assignments only</strong> (activity averages). Attendance is shown in the Attend. column but not included in Final unless enabled above.'
+      : '<strong>Final</strong> uses <strong>assignments only</strong> (points-weighted average of <em>included</em> session items). Attendance is shown in the Attend. column but not included in Final unless enabled above.';
+  }
 
   function setGradesPrintEnabled(enabled) {
     const btn = document.getElementById('btn_printGradesMatrix');
@@ -273,6 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('gm_className').value = '';
     document.getElementById('gm_startDate').value = '';
     document.getElementById('gm_endDate').value = '';
+    const includeAttEl = document.getElementById('gm_includeAttendance');
+    if (includeAttEl) includeAttEl.checked = false;
     document.getElementById('gm_results').classList.add('d-none');
     document.getElementById('gm_evalCard').classList.add('d-none');
     window.currentGradesMatrixData = null;
@@ -301,21 +357,63 @@ document.addEventListener('DOMContentLoaded', () => {
     }));
   });
 
-  function renderCellHtml(c) {
-    if (!c) return '—';
+  function gmEscapeAttr(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  }
+
+  function formatGmColumnWeightLabel(col) {
+    if (!col || typeof col !== 'object') return null;
+    const kind = String(col.kind || '').trim().toLowerCase();
+    const explicit = kind === 'gradebook' ? Number(col._explicitWeight) : NaN;
+    if (kind === 'gradebook' && Number.isFinite(explicit) && explicit > 0) {
+      return { text: `W ${explicit}%`, title: 'Percent of final grade' };
+    }
+    const weight = Number(col.weight);
+    const total = Number(col.totalScore);
+    const pts = Number.isFinite(weight) && weight > 0
+      ? weight
+      : (Number.isFinite(total) && total > 0 ? total : 0);
+    if (!pts) return null;
+    return { text: `${pts} pts`, title: 'Points used in category average weighting' };
+  }
+
+  function renderGmColumnHeadHtml(col) {
+    const kindLine = `<div class="small text-muted">${gmEscapeAttr(col.kindLabel || '')}</div>`;
+    const labelLine = `<div class="text-dark text-truncate" title="${gmEscapeAttr(col.label)}">${gmEscapeAttr(col.label)}</div>`;
+    const weightInfo = formatGmColumnWeightLabel(col);
+    const weightLine = weightInfo
+      ? `<div class="gm-col-weight" title="${gmEscapeAttr(weightInfo.title)}">${gmEscapeAttr(weightInfo.text)}</div>`
+      : '';
+    return `${kindLine}${labelLine}${weightLine}`;
+  }
+
+  function renderGmCommentButton(cell, col, studentName) {
+    if (!cell?.comment) return '';
+    const activityLabel = String(col?.label || 'Activity');
+    return `<button type="button" class="btn btn-link btn-sm p-0 ms-1 gm-comment-btn" title="View comment" data-student-name="${gmEscapeAttr(studentName)}" data-activity-label="${gmEscapeAttr(activityLabel)}" data-comment="${encodeURIComponent(cell.comment)}"><i class="bi bi-chat-left-text-fill text-primary"></i></button>`;
+  }
+
+  function renderCellHtml(c, col, studentName) {
+    const commentBtn = renderGmCommentButton(c, col, studentName);
+    if (!c) return commentBtn || '—';
     if (c.absent) {
       const label = c.attendanceStatus === 'not_applicable'
         ? 'N/A'
         : (c.attendanceStatus === 'acf' ? 'ACF' : 'Absent');
       return `<span class="text-muted small">${label}</span>`;
     }
-    if (c.score == null || c.score === '') return '—';
+    if (c.score == null || c.score === '') {
+      return commentBtn || '—';
+    }
     const pct = c.percent != null ? `<span class="gm-pct small ms-1">${c.percent}%</span>` : '';
     const incl = c.includeInGradeCalculation !== false;
     const eff = !!c.effective;
     const wrapCls = eff ? 'gm-cell-effective' : 'gm-cell-excluded';
     const badge = !incl ? '<span class="badge bg-secondary ms-1" title="Excluded in session activity">excl.</span>' : '';
-    return `<div class="${wrapCls}"><span class="gm-score">${c.score}</span>${pct}${badge}</div>`;
+    return `<div class="${wrapCls} d-inline-flex align-items-center justify-content-center flex-wrap gap-1"><span class="gm-score">${c.score}</span>${pct}${badge}${commentBtn}</div>`;
   }
 
   function bandClass(band) {
@@ -412,6 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
           classId: data.classId,
           startDate: document.getElementById('gm_startDate').value,
           endDate: document.getElementById('gm_endDate').value,
+          includeAttendanceInFinal: getGmIncludeAttendance(),
           columns: data.columns || [],
           students: data.matrix.map((row) => ({
             personId: row.personId,
@@ -427,6 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const rollup = rollups[key];
         if (rollup) Object.assign(row, rollup);
       });
+      data.includeAttendanceInFinal = getGmIncludeAttendance();
       updateGradesRollupDom(data.matrix);
     } catch (_) {}
   }
@@ -446,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
     columns.forEach((col) => {
       const th = document.createElement('th');
       th.className = `gm-col-head text-center ${bandClass(col.dateBand)}`;
-      th.innerHTML = `<div class="small text-muted">${col.kindLabel || ''}</div><div class="text-dark text-truncate" title="${col.label}">${col.label}</div>`;
+      th.innerHTML = renderGmColumnHeadHtml(col);
       trCols.appendChild(th);
     });
   }
@@ -463,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-att small">${attCell}</td>`;
     row.cells.forEach((cell, idx) => {
       const col = columns[idx];
-      html += `<td class="text-center small ${bandClass(col.dateBand)}">${renderCellHtml(cell)}</td>`;
+      html += `<td class="text-center small ${bandClass(col.dateBand)}">${renderCellHtml(cell, col, row.name)}</td>`;
     });
     tr.innerHTML = html;
     tbody.appendChild(tr);
@@ -504,6 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
         classId,
         startDate,
         endDate,
+        includeAttendanceInFinal: getGmIncludeAttendance() ? 'true' : 'false',
         studentOffset: String(mergeMode === 'students' ? gmMatrixWindowState.loadedStudents : 0),
         studentLimit: String(mergeMode === 'columns'
           ? (gmMatrixWindowState.loadedStudents || GM_STUDENT_WINDOW)
@@ -560,12 +661,8 @@ document.addEventListener('DOMContentLoaded', () => {
         weightParts.push(w.finalExam != null ? `Final exam ${w.finalExam}%` : null);
       }
       document.getElementById('gm_weights').innerHTML = weightParts.filter(Boolean).join(' · ') || '—';
-      const blurbMain = document.getElementById('gm_matrixBlurbMain');
-      if (blurbMain) {
-        blurbMain.innerHTML = isRollingClass
-          ? '<strong>Final</strong> uses only <strong>attendance</strong> and <strong>assignments</strong> weights (rolling classes). Assignments = points-weighted average of <em>included</em> session items (gradebooks, quizzes, assignments). Midterm and final exam weights do not apply.'
-          : '<strong>Final</strong> blends weights using attendance % and a points-weighted average of <em>included</em> assignment-category items (gradebooks, quizzes, assignments). Session items map to the assignments bucket; midterm/final exam weights on the class apply when those components are wired into this view.';
-      }
+      const includeAttendance = getGmIncludeAttendance();
+      updateGmMatrixBlurb(isRollingClass, includeAttendance);
       document.getElementById('gm_evalCard').classList.remove('d-none');
 
       if (mergeMode === 'columns') {
@@ -578,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const col = chunk.columns?.[cellIdx];
             const td = document.createElement('td');
             td.className = `text-center small ${bandClass(col?.dateBand)}`;
-            td.innerHTML = renderCellHtml(cell);
+            td.innerHTML = renderCellHtml(cell, col, studentRow.name);
             rowEl.appendChild(td);
           });
         });
@@ -624,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
       columns.forEach((col) => {
         const th = document.createElement('th');
         th.className = `gm-col-head text-center ${bandClass(col.dateBand)}`;
-        th.innerHTML = `<div class="small text-muted">${col.kindLabel || ''}</div><div class="text-dark text-truncate" title="${col.label}">${col.label}</div>`;
+        th.innerHTML = renderGmColumnHeadHtml(col);
         trCols.appendChild(th);
       });
       thead.appendChild(trDate);
@@ -666,6 +763,46 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('gm_btnLoad')?.addEventListener('click', () => loadGradesMatrixData());
+
+  document.getElementById('gm_includeAttendance')?.addEventListener('change', () => {
+    if (!window.currentGradesMatrixData?.classId) return;
+    const isRollingClass = String(window.currentGradesMatrixData.registrationMode || '').trim().toLowerCase() === 'rolling';
+    updateGmMatrixBlurb(isRollingClass, getGmIncludeAttendance());
+    refreshGradesDisplayRollups();
+  });
+
+  let gmCommentModalInstance = null;
+  const gmCommentModalEl = document.getElementById('gmCommentModal');
+  if (gmCommentModalEl && typeof bootstrap !== 'undefined') {
+    gmCommentModalInstance = new bootstrap.Modal(gmCommentModalEl);
+  }
+
+  function gmOpenCommentModal({ studentName, activityLabel, comment }) {
+    const nameEl = document.getElementById('gmCommentModalStudentName');
+    const activityEl = document.getElementById('gmCommentModalActivityName');
+    const textEl = document.getElementById('gmCommentModalText');
+    if (nameEl) nameEl.textContent = String(studentName || '—');
+    if (activityEl) activityEl.textContent = String(activityLabel || '—');
+    if (textEl) textEl.value = String(comment || '');
+    if (gmCommentModalInstance) gmCommentModalInstance.show();
+  }
+
+  document.getElementById('gm_tbody')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('.gm-comment-btn');
+    if (!btn) return;
+    event.preventDefault();
+    let comment = '';
+    try {
+      comment = decodeURIComponent(btn.getAttribute('data-comment') || '');
+    } catch (_) {
+      comment = btn.getAttribute('data-comment') || '';
+    }
+    gmOpenCommentModal({
+      studentName: btn.getAttribute('data-student-name') || '',
+      activityLabel: btn.getAttribute('data-activity-label') || '',
+      comment
+    });
+  });
 
   // --- Grades Matrix Print ---
   function gmPrintEscapeHtml(value) {
@@ -783,6 +920,11 @@ document.addEventListener('DOMContentLoaded', () => {
       weightParts.push(weights.finalExam != null ? `Final exam ${weights.finalExam}%` : null);
     }
     const weightsLabel = weightParts.filter(Boolean).join(' · ') || '—';
+    const includeAttendanceInFinal = meta.includeAttendanceInFinal === true
+      || matrixData.includeAttendanceInFinal === true;
+    const finalNote = includeAttendanceInFinal
+      ? 'Final % includes attendance per class evaluation weights.'
+      : 'Final % uses assignments only; attendance shown separately and not included in Final.';
     const fallbackSettings = {
       includeOrg: true,
       orgName,
@@ -833,7 +975,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const kind = String(col.kindLabel || '').trim();
       const label = gmPrintTruncate(col.label, 28);
       const excl = col.includeInGradeCalculation === false ? ' <span class="excl-tag">excl.</span>' : '';
-      return `<th class="act-col"><div class="act-kind">${gmPrintEscapeHtml(kind)}</div><div class="act-label">${gmPrintEscapeHtml(label)}${excl}</div></th>`;
+      const weightInfo = formatGmColumnWeightLabel(col);
+      const weightHtml = weightInfo
+        ? `<div class="act-weight">${gmPrintEscapeHtml(weightInfo.text)}</div>`
+        : '';
+      return `<th class="act-col"><div class="act-kind">${gmPrintEscapeHtml(kind)}</div><div class="act-label">${gmPrintEscapeHtml(label)}${excl}</div>${weightHtml}</th>`;
     }).join('');
 
     const bodyRows = students.map((row, index) => {
@@ -959,6 +1105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .act-col { min-width: 56px; max-width: 90px; }
     .act-kind { font-size: 8px; color: #666; font-weight: 500; }
     .act-label { font-size: 9px; }
+    .act-weight { font-size: 8px; color: #64748b; }
     .excl-tag { font-size: 7.5px; color: #6c757d; font-weight: 600; }
     .gm-print-cell {
       text-align: center;
@@ -1029,7 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span><strong>Printed:</strong> ${gmPrintEscapeHtml(printedAtLabel)}</span>
         ${settings.requestedByLabel ? `<span><strong>Requested by:</strong> ${gmPrintEscapeHtml(settings.requestedByLabel)}</span>` : ''}
       </div>
-      <div class="eval-line"><strong>Passing:</strong> ${gmPrintEscapeHtml(passing)} · <strong>Weights:</strong> ${gmPrintEscapeHtml(weightsLabel)}</div>
+      <div class="eval-line"><strong>Passing:</strong> ${gmPrintEscapeHtml(passing)} · <strong>Weights:</strong> ${gmPrintEscapeHtml(weightsLabel)} · ${gmPrintEscapeHtml(finalNote)}</div>
         </header>
       </div>
       ${logoHtml}
@@ -1104,6 +1251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startDate,
         endDate,
         className: window.currentGradesMatrixData.className,
+        includeAttendanceInFinal: getGmIncludeAttendance(),
         printedAt: new Date(),
         printSettings: settings
       });

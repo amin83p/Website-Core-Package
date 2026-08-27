@@ -71,10 +71,11 @@ function assignmentsCategoryAveragePercents(cells, columns) {
   return null;
 }
 
-function computeFinalPercent(evaluation, attendancePct, assignmentsPct, midtermPct, finalExamPct) {
+function computeFinalPercent(evaluation, attendancePct, assignmentsPct, midtermPct, finalExamPct, options = {}) {
   const w = evaluation?.weights || {};
+  const includeAttendance = Boolean(options.includeAttendanceInFinal);
   const parts = [];
-  if (Number(w.attendance) > 0 && attendancePct != null && !Number.isNaN(Number(attendancePct))) {
+  if (includeAttendance && Number(w.attendance) > 0 && attendancePct != null && !Number.isNaN(Number(attendancePct))) {
     parts.push({ key: 'attendance', weight: Number(w.attendance), pct: Number(attendancePct) });
   }
   if (Number(w.assignments) > 0 && assignmentsPct != null && !Number.isNaN(Number(assignmentsPct))) {
@@ -134,14 +135,16 @@ function summarizeAttendanceRollupsForStudents(students = [], context = {}) {
 }
 
 function recomputeGradesMatrixRollups(payload = {}, context = {}) {
-  const { classData, orgPolicyCatalog, evaluation } = context;
+  const { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal = false } = context;
   const columns = Array.isArray(payload?.columns) ? payload.columns : [];
   const sessionIdSet = new Set(
     columns.map((col) => String(col?.sessionId || '').trim()).filter(Boolean)
   );
   const matrix = Array.isArray(payload?.matrix) ? payload.matrix : [];
+  const finalOptions = { includeAttendanceInFinal };
   return {
     ...payload,
+    includeAttendanceInFinal,
     matrix: matrix.map((row) => {
       const attendanceRecords = Array.isArray(row?._attendanceRecords)
         ? row._attendanceRecords.filter((rec) => sessionIdSet.has(String(rec?.sessionId || '').trim()))
@@ -158,7 +161,8 @@ function recomputeGradesMatrixRollups(payload = {}, context = {}) {
         attendancePct,
         assignmentsPct,
         null,
-        null
+        null,
+        finalOptions
       );
       const { _attendanceRecords, ...rest } = row;
       return {
@@ -175,11 +179,12 @@ function recomputeGradesMatrixRollups(payload = {}, context = {}) {
 }
 
 function summarizeGradesRollupsForRows(rows = [], columns = [], context = {}) {
-  const { classData, orgPolicyCatalog, evaluation } = context;
+  const { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal = false } = context;
   const rollups = {};
   const sessionIdSet = new Set(
     (Array.isArray(columns) ? columns : []).map((col) => String(col?.sessionId || '').trim()).filter(Boolean)
   );
+  const finalOptions = { includeAttendanceInFinal };
   (Array.isArray(rows) ? rows : []).forEach((row) => {
     const personId = String(row?.personId || '').trim();
     if (!personId) return;
@@ -199,7 +204,8 @@ function summarizeGradesRollupsForRows(rows = [], columns = [], context = {}) {
       attendancePct,
       assignmentsPct,
       null,
-      null
+      null,
+      finalOptions
     );
     rollups[personId] = {
       attendancePct,
@@ -214,6 +220,7 @@ function summarizeGradesRollupsForRows(rows = [], columns = [], context = {}) {
 
 module.exports = {
   assignmentsCategoryAveragePercents,
+  computeFinalPercent,
   rollupRecordsForStudentRow,
   recomputeAttendanceMatrixRollups,
   summarizeAttendanceRollupsForStudents,

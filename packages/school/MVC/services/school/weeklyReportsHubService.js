@@ -601,7 +601,8 @@ async function buildWeeklyReportsStudentBoard({
             classId,
             startDate: normalizedStartDate,
             endDate: normalizedEndDate
-          }
+          },
+          { includeAttendanceInFinal: true }
         ),
         schoolDataService.getClassSessions(classId, reqUser),
         schoolDataService.fetchAllData('sessionStudentCases', {}, reqUser)

@@ -2333,7 +2333,8 @@ function resetGradebooksForMakeup(gradebooks = []) {
             weight: gradebookWeightService.resolveActivityWeight(row),
             activityContent: String(row?.activityContent || ''),
             includeInGradeCalculation: Boolean(row?.includeInGradeCalculation),
-            scores: {}
+            scores: {},
+            scoreComments: {}
         };
     });
 }
@@ -5837,7 +5838,7 @@ async function showFinalGradesPage(req, res) {
         if (getClassRegistrationModeKey(classData) === 'rolling') {
             return res.redirect(`/school/classes/${encodeURIComponent(classId)}/enrollment-outcomes`);
         }
-        const matrixPayload = await gradesMatrixController.buildGradesMatrixPayload(req, { classId, startDate: '', endDate: '' });
+        const matrixPayload = await gradesMatrixController.buildGradesMatrixPayload(req, { classId, startDate: '', endDate: '' }, { includeAttendanceInFinal: true });
         const rawOfficial = classData.officialFinalGrades && typeof classData.officialFinalGrades === 'object' ? classData.officialFinalGrades : {};
         const official = finalGradesWorkflowService.normalizeOfficialFinalGradesMap(rawOfficial);
         const finalGradesCapabilities = await buildFinalGradeWorkflowCapabilities(req, classData);

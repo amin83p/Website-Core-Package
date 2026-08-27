@@ -192,7 +192,8 @@ async function buildClassEnrollmentDetail({
 
   const matrixPayload = await buildGradesMatrixPayload(
     { user: reqUser },
-    { classId, startDate, endDate }
+    { classId, startDate, endDate },
+    { includeAttendanceInFinal: true }
   );
   const matrixRow = (Array.isArray(matrixPayload?.matrix) ? matrixPayload.matrix : [])
     .find((row) => idsEqual(row?.personId, personId)) || null;

@@ -119,3 +119,82 @@ test('normalizeSessionGradebooksFromRequest keeps explicit weight distinct from 
   assert.equal(explicit[0].weight, 25);
   assert.notEqual(explicit[0].weight, explicit[0].totalScore);
 });
+
+test('normalizeSessionGradebooksFromRequest persists trimmed scoreComments', () => {
+  const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
+    {
+      id: 'gb1',
+      name: 'Quiz',
+      weight: 10,
+      totalScore: 10,
+      includeInGradeCalculation: true,
+      scores: { p1: 8, p2: 7 },
+      scoreComments: {
+        p1: '  Great work  ',
+        p2: 'Needs review'
+      }
+    }
+  ], {
+    personIds: ['p1', 'p2'],
+    attendanceByPerson: new Map([['p1', 'present'], ['p2', 'present']]),
+    existingGradebookById: new Map(),
+    sessionSkillPolicy: { selectableIds: [], catalog: [] },
+    mergeHistoricalGradebookSkills: (_incoming, _existing, _ids) => []
+  });
+
+  assert.equal(normalized[0].scoreComments.p1, 'Great work');
+  assert.equal(normalized[0].scoreComments.p2, 'Needs review');
+});
+
+test('normalizeSessionGradebooksFromRequest clears scoreComments for absent students', () => {
+  const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
+    {
+      id: 'gb1',
+      name: 'Quiz',
+      weight: 10,
+      totalScore: 10,
+      includeInGradeCalculation: true,
+      scores: { p1: null, p2: 9 },
+      scoreComments: { p1: 'Should be removed', p2: 'Keep me' }
+    }
+  ], {
+    personIds: ['p1', 'p2'],
+    attendanceByPerson: new Map([['p1', 'absent'], ['p2', 'present']]),
+    existingGradebookById: new Map(),
+    sessionSkillPolicy: { selectableIds: [], catalog: [] },
+    mergeHistoricalGradebookSkills: (_incoming, _existing, _ids) => []
+  });
+
+  assert.equal(normalized[0].scoreComments.p1, undefined);
+  assert.equal(normalized[0].scoreComments.p2, 'Keep me');
+});
+
+test('normalizeSessionGradebooksFromRequest truncates scoreComments to 2000 chars', () => {
+  const longComment = 'x'.repeat(2500);
+  const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
+    {
+      id: 'gb1',
+      name: 'Quiz',
+      weight: 10,
+      totalScore: 10,
+      includeInGradeCalculation: true,
+      scores: { p1: 5 },
+      scoreComments: { p1: longComment }
+    }
+  ], {
+    personIds: ['p1'],
+    attendanceByPerson: new Map([['p1', 'present']]),
+    existingGradebookById: new Map(),
+    sessionSkillPolicy: { selectableIds: [], catalog: [] },
+    mergeHistoricalGradebookSkills: (_incoming, _existing, _ids) => []
+  });
+
+  assert.equal(normalized[0].scoreComments.p1.length, 2000);
+});
+
+test('sessionManager gradebook supports per-student activity comments', () => {
+  assert.match(sessionManagerSource, /gradebookCommentModal/);
+  assert.match(sessionManagerSource, /scoreComments/);
+  assert.match(sessionManagerSource, /gbOpenCommentModal/);
+  assert.match(sessionManagerSource, /gbCommentModalText/);
+});

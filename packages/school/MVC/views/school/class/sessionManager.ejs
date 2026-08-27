@@ -1157,6 +1157,16 @@
         background: #f1f5f9;
         cursor: not-allowed;
     }
+    .session-gradebook-card .gb-comment-btn {
+        min-width: 2.25rem;
+        padding-left: 0.45rem;
+        padding-right: 0.45rem;
+    }
+    .session-gradebook-card .gb-comment-btn.has-comment {
+        border-color: #0d6efd;
+        color: #0d6efd;
+        background: #eef5ff;
+    }
     .session-gradebook-card .gb-collapse-toggle {
         flex-shrink: 0;
         line-height: 1;
@@ -2878,6 +2888,38 @@
             <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary fw-bold" id="gbModalSaveBtn">Save activity</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="gradebookCommentModal" tabindex="-1" aria-labelledby="gradebookCommentModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="gradebookCommentModalTitle"><i class="bi bi-chat-left-text me-2"></i>Activity comment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="gbCommentModalGbId" value="">
+                <input type="hidden" id="gbCommentModalPersonId" value="">
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">Student</div>
+                    <div class="fw-semibold" id="gbCommentModalStudentName">—</div>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">Activity</div>
+                    <div class="fw-semibold text-primary" id="gbCommentModalActivityName">—</div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-bold" for="gbCommentModalText">Comment</label>
+                    <textarea class="form-control" id="gbCommentModalText" rows="5" maxlength="2000" placeholder="Optional comment for this student on this activity…"></textarea>
+                    <div class="form-text">Visible on this session gradebook only.</div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-bold" id="gbCommentModalSaveBtn">Save comment</button>
             </div>
         </div>
     </div>
@@ -9090,6 +9132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalScore = Number(gb.totalScore);
             const weight = gbExplicitWeight(gb);
             const scores = {};
+            const scoreComments = {};
             gradebookRoster.forEach(({ personId }) => {
                 const pid = String(personId);
                 let v = gb.scores && (Object.prototype.hasOwnProperty.call(gb.scores, pid) ? gb.scores[pid] : gb.scores[personId]);
@@ -9105,6 +9148,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (v === '' || v === undefined) v = null;
                     if (v !== null && v !== undefined) v = Number(v);
                     scores[pid] = (v === null || Number.isNaN(v)) ? null : v;
+                });
+            }
+            gradebookRoster.forEach(({ personId }) => {
+                const pid = String(personId);
+                let comment = gb.scoreComments && (Object.prototype.hasOwnProperty.call(gb.scoreComments, pid)
+                    ? gb.scoreComments[pid]
+                    : gb.scoreComments[personId]);
+                comment = String(comment || '').trim().slice(0, 2000);
+                if (comment) scoreComments[pid] = comment;
+            });
+            if (gb.scoreComments && typeof gb.scoreComments === 'object') {
+                Object.keys(gb.scoreComments).forEach((k) => {
+                    const pid = String(k);
+                    if (Object.prototype.hasOwnProperty.call(scoreComments, pid)) return;
+                    const comment = String(gb.scoreComments[k] || '').trim().slice(0, 2000);
+                    if (comment) scoreComments[pid] = comment;
                 });
             }
             const skills = gbNormalizeSkillIds(gb.skills || gbMatchSkillIdsFromLegacyText(gb.skillFocus));
@@ -9128,6 +9187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 activityContent: String(gb.activityContent || ''),
                 includeInGradeCalculation: gb.includeInGradeCalculation !== false,
                 scores,
+                scoreComments,
                 attachments
             };
         });
@@ -9234,6 +9294,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pid = String(personId);
                 if (gbIsPersonAbsent(pid)) {
                     gb.scores[pid] = null;
+                    if (gb.scoreComments && typeof gb.scoreComments === 'object') delete gb.scoreComments[pid];
                     return;
                 }
                 const inp = document.querySelector(`input.gb-score-input[data-gb-id="${gbCssEscape(gb.id)}"][data-person-id="${gbCssEscape(pid)}"]`);
@@ -9259,6 +9320,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 markSessionAutosaveGradebookDirty();
             });
         });
+    }
+
+    function gbRenderCommentButton(gb, personId, studentName) {
+        const pid = String(personId);
+        const comment = String((gb.scoreComments && gb.scoreComments[pid]) || '').trim();
+        const hasComment = comment.length > 0;
+        const btnClass = `btn btn-sm gb-comment-btn ${hasComment ? 'btn-outline-primary has-comment' : 'btn-outline-secondary'}`;
+        const title = hasComment ? 'View or edit comment' : 'Add comment';
+        return `<button type="button" class="${btnClass}" data-gb-id="${gbEscapeHtml(gb.id)}" data-person-id="${gbEscapeHtml(pid)}" data-student-name="${gbEscapeHtml(studentName)}" title="${gbEscapeHtml(title)}" aria-label="${gbEscapeHtml(title)}"><i class="bi bi-chat-left-text" aria-hidden="true"></i></button>`;
     }
 
     function gbRenderList() {
@@ -9310,6 +9380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td class="text-muted"><span class="badge bg-light text-muted border">${gbEscapeHtml(blockedLabel)}</span></td>
                         <td class="text-muted">N/A</td>
                         <td class="text-muted">N/A</td>
+                        <td class="text-muted">—</td>
                     </tr>`;
                     }
                     const val = sc !== null && sc !== undefined && !Number.isNaN(Number(sc)) ? String(sc) : '';
@@ -9321,9 +9392,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                     <td class="gb-pct small text-nowrap">${gbFormatPct(sc, total)}</td>
                     <td class="gb-wt-pct small text-nowrap">${gbFormatWeightContribution(sc, total, explicitWeight)}</td>
+                    <td class="text-center">${gbRenderCommentButton(gb, pid, name)}</td>
                 </tr>`;
                 }).join('')
-                : `<tr><td colspan="4" class="text-muted small ps-3 py-2">No students on the attendance roster yet. Add enrollments to enter scores; saved activities and settings are shown below.</td></tr>`;
+                : `<tr><td colspan="5" class="text-muted small ps-3 py-2">No students on the attendance roster yet. Add enrollments to enter scores; saved activities and settings are shown below.</td></tr>`;
 
             parts.push(`
                 <div class="card border shadow-sm session-gradebook-card mb-3" data-gb-id="${gbEscapeHtml(gb.id)}">
@@ -9344,7 +9416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${gb.activityContent ? `<div class="gb-activity-body mb-3">${gbEscapeHtml(gb.activityContent)}</div>` : '<p class="small text-muted mb-3 fst-italic">No activity description.</p>'}
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered align-middle mb-0">
-                                <thead class="table-light"><tr><th class="ps-3">Student</th><th style="min-width:120px;">${gbEscapeHtml(gradeHeader)}</th><th style="min-width:72px;" title="Score as percent of this activity's total points">%</th><th style="min-width:96px;" title="Earned weight / defined weight (% of final grade)">Weight</th></tr></thead>
+                                <thead class="table-light"><tr><th class="ps-3">Student</th><th style="min-width:120px;">${gbEscapeHtml(gradeHeader)}</th><th style="min-width:72px;" title="Score as percent of this activity's total points">%</th><th style="min-width:96px;" title="Earned weight / defined weight (% of final grade)">Weight</th><th style="min-width:72px;">Comment</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                         </div>
@@ -9397,6 +9469,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         host.querySelectorAll('.gb-del').forEach((btn) => {
             btn.addEventListener('click', () => gbDeleteActivity(btn.getAttribute('data-gb-id')));
+        });
+        host.querySelectorAll('.gb-comment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                gbOpenCommentModal(
+                    btn.getAttribute('data-gb-id'),
+                    btn.getAttribute('data-person-id'),
+                    btn.getAttribute('data-student-name') || ''
+                );
+            });
         });
     }
 
@@ -9451,6 +9532,51 @@ document.addEventListener('DOMContentLoaded', () => {
     if (gbModalEl && typeof bootstrap !== 'undefined') {
         gradebookModalInstance = new bootstrap.Modal(gbModalEl);
     }
+
+    let gradebookCommentModalInstance = null;
+    const gbCommentModalEl = document.getElementById('gradebookCommentModal');
+    if (gbCommentModalEl && typeof bootstrap !== 'undefined') {
+        gradebookCommentModalInstance = new bootstrap.Modal(gbCommentModalEl);
+    }
+
+    function gbOpenCommentModal(gbId, personId, studentName) {
+        const gb = gradebooksState.find((g) => String(g.id) === String(gbId));
+        if (!gb) return;
+        const pid = String(personId || '');
+        if (!pid) return;
+        if (!gb.scoreComments || typeof gb.scoreComments !== 'object') gb.scoreComments = {};
+        document.getElementById('gbCommentModalGbId').value = String(gb.id);
+        document.getElementById('gbCommentModalPersonId').value = pid;
+        document.getElementById('gbCommentModalStudentName').textContent = String(studentName || pid).trim() || 'Student';
+        document.getElementById('gbCommentModalActivityName').textContent = String(gb.name || 'Untitled').trim();
+        document.getElementById('gbCommentModalText').value = String(gb.scoreComments[pid] || '');
+        const textEl = document.getElementById('gbCommentModalText');
+        const saveBtn = document.getElementById('gbCommentModalSaveBtn');
+        const readOnly = gbReadOnly === true;
+        if (textEl) {
+            textEl.disabled = readOnly;
+            textEl.readOnly = readOnly;
+        }
+        if (saveBtn) saveBtn.classList.toggle('d-none', readOnly);
+        if (gradebookCommentModalInstance) gradebookCommentModalInstance.show();
+    }
+
+    function gbApplyCommentModalSave() {
+        if (gbReadOnly) return;
+        const gbId = String(document.getElementById('gbCommentModalGbId')?.value || '').trim();
+        const personId = String(document.getElementById('gbCommentModalPersonId')?.value || '').trim();
+        const gb = gradebooksState.find((g) => String(g.id) === String(gbId));
+        if (!gb || !personId) return;
+        if (!gb.scoreComments || typeof gb.scoreComments !== 'object') gb.scoreComments = {};
+        const comment = String(document.getElementById('gbCommentModalText')?.value || '').trim().slice(0, 2000);
+        if (comment) gb.scoreComments[personId] = comment;
+        else delete gb.scoreComments[personId];
+        if (gradebookCommentModalInstance) gradebookCommentModalInstance.hide();
+        gbRenderList();
+        markSessionAutosaveGradebookDirty();
+    }
+
+    document.getElementById('gbCommentModalSaveBtn')?.addEventListener('click', gbApplyCommentModalSave);
 
     function gbOpenModal(editId) {
         const isEdit = !!editId;
@@ -9560,6 +9686,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             const scores = {};
+            const scoreComments = {};
             gradebookRoster.forEach(({ personId }) => {
                 scores[String(personId)] = null;
             });
@@ -9573,6 +9700,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 activityContent,
                 includeInGradeCalculation,
                 scores,
+                scoreComments,
                 attachments: gbModalAttachmentsState.map((row) => ({ ...row }))
             });
         }
