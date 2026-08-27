@@ -35,6 +35,27 @@
       font-size: 1.05rem;
       line-height: 1;
     }
+    .attendance-history-toggle-btn.active {
+      color: #0d6efd;
+      border-color: #0d6efd;
+      background-color: rgba(13, 110, 253, 0.08);
+    }
+    .attendance-cell-history-btn {
+      z-index: 2;
+      color: #6c757d;
+      line-height: 1;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+    }
+    #resultsContainer.attendance-history-mode-on .attendance-cell-history-btn {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .attendance-cell-history-btn:hover,
+    .attendance-cell-history-btn:focus {
+      color: #0d6efd;
+    }
     .attendance-legend-modal-body .attendance-legend-items {
       display: flex;
       flex-direction: column;
@@ -273,14 +294,24 @@
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h5 class="m-0 fw-bold text-primary" id="lbl_displayClassName">Class Name</h5>
-            <button type="button"
-                class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
-                id="btn_attendanceMatrixLegend"
-                data-attendance-open-legend
-                aria-label="Legend"
-                title="Legend">
-                <i class="bi bi-info-circle" aria-hidden="true"></i>
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button"
+                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn attendance-history-toggle-btn"
+                    id="btn_attendanceMatrixHistory"
+                    aria-label="Toggle change history"
+                    title="Toggle change history"
+                    aria-pressed="false">
+                    <i class="bi bi-clock-history" aria-hidden="true"></i>
+                </button>
+                <button type="button"
+                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                    id="btn_attendanceMatrixLegend"
+                    data-attendance-open-legend
+                    aria-label="Legend"
+                    title="Legend">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                </button>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="matrix-wrapper">
@@ -302,6 +333,38 @@
             </div>
             <div class="modal-body">
                 <div id="attendanceMatrixLegendModalBody" class="attendance-legend-modal-body"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="attendanceCellHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2 px-3">
+                <h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-clock-history me-1"></i>Attendance Change History</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="attendanceCellHistoryMeta" class="small text-muted mb-2"></div>
+                <div id="attendanceCellHistoryLoading" class="text-center py-3 d-none">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span class="ms-2">Loading history...</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0" id="attendanceCellHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>When</th>
+                                <th>Who</th>
+                                <th>From</th>
+                                <th>To</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceCellHistoryBody"></tbody>
+                    </table>
+                </div>
+                <div id="attendanceCellHistoryEmpty" class="text-muted small py-2 d-none">No status changes recorded for this cell.</div>
             </div>
         </div>
     </div>
@@ -430,6 +493,8 @@
 <script>
 // Store the loaded matrix globally so we can access it on clicks
 window.currentMatrixData = null;
+window.attendanceHistoryModeOn = false;
+const attendanceChangeLogCache = new Map();
 window.attendanceVisiblePersonIds = null;
 let currentMentions = [];
 let detailsModalInstance = null;
@@ -1304,7 +1369,177 @@ document.addEventListener('DOMContentLoaded', () => {
         const noteBadge = hasComments
             ? `<div class="position-absolute top-0 end-0 pe-1 pt-1">${buildIcon('notes', '') || '<i class="bi bi-chat-dots-fill status-notes" style="font-size: 0.65rem;"></i>'}</div>`
             : '';
-        return `<td class="att-cell" title="${tooltip} (Click for Details)" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">${icon}${noteBadge}</td>`;
+        const classId = String(window.currentMatrixData?.classId || document.getElementById('filter_classId')?.value || '').trim();
+        const historyBtn = window.attendanceHistoryModeOn
+            ? `<button type="button" class="btn btn-link btn-sm p-0 position-absolute top-0 start-0 ps-1 pt-1 attendance-cell-history-btn" title="View change history" aria-label="View change history" data-class-id="${attEscapeHtml(classId)}" data-session-id="${attEscapeHtml(rec.sessionId)}" data-person-id="${attEscapeHtml(stu.personId)}" onclick="event.stopPropagation(); openAttendanceCellHistory(this);"><i class="bi bi-info-circle" style="font-size:0.65rem;"></i></button>`
+            : '';
+        return `<td class="att-cell" title="${tooltip} (Click for Details)" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">${historyBtn}${icon}${noteBadge}</td>`;
+    }
+
+    function buildAttendanceChangeLogCellKey(sessionId, personId) {
+        return `${String(sessionId || '').trim()}::${String(personId || '').trim()}`;
+    }
+
+    function formatAttendanceHistoryWhen(isoValue) {
+        const raw = String(isoValue || '').trim();
+        if (!raw) return '—';
+        const date = new Date(raw);
+        if (Number.isNaN(date.getTime())) return raw;
+        return date.toLocaleString();
+    }
+
+    function renderAttendanceCellHistoryTable(entries) {
+        const tbody = document.getElementById('attendanceCellHistoryBody');
+        const emptyEl = document.getElementById('attendanceCellHistoryEmpty');
+        const tableEl = document.getElementById('attendanceCellHistoryTable');
+        if (!tbody || !emptyEl || !tableEl) return;
+        const rows = Array.isArray(entries) ? entries : [];
+        if (!rows.length) {
+            tbody.innerHTML = '';
+            tableEl.classList.add('d-none');
+            emptyEl.classList.remove('d-none');
+            return;
+        }
+        tableEl.classList.remove('d-none');
+        emptyEl.classList.add('d-none');
+        tbody.innerHTML = rows.map((entry) => `
+            <tr>
+                <td>${attEscapeHtml(formatAttendanceHistoryWhen(entry.changedAt))}</td>
+                <td>${attEscapeHtml(entry?.changedBy?.displayName || entry?.changedBy?.username || entry?.changedBy?.userId || '—')}</td>
+                <td>${attEscapeHtml(entry?.fromLabel || entry?.fromStatus || 'Unmarked')}</td>
+                <td>${attEscapeHtml(entry?.toLabel || entry?.toStatus || 'Unmarked')}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function fetchAttendanceChangeLogForCell({ classId, sessionId, personId, useCache = true }) {
+        const cacheKey = buildAttendanceChangeLogCellKey(sessionId, personId);
+        if (useCache && attendanceChangeLogCache.has(cacheKey)) {
+            return attendanceChangeLogCache.get(cacheKey);
+        }
+        const params = new URLSearchParams({
+            classId: String(classId || '').trim(),
+            sessionId: String(sessionId || '').trim(),
+            studentPersonId: String(personId || '').trim()
+        });
+        const res = await fetch(`/school/attendances/api/change-log?${params.toString()}`, {
+            headers: { 'X-AJAX-Request': 'true' }
+        });
+        const result = await res.json();
+        if (result.status !== 'success') throw new Error(result.message || 'Unable to load change history.');
+        const entries = Array.isArray(result.entries) ? result.entries : [];
+        attendanceChangeLogCache.set(cacheKey, entries);
+        return entries;
+    }
+
+    async function openAttendanceCellHistory(buttonEl) {
+        const classId = String(buttonEl?.dataset?.classId || '').trim();
+        const sessionId = String(buttonEl?.dataset?.sessionId || '').trim();
+        const personId = String(buttonEl?.dataset?.personId || '').trim();
+        if (!classId || !sessionId || !personId) return;
+
+        const metaEl = document.getElementById('attendanceCellHistoryMeta');
+        const loadingEl = document.getElementById('attendanceCellHistoryLoading');
+        const modalEl = document.getElementById('attendanceCellHistoryModal');
+        if (!modalEl) return;
+
+        if (metaEl) {
+            metaEl.textContent = `Session ${sessionId} · Student ${personId}`;
+        }
+        renderAttendanceCellHistoryTable([]);
+        if (loadingEl) loadingEl.classList.remove('d-none');
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+        try {
+            const entries = await fetchAttendanceChangeLogForCell({ classId, sessionId, personId });
+            renderAttendanceCellHistoryTable(entries);
+        } catch (error) {
+            renderAttendanceCellHistoryTable([]);
+            if (metaEl) metaEl.textContent = error.message || 'Unable to load change history.';
+        } finally {
+            if (loadingEl) loadingEl.classList.add('d-none');
+        }
+    }
+    window.openAttendanceCellHistory = openAttendanceCellHistory;
+
+    function collectVisibleAttendanceChangeLogCells() {
+        const data = window.currentMatrixData;
+        if (!data?.classId || !Array.isArray(data.matrix)) return [];
+        const cells = [];
+        data.matrix.forEach((stu) => {
+            const personId = String(stu?.personId || '').trim();
+            if (!personId) return;
+            (stu.records || []).forEach((rec) => {
+                const sessionId = String(rec?.sessionId || '').trim();
+                if (!sessionId) return;
+                cells.push({ sessionId, studentPersonId: personId });
+            });
+        });
+        return cells;
+    }
+
+    async function prefetchAttendanceChangeLogsForVisibleCells() {
+        const data = window.currentMatrixData;
+        if (!data?.classId) return;
+        const cells = collectVisibleAttendanceChangeLogCells();
+        if (!cells.length) return;
+        const startDate = String(document.getElementById('filter_startDate')?.value || data.startDate || '').trim();
+        const endDate = String(document.getElementById('filter_endDate')?.value || data.endDate || '').trim();
+        try {
+            const res = await fetch('/school/attendances/api/change-log/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify({
+                    classId: data.classId,
+                    startDate,
+                    endDate,
+                    cells
+                })
+            });
+            const result = await res.json();
+            if (result.status !== 'success') return;
+            const entriesByCell = result.entriesByCell || {};
+            Object.entries(entriesByCell).forEach(([key, entries]) => {
+                attendanceChangeLogCache.set(key, Array.isArray(entries) ? entries : []);
+            });
+        } catch (_) {}
+    }
+
+    function rerenderAttendanceMatrixCellsForHistoryMode() {
+        const data = window.currentMatrixData;
+        if (!data?.matrix) return;
+        data.matrix.forEach((stu) => {
+            const personId = String(stu?.personId || '').trim();
+            if (!personId) return;
+            const rowEl = document.querySelector(`tr.matrix-student-row[data-person-id="${CSS.escape(personId)}"]`);
+            if (!rowEl) return;
+            const cells = rowEl.querySelectorAll('td.att-cell');
+            (stu.records || []).forEach((rec, index) => {
+                const targetCell = cells[index];
+                if (!targetCell) return;
+                const template = document.createElement('template');
+                template.innerHTML = buildAttendanceRecordCell(stu, rec).trim();
+                const replacement = template.content.firstElementChild;
+                if (replacement) targetCell.replaceWith(replacement);
+            });
+        });
+    }
+
+    function setAttendanceHistoryMode(enabled) {
+        window.attendanceHistoryModeOn = Boolean(enabled);
+        const resultsContainer = document.getElementById('resultsContainer');
+        const toggleBtn = document.getElementById('btn_attendanceMatrixHistory');
+        if (resultsContainer) {
+            resultsContainer.classList.toggle('attendance-history-mode-on', window.attendanceHistoryModeOn);
+        }
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('active', window.attendanceHistoryModeOn);
+            toggleBtn.setAttribute('aria-pressed', window.attendanceHistoryModeOn ? 'true' : 'false');
+        }
+        rerenderAttendanceMatrixCellsForHistoryMode();
+        if (window.attendanceHistoryModeOn) {
+            prefetchAttendanceChangeLogsForVisibleCells();
+        }
     }
 
     function buildAttendanceStudentRowHtml(stu) {
@@ -1480,6 +1715,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.currentMatrixData = result;
             if (!mergeMode) {
                 resetAttendanceStudentVisibility(result.matrix);
+                attendanceChangeLogCache.clear();
             }
             document.getElementById('resultsContainer').classList.remove('d-none');
             renderAttendanceMatrixLegend();
@@ -1505,6 +1741,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
                 await refreshAttendanceDisplayRollups();
+                if (window.attendanceHistoryModeOn) await prefetchAttendanceChangeLogsForVisibleCells();
                 return;
             }
 
@@ -1515,6 +1752,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
                 await refreshAttendanceDisplayRollups();
+                if (window.attendanceHistoryModeOn) await prefetchAttendanceChangeLogsForVisibleCells();
                 return;
             }
 
@@ -1558,6 +1796,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bindAttendanceStudentVisibilityDropdown();
             applyAttendanceStudentVisibility();
             await refreshAttendanceDisplayRollups();
+            if (window.attendanceHistoryModeOn) await prefetchAttendanceChangeLogsForVisibleCells();
 
             const currentUrlParams = new URLSearchParams(window.location.search);
             const targetStudentId = currentUrlParams.get('studentId');
@@ -1609,6 +1848,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn_loadData').addEventListener('click', () => loadAttendanceMatrixData());
+    document.getElementById('btn_attendanceMatrixHistory')?.addEventListener('click', () => {
+        setAttendanceHistoryMode(!window.attendanceHistoryModeOn);
+    });
     document.getElementById('btn_attendanceMatrixLegend')?.addEventListener('click', () => {
         openAttendanceMatrixLegendModal();
     });

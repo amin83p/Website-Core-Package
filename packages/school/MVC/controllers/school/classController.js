@@ -81,6 +81,7 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
+const attendanceChangeLogService = require('../../services/school/attendanceChangeLogService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 const gradebookWeightService = require('../../services/school/gradebookWeightService');
@@ -5036,6 +5037,51 @@ async function createMakeupSession(req, res) {
     }
 }
 
+async function listMergeEligibleTeachers(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+
+        let query = await buildDataServiceQuery(req.query);
+        const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
+        if (query.q === searchDefaultKeyword) query.q = '';
+
+        const payload = await schoolIdentityLookupService.listSchoolPersons({
+            reqUser: req.user,
+            q: query.q || '',
+            query,
+            requireSchoolRole: true,
+            allowedSchoolRoles: ['school_teacher']
+        });
+        const persons = payload.allRows || payload.rows || [];
+        const results = persons.map((person) => {
+            const personId = toPublicId(person?.personId || person?.id || '');
+            const displayName = String(person?.displayName || person?.name || personId).trim();
+            return {
+                id: personId,
+                personId,
+                name: displayName,
+                label: displayName,
+                firstName: String(person?.firstName || '').trim(),
+                lastName: String(person?.lastName || '').trim(),
+                email: String(person?.email || '').trim()
+            };
+        }).filter((row) => row.personId);
+
+        const { data, pagination } = paginate(results, query);
+        return res.json({ status: 'success', results: data, pagination });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message
+        });
+    }
+}
+
 async function previewSessionMerge(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -5376,6 +5422,7 @@ async function saveSession(req, res) {
             };
         }
         const shouldSkipInstructionalPayload = currentMakeupInactive || nextMakeupInactive;
+        let pendingAttendanceChangeLog = null;
 
         const normalizedNotes = notes !== undefined ? String(notes || '').trim() : originalSession.notes;
         const normalizedRoom = room !== undefined ? String(room || '').trim() : originalSession.room;
@@ -5541,6 +5588,12 @@ async function saveSession(req, res) {
                     )
                 };
             }).filter(Boolean);
+            pendingAttendanceChangeLog = {
+                beforeRoster: existingRoster,
+                afterRoster: originalSession.roster,
+                sessionId,
+                sessionDate: String(originalSession?.date || '').trim()
+            };
         }
 
         if (!shouldSkipInstructionalPayload && req.body?.gradebooks !== undefined) {
@@ -5613,6 +5666,25 @@ async function saveSession(req, res) {
         }
 
         await schoolDataService.saveClassSessions(classId, sessions, req.user);
+
+        if (pendingAttendanceChangeLog) {
+            const rosterChanges = attendanceChangeLogService.diffRosterAttendanceStatusChanges(
+                pendingAttendanceChangeLog.beforeRoster,
+                pendingAttendanceChangeLog.afterRoster
+            );
+            if (rosterChanges.length) {
+                await attendanceChangeLogService.appendChanges({
+                    orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+                    classId,
+                    sessionId: pendingAttendanceChangeLog.sessionId,
+                    sessionDate: pendingAttendanceChangeLog.sessionDate,
+                    source: 'session_save',
+                    changes: rosterChanges,
+                    reqUser: req.user
+                });
+            }
+        }
+
         await classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass({
             classData,
             sessions,
@@ -5925,7 +5997,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

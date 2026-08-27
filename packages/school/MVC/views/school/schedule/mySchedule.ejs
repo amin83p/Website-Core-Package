@@ -118,12 +118,48 @@
         color: #41464b;
         border-color: #c6c8ca;
     }
+
+    .schedule-loaded-at-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.34rem 0.65rem;
+        border: 1px solid #dee2e6;
+        background: #f8f9fa;
+        color: #495057;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        white-space: nowrap;
+        line-height: 1.2;
+    }
+    button.schedule-loaded-at-chip {
+        cursor: pointer;
+        transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    button.schedule-loaded-at-chip:hover,
+    button.schedule-loaded-at-chip:focus {
+        background: #e9ecef;
+        border-color: #ced4da;
+        outline: none;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+    }
+    .schedule-loaded-at-chip.is-stale {
+        border-color: #ffda6a;
+        background: #fff8e1;
+        color: #664d03;
+    }
+    button.schedule-loaded-at-chip.is-stale:hover,
+    button.schedule-loaded-at-chip.is-stale:focus {
+        background: #fff3cd;
+        border-color: #ffc107;
+    }
 </style>
 
 <div class="sections-page schedule-shell">
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
-            <h1 class="page-heading size-md m-0"><i class="bi bi-calendar2-week me-2"></i> Schedule Overview</h1>
+            <h1 class="page-heading size-md text-start m-0"><i class="bi bi-calendar2-week me-2"></i> Schedule Overview</h1>
             <div class="text-muted small mt-1">
                 View daily, weekly, monthly, seasonal, and yearly workload with sessions and assigned tasks.
             </div>
@@ -224,6 +260,7 @@
                     <span class="badge bg-primary-subtle text-primary border" id="ms_personBadge">-</span>
                     <span class="badge bg-info text-dark" id="ms_hoursBadge">0.00 Hours</span>
                     <span class="badge bg-secondary" id="ms_countBadge">0 Items</span>
+                    <button type="button" class="schedule-loaded-at-chip d-none" id="ms_loadedAtChip" title="Click to refresh schedule data" aria-label="Refresh schedule data"></button>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-3" id="ms_statusSummary"></div>
@@ -267,7 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
         isAdminViewer: <%- JSON.stringify(Boolean(isAdminViewer)) %>,
         period: 'week',
         personId: String(<%- JSON.stringify(prefillPersonId || selfPersonId || '') %> || '').trim(),
-        personName: String(<%- JSON.stringify(prefillPersonName || selfPersonName || '') %> || '').trim()
+        personName: String(<%- JSON.stringify(prefillPersonName || selfPersonName || '') %> || '').trim(),
+        lastLoadedAt: '',
+        staleAfterHidden: false
     };
 
     const formatScheduleDateKey = (dateKey, options = {}) => {
@@ -295,7 +334,8 @@ document.addEventListener('DOMContentLoaded', () => {
         countBadge: document.getElementById('ms_countBadge'),
         statusSummary: document.getElementById('ms_statusSummary'),
         resultBadge: document.getElementById('ms_resultBadge'),
-        sessionsBody: document.getElementById('ms_sessionsBody')
+        sessionsBody: document.getElementById('ms_sessionsBody'),
+        loadedAtChip: document.getElementById('ms_loadedAtChip')
     };
 
     const today = new Date();
@@ -584,6 +624,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     };
 
+    const formatScheduleInstant = (value) => {
+        if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatSchoolInstant === 'function') {
+            return window.AppOrgDateTime.formatSchoolInstant(value);
+        }
+        const dateObj = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(dateObj.getTime())) return String(value || '');
+        return dateObj.toLocaleString();
+    };
+
+    const updateLoadedAtChip = () => {
+        const chip = els.loadedAtChip;
+        if (!chip) return;
+        if (!state.lastLoadedAt) {
+            chip.classList.add('d-none');
+            chip.classList.remove('is-stale');
+            chip.textContent = '';
+            return;
+        }
+        const label = `Updated ${formatScheduleInstant(state.lastLoadedAt)}`;
+        chip.classList.remove('d-none');
+        chip.classList.toggle('is-stale', Boolean(state.staleAfterHidden));
+        chip.innerHTML = `<i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span>${escapeHtml(label)}</span>`;
+        chip.setAttribute('aria-label', `Refresh schedule data loaded at ${label}`);
+    };
+
+    const markMyScheduleDataStaleAfterReturn = () => {
+        if (!state.lastLoadedAt || state.staleAfterHidden) return;
+        state.staleAfterHidden = true;
+        updateLoadedAtChip();
+    };
+
     const applyResponse = (payload) => {
         sessionStatusMetaMap = new Map(
             (Array.isArray(payload?.statusMeta) ? payload.statusMeta : [])
@@ -657,6 +728,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             applyResponse(payload);
+            state.lastLoadedAt = new Date().toISOString();
+            state.staleAfterHidden = false;
+            updateLoadedAtChip();
         } catch (error) {
             els.sessionsBody.innerHTML = `
                 <tr>
@@ -698,6 +772,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (els.loadBtn) els.loadBtn.addEventListener('click', loadSchedule);
+    els.loadedAtChip?.addEventListener('click', () => {
+        if (!state.lastLoadedAt) return;
+        loadSchedule();
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        markMyScheduleDataStaleAfterReturn();
+    });
+    window.addEventListener('pageshow', (event) => {
+        if (!event.persisted) return;
+        markMyScheduleDataStaleAfterReturn();
+    });
     if (els.anchorDate) els.anchorDate.addEventListener('change', () => {
         if (!state.personId && state.isAdminViewer) return;
         loadSchedule();

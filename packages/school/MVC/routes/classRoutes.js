@@ -559,6 +559,15 @@ router.post('/:id/sessions/:sessionId/merge/preview',
     allowInactiveTokenFallback: true
   }),
   classCtrl.previewSessionMerge);
+router.get('/:id/sessions/:sessionId/merge/eligible-teachers',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  classCtrl.listMergeEligibleTeachers);
 router.post('/:id/sessions/:sessionId/merge',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {

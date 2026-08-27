@@ -16,8 +16,8 @@ const PARENT_SECTION = { id: '122740', name: 'SCHOOL' };
 const LEGACY_PARENT_SECTION = { id: '332224', name: 'SCHOOL_PEOPLE' };
 
 const OP_BUNDLE = Object.freeze([
-  { id: 'OP1002', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1003', sessionAttempts: 5, sessionTime: 15, active: true }
+  { id: 'OP1002', sessionAttempts: 10, sessionTime: 30, active: true },
+  { id: 'OP1003', sessionAttempts: 10, sessionTime: 30, active: true }
 ]);
 
 const SECTION_DOC = Object.freeze({

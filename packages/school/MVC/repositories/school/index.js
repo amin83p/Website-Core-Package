@@ -55,6 +55,7 @@ const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const taskModel = require('../../models/school/taskModel');
 const taskRoutingRuleModel = require('../../models/school/taskRoutingRuleModel');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
+const attendanceChangeLogModel = require('../../models/school/attendanceChangeLogModel');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const { SCOPE_MODES } = require('../../services/school/schoolDataScopeBuilder');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -1506,6 +1507,38 @@ const schoolRepositories = {
     ],
     dateFields: ['requestDate', 'startDate', 'endDate', 'completionDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
   }),
+  attendanceChangeLogs: createSchoolRepository({
+    entityName: 'attendanceChangeLogs',
+    collectionName: 'schoolAttendanceChangeLogs',
+    getAll: attendanceChangeLogModel.getAllAttendanceChangeLogs,
+    getById: attendanceChangeLogModel.getAttendanceChangeLogById,
+    create: async (data) => (Array.isArray(data)
+      ? attendanceChangeLogModel.addAttendanceChangeLogs(data)
+      : attendanceChangeLogModel.addAttendanceChangeLog(data)),
+    update: async () => {
+      throw new Error('Attendance change logs are append-only.');
+    },
+    remove: async () => {
+      throw new Error('Attendance change logs are append-only.');
+    },
+    mongoRemoveUnsupported: true,
+    mongoRemoveMessage: 'Attendance change logs are append-only.',
+    defaultSearchFields: [
+      'id',
+      'orgId',
+      'classId',
+      'sessionId',
+      'sessionDate',
+      'studentPersonId',
+      'source',
+      'fromStatus',
+      'toStatus',
+      'changedBy.userId',
+      'changedBy.username',
+      'changedBy.displayName'
+    ],
+    dateFields: ['sessionDate', 'changedAt']
+  }),
   sessionStudentCases: createSchoolRepository({
     entityName: 'sessionStudentCases',
     collectionName: 'schoolSessionStudentCases',
@@ -2793,6 +2826,7 @@ assertQueryableCrudRepository('schoolRepositories.studentProgramRegistrations', 
 assertQueryableCrudRepository('schoolRepositories.studentTermRegistrations', schoolRepositories.studentTermRegistrations);
 assertQueryableCrudRepository('schoolRepositories.classEnrollmentPeriods', schoolRepositories.classEnrollmentPeriods);
 assertQueryableCrudRepository('schoolRepositories.leaveRequests', schoolRepositories.leaveRequests);
+assertQueryableCrudRepository('schoolRepositories.attendanceChangeLogs', schoolRepositories.attendanceChangeLogs);
 assertQueryableCrudRepository('schoolRepositories.sessionStudentCases', schoolRepositories.sessionStudentCases);
 assertQueryableCrudRepository('schoolRepositories.tasks', schoolRepositories.tasks);
 assertQueryableCrudRepository('schoolRepositories.taskRoutingRules', schoolRepositories.taskRoutingRules);

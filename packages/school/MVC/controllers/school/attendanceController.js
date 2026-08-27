@@ -28,6 +28,7 @@ const matrixRollupService = require('../../services/school/matrixRollupService')
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
+const attendanceChangeLogService = require('../../services/school/attendanceChangeLogService');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { userCanMarkAttendanceExcused } = require('../../services/school/attendanceMatrixAccessService');
 
@@ -1147,6 +1148,21 @@ async function updateAttendanceRosterCell(req, res) {
         );
 
         await schoolDataService.saveClassSessions(classId, sessions, req.user, routeAccessContext);
+
+        const fromStatus = attendanceChangeLogService.normalizeLoggedStatus(previousAttendance);
+        const toStatus = attendanceChangeLogService.normalizeLoggedStatus(rosterRecord.attendance);
+        if (fromStatus !== toStatus) {
+            await attendanceChangeLogService.appendChanges({
+                orgId: classData?.orgId || req.user?.activeOrgId || '',
+                classId,
+                sessionId,
+                sessionDate: String(session?.date || '').trim(),
+                source: 'matrix_cell',
+                changes: [{ personId: studentPersonId, fromStatus, toStatus }],
+                reqUser: req.user
+            });
+        }
+
         await classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass({
             classData,
             sessions,
@@ -1332,6 +1348,55 @@ function parseIdListParam(value = '') {
         .filter(Boolean);
 }
 
+async function getAttendanceChangeLog(req, res) {
+    try {
+        const classId = String(req.query?.classId || '').trim();
+        const sessionId = String(req.query?.sessionId || '').trim();
+        const studentPersonId = String(req.query?.studentPersonId || '').trim();
+        if (!classId || !sessionId || !studentPersonId) {
+            throw new Error('classId, sessionId, and studentPersonId are required.');
+        }
+
+        const classData = await getAttendanceClassOrThrow(req, classId);
+        const markPolicy = await resolveAttendanceMarkAppearanceForRequest(req);
+        const entries = await attendanceChangeLogService.listForCell({
+            classId,
+            sessionId,
+            studentPersonId,
+            markPolicy
+        }, { scope: buildAttendanceRouteAccessContext(req) });
+
+        return res.json({ status: 'success', entries });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function queryAttendanceChangeLogs(req, res) {
+    try {
+        const classId = String(req.body?.classId || '').trim();
+        const startDate = String(req.body?.startDate || '').trim();
+        const endDate = String(req.body?.endDate || '').trim();
+        const cells = Array.isArray(req.body?.cells) ? req.body.cells : [];
+        if (!classId) throw new Error('classId is required.');
+        if (!cells.length) throw new Error('cells are required.');
+
+        await getAttendanceClassOrThrow(req, classId);
+        const markPolicy = await resolveAttendanceMarkAppearanceForRequest(req);
+        const entriesByCell = await attendanceChangeLogService.listForCells({
+            classId,
+            startDate,
+            endDate,
+            cells,
+            markPolicy
+        }, { scope: buildAttendanceRouteAccessContext(req) });
+
+        return res.json({ status: 'success', entriesByCell });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 module.exports = {
     showAttendancePage,
     showStudentAttendanceReportPage,
@@ -1346,5 +1411,7 @@ module.exports = {
     exportAttendanceExcel,
     uploadAttendanceFile,
     addAttendanceComment,
-    updateAttendanceRosterCell
+    updateAttendanceRosterCell,
+    getAttendanceChangeLog,
+    queryAttendanceChangeLogs
 };

@@ -137,13 +137,16 @@ test('session manager includes merge modal and status hook markers', () => {
   assert.match(sessionManager, /isSessionStatusMergedRequired/);
   assert.match(sessionManager, /mergedSessionModal/);
   assert.match(sessionManager, /merge\/preview/);
+  assert.match(sessionManager, /merge\/eligible-teachers/);
   assert.match(sessionManager, /openMergedSessionModal/);
 });
 
 test('class routes register merge preview and execute endpoints', () => {
   const routes = readPackage('MVC/routes/classRoutes.js');
   assert.match(routes, /merge\/preview/);
+  assert.match(routes, /merge\/eligible-teachers/);
   assert.match(routes, /previewSessionMerge/);
+  assert.match(routes, /listMergeEligibleTeachers/);
   assert.match(routes, /executeSessionMerge/);
   assert.match(routes, /merge\/unmerge/);
   assert.match(routes, /unmergeSession/);

@@ -36,8 +36,7 @@ const sectionRow = {
     'OP1005'
   ].map((id) => ({
     id,
-    sessionAttempts: 5,
-    sessionTime: 15,
+    sessionAttempts: 10, sessionTime: 30,
     active: true
   })),
   subsections: [],

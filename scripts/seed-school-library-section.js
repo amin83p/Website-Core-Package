@@ -105,8 +105,7 @@ function buildLeafSection({ id, name, homeURL, description }) {
     message: '',
     operations: OWNER_OPERATIONS.map((row) => row.operationId).map((opId) => ({
       id: opId,
-      sessionAttempts: 5,
-      sessionTime: 15,
+      sessionAttempts: 10, sessionTime: 30,
       active: true
     })),
     subsections: [],

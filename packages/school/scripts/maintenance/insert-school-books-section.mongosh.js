@@ -24,11 +24,11 @@ const booksSection = {
   inactiveMessage: '',
   message: '',
   operations: [
-    { id: 'OP1001', sessionAttempts: 5, sessionTime: 15, active: true },
-    { id: 'OP1002', sessionAttempts: 5, sessionTime: 15, active: true },
-    { id: 'OP1003', sessionAttempts: 5, sessionTime: 15, active: true },
-    { id: 'OP1004', sessionAttempts: 5, sessionTime: 15, active: true },
-    { id: 'OP1005', sessionAttempts: 5, sessionTime: 15, active: true }
+    { id: 'OP1001', sessionAttempts: 10, sessionTime: 30, active: true },
+    { id: 'OP1002', sessionAttempts: 10, sessionTime: 30, active: true },
+    { id: 'OP1003', sessionAttempts: 10, sessionTime: 30, active: true },
+    { id: 'OP1004', sessionAttempts: 10, sessionTime: 30, active: true },
+    { id: 'OP1005', sessionAttempts: 10, sessionTime: 30, active: true }
   ],
   subsections: [],
   related: [],

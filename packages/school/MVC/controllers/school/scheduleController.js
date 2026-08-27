@@ -1,4 +1,5 @@
 // MVC/controllers/school/scheduleController.js
+const crypto = require('crypto');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
@@ -15,6 +16,7 @@ const activityService = require('../../services/school/activityService');
 const teacherIdentityService = require('../../services/school/teacherIdentityService');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
+const sessionMergeService = require('../../services/school/sessionMergeService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
@@ -26,6 +28,65 @@ const PERIOD_LABELS = Object.freeze({
     season: 'Seasonal',
     year: 'Yearly'
 });
+
+function buildScheduleEventsFingerprint(events = []) {
+    const parts = (Array.isArray(events) ? events : [])
+        .map((event) => [
+            String(event?.eventType || '').trim(),
+            String(event?.sessionId || event?.id || '').trim(),
+            String(event?.date || '').trim(),
+            String(event?.start || '').trim(),
+            String(event?.end || '').trim(),
+            String(event?.status || '').trim(),
+            event?.locked === true || String(event?.locked) === 'true' ? '1' : '0'
+        ].join(':'))
+        .sort();
+    return crypto.createHash('sha256').update(parts.join('|')).digest('hex');
+}
+
+async function resolvePersonScheduleRequest(req) {
+    const { personId, startDate, endDate, role } = req.query;
+    const viewerScheduleAccess = await buildScheduleViewerAccess(req.user);
+    let effectivePersonId = normalizeId(personId);
+    let effectiveRole = normalizeScheduleRole(role);
+
+    if (!viewerScheduleAccess.canSelectAnyPerson) {
+        if (!viewerScheduleAccess.lockedPersonId) {
+            throw new Error('Your user account is not linked to a school student, staff, or teacher profile.');
+        }
+        if (effectivePersonId && !idsEqual(effectivePersonId, viewerScheduleAccess.lockedPersonId)) {
+            throw new Error('You can only view your own school schedule.');
+        }
+        effectivePersonId = viewerScheduleAccess.lockedPersonId;
+
+        const allowedRoles = (Array.isArray(viewerScheduleAccess.availableRoles) ? viewerScheduleAccess.availableRoles : [])
+            .map((item) => normalizeScheduleRole(item?.key))
+            .filter(Boolean);
+        if (!allowedRoles.length) {
+            throw new Error('Your user account is not linked to a school student, staff, or teacher profile.');
+        }
+        if (!effectiveRole && allowedRoles.length === 1) effectiveRole = allowedRoles[0];
+        if (!effectiveRole && allowedRoles.length > 1) {
+            throw new Error('Select one of your school roles to view this schedule.');
+        }
+        if (effectiveRole && allowedRoles.length && !allowedRoles.includes(effectiveRole)) {
+            throw new Error('You can only view schedule roles attached to your school profile.');
+        }
+    }
+
+    if (!effectivePersonId || !startDate || !endDate) {
+        throw new Error('Person ID, Start Date, and End Date are required.');
+    }
+
+    return {
+        effectivePersonId: String(effectivePersonId || '').trim(),
+        effectiveRole,
+        startDate: String(startDate || '').trim(),
+        endDate: String(endDate || '').trim(),
+        viewerScheduleAccess,
+        activeOrgId: getActiveScheduleOrgId(req.user)
+    };
+}
 function normalizeId(value) {
     return String(value || '').trim();
 }
@@ -1014,6 +1075,31 @@ function isAllowedSessionEmbeddedReportOverlap(leftEvent, rightEvent) {
     return true;
 }
 
+function isAllowedMergedSessionOverlap(leftEvent, rightEvent) {
+    const aType = String(leftEvent?.eventType || '').trim().toLowerCase();
+    const bType = String(rightEvent?.eventType || '').trim().toLowerCase();
+    if (aType !== 'class_session' || bType !== 'class_session') return false;
+
+    const sessionA = {
+        sessionId: leftEvent?.sessionId,
+        id: leftEvent?.sessionId,
+        merged: leftEvent?.merged,
+        mergedPartner: leftEvent?.mergedPartner
+    };
+    const sessionB = {
+        sessionId: rightEvent?.sessionId,
+        id: rightEvent?.sessionId,
+        merged: rightEvent?.merged,
+        mergedPartner: rightEvent?.mergedPartner
+    };
+    return sessionMergeService.areMergeLinkedSessions(
+        sessionA,
+        leftEvent?.classId,
+        sessionB,
+        rightEvent?.classId
+    );
+}
+
 function markOverlappingEvents(events, { samePersonOnly = false } = {}) {
     const list = Array.isArray(events) ? events : [];
     list.forEach((event) => {
@@ -1037,6 +1123,7 @@ function markOverlappingEvents(events, { samePersonOnly = false } = {}) {
             if (samePersonOnly && !idsEqual(current?.personId, next?.personId)) continue;
             if (!doesScheduleEventBlockConflicts(next)) continue;
             if (isAllowedSessionEmbeddedReportOverlap(current, next)) continue;
+            if (isAllowedMergedSessionOverlap(current, next)) continue;
 
             current.hasOverlap = true;
             next.hasOverlap = true;
@@ -1305,7 +1392,16 @@ async function getPersonById(personId, reqUser) {
     return getSchoolPersonRecordById(personId, reqUser);
 }
 
-async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqUser, activeOrgId, statusMap = null, accessContext = {} }) {
+async function buildEventsForPersonAndRange({
+    personId,
+    startDate,
+    endDate,
+    reqUser,
+    activeOrgId,
+    statusMap = null,
+    accessContext = {},
+    skipEnrichment = false
+}) {
     const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents, allEnrollmentPeriods] = await Promise.all([
         schoolDataService.getStudentIndex(),
         schoolDataService.getTeacherIndex(),
@@ -1566,7 +1662,9 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
                 soloStudentId: soloStudent?.soloStudentId || '',
                 soloStudentPersonId: soloStudent?.soloStudentPersonId || '',
                 soloStudentName: resolvedSoloStudentName,
-                singleStudentName: resolvedSoloStudentName
+                singleStudentName: resolvedSoloStudentName,
+                merged: session?.merged && typeof session.merged === 'object' ? { ...session.merged } : null,
+                mergedPartner: session?.mergedPartner && typeof session.mergedPartner === 'object' ? { ...session.mergedPartner } : null
             });
         }
     }
@@ -1608,9 +1706,13 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
     });
     events.push(...activityEvents);
 
-    events.splice(0, events.length, ...await attachCaseSummariesToSessionEvents(events, reqUser));
+    if (!skipEnrichment) {
+        events.splice(0, events.length, ...await attachCaseSummariesToSessionEvents(events, reqUser));
+    }
     sortEventsChronologically(events);
-    markOverlappingEvents(events);
+    if (!skipEnrichment) {
+        markOverlappingEvents(events);
+    }
 
     return { events, personName, personOrgRoles, allStudents, allTeachers, person };
 }
@@ -1765,46 +1867,21 @@ async function showSchedulePage(req, res) {
 
 async function getPersonSchedule(req, res) {
     try {
-        const { personId, startDate, endDate, role } = req.query;
-        const viewerScheduleAccess = await buildScheduleViewerAccess(req.user);
-        let effectivePersonId = normalizeId(personId);
-        let effectiveRole = normalizeScheduleRole(role);
+        const {
+            effectivePersonId,
+            effectiveRole,
+            startDate,
+            endDate,
+            viewerScheduleAccess,
+            activeOrgId
+        } = await resolvePersonScheduleRequest(req);
 
-        if (!viewerScheduleAccess.canSelectAnyPerson) {
-            if (!viewerScheduleAccess.lockedPersonId) {
-                throw new Error('Your user account is not linked to a school student, staff, or teacher profile.');
-            }
-            if (effectivePersonId && !idsEqual(effectivePersonId, viewerScheduleAccess.lockedPersonId)) {
-                throw new Error('You can only view your own school schedule.');
-            }
-            effectivePersonId = viewerScheduleAccess.lockedPersonId;
-
-            const allowedRoles = (Array.isArray(viewerScheduleAccess.availableRoles) ? viewerScheduleAccess.availableRoles : [])
-                .map((item) => normalizeScheduleRole(item?.key))
-                .filter(Boolean);
-            if (!allowedRoles.length) {
-                throw new Error('Your user account is not linked to a school student, staff, or teacher profile.');
-            }
-            if (!effectiveRole && allowedRoles.length === 1) effectiveRole = allowedRoles[0];
-            if (!effectiveRole && allowedRoles.length > 1) {
-                throw new Error('Select one of your school roles to view this schedule.');
-            }
-            if (effectiveRole && allowedRoles.length && !allowedRoles.includes(effectiveRole)) {
-                throw new Error('You can only view schedule roles attached to your school profile.');
-            }
-        }
-
-        if (!effectivePersonId || !startDate || !endDate) {
-            throw new Error('Person ID, Start Date, and End Date are required.');
-        }
-
-        const activeOrgId = getActiveScheduleOrgId(req.user);
         const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(statusMeta);
         const personResult = await buildEventsForPersonAndRange({
-            personId: String(effectivePersonId || '').trim(),
-            startDate: String(startDate || '').trim(),
-            endDate: String(endDate || '').trim(),
+            personId: effectivePersonId,
+            startDate,
+            endDate,
             reqUser: req.user,
             activeOrgId,
             statusMap,
@@ -1822,7 +1899,12 @@ async function getPersonSchedule(req, res) {
             })
             : (Array.isArray(viewerScheduleAccess.availableRoles) ? viewerScheduleAccess.availableRoles : []);
 
-        const events = filterEventsWithCasesIfRequested(filterScheduleEventsForRole(personResult?.events, effectiveRole), req.query).map((event) => {
+        const filteredEvents = filterEventsWithCasesIfRequested(
+            filterScheduleEventsForRole(personResult?.events, effectiveRole),
+            req.query
+        );
+        const fingerprint = buildScheduleEventsFingerprint(filteredEvents);
+        const events = filteredEvents.map((event) => {
             const isLeaveEvent = isApprovedLeaveScheduleEvent(event);
             const mapped = {
                 ...event,
@@ -1837,7 +1919,41 @@ async function getPersonSchedule(req, res) {
             return mapped;
         });
 
-        res.json({ status: 'success', events, statusMeta, viewerScheduleAccess, availableRoles, selectedRole: effectiveRole });
+        res.json({ status: 'success', events, statusMeta, viewerScheduleAccess, availableRoles, selectedRole: effectiveRole, fingerprint });
+    } catch (error) {
+        res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function getPersonScheduleVersion(req, res) {
+    try {
+        const {
+            effectivePersonId,
+            effectiveRole,
+            startDate,
+            endDate,
+            activeOrgId
+        } = await resolvePersonScheduleRequest(req);
+
+        const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId || '', { includeInactive: true });
+        const personResult = await buildEventsForPersonAndRange({
+            personId: effectivePersonId,
+            startDate,
+            endDate,
+            reqUser: req.user,
+            activeOrgId,
+            statusMap,
+            accessContext: schoolDataService.buildRouteAccessContext(req),
+            skipEnrichment: true
+        });
+
+        const events = filterEventsWithCasesIfRequested(
+            filterScheduleEventsForRole(personResult?.events, effectiveRole),
+            req.query
+        );
+        const fingerprint = buildScheduleEventsFingerprint(events);
+
+        res.json({ status: 'success', fingerprint, eventCount: events.length });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
     }
@@ -2033,6 +2149,7 @@ module.exports = {
     showMySchedulePage,
     getMyScheduleData,
     getPersonSchedule,
+    getPersonScheduleVersion,
     pickerSchoolSchedulePersons,
     listActiveTeacherSchedulePersons,
     showGlobalSchedulePage,
@@ -2040,6 +2157,7 @@ module.exports = {
     buildScheduleViewerAccess,
     buildSchoolSchedulePersonPickerRows,
     buildEventsForPersonAndRange,
+    buildScheduleEventsFingerprint,
     filterScheduleEventsForRole,
     summarizeEvents,
     summarizeTimesheetHoursForEvents,
@@ -2048,6 +2166,7 @@ module.exports = {
     resolveClassSessionScheduleHours,
     doesScheduleEventCountTowardHours,
     doesScheduleEventBlockConflicts,
-    markOverlappingEvents
+    markOverlappingEvents,
+    isAllowedMergedSessionOverlap
 };
 

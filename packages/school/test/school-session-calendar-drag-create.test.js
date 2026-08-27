@@ -58,3 +58,28 @@ test('session-calendar.css defines full-viewport standalone stage overlay', () =
   assert.match(source, /\.session-enrollment-stage-overlay\.session-enrollment-stage-standalone[\s\S]*position:\s*fixed/s);
   assert.match(source, /\.session-enrollment-stage-overlay\.session-enrollment-stage-standalone[\s\S]*z-index:\s*1060/s);
 });
+
+test('personSchedule wires last-loaded refresh chip and stale detection', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(source, /lastLoadedAtByPersonId/);
+  assert.match(source, /data-schedule-refresh-loaded/);
+  assert.match(source, /schedule-loaded-at-chip/);
+  assert.match(source, /visibilitychange/);
+  assert.match(source, /markScheduleDataStaleAfterReturn/);
+});
+
+test('scheduleController exports buildScheduleEventsFingerprint and getPersonScheduleVersion', () => {
+  const source = read('MVC/controllers/school/scheduleController.js');
+  assert.match(source, /function buildScheduleEventsFingerprint/);
+  assert.match(source, /function getPersonScheduleVersion/);
+  assert.match(source, /skipEnrichment:\s*true/);
+});
+
+test('mySchedule wires last-loaded refresh chip and stale detection', () => {
+  const source = read('MVC/views/school/schedule/mySchedule.ejs');
+  assert.match(source, /ms_loadedAtChip/);
+  assert.match(source, /lastLoadedAt/);
+  assert.match(source, /schedule-loaded-at-chip/);
+  assert.match(source, /visibilitychange/);
+  assert.match(source, /updateLoadedAtChip/);
+});

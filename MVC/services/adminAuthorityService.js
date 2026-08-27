@@ -166,22 +166,21 @@ function hasAdminCategory(profile, category) {
     .includes(category);
 }
 
+function isVirtualSuperAdminAccount(user) {
+  if (!user) return false;
+  if (user.isVirtualSuperAdmin === true) return true;
+  const userId = String(user.id || user.userId || user._id || '').trim().toUpperCase();
+  return userId === 'ROOT_001' || userId === 'SYS_ROOT_001';
+}
+
 function isSuperAdmin(user) {
   if (user === SYSTEM_CONTEXT) return true;
   if (!user) return false;
-  const userId = String(user.id || user.userId || user._id || '').trim();
-  const userEmail = String(user.email || '').trim().toLowerCase();
-  const username = String(user.username || '').trim().toLowerCase();
-  const legacyRootIds = new Set(['ROOT_001', 'SYS_ROOT_001']);
-  const userIsRoot = idsEqual(userId, 'ROOT_001') || idsEqual(userId, 'SYS_ROOT_001') || legacyRootIds.has(userId.toUpperCase());
-  const userIsNamedRoot = username === 'amin' || userEmail === 'apaknejad@equilibrium.ab.ca';
+  if (isVirtualSuperAdminAccount(user)) return true;
   const accessLevel = normalizeAccessLevel(user.accessLevel, 0);
   return Boolean(
-    user.isVirtualSuperAdmin === true ||
     user.isSuperAdmin === true ||
-    accessLevel >= 10 ||
-    userIsRoot ||
-    userIsNamedRoot
+    accessLevel >= 10
   );
 }
 
@@ -516,6 +515,7 @@ async function isAdminAsync(user, orgContext = {}) {
 module.exports = {
   resolveAdminAuthority,
   resolveAdminAuthorityAsync,
+  isVirtualSuperAdminAccount,
   isSuperAdmin,
   isAdmin,
   isAdminAsync,

@@ -99,4 +99,14 @@ router.post('/api/update-roster-cell',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, attendanceMatrixMutationActionState),
   ctrl.updateAttendanceRosterCell);
 
+router.get('/api/change-log',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.getAttendanceChangeLog);
+
+router.post('/api/change-log/query',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.queryAttendanceChangeLogs);
+
 module.exports = router;

@@ -113,7 +113,8 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   leaveRequests: { repository: schoolRepositories.leaveRequests },
   tasks: { repository: schoolRepositories.tasks },
   taskRoutingRules: { repository: schoolRepositories.taskRoutingRules },
-  sessionStudentCases: { repository: schoolRepositories.sessionStudentCases }
+  sessionStudentCases: { repository: schoolRepositories.sessionStudentCases },
+  attendanceChangeLogs: { repository: schoolRepositories.attendanceChangeLogs }
 });
 
 const SCHOOL_INDEX_DOCS = Object.freeze({

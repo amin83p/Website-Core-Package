@@ -69,8 +69,7 @@ function mergeOperations(existing = []) {
     const current = rows.get(id) || {};
     rows.set(id, {
       id,
-      sessionAttempts: 5,
-      sessionTime: 15,
+      sessionAttempts: 10, sessionTime: 30,
       active: current.active !== false,
       ...current
     });

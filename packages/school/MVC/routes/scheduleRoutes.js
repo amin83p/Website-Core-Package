@@ -28,6 +28,10 @@ router.get('/api/person-schedule',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   ctrl.getPersonSchedule);
+router.get('/api/person-schedule-version',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getPersonScheduleVersion);
 router.get('/api/school-person-picker',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),

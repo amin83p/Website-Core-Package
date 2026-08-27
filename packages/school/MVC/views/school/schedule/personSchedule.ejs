@@ -673,6 +673,41 @@
         color: #6c757d;
         box-shadow: none;
     }
+    .schedule-loaded-at-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.34rem 0.65rem;
+        border: 1px solid #dee2e6;
+        background: #f8f9fa;
+        color: #495057;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        white-space: nowrap;
+        line-height: 1.2;
+    }
+    button.schedule-loaded-at-chip {
+        cursor: pointer;
+        transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    button.schedule-loaded-at-chip:hover,
+    button.schedule-loaded-at-chip:focus {
+        background: #e9ecef;
+        border-color: #ced4da;
+        outline: none;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+    }
+    .schedule-loaded-at-chip.is-stale {
+        border-color: #ffda6a;
+        background: #fff8e1;
+        color: #664d03;
+    }
+    button.schedule-loaded-at-chip.is-stale:hover,
+    button.schedule-loaded-at-chip.is-stale:focus {
+        background: #fff3cd;
+        border-color: #ffc107;
+    }
     .schedule-legend-modal-body .schedule-legend-items {
         display: flex;
         flex-direction: column;
@@ -1823,6 +1858,16 @@ document.addEventListener('DOMContentLoaded', () => {
         loadedPersonIds: new Set(),
         loadingPersonId: '',
         selectedSessionKeysByPersonId: {},
+        lastLoadedAtByPersonId: {},
+        scheduleFingerprintByPersonId: {},
+        staleAfterHidden: false,
+        schedulePollTimerId: null,
+        schedulePollIntervalMs: 60000,
+        schedulePollInFlight: false,
+        remoteUpdatePending: false,
+        remoteUpdateFingerprint: '',
+        remoteUpdateModalDismissed: false,
+        remoteUpdateModalOpen: false,
         viewMode: readScheduleViewMode(),
         hideEmptyDays: false,
         isAdminViewer: canSelectAnyPerson,
@@ -2168,8 +2213,13 @@ document.addEventListener('DOMContentLoaded', () => {
         delete scheduleState.statusMetaByPersonId[id];
         delete scheduleState.errorByPersonId[id];
         delete scheduleState.selectedSessionKeysByPersonId[id];
+        delete scheduleState.lastLoadedAtByPersonId[id];
+        delete scheduleState.scheduleFingerprintByPersonId[id];
         scheduleState.loadedPersonIds.delete(id);
-        if (scheduleState.activePersonId === id) scheduleState.activePersonId = scheduleState.persons[0]?.id || '';
+        if (scheduleState.activePersonId === id) {
+            scheduleState.activePersonId = scheduleState.persons[0]?.id || '';
+            clearRemoteUpdatePending();
+        }
         refreshScheduleActiveView();
     }
 
@@ -2178,7 +2228,161 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleState.statusMetaByPersonId = {};
         scheduleState.errorByPersonId = {};
         scheduleState.selectedSessionKeysByPersonId = {};
+        scheduleState.lastLoadedAtByPersonId = {};
+        scheduleState.scheduleFingerprintByPersonId = {};
+        scheduleState.staleAfterHidden = false;
+        scheduleState.remoteUpdatePending = false;
+        scheduleState.remoteUpdateFingerprint = '';
+        scheduleState.remoteUpdateModalDismissed = false;
+        scheduleState.remoteUpdateModalOpen = false;
+        stopScheduleAutoRefresh();
         scheduleState.loadedPersonIds.clear();
+    }
+
+    function isScheduleStageModalOpen() {
+        const modalEl = getScheduleStageModalEl();
+        return Boolean(modalEl && !modalEl.classList.contains('d-none'));
+    }
+
+    function hasScheduleLocalWork() {
+        return countActiveScheduleSelectedSessions() > 0 || isScheduleStageModalOpen();
+    }
+
+    function clearRemoteUpdatePending() {
+        scheduleState.remoteUpdatePending = false;
+        scheduleState.remoteUpdateFingerprint = '';
+        scheduleState.remoteUpdateModalDismissed = false;
+        scheduleState.remoteUpdateModalOpen = false;
+    }
+
+    function markRemoteUpdatePending(nextFingerprint) {
+        const fingerprint = String(nextFingerprint || '').trim();
+        if (!fingerprint) return;
+        if (scheduleState.remoteUpdatePending && scheduleState.remoteUpdateFingerprint === fingerprint) return;
+        scheduleState.remoteUpdatePending = true;
+        scheduleState.remoteUpdateFingerprint = fingerprint;
+        scheduleState.remoteUpdateModalDismissed = false;
+        refreshScheduleActiveView();
+        void promptScheduleRemoteUpdateIfNeeded();
+    }
+
+    async function promptScheduleRemoteUpdateIfNeeded() {
+        const person = activeSchedulePerson();
+        if (!person || !scheduleState.loadedPersonIds.has(person.id)) return;
+        if (!scheduleState.remoteUpdatePending) return;
+        if (scheduleState.remoteUpdateModalDismissed) return;
+        if (scheduleState.remoteUpdateModalOpen) return;
+        if (document.visibilityState !== 'visible') return;
+        if (scheduleState.loadingPersonId) return;
+
+        scheduleState.remoteUpdateModalOpen = true;
+        try {
+            const message = 'Schedule data has changed. Refresh to see the latest sessions.';
+            const title = 'Schedule update available';
+            let result = 'Dismiss';
+            if (typeof showMessageModal === 'function') {
+                result = await showMessageModal({
+                    title,
+                    icon: 'warning',
+                    message,
+                    buttons: [
+                        { text: 'Dismiss', class: 'btn-secondary' },
+                        { text: 'Refresh now', class: 'btn-warning' }
+                    ]
+                });
+            } else {
+                const confirmed = await uiConfirm(message, title);
+                result = confirmed ? 'Refresh now' : 'Dismiss';
+            }
+            if (!scheduleState.remoteUpdatePending) return;
+            if (result === 'Refresh now') {
+                await requestScheduleRefresh();
+            } else {
+                scheduleState.remoteUpdateModalDismissed = true;
+            }
+        } finally {
+            scheduleState.remoteUpdateModalOpen = false;
+        }
+    }
+
+    async function requestScheduleRefresh() {
+        const person = activeSchedulePerson();
+        if (!person) return;
+        if (hasScheduleLocalWork()) {
+            const confirmed = await uiConfirm(
+                'Refreshing will reload the schedule and clear your current selection. Continue?',
+                'Refresh schedule?'
+            );
+            if (!confirmed) return;
+        }
+        await loadSchedulePerson(person, { silent: true });
+    }
+
+    function buildScheduleVersionQuery(person) {
+        const range = getScheduleRange();
+        const role = person.id === scheduleState.activePersonId
+            ? String(selectedScheduleRole() || person.selectedRole || '').trim()
+            : String(person.selectedRole || '').trim();
+        const params = new URLSearchParams({
+            personId: person.id,
+            startDate: range.startDate,
+            endDate: range.endDate
+        });
+        if (role) params.set('role', role);
+        if (hasCasesOnly()) params.set('hasCases', '1');
+        return params;
+    }
+
+    function stopScheduleAutoRefresh() {
+        if (scheduleState.schedulePollTimerId) {
+            window.clearInterval(scheduleState.schedulePollTimerId);
+            scheduleState.schedulePollTimerId = null;
+        }
+    }
+
+    function startScheduleAutoRefresh() {
+        stopScheduleAutoRefresh();
+        if (document.visibilityState !== 'visible') return;
+        scheduleState.schedulePollTimerId = window.setInterval(() => {
+            pollScheduleVersionForActivePerson();
+        }, scheduleState.schedulePollIntervalMs);
+    }
+
+    async function pollScheduleVersionForActivePerson() {
+        if (document.visibilityState !== 'visible') return;
+        if (scheduleState.schedulePollInFlight) return;
+        if (scheduleState.loadingPersonId) return;
+        if (isScheduleStageModalOpen()) return;
+        const person = activeSchedulePerson();
+        if (!person) return;
+        const range = getScheduleRange();
+        if (!range.startDate || !range.endDate) return;
+        if (!scheduleState.loadedPersonIds.has(person.id)) return;
+        if (scheduleState.errorByPersonId[person.id]) return;
+
+        scheduleState.schedulePollInFlight = true;
+        try {
+            const params = buildScheduleVersionQuery(person);
+            const res = await fetch(`/school/schedules/api/person-schedule-version?${params.toString()}`, {
+                headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
+                credentials: 'same-origin'
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') return;
+            const nextFingerprint = String(result.fingerprint || '').trim();
+            if (!nextFingerprint) return;
+            const currentFingerprint = String(scheduleState.scheduleFingerprintByPersonId[person.id] || '').trim();
+            if (!currentFingerprint) {
+                scheduleState.scheduleFingerprintByPersonId[person.id] = nextFingerprint;
+                return;
+            }
+            if (nextFingerprint === currentFingerprint) return;
+            markRemoteUpdatePending(nextFingerprint);
+        } catch (error) {
+            console.warn('Schedule version poll failed', error);
+        } finally {
+            scheduleState.schedulePollInFlight = false;
+        }
     }
 
     function getScheduleRange() {
@@ -2254,7 +2458,10 @@ document.addEventListener('DOMContentLoaded', () => {
         saveScheduleVerticalDayWidthUserAdjusted(false);
         saveScheduleHorizontalSliderUserAdjusted(false);
         const container = document.getElementById('visualDisplayArea');
-        if (container) container.classList.add('session-cal-auto-day-width');
+        if (container) {
+            container.classList.add('session-cal-auto-day-width');
+            container.classList.remove('schedule-week-grid-manual-day-width');
+        }
     }
 
     function readScheduleVerticalDayWidth() {
@@ -2322,7 +2529,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveScheduleHorizontalSliderUserAdjusted(true);
             } else if (mode === 'verticalTimeline') {
                 saveScheduleVerticalDayWidthUserAdjusted(true);
-                document.getElementById('visualDisplayArea')?.classList.remove('session-cal-auto-day-width');
+                const container = document.getElementById('visualDisplayArea');
+                container?.classList.remove('session-cal-auto-day-width');
+                container?.classList.add('schedule-week-grid-manual-day-width');
             }
         }
         if (mode === 'verticalTimeline') {
@@ -2473,6 +2682,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isVertical = mode === 'verticalTimeline';
         container.classList.toggle('session-cal-auto-day-width', isVertical && !scheduleState.verticalDayWidthUserAdjusted);
         container.classList.toggle('schedule-cal-horizontal-mode', mode === 'timeline');
+        container.classList.toggle('schedule-week-grid-manual-day-width', isVertical && scheduleState.verticalDayWidthUserAdjusted);
         const layout = computeScheduleWeekGridLayout(mode, container);
         container.style.setProperty('--session-day-width', `${layout.dayWidth}px`);
         container.style.setProperty('--session-hour-height', `${layout.hourHeight}px`);
@@ -2565,6 +2775,32 @@ document.addEventListener('DOMContentLoaded', () => {
         return resolveScheduleViewMode(mode);
     }
 
+    function buildScheduleLoadedAtChipHtml() {
+        const person = activeSchedulePerson();
+        if (!person) return '';
+        if (scheduleState.loadingPersonId === person.id) return '';
+        if (!scheduleState.loadedPersonIds.has(person.id)) return '';
+        if (scheduleState.errorByPersonId[person.id]) return '';
+        const loadedAt = scheduleState.lastLoadedAtByPersonId[person.id];
+        if (!loadedAt && !scheduleState.remoteUpdatePending) return '';
+        const staleClass = (scheduleState.staleAfterHidden || scheduleState.remoteUpdatePending) ? ' is-stale' : '';
+        const label = scheduleState.remoteUpdatePending
+            ? 'Update available'
+            : `Updated ${formatSchoolInstant(loadedAt)}`;
+        const title = scheduleState.remoteUpdatePending
+            ? 'New schedule data is available. Click to refresh.'
+            : 'Click to refresh schedule data';
+        return `<button type="button" class="schedule-loaded-at-chip${staleClass}" data-schedule-refresh-loaded title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span>${escapeHtml(label)}</span></button>`;
+    }
+
+    function markScheduleDataStaleAfterReturn() {
+        const person = activeSchedulePerson();
+        if (!person || !scheduleState.lastLoadedAtByPersonId[person.id]) return;
+        if (scheduleState.staleAfterHidden) return;
+        scheduleState.staleAfterHidden = true;
+        refreshScheduleActiveView();
+    }
+
     function renderScheduleControls(mode) {
         const legend = document.getElementById('legendContainer');
         const modalBody = document.getElementById('scheduleLegendModalBody');
@@ -2586,6 +2822,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const row2RightControls = showWeekGridControls
             ? `<div class="schedule-viewbar-grid-controls">${scheduleWidthControlHtml()}</div>`
             : '';
+        const loadedAtChip = buildScheduleLoadedAtChipHtml();
         legend.innerHTML = `
             <div class="schedule-viewbar">
                 <div class="schedule-viewbar-row">
@@ -2602,6 +2839,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="schedule-viewbar-row-left schedule-viewbar-chips">
                         <span class="schedule-selected-count-pill ${countActiveScheduleSelectedSessions() ? '' : 'is-empty'}"><i class="bi bi-check2-square" aria-hidden="true"></i><span data-schedule-selected-session-count>${escapeHtml(String(countActiveScheduleSelectedSessions()))} selected</span></span>
                         <div id="lbl_totalHours" class="schedule-toolbar-hours"></div>
+                        ${loadedAtChip}
                         <button type="button" class="btn btn-sm btn-outline-secondary ${countActiveScheduleSelectedSessions() ? '' : 'd-none'}" data-schedule-clear-selected-sessions aria-label="Clear selected sessions"><i class="bi bi-x-circle me-1"></i>Clear selected</button>
                     </div>
                     <div class="schedule-viewbar-row-right is-controls-row">
@@ -3145,15 +3383,16 @@ document.addEventListener('DOMContentLoaded', () => {
         setSchedulePrintEnabled(true);
     }
 
-    async function loadSchedulePerson(person) {
-        if (!person) return;
+    async function loadSchedulePerson(person, options = {}) {
+        if (!person) return false;
+        const silent = options.silent === true;
         const range = getScheduleRange();
-        if (!range.startDate || !range.endDate) { await uiAlert('Please select a start and end date.'); return; }
+        if (!range.startDate || !range.endDate) { await uiAlert('Please select a start and end date.'); return false; }
         const role = person.id === scheduleState.activePersonId ? String(selectedScheduleRole() || person.selectedRole || '').trim() : String(person.selectedRole || '').trim();
         person.selectedRole = role;
         scheduleState.loadingPersonId = person.id;
         refreshScheduleActiveView();
-        if (typeof window.showLoading === 'function') window.showLoading(`Loading schedule for ${person.name || person.id}...`);
+        if (!silent && typeof window.showLoading === 'function') window.showLoading(`Loading schedule for ${person.name || person.id}...`);
         try {
             const params = new URLSearchParams({ personId: person.id, startDate: range.startDate, endDate: range.endDate });
             if (role) params.set('role', role);
@@ -3166,7 +3405,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const guarded = typeof window.applyGuardedApiResult === 'function'
                 ? await window.applyGuardedApiResult(result, { busyTitle: 'Schedule Load In Progress', replayTitle: 'Schedule Already Loaded' })
                 : { stop: false };
-            if (guarded.stop) return;
+            if (guarded.stop) return false;
             if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load schedule.');
             if (Array.isArray(result.availableRoles)) person.availableRoles = result.availableRoles;
             person.selectedRole = result.selectedRole || role;
@@ -3174,15 +3413,25 @@ document.addEventListener('DOMContentLoaded', () => {
             scheduleState.statusMetaByPersonId[person.id] = Array.isArray(result.statusMeta) ? result.statusMeta : [];
             delete scheduleState.errorByPersonId[person.id];
             scheduleState.loadedPersonIds.add(person.id);
+            scheduleState.lastLoadedAtByPersonId[person.id] = new Date().toISOString();
+            scheduleState.staleAfterHidden = false;
+            const fingerprint = String(result.fingerprint || '').trim();
+            if (fingerprint) scheduleState.scheduleFingerprintByPersonId[person.id] = fingerprint;
+            clearRemoteUpdatePending();
+            if (person.id === scheduleState.activePersonId) startScheduleAutoRefresh();
+            return true;
         } catch (error) {
             scheduleState.eventsByPersonId[person.id] = [];
             scheduleState.statusMetaByPersonId[person.id] = [];
             scheduleState.errorByPersonId[person.id] = error.message || 'Unable to load schedule.';
             scheduleState.loadedPersonIds.add(person.id);
+            if (person.id === scheduleState.activePersonId) stopScheduleAutoRefresh();
+            return false;
         } finally {
             scheduleState.loadingPersonId = '';
-            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+            if (!silent && typeof window.hideLoading === 'function') window.hideLoading({ force: true });
             refreshScheduleActiveView();
+            if (scheduleState.remoteUpdatePending) void promptScheduleRemoteUpdateIfNeeded();
         }
     }
 
@@ -3385,6 +3634,8 @@ document.addEventListener('DOMContentLoaded', () => {
         delete scheduleState.eventsByPersonId[person.id];
         delete scheduleState.statusMetaByPersonId[person.id];
         delete scheduleState.errorByPersonId[person.id];
+        delete scheduleState.lastLoadedAtByPersonId[person.id];
+        delete scheduleState.scheduleFingerprintByPersonId[person.id];
         scheduleState.loadedPersonIds.delete(person.id);
         refreshScheduleActiveView();
     });
@@ -3452,6 +3703,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const clearSelectedButton = event.target.closest('[data-schedule-clear-selected-sessions]');
         if (clearSelectedButton) {
             clearActiveScheduleSessionSelection();
+            return;
+        }
+        const refreshLoadedButton = event.target.closest('[data-schedule-refresh-loaded]');
+        if (refreshLoadedButton) {
+            requestScheduleRefresh();
             return;
         }
         const verticalButton = event.target.closest('[data-schedule-view-vertical]');
@@ -3929,6 +4185,33 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('scroll', hideScheduleTip, true);
     window.addEventListener('resize', hideScheduleTip);
     bindScheduleGridResizeObserver();
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            stopScheduleAutoRefresh();
+            return;
+        }
+        markScheduleDataStaleAfterReturn();
+        if (scheduleState.loadedPersonIds.has(scheduleState.activePersonId || '')) {
+            startScheduleAutoRefresh();
+            pollScheduleVersionForActivePerson();
+            if (scheduleState.remoteUpdatePending && !scheduleState.remoteUpdateModalDismissed) {
+                void promptScheduleRemoteUpdateIfNeeded();
+            }
+        }
+    });
+    window.addEventListener('pageshow', (event) => {
+        if (!event.persisted) return;
+        markScheduleDataStaleAfterReturn();
+        if (scheduleState.loadedPersonIds.has(scheduleState.activePersonId || '')) {
+            startScheduleAutoRefresh();
+            pollScheduleVersionForActivePerson();
+            if (scheduleState.remoteUpdatePending && !scheduleState.remoteUpdateModalDismissed) {
+                void promptScheduleRemoteUpdateIfNeeded();
+            }
+        }
+    });
+    window.addEventListener('beforeunload', stopScheduleAutoRefresh);
 
     // --- 3. Deep Link Auto-Loader (Moved to BOTTOM) ---
     // Pure Javascript URL parsing avoids EJS syntax breaks!

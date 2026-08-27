@@ -30,8 +30,7 @@ const sectionRow = {
   message: '',
   operations: ['OP1001', 'OP1002', 'OP1003'].map((id) => ({
     id,
-    sessionAttempts: 5,
-    sessionTime: 15,
+    sessionAttempts: 10, sessionTime: 30,
     active: true
   })),
   subsections: [],

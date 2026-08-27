@@ -4336,6 +4336,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.GenericPicker.open(window.GenericPickerPresets.teacher({
                 title: 'Select Merging Teacher',
                 placeholder: 'Search teachers...',
+                apiEndpoint: '/school/classes/' + encodeURIComponent(sessionManagerClassId) + '/sessions/' + encodeURIComponent(sessionManagerSessionId) + '/merge/eligible-teachers',
                 context: window.GenericPickerContexts
                     ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
                     : undefined,

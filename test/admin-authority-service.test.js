@@ -32,6 +32,29 @@ async function run() {
   }
 
   {
+    assert.strictEqual(adminAuthorityService.isVirtualSuperAdminAccount({ id: 'ROOT_001' }), true);
+    assert.strictEqual(adminAuthorityService.isVirtualSuperAdminAccount({ id: 'SYS_ROOT_001', isVirtualSuperAdmin: false }), true);
+    assert.strictEqual(adminAuthorityService.isVirtualSuperAdminAccount({ isVirtualSuperAdmin: true, id: 'USR_1' }), true);
+    assert.strictEqual(
+      adminAuthorityService.isSuperAdmin({
+        id: '728610',
+        email: 'apaknejad@equilibrium.ab.ca',
+        username: 'apaknejad@equilibrium.ab.ca',
+        accessLevel: 1
+      }),
+      false
+    );
+    assert.strictEqual(
+      adminAuthorityService.isSuperAdmin({ id: 'ROOT_001', isVirtualSuperAdmin: true }),
+      true
+    );
+    assert.strictEqual(
+      adminAuthorityService.isSuperAdmin({ id: 'USR_10', accessLevel: 10 }),
+      true
+    );
+  }
+
+  {
     const authority = adminAuthorityService.resolveAdminAuthority({
       user: userWithProfile({ fullAdmin: true }),
       sectionId: section.id,

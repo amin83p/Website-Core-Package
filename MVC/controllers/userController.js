@@ -1,6 +1,6 @@
 // MVC/controllers/userController.js
 const dataService = require('../services/dataService');
-const { idsEqual } = require('../utils/idAdapter');
+const { idsEqual, toPublicId } = require('../utils/idAdapter');
 const organizationRepository = require('../repositories/organizationRepository');
  
 const securityService = require('../services/security');
@@ -138,6 +138,31 @@ function decorateMembershipOrganizationLabels(rows = [], organizationMap = new M
 // ✅ REFACTORED: Use shared service + local logic
 function isSystemAdmin(user) {
   return adminAuthorityService.isAdmin(user);
+}
+
+function isVirtualSuperAdminAccount(user) {
+  return adminAuthorityService.isVirtualSuperAdminAccount(user);
+}
+
+function snapshotOrgProfileAssignments(organizations = []) {
+  return (Array.isArray(organizations) ? organizations : [])
+    .map((org) => ({
+      orgId: String(org?.orgId || ''),
+      directAccessProfileIds: normalizeIdList(
+        Array.isArray(org?.directAccessProfileIds)
+          ? org.directAccessProfileIds
+          : (org?.accessProfileIds || [])
+      ).slice().sort()
+    }))
+    .sort((a, b) => a.orgId.localeCompare(b.orgId));
+}
+
+function hasProfileAssignmentChanged(current = {}, nextOrganizations = [], nextSystemAccessProfileId = '') {
+  if (String(current?.systemAccessProfileId || '') !== String(nextSystemAccessProfileId || '')) {
+    return true;
+  }
+  return JSON.stringify(snapshotOrgProfileAssignments(current?.organizations || []))
+    !== JSON.stringify(snapshotOrgProfileAssignments(nextOrganizations));
 }
 
 async function buildUserOrganizations(personId, formOrgsJson, reqUser, existingUserOrgs = []) {
@@ -387,7 +412,7 @@ async function showEditUserForm(req, res) {
     if(!userItem) return res.status(404).render('404', { title: 'User Not Found', user: req.user || null });
 
     let personsItem;
-    if (adminAuthorityService.isSuperAdmin(userItem)) { // ✅ Reused helper here too
+    if (isVirtualSuperAdminAccount(userItem)) { // Virtual immune-system admins only
        const allOrgs = await dataService.getAccessibleOrganizations(req.user);
        personsItem = {
            id: 'VIRTUAL_PERSON',
@@ -440,10 +465,10 @@ async function editUser(req, res) {
     if(!current) throw new Error('User not found');
     updateStage = 'handle_super_admin';
 
-    if (adminAuthorityService.isSuperAdmin(current)) { // ✅ Reused helper
+    if (isVirtualSuperAdminAccount(current)) { // Virtual immune-system admins only
         if (req.body.primaryOrgId) {
              await dataService.updateData('users', req.params.id, { primaryOrgId: req.body.primaryOrgId }, req.user);
-             invalidateAuthContextForUser(req.params.id);
+             invalidateAuthContextForUser(toPublicId(req.params.id));
         }
         if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Admin Context Updated.' });
         return res.redirect('/users');
@@ -531,13 +556,23 @@ async function editUser(req, res) {
     if (passwordHash) updates.passwordHash = passwordHash;
     updates.personId = current.personId;
 
+    const profileAssignmentChanged = hasProfileAssignmentChanged(current, organizations, systemAccessProfileId);
+    if (profileAssignmentChanged && !isVirtualSuperAdminAccount(current)) {
+      updates.activeProfileMode = 'LOCAL';
+      if (idsEqual(targetPrimaryOrgId, 'SYSTEM') && !systemAccessProfileId) {
+        targetPrimaryOrgId = organizations.length > 0 ? organizations[0].orgId : FREE_ORG_ID;
+        updates.primaryOrgId = targetPrimaryOrgId;
+      }
+    }
+
     updateStage = 'persist_update';
+    const targetUserId = toPublicId(req.params.id);
     const results = await dataService.updateData('users', req.params.id, updates, req.user);
     const needsHardRevoke = !updates.active || updates.status === 'suspended' || updates.status === 'deleted';
     if (needsHardRevoke) {
-      await hardRevokeAuthContextForUser(req.params.id);
+      await hardRevokeAuthContextForUser(targetUserId);
     } else {
-      invalidateAuthContextForUser(req.params.id);
+      invalidateAuthContextForUser(targetUserId);
     }
 
     updateStage = 'send_response';

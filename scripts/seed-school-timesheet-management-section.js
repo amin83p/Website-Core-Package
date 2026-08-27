@@ -36,7 +36,7 @@ const SECTION_DEFINITIONS = Object.freeze([
 ]);
 
 function buildOperations(operationIds = []) {
-  return operationIds.map((id) => ({ id, sessionAttempts: 5, sessionTime: 15, active: true }));
+  return operationIds.map((id) => ({ id, sessionAttempts: 10, sessionTime: 30, active: true }));
 }
 
 function buildSectionDoc(definition) {

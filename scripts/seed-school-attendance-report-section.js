@@ -64,8 +64,7 @@ function mergeOperations(existing = [], wanted = []) {
   wanted.forEach((id) => {
     rows.set(id, {
       id,
-      sessionAttempts: 5,
-      sessionTime: 15,
+      sessionAttempts: 10, sessionTime: 30,
       active: rows.get(id)?.active !== false,
       ...(rows.get(id) || {})
     });
