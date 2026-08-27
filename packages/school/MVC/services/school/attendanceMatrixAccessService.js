@@ -21,6 +21,12 @@ async function userCanOpenAttendanceMatrix(user, ipAddress) {
   }
 }
 
+async function userCanMarkAttendanceExcused(user, operationId = OPERATIONS.UPDATE) {
+  if (!user) return false;
+  return schoolAdminAccessService.isAttendancesAdminViewerAsync(user, operationId);
+}
+
 module.exports = {
-  userCanOpenAttendanceMatrix
+  userCanOpenAttendanceMatrix,
+  userCanMarkAttendanceExcused
 };

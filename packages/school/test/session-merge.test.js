@@ -172,16 +172,82 @@ test('executeSessionUnmerge is exported for undo merge workflow', () => {
   assert.equal(typeof sessionMergeService.executeSessionUnmerge, 'function');
 });
 
+test('canUserUndoSessionMerge allows host teacher, previous teacher, and admins', () => {
+  const mergedSession = buildMergedSessionFixture();
+  assert.equal(sessionMergeService.canUserUndoSessionMerge(mergedSession, 'HOST-1'), true);
+  assert.equal(sessionMergeService.canUserUndoSessionMerge(mergedSession, 'PREV-1'), true);
+  assert.equal(sessionMergeService.canUserUndoSessionMerge(mergedSession, 'OTHER-1'), false);
+  assert.equal(sessionMergeService.canUserUndoSessionMerge(mergedSession, 'OTHER-1', { isClassAdmin: true }), true);
+  assert.equal(sessionMergeService.canUserUndoSessionMerge(mergedSession, 'OTHER-1', { isSessionAdmin: true }), true);
+  assert.equal(sessionMergeService.canUserUndoSessionMerge({ status: 'scheduled' }, 'HOST-1'), false);
+});
+
+function buildMergedSessionFixture() {
+  return {
+    status: 'merged_session',
+    merged: {
+      isMergedSession: true,
+      mergingTeacherId: 'HOST-1',
+      previousTeacherId: 'PREV-1'
+    },
+    delivery: {
+      deliveredBy: 'HOST-1',
+      coTeachers: [{
+        personId: 'PREV-1',
+        roleLabel: 'Previous Teacher',
+        paid: false,
+        canEdit: false
+      }]
+    }
+  };
+}
+
+test('isPersonMergedPreviousTeacherEditor allows previous teacher on merged sessions only', () => {
+  const mergedSession = buildMergedSessionFixture();
+  assert.equal(sessionMergeService.isPersonMergedPreviousTeacherEditor(mergedSession, 'PREV-1'), true);
+  assert.equal(sessionMergeService.isPersonMergedPreviousTeacherEditor(mergedSession, 'HOST-1'), false);
+  assert.equal(sessionMergeService.isPersonMergedPreviousTeacherEditor(mergedSession, 'OTHER-1'), false);
+  assert.equal(sessionMergeService.isPersonMergedPreviousTeacherEditor({ status: 'scheduled' }, 'PREV-1'), false);
+});
+
+test('isPersonSessionEditor allows merged previous teacher instructional edit without canEdit flag', () => {
+  const mergedSession = buildMergedSessionFixture();
+  assert.equal(sessionDeliveryTeamService.isPersonSessionEditor(mergedSession, 'PREV-1'), true);
+  assert.equal(sessionDeliveryTeamService.isPersonSessionEditor(mergedSession, 'HOST-1'), true);
+  assert.equal(sessionDeliveryTeamService.isPersonSessionEditor(mergedSession, 'OTHER-1'), false);
+  assert.equal(sessionDeliveryTeamService.resolveCoTeacherTimesheetHours({
+    session: mergedSession,
+    personId: 'PREV-1',
+    formulaHours: 2
+  }), 0);
+});
+
+test('session manager keeps metadata controls behind canEditSessionMetadataFlag', () => {
+  const sessionManager = readPackage('MVC/views/school/class/sessionManager.ejs');
+  assert.match(sessionManager, /canEditSessionMetadataFlag/);
+  assert.match(sessionManager, /id="sessionDate"/);
+  assert.match(sessionManager, /canManageCoTeachersFlag/);
+});
+
 test('session manager includes undo merge UI and handler', () => {
   const sessionManager = readPackage('MVC/views/school/class/sessionManager.ejs');
   assert.match(sessionManager, /btnUndoSessionMerge/);
   assert.match(sessionManager, /unmergeSessionFromManager/);
   assert.match(sessionManager, /merge\/unmerge/);
   assert.match(sessionManager, /Undo merge required/);
+  assert.match(sessionManager, /canUndoSessionMergeFlag/);
+  assert.match(sessionManager, /sessionCanUndoMerge/);
+  assert.match(sessionManager, /sessionStatusFrozen/);
+  assert.match(sessionManager, /statusControlDisabled/);
+  assert.doesNotMatch(sessionManager, /sessionIsMergedRow && sessionCanEditMetadata\)/);
 });
 
-test('class controller exports unmergeSession and save guard for UNMERGE_REQUIRED', () => {
+test('class controller enforces undo merge access for viewers and eligible users', () => {
   const controller = readPackage('MVC/controllers/school/classController.js');
+  assert.match(controller, /canUserUndoSessionMerge/);
+  assert.match(controller, /canUndoSessionMerge/);
+  assert.match(controller, /viewSession/);
+  assert.match(controller, /You do not have permission to undo this session merge/);
   assert.match(controller, /unmergeSession/);
   assert.match(controller, /UNMERGE_REQUIRED/);
   assert.match(controller, /executeSessionUnmerge/);

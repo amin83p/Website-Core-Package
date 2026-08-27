@@ -4252,6 +4252,10 @@ async function manageSession(req, res) {
             canEditSession
             && (!isSessionLocked || canOverride || String(session?.lockReason || '') === 'timesheet_approved')
         );
+        const canUndoSessionMerge = sessionMergeService.canUserUndoSessionMerge(session, viewerPersonId, {
+            isClassAdmin: Boolean(canOverride),
+            isSessionAdmin: Boolean(canOverrideMakeupDuration)
+        });
 
         let enrollmentLockedAttendancePersonIds = [];
         if (isRollingClass) {
@@ -4319,6 +4323,7 @@ async function manageSession(req, res) {
             makeupSummary,
             makeupOriginalSessionReference,
             mergedPartnerSessionReference,
+            canUndoSessionMerge,
             canViewSchoolSettings,
             canDeleteStudentCases: Boolean(sessionStudentCaseDeleteAccess?.allowed),
             canDeleteSession,
@@ -5134,8 +5139,33 @@ async function unmergeSession(req, res) {
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (!session) throw new Error('Session not found.');
-        assertSessionScopeForRequest(req, classData, session);
+        assertSessionScopeForRequest(req, classData, session, 'viewSession');
         schoolDependencyService.assertSessionNotTimesheetLocked(session, 'This session');
+
+        const viewerPersonId = String(req.user?.personId || '').trim();
+        const [isClassAdmin, isSessionAdmin] = await Promise.all([
+            adminAuthorityService.isAdminForRequestAsync(
+                req.user,
+                SECTIONS.SCHOOL_CLASSES,
+                OPERATIONS.UPDATE,
+                { section: { id: SECTIONS.SCHOOL_CLASSES } }
+            ),
+            adminAuthorityService.isAdminForRequestAsync(
+                req.user,
+                SECTIONS.SCHOOL_SESSIONS,
+                OPERATIONS.UPDATE,
+                { section: { id: SECTIONS.SCHOOL_SESSIONS } }
+            )
+        ]);
+        const canUndo = sessionMergeService.canUserUndoSessionMerge(session, viewerPersonId, {
+            isClassAdmin: Boolean(isClassAdmin),
+            isSessionAdmin: Boolean(isSessionAdmin)
+        });
+        if (!canUndo) {
+            const denied = new Error('You do not have permission to undo this session merge.');
+            denied.statusCode = 403;
+            throw denied;
+        }
 
         const result = await sessionMergeService.executeSessionUnmerge({
             sourceClassId: classId,

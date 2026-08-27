@@ -305,16 +305,15 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { id: 1 }, options: { name: 'idx_school_book_covering_reports_id', unique: true } },
     { key: { orgId: 1, classId: 1, periodStartDate: 1 }, options: { name: 'idx_school_book_covering_reports_org_class_start' } },
     { key: { orgId: 1, teacherId: 1, status: 1 }, options: { name: 'idx_school_book_covering_reports_org_teacher_status' } },
-  {
-    key: { orgId: 1, classId: 1, sessionId: 1, teacherId: 1 },
-    options: {
-      name: 'idx_school_book_covering_reports_org_class_session_teacher',
-      sparse: true,
-      partialFilterExpression: {
-        sessionId: { $exists: true, $type: 'string', $gt: '' }
+    {
+      key: { orgId: 1, classId: 1, sessionId: 1, teacherId: 1 },
+      options: {
+        name: 'idx_school_book_covering_reports_org_class_session_teacher',
+        partialFilterExpression: {
+          sessionId: { $exists: true, $type: 'string', $gt: '' }
+        }
       }
     }
-  }
   ],
   schoolClassEnrollmentPeriods: [
     { key: { id: 1 }, options: { name: 'idx_school_class_enrollment_periods_id' } },
@@ -620,7 +619,9 @@ const REPAIRABLE_INDEX_NAMES_BY_COLLECTION = Object.freeze({
   sections: ['idx_sections_id'],
   operations: ['idx_operations_id'],
   schoolLibraryLocations: ['idx_school_library_locations_org_code'],
-  schoolBooks: ['idx_school_books_org_isbn']
+  schoolBooks: ['idx_school_books_org_isbn'],
+  schoolBookAssignments: ['idx_school_book_assignments_org_class'],
+  schoolBookCoveringReports: ['idx_school_book_covering_reports_org_class_session_teacher']
 });
 
 function getIndexFieldNames(index = {}) {

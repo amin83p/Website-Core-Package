@@ -196,6 +196,27 @@ function isMergedSessionRow(session = {}) {
   return session?.merged?.isMergedSession === true;
 }
 
+function canUserUndoSessionMerge(session = {}, personId = '', { isClassAdmin = false, isSessionAdmin = false } = {}) {
+  if (!isMergedSessionRow(session)) return false;
+  if (isClassAdmin || isSessionAdmin) return true;
+  const viewerId = toPublicId(personId);
+  if (!viewerId) return false;
+  const mergingId = toPublicId(session?.merged?.mergingTeacherId);
+  if (mergingId && idsEqual(viewerId, mergingId)) return true;
+  if (isPersonMergedPreviousTeacherEditor(session, personId)) return true;
+  return false;
+}
+
+function isPersonMergedPreviousTeacherEditor(session = {}, personId = '') {
+  if (!isMergedSessionRow(session)) return false;
+  const viewerId = toPublicId(personId);
+  if (!viewerId) return false;
+  const previousId = toPublicId(session?.merged?.previousTeacherId);
+  if (previousId && idsEqual(viewerId, previousId)) return true;
+  const coTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
+  return coTeachers.some((row) => isMergeAddedPreviousTeacherCoTeacher(row, viewerId));
+}
+
 function areMergeLinkedSessions(sessionA = {}, classIdA = '', sessionB = {}, classIdB = '') {
   const aClassId = toPublicId(classIdA || sessionA?.merged?.partnerClassId);
   const aSessionId = toPublicId(sessionA?.sessionId || sessionA?.id);
@@ -842,6 +863,8 @@ module.exports = {
   normalizeClock,
   normalizeDateOnly,
   isMergedSessionRow,
+  canUserUndoSessionMerge,
+  isPersonMergedPreviousTeacherEditor,
   areMergeLinkedSessions,
   scanPartnerSessionsForMerge,
   explainPartnerSessionMergeFailure,

@@ -173,7 +173,12 @@ test('book save returns duplicate ISBN warnings without blocking catalog variant
   assert.match(controller, /warning:\s*duplicateIsbnWarning/);
   assert.match(indexes, /idx_school_books_org_isbn',\s*sparse:\s*true/);
   assert.doesNotMatch(indexes, /idx_school_books_org_isbn',\s*unique:\s*true/);
-  assert.match(indexes, /schoolBooks:\s*'idx_school_books_org_isbn'/);
+  assert.match(indexes, /schoolBooks:\s*\['idx_school_books_org_isbn'\]/);
+  assert.match(indexes, /idx_school_book_assignments_org_class',\s*unique:\s*true/);
+  assert.match(indexes, /schoolBookAssignments:\s*\['idx_school_book_assignments_org_class'\]/);
+  assert.match(indexes, /idx_school_book_covering_reports_org_class_session_teacher',\s*partialFilterExpression:/);
+  assert.doesNotMatch(indexes, /idx_school_book_covering_reports_org_class_session_teacher',\s*sparse:\s*true/);
+  assert.match(indexes, /schoolBookCoveringReports:\s*\['idx_school_book_covering_reports_org_class_session_teacher'\]/);
 });
 
 test('bookModel sorts TOC entries by sortOrder then startPage', () => {

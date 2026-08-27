@@ -86,6 +86,41 @@ test('schoolRecordAccessService grants view to co-teachers and edit only with ca
   }), false);
 });
 
+test('schoolRecordAccessService grants manageSession to merged previous teacher without canEdit flag', () => {
+  const mergedSession = {
+    status: 'merged_session',
+    merged: {
+      isMergedSession: true,
+      mergingTeacherId: 'HOST-1',
+      previousTeacherId: 'PREV-1'
+    },
+    delivery: {
+      deliveredBy: 'HOST-1',
+      coTeachers: [{
+        personId: 'PREV-1',
+        roleLabel: 'Previous Teacher',
+        paid: false,
+        canEdit: false
+      }]
+    }
+  };
+  const previousTeacherAccess = { scopeMode: SCOPE_MODES.ASSIGNMENT, personId: 'PREV-1' };
+  const classRow = { instructors: [] };
+
+  assert.equal(schoolRecordAccessService.isSessionAccessible({
+    classRow,
+    session: mergedSession,
+    access: previousTeacherAccess,
+    context: 'viewSession'
+  }), true);
+  assert.equal(schoolRecordAccessService.isSessionAccessible({
+    classRow,
+    session: mergedSession,
+    access: previousTeacherAccess,
+    context: 'manageSession'
+  }), true);
+});
+
 test('rolling staged sessions preserve coTeachers', () => {
   const staged = rollingEnrollmentSessionAlignmentService.sanitizeStagedSessionRow({
     date: '2026-07-21',

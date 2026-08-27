@@ -1402,6 +1402,9 @@
         const isMakeupRequiredInactive = currentSessionStatusMeta && currentSessionStatusMeta.makeUpRequired === true;
         const isMergedSessionRow = session.merged && session.merged.isMergedSession === true;
         const isMergedSessionInactive = currentSessionStatusMeta && currentSessionStatusMeta.mergedSessionRequired === true && !isMergedSessionRow;
+        const canUndoSessionMergeFlag = typeof canUndoSessionMerge !== 'undefined' && canUndoSessionMerge === true;
+        const statusControlDisabled = isReadOnly || isMergedSessionRow;
+        const statusControlDisabledAttr = statusControlDisabled ? 'disabled' : '';
         const isInstructionalInactive = isMakeupRequiredInactive || isMergedSessionInactive;
         const mergedPartnerReference = (typeof mergedPartnerSessionReference !== 'undefined' && mergedPartnerSessionReference && typeof mergedPartnerSessionReference === 'object')
             ? mergedPartnerSessionReference
@@ -1585,13 +1588,26 @@
             <div class="session-info-status-slot">
                 <div class="session-info-status-slot-label">
                     <span>Session status</span>
+                    <% if (!isMergedSessionRow && !isSessionCompleted) { %>
                     <span class="badge bg-warning text-dark session-status-required-badge">Required</span>
+                    <% } %>
                 </div>
-                <button type="button" id="sessionStatusButton" class="btn session-status-button session-status-button--action-required" <%= disabledAttr ? 'disabled' : '' %>>
+                <% if (isMergedSessionRow) { %>
+                <div
+                    id="sessionStatusButton"
+                    class="btn session-status-button"
+                    style="background-color: <%= currentSessionStatusMeta?.colorBg || '#e2e3e5' %>; color: <%= currentSessionStatusMeta?.colorText || '#41464b' %>; border-color: <%= currentSessionStatusMeta?.colorBorder || '#c6c8ca' %>; cursor: default; pointer-events: none;"
+                    aria-disabled="true"
+                >
+                    <span id="sessionStatusButtonLabel"><%= smCurrentStatusLabel %></span>
+                </div>
+                <% } else { %>
+                <button type="button" id="sessionStatusButton" class="btn session-status-button session-status-button--action-required" <%= statusControlDisabledAttr ? 'disabled' : '' %>>
                     <span id="sessionStatusButtonLabel"><%= smCurrentStatusLabel %></span>
                     <i class="bi bi-pencil-square" aria-hidden="true"></i>
                 </button>
-                <select id="sessionStatusSelect" class="d-none" aria-hidden="true" tabindex="-1" <%= disabledAttr ? 'disabled' : '' %>>
+                <% } %>
+                <select id="sessionStatusSelect" class="d-none" aria-hidden="true" tabindex="-1" <%= statusControlDisabledAttr ? 'disabled' : '' %>>
                     <% const pickerRowsForSelect = [...availableStatusRows]; %>
                     <% if (normalizedSessionStatus && !pickerRowsForSelect.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)) {
                         const lockedRow = displayStatusRows.find((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus);
@@ -1819,7 +1835,7 @@
                 <% } else { %>
                     <div class="small text-muted">Linked partner session could not be loaded.</div>
                 <% } %>
-                <% if (!isReadOnly) { %>
+                <% if (canUndoSessionMergeFlag) { %>
                     <button type="button" class="btn btn-outline-info btn-sm mt-2" id="btnUndoSessionMerge">
                         <i class="bi bi-arrow-counterclockwise me-1"></i>Undo merge (restore Scheduled)
                     </button>
@@ -3411,6 +3427,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionCanOverrideMakeupDuration = <%- jsonForScript(Boolean(typeof canOverrideMakeupDuration !== 'undefined' && canOverrideMakeupDuration === true)) %>;
     const sessionInstructionalInactive = <%- jsonForScript(Boolean(isInstructionalInactive)) %>;
     const sessionIsMergedRow = <%- jsonForScript(Boolean(isMergedSessionRow)) %>;
+    const sessionStatusFrozen = <%- jsonForScript(Boolean(isMergedSessionRow)) %>;
+    const sessionCanUndoMerge = <%- jsonForScript(Boolean(canUndoSessionMergeFlag)) %>;
     const sessionMergedPartnerReference = <%- jsonForScript(mergedPartnerReference || null) %>;
     const sessionDefaultTeacherId = <%- jsonForScript(session.delivery?.deliveredBy || '') %>;
     const sessionDefaultTeacherName = <%- jsonForScript(session.delivery?.deliveredByName || '') %>;
@@ -4492,7 +4510,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    if (sessionIsMergedRow && sessionCanEditMetadata) {
+    if (sessionIsMergedRow && sessionCanUndoMerge) {
         document.getElementById('btnUndoSessionMerge')?.addEventListener('click', unmergeSessionFromManager);
     }
 
@@ -7375,7 +7393,7 @@ document.addEventListener('DOMContentLoaded', () => {
         syncSessionNotesNavBadge();
         markSessionAutosaveCoreDirty();
     });
-    if (statusButton) {
+    if (statusButton && !sessionStatusFrozen) {
         statusButton.addEventListener('click', () => {
             ensureSessionStatusModal();
             renderSessionStatusButtons();

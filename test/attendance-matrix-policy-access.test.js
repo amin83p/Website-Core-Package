@@ -73,3 +73,24 @@ test('open-matrix access remains distinct from School Settings access', () => {
   assert.match(settingsAccess, /OPERATIONS\.READ_ALL/);
   assert.match(settingsAccess, /OPERATIONS\.UPDATE/);
 });
+
+test('attendance matrix excuse marking is admin-only in access service, controller, and viewer', () => {
+  const matrixAccess = read('packages/school/MVC/services/school/attendanceMatrixAccessService.js');
+  const controller = read('packages/school/MVC/controllers/school/attendanceController.js');
+  const viewer = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
+
+  assert.match(matrixAccess, /userCanMarkAttendanceExcused/);
+  assert.match(matrixAccess, /isAttendancesAdminViewerAsync\(user, operationId\)/);
+
+  assert.match(controller, /userCanMarkAttendanceExcused/);
+  assert.match(controller, /canMarkAttendanceExcused/);
+  assert.match(controller, /savedExcuseState/);
+  assert.match(controller, /if \(canMarkAttendanceExcused\) \{[\s\S]*rosterRecord\.lateExcused/);
+  assert.match(controller, /else \{[\s\S]*rosterRecord\.lateExcused = savedExcuseState\.lateExcused/);
+
+  assert.match(viewer, /CAN_MARK_ATTENDANCE_EXCUSED/);
+  assert.match(viewer, /attendanceCanMarkExcused/);
+  assert.match(viewer, /syncExcuseNotesAccess/);
+  assert.match(viewer, /if \(attendanceCanMarkExcused\(\)\) \{[\s\S]*payload\.lateExcused/);
+  assert.match(viewer, /if \(!attendanceCanMarkExcused\(\)\) \{[\s\S]*wrapper\.classList\.add\('d-none'\)/);
+});

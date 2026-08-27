@@ -134,6 +134,9 @@ function isPersonSessionViewer(session, personId, teacherPersonMap = null) {
 
 function isPersonSessionEditor(session, personId, teacherPersonMap = null) {
   if (isPersonSessionMainTeacher(session, personId, teacherPersonMap)) return true;
+  // Lazy require avoids circular dependency with sessionMergeService.
+  const sessionMergeService = require('./sessionMergeService');
+  if (sessionMergeService.isPersonMergedPreviousTeacherEditor(session, personId)) return true;
   const coTeacher = findCoTeacherEntry(session, personId, teacherPersonMap);
   return Boolean(coTeacher && coTeacher.canEdit === true);
 }

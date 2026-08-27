@@ -374,9 +374,9 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="col-12">
+                        <div class="col-12" id="wrap_cellExcuseNotes">
                             <label class="form-label fw-bold small mb-0">Excuse / reference notes</label>
-                            <div class="row g-2 align-items-start">
+                            <div class="row g-2 align-items-start" id="wrap_cellExcuseNotesEditor">
                                 <div class="col-md-8">
                                     <textarea class="form-control form-control-sm" id="inp_cellExcuseRef" rows="3" placeholder="Add details..."></textarea>
                                 </div>
@@ -385,6 +385,7 @@
                                     <div class="small text-muted mt-1">Attach supporting file if needed.</div>
                                 </div>
                             </div>
+                            <div class="small mt-2 d-none" id="wrap_cellExcuseNotesReadonly"></div>
                             <div class="small mt-2" id="inp_cellExcuseAttachmentPreview"></div>
                         </div>
                     </div>
@@ -814,12 +815,57 @@ function parseAttendanceMinutesInputValue(id) {
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 }
 
+function attendanceCanMarkExcused() {
+    return window.CAN_MARK_ATTENDANCE_EXCUSED === true;
+}
+
+function syncExcuseNotesAccess(record = null) {
+    const canMark = attendanceCanMarkExcused();
+    const editorWrap = document.getElementById('wrap_cellExcuseNotesEditor');
+    const readonlyWrap = document.getElementById('wrap_cellExcuseNotesReadonly');
+    const notesWrap = document.getElementById('wrap_cellExcuseNotes');
+    if (!notesWrap) return;
+    if (canMark) {
+        notesWrap.classList.remove('d-none');
+        if (editorWrap) editorWrap.classList.remove('d-none');
+        if (readonlyWrap) readonlyWrap.classList.add('d-none');
+        return;
+    }
+    const excuseRef = String(record?.excuseRef || document.getElementById('inp_cellExcuseRef')?.value || '').trim();
+    const excuseAttachment = record?.excuseAttachment || window.currentAttendanceExcuseAttachment || null;
+    const hasExcuseData = Boolean(excuseRef || excuseAttachment);
+    if (editorWrap) editorWrap.classList.add('d-none');
+    if (readonlyWrap) {
+        if (hasExcuseData) {
+            const parts = [];
+            if (excuseRef) parts.push(`<div class="text-muted">${attendanceAttachmentEscape(excuseRef).replace(/\n/g, '<br>')}</div>`);
+            if (excuseAttachment) {
+                parts.push(renderAttendanceAttachmentLink(excuseAttachment, '<span class="text-muted">No file attached.</span>'));
+            }
+            readonlyWrap.innerHTML = parts.join('');
+            readonlyWrap.classList.remove('d-none');
+            notesWrap.classList.remove('d-none');
+        } else {
+            readonlyWrap.innerHTML = '';
+            readonlyWrap.classList.add('d-none');
+            notesWrap.classList.add('d-none');
+        }
+    } else {
+        notesWrap.classList.toggle('d-none', !hasExcuseData);
+    }
+}
+
 function syncTimingExcuseControl({ minutesInputId, checkboxId, wrapperId, buttonId, inactiveText, activeText }) {
     const minutes = parseAttendanceMinutesInputValue(minutesInputId);
     const checkbox = document.getElementById(checkboxId);
     const wrapper = document.getElementById(wrapperId);
     const button = document.getElementById(buttonId);
     if (!checkbox || !wrapper) return false;
+    if (!attendanceCanMarkExcused()) {
+        checkbox.checked = false;
+        wrapper.classList.add('d-none');
+        return false;
+    }
     if (minutes > 0) {
         wrapper.classList.remove('d-none');
         if (button) {
@@ -850,6 +896,11 @@ function syncAbsenceExcuseControl() {
     const wrapper = document.getElementById('wrap_cellAbsenceExcused');
     const button = document.getElementById('btn_cellAbsenceExcused');
     if (!checkbox || !wrapper) return false;
+    if (!attendanceCanMarkExcused()) {
+        checkbox.checked = false;
+        wrapper.classList.add('d-none');
+        return false;
+    }
     if (!isAbsentLikeAttendanceStatus(attendance)) {
         checkbox.checked = false;
         wrapper.classList.add('d-none');
@@ -892,6 +943,7 @@ function syncTimingExcuseControls() {
         activeText: 'Early leave excused'
     });
     syncAbsenceExcuseControl();
+    syncExcuseNotesAccess();
 }
 
 function captureAttendanceDetailsModalSnapshot() {
@@ -941,6 +993,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     window.ATTENDANCE_ACTION_STATE_ID = actionStateId;
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
+    window.CAN_MARK_ATTENDANCE_EXCUSED = <%= (typeof canMarkAttendanceExcused !== 'undefined' && canMarkAttendanceExcused) ? 'true' : 'false' %>;
     window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
 
     if (typeof bootstrap !== 'undefined') {
@@ -2325,14 +2378,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     attendance,
                     lateMinutes: document.getElementById('inp_cellLateMins').value,
                     earlyLeaveMinutes: document.getElementById('inp_cellLeaveMins').value,
-                    lateExcused: parseAttendanceMinutesInputValue('inp_cellLateMins') > 0 && document.getElementById('inp_cellLateExcused')?.checked === true,
-                    earlyLeaveExcused: parseAttendanceMinutesInputValue('inp_cellLeaveMins') > 0 && document.getElementById('inp_cellEarlyLeaveExcused')?.checked === true,
-                    absenceExcused: isAbsentLikeAttendanceStatus(attendance) && document.getElementById('inp_cellAbsenceExcused')?.checked === true,
-                    excuseRef: document.getElementById('inp_cellExcuseRef').value,
-                    excuseAttachment: await uploadAttendanceFile(document.getElementById('inp_cellExcuseFile'), 'excuse', classId, sessionId, personId) || window.currentAttendanceExcuseAttachment || null,
                     notes: document.getElementById('inp_rosterStudentNote').value,
                     actionStateId
                 };
+                if (attendanceCanMarkExcused()) {
+                    payload.lateExcused = parseAttendanceMinutesInputValue('inp_cellLateMins') > 0 && document.getElementById('inp_cellLateExcused')?.checked === true;
+                    payload.earlyLeaveExcused = parseAttendanceMinutesInputValue('inp_cellLeaveMins') > 0 && document.getElementById('inp_cellEarlyLeaveExcused')?.checked === true;
+                    payload.absenceExcused = isAbsentLikeAttendanceStatus(attendance) && document.getElementById('inp_cellAbsenceExcused')?.checked === true;
+                    payload.excuseRef = document.getElementById('inp_cellExcuseRef').value;
+                    payload.excuseAttachment = await uploadAttendanceFile(document.getElementById('inp_cellExcuseFile'), 'excuse', classId, sessionId, personId) || window.currentAttendanceExcuseAttachment || null;
+                }
                 const res = await fetch('/school/attendances/api/update-roster-cell', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
@@ -2472,7 +2527,12 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     const excuseFileInput = document.getElementById('inp_cellExcuseFile');
     if (excuseFileInput) excuseFileInput.value = '';
     const excusePreview = document.getElementById('inp_cellExcuseAttachmentPreview');
-    if (excusePreview) excusePreview.innerHTML = renderAttendanceAttachmentLink(record.excuseAttachment, '<span class="text-muted">No file attached.</span>');
+    if (excusePreview) {
+        excusePreview.innerHTML = attendanceCanMarkExcused()
+            ? renderAttendanceAttachmentLink(record.excuseAttachment, '<span class="text-muted">No file attached.</span>')
+            : '';
+    }
+    syncExcuseNotesAccess(record);
     document.getElementById('inp_rosterStudentNote').value = record.rosterStudentNotes != null ? record.rosterStudentNotes : '';
 
     const locked = record.sessionLocked === true;

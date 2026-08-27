@@ -29,6 +29,7 @@ const studentAttendanceReportPolicyModel = require('../../models/school/studentA
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { userCanMarkAttendanceExcused } = require('../../services/school/attendanceMatrixAccessService');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
@@ -381,6 +382,7 @@ async function showAttendancePage(req, res) {
         }
 
         const attendanceMarkAppearanceResolved = await resolveAttendanceMarkAppearanceForRequest(req);
+        const canMarkAttendanceExcused = await userCanMarkAttendanceExcused(req.user);
 
         res.render('school/attendance/attendanceViewer', {
             title: 'Attendance Matrix',
@@ -391,6 +393,7 @@ async function showAttendancePage(req, res) {
             tableName: 'Attendance_Matrix',
             canEditAttendanceRoster,
             isAttendanceAdminViewer,
+            canMarkAttendanceExcused,
             canOverrideSessionLock,
             attendanceMarkAppearanceResolved,
             initialClassId,
@@ -1055,7 +1058,18 @@ async function updateAttendanceRosterCell(req, res) {
             studentPersonId
         });
 
-        const previousAttendance = session.roster?.find((r) => idsEqual(r.personId, studentPersonId))?.attendance;
+        const existingRosterRecord = session.roster?.find((r) => idsEqual(r.personId, studentPersonId)) || null;
+        const previousAttendance = existingRosterRecord?.attendance;
+        const savedExcuseState = {
+            lateExcused: Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(existingRosterRecord).lateExcused),
+            earlyLeaveExcused: Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(existingRosterRecord).earlyLeaveExcused),
+            absenceExcused: Boolean(attendanceMatrixMetricsService.normalizeAbsenceExcusedFields(existingRosterRecord).absenceExcused),
+            excuseRef: String(existingRosterRecord?.excuseRef || '').trim(),
+            excuseAttachment: existingRosterRecord?.excuseAttachment && typeof existingRosterRecord.excuseAttachment === 'object'
+                ? existingRosterRecord.excuseAttachment
+                : null
+        };
+        const canMarkAttendanceExcused = await userCanMarkAttendanceExcused(req.user);
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
         const normalizedAttendance = attendanceMatrixMetricsService.assertAttendanceStatusAllowedForSave({
             status: req.body?.attendance,
@@ -1083,18 +1097,26 @@ async function updateAttendanceRosterCell(req, res) {
         if (req.body?.earlyLeaveMinutes !== undefined) {
             rosterRecord.earlyLeaveMinutes = parseNonNegInt(req.body.earlyLeaveMinutes);
         }
-        rosterRecord.lateExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.lateExcused);
-        rosterRecord.earlyLeaveExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.earlyLeaveExcused);
-        if (req.body?.absenceExcused !== undefined) {
-            rosterRecord.absenceExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.absenceExcused);
-        }
-        if (req.body?.excuseRef !== undefined) {
-            rosterRecord.excuseRef = String(req.body.excuseRef || '').trim();
-        }
-        if (req.body?.excuseAttachment !== undefined) {
-            rosterRecord.excuseAttachment = req.body.excuseAttachment && typeof req.body.excuseAttachment === 'object'
-                ? req.body.excuseAttachment
-                : null;
+        if (canMarkAttendanceExcused) {
+            rosterRecord.lateExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.lateExcused);
+            rosterRecord.earlyLeaveExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.earlyLeaveExcused);
+            if (req.body?.absenceExcused !== undefined) {
+                rosterRecord.absenceExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.absenceExcused);
+            }
+            if (req.body?.excuseRef !== undefined) {
+                rosterRecord.excuseRef = String(req.body.excuseRef || '').trim();
+            }
+            if (req.body?.excuseAttachment !== undefined) {
+                rosterRecord.excuseAttachment = req.body.excuseAttachment && typeof req.body.excuseAttachment === 'object'
+                    ? req.body.excuseAttachment
+                    : null;
+            }
+        } else {
+            rosterRecord.lateExcused = savedExcuseState.lateExcused;
+            rosterRecord.earlyLeaveExcused = savedExcuseState.earlyLeaveExcused;
+            rosterRecord.absenceExcused = savedExcuseState.absenceExcused;
+            rosterRecord.excuseRef = savedExcuseState.excuseRef;
+            rosterRecord.excuseAttachment = savedExcuseState.excuseAttachment;
         }
         if (req.body?.notes !== undefined) {
             rosterRecord.notes = String(req.body.notes || '').trim();
