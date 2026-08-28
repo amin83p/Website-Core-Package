@@ -13,6 +13,8 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/departments(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_DEPARTMENTS },
     { pattern: /^\/school\/subjects(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SUBJECTS },
     { pattern: /^\/school\/terms(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TERMS },
+    { pattern: /^\/school\/rolling-enrollment(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ROLLING_ENROLLMENT },
+    { pattern: /^\/school\/classes\/[^/]+\/rolling-enrollment(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ROLLING_ENROLLMENT },
     { pattern: /^\/school\/classes(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_CLASSES },
     { pattern: /^\/school\/transactionTemplates(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TRANSACTION_TEMPLATES },
     { pattern: /^\/school\/accounts(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ACCOUNTS },

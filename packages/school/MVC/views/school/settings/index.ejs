@@ -4,6 +4,7 @@
   const attendanceItemsJson = JSON.stringify(attendanceItems || []).replace(/</g, '\\u003c');
   const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
   const autosaveSectionsJson = JSON.stringify(typeof autosaveSections !== 'undefined' ? autosaveSections : []).replace(/</g, '\\u003c');
+  const sessionAccessPolicyJson = JSON.stringify(typeof sessionAccessPolicy !== 'undefined' ? sessionAccessPolicy : {}).replace(/</g, '\\u003c');
   const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '', overallReportTemplateIds: [], templateExportFormats: { report: {}, overall: {} } }).replace(/</g, '\\u003c');
   const studentAttendanceReportTemplateCapabilitiesJson = JSON.stringify(typeof studentAttendanceReportTemplateCapabilities !== 'undefined' ? studentAttendanceReportTemplateCapabilities : { hasDocx: false, hasPdf: false }).replace(/</g, '\\u003c');
   const studentAttendanceReportOverallLabelsJson = JSON.stringify(typeof studentAttendanceReportOverallLabels !== 'undefined' ? studentAttendanceReportOverallLabels : []).replace(/</g, '\\u003c');
@@ -608,6 +609,115 @@
         </div>
       </section>
 
+      <section class="school-settings-panel card border-0 shadow-sm" id="session-access" role="tabpanel" aria-labelledby="settings-tab-session-access" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Session Access &amp; Edit</h2>
+              <p class="small text-muted mb-0">Control teacher reminders for uncompleted sessions and attendance edit windows after completion.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <div class="alert alert-danger d-none js-settings-error" id="sessionAccessSettingsError" role="alert"></div>
+          <form id="sessionAccessSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="rollup-feature-card mb-4" id="cardSessionNotification">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="sessionNotificationEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                <label class="form-check-label fw-semibold" for="sessionNotificationEnabled">Notify teachers about uncompleted sessions</label>
+              </div>
+              <p class="small text-muted mt-2 mb-0">Notifications are sent to each teacher&apos;s email or phone on file.</p>
+              <div class="rollup-feature-options mt-3" id="sessionNotificationOptions">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label fw-semibold">Send when</label>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="sessionNotificationSendWhen" id="sessionNotificationSameDay" value="same_day" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <label class="form-check-label" for="sessionNotificationSameDay">Same day as session</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="sessionNotificationSendWhen" id="sessionNotificationNextDay" value="next_day" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <label class="form-check-label" for="sessionNotificationNextDay">Day after session</label>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label fw-semibold" for="sessionNotificationSendAtTime">Send at time</label>
+                    <input class="form-control" type="time" id="sessionNotificationSendAtTime" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  </div>
+                </div>
+                <div class="border rounded p-3 mt-3">
+                  <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sessionNotificationEmailEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="sessionNotificationEmailEnabled">Email notifications</label>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="sessionNotificationEmailFrom">From email (optional)</label>
+                      <input class="form-control" type="email" id="sessionNotificationEmailFrom" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="sessionNotificationEmailSubject">Email subject template</label>
+                      <input class="form-control" type="text" id="sessionNotificationEmailSubject" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="sessionNotificationEmailBody">Email body template</label>
+                      <textarea class="form-control" rows="3" id="sessionNotificationEmailBody" <%= canUpdateFlag ? '' : 'disabled' %>></textarea>
+                    </div>
+                  </div>
+                </div>
+                <div class="border rounded p-3 mt-3">
+                  <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sessionNotificationSmsEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="sessionNotificationSmsEnabled">SMS notifications</label>
+                  </div>
+                  <label class="form-label" for="sessionNotificationSmsBody">SMS body template</label>
+                  <textarea class="form-control" rows="2" maxlength="320" id="sessionNotificationSmsBody" <%= canUpdateFlag ? '' : 'disabled' %>></textarea>
+                </div>
+                <p class="small text-muted mt-2 mb-0">Placeholders: {{className}}, {{classId}}, {{sessionName}}, {{sessionId}}, {{sessionDate}}, {{sessionTime}}, {{teacherName}}, {{orgName}}, {{sessionManagerUrl}}</p>
+              </div>
+            </div>
+
+            <div class="rollup-feature-card" id="cardSessionAttendanceEdit">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="sessionAttendanceEditEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                <label class="form-check-label fw-semibold" for="sessionAttendanceEditEnabled">Allow attendance edits after session completion</label>
+              </div>
+              <p class="small text-muted mt-2 mb-0" id="sessionAttendanceEditDisabledHelp">
+                When off, teachers may edit attendance until the end of the next calendar day after completion.
+              </p>
+              <div class="rollup-feature-options mt-3" id="sessionAttendanceEditOptions">
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-5">
+                    <label class="form-label fw-semibold" for="sessionAttendanceEditWindowType">Edit window</label>
+                    <select class="form-select" id="sessionAttendanceEditWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <option value="end_of_week">End of week</option>
+                      <option value="end_of_month">End of month</option>
+                      <option value="timesheet_period">Timesheet period</option>
+                      <option value="days_after_session">Days after session</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label fw-semibold" for="sessionAttendanceEditDaysAfter">Days after session</label>
+                    <input class="form-control" type="number" min="1" max="365" step="1" id="sessionAttendanceEditDaysAfter" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  </div>
+                </div>
+                <p class="small text-muted mt-2 mb-0" id="sessionAttendanceEditPreview"></p>
+              </div>
+            </div>
+
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end mt-4">
+                <button class="btn btn-primary" type="submit" id="btnSaveSessionAccessSettings">
+                  <i class="bi bi-save me-1"></i>Save Session Access Settings
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+
       <section class="school-settings-panel card border-0 shadow-sm" id="student-attendance-report" role="tabpanel" aria-labelledby="settings-tab-student-attendance-report" tabindex="0" hidden>
         <header class="school-settings-panel-header card-header px-4 py-3">
           <div class="d-flex align-items-center gap-3">
@@ -719,6 +829,7 @@
   let attendanceItems = <%- attendanceItemsJson %>;
   let autosavePolicy = <%- autosavePolicyJson %>;
   const autosaveSections = <%- autosaveSectionsJson %>;
+  let sessionAccessPolicy = <%- sessionAccessPolicyJson %>;
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
   let sarReportTemplateCapabilities = <%- studentAttendanceReportTemplateCapabilitiesJson %>;
@@ -1694,12 +1805,139 @@
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
+  function collectSessionAccessPolicy() {
+    const sendWhen = document.getElementById('sessionNotificationNextDay')?.checked ? 'next_day' : 'same_day';
+    return {
+      uncompletedSessionNotification: {
+        enabled: document.getElementById('sessionNotificationEnabled')?.checked === true,
+        sendWhen,
+        sendAtTime: String(document.getElementById('sessionNotificationSendAtTime')?.value || '18:00').slice(0, 5),
+        channels: {
+          email: {
+            enabled: document.getElementById('sessionNotificationEmailEnabled')?.checked === true,
+            fromEmail: document.getElementById('sessionNotificationEmailFrom')?.value || '',
+            subjectTemplate: document.getElementById('sessionNotificationEmailSubject')?.value || '',
+            bodyTemplate: document.getElementById('sessionNotificationEmailBody')?.value || ''
+          },
+          sms: {
+            enabled: document.getElementById('sessionNotificationSmsEnabled')?.checked === true,
+            bodyTemplate: document.getElementById('sessionNotificationSmsBody')?.value || ''
+          }
+        }
+      },
+      completedSessionAttendanceEdit: {
+        enabled: document.getElementById('sessionAttendanceEditEnabled')?.checked === true,
+        windowType: document.getElementById('sessionAttendanceEditWindowType')?.value || 'timesheet_period',
+        daysAfterSession: document.getElementById('sessionAttendanceEditDaysAfter')?.value || ''
+      }
+    };
+  }
+
+  function refreshSessionAccessPanels() {
+    const notificationOn = document.getElementById('sessionNotificationEnabled')?.checked === true;
+    document.getElementById('cardSessionNotification')?.classList.toggle('is-disabled', !notificationOn);
+    document.getElementById('sessionNotificationOptions')?.querySelectorAll('input, textarea, select').forEach((el) => {
+      el.disabled = !canUpdate || !notificationOn;
+    });
+
+    const editEnabled = document.getElementById('sessionAttendanceEditEnabled')?.checked === true;
+    document.getElementById('cardSessionAttendanceEdit')?.classList.toggle('is-disabled', false);
+    document.getElementById('sessionAttendanceEditDisabledHelp')?.classList.toggle('d-none', editEnabled);
+    document.getElementById('sessionAttendanceEditOptions')?.classList.toggle('d-none', !editEnabled);
+    const windowType = document.getElementById('sessionAttendanceEditWindowType')?.value || 'timesheet_period';
+    const daysField = document.getElementById('sessionAttendanceEditDaysAfter');
+    if (daysField) {
+      daysField.disabled = !canUpdate || !editEnabled || windowType !== 'days_after_session';
+    }
+    document.getElementById('sessionAttendanceEditWindowType').disabled = !canUpdate || !editEnabled;
+    const preview = document.getElementById('sessionAttendanceEditPreview');
+    if (preview) {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const sampleDate = `${yyyy}-${mm}-${dd}`;
+      let message = '';
+      if (!editEnabled) {
+        message = `Example: a session completed on ${sampleDate} would remain editable through the next calendar day.`;
+      } else if (windowType === 'days_after_session') {
+        const days = Number(document.getElementById('sessionAttendanceEditDaysAfter')?.value || 1);
+        message = `Example: a session on ${sampleDate} would remain editable for ${days} day(s) after the session date.`;
+      } else if (windowType === 'end_of_week') {
+        message = `Example: a session completed today would remain editable through the end of this week.`;
+      } else if (windowType === 'end_of_month') {
+        message = `Example: a session completed today would remain editable through the end of this month.`;
+      } else {
+        message = `Example: a session completed today would remain editable through the end of its timesheet period.`;
+      }
+      preview.textContent = message;
+    }
+  }
+
+  function renderSessionAccessSettings() {
+    const notification = sessionAccessPolicy?.uncompletedSessionNotification || {};
+    const channels = notification.channels || {};
+    const email = channels.email || {};
+    const sms = channels.sms || {};
+    const edit = sessionAccessPolicy?.completedSessionAttendanceEdit || {};
+
+    const notificationEnabled = document.getElementById('sessionNotificationEnabled');
+    if (notificationEnabled) notificationEnabled.checked = notification.enabled === true;
+    if (notification.sendWhen === 'next_day') {
+      document.getElementById('sessionNotificationNextDay').checked = true;
+    } else {
+      document.getElementById('sessionNotificationSameDay').checked = true;
+    }
+    document.getElementById('sessionNotificationSendAtTime').value = String(notification.sendAtTime || '18:00').slice(0, 5);
+    document.getElementById('sessionNotificationEmailEnabled').checked = email.enabled !== false;
+    document.getElementById('sessionNotificationEmailFrom').value = email.fromEmail || '';
+    document.getElementById('sessionNotificationEmailSubject').value = email.subjectTemplate || '';
+    document.getElementById('sessionNotificationEmailBody').value = email.bodyTemplate || '';
+    document.getElementById('sessionNotificationSmsEnabled').checked = sms.enabled === true;
+    document.getElementById('sessionNotificationSmsBody').value = sms.bodyTemplate || '';
+
+    document.getElementById('sessionAttendanceEditEnabled').checked = edit.enabled !== false;
+    document.getElementById('sessionAttendanceEditWindowType').value = edit.windowType || 'timesheet_period';
+    document.getElementById('sessionAttendanceEditDaysAfter').value = edit.daysAfterSession || '';
+    refreshSessionAccessPanels();
+  }
+
+  [
+    'sessionNotificationEnabled',
+    'sessionNotificationEmailEnabled',
+    'sessionNotificationSmsEnabled',
+    'sessionAttendanceEditEnabled',
+    'sessionAttendanceEditWindowType',
+    'sessionAttendanceEditDaysAfter'
+  ].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', refreshSessionAccessPanels);
+    document.getElementById(id)?.addEventListener('input', refreshSessionAccessPanels);
+  });
+  document.querySelectorAll('input[name="sessionNotificationSendWhen"]').forEach((input) => {
+    input.addEventListener('change', refreshSessionAccessPanels);
+  });
+
+  document.getElementById('sessionAccessSettingsForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveSessionAccessSettings');
+    if (!button) return;
+    const result = await postSettings('/school/settings/session-access', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      ...collectSessionAccessPolicy()
+    }, button, 'sessionAccessSettingsError');
+    if (!result) return;
+    sessionAccessPolicy = result.policy && typeof result.policy === 'object' ? result.policy : sessionAccessPolicy;
+    renderSessionAccessSettings();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
   renderConductLevels();
   renderAttendanceMarks();
   renderAttendanceItems();
   renderRollupFormulaControls();
   renderRollupGraceItems();
   renderAutosaveSections();
+  renderSessionAccessSettings();
   initializeSarOverallTemplates();
   renderSarReportExportFormatControls();
 })();

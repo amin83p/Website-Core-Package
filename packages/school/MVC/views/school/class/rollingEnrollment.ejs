@@ -89,6 +89,10 @@
   .rolling-enrollment-page tr.rolling-period-row-ended:hover > td {
     background-color: var(--bs-secondary-bg-subtle, #dde2e6);
   }
+  .rolling-enrollment-page tr.unmark-session-row-occupied > td {
+    background-color: #f1f3f5;
+    color: #6c757d;
+  }
   #addEnrollmentPeriodModal .enroll-wizard-guide {
     margin-bottom: 1rem;
   }
@@ -879,12 +883,13 @@
         </div>
 
         <div id="enrollWizardStepUnmarkSessions" class="d-none">
-          <div class="alert alert-info border small" id="unmarkSummaryText">Select sessions to clear from N/A to unmarked for this student.</div>
+          <div class="alert alert-info border small" id="unmarkSummaryText">Choose empty sessions for this student. Sessions that already have a student enrolled are shown but cannot be selected.</div>
           <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
             <button type="button" class="btn btn-outline-primary btn-sm" id="btn_openUnmarkCalendarPicker"><i class="bi bi-calendar3 me-1"></i>Calendar picker</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_openUnmarkSessionsList"><i class="bi bi-list-ul me-1"></i>List view</button>
             <div class="small text-muted" id="unmarkSelectionCounter">Selected 0 session(s)</div>
           </div>
-          <div class="table-responsive border rounded">
+          <div id="unmarkSessionsTablePanel" class="table-responsive border rounded d-none">
             <table class="table table-sm align-middle mb-0">
               <thead class="table-light">
                 <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
@@ -1889,6 +1894,37 @@
   </div>
 </div>
 
+<div class="modal fade" id="unmarkSessionListModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-list-ul me-1"></i>Sessions to unmark</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr><th>Date</th><th>Time</th><th>Status</th><th>Countable</th><th class="text-end">Actions</th></tr>
+            </thead>
+            <tbody id="unmarkSessionListTbody">
+              <tr><td colspan="5" class="text-center text-muted py-3">No sessions loaded.</td></tr>
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <td colspan="5" class="small py-2 text-secondary" id="unmarkSessionListTotals">Selected: 0 session(s), 0 Hrs</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal_GenericPicker') %>
 <%- include('school/partials/sessionEnrollmentCalendarModal') %>
 
@@ -2461,6 +2497,7 @@
   const priorCreditRepairModalEl = qs('priorCreditRepairModal');
   const clbPlacementInsightModalEl = qs('clbPlacementInsightModal');
   const enrollmentSessionListModalEl = qs('enrollmentSessionListModal');
+  const unmarkSessionListModalEl = qs('unmarkSessionListModal');
   const groupEnrollmentModalEl = qs('groupEnrollmentModal');
   const groupEnrollmentResultsModalEl = qs('groupEnrollmentResultsModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
@@ -2539,6 +2576,7 @@
   const priorCreditRepairModal = createModalController(priorCreditRepairModalEl);
   const clbPlacementInsightModal = createModalController(clbPlacementInsightModalEl);
   const enrollmentSessionListModal = createModalController(enrollmentSessionListModalEl);
+  const unmarkSessionListModal = createModalController(unmarkSessionListModalEl);
   const groupEnrollmentModal = createModalController(groupEnrollmentModalEl);
   const groupEnrollmentResultsModal = createModalController(groupEnrollmentResultsModalEl);
   const addButton = qs('btn_addPeriod');
@@ -5065,7 +5103,7 @@
       payload.plannedNotApplicableSessionIds = pendingPlannedNaSessionIds.slice();
     }
     if (pendingUnmarkSessionIds.length) {
-      payload.unmarkSessionIds = pendingUnmarkSessionIds.slice();
+      payload.unmarkSessionIds = filterSelectableUnmarkSessionIds(pendingUnmarkSessionIds);
     }
     return payload;
   }
@@ -5083,7 +5121,7 @@
       classId: base.classId,
       students: [{
         studentId: base.studentId,
-        ...(pendingUnmarkSessionIds.length ? { unmarkSessionIds: pendingUnmarkSessionIds.slice() } : {})
+        ...(pendingUnmarkSessionIds.length ? { unmarkSessionIds: filterSelectableUnmarkSessionIds(pendingUnmarkSessionIds) } : {})
       }],
       enrollmentMode: inferEnrollmentModeFromForm(),
       startDate: base.startDate,
@@ -5104,7 +5142,7 @@
       enginePayload.plannedNotApplicableSessionIds = pendingPlannedNaSessionIds.slice();
     }
     if (pendingUnmarkSessionIds.length) {
-      enginePayload.unmarkSessionIds = pendingUnmarkSessionIds.slice();
+      enginePayload.unmarkSessionIds = filterSelectableUnmarkSessionIds(pendingUnmarkSessionIds);
     }
     if (pendingGapBatch && !enginePayload.sessionsToCreate.length) {
       enginePayload.pendingGapBatch = { ...pendingGapBatch };
@@ -5288,6 +5326,82 @@
       endTime,
       status: String(row?.status || 'scheduled').trim().toLowerCase() || 'scheduled',
       countable: row?.countable === true
+    };
+  }
+
+  function resolveSessionRosterCount(row = {}) {
+    const direct = Number(row?.rosterCount);
+    if (Number.isFinite(direct) && direct >= 0) return direct;
+    const sessionId = String(row?.sessionId || row?.id || '').trim();
+    if (sessionId && Array.isArray(rollingEnrollmentWorkspace?.sessions)) {
+      const match = rollingEnrollmentWorkspace.sessions.find((session) => (
+        String(session?.sessionId || session?.id || '').trim() === sessionId
+      ));
+      if (match) {
+        const fromWorkspace = Number(match?.rosterCount);
+        if (Number.isFinite(fromWorkspace) && fromWorkspace >= 0) return fromWorkspace;
+        if (Array.isArray(match?.roster)) return match.roster.length;
+      }
+    }
+    return 0;
+  }
+
+  function isUnmarkSelectableSessionRow(row = {}) {
+    if (!isOneOnOneSessionCapacityEnrollment()) return true;
+    return resolveSessionRosterCount(row) === 0;
+  }
+
+  function enrichUnmarkSessionRow(row = {}) {
+    const normalized = normalizeSessionRowForDisplay(row);
+    const rosterCount = resolveSessionRosterCount(normalized);
+    const unmarkSelectable = isUnmarkSelectableSessionRow(normalized);
+    return {
+      ...normalized,
+      rosterCount,
+      unmarkSelectable,
+      unmarkOccupiedLabel: unmarkSelectable ? '' : 'Student enrolled'
+    };
+  }
+
+  function filterSelectableUnmarkSessionIds(sessionIds = []) {
+    const selectableIds = new Set(
+      buildUnmarkSessionRows(lastAlignmentResult)
+        .filter((row) => row.unmarkSelectable !== false)
+        .map((row) => String(row?.sessionId || '').trim())
+        .filter(Boolean)
+    );
+    return (Array.isArray(sessionIds) ? sessionIds : [])
+      .map((id) => String(id || '').trim())
+      .filter((id) => selectableIds.has(id));
+  }
+
+  function applyUnmarkSelectableRules(pickerData) {
+    if (!pickerData || typeof pickerData !== 'object') return pickerData;
+    const patchEvents = (events) => (Array.isArray(events) ? events : []).map((event) => {
+      const rosterCount = resolveSessionRosterCount(event);
+      const outOfWindow = String(event?.excludeReason || '').trim() === 'out_of_window';
+      const occupied = rosterCount > 0;
+      const selectable = !outOfWindow && !occupied;
+      let excludeReason = '';
+      if (outOfWindow) excludeReason = 'out_of_window';
+      else if (occupied) excludeReason = 'Student already enrolled';
+      return {
+        ...event,
+        rosterCount,
+        selectable,
+        excludeReason
+      };
+    });
+    const allEvents = patchEvents(pickerData.allEvents);
+    const events = patchEvents(pickerData.events);
+    const selectableSessionIds = allEvents
+      .filter((row) => row.selectable && row.sessionId)
+      .map((row) => row.sessionId);
+    return {
+      ...pickerData,
+      allEvents,
+      events,
+      selectableSessionIds
     };
   }
 
@@ -5632,6 +5746,7 @@
       classLabel: classTitle,
       startDate: payload.startDate,
       endDate: payload.endDate,
+      cycleEndDate: String(cycleWindow?.endDate || '').trim(),
       targetSessionCount: hasTargetSessionCount() ? Number(qs('inp_targetSessionCount')?.value || 0) : 0,
       targetHours: hasTargetHours() ? Number(qs('inp_targetHours')?.value || 0) : 0,
       selectedSessionIds: getEnrollmentPickerSelectedIds(),
@@ -5653,6 +5768,114 @@
           syncPendingStagedSessionsFromCalendar(sessionsToCreate);
         }
         applyEnrollmentSelectionFromIds(selectedSessionIds, { refreshAlignment: true });
+      }
+    });
+  }
+
+  function applyUnmarkSelectionFromIds(selectedSessionIds) {
+    pendingUnmarkSessionIds = filterSelectableUnmarkSessionIds(
+      Array.isArray(selectedSessionIds) ? selectedSessionIds : []
+    );
+    renderUnmarkSessionTable(buildUnmarkSessionRows(lastAlignmentResult), pendingUnmarkSessionIds);
+  }
+
+  function readSelectedUnmarkSessionIdsFromScope(scopeEl) {
+    const root = scopeEl || qs('unmarkSessionsTbody') || document;
+    return Array.from(root.querySelectorAll('.unmark-session-toggle.is-selected'))
+      .map((btn) => String(btn.dataset?.sessionId || '').trim())
+      .filter(Boolean);
+  }
+
+  function syncUnmarkSelectionFromScope(scopeEl) {
+    applyUnmarkSelectionFromIds(readSelectedUnmarkSessionIdsFromScope(scopeEl));
+  }
+
+  function renderUnmarkSessionListModalTable() {
+    const rows = buildUnmarkSessionRows(lastAlignmentResult);
+    const selectedUnmarkIds = readSelectedUnmarkSessionIds().length
+      ? readSelectedUnmarkSessionIds()
+      : pendingUnmarkSessionIds.slice();
+    renderSessionWindowTable(rows, 'unmarkSessionListTbody', {
+      unmarkToggle: true,
+      selectedUnmarkIds,
+      footerTotalsId: 'unmarkSessionListTotals'
+    });
+  }
+
+  function openUnmarkSessionListModal() {
+    renderUnmarkSessionListModalTable();
+    unmarkSessionListModal?.show();
+  }
+
+  function handleUnmarkSessionToggleClick(event, scopeEl) {
+    const btn = event.target.closest('.unmark-session-toggle');
+    if (!btn) return false;
+    const row = btn.closest('tr');
+    if (row?.classList.contains('unmark-session-row-occupied')) return false;
+    const selected = btn.classList.toggle('is-selected');
+    btn.classList.toggle('btn-success', selected);
+    btn.classList.toggle('btn-outline-secondary', !selected);
+    btn.textContent = selected ? 'Unmarked' : 'Unmark';
+    if (row) row.classList.toggle('unmark-session-row-selected', selected);
+    if (scopeEl) {
+      syncUnmarkSelectionFromScope(scopeEl);
+      if (unmarkSessionListModalEl?.classList.contains('show')) {
+        renderUnmarkSessionListModalTable();
+      }
+    } else {
+      pendingUnmarkSessionIds = readSelectedUnmarkSessionIdsFromScope(qs('unmarkSessionsTbody'));
+      updateUnmarkSelectionCounter();
+    }
+    return true;
+  }
+
+  async function openUnmarkSessionCalendarModal() {
+    if (!window.SessionEnrollmentCalendarModal || !window.SessionCalendarCore) {
+      openUnmarkSessionListModal();
+      return;
+    }
+    const payload = collectEnrollmentPayloadFromForm();
+    const studentName = String(qs('inp_studentLabel')?.value || '').trim();
+    const classTitle = String(document.querySelector('.page-title, h1, h2')?.textContent || '').trim();
+    const selectedUnmarkIds = filterSelectableUnmarkSessionIds(
+      readSelectedUnmarkSessionIds().length
+        ? readSelectedUnmarkSessionIds()
+        : pendingUnmarkSessionIds.slice()
+    );
+    let prefetchedPickerData = null;
+    if (rollingEnrollmentWorkspace) {
+      try {
+        prefetchedPickerData = await buildEnrollmentPickerBundleFromWorkspace(payload);
+        if (prefetchedPickerData) {
+          prefetchedPickerData = applyUnmarkSelectableRules(prefetchedPickerData);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    window.SessionEnrollmentCalendarModal.open({
+      classId,
+      studentId: payload.studentId,
+      studentLabel: studentName,
+      classLabel: classTitle,
+      startDate: payload.startDate,
+      endDate: payload.endDate,
+      cycleEndDate: String(cycleWindow?.endDate || '').trim(),
+      targetSessionCount: hasTargetSessionCount() ? Number(qs('inp_targetSessionCount')?.value || 0) : 0,
+      targetHours: hasTargetHours() ? Number(qs('inp_targetHours')?.value || 0) : 0,
+      selectedSessionIds: selectedUnmarkIds,
+      sessionsToCreate: [],
+      scheduleDefaults: rollingEnrollmentWorkspace?.scheduleDefaults || lastAlignmentResult?.scheduleDefaults || {},
+      persistedSessions: rollingEnrollmentWorkspace?.sessions || [],
+      statusMap: rollingEnrollmentWorkspace?.statusMap || null,
+      localPickerMode: Boolean(prefetchedPickerData),
+      prefetchedPickerData,
+      requestJson,
+      onSelectionChange: ({ selectedSessionIds }) => {
+        applyUnmarkSelectionFromIds(selectedSessionIds);
+      },
+      onSave: ({ selectedSessionIds }) => {
+        applyUnmarkSelectionFromIds(selectedSessionIds);
       }
     });
   }
@@ -6005,14 +6228,14 @@
     const startDate = String(qs('inp_startDate')?.value || '').trim();
     const fromAlignment = (Array.isArray(alignment?.sessions) ? alignment.sessions : [])
       .filter((row) => row.inWindow !== false)
-      .map((row) => normalizeSessionRowForDisplay(row));
+      .map((row) => enrichUnmarkSessionRow(row));
     if (fromAlignment.length) return fromAlignment;
     const workspaceSessions = Array.isArray(rollingEnrollmentWorkspace?.sessions)
       ? rollingEnrollmentWorkspace.sessions
       : [];
     return workspaceSessions
       .filter((row) => !startDate || String(row?.date || '').trim() >= startDate)
-      .map((row) => normalizeSessionRowForDisplay(row));
+      .map((row) => enrichUnmarkSessionRow(row));
   }
 
   function prepareUnmarkSessionsStep(alignment) {
@@ -6020,31 +6243,32 @@
     const studentName = String(qs('inp_studentLabel')?.value || '').trim() || 'this student';
     const summary = qs('unmarkSummaryText');
     if (summary) {
-      summary.textContent = `Select sessions to clear from N/A to unmarked for ${studentName}. At least one session is required.`;
+      summary.textContent = `Choose empty sessions for ${studentName}. Sessions that already have a student enrolled are shown but cannot be selected. At least one empty session is required.`;
     }
-    const preselected = pendingUnmarkSessionIds.length ? pendingUnmarkSessionIds.slice() : [];
-    renderUnmarkSessionTable(buildUnmarkSessionRows(alignment), preselected);
+    pendingUnmarkSessionIds = filterSelectableUnmarkSessionIds(
+      pendingUnmarkSessionIds.length ? pendingUnmarkSessionIds.slice() : []
+    );
+    renderUnmarkSessionTable(buildUnmarkSessionRows(alignment), pendingUnmarkSessionIds);
   }
 
   function renderUnmarkSessionTable(sessions = [], selectedIds = []) {
-    const rows = (Array.isArray(sessions) ? sessions : []).map((row) => normalizeSessionRowForDisplay(row));
+    const rows = (Array.isArray(sessions) ? sessions : []).map((row) => enrichUnmarkSessionRow(row));
+    const filteredSelectedIds = filterSelectableUnmarkSessionIds(selectedIds);
     renderSessionWindowTable(rows, 'unmarkSessionsTbody', {
       unmarkToggle: true,
-      selectedUnmarkIds: selectedIds,
+      selectedUnmarkIds: filteredSelectedIds,
       footerTotalsId: 'unmarkSessionsTotals'
     });
     updateUnmarkSelectionCounter();
   }
 
   function readSelectedUnmarkSessionIds() {
-    return Array.from(document.querySelectorAll('.unmark-session-toggle.is-selected'))
-      .map((btn) => String(btn.dataset?.sessionId || '').trim())
-      .filter(Boolean);
+    return readSelectedUnmarkSessionIdsFromScope(qs('unmarkSessionsTbody'));
   }
 
   function readSelectedUnmarkSessionHours() {
     let total = 0;
-    document.querySelectorAll('.unmark-session-toggle.is-selected').forEach((btn) => {
+    (qs('unmarkSessionsTbody') || document).querySelectorAll('.unmark-session-toggle.is-selected').forEach((btn) => {
       total = normalizeTargetHoursValue(total + Number(btn.dataset?.hours || 0));
     });
     return total;
@@ -6192,7 +6416,7 @@
       return;
     }
     if (enrollWizardStep === 'unmarkSessions') {
-      pendingUnmarkSessionIds = readSelectedUnmarkSessionIds();
+      pendingUnmarkSessionIds = filterSelectableUnmarkSessionIds(readSelectedUnmarkSessionIds());
       enrollWizardStep = 'form';
       enrollWizardPath = 'oneOnOne';
       setEnrollmentWizardStepVisibility();
@@ -6297,16 +6521,21 @@
       const staged = highlightStaged && isStagedSessionRow(row);
       const naSelected = naToggle && selectedNaIds.has(sessionId);
       const unmarkSelected = unmarkToggle && selectedUnmarkIds.has(sessionId);
+      const unmarkOccupied = unmarkToggle && row.unmarkSelectable === false;
       const picked = enrollmentPick && selectedEnrollmentIds.has(sessionId);
-      const rowClass = naSelected
+      const rowClass = unmarkOccupied
+        ? 'unmark-session-row-occupied'
+        : (naSelected
         ? 'na-session-row-selected'
         : (unmarkSelected
           ? 'unmark-session-row-selected'
-          : (picked ? 'enrollment-session-row-selected' : (staged ? 'gap-session-row-staged' : '')));
+          : (picked ? 'enrollment-session-row-selected' : (staged ? 'gap-session-row-staged' : ''))));
       const countableBadge = row.countable
         ? '<span class="badge bg-success-subtle text-success border">Yes</span>'
         : `<span class="badge bg-secondary-subtle text-secondary border" title="${htmlEscape(row.excludeReason || '')}">No</span>`;
-      const statusCell = formatSessionStatusCell(row, staged);
+      const statusCell = unmarkOccupied
+        ? '<span class="badge bg-secondary-subtle text-secondary border">Student enrolled</span>'
+        : formatSessionStatusCell(row, staged);
       let actionsCell = '';
       if (enrollmentPick && row.countable && !staged) {
         const isPicked = selectedEnrollmentIds.has(sessionId);
@@ -6324,11 +6553,15 @@
         actionsCell = `<button type="button" class="${btnClass}" data-session-id="${htmlEscape(sessionId)}" data-hours="${hours}" title="Include this staged session in the enrollment">${btnLabel}</button>`
           + ` <button type="button" class="btn btn-sm btn-outline-danger btn-remove-staged" data-session-id="${htmlEscape(sessionId)}" title="Remove staged session"><i class="bi bi-trash"></i></button>`;
       } else if (unmarkToggle) {
-        const btnClass = unmarkSelected
-          ? 'btn btn-sm btn-success unmark-session-toggle is-selected'
-          : 'btn btn-sm btn-outline-secondary unmark-session-toggle';
-        const btnLabel = unmarkSelected ? 'Unmarked' : 'Unmark';
-        actionsCell = `<button type="button" class="${btnClass}" data-session-id="${htmlEscape(sessionId)}" data-hours="${hours}" title="Clear N/A and unmark attendance for this session">${btnLabel}</button>`;
+        if (row.unmarkSelectable === false) {
+          actionsCell = '<span class="small text-muted">Occupied</span>';
+        } else {
+          const btnClass = unmarkSelected
+            ? 'btn btn-sm btn-success unmark-session-toggle is-selected'
+            : 'btn btn-sm btn-outline-secondary unmark-session-toggle';
+          const btnLabel = unmarkSelected ? 'Unmarked' : 'Unmark';
+          actionsCell = `<button type="button" class="${btnClass}" data-session-id="${htmlEscape(sessionId)}" data-hours="${hours}" title="Clear N/A and unmark attendance for this session">${btnLabel}</button>`;
+        }
       } else if (naToggle) {
         const btnClass = naSelected
           ? 'btn btn-sm btn-success na-session-toggle is-selected'
@@ -7638,25 +7871,25 @@
                 <button type="button" class="btn btn-outline-danger btn-sm btn-row-remove" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-trash me-1"></i>${removeLabel}</button>`;
       return `
         <tr class="${rowClass}">
-          <td class="ps-4" data-sort-value="${htmlEscape(studentSortValue)}">
+          <td class="ps-4" data-column="student" data-sort-value="${htmlEscape(studentSortValue)}">
             <div class="fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(studentDisplay.label, studentDisplay.recordId, { className: 'text-decoration-none fw-semibold' }) : htmlEscape(studentDisplay.label))}</div>
             <div class="x-small text-muted font-monospace">${htmlEscape(studentId)}</div>
           </td>
-          <td data-sort-value="${htmlEscape(String(row?.startDate || ''))}">${htmlEscape(String(row?.startDate || '-'))}</td>
-          <td data-sort-value="${htmlEscape(endSortValue)}">${hasEnrollmentTarget ? '<span class="text-muted">Target-based</span>' : htmlEscape(String(row?.endDate || 'Open'))}</td>
-          <td class="text-center small" data-sort-value="${htmlEscape(targetSortValue)}">${targetDisplay ? htmlEscape(targetDisplay) : '<span class="text-muted">-</span>'}</td>
-          <td class="text-center small" data-sort-value="${htmlEscape(consumedSortValue)}">${consumedDisplay ? htmlEscape(consumedDisplay) : '<span class="text-muted">-</span>'}</td>
-          <td class="text-center small" data-sort-value="${htmlEscape(remainingSortValue)}">${remainingDisplay ? htmlEscape(remainingDisplay) : '<span class="text-muted">-</span>'}</td>
-          <td data-sort-value="${htmlEscape(completionSortValue)}">${completionHtml}</td>
-          <td class="text-center" data-sort-value="${htmlEscape(status)}">
+          <td data-column="startDate" data-sort-value="${htmlEscape(String(row?.startDate || ''))}">${htmlEscape(String(row?.startDate || '-'))}</td>
+          <td data-column="endDate" data-sort-value="${htmlEscape(endSortValue)}">${hasEnrollmentTarget ? '<span class="text-muted">Target-based</span>' : htmlEscape(String(row?.endDate || 'Open'))}</td>
+          <td class="text-center small" data-column="target" data-sort-value="${htmlEscape(targetSortValue)}">${targetDisplay ? htmlEscape(targetDisplay) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center small" data-column="consumed" data-sort-value="${htmlEscape(consumedSortValue)}">${consumedDisplay ? htmlEscape(consumedDisplay) : '<span class="text-muted">-</span>'}</td>
+          <td class="text-center small" data-column="remaining" data-sort-value="${htmlEscape(remainingSortValue)}">${remainingDisplay ? htmlEscape(remainingDisplay) : '<span class="text-muted">-</span>'}</td>
+          <td data-column="completion" data-sort-value="${htmlEscape(completionSortValue)}">${completionHtml}</td>
+          <td class="text-center" data-column="status" data-sort-value="${htmlEscape(status)}">
             <span class="badge ${badgeClass}">${htmlEscape(formatPeriodStatusLabel(status))}</span>
             <div class="x-small text-muted mt-1">Finance: ${htmlEscape(financialStatus)}</div>
           </td>
-          <td class="text-center small" data-sort-value="${htmlEscape(sessionCapacitySortValue)}">
+          <td class="text-center small" data-column="sessionCapacity" data-sort-value="${htmlEscape(sessionCapacitySortValue)}">
             <span class="badge text-bg-light border">${htmlEscape(sessionCapacityLabel)}</span>
           </td>
-          <td data-sort-value="${htmlEscape(String(funderLabel || '').toLowerCase())}">${htmlEscape(funderLabel)}</td>
-          <td class="text-end table-actions pe-4">
+          <td data-column="funder" data-sort-value="${htmlEscape(String(funderLabel || '').toLowerCase())}">${htmlEscape(funderLabel)}</td>
+          <td class="text-end table-actions pe-4" data-column="col_10">
             <div class="rolling-row-actions-wrap">
               <button type="button" class="btn btn-secondary btn-sm rolling-row-actions-toggle" data-period-id="${htmlEscape(String(row?.id || ''))}">
                 <i class="bi bi-three-dots-vertical"></i>
@@ -7792,9 +8025,9 @@
     }
 
     if (enrollWizardStep === 'unmarkSessions') {
-      const selected = readSelectedUnmarkSessionIds();
+      const selected = filterSelectableUnmarkSessionIds(readSelectedUnmarkSessionIds());
       if (!selected.length) {
-        await showMsg('Validation', 'warning', 'Select at least one session to unmark.');
+        await showMsg('Validation', 'warning', 'Select at least one empty session to unmark.');
         return;
       }
       pendingUnmarkSessionIds = selected.slice();
@@ -8902,7 +9135,8 @@
   qs('btn_viewEnrollmentSessions')?.addEventListener('click', openEnrollmentSessionCalendarModal);
   qs('btn_viewEnrollmentSessionsList')?.addEventListener('click', openEnrollmentSessionListModal);
   qs('btn_openNaCalendarPicker')?.addEventListener('click', openEnrollmentSessionCalendarModal);
-  qs('btn_openUnmarkCalendarPicker')?.addEventListener('click', openEnrollmentSessionListModal);
+  qs('btn_openUnmarkCalendarPicker')?.addEventListener('click', openUnmarkSessionCalendarModal);
+  qs('btn_openUnmarkSessionsList')?.addEventListener('click', openUnmarkSessionListModal);
   qs('btn_gapPickTeacher')?.addEventListener('click', pickGapTeacher);
   qs('btn_gapAppendSessions')?.addEventListener('click', appendGapBatchSessions);
   qs('btn_gapClearStaged')?.addEventListener('click', async () => {
@@ -8945,15 +9179,10 @@
     updateNaSelectionCounter();
   });
   qs('unmarkSessionsTbody')?.addEventListener('click', (event) => {
-    const btn = event.target.closest('.unmark-session-toggle');
-    if (!btn) return;
-    const selected = btn.classList.toggle('is-selected');
-    btn.classList.toggle('btn-success', selected);
-    btn.classList.toggle('btn-outline-secondary', !selected);
-    btn.textContent = selected ? 'Unmarked' : 'Unmark';
-    const row = btn.closest('tr');
-    if (row) row.classList.toggle('unmark-session-row-selected', selected);
-    updateUnmarkSelectionCounter();
+    handleUnmarkSessionToggleClick(event);
+  });
+  qs('unmarkSessionListTbody')?.addEventListener('click', (event) => {
+    handleUnmarkSessionToggleClick(event, qs('unmarkSessionListTbody'));
   });
   addEnrollmentModalEl?.addEventListener('hidden.bs.modal', () => {
     if (enrollWizardStep === 'addSessions' || pendingStagedSessions.length) captureGapFormDraft();

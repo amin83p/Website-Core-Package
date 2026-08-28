@@ -4,6 +4,7 @@ const schoolDataService = require('./schoolDataService');
 const enrollmentSessionMarksService = require('./enrollmentSessionMarksService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
+const rollingEnrollmentWorkspaceService = require('./rollingEnrollmentWorkspaceService');
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const sessionConflictDetectionService = require('./sessionConflictDetectionService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
@@ -257,6 +258,31 @@ function buildEnrollmentPayloadForStudent(classData, normalized, student, studen
   };
 }
 
+async function augmentEnrollmentPayloadForSessionCapacity({
+  classData,
+  normalized,
+  studentEntry = {},
+  enrollmentPayload = {},
+  reqUser
+} = {}) {
+  if (enrollmentPayload.sessionCapacityType !== 'one_on_one') return enrollmentPayload;
+  const activeSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
+    studentEntry?.unmarkSessionIds || normalized?.unmarkSessionIds || []
+  );
+  if (!activeSessionIds.length) return enrollmentPayload;
+  let sessions = Array.isArray(classData?.sessions) ? classData.sessions : [];
+  if (!sessions.length) {
+    sessions = await schoolDataService.getClassSessions(classData?.id, reqUser);
+  }
+  enrollmentPayload.plannedNotApplicableSessionIds = rollingEnrollmentSessionAlignmentService.computeOneOnOneExcludedSessionIds({
+    sessions,
+    startDate: normalized.startDate,
+    endDate: normalized.endDate,
+    activeSessionIds
+  });
+  return enrollmentPayload;
+}
+
 async function commitSessionsBeforeEnrollment({
   classData,
   normalized,
@@ -394,6 +420,51 @@ async function materializeEnrollmentSessionUnmarks({
     );
     if (!sessionIds.length) {
       throw new Error('At least one session must be selected to unmark for 1-on-1 enrollment.');
+    }
+  }
+
+  if (sessionCapacityType === 'one_on_one' && sessionIds.length) {
+    let sessions = Array.isArray(classData?.sessions) ? classData.sessions : [];
+    let periodRows = [];
+    let students = [];
+    if (!sessions.length) {
+      [sessions, periodRows, students] = await Promise.all([
+        schoolDataService.getClassSessions(classData?.id || period?.classId, reqUser),
+        schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id || period?.classId, reqUser),
+        schoolDataService.fetchAllData('students', {}, reqUser)
+      ]);
+    } else {
+      [periodRows, students] = await Promise.all([
+        schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id || period?.classId, reqUser),
+        schoolDataService.fetchAllData('students', {}, reqUser)
+      ]);
+    }
+    const activeOrgId = toPublicId(classData?.orgId || reqUser?.activeOrgId || '');
+    const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true });
+    const policyMap = rollingEnrollmentWorkspaceService.statusMapToPolicyMap(statusMap);
+    const studentToPersonMap = rollingEnrollmentWorkspaceService.buildStudentToPersonMap(students, activeOrgId);
+    const forceNotApplicableSessionKeys = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(
+      policyMap,
+      sessions
+    );
+    const excludeStudentId = toPublicId(student?.id || studentEntry?.studentId || period?.studentId || '');
+    const occupiedIds = sessionIds.filter((sessionId) => {
+      const session = (Array.isArray(sessions) ? sessions : []).find((row) => (
+        idsEqual(row?.sessionId || row?.id, sessionId)
+      ));
+      if (!session) return false;
+      return rollingEnrollmentWorkspaceService.resolveSessionOccupiedStudentCount({
+        session,
+        periodRows,
+        studentToPersonMap,
+        statusMap: policyMap,
+        forceNotApplicableSessionKeys,
+        excludeStudentId,
+        activeOrgId
+      }) > 0;
+    });
+    if (occupiedIds.length) {
+      throw new Error('One or more selected sessions already have a student enrolled and cannot be unmarked.');
     }
   }
 
@@ -610,13 +681,19 @@ async function execute({
 
       await assertEnrollmentAlignmentForCreate(classDataCurrent, normalized, reqUser);
 
-      const enrollmentPayload = buildEnrollmentPayloadForStudent(
-        classDataCurrent,
+      const enrollmentPayload = await augmentEnrollmentPayloadForSessionCapacity({
+        classData: classDataCurrent,
         normalized,
-        student,
         studentEntry,
-        resolution
-      );
+        enrollmentPayload: buildEnrollmentPayloadForStudent(
+          classDataCurrent,
+          normalized,
+          student,
+          studentEntry,
+          resolution
+        ),
+        reqUser
+      });
 
       let enrollResult;
       if (billingMode === 'no_charge') {

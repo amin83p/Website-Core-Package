@@ -701,6 +701,35 @@ function applyColumnHeaderPresentation(headerCell, col) {
   headerCell.appendChild(sortSpan);
 }
 
+function buildBodyCellMap(table, row, headerCells) {
+  const map = new Map();
+  const cells = [...row.children];
+  if (!cells.length) return map;
+  if (cells.length === 1 && Number(cells[0].colSpan || 1) > 1) return map;
+  if (cells.length < headerCells.length) return map;
+
+  cells.forEach((cell) => {
+    const key = String(cell.dataset.column || '').trim();
+    if (key) map.set(key, cell);
+  });
+
+  const headerKeys = headerCells
+    .map((cell) => String(cell.dataset.column || '').trim())
+    .filter(Boolean);
+  if (map.size >= headerKeys.length) return map;
+
+  // Dynamic row renders usually keep body cells in the table's default column order
+  // even when headers were previously reordered by saved settings.
+  const defaultKeys = getDefaultSettings(table).columns
+    .map((col) => String(col.key || '').trim())
+    .filter(Boolean);
+  defaultKeys.forEach((key, index) => {
+    if (key && cells[index] && !map.has(key)) map.set(key, cells[index]);
+  });
+
+  return map;
+}
+
 function applySettings(table, settings) {
   if (!table || !settings) return;
 
@@ -719,19 +748,8 @@ function applySettings(table, settings) {
       .filter(([key]) => key)
   );
 
-  // Snapshot body cells by the key of the header currently at the same index
-  // (before any reordering), so data stays tied to the correct column identity.
   const bodyRows = [...table.querySelectorAll('tbody tr')];
-  const bodyMaps = bodyRows.map((row) => {
-    const map = new Map();
-    const cells = [...row.children];
-    if (cells.length < headerCells.length) return map; // colspan / placeholder rows
-    headerCells.forEach((headerCell, index) => {
-      const key = String(headerCell.dataset.column || '').trim();
-      if (key && cells[index]) map.set(key, cells[index]);
-    });
-    return map;
-  });
+  const bodyMaps = bodyRows.map((row) => buildBodyCellMap(table, row, headerCells));
 
   // Reorder header by desired key order
   orderedKeys.forEach((key) => {
@@ -750,10 +768,6 @@ function applySettings(table, settings) {
   });
 
   // Visibility / labels / widths by column key (not nth-child position)
-  const headerIndexByKey = new Map(
-    [...headerRow.children].map((cell, index) => [String(cell.dataset.column || '').trim(), index])
-  );
-
   columns.forEach((col) => {
     const key = String(col?.key || '').trim();
     if (!key) return;
@@ -762,11 +776,8 @@ function applySettings(table, settings) {
 
     applyColumnHeaderPresentation(headerCell, col);
 
-    const index = headerIndexByKey.get(key);
-    if (index === undefined) return;
-    bodyRows.forEach((row) => {
-      if (row.children.length <= index) return;
-      const cell = row.children[index];
+    bodyRows.forEach((row, rowIndex) => {
+      const cell = bodyMaps[rowIndex]?.get(key);
       if (cell) cell.style.display = col.visible ? '' : 'none';
     });
   });
@@ -792,9 +803,15 @@ function reapplyCurrentTableSettings(tableElement) {
   const table = tableElement || document.getElementById('first-table');
   if (!table) return;
   const tableNameEl = document.getElementById('tableName');
+  const userIdEl = document.getElementById('user-id');
   const tableId = tableNameEl ? tableNameEl.getAttribute('data-id') : '';
-  const settings = (tableId && window.__tableSettings && window.__tableSettings[tableId])
-    || getDefaultSettings(table);
+  const userId = userIdEl ? userIdEl.getAttribute('data-id') : '';
+  const cachedSettings = (tableId && window.__tableSettings && window.__tableSettings[tableId])
+    || (tableId && userId ? getCachedSettings(tableId, userId) : null);
+  const hasCachedSettings = Boolean(cachedSettings);
+  const settings = hasCachedSettings
+    ? normalizeSettingsForTable(table, cachedSettings, getDefaultSettings(table))
+    : getDefaultSettings(table);
   applySettings(table, settings);
 }
 

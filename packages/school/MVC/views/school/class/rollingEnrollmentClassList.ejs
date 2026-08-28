@@ -1,0 +1,166 @@
+<%- include('partials/tablePages-start', {
+  title: 'Rolling Enrollment',
+  user,
+  tableName,
+  btn_export: false,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<div class="alert alert-light border d-flex gap-3 align-items-start mb-3">
+  <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+  <div>
+    <div class="fw-semibold">Select a rolling class to manage enrollment periods.</div>
+    <div class="small text-muted">Only classes with lifecycle <strong>Rolling</strong> appear here. Term-based classes are managed from Class Management.</div>
+  </div>
+</div>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search rolling classes...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Title / ID</th>
+        <th>Organization</th>
+        <th>Delivery Dept</th>
+        <th>Assigned Teacher</th>
+        <th>Cycle / Periods</th>
+        <th>Schedule</th>
+        <th class="text-center">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr>
+          <td colspan="8" class="text-center py-4 text-muted">
+            No rolling classes found. Create or edit a class and set its lifecycle to <strong>Rolling</strong> to manage enrollment here.
+          </td>
+        </tr>
+      <% } %>
+
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.title %></div>
+            <div class="x-small text-muted font-monospace"><%= item.id %></div>
+          </td>
+
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center text-primary" style="width:32px;height:32px;">
+                <i class="bi bi-building"></i>
+              </div>
+              <div class="fw-bold text-dark small"><%= item.orgName %></div>
+            </div>
+          </td>
+
+          <td>
+            <span class="badge bg-light text-dark border"><%= item.deliveryDepartmentName || item.deliveryDepartmentId || 'N/A' %></span>
+          </td>
+
+          <td>
+            <% const assignedInstructors = Array.isArray(item.instructors)
+              ? item.instructors.filter((instructor) =>
+                instructor?.personId && String(instructor?.status || 'active').trim().toLowerCase() === 'active'
+              )
+              : []; %>
+            <% const primaryInstructor = assignedInstructors.find((instructor) =>
+              String(instructor?.role || '').trim().toLowerCase() === 'primary'
+            ) || assignedInstructors[0]; %>
+            <% if (primaryInstructor) { %>
+              <div class="d-flex align-items-center gap-2">
+                <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center text-primary" style="width:32px;height:32px;">
+                  <i class="bi bi-person-workspace"></i>
+                </div>
+                <div>
+                  <div class="fw-bold text-dark small"><%= primaryInstructor.name || primaryInstructor.personId %></div>
+                  <div class="x-small text-muted"><%= String(primaryInstructor.role || 'Instructor').trim() || 'Instructor' %><% if (assignedInstructors.length > 1) { %> + <%= assignedInstructors.length - 1 %> more<% } %></div>
+                </div>
+              </div>
+            <% } else { %>
+              <span class="text-muted small fst-italic">Not assigned</span>
+            <% } %>
+          </td>
+
+          <td>
+            <div class="d-flex flex-column gap-1">
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Rolling</span>
+              <span class="x-small text-muted">Active Periods: <%= Number(item.activePeriodCount || 0) %></span>
+              <span class="x-small text-muted">Open Periods: <%= Number(item.openPeriodCount || 0) %></span>
+              <span class="x-small text-muted">Cycle #<%= Number(item.cycleNo || 1) > 0 ? Number(item.cycleNo || 1) : 1 %></span>
+              <% if (item.previousClassId || item.nextClassId) { %>
+                <span class="x-small text-muted">
+                  <% if (item.previousClassId) { %>
+                    Prev: <%= item.previousClassTitle || item.previousClassId %>
+                  <% } %>
+                  <% if (item.previousClassId && item.nextClassId) { %> | <% } %>
+                  <% if (item.nextClassId) { %>
+                    Next: <%= item.nextClassTitle || item.nextClassId %>
+                  <% } %>
+                </span>
+              <% } %>
+              <% if (item.isClosedForNewEnrollment) { %>
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed Enrollment</span>
+              <% } %>
+            </div>
+          </td>
+
+          <td>
+            <div class="small">
+              <% if (item.schedule && item.schedule.current && item.schedule.current.startDate) { %>
+                <div class="fw-bold">
+                  <%= item.schedule.current.startDate %> <i class="bi bi-arrow-right mx-1 text-muted"></i> <%= item.schedule.current.endDate %>
+                </div>
+                <div class="text-muted x-small mt-1">
+                  <% const days = item.schedule.current.daysOfWeek || []; %>
+                  <%= days.map((day) => typeof day === 'string' ? day.substring(0, 3) : day).join(', ') %>
+                  <% if (item.schedule.current.startTime) { %>
+                    (@ <%= item.schedule.current.startTime %> - <%= item.schedule.current.endTime %>)
+                  <% } %>
+                </div>
+              <% } else { %>
+                <span class="text-muted fst-italic">Not Scheduled</span>
+              <% } %>
+            </div>
+          </td>
+
+          <td class="text-center">
+            <%
+              let badge = 'bg-secondary';
+              if (item.status === 'active') badge = 'bg-success';
+              if (item.status === 'draft') badge = 'bg-warning text-dark';
+              if (item.status === 'completed') badge = 'bg-primary';
+              if (item.status === 'cancelled') badge = 'bg-danger';
+            %>
+            <span class="badge <%= badge %>"><%= (item.status || 'unknown').toUpperCase() %></span>
+          </td>
+
+          <td class="table-actions text-end pe-4">
+            <a href="/school/classes/<%= encodeURIComponent(item.id) %>/rolling-enrollment" class="btn btn-primary btn-sm">
+              <i class="bi bi-person-check me-1"></i>Open Rolling Enrollment
+            </a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="school/rolling-enrollment" hidden></span>
+
+<%- include('partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: 'school/rolling-enrollment'
+}) %>
+
+<%- include('partials/tablePages-end') %>

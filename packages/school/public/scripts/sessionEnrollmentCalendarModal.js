@@ -225,6 +225,9 @@
   function resolveEnrollmentWindowBounds() {
     const minDate = core.normalizeDateOnly(state?.startDate || '');
     let maxDate = core.normalizeDateOnly(state?.endDate || '');
+    if (!maxDate) {
+      maxDate = core.normalizeDateOnly(state?.cycleEndDate || '');
+    }
     if (!maxDate && Array.isArray(allEvents) && allEvents.length) {
       const dates = allEvents
         .map((row) => core.normalizeDateOnly(row?.date))
@@ -266,7 +269,7 @@
     return core.computeViewRange(key, rangeAnchor);
   }
 
-  function initManageModeViewRange() {
+  function initDefaultViewRange() {
     if (!state) return;
     const bounds = resolveEnrollmentWindowBounds();
     const rangeStart = bounds.minDate || core.parseAnchorDate('');
@@ -282,16 +285,15 @@
     }, bounds);
   }
 
+  const initManageModeViewRange = initDefaultViewRange;
+
   function syncModalChromeForMode() {
     const titleEl = qs('sessionEnrollmentCalendarModalTitle');
     const hintEl = qs('sessionEnrollmentCalendarHint');
     const clearBtn = qs('btn_sessionEnrollmentCalendarClear');
     const saveBtn = qs('btn_sessionEnrollmentCalendarSave');
     const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
-    const thirtyDaysBtn = qs('btn_sessionEnrollmentPresetThirtyDays');
-    const legendBtn = qs('btn_sessionEnrollmentCalendarLegend');
     const bulkNaBtn = qs('btn_sessionEnrollmentBulkNa');
-    const studentBanner = qs('sessionEnrollmentCalendarStudentBanner');
     const dialogEl = modalEl?.querySelector('.modal-dialog') || qs('sessionEnrollmentCalendarModal')?.querySelector('.modal-dialog');
     const manage = isManageMode();
     if (titleEl) {
@@ -306,17 +308,31 @@
     clearBtn?.classList.toggle('d-none', manage);
     saveBtn?.classList.toggle('d-none', manage);
     doneBtn?.classList.toggle('d-none', !manage);
-    thirtyDaysBtn?.classList.toggle('d-none', !manage);
-    document.querySelectorAll('.session-enrollment-manage-preset').forEach((btn) => {
-      btn.classList.toggle('d-none', !manage);
-    });
-    legendBtn?.classList.toggle('d-none', !manage);
     bulkNaBtn?.classList.toggle('d-none', !manage);
-    studentBanner?.classList.toggle('d-none', !manage);
     if (dialogEl) dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage);
     syncDoneButtonLabel();
     syncPresetButtons();
-    if (manage) renderEnrollmentSessionsLegend();
+    renderSessionsLegendForMode();
+  }
+
+  function renderSessionsLegendForMode() {
+    if (isManageMode()) {
+      renderEnrollmentSessionsLegend();
+      return;
+    }
+    renderPickerSessionsLegend();
+  }
+
+  function renderPickerSessionsLegend() {
+    const modalBody = qs('sessionEnrollmentCalendarLegendModalBody');
+    if (!modalBody) return;
+    modalBody.innerHTML = ''
+      + '<div class="session-enrollment-legend-items">'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Available session (not selected)</span></div>'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-attendance" aria-hidden="true"></span><span>Selected session</span></div>'
+      +   '<div class="session-enrollment-legend-item session-enrollment-legend-hint text-muted"><i class="bi bi-hand-index-thumb" aria-hidden="true"></i><span>Click a session to include or exclude it</span></div>'
+      +   '<div class="session-enrollment-legend-item session-enrollment-legend-hint text-muted"><i class="bi bi-mouse2" aria-hidden="true"></i><span>Right-click for bulk select by time window</span></div>'
+      + '</div>';
   }
 
   function renderEnrollmentSessionsLegend() {
@@ -335,7 +351,7 @@
   function openEnrollmentSessionsLegendModal() {
     const legendModalEl = qs('sessionEnrollmentCalendarLegendModal');
     if (!legendModalEl || !global.bootstrap?.Modal) return;
-    renderEnrollmentSessionsLegend();
+    renderSessionsLegendForMode();
     global.bootstrap.Modal.getOrCreateInstance(legendModalEl).show();
   }
 
@@ -348,21 +364,22 @@
     const classLabel = String(options.classLabel || options.classId || '').trim();
     const windowStart = String(options.startDate || '').trim();
     const windowEnd = String(options.endDate || '').trim();
-    const manage = String(options.mode || '').trim() === 'manageEnrollmentSessions';
 
     if (contextEl) {
-      contextEl.classList.toggle('d-none', manage);
-      if (!manage) {
-        contextEl.textContent = [student, classLabel].filter(Boolean).join(' · ') || String(options.classId || '');
-      }
+      contextEl.classList.add('d-none');
+      contextEl.setAttribute('aria-hidden', 'true');
+      contextEl.textContent = '';
     }
     if (!banner || !nameEl || !metaEl) return;
-    banner.classList.toggle('d-none', !manage);
-    if (!manage) {
+
+    const hasBannerContent = Boolean(student || classLabel || windowStart || windowEnd);
+    banner.classList.toggle('d-none', !hasBannerContent);
+    if (!hasBannerContent) {
       nameEl.textContent = '';
       metaEl.textContent = '';
       return;
     }
+
     nameEl.textContent = student || 'Student';
     const metaParts = [];
     if (classLabel) metaParts.push(classLabel);
@@ -431,17 +448,15 @@
     if (data?.targetHours !== undefined) {
       state.targetHours = Number(data.targetHours) || 0;
     }
-    if (isManageMode()) {
-      syncStudentBanner({
-        mode: state.mode,
-        studentLabel: state.studentLabel,
-        studentId: state.studentId,
-        classLabel: state.classLabel,
-        classId: state.classId,
-        startDate: state.startDate,
-        endDate: state.endDate
-      });
-    }
+    syncStudentBanner({
+      mode: state.mode,
+      studentLabel: state.studentLabel,
+      studentId: state.studentId,
+      classLabel: state.classLabel,
+      classId: state.classId,
+      startDate: state.startDate,
+      endDate: state.endDate
+    });
     allEvents = (Array.isArray(data?.sessions) ? data.sessions : [])
       .map((row) => mapSessionWindowRowToEvent(row))
       .filter((row) => row.sessionId && row.date);
@@ -1063,24 +1078,66 @@
 
   function readTimeSlotAction() {
     const fromState = String(timeSlotAction || '').trim().toLowerCase();
-    if (fromState === 'unmark' || fromState === 'mark_na') return fromState;
+    if (isManageMode()) {
+      if (fromState === 'unmark' || fromState === 'mark_na') return fromState;
+      const scope = timeSlotModalEl || qs('sessionEnrollmentTimeSlotSelectModal');
+      const active = scope?.querySelector('[data-time-slot-action].active');
+      const action = String(active?.getAttribute('data-time-slot-action') || 'mark_na').trim().toLowerCase();
+      return action === 'unmark' ? 'unmark' : 'mark_na';
+    }
+    if (fromState === 'deselect' || fromState === 'select') return fromState;
     const scope = timeSlotModalEl || qs('sessionEnrollmentTimeSlotSelectModal');
     const active = scope?.querySelector('[data-time-slot-action].active');
-    const action = String(active?.getAttribute('data-time-slot-action') || 'mark_na').trim().toLowerCase();
-    return action === 'unmark' ? 'unmark' : 'mark_na';
+    const action = String(active?.getAttribute('data-time-slot-action') || 'select').trim().toLowerCase();
+    return action === 'deselect' ? 'deselect' : 'select';
+  }
+
+  function syncTimeSlotModalChromeForMode() {
+    const subtitleEl = qs('sessionEnrollmentTimeSlotSelectModal')?.querySelector('.card-header .small.text-muted');
+    const actionGroup = qs('sessionEnrollmentTimeSlotActionGroup');
+    const noteWrap = qs('sessionEnrollmentTimeSlotNoteWrap');
+    const stageBtn = qs('btn_sessionEnrollmentTimeSlotStage');
+    const manage = isManageMode();
+    if (subtitleEl) {
+      subtitleEl.textContent = manage
+        ? 'Stage mark or unmark changes for sessions with the same time window.'
+        : 'Select or deselect sessions with the same time window.';
+    }
+    if (actionGroup) {
+      const buttons = actionGroup.querySelectorAll('[data-time-slot-action]');
+      if (buttons.length >= 2) {
+        if (manage) {
+          buttons[0].setAttribute('data-time-slot-action', 'mark_na');
+          buttons[0].textContent = 'Mark N/A';
+          buttons[1].setAttribute('data-time-slot-action', 'unmark');
+          buttons[1].textContent = 'Unmark N/A';
+        } else {
+          buttons[0].setAttribute('data-time-slot-action', 'select');
+          buttons[0].textContent = 'Select';
+          buttons[1].setAttribute('data-time-slot-action', 'deselect');
+          buttons[1].textContent = 'Deselect';
+        }
+      }
+    }
+    noteWrap?.classList.toggle('d-none', !manage || readTimeSlotAction() === 'unmark');
+    if (stageBtn) {
+      stageBtn.textContent = manage ? 'Stage changes' : 'Apply selection';
+    }
   }
 
   function syncTimeSlotActionButtons(forcedAction = '') {
-    const raw = String(forcedAction || timeSlotAction || readTimeSlotAction() || 'mark_na').trim().toLowerCase();
-    const action = raw === 'unmark' ? 'unmark' : 'mark_na';
+    const manage = isManageMode();
+    const raw = String(forcedAction || timeSlotAction || readTimeSlotAction() || (manage ? 'mark_na' : 'select')).trim().toLowerCase();
+    const action = manage
+      ? (raw === 'unmark' ? 'unmark' : 'mark_na')
+      : (raw === 'deselect' ? 'deselect' : 'select');
     timeSlotAction = action;
     const scope = timeSlotModalEl || qs('sessionEnrollmentTimeSlotSelectModal');
     (scope ? scope.querySelectorAll('[data-time-slot-action]') : document.querySelectorAll('[data-time-slot-action]')).forEach((btn) => {
       const btnAction = String(btn.getAttribute('data-time-slot-action') || '').trim().toLowerCase();
       btn.classList.toggle('active', btnAction === action);
     });
-    const noteWrap = qs('sessionEnrollmentTimeSlotNoteWrap');
-    noteWrap?.classList.toggle('d-none', action === 'unmark');
+    syncTimeSlotModalChromeForMode();
   }
 
   function applyTimeSlotInputBounds() {
@@ -1137,7 +1194,8 @@
       startDate,
       endDate,
       limitCount: readTimeSlotLimitCount(),
-      action
+      action,
+      selectedSet: state?.selectedSet
     });
   }
 
@@ -1174,13 +1232,23 @@
     const stageBtn = qs('btn_sessionEnrollmentTimeSlotStage');
     if (previewEl) {
       if (!count) {
-        previewEl.textContent = action === 'unmark'
-          ? 'No N/A sessions of this type in the selected range.'
-          : 'No open sessions of this type in the selected range.';
-      } else {
+        if (isManageMode()) {
+          previewEl.textContent = action === 'unmark'
+            ? 'No N/A sessions of this type in the selected range.'
+            : 'No open sessions of this type in the selected range.';
+        } else {
+          previewEl.textContent = action === 'deselect'
+            ? 'No selected sessions of this type in the selected range.'
+            : 'No selectable sessions of this type in the selected range.';
+        }
+      } else if (isManageMode()) {
         previewEl.textContent = action === 'unmark'
           ? `${count} session(s) will be unmarked from N/A.`
           : `${count} session(s) will be marked N/A.`;
+      } else {
+        previewEl.textContent = action === 'deselect'
+          ? `${count} session(s) will be deselected.`
+          : `${count} session(s) will be selected.`;
       }
     }
     if (stageBtn) stageBtn.disabled = count === 0;
@@ -1188,7 +1256,7 @@
   }
 
   function openTimeSlotSelectModal(ev) {
-    if (!state || !isManageMode() || !ev) return;
+    if (!state || !ev) return;
     hideContextMenu();
     bindTimeSlotModalEvents();
     timeSlotContext = {
@@ -1197,7 +1265,7 @@
       endTime: String(ev?.end || ev?.endTime || '').trim(),
       date: core.normalizeDateOnly(ev?.date)
     };
-    timeSlotAction = 'mark_na';
+    timeSlotAction = isManageMode() ? 'mark_na' : 'select';
     timeSlotCountTouched = false;
     const bounds = resolveEnrollmentWindowBounds();
     const defaultStart = timeSlotContext.date || bounds.minDate || state?.startDate || '';
@@ -1214,17 +1282,41 @@
     if (startInput) startInput.value = defaultStart || '';
     if (endInput) endInput.value = defaultEnd || '';
     if (noteInput) noteInput.value = '';
-    document.querySelectorAll('[data-time-slot-action]').forEach((btn) => {
-      btn.classList.toggle('active', String(btn.getAttribute('data-time-slot-action') || '') === 'mark_na');
-    });
+    syncTimeSlotModalChromeForMode();
+    syncTimeSlotActionButtons(timeSlotAction);
     applyTimeSlotInputBounds();
     clampTimeSlotDateInputs();
     refreshTimeSlotSelectPreview();
     showTimeSlotModalLayer();
   }
 
+  function stageTimeSlotPickerChanges() {
+    if (!state || !timeSlotContext) return;
+    const action = readTimeSlotAction();
+    const sessions = collectTimeSlotSessionsForForm();
+    if (!sessions.length) {
+      showTimeSlotFormError('No sessions match this time window, date range, and action.');
+      return;
+    }
+    sessions.forEach((row) => {
+      const sessionId = String(row?.sessionId || '').trim();
+      if (!sessionId) return;
+      if (action === 'deselect') state.selectedSet.delete(sessionId);
+      else state.selectedSet.add(sessionId);
+    });
+    hideTimeSlotModalLayer();
+    const scrollSnapshot = captureScrollPositions();
+    renderCalendar();
+    restoreScrollPositions(scrollSnapshot);
+    updateSummary();
+  }
+
   function stageTimeSlotSelectChanges() {
     if (!state || !timeSlotContext) return;
+    if (!isManageMode()) {
+      stageTimeSlotPickerChanges();
+      return;
+    }
     const action = readTimeSlotAction();
     const sessions = collectTimeSlotSessionsForForm();
     if (!sessions.length) {
@@ -1277,8 +1369,12 @@
       const actionBtn = event.target.closest('[data-time-slot-action]');
       if (actionBtn) {
         event.preventDefault();
-        const nextAction = String(actionBtn.getAttribute('data-time-slot-action') || 'mark_na').trim().toLowerCase();
-        timeSlotAction = nextAction === 'unmark' ? 'unmark' : 'mark_na';
+        const nextAction = String(actionBtn.getAttribute('data-time-slot-action') || '').trim().toLowerCase();
+        if (isManageMode()) {
+          timeSlotAction = nextAction === 'unmark' ? 'unmark' : 'mark_na';
+        } else {
+          timeSlotAction = nextAction === 'deselect' ? 'deselect' : 'select';
+        }
         syncTimeSlotActionButtons(timeSlotAction);
         refreshTimeSlotSelectPreview();
         return;
@@ -1337,16 +1433,20 @@
   }
 
   function showContextMenu(event, sessionId) {
-    if (!isManageMode()) return;
     contextMenuEl = resolveContextMenuEl();
     if (!contextMenuEl) return;
     const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === String(sessionId || '').trim());
     if (!eventRow) return;
     contextMenuSessionId = String(sessionId || '').trim();
-    const naState = resolveManageNaState(eventRow);
     const markBtn = qs('btn_sessionEnrollmentContextMark');
     if (markBtn) {
-      markBtn.textContent = naState !== 'normal' ? 'Unmark N/A' : 'Mark N/A';
+      if (isManageMode()) {
+        const naState = resolveManageNaState(eventRow);
+        markBtn.textContent = naState !== 'normal' ? 'Unmark N/A' : 'Mark N/A';
+      } else {
+        const isSelected = state?.selectedSet?.has(contextMenuSessionId);
+        markBtn.textContent = isSelected ? 'Exclude session' : 'Include session';
+      }
     }
     const menuWidth = 200;
     const menuHeight = 80;
@@ -1373,7 +1473,13 @@
       const sessionId = String(contextMenuSessionId || '').trim();
       hideContextMenu();
       const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
-      if (eventRow) openMarkModalForEvent(eventRow);
+      if (!eventRow) return;
+      if (isManageMode()) {
+        openMarkModalForEvent(eventRow);
+        return;
+      }
+      if (eventRow.selectable !== true) return;
+      toggleSession(sessionId);
     });
     qs('btn_sessionEnrollmentContextSelect')?.addEventListener('click', (event) => {
       event.preventDefault();
@@ -1391,7 +1497,6 @@
   }
 
   function handleHostContextMenu(event) {
-    if (!isManageMode()) return;
     const block = event.target.closest('[data-session-id]');
     if (!block) return;
     event.preventDefault();
@@ -1988,16 +2093,21 @@
     hostResizeObserver.observe(hostEl);
   }
 
-  function applyPickerData(data = {}) {
+  function applyPickerData(data = {}, options = {}) {
+    const preserveViewRange = options.preserveViewRange === true;
     allEvents = Array.isArray(data.allEvents) ? data.allEvents : [];
     if (!allEvents.length && Array.isArray(data.events)) allEvents = data.events.slice();
 
-    const clientAnchor = core.clampAnchorDate(
-      state.anchorDate || state.viewRange?.anchorDate || state.startDate || '',
-      state.startDate
-    );
-    state.viewRange = core.computeViewRange(state.viewPreset, clientAnchor);
-    state.anchorDate = core.clampAnchorDate(state.viewRange.anchorDate || clientAnchor, state.startDate);
+    if (!preserveViewRange) {
+      initDefaultViewRange();
+    } else {
+      const clientAnchor = core.clampAnchorDate(
+        state.anchorDate || state.viewRange?.anchorDate || state.startDate || '',
+        state.startDate
+      );
+      state.viewRange = core.computeViewRange(state.viewPreset, clientAnchor);
+      state.anchorDate = core.clampAnchorDate(state.viewRange.anchorDate || clientAnchor, state.startDate);
+    }
     state.enrollmentAlignment = data.enrollmentAlignment || null;
     if (Array.isArray(data.selectableSessionIds)) state.selectableSessionIds = data.selectableSessionIds;
     syncPresetButtons();
@@ -2479,7 +2589,7 @@
 
     const viewPreset = mode === 'manageEnrollmentSessions'
       ? 'thirtyDays'
-      : String(options.viewPreset || 'week').trim();
+      : String(options.viewPreset || 'thirtyDays').trim();
     const anchorDate = mode === 'manageEnrollmentSessions'
       ? core.parseAnchorDate('')
       : core.clampAnchorDate(

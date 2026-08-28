@@ -1542,8 +1542,15 @@
     const startDate = normalizeDateOnly(options.startDate);
     const endDate = normalizeDateOnly(options.endDate);
     const action = String(options.action || '').trim().toLowerCase();
+    const selectedSet = options.selectedSet;
     let limitCount = Number.parseInt(String(options.limitCount ?? ''), 10);
     if (!Number.isFinite(limitCount) || limitCount <= 0) limitCount = 0;
+
+    const isSelected = (sessionId) => {
+      if (selectedSet && typeof selectedSet.has === 'function') return selectedSet.has(sessionId);
+      if (Array.isArray(selectedSet)) return selectedSet.includes(sessionId);
+      return false;
+    };
 
     let rows = (Array.isArray(events) ? events : []).filter((ev) => {
       const sessionId = String(ev?.sessionId || '').trim();
@@ -1554,6 +1561,8 @@
       const naState = resolveEnrollmentNaState(ev, pendingMap);
       if (action === 'mark_na') return naState === 'normal';
       if (action === 'unmark') return naState !== 'normal';
+      if (action === 'select') return ev?.selectable === true && !isSelected(sessionId);
+      if (action === 'deselect') return isSelected(sessionId);
       return false;
     });
     rows.sort((a, b) => normalizeDateOnly(a?.date).localeCompare(normalizeDateOnly(b?.date)));

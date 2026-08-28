@@ -35,7 +35,7 @@ async function withStubbedPickerRoute(callback) {
       if (target === 'bad-target') throw makeError('Unsupported picker target: bad-target', 400, 'INVALID_PICKER_TARGET');
       return target === 'teachers'
         ? ['SCHOOL_DEPARTMENTS', 'SCHOOL_TEACHERS']
-        : ['SCHOOL_DEPARTMENTS', 'SCHOOL_CLASSES', 'SCHOOL_STUDENTS', 'SCHOOL_CLASS_ENROLLMENT_PERIODS'];
+        : ['SCHOOL_DEPARTMENTS', 'SCHOOL_CLASSES', 'SCHOOL_STUDENTS', 'SCHOOL_ROLLING_ENROLLMENT'];
     },
     async listOptions({ query }) {
       if (query.level === 'bad-level') throw makeError('Unsupported picker level "bad-level"', 400, 'INVALID_PICKER_LEVEL');

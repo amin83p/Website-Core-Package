@@ -7,6 +7,7 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
+const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { getActiveDataBackendMode } = requireCoreModule('MVC/infrastructure/runtime/dataBackendRuntime');
@@ -58,6 +59,7 @@ function resolvePolicyModel(catalogEntry) {
   if (catalogEntry?.policyModel === 'attendanceMarkAppearance') return attendanceMarkAppearancePolicyModel;
   if (catalogEntry?.policyModel === 'conductRatingScale') return conductRatingScalePolicyModel;
   if (catalogEntry?.policyModel === 'autosave') return autosavePolicyModel;
+  if (catalogEntry?.policyModel === 'sessionAccess') return sessionAccessPolicyModel;
   if (catalogEntry?.policyModel === 'studentAttendanceReport') return studentAttendanceReportPolicyModel;
   return null;
 }

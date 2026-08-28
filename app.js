@@ -67,6 +67,7 @@ const packageNavigationService = require('./MVC/services/packageNavigationServic
 const { getPackageStorageRootAbsolute } = require('./MVC/utils/packageStoragePathUtils');
 const startupLogger = require('./MVC/utils/startupLogger');
 const actionStateRetentionService = require('./MVC/services/actionStateRetentionService');
+const sessionNotificationSchedulerService = require('./packages/school/MVC/services/school/sessionNotificationSchedulerService');
 const { runWithRequestContext } = require('./MVC/utils/requestContextStore');
 const uploadPathUtils = require('./MVC/utils/uploadPathUtils');
 const { isRailwayProxyMode, getGatewayBaseUrl } = require('./MVC/utils/uploadModeUtils');
@@ -427,9 +428,7 @@ app.use((req, res, next) => {
     
     if (!req.session || !tokenSent || tokenSent !== req.session.csrfToken) {
       const isAjax = req.headers['x-ajax-request'] || req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
-      const message = !tokenSent
-        ? 'Invalid or missing CSRF token.'
-        : 'Invalid or missing CSRF token. Please refresh the page and try again.';
+      const message = 'This page is out of date. Please refresh the page and try again.';
       if (isAjax) {
         return res.status(403).json({ status: 'error', message });
       }
@@ -1087,6 +1086,7 @@ async function startServer() {
       startupLogger.info('APP', 'SETTINGS_SNAPSHOT', 'Loaded settings summary.', appSettingsSnapshot);
     });
     actionStateRetentionService.start({ enabled: dataBackend.mode === 'mongo' });
+    sessionNotificationSchedulerService.start({ enabled: dataBackend.mode === 'mongo' });
     smsProviderService.logStartupDiagnostics();
   } catch (err) {
     if (err?.code === 'EADDRINUSE') {

@@ -5,6 +5,7 @@ const conductRatingScalePolicyModel = require('../../models/school/conductRating
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const attendanceMarkAppearanceService = require('../../services/school/attendanceMarkAppearanceService');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
+const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
@@ -240,6 +241,7 @@ async function loadSettingsPageData(req) {
     attendanceConfig,
     attendanceMarkAppearancePolicy,
     autosavePolicy,
+    sessionAccessPolicy,
     studentAttendanceReportPolicy,
     canUpdate
   ] = await Promise.all([
@@ -248,6 +250,7 @@ async function loadSettingsPageData(req) {
     attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId),
     attendanceMarkAppearancePolicyModel.getPolicyForOrg(activeOrgId),
     autosavePolicyModel.getPolicyForOrg(activeOrgId),
+    sessionAccessPolicyModel.getPolicyForOrg(activeOrgId),
     studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
@@ -269,6 +272,7 @@ async function loadSettingsPageData(req) {
     attendanceMarkCuratedIcons: attendanceMarkAppearanceService.CURATED_ICONS,
     rollupFormula: attendanceConfig.rollupFormula || defaultAttendanceRollupFormula(),
     autosavePolicy,
+    sessionAccessPolicy,
     autosaveSections: listAutosaveSections(),
     studentAttendanceReportPolicy,
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
@@ -455,6 +459,27 @@ async function saveStudentAttendanceReportSettings(req, res) {
   }
 }
 
+async function saveSessionAccessPolicy(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const policy = await sessionAccessPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      req.body || {},
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Session access settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save session access settings.'
+    });
+  }
+}
+
 async function saveAutosavePolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -498,6 +523,7 @@ module.exports = {
   saveAttendanceRollupFormula,
   saveStudentAttendanceReportSettings,
   saveAutosavePolicy,
+  saveSessionAccessPolicy,
   redirectLegacyConductSettings,
   redirectLegacyAttendanceSettings
 };

@@ -77,3 +77,59 @@ test('syncEnrollmentWizardPathFromCap routes one-on-one only', () => {
   assert.match(syncPath, /enrollWizardPath = 'oneOnOne'/);
   assert.doesNotMatch(syncPath, /enrollWizardPath = 'planA'/);
 });
+
+test('unmark step calendar picker opens calendar modal and syncs pendingUnmarkSessionIds', () => {
+  const unmarkCalendar = functionSource('openUnmarkSessionCalendarModal', 'openEnrollmentSessionListModal');
+  assert.match(unmarkCalendar, /SessionEnrollmentCalendarModal\.open/);
+  assert.match(unmarkCalendar, /applyUnmarkSelectionFromIds/);
+  assert.match(unmarkCalendar, /selectedUnmarkIds/);
+  assert.match(unmarkCalendar, /cycleEndDate:\s*String\(cycleWindow\?\.endDate/);
+
+  const applyUnmark = functionSource('applyUnmarkSelectionFromIds', 'readSelectedUnmarkSessionIdsFromScope');
+  assert.match(applyUnmark, /pendingUnmarkSessionIds =/);
+  assert.match(applyUnmark, /renderUnmarkSessionTable\(buildUnmarkSessionRows/);
+
+  assert.match(viewSource, /btn_openUnmarkCalendarPicker'\)\?\.addEventListener\('click', openUnmarkSessionCalendarModal\)/);
+  assert.doesNotMatch(viewSource, /btn_openUnmarkCalendarPicker'\)\?\.addEventListener\('click', openEnrollmentSessionListModal\)/);
+  assert.match(unmarkCalendar, /openUnmarkSessionListModal\(\)/);
+});
+
+test('unmark step list view opens dedicated session list modal', () => {
+  assert.match(viewSource, /id="btn_openUnmarkSessionsList"/);
+  assert.match(viewSource, /id="unmarkSessionListModal"/);
+  assert.match(viewSource, /id="unmarkSessionListTbody"/);
+  assert.match(viewSource, /Sessions to unmark/);
+
+  const openList = functionSource('openUnmarkSessionListModal', 'handleUnmarkSessionToggleClick');
+  assert.match(openList, /renderUnmarkSessionListModalTable/);
+  assert.match(openList, /unmarkSessionListModal\?\.show/);
+
+  assert.match(viewSource, /btn_openUnmarkSessionsList'\)\?\.addEventListener\('click', openUnmarkSessionListModal\)/);
+  assert.match(viewSource, /unmarkSessionListTbody'\)\?\.addEventListener\('click'/);
+});
+
+test('enrollment picker calendar modal passes cycle end date', () => {
+  const pickerCalendar = functionSource('openEnrollmentSessionCalendarModal', 'applyUnmarkSelectionFromIds');
+  assert.match(pickerCalendar, /cycleEndDate:\s*String\(cycleWindow\?\.endDate/);
+});
+
+test('unmark step hides inline session table panel', () => {
+  assert.match(viewSource, /id="unmarkSessionsTablePanel"[^>]*class="[^"]*\bd-none\b/);
+  assert.match(viewSource, /Choose empty sessions for this student/);
+});
+
+test('unmark occupancy helpers and occupied row styling exist', () => {
+  assert.match(viewSource, /function resolveSessionRosterCount\(/);
+  assert.match(viewSource, /function isUnmarkSelectableSessionRow\(/);
+  assert.match(viewSource, /function applyUnmarkSelectableRules\(/);
+  assert.match(viewSource, /unmark-session-row-occupied/);
+  assert.match(viewSource, /Student enrolled/);
+  assert.match(viewSource, /filterSelectableUnmarkSessionIds/);
+
+  const unmarkCalendar = functionSource('openUnmarkSessionCalendarModal', 'openEnrollmentSessionListModal');
+  assert.match(unmarkCalendar, /applyUnmarkSelectableRules\(prefetchedPickerData\)/);
+
+  const renderTable = functionSource('renderSessionWindowTable', 'getCountableSessionsFromAlignment');
+  assert.match(renderTable, /unmarkOccupied/);
+  assert.match(renderTable, /Occupied/);
+});

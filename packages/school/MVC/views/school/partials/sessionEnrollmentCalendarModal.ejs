@@ -6,7 +6,7 @@
           <div class="d-flex align-items-start justify-content-between gap-2">
             <div class="min-w-0">
               <h5 class="modal-title mb-0" id="sessionEnrollmentCalendarModalTitle">Select sessions</h5>
-              <div class="small text-muted mt-1" id="sessionEnrollmentCalendarContext"></div>
+              <div class="small text-muted mt-1 d-none" id="sessionEnrollmentCalendarContext" aria-hidden="true"></div>
               <div class="session-enrollment-student-banner d-none mt-2" id="sessionEnrollmentCalendarStudentBanner">
                 <div class="session-enrollment-student-name" id="sessionEnrollmentCalendarStudentName"></div>
                 <div class="session-enrollment-student-meta" id="sessionEnrollmentCalendarStudentMeta"></div>
@@ -22,14 +22,14 @@
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="day">Day</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="week">Week</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="twoWeeks">2 Weeks</button>
-            <button type="button" class="btn btn-outline-secondary d-none" data-session-picker-preset="thirtyDays" id="btn_sessionEnrollmentPresetThirtyDays">30 Days</button>
+            <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="thirtyDays" id="btn_sessionEnrollmentPresetThirtyDays">30 Days</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="month">Month</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="twoMonths">2 Months</button>
             <button type="button" class="btn btn-outline-secondary" data-session-picker-preset="threeMonths">3 Months</button>
-            <button type="button" class="btn btn-outline-secondary d-none session-enrollment-manage-preset" data-session-picker-preset="fourMonths" id="btn_sessionEnrollmentPresetFourMonths">4 Months</button>
-            <button type="button" class="btn btn-outline-secondary d-none session-enrollment-manage-preset" data-session-picker-preset="fiveMonths" id="btn_sessionEnrollmentPresetFiveMonths">5 Months</button>
-            <button type="button" class="btn btn-outline-secondary d-none session-enrollment-manage-preset" data-session-picker-preset="sixMonths" id="btn_sessionEnrollmentPresetSixMonths">6 Months</button>
-            <button type="button" class="btn btn-outline-secondary d-none session-enrollment-manage-preset" data-session-picker-preset="wholeCycle" id="btn_sessionEnrollmentPresetWholeCycle">Whole Cycle</button>
+            <button type="button" class="btn btn-outline-secondary session-enrollment-manage-preset" data-session-picker-preset="fourMonths" id="btn_sessionEnrollmentPresetFourMonths">4 Months</button>
+            <button type="button" class="btn btn-outline-secondary session-enrollment-manage-preset" data-session-picker-preset="fiveMonths" id="btn_sessionEnrollmentPresetFiveMonths">5 Months</button>
+            <button type="button" class="btn btn-outline-secondary session-enrollment-manage-preset" data-session-picker-preset="sixMonths" id="btn_sessionEnrollmentPresetSixMonths">6 Months</button>
+            <button type="button" class="btn btn-outline-secondary session-enrollment-manage-preset" data-session-picker-preset="wholeCycle" id="btn_sessionEnrollmentPresetWholeCycle">Whole Cycle</button>
           </div>
           <div class="btn-group btn-group-sm" role="group" aria-label="Navigate range">
             <button type="button" class="btn btn-outline-secondary" id="btn_sessionEnrollmentCalendarPrev" title="Previous"><i class="bi bi-chevron-left"></i></button>
@@ -39,7 +39,7 @@
           <span class="small text-muted ms-1" id="sessionEnrollmentCalendarRangeLabel"></span>
           <div class="ms-auto d-flex flex-wrap align-items-center gap-2 session-enrollment-viewbar-controls">
             <button type="button"
-              class="btn btn-sm btn-outline-secondary schedule-view-icon-btn d-none"
+              class="btn btn-sm btn-outline-secondary schedule-view-icon-btn"
               id="btn_sessionEnrollmentCalendarLegend"
               data-session-enrollment-open-legend
               aria-label="Legend"

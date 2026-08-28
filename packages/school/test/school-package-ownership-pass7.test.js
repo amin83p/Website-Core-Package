@@ -332,7 +332,7 @@ test('school package pass14 owns classRoutes implementation', () => {
   assert.match(routeSource, /const\s+classCtrl\s*=\s*require\('\.\.\/controllers\/school\/classController'\)/);
   assert.match(routeSource, /requireCoreModule\('MVC\/services\/security\/index'\)/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASSES,\s*OPERATIONS\.READ_ALL\)/);
-  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASS_ENROLLMENT_PERIODS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ROLLING_ENROLLMENT,\s*OPERATIONS\.UPDATE\)/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASS_CYCLES,\s*OPERATIONS\.UPDATE\)/);
   assert.match(routeSource, /classCtrl\.listClasses/);
   assert.match(routeSource, /classCtrl\.showFinalGradesPage/);

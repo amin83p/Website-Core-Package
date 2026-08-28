@@ -163,3 +163,87 @@ test('filterSessionsInEnrollmentWindow scopes sessions to enrollment dates', () 
   assert.equal(filtered.length, 1);
   assert.equal(filtered[0].sessionId, 'SES_OK');
 });
+
+test('slimSessionRow preserves rosterCount from roster array', () => {
+  const row = workspaceService.slimSessionRow({
+    sessionId: 'SES_ROSTER',
+    date: '2026-02-01',
+    startTime: '09:00',
+    endTime: '10:00',
+    roster: [{ personId: 'PERSON_1' }]
+  });
+  assert.equal(row.rosterCount, 1);
+});
+
+test('slimSessionRow reports zero rosterCount when roster is empty', () => {
+  const row = workspaceService.slimSessionRow({
+    sessionId: 'SES_EMPTY',
+    date: '2026-02-01',
+    startTime: '09:00',
+    endTime: '10:00',
+    roster: []
+  });
+  assert.equal(row.rosterCount, 0);
+});
+
+test('resolveSessionOccupiedStudentCount uses enrollment applicability without roster attendance', () => {
+  const sessions = [{ sessionId: 'SES_OCC', date: '2026-02-01', startTime: '09:00', endTime: '10:00', roster: [] }];
+  const students = [
+    { id: 'STU_A', personId: 'PERSON_A', orgId: 'ORG_900000' },
+    { id: 'STU_B', personId: 'PERSON_B', orgId: 'ORG_900000' }
+  ];
+  const periodRows = [{
+    id: 'EP_A',
+    orgId: 'ORG_900000',
+    studentId: 'STU_A',
+    personId: 'PERSON_A',
+    status: 'active',
+    startDate: '2026-02-01',
+    endDate: '2026-03-31',
+    sessionCapacityType: 'one_on_one',
+    plannedNotApplicableSessionIds: []
+  }];
+  const count = workspaceService.resolveSessionOccupiedStudentCount({
+    session: sessions[0],
+    periodRows,
+    studentToPersonMap: workspaceService.buildStudentToPersonMap(students, 'ORG_900000'),
+    statusMap: STATUS_MAP,
+    excludeStudentId: 'STU_B',
+    activeOrgId: 'ORG_900000'
+  });
+  assert.equal(count, 1);
+});
+
+test('enrichSessionsWithEnrollmentOccupancy writes occupancy onto slim sessions', () => {
+  const sessions = [{ sessionId: 'SES_OCC', date: '2026-02-01', startTime: '09:00', endTime: '10:00', roster: [] }];
+  const students = [
+    { id: 'STU_A', personId: 'PERSON_A', orgId: 'ORG_900000' },
+    { id: 'STU_B', personId: 'PERSON_B', orgId: 'ORG_900000' }
+  ];
+  const periodRows = [{
+    id: 'EP_A',
+    orgId: 'ORG_900000',
+    studentId: 'STU_A',
+    personId: 'PERSON_A',
+    status: 'active',
+    startDate: '2026-02-01',
+    endDate: '2026-03-31',
+    sessionCapacityType: 'one_on_one',
+    plannedNotApplicableSessionIds: []
+  }];
+  const enriched = workspaceService.enrichSessionsWithEnrollmentOccupancy({
+    sessions,
+    periodRows,
+    statusMap: STATUS_MAP,
+    students,
+    excludeStudentId: 'STU_B',
+    activeOrgId: 'ORG_900000'
+  });
+  const payload = workspaceService.buildRollingEnrollmentWorkspacePayload({
+    classData: { id: 'CLS_OCC', orgId: 'ORG_900000' },
+    sessions: enriched,
+    statusMap: STATUS_MAP,
+    scheduleDefaults: {}
+  });
+  assert.equal(payload.sessions[0].rosterCount, 1);
+});

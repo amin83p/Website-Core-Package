@@ -1,6 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -35,8 +36,91 @@ function slimSessionRow(session = {}) {
     status: String(session.status || 'scheduled').trim().toLowerCase() || 'scheduled',
     notes: String(session.notes || '').trim(),
     room: String(session.room || '').trim(),
-    durationHours
+    durationHours,
+    rosterCount: Number.isFinite(Number(session?.rosterCount)) && Number(session.rosterCount) >= 0
+      ? Number(session.rosterCount)
+      : (Array.isArray(session?.roster) ? session.roster.length : 0)
   };
+}
+
+function buildStudentToPersonMap(students = [], activeOrgId = '') {
+  const map = new Map();
+  (Array.isArray(students) ? students : []).forEach((row) => {
+    if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return;
+    const studentId = toPublicId(row?.id);
+    const personId = toPublicId(row?.personId);
+    if (studentId && personId) map.set(studentId, personId);
+  });
+  return map;
+}
+
+function resolveSessionOccupiedStudentCount({
+  session = {},
+  periodRows = [],
+  studentToPersonMap = new Map(),
+  statusMap = new Map(),
+  forceNotApplicableSessionKeys = new Set(),
+  excludeStudentId = '',
+  activeOrgId = ''
+} = {}) {
+  const sessionId = toPublicId(session?.sessionId || session?.id || '');
+  const excludePersonId = toPublicId(studentToPersonMap.get(toPublicId(excludeStudentId)) || '');
+  const roster = Array.isArray(session?.roster) ? session.roster : [];
+  const rosterOthers = roster.filter((row) => {
+    const personId = toPublicId(row?.personId);
+    return personId && !idsEqual(personId, excludePersonId);
+  }).length;
+
+  const applicability = classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicability({
+    sessions: [session],
+    periodRows,
+    studentToPersonMap,
+    activeOrgId,
+    allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_STATUSES,
+    forceNotApplicableSessionKeys
+  });
+
+  let expectedOthers = 0;
+  applicability.personIds.forEach((personId) => {
+    if (excludePersonId && idsEqual(personId, excludePersonId)) return;
+    const state = classEnrollmentSessionApplicabilityService.getApplicabilityState(
+      applicability.stateByKey,
+      personId,
+      session,
+      sessionId
+    );
+    if (state?.expected === true) expectedOthers += 1;
+  });
+
+  return Math.max(rosterOthers, expectedOthers);
+}
+
+function enrichSessionsWithEnrollmentOccupancy({
+  sessions = [],
+  periodRows = [],
+  statusMap = {},
+  students = [],
+  excludeStudentId = '',
+  activeOrgId = ''
+} = {}) {
+  const policyMap = statusMapToPolicyMap(statusMap);
+  const studentToPersonMap = buildStudentToPersonMap(students, activeOrgId);
+  const forceNotApplicableSessionKeys = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(
+    policyMap,
+    sessions
+  );
+  return (Array.isArray(sessions) ? sessions : []).map((session) => ({
+    ...session,
+    rosterCount: resolveSessionOccupiedStudentCount({
+      session,
+      periodRows,
+      studentToPersonMap,
+      statusMap: policyMap,
+      forceNotApplicableSessionKeys,
+      excludeStudentId,
+      activeOrgId
+    })
+  }));
 }
 
 function buildRollingEnrollmentWorkspacePayload({
@@ -64,14 +148,25 @@ async function buildRollingEnrollmentWorkspace({
   reqUser,
   eligibilitySnapshot = null
 } = {}) {
-  const [sessions, statusMap] = await Promise.all([
+  const activeOrgId = toPublicId(classData?.orgId || reqUser?.activeOrgId || '');
+  const [sessions, statusMap, periodRows, students] = await Promise.all([
     schoolDataService.getClassSessions(classData.id, reqUser),
-    sessionStatusPolicyService.getStatusMap(classData?.orgId || reqUser?.activeOrgId || '', { includeInactive: true })
+    sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true }),
+    schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, reqUser),
+    schoolDataService.fetchAllData('students', {}, reqUser)
   ]);
   const scheduleDefaults = rollingEnrollmentSessionAlignmentService.extractScheduleDefaults(classData);
+  const enrichedSessions = enrichSessionsWithEnrollmentOccupancy({
+    sessions,
+    periodRows,
+    statusMap,
+    students,
+    excludeStudentId: studentId,
+    activeOrgId
+  });
   return buildRollingEnrollmentWorkspacePayload({
     classData,
-    sessions,
+    sessions: enrichedSessions,
     statusMap,
     scheduleDefaults,
     eligibility: eligibilitySnapshot
@@ -163,5 +258,8 @@ module.exports = {
   serializeStatusMap,
   slimSessionRow,
   statusMapToPolicyMap,
-  filterSessionsInEnrollmentWindow
+  filterSessionsInEnrollmentWindow,
+  buildStudentToPersonMap,
+  resolveSessionOccupiedStudentCount,
+  enrichSessionsWithEnrollmentOccupancy
 };

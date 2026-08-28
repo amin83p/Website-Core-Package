@@ -27,6 +27,7 @@ const {
 const transactionDefinitionPreviewService = require('../../services/school/transactionDefinitionPreviewService');
 const programRegistrationDraftService = require('../../services/school/programRegistrationDraftService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const sessionAttendanceEditAccessService = require('../../services/school/sessionAttendanceEditAccessService');
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const makeupSessionAllocationService = require('../../services/school/makeupSessionAllocationService');
 const sessionMergeService = require('../../services/school/sessionMergeService');
@@ -348,6 +349,20 @@ function getClassRegistrationModeKey(classData) {
 
 function isSchoolRequestAdmin(reqUser, sectionId, operationId = OPERATIONS.READ_ALL) {
     return schoolAdminAccessService.isAdminForRequest(reqUser, sectionId, operationId);
+}
+
+async function canAccessRollingEnrollment(user) {
+    try {
+        if (!user) return false;
+        const result = await accessService.evaluateAccess({
+            user,
+            sectionId: SECTIONS.SCHOOL_ROLLING_ENROLLMENT,
+            operationId: OPERATIONS.READ_ALL
+        });
+        return result === true || result?.granted === true || result?.allowed === true;
+    } catch (_) {
+        return false;
+    }
 }
 
 /**
@@ -2973,6 +2988,8 @@ async function showEditForm(req, res) {
         });
     }
 
+    const canAccessRollingEnrollmentPage = await canAccessRollingEnrollment(req.user);
+
     res.render('school/class/classForm', {
       title: 'Edit Class', 
       classData, 
@@ -2989,6 +3006,7 @@ async function showEditForm(req, res) {
       skillCatalog,
       subjectFeeCatalog,
       user: req.user,
+      canAccessRollingEnrollment: canAccessRollingEnrollmentPage,
       actionStateId: req.actionStateId
     });
   } catch (error) {
@@ -4028,7 +4046,20 @@ async function manageSession(req, res) {
             };
         })();
         const isSessionLocked = session.locked === true || String(session.locked) === 'true';
-        const isReadOnly = !canEditSession || (isSessionLocked && !canOverride);
+        const orgIdForPolicies = classData?.orgId || getActiveOrgIdOrThrow(req.user);
+        const attendanceEditAccess = await sessionAttendanceEditAccessService.resolveAttendanceEditAccess({
+            orgId: orgIdForPolicies,
+            session,
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
+        });
+        const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_ATTENDANCES,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
+        );
+        const attendanceEditLocked = !attendanceEditAccess.editable && !canOverrideAttendanceEdit;
+        const isReadOnly = !canEditSession || (isSessionLocked && !canOverride) || attendanceEditLocked;
 
         // 2. Prefetch identity, subjects, and enrollment periods once; reuse across roster, reports, outline, and locks.
         const prefetchStart = Date.now();
@@ -4072,7 +4103,6 @@ async function manageSession(req, res) {
         );
 
         const isReportAdminViewer = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL);
-        const orgIdForPolicies = classData?.orgId || getActiveOrgIdOrThrow(req.user);
 
         const parallelStart = Date.now();
         const [
@@ -4338,6 +4368,8 @@ async function manageSession(req, res) {
             nextSessionHref,
             isSessionLocked, 
             isReadOnly,
+            attendanceEditAccess,
+            attendanceEditLocked,
             canEditSessionMetadata: canOverride,
             canManageClassConduct: Boolean(canOverride) || Boolean(canEditSession),
             canOverrideMakeupDuration,
@@ -5500,6 +5532,27 @@ async function saveSession(req, res) {
                 levels: outlineLevels,
                 templates: outlineTemplates,
                 preserveOutlineItemIdsBySkill
+            });
+        }
+
+        if (!wasCompletion && willBeCompletion) {
+            originalSession.completedAt = new Date().toISOString();
+        } else if (wasCompletion && !willBeCompletion) {
+            originalSession.completedAt = '';
+        }
+        const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_ATTENDANCES,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
+        );
+
+        if (!shouldSkipInstructionalPayload && roster !== undefined && wasCompletion) {
+            await sessionAttendanceEditAccessService.assertSessionAttendanceEditable({
+                orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+                session: originalSession,
+                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+                canOverride: canOverrideAttendanceEdit
             });
         }
 

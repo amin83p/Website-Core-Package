@@ -249,6 +249,22 @@ test('enrollment_excluded session is not expected and is ineligible for rollup d
   );
 });
 
+test('computeOneOnOneExcludedSessionIds excludes non-selected in-window sessions', () => {
+  const sessions = [
+    { sessionId: 'SES_A', date: '2026-01-05' },
+    { sessionId: 'SES_B', date: '2026-01-12' },
+    { sessionId: 'SES_C', date: '2026-01-19' },
+    { sessionId: 'SES_OUT', date: '2025-12-01' }
+  ];
+  const excluded = rollingAlignmentService.computeOneOnOneExcludedSessionIds({
+    sessions,
+    startDate: '2026-01-01',
+    endDate: '2026-03-31',
+    activeSessionIds: ['SES_A', 'SES_C']
+  });
+  assert.deepEqual(excluded, ['SES_B']);
+});
+
 test('removePersonFromExcludedSessionRosters drops only the target person', () => {
   const sessions = [{
     id: 'S1',

@@ -172,6 +172,9 @@
           "id": "442039"
         },
         {
+          "id": "445572"
+        },
+        {
           "id": "358609"
         },
         {
@@ -642,16 +645,16 @@
     },
     {
       "id": "445572",
-      "name": "SCHOOL_CLASS_ENROLLMENT_PERIODS",
+      "name": "SCHOOL_ROLLING_ENROLLMENT",
       "category": "SCHOOL",
-      "description": "Manage canonical class enrollment periods for rolling lifecycle.",
+      "description": "Rolling Enrollment lifecycle for rolling classes.",
       "active": true,
       "trackState": true,
       "minimumAccessRequirement": 5,
-      "dashboardDisplay": false,
+      "dashboardDisplay": true,
       "mainDashboardDisplay": false,
       "navigatorSection": false,
-      "homeURL": "/school/classes",
+      "homeURL": "/school/rolling-enrollment",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -4689,6 +4692,19 @@
       "tags": [
         "SCHOOL_CALENDAR",
         "445581"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_064",
+      "name": "SCHOOL_ROLLING_ENROLLMENT",
+      "type": "class",
+      "value": "bi bi-person-check",
+      "tags": [
+        "SCHOOL_ROLLING_ENROLLMENT",
+        "SCHOOL_CLASS_ENROLLMENT_PERIODS",
+        "445572"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true

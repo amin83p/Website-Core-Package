@@ -37,6 +37,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     order: 30
   }),
   Object.freeze({
+    key: 'session-access',
+    title: 'Session Access & Edit',
+    description: 'Configure teacher reminders for uncompleted sessions and attendance edit windows after completion.',
+    icon: 'bi-shield-lock',
+    order: 35
+  }),
+  Object.freeze({
     key: 'student-attendance-report',
     title: 'Student Attendance Report',
     description: 'Choose report templates used for generated student attendance reports.',

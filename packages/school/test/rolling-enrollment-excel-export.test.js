@@ -46,7 +46,7 @@ test('class routes expose rolling-enrollment export.xlsx with READ_ALL access', 
   assert.match(routes, /exportRollingEnrollmentExcel/);
   assert.match(
     routes,
-    /rolling-enrollment\/export\.xlsx'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_CLASS_ENROLLMENT_PERIODS,\s*OPERATIONS\.READ_ALL\)/
+    /rolling-enrollment\/export\.xlsx'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ROLLING_ENROLLMENT,\s*OPERATIONS\.READ_ALL\)/
   );
 });
 

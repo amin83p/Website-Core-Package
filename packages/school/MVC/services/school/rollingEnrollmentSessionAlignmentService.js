@@ -843,6 +843,60 @@ function removePersonFromExcludedSessionRosters(sessions = [], personId = '', se
   return { nextSessions, updatedCount };
 }
 
+function filterSessionsInEnrollmentWindow(sessions = [], startDate = '', endDate = '') {
+  const normalizedStart = normalizeDateOnly(startDate);
+  const normalizedEnd = normalizeDateOnly(endDate);
+  if (!normalizedStart) return [];
+  return (Array.isArray(sessions) ? sessions : []).filter((session) => {
+    const sessionDate = normalizeDateOnly(session?.date || session?.sessionDate || session?.startDate);
+    if (!sessionDate) return false;
+    if (sessionDate < normalizedStart) return false;
+    if (normalizedEnd && sessionDate > normalizedEnd) return false;
+    return true;
+  });
+}
+
+function computeOneOnOneExcludedSessionIds({
+  sessions = [],
+  startDate = '',
+  endDate = '',
+  activeSessionIds = []
+} = {}) {
+  const activeSet = new Set(sanitizePlannedNaSessionIds(activeSessionIds));
+  return sanitizePlannedNaSessionIds(
+    filterSessionsInEnrollmentWindow(sessions, startDate, endDate)
+      .map((session) => getSessionId(session))
+      .filter((sessionId) => sessionId && !activeSet.has(sessionId))
+  );
+}
+
+async function purgePersonFromEnrollmentWindowRosters({
+  classId,
+  personId,
+  startDate = '',
+  endDate = '',
+  reqUser
+} = {}) {
+  const classToken = toPublicId(classId);
+  const personToken = toPublicId(personId);
+  if (!classToken || !personToken) return { updatedCount: 0, sessionIds: [] };
+
+  const schoolDataService = resolveSchoolDataService();
+  const sessions = await schoolDataService.getClassSessions(classToken, reqUser);
+  const sessionIds = filterSessionsInEnrollmentWindow(sessions, startDate, endDate)
+    .map((session) => getSessionId(session))
+    .filter(Boolean);
+  const { nextSessions, updatedCount } = removePersonFromExcludedSessionRosters(
+    sessions,
+    personToken,
+    sessionIds
+  );
+  if (updatedCount > 0) {
+    await schoolDataService.saveClassSessions(classToken, nextSessions, reqUser);
+  }
+  return { updatedCount, sessionIds };
+}
+
 async function materializePlannedNaAttendance({ classId, personId, sessionIds = [], reqUser } = {}) {
   const classToken = toPublicId(classId);
   const personToken = toPublicId(personId);
@@ -1163,6 +1217,9 @@ module.exports = {
   appendBatchSessions,
   materializePlannedNaAttendance,
   removePersonFromExcludedSessionRosters,
+  filterSessionsInEnrollmentWindow,
+  computeOneOnOneExcludedSessionIds,
+  purgePersonFromEnrollmentWindowRosters,
   sanitizePlannedNaSessionIds,
   parsePlannedNaSessionIdsFromBody,
   assertRollingSessionsWithinCycleWindowOrThrow,

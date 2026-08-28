@@ -12,6 +12,7 @@ function read(relativePath) {
 test('rolling enrollment mutation routes allow expired operation token fallback', () => {
   const source = read('packages/school/MVC/routes/classRoutes.js');
 
+  assert.match(source, /SECTIONS\.SCHOOL_ROLLING_ENROLLMENT/);
   assert.match(source, /const\s+rollingEnrollmentMutationActionState\s*=\s*{/);
   assert.match(source, /rollingEnrollmentMutationActionState[\s\S]*requireToken:\s*true/);
   assert.match(source, /rollingEnrollmentMutationActionState[\s\S]*keepActive:\s*true/);

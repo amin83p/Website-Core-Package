@@ -338,6 +338,9 @@ function buildEnrollmentSessionPickerPayloadSync({
     const start = String(classified?.startTime || session?.startTime || '').trim();
     const end = String(classified?.endTime || session?.endTime || '').trim();
     const durationHours = Number(classified?.durationHours || 0);
+    const rosterCount = Array.isArray(session?.roster)
+      ? session.roster.length
+      : Math.max(0, Number(session?.rosterCount || 0) || 0);
     const selectable = classified?.countable === true;
     return {
       sessionId,
@@ -346,6 +349,7 @@ function buildEnrollmentSessionPickerPayloadSync({
       start,
       end,
       durationHours,
+      rosterCount,
       teacherName: resolveTeacherName(session, classData),
       manageable: Boolean(sessionId),
       manageSessionUrl: buildManageSessionUrl(classId, sessionId),

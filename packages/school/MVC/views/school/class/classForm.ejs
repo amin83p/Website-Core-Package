@@ -72,7 +72,9 @@
           <span class="badge bg-info-subtle text-info border border-info-subtle">Active Periods: <%= Number(lc.activePeriodCount || 0) %></span>
           <span class="badge bg-light text-dark border">Open Periods: <%= Number(lc.openPeriodCount || 0) %></span>
           <% if (String(c.registrationMode || '').trim().toLowerCase() === 'rolling') { %>
+            <% if (typeof canAccessRollingEnrollment !== 'undefined' && canAccessRollingEnrollment) { %>
             <a href="/school/classes/<%= encodeURIComponent(c.id || '') %>/rolling-enrollment" class="btn btn-outline-primary btn-sm ms-auto"><i class="bi bi-people me-1"></i>Rolling Enrollment</a>
+            <% } %>
             <a href="/school/classes/<%= encodeURIComponent(c.id || '') %>/cycle-rollover" class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-repeat me-1"></i>Cycle Rollover</a>
           <% } %>
         </div>

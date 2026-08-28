@@ -69,6 +69,10 @@ test('School Settings routes use standard access and action-state protection', (
     routes,
     /router\.post\('\/autosave'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
   );
+  assert.match(
+    routes,
+    /router\.post\('\/session-access'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
+  );
   assert.doesNotMatch(routes, /AdminMiddleware|adminAuthority|schoolAdminAccessService/);
 });
 
@@ -105,7 +109,7 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   const catalog = require('../packages/school/MVC/config/schoolSettingsCatalog');
   assert.deepEqual(
     catalog.listSchoolSettingsGroups().map((row) => row.key),
-    ['conduct-rating-scale', 'attendance-matrix', 'attendance-rollup', 'autosave', 'student-attendance-report']
+    ['conduct-rating-scale', 'attendance-matrix', 'attendance-marks', 'attendance-rollup', 'autosave', 'session-access', 'student-attendance-report']
   );
   const rollupGroup = catalog.listSchoolSettingsGroups().find((row) => row.key === 'attendance-rollup');
   assert.equal(rollupGroup?.href, undefined);
@@ -131,6 +135,8 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.doesNotMatch(view, /rollupUnmarkedTreatment/);
   assert.match(view, /id="autosave"/);
   assert.match(view, /\/school\/settings\/autosave/);
+  assert.match(view, /id="session-access"/);
+  assert.match(view, /\/school\/settings\/session-access/);
   assert.match(view, /stored on their device only/);
   assert.match(view, /window\.showMessageModal/);
   assert.match(view, /window\.alert/);
@@ -181,6 +187,10 @@ test('settings page renders in editable and read-only modes with valid client Ja
       isDefault: true
     }],
     attendanceThresholdsEnabled: false,
+    attendanceMarkAppearancePolicy: {
+      marks: []
+    },
+    attendanceMarkCuratedIcons: ['bi-check-circle', 'bi-x-circle'],
     rollupFormula: {
       includeUnmarkedSessions: false,
       countUnmarkedAsAbsent: false,
@@ -201,6 +211,22 @@ test('settings page renders in editable and read-only modes with valid client Ja
       defaultMinutes: 5,
       sections: {
         'manage-session': { enabledByDefault: true, defaultMinutes: null }
+      }
+    },
+    sessionAccessPolicy: {
+      uncompletedSessionNotification: {
+        enabled: false,
+        sendWhen: 'same_day',
+        sendAtTime: '18:00',
+        channels: {
+          email: { enabled: true, fromEmail: '', subjectTemplate: 'Reminder', bodyTemplate: 'Body' },
+          sms: { enabled: false, bodyTemplate: 'SMS' }
+        }
+      },
+      completedSessionAttendanceEdit: {
+        enabled: true,
+        windowType: 'timesheet_period',
+        daysAfterSession: null
       }
     },
     autosaveSections: require('../packages/school/MVC/config/autosaveSectionCatalog').listAutosaveSections(),

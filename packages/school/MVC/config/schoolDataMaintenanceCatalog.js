@@ -62,6 +62,7 @@ const LABEL_FIELDS = Object.freeze({
   attendanceMatrixPolicy: ['orgId'],
   conductRatingScalePolicy: ['orgId'],
   autosavePolicy: ['orgId'],
+  sessionAccessPolicy: ['orgId'],
   studentAttendanceReportPolicy: ['orgId'],
   studentEnrollments: ['key'],
   teacherSchedules: ['key']
@@ -126,6 +127,7 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'attendanceMarkAppearancePolicy', label: 'Attendance Mark Appearance Policies', group: 'operations', collectionName: 'schoolAttendanceMarkAppearancePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'attendanceMarkAppearance' },
   { entityType: 'conductRatingScalePolicy', label: 'Conduct Rating Scale Policies', group: 'operations', collectionName: 'schoolConductRatingScalePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'conductRatingScale' },
   { entityType: 'autosavePolicy', label: 'Autosave Policies', group: 'operations', collectionName: 'schoolAutosavePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'autosave' },
+  { entityType: 'sessionAccessPolicy', label: 'Session Access Policies', group: 'operations', collectionName: 'schoolSessionAccessPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'sessionAccess' },
   { entityType: 'studentAttendanceReportPolicy', label: 'Student Attendance Report Policies', group: 'operations', collectionName: 'schoolStudentAttendanceReportPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'studentAttendanceReport' },
   { entityType: 'leaveRequests', label: 'Leave Requests', group: 'operations', collectionName: 'schoolLeaveRequests', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'tasks', label: 'Tasks', group: 'operations', collectionName: 'schoolTasks', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
@@ -184,6 +186,7 @@ function resolveListFields(entityType) {
     attendanceMatrixPolicy: ['scheduledMinutes'],
     conductRatingScalePolicy: ['levelCount'],
     autosavePolicy: ['defaultMinutes'],
+    sessionAccessPolicy: ['orgId'],
     studentEnrollments: ['key'],
     teacherSchedules: ['key']
   };

@@ -371,7 +371,8 @@ function buildTaskActionLinks(row) {
   return actions;
 }
 
-function buildClassActionLinks(row) {
+function buildClassActionLinks(row, options = {}) {
+  const { canAccessRollingEnrollment = true } = options;
   const id = normalizeText(row?.id);
   const encodedId = encodeURIComponent(id);
   const lifecycleMode = lower(row?.registrationMode || 'term_based') === 'rolling' ? 'rolling' : 'term_based';
@@ -381,10 +382,12 @@ function buildClassActionLinks(row) {
   ];
 
   if (lifecycleMode === 'rolling') {
-    actions.unshift(
-      { label: 'Enrollment', href: `/school/classes/${encodedId}/rolling-enrollment`, icon: 'bi bi-person-check', tone: 'primary' },
-      { label: 'Rollover', href: `/school/classes/${encodedId}/cycle-rollover`, icon: 'bi bi-arrow-repeat', tone: 'warning' }
-    );
+    const rollingActions = [];
+    if (canAccessRollingEnrollment) {
+      rollingActions.push({ label: 'Enrollment', href: `/school/classes/${encodedId}/rolling-enrollment`, icon: 'bi bi-person-check', tone: 'primary' });
+    }
+    rollingActions.push({ label: 'Rollover', href: `/school/classes/${encodedId}/cycle-rollover`, icon: 'bi bi-arrow-repeat', tone: 'warning' });
+    actions.unshift(...rollingActions);
   }
 
   return actions;
@@ -435,7 +438,7 @@ function resolveDefaultTeacherName(row) {
   ) || 'Unassigned';
 }
 
-function normalizeClassRows(rows) {
+function normalizeClassRows(rows, options = {}) {
   return (Array.isArray(rows) ? rows : []).map((row) => {
     const lifecycleMode = lower(row?.registrationMode || 'term_based') === 'rolling' ? 'rolling' : 'term_based';
     const subjects = Array.isArray(row?.curriculum?.subjects) ? row.curriculum.subjects : [];
@@ -456,7 +459,7 @@ function normalizeClassRows(rows) {
       defaultTeacherName: resolveDefaultTeacherName(row),
       subjectLabels: subjects.map((subject) => normalizeText(subject?.code || subject?.subjectId)).filter(Boolean),
       totalHours: Number(row?.curriculum?.totalHours || 0),
-      actions: buildClassActionLinks(row)
+      actions: buildClassActionLinks(row, options)
     };
   });
 }
@@ -1071,6 +1074,11 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     delete fetchQuery.page;
     delete fetchQuery.limit;
     const rows = await dataService.fetchData('classes', fetchQuery, req.user, { scopeId: access.scopeId });
+    const rollingEnrollmentAccess = await evaluateModuleAccess(req, {
+      label: 'Rolling Enrollment',
+      sectionId: SECTIONS.SCHOOL_ROLLING_ENROLLMENT,
+      operationId: OPERATIONS.READ_ALL
+    });
     return {
       section: {
         key: 'classes',
@@ -1078,7 +1086,9 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
         icon: 'bi bi-easel-fill',
         sourceUrl: '/school/classes'
       },
-      rows: normalizeClassRows(rows),
+      rows: normalizeClassRows(rows, {
+        canAccessRollingEnrollment: rollingEnrollmentAccess.allowed
+      }),
       total: Array.isArray(rows) ? rows.length : 0,
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()

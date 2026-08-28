@@ -1351,6 +1351,59 @@ async function enrichCycleRolloverPreviewStudentLabels(preview, user) {
   };
 }
 
+async function listRollingEnrollmentClasses(req, res) {
+  try {
+    let query = await buildDataServiceQuery(req.query);
+    const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
+    if (query.q === searchDefaultKeyword) query = {};
+
+    const rows = await schoolDataService.fetchData('classes', query, req.user, buildRouteAccessContext(req));
+    const rollingClasses = (Array.isArray(rows) ? rows : []).filter((row) => getClassRegistrationModeKey(row) === 'rolling');
+    const orgs = await dataService.fetchData('organizations', {}, req.user);
+    const classIds = rollingClasses.map((row) => toPublicId(row?.id)).filter(Boolean);
+    const periodMetricsMap = await buildClassEnrollmentPeriodMetrics(req.user, classIds, resolveOrgTodayFromRequest(req));
+    const searchableFields = await inferSearchableFields(rollingClasses, { exclude: ['audit', 'attachments'] });
+    const classTitleMap = new Map(rollingClasses.map((row) => [toPublicId(row?.id), String(row?.title || '').trim()]));
+
+    const enriched = rollingClasses.map((classRow) => {
+      const org = orgs.find((o) => idsEqual(o.id, classRow.orgId));
+      const classId = toPublicId(classRow?.id);
+      const metrics = periodMetricsMap.get(classId) || { activePeriodCount: 0, openPeriodCount: 0 };
+      const previousClassId = toPublicId(classRow?.previousClassId);
+      const nextClassId = toPublicId(classRow?.nextClassId);
+      return {
+        ...classRow,
+        orgName: org ? org.identity?.displayName || org.name : `Unknown Org (#${classRow.orgId})`,
+        activePeriodCount: Number(metrics.activePeriodCount || 0),
+        openPeriodCount: Number(metrics.openPeriodCount || 0),
+        previousClassTitle: previousClassId ? (classTitleMap.get(previousClassId) || previousClassId) : '',
+        nextClassTitle: nextClassId ? (classTitleMap.get(nextClassId) || nextClassId) : ''
+      };
+    });
+
+    const { data, pagination } = paginate(enriched, req.query);
+
+    if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
+
+    res.render('school/class/rollingEnrollmentClassList', {
+      title: 'Rolling Enrollment',
+      tableName: 'Rolling_Enrollment_Classes_List',
+      data,
+      searchableFields,
+      includeModal: true,
+      includeModal_Table: true,
+      print: true,
+      pagination,
+      filters: req.query,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    if (isAjax(req)) return res.status(500).json({ status: 'error', error, message: error.message });
+    res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
+  }
+}
+
 async function showRollingEnrollmentPage(req, res) {
   try {
     const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
@@ -4286,6 +4339,13 @@ async function removeOrRollbackClassEnrollmentPeriod(req, res) {
       const voidPatch = buildVoidPatch(periodRow, req.user, 'Draft class enrollment deleted by user');
       voidPatch.transactionSummary = financeSettlement.summary;
       await schoolDataService.updateClassEnrollmentPeriod(periodId, voidPatch, req.user);
+      await rollingEnrollmentSessionAlignmentService.purgePersonFromEnrollmentWindowRosters({
+        classId: periodRow?.classId || classData?.id,
+        personId: periodRow?.personId,
+        startDate: periodRow?.startDate,
+        endDate: periodRow?.endDate,
+        reqUser: req.user
+      });
       const payloadOut = {
         status: 'success',
         operation: 'void',
@@ -5068,6 +5128,7 @@ async function createExtensionEnrollmentPeriod(req, res) {
 }
 
 module.exports = {
+  listRollingEnrollmentClasses,
   showRollingEnrollmentPage,
   showCycleRolloverWizard,
   previewCycleRollover,

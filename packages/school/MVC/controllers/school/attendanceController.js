@@ -7,6 +7,7 @@ const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreMo
 const chatRepository = requireCoreModule('MVC/repositories/chatRepository');
 const socketService = requireCoreModule('MVC/services/socketService'); // IMPORT SOCKET SERVICE
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const sessionAttendanceEditAccessService = require('../../services/school/sessionAttendanceEditAccessService');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
@@ -213,6 +214,19 @@ async function assertAttendanceMatrixSessionEditable(req, classData, session) {
     if (isSessionLocked && !canOverride) {
         throw new Error('This session is locked and cannot be edited. Please contact an administrator.');
     }
+
+    const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
+        req.user,
+        SECTIONS.SCHOOL_ATTENDANCES,
+        OPERATIONS.UPDATE,
+        { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
+    );
+    await sessionAttendanceEditAccessService.assertSessionAttendanceEditable({
+        orgId: String(classData?.orgId || req.user?.activeOrgId || '').trim(),
+        session,
+        orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+        canOverride: canOverrideAttendanceEdit
+    });
 
     const statusMap = await sessionStatusPolicyService.getStatusMap(
         String(classData?.orgId || req.user?.activeOrgId || '').trim(),

@@ -73,6 +73,56 @@ test('collectTimeSlotSessions filters by action and limits chronologically', () 
   assert.deepEqual(unmarkRows.map((row) => row.sessionId), ['S2']);
 });
 
+test('collectTimeSlotSessions supports picker select and deselect actions', () => {
+  const pickerEvents = [
+    { sessionId: 'S1', date: '2026-01-05', start: '09:00', end: '10:30', selectable: true },
+    { sessionId: 'S2', date: '2026-01-12', start: '09:00', end: '10:30', selectable: true },
+    { sessionId: 'S3', date: '2026-01-19', start: '09:00', end: '10:30', selectable: false }
+  ];
+  const selectedSet = new Set(['S2']);
+
+  const selectRows = core.collectTimeSlotSessions(pickerEvents, null, {
+    startTime: '09:00',
+    endTime: '10:30',
+    startDate: '2026-01-05',
+    endDate: '2026-01-26',
+    action: 'select',
+    selectedSet
+  });
+  assert.deepEqual(selectRows.map((row) => row.sessionId), ['S1']);
+
+  const deselectRows = core.collectTimeSlotSessions(pickerEvents, null, {
+    startTime: '09:00',
+    endTime: '10:30',
+    startDate: '2026-01-05',
+    endDate: '2026-01-26',
+    action: 'deselect',
+    selectedSet
+  });
+  assert.deepEqual(deselectRows.map((row) => row.sessionId), ['S2']);
+});
+
+test('calendar modal exposes full preset toolbar and legend for picker parity', () => {
+  assert.match(calendarPartialSource, /data-session-picker-preset="thirtyDays"/);
+  assert.match(calendarPartialSource, /data-session-picker-preset="wholeCycle"/);
+  assert.doesNotMatch(calendarPartialSource, /data-session-picker-preset="thirtyDays"[^>]*d-none/);
+  assert.doesNotMatch(calendarPartialSource, /data-session-picker-preset="wholeCycle"[^>]*d-none/);
+  assert.match(calendarPartialSource, /id="btn_sessionEnrollmentCalendarLegend"/);
+  assert.doesNotMatch(calendarPartialSource, /id="btn_sessionEnrollmentCalendarLegend"[^>]*d-none/);
+  assert.match(calendarPartialSource, /id="sessionEnrollmentCalendarStudentBanner"/);
+});
+
+test('calendar modal chrome and context menu work in picker mode', () => {
+  assert.match(modalSource, /function renderPickerSessionsLegend/);
+  assert.match(modalSource, /function initDefaultViewRange/);
+  assert.doesNotMatch(modalSource, /thirtyDaysBtn\?\.classList\.toggle\('d-none', !manage\)/);
+  assert.doesNotMatch(modalSource, /legendBtn\?\.classList\.toggle\('d-none', !manage\)/);
+  assert.doesNotMatch(modalSource, /function handleHostContextMenu\(event\) \{\s*if \(!isManageMode\(\)\) return;/);
+  assert.doesNotMatch(modalSource, /function showContextMenu\(event, sessionId\) \{\s*if \(!isManageMode\(\)\) return;/);
+  assert.match(modalSource, /Exclude session/);
+  assert.match(modalSource, /stageTimeSlotPickerChanges/);
+});
+
 test('calendar modal includes time-slot select overlay and context menu partials', () => {
   assert.match(calendarPartialSource, /sessionEnrollmentTimeSlotSelectModal/);
   assert.match(calendarPartialSource, /sessionEnrollmentContextMenu/);
@@ -91,4 +141,14 @@ test('session enrollment calendar modal wires context menu and time-slot select 
 test('rolling enrollment passes cycle end date into manage sessions modal', () => {
   assert.match(rollingSource, /mode: 'manageEnrollmentSessions'/);
   assert.match(rollingSource, /cycleEndDate:\s*String\(cycleWindow\?\.endDate/);
+});
+
+test('rolling enrollment passes cycle end date into picker calendar modal', () => {
+  const openPicker = rollingSource.match(/async function openEnrollmentSessionCalendarModal\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(openPicker, 'openEnrollmentSessionCalendarModal should exist');
+  assert.match(openPicker[0], /cycleEndDate:\s*String\(cycleWindow\?\.endDate/);
+
+  const openUnmark = rollingSource.match(/async function openUnmarkSessionCalendarModal\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(openUnmark, 'openUnmarkSessionCalendarModal should exist');
+  assert.match(openUnmark[0], /cycleEndDate:\s*String\(cycleWindow\?\.endDate/);
 });
