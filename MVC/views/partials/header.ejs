@@ -14,15 +14,31 @@
        const warnings = (typeof user !== 'undefined' && user && user.siteWarnings) ? 
        user.siteWarnings : (typeof siteWarnings !== 'undefined' ? siteWarnings : []);
        const displayName = (typeof user !== 'undefined' && user) ? (user.name || user.username || 'U') : 'U';
-       const avatarInitial = String(displayName || 'U').charAt(0).toUpperCase();
-       const headerAvatarUrl = (typeof user !== 'undefined' && user)
-         ? String(user.personAvatarUrl || user.userAvatarUrl || user.avatarUrl || user.avatar || '').trim()
-         : '';
        const cleanNamePart = (value) => String(value || '').trim();
        const firstToken = (value) => {
          const token = cleanNamePart(value);
          if (!token) return '';
          return token.split(/\s+/).filter(Boolean)[0] || '';
+       };
+       const lastToken = (value) => {
+         const token = cleanNamePart(value);
+         if (!token) return '';
+         const parts = token.split(/\s+/).filter(Boolean);
+         return parts.length ? parts[parts.length - 1] : '';
+       };
+       const buildAvatarInitials = (firstName, lastName, fallbackName) => {
+         const first = cleanNamePart(firstName);
+         const last = cleanNamePart(lastName);
+         if (first && last) {
+           return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+         }
+         const fallback = cleanNamePart(typeof fallbackName === 'string' ? fallbackName : '');
+         const parts = fallback.split(/\s+/).filter(Boolean);
+         if (parts.length >= 2) {
+           return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+         }
+         const single = first || last || parts[0] || 'U';
+         return single.charAt(0).toUpperCase();
        };
        const headerPreferredName = (typeof user !== 'undefined' && user)
          ? cleanNamePart((user.name && typeof user.name === 'object' ? user.name.preferred : '') || user.preferredName || '')
@@ -30,8 +46,14 @@
        const headerFirstName = (typeof user !== 'undefined' && user)
          ? cleanNamePart((user.name && typeof user.name === 'object' ? user.name.first : '') || user.firstName || '')
          : '';
+       const headerLastName = (typeof user !== 'undefined' && user)
+         ? cleanNamePart((user.name && typeof user.name === 'object' ? user.name.last : '') || user.lastName || '')
+         : '';
        const headerStringNameFirst = (typeof user !== 'undefined' && user)
          ? firstToken(typeof user.name === 'string' ? user.name : '')
+         : '';
+       const headerStringNameLast = (typeof user !== 'undefined' && user)
+         ? lastToken(typeof user.name === 'string' ? user.name : '')
          : '';
        const headerDisplayNameFirst = (typeof user !== 'undefined' && user)
          ? firstToken(user.displayName || (user.identity && user.identity.displayName) || '')
@@ -40,6 +62,14 @@
          ? firstToken(user.username || '')
          : '';
        const headerShortName = headerPreferredName || headerFirstName || headerStringNameFirst || headerDisplayNameFirst || headerUsernameFirst || firstToken(displayName) || 'U';
+       const avatarInitial = buildAvatarInitials(
+         headerFirstName || headerStringNameFirst || headerDisplayNameFirst || headerUsernameFirst,
+         headerLastName || headerStringNameLast,
+         typeof displayName === 'string' ? displayName : headerShortName
+       );
+       const headerAvatarUrl = (typeof user !== 'undefined' && user)
+         ? String(user.personAvatarUrl || user.userAvatarUrl || user.avatarUrl || user.avatar || '').trim()
+         : '';
        const headerBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
        const headerLogoUrl = headerBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
        const headerLogoAlt = (headerBrand.appName || headerBrand.ownerDisplayName || 'Amin Paknejad') + ' Logo';
