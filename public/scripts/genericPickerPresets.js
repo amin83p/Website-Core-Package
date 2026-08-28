@@ -86,6 +86,13 @@
       apiEndpoint: '/school/departments/api/data',
       placeholder: 'Search departments...'
     },
+    emailTemplate: {
+      title: 'Select Email Template',
+      icon: 'bi-envelope-paper',
+      apiEndpoint: '/email-management/api/templates?isActive__eq=true',
+      placeholder: 'Search email templates...',
+      searchFields: 'id,label,name,packageName,eventKey,subjectTemplate'
+    },
     term: {
       title: 'Select Term',
       icon: 'bi-calendar3-range-fill',
@@ -406,6 +413,7 @@
     clbStage: (overrides) => byName('clbStage', overrides),
     clbSkill: (overrides) => byName('clbSkill', overrides),
     department: (overrides) => byName('department', overrides),
+    emailTemplate: (overrides) => byName('emailTemplate', overrides),
     group: (overrides) => byName('group', overrides),
     organization: (overrides) => byName('organization', overrides),
     operation: (overrides) => byName('operation', overrides),

@@ -19,6 +19,7 @@ const COLLECTION_NAME = 'emailManagementTemplates';
 const DEFAULT_SEARCH_FIELDS = Object.freeze([
   'id',
   'orgId',
+  'packageName',
   'sectionId',
   'operationId',
   'senderTemplate',
@@ -72,19 +73,25 @@ function hasUniqueConflict(error = null) {
   return message.includes('e11000') || (message.includes('duplicate') && message.includes('key'));
 }
 
+function normalizePackageName(value = '') {
+  return normalizeKeyToken(value || 'CORE') || 'CORE';
+}
+
 function assertUniquePair(rows = [], targetRow = {}, excludeId = '') {
   const orgId = toPublicId(targetRow?.orgId || '');
+  const packageName = normalizePackageName(targetRow?.packageName || 'CORE');
   const sectionId = normalizeKeyToken(targetRow?.sectionId || '');
   const operationId = normalizeKeyToken(targetRow?.operationId || '');
   if (!orgId || !sectionId || !operationId) return;
   const conflict = (Array.isArray(rows) ? rows : []).find((row) => {
     if (excludeId && idsEqual(row?.id, excludeId)) return false;
     return idsEqual(row?.orgId, orgId)
+      && normalizePackageName(row?.packageName || 'CORE') === packageName
       && normalizeKeyToken(row?.sectionId || '') === sectionId
       && normalizeKeyToken(row?.operationId || '') === operationId;
   });
   if (conflict) {
-    throw new Error('A template for this section/operation already exists in the selected organization.');
+    throw new Error('A template for this package/section/operation already exists in the selected organization.');
   }
 }
 
@@ -188,6 +195,7 @@ const emailManagementTemplateRepository = {
           scope: { canViewAll: true },
           query: {
             orgId__eq: toPublicId(data?.orgId || ''),
+            packageName__eq: normalizePackageName(data?.packageName || 'CORE'),
             sectionId__eq: normalizeKeyToken(data?.sectionId || ''),
             operationId__eq: normalizeKeyToken(data?.operationId || ''),
             page: 1,
@@ -239,6 +247,7 @@ const emailManagementTemplateRepository = {
           scope: { canViewAll: true },
           query: {
             orgId__eq: normalized.orgId,
+            packageName__eq: normalized.packageName,
             sectionId__eq: normalized.sectionId,
             operationId__eq: normalized.operationId,
             page: 1,

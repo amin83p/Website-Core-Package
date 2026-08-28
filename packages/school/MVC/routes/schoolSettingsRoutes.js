@@ -61,6 +61,11 @@ router.post('/session-access',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveSessionAccessPolicy);
 
+router.post('/session-access/test-notification',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
+  ctrl.sendSessionAccessTestNotification);
+
 router.post('/student-attendance-report',
   requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),

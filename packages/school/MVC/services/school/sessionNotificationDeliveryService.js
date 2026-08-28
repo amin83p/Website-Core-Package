@@ -2,11 +2,14 @@
 
 const { requireCoreModule } = require('./schoolCoreModuleResolver');
 const resendEmailService = requireCoreModule('MVC/services/resendEmailService');
+const emailManagementService = requireCoreModule('MVC/services/emailManagementService');
 const sessionAccessPolicyService = require('./sessionAccessPolicyService');
 const sessionNotificationLedgerModel = require('../../models/school/sessionNotificationLedgerModel');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
-const { renderTemplate } = sessionAccessPolicyService;
+const sessionUncompletedNotificationService = require('./sessionUncompletedNotificationService');
+const { mapNotificationContextToEmailPlaceholders } = require('./sessionNotificationEmailContextAdapter');
+const { renderTemplate, DAILY_DIGEST_SESSION_ID, usesManagedEmailTemplate } = sessionAccessPolicyService;
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -39,11 +42,12 @@ function buildTemplateContext({
   classData = {},
   session = {},
   teacher = {},
-  orgName = ''
+  orgName = '',
+  baseUrl = ''
 } = {}) {
   const classId = cleanText(classData?.id);
   const sessionId = cleanText(session?.sessionId || session?.id);
-  return {
+  const baseContext = {
     className: cleanText(classData?.title || classData?.name || classId),
     classId,
     sessionName: buildSessionName(session),
@@ -57,6 +61,15 @@ function buildTemplateContext({
     sessionManagerUrl: classId && sessionId
       ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
       : ''
+  };
+  const sessionList = sessionUncompletedNotificationService.buildSessionListText(
+    [{ classData, session }],
+    { baseUrl }
+  );
+  return {
+    ...baseContext,
+    sessionCount: '1',
+    sessionList
   };
 }
 
@@ -72,6 +85,65 @@ function listSessionEditorIds(session = {}) {
   return ids;
 }
 
+async function resolveEmailDeliveryPayload({
+  emailChannel = {},
+  teacher = {},
+  context = {},
+  orgId = '',
+  subjectPrefix = ''
+} = {}) {
+  const to = schoolPersonAccessService.readPersonEmail
+    ? schoolPersonAccessService.readPersonEmail(teacher)
+    : cleanText(teacher?.contact?.email || teacher?.email);
+  if (!to) {
+    return { status: 'skipped_no_contact', channel: 'email' };
+  }
+  if (!resendEmailService.isConfigured()) {
+    return { status: 'skipped_email_not_configured', channel: 'email' };
+  }
+
+  if (usesManagedEmailTemplate(emailChannel)) {
+    const rendered = await emailManagementService.resolveTemplateById({
+      templateId: emailChannel.emailTemplateId,
+      orgId,
+      to,
+      injectedValues: mapNotificationContextToEmailPlaceholders(context)
+    });
+    const prefix = cleanText(subjectPrefix);
+    return {
+      status: 'ready',
+      channel: 'email',
+      recipient: to,
+      payload: {
+        to: rendered.to,
+        subject: `${prefix}${rendered.subject}`,
+        text: rendered.text,
+        html: rendered.html,
+        from: rendered.from || undefined
+      },
+      subject: `${prefix}${rendered.subject}`,
+      text: rendered.text
+    };
+  }
+
+  const subject = `${cleanText(subjectPrefix)}${renderTemplate(emailChannel.subjectTemplate, context)}`;
+  const text = renderTemplate(emailChannel.bodyTemplate, context);
+  const from = cleanText(emailChannel.fromEmail) || undefined;
+  return {
+    status: 'ready',
+    channel: 'email',
+    recipient: to,
+    payload: {
+      to,
+      subject,
+      text,
+      from
+    },
+    subject,
+    text
+  };
+}
+
 async function sendEmailNotification({
   policy,
   teacher,
@@ -82,31 +154,26 @@ async function sendEmailNotification({
   if (!emailChannel.enabled) {
     return { status: 'skipped_channel_disabled' };
   }
-  const to = schoolPersonAccessService.readPersonEmail
-    ? schoolPersonAccessService.readPersonEmail(teacher)
-    : cleanText(teacher?.contact?.email || teacher?.email);
-  if (!to) {
-    return { status: 'skipped_no_contact', channel: 'email' };
+  const resolved = await resolveEmailDeliveryPayload({
+    emailChannel,
+    teacher,
+    context,
+    orgId
+  });
+  if (resolved.status !== 'ready') {
+    return resolved;
   }
-  if (!resendEmailService.isConfigured()) {
-    return { status: 'skipped_email_not_configured', channel: 'email' };
-  }
-  const subject = renderTemplate(emailChannel.subjectTemplate, context);
-  const text = renderTemplate(emailChannel.bodyTemplate, context);
-  const from = cleanText(emailChannel.fromEmail) || undefined;
   await resendEmailService.sendEmail({
-    to,
-    subject,
-    text,
-    from,
+    ...resolved.payload,
     meta: {
       orgId,
       purpose: 'uncompleted_session_notification',
       sessionId: context.sessionId,
-      classId: context.classId
+      classId: context.classId,
+      emailTemplateId: emailChannel.emailTemplateId || ''
     }
   });
-  return { status: 'sent', channel: 'email', recipient: to };
+  return { status: 'sent', channel: 'email', recipient: resolved.recipient };
 }
 
 async function sendSmsNotification({
@@ -130,6 +197,132 @@ async function sendSmsNotification({
   };
 }
 
+async function sendDigestEmailNotification({
+  policy,
+  teacher,
+  context,
+  orgId = '',
+  subjectPrefix = ''
+} = {}) {
+  const emailChannel = policy?.uncompletedSessionNotification?.channels?.email || {};
+  if (!emailChannel.enabled) {
+    return { status: 'skipped_channel_disabled' };
+  }
+  const resolved = await resolveEmailDeliveryPayload({
+    emailChannel,
+    teacher,
+    context,
+    orgId,
+    subjectPrefix
+  });
+  if (resolved.status !== 'ready') {
+    return resolved;
+  }
+  await resendEmailService.sendEmail({
+    ...resolved.payload,
+    meta: {
+      orgId,
+      purpose: 'uncompleted_session_digest_notification',
+      sessionCount: context.sessionCount,
+      emailTemplateId: emailChannel.emailTemplateId || ''
+    }
+  });
+  return {
+    status: 'sent',
+    channel: 'email',
+    recipient: resolved.recipient,
+    subject: resolved.subject,
+    text: resolved.text
+  };
+}
+
+async function sendDigestSmsNotification({
+  policy,
+  teacher,
+  context
+} = {}) {
+  const smsChannel = policy?.uncompletedSessionNotification?.channels?.sms || {};
+  if (!smsChannel.enabled) {
+    return { status: 'skipped_channel_disabled' };
+  }
+  const phone = readPersonPhone(teacher);
+  if (!phone) {
+    return { status: 'skipped_no_contact', channel: 'sms' };
+  }
+  const message = renderTemplate(smsChannel.bodyTemplate, context);
+  if (message.length > 320) {
+    return {
+      status: 'skipped_message_too_long',
+      channel: 'sms',
+      recipient: phone,
+      message
+    };
+  }
+  return {
+    status: 'skipped_no_sms_provider',
+    channel: 'sms',
+    recipient: phone,
+    message
+  };
+}
+
+async function notifyTeacherDigest({
+  orgId = '',
+  orgName = '',
+  teacher = {},
+  sessions = [],
+  policy = null,
+  sendWhenDate = '',
+  baseUrl = '',
+  skipLedger = false,
+  channels = ['email', 'sms']
+} = {}) {
+  const resolvedPolicy = policy || sessionAccessPolicyService.resolvePolicy();
+  const context = sessionUncompletedNotificationService.buildDigestContext({
+    teacher,
+    sessions,
+    orgName,
+    baseUrl
+  });
+  const teacherId = cleanText(teacher?.id || teacher?.personId);
+  const results = [];
+  const targetChannels = (Array.isArray(channels) ? channels : ['email', 'sms'])
+    .filter((channel) => ['email', 'sms'].includes(channel));
+
+  for (const channel of targetChannels) {
+    const dedupeKey = sessionNotificationLedgerModel.buildDedupeKey({
+      orgId,
+      sessionId: DAILY_DIGEST_SESSION_ID,
+      teacherId,
+      channel,
+      sendWhenDate
+    });
+    if (!skipLedger && await sessionNotificationLedgerModel.hasSentEntry(dedupeKey)) {
+      results.push({ channel, status: 'skipped_duplicate' });
+      continue;
+    }
+    const outcome = channel === 'email'
+      ? await sendDigestEmailNotification({ policy: resolvedPolicy, teacher, context, orgId })
+      : await sendDigestSmsNotification({ policy: resolvedPolicy, teacher, context });
+    if (!skipLedger) {
+      await sessionNotificationLedgerModel.appendEntry({
+        dedupeKey,
+        orgId,
+        sessionId: DAILY_DIGEST_SESSION_ID,
+        teacherId,
+        channel,
+        sendWhenDate,
+        status: outcome.status,
+        recipient: outcome.recipient || '',
+        message: outcome.message || outcome.text || `${context.sessionCount} session(s)`
+      });
+    }
+    results.push(outcome);
+  }
+
+  return results;
+}
+
 async function notifyTeacherForSession({
   orgId = '',
   orgName = '',
@@ -137,15 +330,18 @@ async function notifyTeacherForSession({
   session = {},
   teacher = {},
   policy = null,
-  sendWhenDate = ''
+  sendWhenDate = '',
+  channels = ['email', 'sms']
 } = {}) {
   const resolvedPolicy = policy || sessionAccessPolicyService.resolvePolicy();
   const context = buildTemplateContext({ classData, session, teacher, orgName });
   const teacherId = cleanText(teacher?.id || teacher?.personId);
   const sessionId = cleanText(session?.sessionId || session?.id);
   const results = [];
+  const targetChannels = (Array.isArray(channels) ? channels : ['email', 'sms'])
+    .filter((channel) => ['email', 'sms'].includes(channel));
 
-  for (const channel of ['email', 'sms']) {
+  for (const channel of targetChannels) {
     const dedupeKey = sessionNotificationLedgerModel.buildDedupeKey({
       orgId,
       sessionId,
@@ -182,5 +378,7 @@ module.exports = {
   buildTemplateContext,
   listSessionEditorIds,
   notifyTeacherForSession,
+  notifyTeacherDigest,
+  sendDigestEmailNotification,
   readPersonPhone
 };

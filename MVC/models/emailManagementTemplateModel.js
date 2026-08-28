@@ -121,6 +121,10 @@ function normalizeKeyToken(value = '') {
   return cleanString(value, { max: 120, allowEmpty: true }).toUpperCase();
 }
 
+function normalizePackageName(value = '') {
+  return normalizeKeyToken(value || 'CORE') || 'CORE';
+}
+
 function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
   const input = isPlainObject(record) ? record : {};
   const base = isPlainObject(existing) ? existing : {};
@@ -128,6 +132,7 @@ function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
 
   const id = cleanId(input.id || base.id, { max: 120, allowEmpty: true }) || '';
   const orgId = cleanId(input.orgId || base.orgId, { max: 120, allowEmpty: false });
+  const packageName = normalizePackageName(input.packageName || base.packageName || 'CORE');
   const sectionId = normalizeKeyToken(input.sectionId || base.sectionId || '');
   const operationId = normalizeKeyToken(input.operationId || base.operationId || '');
   const recipientTemplate = cleanString(
@@ -171,6 +176,7 @@ function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
     ...base,
     id,
     orgId,
+    packageName,
     sectionId,
     operationId,
     senderTemplate: senderTemplate || '',
@@ -187,13 +193,14 @@ function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
 
 function sanitizeTemplateForRead(record = {}) {
   const row = isPlainObject(record) ? { ...record } : {};
+  row.packageName = normalizePackageName(row.packageName || 'CORE');
   row.sectionId = normalizeKeyToken(row.sectionId || '');
   row.operationId = normalizeKeyToken(row.operationId || '');
   return row;
 }
 
 function buildCompositeKey(row = {}) {
-  return `${toPublicId(row?.orgId) || ''}::${normalizeKeyToken(row?.sectionId || '')}::${normalizeKeyToken(row?.operationId || '')}`;
+  return `${toPublicId(row?.orgId) || ''}::${normalizePackageName(row?.packageName || 'CORE')}::${normalizeKeyToken(row?.sectionId || '')}::${normalizeKeyToken(row?.operationId || '')}`;
 }
 
 function assertUniqueKey(rows = [], targetRow = {}, excludeId = '') {
@@ -204,7 +211,7 @@ function assertUniqueKey(rows = [], targetRow = {}, excludeId = '') {
     return buildCompositeKey(row) === targetKey;
   });
   if (conflict) {
-    throw new Error('A template for this section/operation already exists in the selected organization.');
+    throw new Error('A template for this package/section/operation already exists in the selected organization.');
   }
 }
 

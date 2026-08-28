@@ -3,7 +3,7 @@ const dataService = require('./dataService');
 const emailManagementTemplateRepository = require('../repositories/emailManagementTemplateRepository');
 const appBrandingService = require('./appBrandingService');
 const startupLogger = require('../utils/startupLogger');
-const { toPublicId } = require('../utils/idAdapter');
+const { toPublicId, idsEqual } = require('../utils/idAdapter');
 const { assertCreateOrgContextOrThrow } = require('../utils/orgContextUtils');
 const {
   listSupportedEmailEvents,
@@ -97,11 +97,27 @@ function resolveValuesByResolverId(resolverId = '', context = {}) {
   return resolver(context || {});
 }
 
+function normalizePackageName(value = '') {
+  return normalizeKeyToken(value || 'CORE') || 'CORE';
+}
+
+function normalizeInjectedValues(values = {}) {
+  const source = values && typeof values === 'object' ? values : {};
+  const output = {};
+  Object.keys(source).forEach((key) => {
+    const token = normalizeKeyToken(key);
+    if (!token) return;
+    output[token] = source[key];
+  });
+  return output;
+}
+
 function buildDefinitionFromEvent(event = null) {
   if (!event) return null;
   return {
     key: `${normalizeKeyToken(event.sectionId)}::${normalizeKeyToken(event.operationId)}`,
     eventKey: normalizeKeyToken(event.eventKey),
+    packageName: normalizePackageName(event.packageName || 'CORE'),
     sectionId: normalizeKeyToken(event.sectionId),
     operationId: normalizeKeyToken(event.operationId),
     label: cleanString(event.label, { max: 160, allowEmpty: true })
@@ -113,24 +129,31 @@ function buildDefinitionFromEvent(event = null) {
     required: Array.isArray(event.requiredPlaceholders)
       ? event.requiredPlaceholders.map((token) => normalizeKeyToken(token)).filter(Boolean)
       : [],
+    runtime: Array.isArray(event.runtimePlaceholders)
+      ? event.runtimePlaceholders.map((token) => normalizeKeyToken(token)).filter(Boolean)
+      : [],
     resolve(context = {}) {
       return resolveValuesByResolverId(event.resolverId, context);
     }
   };
 }
 
-function resolveDefinition(sectionId = '', operationId = '', { includeInactive = true } = {}) {
-  const event = getEmailEventBySectionOperation(sectionId, operationId, { includeInactive });
+function resolveDefinition(sectionId = '', operationId = '', { includeInactive = true, packageName = '' } = {}) {
+  const event = getEmailEventBySectionOperation(sectionId, operationId, { includeInactive, packageName });
   return buildDefinitionFromEvent(event);
 }
 
 function resolveEventForSave(payload = {}, { requireActive = true } = {}) {
   const eventKeyToken = normalizeKeyToken(payload?.eventKey || '');
+  const packageName = normalizePackageName(payload?.packageName || '');
   let event = null;
   if (eventKeyToken) {
     event = getEmailEventByKey(eventKeyToken, { includeInactive: true });
   } else {
-    event = getEmailEventBySectionOperation(payload?.sectionId, payload?.operationId, { includeInactive: true });
+    event = getEmailEventBySectionOperation(payload?.sectionId, payload?.operationId, {
+      includeInactive: true,
+      packageName
+    });
   }
   if (!event) {
     throw new Error('Selected email event is not supported by backend.');
@@ -143,6 +166,7 @@ function resolveEventForSave(payload = {}, { requireActive = true } = {}) {
 
 function validateTemplatePlaceholders({
   eventKey = '',
+  packageName = '',
   sectionId = '',
   operationId = '',
   senderTemplate = '',
@@ -154,7 +178,10 @@ function validateTemplatePlaceholders({
 } = {}) {
   const event = normalizeKeyToken(eventKey)
     ? getEmailEventByKey(eventKey, { includeInactive: true })
-    : getEmailEventBySectionOperation(sectionId, operationId, { includeInactive: true });
+    : getEmailEventBySectionOperation(sectionId, operationId, {
+      includeInactive: true,
+      packageName
+    });
   if (event && requireActive && event.isActive === false) {
     throw new Error('Selected email event is currently disabled.');
   }
@@ -220,8 +247,12 @@ function buildFallbackPasswordResetTemplate() {
 function buildTemplateContextForSave(payload = {}, activeOrgId = '', event = null) {
   const sectionId = event ? normalizeKeyToken(event.sectionId) : normalizeKeyToken(payload?.sectionId || '');
   const operationId = event ? normalizeKeyToken(event.operationId) : normalizeKeyToken(payload?.operationId || '');
+  const packageName = event
+    ? normalizePackageName(event.packageName || 'CORE')
+    : normalizePackageName(payload?.packageName || 'CORE');
   return {
     orgId: toPublicId(activeOrgId || payload?.orgId) || '',
+    packageName,
     sectionId,
     operationId,
     senderTemplate: cleanString(payload?.senderTemplate, { max: 320, allowEmpty: true }) || '',
@@ -234,9 +265,13 @@ function buildTemplateContextForSave(payload = {}, activeOrgId = '', event = nul
 
 function decorateTemplateRowWithEvent(row = null) {
   if (!row || typeof row !== 'object') return row;
-  const event = getEmailEventBySectionOperation(row.sectionId, row.operationId, { includeInactive: true });
+  const event = getEmailEventBySectionOperation(row.sectionId, row.operationId, {
+    includeInactive: true,
+    packageName: row.packageName
+  });
   return {
     ...row,
+    packageName: normalizePackageName(row.packageName || 'CORE'),
     eventKey: cleanString(event?.eventKey, { max: 120, allowEmpty: true }) || '',
     eventLabel: cleanString(event?.label, { max: 180, allowEmpty: true }) || '',
     eventIsActive: event ? event.isActive !== false : false
@@ -352,14 +387,20 @@ const emailManagementService = {
       .map((event) => ({
         eventKey: normalizeKeyToken(event.eventKey),
         label: cleanString(event.label, { max: 180, allowEmpty: true }) || normalizeKeyToken(event.eventKey),
+        packageName: normalizePackageName(event.packageName || 'CORE'),
         sectionId: normalizeKeyToken(event.sectionId),
         operationId: normalizeKeyToken(event.operationId),
         resolverId: normalizeKeyToken(event.resolverId),
         allowedPlaceholders: Array.isArray(event.allowedPlaceholders) ? event.allowedPlaceholders.slice() : [],
         requiredPlaceholders: Array.isArray(event.requiredPlaceholders) ? event.requiredPlaceholders.slice() : [],
+        runtimePlaceholders: Array.isArray(event.runtimePlaceholders) ? event.runtimePlaceholders.slice() : [],
         isActive: event.isActive !== false
       }))
-      .sort((a, b) => String(a.label || a.eventKey).localeCompare(String(b.label || b.eventKey)));
+      .sort((a, b) => {
+        const packageCmp = String(a.packageName || '').localeCompare(String(b.packageName || ''));
+        if (packageCmp !== 0) return packageCmp;
+        return String(a.label || a.eventKey).localeCompare(String(b.label || b.eventKey));
+      });
     return rows;
   },
 
@@ -367,11 +408,13 @@ const emailManagementService = {
     return this.getSupportedEventCatalog({ includeInactive: true }).map((event) => ({
       key: `${event.sectionId}::${event.operationId}`,
       eventKey: event.eventKey,
+      packageName: event.packageName,
       sectionId: event.sectionId,
       operationId: event.operationId,
       label: event.label,
       allowed: Array.isArray(event.allowedPlaceholders) ? event.allowedPlaceholders.slice() : [],
-      required: Array.isArray(event.requiredPlaceholders) ? event.requiredPlaceholders.slice() : []
+      required: Array.isArray(event.requiredPlaceholders) ? event.requiredPlaceholders.slice() : [],
+      runtime: Array.isArray(event.runtimePlaceholders) ? event.runtimePlaceholders.slice() : []
     }));
   },
 
@@ -557,12 +600,144 @@ const emailManagementService = {
     })();
   },
 
+  async resolveTemplateById({
+    templateId = '',
+    orgId = '',
+    to = '',
+    context = {},
+    injectedValues = {}
+  } = {}) {
+    const token = cleanString(templateId, { max: 120, allowEmpty: true });
+    if (!token) throw new Error('Email template id is required.');
+
+    const activeOrgId = toPublicId(orgId) || '';
+    if (!activeOrgId) throw new Error('Organization id is required.');
+
+    const row = await emailManagementTemplateRepository.getById(token, {
+      scope: { canViewAll: true }
+    });
+    if (!row) throw new Error('Email template not found.');
+    if (!idsEqual(row.orgId, activeOrgId)) {
+      throw new Error('Email template does not belong to this organization.');
+    }
+    if (row.isActive === false) {
+      throw new Error('Email template is not active.');
+    }
+
+    const templateContext = {
+      packageName: normalizePackageName(row.packageName || 'CORE'),
+      sectionId: normalizeKeyToken(row.sectionId || ''),
+      operationId: normalizeKeyToken(row.operationId || ''),
+      senderTemplate: cleanString(row.senderTemplate, { max: 320, allowEmpty: true }) || '',
+      recipientTemplate: cleanString(row.recipientTemplate, { max: 600, allowEmpty: true }) || '',
+      subjectTemplate: cleanString(row.subjectTemplate, { max: 260, allowEmpty: true }) || '',
+      bodyTemplate: cleanString(row.bodyTemplate, { max: 30000, allowEmpty: true }) || ''
+    };
+
+    const event = getEmailEventBySectionOperation(templateContext.sectionId, templateContext.operationId, {
+      includeInactive: true,
+      packageName: templateContext.packageName
+    });
+    const definition = buildDefinitionFromEvent(event);
+    const resolverValues = definition ? definition.resolve(context || {}) : {};
+    const mergedValues = {
+      ...resolverValues,
+      ...normalizeInjectedValues(injectedValues)
+    };
+
+    const usedPlaceholders = extractPlaceholders(
+      templateContext.senderTemplate,
+      templateContext.recipientTemplate,
+      templateContext.subjectTemplate,
+      templateContext.bodyTemplate
+    );
+
+    if (definition) {
+      const allowedSet = new Set(definition.allowed || []);
+      const unknown = usedPlaceholders.filter((token) => !allowedSet.has(token));
+      if (unknown.length > 0) {
+        throw new Error(`Unknown placeholders: ${unknown.join(', ')}.`);
+      }
+
+      const runtimeSet = new Set(definition.runtime || []);
+      const missingRuntime = usedPlaceholders.filter((token) => {
+        if (!runtimeSet.has(token)) return false;
+        return !cleanString(mergedValues?.[token], { max: 60000, allowEmpty: true });
+      });
+      if (missingRuntime.length > 0) {
+        throw new Error(`Missing runtime placeholder values: ${missingRuntime.join(', ')}.`);
+      }
+    } else if (usedPlaceholders.length > 0) {
+      throw new Error('This template event does not support placeholders.');
+    }
+
+    const renderedFrom = cleanString(
+      applyPlaceholderValues(templateContext.senderTemplate, mergedValues),
+      { max: 320, allowEmpty: true }
+    );
+    const renderedSubject = applyPlaceholderValues(templateContext.subjectTemplate, mergedValues);
+    const renderedBody = applyPlaceholderValues(templateContext.bodyTemplate, mergedValues);
+    const overrideRecipient = cleanString(to, { max: 320, allowEmpty: true });
+    const renderedTo = overrideRecipient
+      || applyPlaceholderValues(templateContext.recipientTemplate, mergedValues);
+    const recipients = parseAddressList(renderedTo);
+    if (!recipients.length) {
+      throw new Error('Resolved recipient list is empty.');
+    }
+
+    const subject = cleanString(renderedSubject, { max: 260, allowEmpty: true });
+    if (!subject) throw new Error('Resolved email subject is empty.');
+
+    const bodyOutputs = buildRuntimeBodyOutputs(renderedBody);
+    const bodyText = cleanString(bodyOutputs.text, { max: 60000, allowEmpty: true });
+    const bodyHtml = cleanString(bodyOutputs.html, { max: 60000, allowEmpty: true });
+    if (!bodyText || !bodyHtml) throw new Error('Resolved email body is empty.');
+
+    return {
+      from: renderedFrom || '',
+      to: recipients,
+      subject,
+      text: bodyText,
+      html: bodyHtml,
+      body: bodyText,
+      templateId: token,
+      packageName: templateContext.packageName,
+      eventKey: cleanString(definition?.eventKey || event?.eventKey, { max: 120, allowEmpty: true }) || '',
+      usedFallback: false
+    };
+  },
+
+  async listTemplatesForPicker(query = {}, requestingUser = null) {
+    ensureOrgAdmin(requestingUser);
+    const source = query && typeof query === 'object' ? { ...query } : {};
+    if (!source.isActive__eq) source.isActive__eq = 'true';
+    const result = await this.listTemplates(source, requestingUser);
+    const rows = Array.isArray(result?.rows) ? result.rows : (Array.isArray(result) ? result : []);
+    return rows.map((row) => ({
+      id: row.id,
+      label: [
+        row.eventLabel || row.eventKey || row.id,
+        row.subjectTemplate ? `— ${String(row.subjectTemplate).slice(0, 80)}` : ''
+      ].join(' ').trim(),
+      name: row.eventLabel || row.eventKey || row.id,
+      packageName: normalizePackageName(row.packageName || 'CORE'),
+      eventKey: row.eventKey || '',
+      subjectTemplate: row.subjectTemplate || '',
+      isActive: row.isActive !== false
+    }));
+  },
+
   __testables: Object.freeze({
     validateTemplatePlaceholders,
     resolveEventForSave,
     normalizeTemplateListQuery,
     buildTemplateContextForSave,
-    decorateTemplateRowWithEvent
+    decorateTemplateRowWithEvent,
+    normalizeInjectedValues,
+    applyPlaceholderValues,
+    buildRuntimeBodyOutputs,
+    extractPlaceholders,
+    buildDefinitionFromEvent
   })
 };
 

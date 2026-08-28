@@ -15,8 +15,11 @@
   const safeEventCatalog = Array.isArray(eventCatalog) ? eventCatalog : [];
   const selectedEventFilter = String(stateFilters?.eventKey__eq || '').toUpperCase();
   const selectedStatusFilter = String(stateFilters?.isActive__eq || '').toLowerCase();
+  const selectedPackageFilter = String(stateFilters?.packageName__eq || '').toUpperCase();
+  const safePackageOptions = Array.isArray(packageFilterOptions) ? packageFilterOptions : ['CORE'];
   const hasEmailManagementFiltersApplied = Boolean(
     String(stateFilters?.eventKey__eq || '').trim()
+    || String(stateFilters?.packageName__eq || '').trim()
     || String(stateFilters?.isActive__eq || '').trim()
   );
 %>
@@ -42,18 +45,27 @@
       <% if (stateFilters?.type) { %><input type="hidden" name="type" value="<%= stateFilters.type %>"><% } %>
       <% if (stateFilters?.searchFields) { %><input type="hidden" name="searchFields" value="<%= stateFilters.searchFields %>"><% } %>
       <div class="row g-3 align-items-end">
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label class="form-label mb-1">Email Event</label>
           <select class="form-select size-md" name="eventKey__eq">
             <option value="">All supported events</option>
             <% safeEventCatalog.forEach((event) => { %>
               <option value="<%= event.eventKey %>" <%= String(event.eventKey || '').toUpperCase() === selectedEventFilter ? 'selected' : '' %>>
-                <%= event.label || event.eventKey %>
+                <%= (event.packageName ? event.packageName + ' — ' : '') + (event.label || event.eventKey) %>
               </option>
             <% }) %>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
+          <label class="form-label mb-1">Package</label>
+          <select class="form-select size-md" name="packageName__eq">
+            <option value="">All packages</option>
+            <% safePackageOptions.forEach((pkg) => { %>
+              <option value="<%= pkg %>" <%= String(pkg || '').toUpperCase() === selectedPackageFilter ? 'selected' : '' %>><%= pkg %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-2">
           <label class="form-label mb-1">Status</label>
           <select class="form-select size-md" name="isActive__eq">
             <option value="">All</option>
@@ -61,7 +73,7 @@
             <option value="false" <%= selectedStatusFilter === 'false' ? 'selected' : '' %>>Inactive</option>
           </select>
         </div>
-        <div class="col-md-3 d-flex gap-2 justify-content-md-end">
+        <div class="col-md-4 d-flex gap-2 justify-content-md-end">
           <a href="/email-management/templates" class="btn btn-outline-secondary btn-md">Reset</a>
           <button type="submit" class="btn btn-filled btn-primary btn-md">
             <i class="bi bi-funnel me-1"></i> Apply
@@ -82,6 +94,8 @@
     <thead>
       <tr>
         <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="packageName">Package <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="orgId">Org <span class="sort-icon"></span></th>
         <th class="draggable" data-column="eventLabel">Email Event <span class="sort-icon"></span></th>
         <th class="draggable" data-column="senderTemplate">Sender <span class="sort-icon"></span></th>
         <th class="draggable" data-column="recipientTemplate">Recipient <span class="sort-icon"></span></th>
@@ -94,12 +108,14 @@
     <tbody>
       <% if (!data || !data.length) { %>
         <tr>
-          <td colspan="8" class="text-center text-muted py-4">No email templates found.</td>
+          <td colspan="10" class="text-center text-muted py-4">No email templates found.</td>
         </tr>
       <% } %>
       <% (data || []).forEach((row) => { %>
         <tr>
           <td class="font-monospace"><%= row.id %></td>
+          <td><span class="badge bg-light text-dark border"><%= row.packageName || 'CORE' %></span></td>
+          <td class="font-monospace small"><%= row.orgId || '-' %></td>
           <td>
             <div class="fw-semibold"><%= row.eventLabel || row.eventKey || '-' %></div>
             <% if (row.sectionId || row.operationId) { %>

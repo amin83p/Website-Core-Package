@@ -7,6 +7,8 @@ const {
   getEmailEventBySectionOperation
 } = require('../config/emailEventCatalog');
 const emailManagementService = require('../MVC/services/emailManagementService');
+const { clearPackageEmailEventsForTests } = require('../MVC/services/emailEventRegistry');
+const { registerSchoolEmailEvents } = require('../packages/school/MVC/services/school/schoolEmailEventRegistration');
 
 const {
   validateTemplatePlaceholders,
@@ -15,6 +17,7 @@ const {
 } = emailManagementService.__testables || {};
 
 test('email event catalog helpers return reset event mappings', () => {
+  clearPackageEmailEventsForTests();
   const rows = listSupportedEmailEvents({ includeInactive: true });
   assert.ok(Array.isArray(rows));
   assert.ok(rows.length >= 1);
@@ -90,4 +93,39 @@ test('event-based list query maps event key to section/operation filters', () =>
   assert.equal(out.query.isActive__eq, 'true');
   assert.equal(out.query.page, 2);
   assert.equal(out.query.limit, 25);
+});
+
+test('school package registers uncompleted session email event with runtime placeholders', () => {
+  clearPackageEmailEventsForTests();
+  registerSchoolEmailEvents();
+
+  const event = getEmailEventByKey('SCHOOL_UNCOMPLETED_SESSION_EMAIL', { includeInactive: true });
+  assert.ok(event);
+  assert.equal(event.packageName, 'SCHOOL');
+  assert.equal(event.sectionId, 'SCHOOL_SESSION_ACCESS');
+  assert.equal(event.operationId, 'NOTIFY');
+  assert.ok(event.runtimePlaceholders.includes('SESSION_LIST'));
+  assert.ok(event.runtimePlaceholders.includes('BODY_CONTENT'));
+
+  const byRoute = getEmailEventBySectionOperation('SCHOOL_SESSION_ACCESS', 'NOTIFY', {
+    includeInactive: true,
+    packageName: 'SCHOOL'
+  });
+  assert.equal(byRoute?.eventKey, 'SCHOOL_UNCOMPLETED_SESSION_EMAIL');
+});
+
+test('template save context includes packageName from selected event', () => {
+  clearPackageEmailEventsForTests();
+  registerSchoolEmailEvents();
+  const { buildTemplateContextForSave, resolveEventForSave } = emailManagementService.__testables || {};
+  const event = resolveEventForSave({ eventKey: 'SCHOOL_UNCOMPLETED_SESSION_EMAIL' });
+  const context = buildTemplateContextForSave({
+    senderTemplate: 'school@example.com',
+    recipientTemplate: '{{TEACHER_NAME}}',
+    subjectTemplate: 'Reminder',
+    bodyTemplate: 'Hi {{TEACHER_NAME}}\n{{BODY_CONTENT}}'
+  }, 'ORG_EVENT_CATALOG_TEST', event);
+  assert.equal(context.packageName, 'SCHOOL');
+  assert.equal(context.sectionId, 'SCHOOL_SESSION_ACCESS');
+  assert.equal(context.operationId, 'NOTIFY');
 });

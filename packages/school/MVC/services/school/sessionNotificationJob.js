@@ -12,53 +12,106 @@ const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolic
 const sessionAccessPolicyService = require('./sessionAccessPolicyService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionNotificationDeliveryService = require('./sessionNotificationDeliveryService');
+const sessionUncompletedNotificationService = require('./sessionUncompletedNotificationService');
 const classModel = require('../../models/school/classModel');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const sessionAttendanceEditAccessService = require('./sessionAttendanceEditAccessService');
+
+const CHANNEL_NAMES = Object.freeze(['email', 'sms']);
 
 function cleanText(value) {
   return String(value || '').trim();
 }
 
-function shouldRunForOrgNow(policy, orgTimeZone, now = new Date()) {
-  const notification = policy?.uncompletedSessionNotification || {};
-  if (!notification.enabled) return false;
+function shouldRunChannelNow(channelConfig = {}, orgTimeZone, now = new Date()) {
+  if (!channelConfig?.enabled) return false;
   const parts = getDateTimePartsInTimezone(now.getTime(), orgTimeZone);
   if (!parts) return false;
-  const configured = cleanText(notification.sendAtTime).slice(0, 5);
+  const configured = cleanText(channelConfig.sendAtTime).slice(0, 5);
   const current = `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
   return configured === current;
 }
 
-function resolveTargetSessionDate(policy, orgTimeZone, now = new Date()) {
+function shouldRunForOrgNow(policy, orgTimeZone, now = new Date()) {
+  const notification = policy?.uncompletedSessionNotification || {};
+  if (!notification.enabled) return false;
+  const channels = notification.channels || {};
+  return CHANNEL_NAMES.some((channelName) => shouldRunChannelNow(channels[channelName], orgTimeZone, now));
+}
+
+function resolveTargetSessionDate(channelConfig = {}, orgTimeZone, now = new Date()) {
+  const sendWhen = channelConfig?.sendWhen;
+  if (sendWhen === 'daily_all') return null;
   const today = getTodayDateKeyInTimezone(orgTimeZone, now.getTime());
-  if (policy?.uncompletedSessionNotification?.sendWhen === 'next_day') {
+  if (sendWhen === 'next_day') {
     return sessionAttendanceEditAccessService.addDaysToDateKey(today, -1);
   }
   return today;
 }
 
-async function resolveOrgTimeZone(orgId) {
-  try {
-    const organizationModel = requireCoreModule('MVC/models/organizationModel');
-    const row = await organizationModel.getOrganizationById(orgId);
-    if (row) return resolveOrganizationTimezoneFromRow(row);
-  } catch (_) {
-    // Fall back to default timezone when organization lookup is unavailable.
+async function processChannelDailyDigest({
+  orgId,
+  policy,
+  channel,
+  orgTimeZone,
+  sendWhenDate,
+  statusMap
+}) {
+  const channelConfig = policy?.uncompletedSessionNotification?.channels?.[channel] || {};
+  const sessionDateRange = channelConfig.sessionDateRange || {};
+  const { fromDate, throughDate } = await sessionUncompletedNotificationService.resolveSessionDateRangeBounds({
+    orgId,
+    throughDate: sendWhenDate,
+    rangeType: sessionDateRange.type,
+    daysBeforeToday: sessionDateRange.daysBeforeToday
+  });
+  const allEntries = await sessionUncompletedNotificationService.listUncompletedSessionsForOrg(orgId, {
+    fromDate,
+    throughDate,
+    statusMap
+  });
+  const grouped = sessionUncompletedNotificationService.groupSessionsByTeacher(allEntries);
+  let sentCount = 0;
+
+  for (const [teacherId, sessions] of grouped.entries()) {
+    const teacher = await schoolPersonAccessService.getPersonById({
+      reqUser: { activeOrgId: orgId },
+      personId: teacherId
+    }).catch(() => null);
+    if (!teacher) continue;
+    const outcomes = await sessionNotificationDeliveryService.notifyTeacherDigest({
+      orgId,
+      orgName: orgId,
+      teacher,
+      sessions,
+      policy,
+      sendWhenDate,
+      channels: [channel]
+    });
+    sentCount += outcomes.filter((row) => row.status === 'sent').length;
   }
-  return resolveDefaultTimezone();
+
+  return {
+    channel,
+    mode: 'daily_all',
+    candidateCount: allEntries.length,
+    sentCount,
+    fromDate,
+    throughDate
+  };
 }
 
-async function processOrgNotifications(orgId, now = new Date()) {
-  const policy = await sessionAccessPolicyModel.getPolicyForOrg(orgId);
-  const orgTimeZone = await resolveOrgTimeZone(orgId);
-  if (!shouldRunForOrgNow(policy, orgTimeZone, now)) {
-    return { orgId, skipped: true, reason: 'outside_send_window' };
-  }
-
-  const targetSessionDate = resolveTargetSessionDate(policy, orgTimeZone, now);
-  const sendWhenDate = getTodayDateKeyInTimezone(orgTimeZone, now.getTime());
-  const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
+async function processChannelPerSession({
+  orgId,
+  policy,
+  channel,
+  orgTimeZone,
+  sendWhenDate,
+  statusMap,
+  now
+}) {
+  const channelConfig = policy?.uncompletedSessionNotification?.channels?.[channel] || {};
+  const targetSessionDate = resolveTargetSessionDate(channelConfig, orgTimeZone, now);
   const classes = await classModel.getAllClasses();
   const orgClasses = (Array.isArray(classes) ? classes : [])
     .filter((row) => cleanText(row?.orgId) === cleanText(orgId));
@@ -75,7 +128,10 @@ async function processOrgNotifications(orgId, now = new Date()) {
       candidateCount += 1;
       const teacherIds = sessionNotificationDeliveryService.listSessionEditorIds(session);
       for (const teacherId of teacherIds) {
-        const teacher = await schoolPersonAccessService.getPersonById(teacherId).catch(() => null);
+        const teacher = await schoolPersonAccessService.getPersonById({
+      reqUser: { activeOrgId: orgId },
+      personId: teacherId
+    }).catch(() => null);
         if (!teacher) continue;
         const outcomes = await sessionNotificationDeliveryService.notifyTeacherForSession({
           orgId,
@@ -84,14 +140,112 @@ async function processOrgNotifications(orgId, now = new Date()) {
           session,
           teacher,
           policy,
-          sendWhenDate
+          sendWhenDate,
+          channels: [channel]
         });
         sentCount += outcomes.filter((row) => row.status === 'sent').length;
       }
     }
   }
 
-  return { orgId, skipped: false, candidateCount, sentCount, targetSessionDate, sendWhenDate };
+  return {
+    channel,
+    mode: channelConfig.sendWhen,
+    candidateCount,
+    sentCount,
+    targetSessionDate
+  };
+}
+
+async function processDailyDigestNotifications(options = {}) {
+  const results = [];
+  for (const channel of CHANNEL_NAMES) {
+    results.push(await processChannelDailyDigest(options));
+  }
+  const aggregate = results.reduce((acc, row) => ({
+    candidateCount: acc.candidateCount + Number(row.candidateCount || 0),
+    sentCount: acc.sentCount + Number(row.sentCount || 0)
+  }), { candidateCount: 0, sentCount: 0 });
+  return {
+    orgId: options.orgId,
+    skipped: false,
+    mode: 'daily_all',
+    channels: results,
+    ...aggregate,
+    targetSessionDate: null,
+    sendWhenDate: options.sendWhenDate
+  };
+}
+
+async function resolveOrgTimeZone(orgId) {
+  try {
+    const organizationModel = requireCoreModule('MVC/models/organizationModel');
+    const row = await organizationModel.getOrganizationById(orgId);
+    if (row) return resolveOrganizationTimezoneFromRow(row);
+  } catch (_) {
+    // Fall back to default timezone when organization lookup is unavailable.
+  }
+  return resolveDefaultTimezone();
+}
+
+async function processOrgNotifications(orgId, now = new Date()) {
+  const policy = await sessionAccessPolicyModel.getPolicyForOrg(orgId);
+  const orgTimeZone = await resolveOrgTimeZone(orgId);
+  const notification = policy?.uncompletedSessionNotification || {};
+  if (!notification.enabled) {
+    return { orgId, skipped: true, reason: 'notifications_disabled' };
+  }
+
+  const sendWhenDate = getTodayDateKeyInTimezone(orgTimeZone, now.getTime());
+  const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
+  const channels = notification.channels || {};
+  const channelResults = [];
+  let sentCount = 0;
+  let candidateCount = 0;
+  let anyChannelRan = false;
+
+  for (const channel of CHANNEL_NAMES) {
+    const channelConfig = channels[channel] || {};
+    if (!shouldRunChannelNow(channelConfig, orgTimeZone, now)) {
+      channelResults.push({ channel, skipped: true, reason: 'outside_send_window' });
+      continue;
+    }
+    anyChannelRan = true;
+    const result = channelConfig.sendWhen === 'daily_all'
+      ? await processChannelDailyDigest({
+        orgId,
+        policy,
+        channel,
+        orgTimeZone,
+        sendWhenDate,
+        statusMap
+      })
+      : await processChannelPerSession({
+        orgId,
+        policy,
+        channel,
+        orgTimeZone,
+        sendWhenDate,
+        statusMap,
+        now
+      });
+    channelResults.push(result);
+    sentCount += Number(result.sentCount || 0);
+    candidateCount += Number(result.candidateCount || 0);
+  }
+
+  if (!anyChannelRan) {
+    return { orgId, skipped: true, reason: 'outside_send_window' };
+  }
+
+  return {
+    orgId,
+    skipped: false,
+    channels: channelResults,
+    candidateCount,
+    sentCount,
+    sendWhenDate
+  };
 }
 
 async function runNotificationPass(options = {}) {
@@ -128,8 +282,13 @@ async function runNotificationPass(options = {}) {
 }
 
 module.exports = {
+  CHANNEL_NAMES,
+  shouldRunChannelNow,
   shouldRunForOrgNow,
   resolveTargetSessionDate,
+  processChannelDailyDigest,
+  processChannelPerSession,
+  processDailyDigestNotifications,
   processOrgNotifications,
   runNotificationPass
 };

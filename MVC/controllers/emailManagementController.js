@@ -6,7 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const coreFilesService = require('../services/coreFilesService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
-const settingService = require('../services/settingService');
+const { getRegisteredPackageNames } = require('../services/emailEventRegistry');
 
 function isAjax(req) {
   return Boolean(req?.headers?.['x-ajax-request'] || req?.xhr);
@@ -31,6 +31,7 @@ function normalizeBoolean(value, fallback = false) {
 function buildPayloadFromBody(body = {}) {
   return {
     eventKey: cleanString(body.eventKey, { max: 120, allowEmpty: true }).toUpperCase(),
+    packageName: cleanString(body.packageName, { max: 64, allowEmpty: true }).toUpperCase(),
     sectionId: cleanString(body.sectionId, { max: 120, allowEmpty: true }).toUpperCase(),
     operationId: cleanString(body.operationId, { max: 120, allowEmpty: true }).toUpperCase(),
     senderTemplate: cleanString(body.senderTemplate, { max: 320, allowEmpty: true }),
@@ -50,10 +51,12 @@ function buildPlaceholderMap(registryRows = []) {
     map[key] = {
       eventKey,
       label: row?.label || key,
+      packageName: String(row?.packageName || 'CORE').trim().toUpperCase(),
       sectionId: String(row?.sectionId || '').trim().toUpperCase(),
       operationId: String(row?.operationId || '').trim().toUpperCase(),
       allowed: Array.isArray(row?.allowed) ? row.allowed : [],
-      required: Array.isArray(row?.required) ? row.required : []
+      required: Array.isArray(row?.required) ? row.required : [],
+      runtime: Array.isArray(row?.runtime) ? row.runtime : []
     };
   });
   return map;
@@ -161,6 +164,7 @@ async function showTemplateList(req, res) {
       Promise.resolve(emailManagementService.getSupportedEventCatalog({ includeInactive: true })),
       canCreateOrgScopedItem(req.user, { scopeLabel: 'email templates' })
     ]);
+    const packageFilterOptions = ['CORE', ...getRegisteredPackageNames().filter((pkg) => pkg !== 'CORE')];
     const baseRows = Array.isArray(result?.rows) ? result.rows : (Array.isArray(result) ? result : []);
     const eventLabelByComposite = new Map();
     const eventLabelByKey = new Map();
@@ -204,6 +208,7 @@ async function showTemplateList(req, res) {
       newLabel: canCreateTemplate ? 'Add Email Template' : null,
       tableName: 'Email_Management_Templates',
       eventCatalog: Array.isArray(eventCatalog) ? eventCatalog : [],
+      packageFilterOptions,
       includeModal: true,
       includeModal_Table: true,
       print: true,
@@ -336,8 +341,12 @@ async function pickerEmailEvents(req, res) {
       return tokens.every((token) => matchesKeyword(searchable, token));
     }).map((event) => ({
       id: String(event?.eventKey || '').toUpperCase(),
-      name: String(event?.label || event?.eventKey || '').trim() || String(event?.eventKey || '').toUpperCase(),
+      name: [
+        String(event?.packageName || 'CORE').toUpperCase(),
+        String(event?.label || event?.eventKey || '').trim() || String(event?.eventKey || '').toUpperCase()
+      ].filter(Boolean).join(' — '),
       eventKey: String(event?.eventKey || '').toUpperCase(),
+      packageName: String(event?.packageName || 'CORE').toUpperCase(),
       label: String(event?.label || event?.eventKey || '').trim() || String(event?.eventKey || '').toUpperCase(),
       sectionId: String(event?.sectionId || '').toUpperCase(),
       operationId: String(event?.operationId || '').toUpperCase(),
@@ -432,6 +441,40 @@ async function listTemplateMediaLibrary(req, res) {
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message || 'Unable to load saved media library.' });
+  }
+}
+
+async function pickerEmailTemplates(req, res) {
+  try {
+    const page = Math.max(1, Number.parseInt(String(req.query?.page || '1'), 10) || 1);
+    const limit = Math.max(1, Number.parseInt(String(req.query?.limit || '20'), 10) || 20);
+    const rawQuery = cleanString(req.query?.q, { max: 200, allowEmpty: true }).toLowerCase();
+    const tokens = rawQuery ? rawQuery.split(/\s+/g).filter(Boolean) : [];
+
+    const rows = await emailManagementService.listTemplatesForPicker(req.query || {}, req.user);
+    const filtered = (Array.isArray(rows) ? rows : []).filter((row) => {
+      if (!tokens.length) return true;
+      const searchable = [
+        row?.id || '',
+        row?.label || '',
+        row?.name || '',
+        row?.packageName || '',
+        row?.eventKey || '',
+        row?.subjectTemplate || ''
+      ].join(' ');
+      return tokens.every((token) => matchesKeyword(searchable, token));
+    });
+
+    const startIndex = (page - 1) * limit;
+    const paged = filtered.slice(startIndex, startIndex + limit);
+    const pagination = buildPickerPagination(filtered.length, page, limit);
+    return res.json({
+      status: 'success',
+      results: paged,
+      pagination
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to load email templates.' });
   }
 }
 
@@ -538,6 +581,7 @@ module.exports = {
   showAddTemplateForm,
   showEditTemplateForm,
   pickerEmailEvents,
+  pickerEmailTemplates,
   listTemplateMediaLibrary,
   addTemplate,
   editTemplate,

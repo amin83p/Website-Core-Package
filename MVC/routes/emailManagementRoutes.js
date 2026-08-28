@@ -47,6 +47,13 @@ router.get(
 );
 
 router.get(
+  '/api/templates',
+  requireAccessAny(TEMPLATE_SECTION_ACCESS_IDS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.EMAIL_TEMPLATES, OPERATIONS.READ_ALL, { keepActive: true }),
+  ctrl.pickerEmailTemplates
+);
+
+router.get(
   '/templates/picker/events',
   requireAccessAny(TEMPLATE_SECTION_ACCESS_IDS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.EMAIL_TEMPLATES, OPERATIONS.READ_ALL, { keepActive: true }),

@@ -6,6 +6,17 @@ const attendanceMarkAppearancePolicyModel = require('../../models/school/attenda
 const attendanceMarkAppearanceService = require('../../services/school/attendanceMarkAppearanceService');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
+const sessionAccessPolicyService = require('../../services/school/sessionAccessPolicyService');
+const sessionUncompletedNotificationService = require('../../services/school/sessionUncompletedNotificationService');
+const sessionNotificationDeliveryService = require('../../services/school/sessionNotificationDeliveryService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const { requireCoreModule } = require('../../services/school/schoolCoreModuleResolver');
+const emailManagementService = requireCoreModule('MVC/services/emailManagementService');
+const {
+  getTodayDateKeyInTimezone,
+  resolveDefaultTimezone,
+  resolveOrganizationTimezoneFromRow
+} = requireCoreModule('MVC/utils/timezoneUtils');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
@@ -233,6 +244,32 @@ async function resolveStudentAttendanceReportLabels(policy = {}, reqUser) {
   };
 }
 
+async function enrichSessionAccessPolicyForView(policy = {}, reqUser = null) {
+  const resolved = sessionAccessPolicyService.resolvePolicy(policy);
+  const emailChannel = resolved?.uncompletedSessionNotification?.channels?.email || {};
+  const templateId = String(emailChannel.emailTemplateId || '').trim();
+  if (!templateId) return resolved;
+  try {
+    const template = await emailManagementService.getTemplateById(templateId, reqUser);
+    if (!template) return resolved;
+    return {
+      ...resolved,
+      uncompletedSessionNotification: {
+        ...resolved.uncompletedSessionNotification,
+        channels: {
+          ...resolved.uncompletedSessionNotification.channels,
+          email: {
+            ...emailChannel,
+            emailTemplateLabel: String(template.eventLabel || template.subjectTemplate || template.id || templateId).trim()
+          }
+        }
+      }
+    };
+  } catch (_) {
+    return resolved;
+  }
+}
+
 async function loadSettingsPageData(req) {
   const activeOrgId = activeOrgIdOrThrow(req.user);
   const [
@@ -258,6 +295,7 @@ async function loadSettingsPageData(req) {
     studentAttendanceReportPolicy,
     req.user
   );
+  const enrichedSessionAccessPolicy = await enrichSessionAccessPolicyForView(sessionAccessPolicy, req.user);
 
   return {
     activeOrgId,
@@ -272,7 +310,7 @@ async function loadSettingsPageData(req) {
     attendanceMarkCuratedIcons: attendanceMarkAppearanceService.CURATED_ICONS,
     rollupFormula: attendanceConfig.rollupFormula || defaultAttendanceRollupFormula(),
     autosavePolicy,
-    sessionAccessPolicy,
+    sessionAccessPolicy: enrichedSessionAccessPolicy,
     autosaveSections: listAutosaveSections(),
     studentAttendanceReportPolicy,
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
@@ -459,6 +497,17 @@ async function saveStudentAttendanceReportSettings(req, res) {
   }
 }
 
+async function resolveOrgTimeZone(orgId) {
+  try {
+    const organizationModel = requireCoreModule('MVC/models/organizationModel');
+    const row = await organizationModel.getOrganizationById(orgId);
+    if (row) return resolveOrganizationTimezoneFromRow(row);
+  } catch (_) {
+    // Fall back to default timezone when organization lookup is unavailable.
+  }
+  return resolveDefaultTimezone();
+}
+
 async function saveSessionAccessPolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -476,6 +525,108 @@ async function saveSessionAccessPolicy(req, res) {
     return res.status(Number(error?.statusCode) || 500).json({
       status: 'error',
       message: error?.message || 'Failed to save session access settings.'
+    });
+  }
+}
+
+async function sendSessionAccessTestNotification(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const teacherId = String(req.body?.teacherId || '').trim();
+    if (!teacherId) {
+      const error = new Error('Select a teacher before sending a test email.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const policy = req.body?.policy
+      ? sessionAccessPolicyService.validatePolicyInput(req.body)
+      : await sessionAccessPolicyModel.getPolicyForOrg(activeOrgId);
+    if (policy?.uncompletedSessionNotification?.channels?.email?.enabled !== true) {
+      const error = new Error('Enable email notifications before sending a test email.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const teacher = await schoolPersonAccessService.getPersonById({
+      reqUser: req.user,
+      personId: teacherId
+    }).catch(() => null);
+    if (!teacher) {
+      const error = new Error('Selected teacher was not found.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const orgTimeZone = await resolveOrgTimeZone(activeOrgId);
+    const throughDate = getTodayDateKeyInTimezone(orgTimeZone, Date.now());
+    const emailChannel = policy?.uncompletedSessionNotification?.channels?.email || {};
+    const sessionDateRange = emailChannel.sessionDateRange || {};
+    const { fromDate } = await sessionUncompletedNotificationService.resolveSessionDateRangeBounds({
+      orgId: activeOrgId,
+      throughDate,
+      rangeType: sessionDateRange.type,
+      daysBeforeToday: sessionDateRange.daysBeforeToday
+    });
+    const rangeLabel = sessionUncompletedNotificationService.describeSessionDateRange(sessionDateRange);
+    const { sessions, usedSampleData } = await sessionUncompletedNotificationService.resolveTeacherSessionsForDigest({
+      orgId: activeOrgId,
+      teacherId,
+      fromDate,
+      throughDate
+    });
+
+    const orgName = resolveActiveOrgName(req.user, activeOrgId);
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const context = sessionUncompletedNotificationService.buildDigestContext({
+      teacher,
+      sessions,
+      orgName,
+      baseUrl
+    });
+
+    const outcome = await sessionNotificationDeliveryService.sendDigestEmailNotification({
+      policy,
+      teacher,
+      context,
+      orgId: activeOrgId,
+      subjectPrefix: '[TEST] '
+    });
+
+    if (outcome.status === 'skipped_email_not_configured') {
+      const error = new Error('Email delivery is not configured. Configure Resend before sending test emails.');
+      error.statusCode = 503;
+      throw error;
+    }
+    if (outcome.status === 'skipped_no_contact') {
+      const error = new Error('Selected teacher does not have an email address on file.');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (outcome.status !== 'sent') {
+      const error = new Error('Unable to send the test email.');
+      error.statusCode = 500;
+      throw error;
+    }
+
+    return res.json({
+      status: 'success',
+      message: usedSampleData
+        ? `Test email sent using sample session data because this teacher has no uncompleted sessions for ${rangeLabel}.`
+        : `Test email sent using this teacher's uncompleted sessions for ${rangeLabel}.`,
+      sessionCount: sessions.length,
+      usedSampleData,
+      dateRange: { fromDate, throughDate, label: rangeLabel },
+      recipient: outcome.recipient,
+      preview: {
+        subject: outcome.subject,
+        body: outcome.text
+      }
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to send session access test email.'
     });
   }
 }
@@ -524,6 +675,7 @@ module.exports = {
   saveStudentAttendanceReportSettings,
   saveAutosavePolicy,
   saveSessionAccessPolicy,
+  sendSessionAccessTestNotification,
   redirectLegacyConductSettings,
   redirectLegacyAttendanceSettings
 };

@@ -5,6 +5,7 @@
   const selectedEventKey = String(row.eventKey || '').toUpperCase();
   const selectedSection = String(row.sectionId || '').toUpperCase();
   const selectedOperation = String(row.operationId || '').toUpperCase();
+  const selectedPackageName = String(row.packageName || 'CORE').toUpperCase();
   const mediaDefaultFolder = String((typeof locals.mediaDefaultFolder !== 'undefined' && locals.mediaDefaultFolder) ? locals.mediaDefaultFolder : 'email-templates').trim() || 'email-templates';
 %>
 
@@ -46,6 +47,7 @@
                     </button>
                   </div>
                   <input type="hidden" name="eventKey" id="emailTemplateEventKeyHidden" value="<%= selectedEventKey %>" required>
+                  <input type="hidden" name="packageName" id="emailTemplatePackageNameHidden" value="<%= selectedPackageName %>">
                   <input type="hidden" name="sectionId" id="emailTemplateSectionIdHidden" value="<%= selectedSection %>">
                   <input type="hidden" name="operationId" id="emailTemplateOperationIdHidden" value="<%= selectedOperation %>">
                 </div>
@@ -182,6 +184,7 @@
     }
 
     const eventKeyHidden = document.getElementById('emailTemplateEventKeyHidden');
+    const packageNameHidden = document.getElementById('emailTemplatePackageNameHidden');
     const eventDisplayInput = document.getElementById('emailTemplateEventDisplay');
     const pickEventBtn = document.getElementById('emailTemplatePickEventBtn');
     const sectionIdHidden = document.getElementById('emailTemplateSectionIdHidden');
@@ -498,8 +501,10 @@
       const label = String(selected?.label || selected?.name || key || '').trim();
       const sectionId = normalizeToken(selected?.sectionId || '');
       const operationId = normalizeToken(selected?.operationId || '');
+      const packageName = normalizeToken(selected?.packageName || 'CORE');
 
       if (eventKeyHidden) eventKeyHidden.value = key;
+      if (packageNameHidden) packageNameHidden.value = packageName;
       if (eventDisplayInput) eventDisplayInput.value = label;
       if (sectionIdHidden) sectionIdHidden.value = sectionId;
       if (operationIdHidden) operationIdHidden.value = operationId;

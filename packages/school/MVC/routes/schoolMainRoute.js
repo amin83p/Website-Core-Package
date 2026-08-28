@@ -3,11 +3,13 @@ const express = require('express');
 const router = express.Router();
 const { SECTIONS } = require('./schoolRouteDependencies');
 const { registerSchoolUploadCategoryResolvers } = require('../services/school/schoolUploadCategoryRegistration');
+const { registerSchoolEmailEvents } = require('../services/school/schoolEmailEventRegistration');
 const schoolStudentProfileLinkService = require('../services/school/schoolStudentProfileLinkService');
 
 const SCHOOL_MOUNT_GUARD_KEY = '__schoolMainRouteMounted';
 
 registerSchoolUploadCategoryResolvers();
+registerSchoolEmailEvents();
 
 router.use((req, _res, next) => {
   if (req?.[SCHOOL_MOUNT_GUARD_KEY]) return next('router');
