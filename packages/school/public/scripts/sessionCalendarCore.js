@@ -1682,6 +1682,17 @@
     return blocked;
   }
 
+  function findFirstPlaceableRotationDate(startDate, rotationOrder, rangeEnd, canPlaceFn) {
+    let current = normalizeDateOnly(startDate);
+    if (!current) return null;
+    while (current <= rangeEnd) {
+      const dow = new Date(`${current}T12:00:00`).getDay();
+      if (rotationOrder.includes(dow) && canPlaceFn(current)) return current;
+      current = addDaysIso(current, 1);
+    }
+    return null;
+  }
+
   function generateRotatingWeekdaySessions(options = {}) {
     const anchorDate = normalizeDateOnly(options.anchorDate);
     const startTime = String(options.startTime || '').trim();
@@ -1777,24 +1788,36 @@
 
     function generateUpTo(maxCount) {
       const sessions = [];
-      let lastDate = null;
+      const rotationOrder = buildRotationWeekdayOrder(weekdays, anchorDate);
+      if (!rotationOrder.length) return sessions;
 
-      let firstDate = anchorDate;
-      if (firstDate < rangeStart) {
-        firstDate = findAnchorWeekdayOnOrAfter(rangeStart, anchorDow, rangeEnd);
-      }
+      let scanStart = anchorDate;
+      if (scanStart < rangeStart) scanStart = rangeStart;
+
+      const firstDate = findFirstPlaceableRotationDate(scanStart, rotationOrder, rangeEnd, canPlace);
+      if (!firstDate) return sessions;
+
       const placedFirst = placeSession(firstDate, sessions);
-      lastDate = placedFirst || firstDate;
+      let lastDate = placedFirst || firstDate;
       if (!lastDate) return sessions;
 
-      for (let slot = 2; slot <= maxCount; slot += 1) {
-        const nextDate = slot % 2 === 0
-          ? findNextPlaceableSelectedWeekdayAfter(lastDate, weekdays, rangeEnd, canPlace)
-          : findNextPlaceableWeekdayAfter(lastDate, anchorDow, rangeEnd, canPlace);
-        if (!nextDate) break;
-        const placed = placeSession(nextDate, sessions);
+      let rotationIdx = rotationOrder.indexOf(new Date(`${lastDate}T12:00:00`).getDay());
+      if (rotationIdx < 0) rotationIdx = 0;
+
+      while (sessions.length < maxCount) {
+        let placed = false;
+        for (let attempt = 0; attempt < rotationOrder.length; attempt += 1) {
+          rotationIdx = (rotationIdx + 1) % rotationOrder.length;
+          const targetDow = rotationOrder[rotationIdx];
+          const candidate = findNextWeekdayAfter(lastDate, targetDow, rangeEnd);
+          if (!candidate || !canPlace(candidate)) continue;
+          const placedDate = placeSession(candidate, sessions);
+          if (!placedDate) continue;
+          lastDate = placedDate;
+          placed = true;
+          break;
+        }
         if (!placed) break;
-        lastDate = placed;
       }
       return sessions;
     }

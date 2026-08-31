@@ -12,7 +12,7 @@ function loadSessionCalendarCore() {
   return sandbox.window.SessionCalendarCore;
 }
 
-test('generateRotatingWeekdaySessions starts on anchor then alternates selected and anchor weekdays', () => {
+test('generateRotatingWeekdaySessions rotates only through selected weekdays from first match on or after anchor', () => {
   const core = loadSessionCalendarCore();
   const result = core.generateRotatingWeekdaySessions({
     anchorDate: '2026-01-06',
@@ -28,7 +28,7 @@ test('generateRotatingWeekdaySessions starts on anchor then alternates selected 
 
   assert.equal(result.created, 5);
   const dates = result.sessions.map((row) => String(row.date));
-  assert.equal(dates.join(','), '2026-01-06,2026-01-07,2026-01-13,2026-01-14,2026-01-20');
+  assert.equal(dates.join(','), '2026-01-07,2026-01-12,2026-01-14,2026-01-19,2026-01-21');
 });
 
 test('generateRotatingWeekdaySessions rotates Mon and Wed from Monday anchor date', () => {
@@ -72,25 +72,25 @@ test('generateRotatingWeekdaySessions skips occupied dates in rotation without s
 
   assert.equal(result.created, 3);
   const dates = result.sessions.map((row) => String(row.date));
-  assert.equal(dates.join(','), '2026-01-06,2026-01-12,2026-01-13');
+  assert.equal(dates.join(','), '2026-01-12,2026-01-14,2026-01-19');
 });
 
-test('generateRotatingWeekdaySessions allows anchor when another session exists same day at different time', () => {
+test('generateRotatingWeekdaySessions allows selected anchor weekday when another session exists same day at different time', () => {
   const core = loadSessionCalendarCore();
   const result = core.generateRotatingWeekdaySessions({
-    anchorDate: '2026-01-06',
+    anchorDate: '2026-01-05',
     startTime: '11:00',
     durationHours: 1,
     weekdays: [1, 3],
     count: 2,
     enrollmentStart: '2026-01-01',
     enrollmentEnd: '2026-03-31',
-    existingSessions: [{ sessionId: 'SES_1', date: '2026-01-06', startTime: '08:00', endTime: '09:00' }],
+    existingSessions: [{ sessionId: 'SES_1', date: '2026-01-05', startTime: '08:00', endTime: '09:00' }],
     alreadyStaged: []
   });
 
   assert.equal(result.created, 2);
-  assert.equal(result.sessions[0].date, '2026-01-06');
+  assert.equal(result.sessions[0].date, '2026-01-05');
   assert.equal(result.sessions[0].startTime, '11:00');
 });
 
@@ -180,6 +180,46 @@ test('generateRotatingWeekdaySessions returns empty when enrollment starts after
 
   assert.equal(result.created, 1);
   assert.equal(result.sessions[0].date, '2026-01-19');
+});
+
+test('generateRotatingWeekdaySessions uses other selected weekdays when one is a blocked holiday', () => {
+  const core = loadSessionCalendarCore();
+  const result = core.generateRotatingWeekdaySessions({
+    anchorDate: '2026-08-31',
+    startTime: '09:00',
+    durationHours: 1,
+    weekdays: [1, 3, 5],
+    count: 6,
+    enrollmentStart: '2026-08-31',
+    enrollmentEnd: '2026-09-30',
+    blockedDates: ['2026-09-07'],
+    existingSessions: [],
+    alreadyStaged: []
+  });
+
+  assert.equal(result.created, 6);
+  const dates = result.sessions.map((row) => String(row.date));
+  assert.equal(dates.join(','), '2026-08-31,2026-09-02,2026-09-04,2026-09-09,2026-09-11,2026-09-14');
+  assert.ok(!dates.includes('2026-09-07'));
+});
+
+test('generateRotatingWeekdaySessions rotates through three selected weekdays evenly', () => {
+  const core = loadSessionCalendarCore();
+  const result = core.generateRotatingWeekdaySessions({
+    anchorDate: '2026-08-31',
+    startTime: '09:00',
+    durationHours: 1,
+    weekdays: [1, 3, 5],
+    count: 6,
+    enrollmentStart: '2026-08-31',
+    enrollmentEnd: '2026-10-31',
+    existingSessions: [],
+    alreadyStaged: []
+  });
+
+  assert.equal(result.created, 6);
+  const dates = result.sessions.map((row) => String(row.date));
+  assert.equal(dates.join(','), '2026-08-31,2026-09-02,2026-09-04,2026-09-07,2026-09-09,2026-09-11');
 });
 
 test('resolveGridClickContext returns null without valid grid target', () => {
