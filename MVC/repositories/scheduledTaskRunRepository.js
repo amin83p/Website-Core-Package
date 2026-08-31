@@ -16,7 +16,7 @@ const {
 } = require('./backend/mongoRepositoryUtils');
 
 const COLLECTION_NAME = 'scheduledTaskRuns';
-const DEFAULT_SEARCH_FIELDS = Object.freeze(['id', 'definitionId', 'orgId', 'packageName', 'taskKey', 'status', 'resultSummary']);
+const DEFAULT_SEARCH_FIELDS = Object.freeze(['id', 'definitionId', 'orgId', 'packageName', 'taskKey', 'status', 'resultSummary', 'organizedByUserId', 'organizedByDisplayName']);
 const DEFAULT_DATE_FIELDS = Object.freeze(['scheduledFor', 'startedAt', 'finishedAt', 'createdAt', 'updatedAt']);
 
 function stripPaginationFromQuery(query = {}) {

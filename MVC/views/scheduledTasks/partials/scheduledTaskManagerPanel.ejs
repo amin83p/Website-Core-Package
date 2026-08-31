@@ -1,0 +1,31 @@
+<div class="scheduled-task-manager-panel" data-scheduled-task-manager-panel>
+  <div class="scheduled-task-manager-toolbar d-flex align-items-center justify-content-between gap-2 mb-3">
+    <ul class="nav nav-pills scheduled-task-manager-tabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" type="button" data-stm-tab="upcoming" role="tab" aria-selected="true">
+          Upcoming <span class="badge rounded-pill bg-primary-subtle text-primary ms-1" data-stm-count="upcoming">0</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" type="button" data-stm-tab="completed" role="tab" aria-selected="false">
+          Completed <span class="badge rounded-pill bg-secondary-subtle text-secondary ms-1" data-stm-count="completed">0</span>
+        </button>
+      </li>
+    </ul>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-stm-refresh title="Refresh">
+      <i class="bi bi-arrow-clockwise"></i>
+    </button>
+  </div>
+
+  <div class="scheduled-task-manager-loading text-center py-5" data-stm-loading>
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="mt-2 text-muted small">Loading scheduled tasks...</div>
+  </div>
+
+  <div class="alert alert-danger d-none" role="alert" data-stm-error></div>
+
+  <div class="scheduled-task-manager-content d-none" data-stm-content>
+    <div data-stm-pane="upcoming" class="scheduled-task-manager-pane stm-pane-active"></div>
+    <div data-stm-pane="completed" class="scheduled-task-manager-pane" hidden></div>
+  </div>
+</div>

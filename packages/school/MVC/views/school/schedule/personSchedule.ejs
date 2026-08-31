@@ -74,6 +74,16 @@
     .schedule-session-select.is-disabled .schedule-session-select-icon {
         color: #842029;
     }
+    .event-block.is-schedule-draft,
+    .vertical-event-block.is-schedule-draft {
+        border-style: dashed !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 193, 7, 0.35);
+    }
+    .schedule-draft-badge {
+        font-size: 0.62rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+    }
     .event-block.is-session-unselectable .schedule-event-title,
     .vertical-event-block.is-session-unselectable .schedule-event-title {
         opacity: 0.72;
@@ -1149,8 +1159,12 @@
   const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
     ? schoolSectionDashboardHref
     : '/dashboard/section-nav/SCHOOL';
+  const caps = (typeof scheduleCapabilities !== 'undefined' && scheduleCapabilities) ? scheduleCapabilities : {};
   const scheduleAccess = (typeof viewerScheduleAccess !== 'undefined' && viewerScheduleAccess) ? viewerScheduleAccess : {};
-  const canSelectAnyPerson = scheduleAccess.canSelectAnyPerson === true;
+  const canSelectAnyPerson = caps.canSelectAnyPerson === true || scheduleAccess.canSelectAnyPerson === true;
+  const canDragCreateSessions = caps.canDragCreateSessions === true || scheduleAccess.canDragCreateSessions === true;
+  const canLoadAllSchedules = caps.canLoadAllSchedules === true || scheduleAccess.canLoadAllSchedules === true;
+  const canUseGlobalComparison = caps.canUseGlobalComparison === true || scheduleAccess.canUseGlobalComparison === true;
   const scheduleRoles = Array.isArray(scheduleAccess.availableRoles) ? scheduleAccess.availableRoles : [];
   const defaultRole = scheduleAccess.selectedRole || (scheduleRoles.length >= 1 ? scheduleRoles[0].key : '');
   const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
@@ -1172,7 +1186,7 @@
     '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
   ],
-  manageBtns: canSelectAnyPerson ? [
+  manageBtns: canUseGlobalComparison ? [
     '<a href="/school/schedules/global" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-layers me-1"></i> Global Comparison</a>',
     '<a href="/school/classes" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-collection me-1"></i> Classes</a>'
   ] : []
@@ -1330,15 +1344,36 @@
   </div>
 </div>
 
-<div id="scheduleStageModalRoot">
-<%- include('school/partials/sessionEnrollmentStageModal') %>
+<% if (canDragCreateSessions) { %>
+<%- include('school/partials/sessionEnrollmentCalendarModal') %>
+<link rel="stylesheet" href="/styles/session-calendar.css">
+<div class="modal fade" id="scheduleClassPickerModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleClassPickerModalTitle">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title mb-0" id="scheduleClassPickerModalTitle">Select class</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-2">
+        <input type="search" class="form-control form-control-sm mb-2" id="scheduleClassPickerSearch" placeholder="Search classes..." autocomplete="off">
+        <div id="scheduleClassPickerEmpty" class="d-none text-muted small py-3 text-center">No active instructor classes found for this teacher.</div>
+        <div id="scheduleClassPickerList" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
 </div>
+<% } %>
 
+<% if (canSelectAnyPerson) { %>
 <%- include('partials/modal_GenericPicker') %>
+<% } %>
 <%- include('partials/tablePages-end') %>
 
 <script src="/scripts/scheduleCompletionDisplay.js"></script>
 <script src="/scripts/sessionCalendarCore.js"></script>
+<% if (canDragCreateSessions) { %>
+<script src="/scripts/sessionEnrollmentCalendarModal.js"></script>
+<% } %>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const scheduleCalendarCore = window.SessionCalendarCore;
@@ -1460,6 +1495,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span class="badge border ms-1 ${classMap[tone] || classMap.muted}" title="${escapeHtml(title)}"><i class="bi bi-exclamation-diamond-fill me-1"></i>${escapeHtml(label)}</span>`;
     }
     const canSelectAnyPerson = <%- JSON.stringify(canSelectAnyPerson) %>;
+    const canDragCreateSessions = <%- JSON.stringify(canDragCreateSessions) %>;
+    const canLoadAllSchedules = <%- JSON.stringify(canLoadAllSchedules) %>;
     const initialScheduleRoles = <%- JSON.stringify(scheduleRoles) %>;
     const initialDefaultRole = <%- JSON.stringify(defaultRole) %>;
     const initialLockedPersonId = <%- JSON.stringify(lockedPersonId) %>;
@@ -1576,6 +1613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<div class="schedule-event-student"><i class="bi bi-person-check-fill" aria-hidden="true"></i><span>${escapeHtml(name)}</span></div>`;
     }
     function scheduleSessionSelectHtml(event) {
+        if (!canSelectAnyPerson) return '';
         const key = scheduleSessionSelectionKey(event);
         if (!key) return '';
         const selectionSet = getActiveScheduleSelectionSet();
@@ -1853,6 +1891,7 @@ document.addEventListener('DOMContentLoaded', () => {
         persons: [],
         activePersonId: '',
         eventsByPersonId: {},
+        draftEventsByPersonId: {},
         statusMetaByPersonId: {},
         errorByPersonId: {},
         loadedPersonIds: new Set(),
@@ -1871,14 +1910,31 @@ document.addEventListener('DOMContentLoaded', () => {
         viewMode: readScheduleViewMode(),
         hideEmptyDays: false,
         isAdminViewer: canSelectAnyPerson,
+        canDragCreateSessions,
         verticalDayWidthUserAdjusted: false,
         horizontalSliderUserAdjusted: false,
         suppressGridClick: false
     };
 
+    function getScheduleEventsForPerson(personId) {
+        const base = Array.isArray(scheduleState.eventsByPersonId[personId]) ? scheduleState.eventsByPersonId[personId] : [];
+        const drafts = Array.isArray(scheduleState.draftEventsByPersonId?.[personId]) ? scheduleState.draftEventsByPersonId[personId] : [];
+        if (!drafts.length) return base;
+        const withoutDrafts = base.filter((ev) => ev?.isDraft !== true);
+        return [...withoutDrafts, ...drafts];
+    }
+
+    function buildScheduleDraftBadge(event) {
+        if (event?.isDraft !== true) return '';
+        return '<span class="badge bg-warning text-dark schedule-draft-badge mb-1">Draft</span>';
+    }
+
+<% if (canDragCreateSessions) { %>
     const SCHEDULE_STAGE_DURATION_CHIPS = [0.5, 1, 1.5, 2, 2.5, 3];
     let scheduleStageModalBound = false;
     let scheduleStageContext = null;
+    let scheduleStageClassContext = null;
+    let scheduleClassPickerModalInstance = null;
 
     function nearestScheduleStageDurationChip(hours) {
         const value = Number(hours || 0);
@@ -1895,7 +1951,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getScheduleStageModalEl() {
-        return document.getElementById('sessionEnrollmentStageModal');
+        const visible = document.querySelector('#sessionEnrollmentStageModal.show');
+        if (visible) return visible;
+        const calendarModal = document.getElementById('sessionEnrollmentCalendarModal');
+        return calendarModal?.querySelector('#sessionEnrollmentStageModal')
+            || document.getElementById('sessionEnrollmentStageModal');
     }
 
     function hideScheduleStageModal() {
@@ -1906,9 +1966,10 @@ document.addEventListener('DOMContentLoaded', () => {
         modalEl.classList.remove('show');
         modalEl.style.display = 'none';
         modalEl.setAttribute('aria-hidden', 'true');
-        const createBtn = document.getElementById('btn_sessionEnrollmentStageCreate');
+        const createBtn = modalEl.querySelector('#btn_sessionEnrollmentStageCreate');
         if (createBtn) {
             createBtn.disabled = false;
+            createBtn.textContent = 'Create staged sessions';
             createBtn.removeAttribute('title');
         }
     }
@@ -1924,39 +1985,289 @@ document.addEventListener('DOMContentLoaded', () => {
         modalEl.classList.add('show');
         modalEl.style.display = 'flex';
         modalEl.setAttribute('aria-hidden', 'false');
-        const createBtn = document.getElementById('btn_sessionEnrollmentStageCreate');
+        const createBtn = modalEl.querySelector('#btn_sessionEnrollmentStageCreate');
         if (createBtn) {
-            createBtn.disabled = true;
-            createBtn.title = 'Session creation from Master Schedule is not enabled yet';
+            createBtn.disabled = false;
+            createBtn.removeAttribute('title');
         }
-        const countDisplay = document.getElementById('sessionEnrollmentStageCountDisplay');
+        const countDisplay = modalEl.querySelector('#sessionEnrollmentStageCountDisplay');
         if (countDisplay && typeof countDisplay.focus === 'function') {
             countDisplay.focus();
         }
     }
 
     function syncScheduleStageCountDisplay(count) {
-        const normalized = Math.max(1, Math.min(24, Math.round(Number(count) || 4)));
-        const display = document.getElementById('sessionEnrollmentStageCountDisplay');
-        if (display) display.textContent = String(normalized);
         const modalEl = getScheduleStageModalEl();
+        const normalized = Math.max(1, Math.min(24, Math.round(Number(count) || 4)));
+        const display = modalEl?.querySelector('#sessionEnrollmentStageCountDisplay');
+        if (display) display.textContent = String(normalized);
         modalEl?.querySelectorAll('[data-stage-count]').forEach((btn) => {
             const chip = Number(btn.getAttribute('data-stage-count'));
             btn.classList.toggle('active', chip === normalized);
         });
     }
 
+    async function fetchInstructorClassesForPerson(personId) {
+        const url = `/school/schedules/api/instructor-classes?personId=${encodeURIComponent(personId)}`;
+        const res = await fetch(url, { headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.status !== 'success') {
+            throw new Error(data.message || 'Unable to load instructor classes.');
+        }
+        return Array.isArray(data.items) ? data.items : [];
+    }
+
+    function getScheduleClassPickerModal() {
+        const el = document.getElementById('scheduleClassPickerModal');
+        if (!el || !window.bootstrap?.Modal) return null;
+        if (!scheduleClassPickerModalInstance) {
+            scheduleClassPickerModalInstance = window.bootstrap.Modal.getOrCreateInstance(el);
+        }
+        return scheduleClassPickerModalInstance;
+    }
+
+    function bindScheduleClassPickerList() {
+        const listEl = document.getElementById('scheduleClassPickerList');
+        const searchEl = document.getElementById('scheduleClassPickerSearch');
+        if (!listEl || listEl.dataset.bound === '1') return;
+        listEl.dataset.bound = '1';
+        listEl.addEventListener('click', (event) => {
+            const item = event.target.closest('.schedule-class-picker-item');
+            if (!item) return;
+            scheduleStageClassContext = {
+                classId: String(item.getAttribute('data-class-id') || '').trim(),
+                classLabel: String(item.getAttribute('data-class-title') || '').trim()
+            };
+            getScheduleClassPickerModal()?.hide();
+            openScheduleStageModal(scheduleStageContext);
+        });
+        searchEl?.addEventListener('input', () => {
+            const q = String(searchEl.value || '').trim().toLowerCase();
+            listEl.querySelectorAll('.schedule-class-picker-item').forEach((item) => {
+                const hay = String(item.textContent || '').trim().toLowerCase();
+                item.classList.toggle('d-none', Boolean(q) && !hay.includes(q));
+            });
+        });
+    }
+
+    async function openScheduleClassPickerModal(dragContext) {
+        const person = activeSchedulePerson();
+        if (!person?.id) {
+            if (typeof uiAlert === 'function') uiAlert('Load a teacher schedule before creating sessions.', 'Stage Sessions');
+            return;
+        }
+        if (!scheduleState.loadedPersonIds.has(person.id)) {
+            if (typeof uiAlert === 'function') uiAlert('Load the schedule first, then create staged sessions.', 'Stage Sessions');
+            return;
+        }
+        bindScheduleClassPickerList();
+        const listEl = document.getElementById('scheduleClassPickerList');
+        const emptyEl = document.getElementById('scheduleClassPickerEmpty');
+        const searchEl = document.getElementById('scheduleClassPickerSearch');
+        if (!listEl) return;
+        listEl.innerHTML = '<div class="text-center py-3 text-muted small">Loading classes...</div>';
+        if (emptyEl) emptyEl.classList.add('d-none');
+        if (searchEl) searchEl.value = '';
+        scheduleStageContext = dragContext;
+        try {
+            const items = await fetchInstructorClassesForPerson(person.id);
+            if (!items.length) {
+                listEl.innerHTML = '';
+                if (emptyEl) emptyEl.classList.remove('d-none');
+            } else {
+                if (emptyEl) emptyEl.classList.add('d-none');
+                listEl.innerHTML = items.map((item) => `
+                    <button type="button" class="list-group-item list-group-item-action schedule-class-picker-item"
+                      data-class-id="${escapeHtml(item.id)}"
+                      data-class-title="${escapeHtml(item.title || item.id)}">
+                      <div class="fw-semibold">${escapeHtml(item.title || item.id)}</div>
+                      ${item.code ? `<div class="small text-muted">${escapeHtml(item.code)}</div>` : ''}
+                    </button>
+                `).join('');
+            }
+            getScheduleClassPickerModal()?.show();
+        } catch (err) {
+            if (typeof uiAlert === 'function') uiAlert(err.message || 'Unable to load classes.', 'Stage Sessions');
+        }
+    }
+
+    function readScheduleStageFormValues() {
+        const modalEl = getScheduleStageModalEl();
+        const durationBtn = modalEl?.querySelector('[data-stage-duration].active');
+        const durationHours = Number(durationBtn?.getAttribute('data-stage-duration') || 1);
+        const weekdays = [];
+        modalEl?.querySelectorAll('[data-stage-weekday].active').forEach((btn) => {
+            const dow = Number(btn.getAttribute('data-stage-weekday'));
+            if (Number.isFinite(dow)) weekdays.push(dow);
+        });
+        const count = Number(modalEl?.querySelector('#sessionEnrollmentStageCountDisplay')?.textContent || 4);
+        const skipHolidays = Boolean(modalEl?.querySelector('#sessionEnrollmentStageSkipHolidays')?.checked);
+        return {
+            durationHours,
+            weekdays: scheduleCalendarCore?.normalizeWeekdays ? scheduleCalendarCore.normalizeWeekdays(weekdays) : weekdays,
+            count,
+            skipHolidays
+        };
+    }
+
+    function mapStagedSessionsToScheduleEvents(sessions, classMeta = {}) {
+        const classId = String(classMeta.classId || '').trim();
+        const className = String(classMeta.classLabel || classMeta.className || classId || 'Class').trim();
+        const person = activeSchedulePerson();
+        const role = selectedScheduleRole() || 'teacher';
+        const roleLabel = role === 'staff' ? 'Staff' : (role === 'student' ? 'Student' : 'Teacher');
+        return (Array.isArray(sessions) ? sessions : []).map((row, index) => {
+            const sessionId = String(row?.sessionId || '').trim() || `DRAFT_${Date.now()}_${index + 1}`;
+            const date = String(row?.date || '').trim();
+            const start = String(row?.startTime || row?.start || '').trim();
+            const end = String(row?.endTime || row?.end || '').trim();
+            return {
+                id: sessionId,
+                sessionId,
+                eventType: 'class_session',
+                targetType: 'session',
+                personId: person?.id || '',
+                date,
+                start,
+                end,
+                classId,
+                className,
+                duration: Number(row?.durationHours || 0),
+                scheduledDuration: Number(row?.durationHours || 0),
+                status: 'scheduled',
+                roles: [roleLabel],
+                roleLabel,
+                role: roleLabel,
+                hasOverlap: false,
+                isDraft: true,
+                detailsUrl: '',
+                countsTowardHours: true,
+                blocksConflicts: true
+            };
+        });
+    }
+
+    function applyDraftStagedSessionsToSchedule(payload = {}) {
+        const person = activeSchedulePerson();
+        if (!person?.id || !scheduleStageClassContext?.classId) return;
+        const sessions = Array.isArray(payload.sessionsToCreate) ? payload.sessionsToCreate : [];
+        const draftEvents = mapStagedSessionsToScheduleEvents(sessions, scheduleStageClassContext);
+        if (!scheduleState.draftEventsByPersonId) scheduleState.draftEventsByPersonId = {};
+        const existingDrafts = Array.isArray(scheduleState.draftEventsByPersonId[person.id])
+            ? scheduleState.draftEventsByPersonId[person.id]
+            : [];
+        const classId = scheduleStageClassContext.classId;
+        scheduleState.draftEventsByPersonId[person.id] = [
+            ...existingDrafts.filter((ev) => String(ev?.classId || '') !== classId),
+            ...draftEvents
+        ];
+        const viewRange = payload.viewRange || {};
+        const start = String(viewRange.startDate || '').trim();
+        const end = String(viewRange.endDate || '').trim();
+        if (start && end) {
+            setDateRange(new Date(`${start}T00:00:00`), new Date(`${end}T00:00:00`));
+        }
+        scheduleState.remoteUpdatePending = true;
+        refreshScheduleActiveView();
+    }
+
+    async function commitScheduleStageCreate() {
+        if (!scheduleStageContext || !scheduleStageClassContext?.classId) return;
+        const form = readScheduleStageFormValues();
+        if (!form.weekdays.length) {
+            if (typeof uiAlert === 'function') uiAlert('Select at least one weekday.', 'Stage Sessions');
+            return;
+        }
+        const createBtn = getScheduleStageModalEl()?.querySelector('#btn_sessionEnrollmentStageCreate');
+        if (createBtn) {
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creating...';
+        }
+        try {
+            const count = Math.max(1, Math.min(24, Math.round(form.count || 4)));
+            const projectedEnd = scheduleCalendarCore.addDaysIso(
+                scheduleStageContext.date,
+                Math.max(2, Math.ceil(count / 2) + 1) * 7 + 14
+            );
+            let blockedDates = [];
+            if (form.skipHolidays && window.SessionEnrollmentCalendarModal?.collectHolidayDatesForRange) {
+                blockedDates = await window.SessionEnrollmentCalendarModal.collectHolidayDatesForRange(
+                    scheduleStageContext.date,
+                    projectedEnd
+                );
+            }
+            const result = scheduleCalendarCore.generateRotatingWeekdaySessions({
+                anchorDate: scheduleStageContext.date,
+                startTime: scheduleStageContext.startTime24,
+                durationHours: form.durationHours,
+                weekdays: form.weekdays,
+                count,
+                enrollmentStart: scheduleStageContext.date,
+                enrollmentEnd: projectedEnd,
+                blockedDates,
+                scheduleDefaults: {
+                    teacherId: activeSchedulePerson()?.id || '',
+                    teacherName: activeSchedulePerson()?.name || ''
+                }
+            });
+            if (!result.sessions.length) {
+                if (typeof uiAlert === 'function') {
+                    uiAlert('No sessions could be generated. Adjust weekdays, count, or holiday settings.', 'Stage Sessions');
+                }
+                return;
+            }
+            const dates = result.sessions.map((row) => row.date).filter(Boolean).sort();
+            const startDate = dates[0] || scheduleStageContext.date;
+            const endDate = dates[dates.length - 1] || startDate;
+            hideScheduleStageModal();
+            if (!window.SessionEnrollmentCalendarModal?.buildPartialPickerData) {
+                if (typeof uiAlert === 'function') uiAlert('Calendar modal is not available on this page.', 'Stage Sessions');
+                return;
+            }
+            const person = activeSchedulePerson();
+            const existingEvents = getScheduleEventsForPerson(person?.id || '')
+                .filter((ev) => String(ev?.classId || '') === scheduleStageClassContext.classId);
+            const prefetchedPickerData = window.SessionEnrollmentCalendarModal.buildPartialPickerData({
+                classId: scheduleStageClassContext.classId,
+                classLabel: scheduleStageClassContext.classLabel,
+                sessionsToCreate: result.sessions,
+                existingEvents,
+                startDate,
+                endDate
+            });
+            window.SessionEnrollmentCalendarModal.open({
+                mode: 'partial',
+                classId: scheduleStageClassContext.classId,
+                classLabel: scheduleStageClassContext.classLabel,
+                startDate,
+                endDate,
+                sessionsToCreate: result.sessions,
+                existingEvents,
+                prefetchedPickerData,
+                onSave: (payload) => applyDraftStagedSessionsToSchedule(payload)
+            });
+        } finally {
+            if (createBtn) {
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create staged sessions';
+            }
+        }
+    }
+
     function openScheduleStageModal(context) {
         if (!context) return;
         scheduleStageContext = context;
         initScheduleStageModal();
-        const contextEl = document.getElementById('sessionEnrollmentStageContext');
+        const modalEl = getScheduleStageModalEl();
+        const contextEl = modalEl?.querySelector('#sessionEnrollmentStageContext');
         if (contextEl && scheduleCalendarCore) {
             const dateLabel = scheduleCalendarCore.formatDayHeaderLong(context.date);
             const timeLabel = String(context.startTimeLabel || context.startTime24 || '').trim();
-            contextEl.textContent = `${dateLabel} · Start ${timeLabel}`;
+            const classLabel = String(scheduleStageClassContext?.classLabel || '').trim();
+            contextEl.textContent = classLabel
+                ? `${classLabel} · ${dateLabel} · Start ${timeLabel}`
+                : `${dateLabel} · Start ${timeLabel}`;
         }
-        const modalEl = getScheduleStageModalEl();
         const durationHours = nearestScheduleStageDurationChip(context.durationHours);
         modalEl?.querySelectorAll('[data-stage-duration]').forEach((btn) => {
             const hours = Number(btn.getAttribute('data-stage-duration'));
@@ -1968,7 +2279,14 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.toggle('active', dow === anchorDow);
         });
         syncScheduleStageCountDisplay(4);
-        const warningEl = document.getElementById('sessionEnrollmentStageCapacityWarning');
+        const skipEl = modalEl?.querySelector('#sessionEnrollmentStageSkipHolidays');
+        if (skipEl) skipEl.checked = false;
+        const holidayHint = modalEl?.querySelector('#sessionEnrollmentStageHolidayHint');
+        if (holidayHint) {
+            holidayHint.classList.add('d-none');
+            holidayHint.textContent = '';
+        }
+        const warningEl = modalEl?.querySelector('#sessionEnrollmentStageCapacityWarning');
         if (warningEl) {
             warningEl.classList.add('d-none');
             warningEl.textContent = '';
@@ -1985,9 +2303,10 @@ document.addEventListener('DOMContentLoaded', () => {
         modalEl.addEventListener('click', (event) => {
             if (event.target.closest('#btn_sessionEnrollmentStageCreate')) {
                 event.preventDefault();
-                if (typeof uiAlert === 'function') {
-                    uiAlert('Session creation from Master Schedule is not enabled yet.', 'Stage Sessions');
-                }
+                commitScheduleStageCreate().catch((err) => {
+                    console.error(err);
+                    if (typeof uiAlert === 'function') uiAlert(err.message || 'Unable to create staged sessions.', 'Stage Sessions');
+                });
                 return;
             }
             if (event.target.closest('[data-stage-dismiss]')) {
@@ -2013,14 +2332,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        document.getElementById('btn_sessionEnrollmentStageCountDown')?.addEventListener('click', () => {
-            const display = document.getElementById('sessionEnrollmentStageCountDisplay');
+        modalEl.querySelector('#btn_sessionEnrollmentStageCountDown')?.addEventListener('click', () => {
+            const display = modalEl.querySelector('#sessionEnrollmentStageCountDisplay');
             const current = Number(display?.textContent || 4);
             syncScheduleStageCountDisplay(current - 1);
         });
 
-        document.getElementById('btn_sessionEnrollmentStageCountUp')?.addEventListener('click', () => {
-            const display = document.getElementById('sessionEnrollmentStageCountDisplay');
+        modalEl.querySelector('#btn_sessionEnrollmentStageCountUp')?.addEventListener('click', () => {
+            const display = modalEl.querySelector('#sessionEnrollmentStageCountDisplay');
             const current = Number(display?.textContent || 4);
             syncScheduleStageCountDisplay(current + 1);
         });
@@ -2035,11 +2354,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function bindScheduleDragCreate(container, mode) {
         if (!container || !scheduleCalendarCore?.bindCalendarDragCreate) return;
         scheduleCalendarCore.bindCalendarDragCreate(container, {
-            enabled: mode === 'verticalTimeline' && scheduleState.isAdminViewer === true,
-            onDragComplete: openScheduleStageModal,
+            enabled: mode === 'verticalTimeline' && canDragCreateSessions === true,
+            onDragComplete: openScheduleClassPickerModal,
             setSuppressGridClick: (value) => { scheduleState.suppressGridClick = value === true; }
         });
     }
+<% } else { %>
+    function bindScheduleDragCreate() {}
+<% } %>
 
     function saveScheduleViewMode(mode) {
         const normalized = resolveScheduleViewMode(mode);
@@ -2932,9 +3254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!person || !scheduleState.loadedPersonIds.has(person.id) || scheduleState.errorByPersonId[person.id]) {
             return null;
         }
-        const events = Array.isArray(scheduleState.eventsByPersonId[person.id])
-            ? [...scheduleState.eventsByPersonId[person.id]]
-            : [];
+        const events = getScheduleEventsForPerson(person.id);
         events.sort((a, b) => {
             const dateCmp = String(a?.date || '').localeCompare(String(b?.date || ''));
             if (dateCmp !== 0) return dateCmp;
@@ -3351,7 +3671,7 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i>${escapeHtml(scheduleState.errorByPersonId[person.id])}</div>`;
             return;
         }
-        const events = scheduleState.eventsByPersonId[person.id] || [];
+        const events = getScheduleEventsForPerson(person.id);
         sessionStatusMetaMap = new Map(
             (scheduleState.statusMetaByPersonId[person.id] || [])
                 .map((row) => [normalizeSessionStatus(row?.code), row])
@@ -3539,6 +3859,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+<% if (canSelectAnyPerson) { %>
     const btnPicker = document.getElementById('btn_openPersonPicker');
     if (btnPicker) {
         btnPicker.addEventListener('click', () => {
@@ -3597,18 +3918,16 @@ document.addEventListener('DOMContentLoaded', () => {
         clearLoadedSchedules();
         const roleEl = document.getElementById('sch_role');
         if (roleEl) {
-            roleEl.value = canSelectAnyPerson ? 'teacher' : '';
+            roleEl.value = 'teacher';
         }
         refreshScheduleActiveView();
     });
 
     document.getElementById('btn_resetScheduleFilters')?.addEventListener('click', () => {
-        if (canSelectAnyPerson) {
-            scheduleState.persons = [];
-            scheduleState.activePersonId = '';
-            const roleEl = document.getElementById('sch_role');
-            if (roleEl) roleEl.value = 'teacher';
-        }
+        scheduleState.persons = [];
+        scheduleState.activePersonId = '';
+        const roleEl = document.getElementById('sch_role');
+        if (roleEl) roleEl.value = 'teacher';
         clearLoadedSchedules();
         const hasCasesEl = document.getElementById('sch_hasCases');
         if (hasCasesEl) hasCasesEl.checked = false;
@@ -3619,9 +3938,12 @@ document.addEventListener('DOMContentLoaded', () => {
         applyDefaultWeekRange();
         refreshScheduleActiveView();
     });
+<% } %>
 
     document.getElementById('btn_loadSchedule')?.addEventListener('click', loadActiveSchedulePerson);
+<% if (canLoadAllSchedules) { %>
     document.getElementById('btn_loadAllSchedules')?.addEventListener('click', loadAllSchedulePeople);
+<% } %>
     document.getElementById('btn_printSchedule')?.addEventListener('click', () => openSchedulePrint());
 
     document.getElementById('sch_role')?.addEventListener('change', () => {
@@ -3828,7 +4150,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             dayWidth: readScheduleVerticalDayWidth(),
             filterEmptyDays: scheduleState.hideEmptyDays === true,
-            enableTimeHover: scheduleState.isAdminViewer === true,
+            enableTimeHover: canDragCreateSessions === true,
             buildPositionedBlockHtml: buildSchedulePositionedBlockHtml,
             buildDayHeaderBadgeHtml: (day, dayEvents, inRange) => {
                 if (!inRange) return '';
@@ -3855,8 +4177,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cssClass = scheduleEventRoleClass(ev);
                 const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
                 const blockClasses = scd
-            ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
-            : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
+            ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}`)
+            : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}`;
                 const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
                 const selectionKey = scheduleSessionSelectionKey(ev);
                 const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
@@ -3866,7 +4188,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const detailsUrl = getEventDetailsUrl(ev);
                 const encodedDetailsUrl = encodeURIComponent(detailsUrl);
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
-        const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
+        const clickHandler = (detailsUrl && !ev.isDraft) ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
                 const soloStudentHtml = scheduleSoloStudentHtml(ev);
@@ -3883,6 +4205,7 @@ document.addEventListener('DOMContentLoaded', () => {
                              ${clickHandler}>
                              ${selectionControl}
                              ${statusChip}
+                             ${buildScheduleDraftBadge(ev)}
                              <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
                              ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
                              <div class="event-meta x-small">
@@ -3900,8 +4223,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cssClass = scheduleEventRoleClass(ev);
                 const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
                 const blockClasses = scd
-            ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`)
-            : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}`;
+            ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}`)
+            : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}`;
                 const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
                 const selectionKey = scheduleSessionSelectionKey(ev);
                 const selectedClass = selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
@@ -3911,7 +4234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const detailsUrl = getEventDetailsUrl(ev);
                 const encodedDetailsUrl = encodeURIComponent(detailsUrl);
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
-                const clickHandler = detailsUrl ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
+                const clickHandler = (detailsUrl && !ev.isDraft) ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
                 const soloStudentHtml = scheduleSoloStudentHtml(ev);
@@ -3928,6 +4251,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          ${clickHandler}>
                          ${selectionControl}
                          ${statusChip}
+                         ${buildScheduleDraftBadge(ev)}
                          <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
                          ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
                          <div class="event-meta x-small">

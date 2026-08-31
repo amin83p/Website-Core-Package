@@ -62,7 +62,16 @@ function requireCaseStatusMutationAccess(req, res, next) {
   return requireCaseSectionOperationAny(operationId)(req, res, next);
 }
 
+async function requireCaseRoutingAdmin(req, res, next) {
+  const schoolAdminAccessService = require('../services/school/schoolAdminAccessService');
+  if (schoolAdminAccessService.isStudentCaseRoutingAdminViewer(req.user)) {
+    return next();
+  }
+  return denyAccess(req, res, 'Only student case routing administrators can manage category routing.');
+}
+
 module.exports = {
   requireCaseSectionOperationAny,
-  requireCaseStatusMutationAccess
+  requireCaseStatusMutationAccess,
+  requireCaseRoutingAdmin
 };

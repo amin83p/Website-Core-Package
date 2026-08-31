@@ -40,8 +40,8 @@ test('session student cases section is registered in access constants and routes
   assert.match(accessSource, /SCHOOL_SESSION_STUDENT_CASES:\s*'SCHOOL_SESSION_STUDENT_CASES'/);
   assert.match(mainRouteSource, /router\.use\('\/session-student-cases',\s*require\('\.\/sessionStudentCaseRoutes'\)\)/);
   assert.match(routeSource, /SECTIONS\.SCHOOL_SESSION_STUDENT_CASES/);
-  assert.match(routeSource, /OPERATIONS\.READ_ALL/);
-  const listRouteBlock = routeSource.slice(routeSource.indexOf("router.get('/'"), routeSource.indexOf('router.get(\'/:caseId/review-context\''));
+  assert.match(routeSource, /requireCaseSectionOperationAny\(\[OPERATIONS\.READ, OPERATIONS\.READ_ALL\]\)/);
+  const listRouteBlock = routeSource.slice(routeSource.indexOf("router.get('/'"), routeSource.indexOf("router.get('/routing'"));
   const listTrackActionStateCount = (listRouteBlock.match(/trackActionState\(/g) || []).length;
   assert.equal(listTrackActionStateCount, 1, 'GET list route must use a single trackActionState to avoid res.send recursion');
   assert.match(routeSource, /ctrl\.listSessionStudentCases/);
@@ -100,13 +100,26 @@ test('session student cases list view contains table and row action menu wiring'
   assert.match(viewSource, /canDeleteCases/);
   assert.match(viewSource, /canReadCases/);
   assert.match(viewSource, /canReadRow/);
-  assert.match(viewSource, /sessionStudentCaseModalClient\.js/);
-  assert.match(viewSource, /SessionStudentCaseModal\.openRemote/);
-  assert.match(viewSource, /SessionStudentCaseModal\.resolveRemote/);
-  assert.match(viewSource, /SessionStudentCaseModal\.deleteRemote/);
-  assert.match(read('packages/school/MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModal.ejs'), /id="studentCaseModal"/);
+  assert.match(viewSource, /sessionStudentCaseModalAssets/);
+  assert.match(viewSource, /SessionStudentCaseModal\.wireListRowActions/);
+  assert.match(clientSource, /wireListRowActions/);
+  assert.match(clientSource, /js-student-case-open-here/);
+  assert.match(clientSource, /js-student-case-resolve/);
+  assert.match(clientSource, /js-student-case-delete/);
+  const modalShell = read('packages/school/MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModal.ejs');
+  const modalBody = read('packages/school/MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModalBody.ejs');
+  const modalFooter = read('packages/school/MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModalFooter.ejs');
+  const modalAssets = read('packages/school/MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModalAssets.ejs');
+  assert.match(modalAssets, /sessionStudentCaseModal\.css/);
+  assert.match(modalAssets, /sessionStudentCaseModalClient\.js/);
+  assert.match(modalShell, /sessionStudentCaseModalBody/);
+  assert.match(modalShell, /sessionStudentCaseModalFooter/);
+  assert.match(modalShell, /id="studentCaseModal"/);
+  assert.match(modalBody, /id="studentCaseResultSection"/);
+  assert.match(modalFooter, /id="btnResolveStudentCase"/);
   assert.match(clientSource, /document\.body\.appendChild\(modalEl\)/);
-  assert.match(clientSource, /resolveRemote/);
+  assert.match(clientSource, /resolveMode/);
+  assert.match(clientSource, /collectResultPayload/);
   assert.match(clientSource, /deleteRemote/);
   const modalCss = read('public/styles/sessionStudentCaseModal.css');
   assert.match(modalCss, /\.student-case-student-grid/);
@@ -304,14 +317,12 @@ test('review service exposes review context and capability checks', () => {
 
 test('manage session uses shared student case modal assets and capability flags', () => {
   const sessionManagerSource = read('packages/school/MVC/views/school/class/sessionManager.ejs');
-  assert.match(sessionManagerSource, /sessionStudentCaseModalClient\.js/);
-  assert.match(sessionManagerSource, /sessionStudentCaseModal\.css/);
+  assert.match(sessionManagerSource, /sessionStudentCaseModalAssets/);
   assert.match(sessionManagerSource, /SessionStudentCaseModal\.init/);
   assert.match(sessionManagerSource, /studentCaseCapabilities/);
   assert.match(sessionManagerSource, /canCreateStudentCases/);
   assert.match(sessionManagerSource, /canResolveStudentCases/);
   assert.match(sessionManagerSource, /canReadAll/);
-  assert.match(sessionManagerSource, /school\/sessionStudentCase\/partials\/sessionStudentCaseModal/);
 });
 
 test('resolveCaseCapabilities maps section operations without SCHOOL_SESSIONS fallback', async () => {
@@ -424,4 +435,18 @@ test('resolveCaseCapabilities allows resolve without update when only RESOLVE is
   assert.equal(capabilities.canResolve, true);
   assert.equal(capabilities.canUpdate, false);
   assert.equal(capabilities.readOnly, true);
+});
+
+test('student cases list opens resolve flow in modal instead of silent status update', () => {
+  const viewSource = read('packages/school/MVC/views/school/sessionStudentCase/sessionStudentCaseList.ejs');
+  const clientSource = read('packages/school/public/scripts/sessionStudentCaseModalClient.js');
+  assert.match(viewSource, /SessionStudentCaseModal\.wireListRowActions/);
+  assert.match(clientSource, /openRemote\(caseId, \{ resolveMode: true \}\)/);
+  assert.doesNotMatch(viewSource, /resolveRemote\(caseId\)/);
+});
+
+test('review context enriches capabilities with canViewResultNote', () => {
+  const reviewSource = read('packages/school/MVC/services/school/sessionStudentCaseReviewService.js');
+  assert.match(reviewSource, /enrichCapabilities/);
+  assert.match(reviewSource, /redactCaseForViewer/);
 });

@@ -4,6 +4,7 @@ const scheduledTaskDefinitionRepository = require('../repositories/scheduledTask
 const scheduledTaskRunRepository = require('../repositories/scheduledTaskRunRepository');
 const { getScheduledTaskHandler } = require('./scheduledTaskRegistry');
 const { computeNextRunAt } = require('./scheduledTaskSchedulingUtils');
+const { resolveOrganizerFields, resolveActorFromUser } = require('../utils/scheduledTaskActorUtils');
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -47,6 +48,10 @@ async function executeDefinition(definition = {}, options = {}) {
 
   const logger = buildRunLogger();
   const scheduledFor = cleanText(definition.nextRunAt) || new Date(now).toISOString();
+  const manualActor = options.actor && typeof options.actor === 'object' ? options.actor : null;
+  const organizer = manualActor
+    ? resolveOrganizerFields({}, manualActor)
+    : resolveOrganizerFields(definition);
   let run = await scheduledTaskRunRepository.create({
     definitionId: definition.id,
     orgId: definition.orgId || '',
@@ -55,7 +60,8 @@ async function executeDefinition(definition = {}, options = {}) {
     scheduledFor,
     startedAt: new Date().toISOString(),
     status: 'running',
-    logs: []
+    logs: [],
+    ...organizer
   });
 
   try {
@@ -125,9 +131,11 @@ const scheduledTaskOrchestratorService = {
   async runDefinitionNow(definitionId, options = {}) {
     const definition = await scheduledTaskDefinitionRepository.getById(definitionId, options);
     if (!definition) throw new Error('Scheduled task definition not found.');
+    const actor = options.reqUser ? resolveActorFromUser(options.reqUser) : (options.actor || null);
     return executeDefinition(definition, {
       now: options.now || new Date(),
-      prepareMode: options.prepareMode
+      prepareMode: options.prepareMode,
+      actor
     });
   },
 

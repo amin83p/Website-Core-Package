@@ -54,6 +54,7 @@ const sessionStudentCaseService = require('../../services/school/sessionStudentC
 const sessionStudentCaseAccessService = require('../../services/school/sessionStudentCaseAccessService');
 const sessionStudentCaseReviewService = require('../../services/school/sessionStudentCaseReviewService');
 const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
+const sessionStudentCaseResultVisibilityService = require('../../services/school/sessionStudentCaseResultVisibilityService');
 const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
 const bookCoveringReportService = require('../../services/school/bookCoveringReportService');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
@@ -4427,6 +4428,7 @@ async function manageSession(req, res) {
             conductRatingScaleResolved,
             autosavePolicyResolved,
             sessionStudentCases,
+            sessionStudentCaseSummary: sessionStudentCaseService.summarizeSessionCases(sessionStudentCases),
             studentCaseDetailPresets: getPresetConfig(),
             gradebookSkills: sessionSkillPolicy.renderCatalog,
             teachingOutlineContext,
@@ -4636,7 +4638,15 @@ async function listSessionStudentCases(req, res) {
         const { id: classId, sessionId } = req.params;
         await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         const cases = await sessionStudentCaseService.listCasesForSession({ classId, sessionId, reqUser: req.user });
-        return res.json({ status: 'success', cases });
+        const { classData, session } = await sessionStudentCaseReviewService.loadClassSessionContext(req, classId, sessionId);
+        const capabilities = await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session });
+        const redactedCases = (Array.isArray(cases) ? cases : []).map((row) => (
+            sessionStudentCaseResultVisibilityService.redactCaseForViewer(row, {
+                reqUser: req.user,
+                capabilities
+            })
+        ));
+        return res.json({ status: 'success', cases: redactedCases });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }
@@ -4653,18 +4663,28 @@ async function saveSessionStudentCase(req, res) {
             isCreate: !caseId,
             resolve: shouldResolve
         });
+        const capabilities = await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session });
+        const saveOptions = {
+            classId,
+            sessionId,
+            reqUser: req.user,
+            canManageResultFields: capabilities.canResolve === true,
+            capabilities
+        };
+        const redactSaved = (saved) => sessionStudentCaseResultVisibilityService.redactCaseForViewer(saved, {
+            reqUser: req.user,
+            capabilities
+        });
         if (caseId) {
             const saved = await sessionStudentCaseService.saveCase({
-                classId,
-                sessionId,
+                ...saveOptions,
                 caseId,
-                input: body,
-                reqUser: req.user
+                input: body
             });
             const message = String(saved?.status || '').toLowerCase() === 'resolved'
                 ? 'Student case saved and resolved.'
                 : 'Student case saved.';
-            return res.json({ status: 'success', message, case: saved });
+            return res.json({ status: 'success', message, case: redactSaved(saved) });
         }
 
         const studentPersonIds = [...new Set(
@@ -4674,10 +4694,8 @@ async function saveSessionStudentCase(req, res) {
         )];
         if (studentPersonIds.length > 1) {
             const result = await sessionStudentCaseService.saveCasesBulk({
-                classId,
-                sessionId,
-                input: body,
-                reqUser: req.user
+                ...saveOptions,
+                input: body
             });
             const count = Number(result?.createdCount || 0);
             const message = count === 1
@@ -4686,25 +4704,23 @@ async function saveSessionStudentCase(req, res) {
             return res.json({
                 status: 'success',
                 message,
-                cases: result.cases,
+                cases: (result.cases || []).map(redactSaved),
                 createdCount: count
             });
         }
 
         const saved = await sessionStudentCaseService.saveCase({
-            classId,
-            sessionId,
+            ...saveOptions,
             caseId: '',
             input: {
                 ...body,
                 studentPersonId: studentPersonIds[0] || body.studentPersonId || body.personId || ''
-            },
-            reqUser: req.user
+            }
         });
         const message = String(saved?.status || '').toLowerCase() === 'resolved'
             ? 'Student case saved and resolved.'
             : 'Student case saved.';
-        return res.json({ status: 'success', message, case: saved });
+        return res.json({ status: 'success', message, case: redactSaved(saved) });
     } catch (error) {
         return res.status(error.statusCode || 400).json({ status: 'error', message: error.message });
     }
@@ -4718,18 +4734,30 @@ async function updateSessionStudentCaseStatus(req, res) {
         const status = String(req.body?.status || '').trim().toLowerCase();
         if (status === 'resolved') {
             await sessionStudentCaseAccessService.assertCanResolve(req, classData, session);
+        } else if (status === 'reopened') {
+            await sessionStudentCaseAccessService.assertCanUpdate(req, classData, session);
         } else {
             await sessionStudentCaseAccessService.assertCanUpdate(req, classData, session);
         }
+        const capabilities = await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session });
         const saved = await sessionStudentCaseService.updateStatus({
             classId,
             sessionId,
             caseId,
             status: req.body?.status,
             note: req.body?.note || '',
-            reqUser: req.user
+            resultNote: req.body?.resultNote,
+            revealResultToCreator: req.body?.revealResultToCreator,
+            locked: req.body?.locked,
+            reqUser: req.user,
+            canManageResultFields: capabilities.canResolve === true,
+            capabilities
         });
-        return res.json({ status: 'success', message: 'Student case updated.', case: saved });
+        const redacted = sessionStudentCaseResultVisibilityService.redactCaseForViewer(saved, {
+            reqUser: req.user,
+            capabilities
+        });
+        return res.json({ status: 'success', message: 'Student case updated.', case: redacted });
     } catch (error) {
         return res.status(error.statusCode || 400).json({ status: 'error', message: error.message });
     }
@@ -4741,11 +4769,13 @@ async function deleteSessionStudentCase(req, res) {
         await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         const { classData, session } = await sessionStudentCaseReviewService.loadClassSessionContext(req, classId, sessionId);
         await sessionStudentCaseAccessService.assertCanDelete(req, classData, session);
+        const capabilities = await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session });
         const deleted = await sessionStudentCaseService.deleteCase({
             classId,
             sessionId,
             caseId,
-            reqUser: req.user
+            reqUser: req.user,
+            capabilities
         });
         return res.json({ status: 'success', message: 'Student case deleted.', deleted });
     } catch (error) {

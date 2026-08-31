@@ -63,6 +63,10 @@ function isTaskRoutingAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_TASKS, OPERATIONS.CONFIGURE);
 }
 
+function isStudentCaseRoutingAdminViewer(user) {
+  return isAdminForRequest(user, SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.CONFIGURE);
+}
+
 function isReportsInstancesAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL);
 }
@@ -131,6 +135,7 @@ module.exports = {
   isAdminForRequestAsync,
   isTasksAdminViewer,
   isTaskRoutingAdminViewer,
+  isStudentCaseRoutingAdminViewer,
   isReportsInstancesAdminViewer,
   isSessionsAdminViewer,
   canSelectAdminSessionStatuses,

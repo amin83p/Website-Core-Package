@@ -1,0 +1,81 @@
+<input type="hidden" id="studentCaseId">
+<input type="hidden" id="studentCasePersonId">
+<input type="hidden" id="studentCaseClassId">
+<input type="hidden" id="studentCaseSessionId">
+<div id="studentCaseReadOnlyNotice" class="alert alert-info border d-none mb-3">
+    <div class="fw-semibold mb-1">Read-only review</div>
+    <div class="small mb-0">You can view this case here. Open Manage Session to make changes.</div>
+</div>
+<div id="studentCaseStepDetails">
+    <div class="alert alert-light border small mb-3" id="studentCaseContext"></div>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label fw-bold" for="studentCaseCategory">Category</label>
+            <select class="form-select" id="studentCaseCategory">
+                <option value="learning">Learning</option>
+                <option value="technology">Technology</option>
+                <option value="engagement">Engagement</option>
+                <option value="behavior">Behavior</option>
+                <option value="support">Additional Support</option>
+                <option value="resources">Resources</option>
+                <option value="lesson_delivery">Lesson Delivery</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+        <div class="col-md-8">
+            <div class="form-label fw-bold">Severity</div>
+            <div class="student-case-severity-group" role="group" aria-label="Case severity">
+                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityInfo" value="info" checked>
+                <label class="btn btn-sm btn-outline-primary student-case-severity-label student-case-severity-label--info" for="studentCaseSeverityInfo">Info</label>
+                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityWarning" value="warning">
+                <label class="btn btn-sm btn-outline-warning student-case-severity-label student-case-severity-label--warning" for="studentCaseSeverityWarning">Warning</label>
+                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityUrgent" value="urgent">
+                <label class="btn btn-sm btn-outline-danger student-case-severity-label student-case-severity-label--urgent" for="studentCaseSeverityUrgent">Urgent</label>
+            </div>
+        </div>
+        <div class="col-12">
+            <label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label>
+            <div id="studentCaseDetailPresetsWrap">
+                <div id="studentCaseDetailPresets" class="student-case-detail-presets"></div>
+            </div>
+            <textarea class="form-control student-case-details-textarea" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea>
+            <div class="form-text">Pick a common issue below, then adjust the detail text if needed.</div>
+        </div>
+        <div class="col-12 d-none" id="studentCaseResultSection">
+            <div class="border rounded p-3 bg-light" id="studentCaseResultEditable">
+                <div class="fw-bold mb-2">Resolution result</div>
+                <label class="form-label" for="studentCaseResultNote">Result note</label>
+                <textarea class="form-control" id="studentCaseResultNote" rows="4" maxlength="3000" placeholder="Explain the resolution outcome for this case."></textarea>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="studentCaseRevealResultToCreator">
+                    <label class="form-check-label" for="studentCaseRevealResultToCreator">Reveal the Result to the Creator</label>
+                </div>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="studentCaseLocked">
+                    <label class="form-check-label" for="studentCaseLocked">Locked</label>
+                </div>
+                <div class="form-text mt-2 mb-0">Only users with resolve access can see or edit this section unless you reveal the result to the creator. Locked prevents edit and delete after resolution unless the user has resolve access.</div>
+            </div>
+            <div class="border rounded p-3 bg-light d-none" id="studentCaseResultReadOnly">
+                <div class="fw-bold mb-2">Resolution result</div>
+                <div class="small text-muted mb-1">Result note</div>
+                <div id="studentCaseResultReadOnlyText" class="mb-0"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="studentCaseStepStudents" class="d-none">
+    <div class="alert alert-primary border-0 mb-3" style="background: #eff6ff;">
+        <h6 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i>Assign students</h6>
+        <p class="small mb-0 text-muted" id="studentCaseStudentStepIntro">Select students if this case applies to specific learners.</p>
+    </div>
+    <div class="student-case-pending-summary card mb-3">
+        <div class="card-body py-3" id="studentCasePendingSummary"></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
+        <input type="search" class="form-control form-control-sm flex-grow-1" id="studentCaseStudentSearch" placeholder="Search students by name..." style="min-width: 14rem;">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnStudentCaseSelectAll">Select all</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnStudentCaseClearAll">Clear</button>
+    </div>
+    <div id="studentCaseStudentPicker" class="student-case-student-picker"></div>
+</div>

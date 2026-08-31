@@ -4,6 +4,7 @@ const classEnrollmentReadService = require('./classEnrollmentReadService');
 const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
 const { deriveCaseSummary, categoryRequiresStudent } = require('./sessionStudentCasePresetService');
+const sessionStudentCaseResultVisibilityService = require('./sessionStudentCaseResultVisibilityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -36,7 +37,21 @@ async function resolveActorName(user) {
 function normalizeScope(reqUser, query = {}) {
   return {
     query,
-    scope: { activeOrgId: getActiveOrgId(reqUser) }
+    scope: { activeOrgId: getActiveOrgId(reqUser) },
+    requestingUser: reqUser
+  };
+}
+
+function buildCaseAudit(existing, reqUser) {
+  const now = new Date().toISOString();
+  const actorId = getActorUserId(reqUser);
+  const priorAudit = existing?.audit && typeof existing.audit === 'object' ? existing.audit : {};
+  return {
+    ...priorAudit,
+    createDateTime: priorAudit.createDateTime || now,
+    lastUpdateDateTime: now,
+    createdBy: priorAudit.createdBy || actorId,
+    updatedBy: actorId
   };
 }
 
@@ -182,7 +197,8 @@ async function assertStudentOnSessionRoster({ classData, session, studentPersonI
     const effectivePersonIds = await resolveEffectiveSessionRosterPersonIds({
       classData,
       session,
-      reqUser
+      reqUser,
+      canManageResultFields
     });
     if (personIdSetHas(effectivePersonIds, target)) {
       return { personId: target };
@@ -373,7 +389,7 @@ async function listSessionCaseSummaries({ sessionRefs = [], reqUser }) {
   return summaries;
 }
 
-async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }) {
+async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser, canManageResultFields = false, capabilities = {} }) {
   const { classData, session } = await getClassAndSession({ classId, sessionId, reqUser });
   const existing = caseId
     ? await schoolRepositories.sessionStudentCases.getById(caseId, normalizeScope(reqUser))
@@ -396,25 +412,39 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
     throw new Error('Student case does not belong to this session.');
   }
 
+  sessionStudentCaseResultVisibilityService.assertCaseMutationAllowed(existing, capabilities, { action: 'edit' });
+
   const oldStatus = existing?.status || '';
-  const requestedStatus = normalizeCaseStatus(input.status || '');
+  const rawRequestedStatus = String(input.status || '').trim();
+  const requestedStatus = rawRequestedStatus ? normalizeCaseStatus(rawRequestedStatus) : '';
+  const existingStatus = normalizeCaseStatus(existing?.status || 'open');
   const status = requestedStatus === 'resolved'
     ? 'resolved'
-    : (existing?.status === 'resolved' ? 'reopened' : (requestedStatus || existing?.status || 'open'));
+    : (requestedStatus || existingStatus || 'open');
   if (!['resolved', 'reopened', 'cancelled', 'open', 'in_progress'].includes(status)) throw new Error('Invalid case status.');
-  const lifecycleAction = status === 'resolved'
+  const lifecycleAction = status === 'resolved' && oldStatus !== 'resolved'
     ? 'case_resolved'
-    : (existing ? (oldStatus === 'resolved' ? 'case_reopened' : 'case_updated') : 'case_created');
+    : (existing
+      ? (oldStatus !== status && status === 'reopened' ? 'case_reopened' : 'case_updated')
+      : 'case_created');
   const lifecycleEvent = await enrichActor(buildLifecycleEvent({
     action: lifecycleAction,
     reqUser,
     oldStatus,
     newStatus: status,
-    note: input.details || input.summary || ''
+    note: status === 'resolved'
+      ? (cleanString(input.resultNote, 1000) || input.details || input.summary || '')
+      : (input.details || input.summary || '')
   }), reqUser);
 
   const details = cleanString(input.details || existing?.details || '', 5000);
   const summary = cleanString(input.summary || existing?.summary || deriveCaseSummary(category, details), 260);
+  const resultFields = sessionStudentCaseResultVisibilityService.applyResultFieldsForSave({
+    input,
+    existing,
+    canManageResultFields,
+    nextStatus: status
+  });
 
   const payload = {
     ...(existing || {}),
@@ -422,6 +452,7 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
     category,
     details,
     summary,
+    ...resultFields,
     orgId: toPublicId(classData.orgId || getActiveOrgId(reqUser)),
     classId: toPublicId(classData.id || classId),
     classTitle: cleanString(classData.title || classData.name || classId, 220),
@@ -436,11 +467,7 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
     status,
     lifecycle: [...(Array.isArray(existing?.lifecycle) ? existing.lifecycle : []), lifecycleEvent],
     revisionNo: Math.max(1, Number(existing?.revisionNo || 0) + 1),
-    audit: {
-      ...(existing?.audit || {}),
-      updatedBy: getActorUserId(reqUser),
-      ...(existing ? {} : { createdBy: getActorUserId(reqUser) })
-    }
+    audit: buildCaseAudit(existing, reqUser)
   };
 
   const saved = existing
@@ -453,7 +480,7 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
       sourceType: 'student_session_case',
       sourceId: saved.id,
       status: 'resolved',
-      note: input.resolutionNote || input.details || input.summary || 'Student session case was resolved.'
+      note: resultFields.resultNote || input.resolutionNote || input.details || input.summary || 'Student session case was resolved.'
     }, reqUser);
   } else {
     await taskService.upsertSourceTask(caseTaskPayload(saved), reqUser);
@@ -461,7 +488,19 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
   return saved;
 }
 
-async function updateStatus({ classId, sessionId, caseId, status, note = '', reqUser }) {
+async function updateStatus({
+  classId,
+  sessionId,
+  caseId,
+  status,
+  note = '',
+  resultNote = undefined,
+  revealResultToCreator = undefined,
+  locked = undefined,
+  reqUser,
+  canManageResultFields = false,
+  capabilities = {}
+} = {}) {
   const existing = await schoolRepositories.sessionStudentCases.getById(caseId, normalizeScope(reqUser));
   if (!existing) throw new Error('Student case not found.');
   if (!idsEqual(existing.classId, classId) || !idsEqual(existing.sessionId, sessionId)) {
@@ -470,22 +509,34 @@ async function updateStatus({ classId, sessionId, caseId, status, note = '', req
   const oldStatus = existing.status || '';
   const nextStatus = cleanString(status, 40).toLowerCase();
   if (!['resolved', 'reopened', 'cancelled', 'open', 'in_progress'].includes(nextStatus)) throw new Error('Invalid case status.');
+  const mutationAction = nextStatus === 'reopened' ? 'reopen' : (nextStatus === 'resolved' ? 'edit' : 'edit');
+  sessionStudentCaseResultVisibilityService.assertCaseMutationAllowed(existing, capabilities, { action: mutationAction });
   const lifecycleEvent = await enrichActor(buildLifecycleEvent({
     action: nextStatus === 'resolved' ? 'case_resolved' : (nextStatus === 'reopened' ? 'case_reopened' : 'case_status_changed'),
     reqUser,
     oldStatus,
     newStatus: nextStatus,
-    note
+    note: nextStatus === 'resolved'
+      ? (cleanString(resultNote !== undefined ? resultNote : existing.resultNote, 1000) || note)
+      : note
   }), reqUser);
+  const resultFields = sessionStudentCaseResultVisibilityService.applyResultFieldsForSave({
+    input: {
+      ...(resultNote !== undefined ? { resultNote } : {}),
+      ...(revealResultToCreator !== undefined ? { revealResultToCreator } : {}),
+      ...(locked !== undefined ? { locked } : {})
+    },
+    existing,
+    canManageResultFields,
+    nextStatus
+  });
   const next = {
     ...existing,
     status: nextStatus,
+    ...resultFields,
     lifecycle: [...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []), lifecycleEvent],
     revisionNo: Math.max(1, Number(existing.revisionNo || 1) + 1),
-    audit: {
-      ...(existing.audit || {}),
-      updatedBy: getActorUserId(reqUser)
-    }
+    audit: buildCaseAudit(existing, reqUser)
   };
   const saved = await schoolRepositories.sessionStudentCases.update(existing.id, next, normalizeScope(reqUser));
   if (nextStatus === 'resolved' || nextStatus === 'cancelled') {
@@ -494,7 +545,7 @@ async function updateStatus({ classId, sessionId, caseId, status, note = '', req
       sourceType: 'student_session_case',
       sourceId: saved.id,
       status: 'resolved',
-      note: note || 'Student session case was resolved.'
+      note: resultFields.resultNote || note || 'Student session case was resolved.'
     }, reqUser);
   } else {
     await taskService.upsertSourceTask(caseTaskPayload(saved), reqUser);
@@ -502,7 +553,7 @@ async function updateStatus({ classId, sessionId, caseId, status, note = '', req
   return saved;
 }
 
-async function saveCasesBulk({ classId, sessionId, input = {}, reqUser }) {
+async function saveCasesBulk({ classId, sessionId, input = {}, reqUser, canManageResultFields = false, capabilities = {} }) {
   const studentPersonIds = [...new Set(
     (Array.isArray(input?.studentPersonIds) ? input.studentPersonIds : [])
       .map((id) => toPublicId(id))
@@ -522,7 +573,9 @@ async function saveCasesBulk({ classId, sessionId, input = {}, reqUser }) {
         studentPersonId: '',
         personId: ''
       },
-      reqUser
+      reqUser,
+      canManageResultFields,
+      capabilities
     });
     return {
       cases: [saved],
@@ -553,7 +606,9 @@ async function saveCasesBulk({ classId, sessionId, input = {}, reqUser }) {
         studentPersonId,
         personId: studentPersonId
       },
-      reqUser
+      reqUser,
+      canManageResultFields,
+      capabilities
     });
     cases.push(saved);
   }
@@ -564,7 +619,7 @@ async function saveCasesBulk({ classId, sessionId, input = {}, reqUser }) {
   };
 }
 
-async function deleteCase({ classId, sessionId, caseId, reqUser }) {
+async function deleteCase({ classId, sessionId, caseId, reqUser, capabilities = {} }) {
   const existing = await schoolRepositories.sessionStudentCases.getById(caseId, normalizeScope(reqUser));
   if (!existing) {
     const error = new Error('Student case not found.');
@@ -577,6 +632,7 @@ async function deleteCase({ classId, sessionId, caseId, reqUser }) {
     throw error;
   }
 
+  sessionStudentCaseResultVisibilityService.assertCaseMutationAllowed(existing, capabilities, { action: 'delete' });
   await taskService.deleteSourceTask({
     orgId: existing.orgId,
     sourceType: 'student_session_case',

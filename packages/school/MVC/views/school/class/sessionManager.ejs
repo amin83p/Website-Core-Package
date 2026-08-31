@@ -821,6 +821,15 @@
         line-height: 1.2;
         padding: 0.2rem 0.4rem;
     }
+    .session-manager-nav-item .session-nav-badge-group {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .session-manager-nav-item .session-nav-badge-group .session-nav-badge {
+        margin-left: 0;
+    }
     .session-manager-nav-item .session-nav-badge.session-nav-badge--dot {
         min-width: 0.65rem;
         width: 0.65rem;
@@ -842,6 +851,15 @@
         min-width: 1.1rem;
         padding: 0.12rem 0.28rem;
         font-size: 0.65rem;
+    }
+    .session-manager-sidebar.collapsed .session-manager-nav-item .session-nav-badge-group {
+        position: absolute;
+        top: 0.2rem;
+        right: 0.2rem;
+        margin-left: 0;
+    }
+    .session-manager-sidebar.collapsed .session-manager-nav-item .session-nav-badge-group .session-nav-badge {
+        position: static;
     }
     .session-manager-sidebar.collapsed .session-manager-nav-item .session-nav-badge.session-nav-badge--dot {
         min-width: 0.55rem;
@@ -1029,6 +1047,41 @@
         font-weight: 600;
         padding: 0.7rem 1.25rem;
         box-shadow: none;
+    }
+    .student-case-status-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+    }
+    .student-case-issue-cell {
+        max-width: 14rem;
+    }
+    .student-case-issue-preview {
+        display: block;
+        color: #334155;
+        line-height: 1.35;
+    }
+    .student-case-row-actions {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
+    }
+    .student-case-action-btn {
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.45rem;
+        line-height: 1;
+    }
+    .student-case-action-btn i {
+        font-size: 0.95rem;
     }
     .session-panel-cta-zone {
         padding: 1rem 1.5rem;
@@ -1895,8 +1948,13 @@
                 </button>
                 <% } %>
                 <% if (typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canReadAll) { %>
+                <% const studentCaseNavSummary = (typeof sessionStudentCaseSummary !== 'undefined' && sessionStudentCaseSummary) ? sessionStudentCaseSummary : { hasCases: false, activeCount: 0, resolvedCount: 0 }; %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-folder-check fs-5"></i><span class="session-manager-nav-label">Student Cases</span>
+                    <span id="sessionStudentCasesNavBadges" class="session-nav-badge-group<%= studentCaseNavSummary.hasCases ? '' : ' d-none' %>" aria-hidden="<%= studentCaseNavSummary.hasCases ? 'false' : 'true' %>" title="<%= studentCaseNavSummary.hasCases ? [studentCaseNavSummary.activeCount ? `${studentCaseNavSummary.activeCount} unresolved` : '', studentCaseNavSummary.resolvedCount ? `${studentCaseNavSummary.resolvedCount} resolved` : ''].filter(Boolean).join(', ') : 'Student cases' %>">
+                        <span id="sessionStudentCasesActiveNavBadge" class="badge rounded-pill session-nav-badge bg-danger<%= studentCaseNavSummary.activeCount ? '' : ' d-none' %>" aria-hidden="<%= studentCaseNavSummary.activeCount ? 'false' : 'true' %>"><%= studentCaseNavSummary.activeCount || '' %></span>
+                        <span id="sessionStudentCasesResolvedNavBadge" class="badge rounded-pill session-nav-badge bg-success<%= studentCaseNavSummary.resolvedCount ? '' : ' d-none' %>" aria-hidden="<%= studentCaseNavSummary.resolvedCount ? 'false' : 'true' %>"><%= studentCaseNavSummary.resolvedCount || '' %></span>
+                    </span>
                 </button>
                 <% } %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="gradebook" title="<%= isInstructionalInactive ? 'Inactive original session' : 'Coming soon' %>" <%= isInstructionalInactive ? 'disabled' : '' %>>
@@ -2574,7 +2632,7 @@
                                         <th>Severity</th>
                                         <th>Status</th>
                                         <th>Issue</th>
-                                        <th>Updated</th>
+                                        <th>Last updated</th>
                                         <th class="text-end pe-4">Actions</th>
                                     </tr>
                                 </thead>
@@ -2950,7 +3008,6 @@
     </div>
 </div>
 
-<%- include('school/sessionStudentCase/partials/sessionStudentCaseModal') %>
 <div class="modal fade" id="sessionReportAssignmentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -3042,8 +3099,7 @@
 <script src="/scripts/visibilityInterval.js"></script>
 <script src="/scripts/schoolAutosave.js"></script>
 <script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
-<link rel="stylesheet" href="/styles/sessionStudentCaseModal.css">
-<script src="/scripts/sessionStudentCaseModalClient.js"></script>
+<%- include('school/sessionStudentCase/partials/sessionStudentCaseModalAssets') %>
 
 <script>
 let detailsModalInstance = null;
@@ -5274,6 +5330,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }[ch]));
     }
 
+    function truncateStudentCaseIssueText(text, maxWords = 10) {
+        const normalized = String(text || '').trim().replace(/\s+/g, ' ');
+        if (!normalized) return { preview: '-', full: '' };
+        const words = normalized.split(' ');
+        if (words.length <= maxWords) {
+            return { preview: normalized, full: normalized };
+        }
+        return {
+            preview: `${words.slice(0, maxWords).join(' ')}…`,
+            full: normalized
+        };
+    }
+
+    function resolveStudentCaseUpdatedAt(row = {}) {
+        const audit = row?.audit || {};
+        const direct = String(audit.lastUpdateDateTime || audit.createDateTime || '').trim();
+        if (direct) return direct;
+        const lifecycle = Array.isArray(row.lifecycle) ? row.lifecycle : [];
+        for (let i = lifecycle.length - 1; i >= 0; i -= 1) {
+            const at = String(lifecycle[i]?.at || '').trim();
+            if (at) return at;
+        }
+        return '';
+    }
+
+    function formatStudentCaseUpdatedAt(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '-';
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return raw;
+        return parsed.toLocaleString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+    }
+
     async function showStudentCaseMessage(title, message, icon = 'info') {
         return sessionMessageBox({
             title: title || 'Student Case',
@@ -5317,27 +5412,96 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'bg-dark';
     }
 
+    function isActiveStudentCaseStatus(status) {
+        return ['open', 'in_progress', 'reopened'].includes(String(status || 'open').trim().toLowerCase());
+    }
+
+    function syncSessionStudentCasesNavBadge() {
+        const group = document.getElementById('sessionStudentCasesNavBadges');
+        const activeBadge = document.getElementById('sessionStudentCasesActiveNavBadge');
+        const resolvedBadge = document.getElementById('sessionStudentCasesResolvedNavBadge');
+        if (!group || !activeBadge || !resolvedBadge) return;
+
+        const rows = Array.isArray(studentCasesState) ? studentCasesState : [];
+        const activeCount = rows.filter((row) => isActiveStudentCaseStatus(row?.status)).length;
+        const resolvedCount = Math.max(0, rows.length - activeCount);
+
+        if (!rows.length) {
+            group.classList.add('d-none');
+            group.setAttribute('aria-hidden', 'true');
+            group.removeAttribute('title');
+            activeBadge.classList.add('d-none');
+            activeBadge.textContent = '';
+            activeBadge.setAttribute('aria-hidden', 'true');
+            resolvedBadge.classList.add('d-none');
+            resolvedBadge.textContent = '';
+            resolvedBadge.setAttribute('aria-hidden', 'true');
+            return;
+        }
+
+        group.classList.remove('d-none');
+        group.setAttribute('aria-hidden', 'false');
+
+        if (activeCount > 0) {
+            activeBadge.classList.remove('d-none');
+            activeBadge.textContent = String(activeCount);
+            activeBadge.setAttribute('aria-hidden', 'false');
+        } else {
+            activeBadge.classList.add('d-none');
+            activeBadge.textContent = '';
+            activeBadge.setAttribute('aria-hidden', 'true');
+        }
+
+        if (resolvedCount > 0) {
+            resolvedBadge.classList.remove('d-none');
+            resolvedBadge.textContent = String(resolvedCount);
+            resolvedBadge.setAttribute('aria-hidden', 'false');
+        } else {
+            resolvedBadge.classList.add('d-none');
+            resolvedBadge.textContent = '';
+            resolvedBadge.setAttribute('aria-hidden', 'true');
+        }
+
+        const titleParts = [];
+        if (activeCount > 0) titleParts.push(`${activeCount} unresolved`);
+        if (resolvedCount > 0) titleParts.push(`${resolvedCount} resolved`);
+        group.title = titleParts.join(', ');
+    }
+
     function renderStudentCases() {
         const body = document.getElementById('studentCasesTableBody');
         if (!body) return;
         const rows = Array.isArray(studentCasesState) ? studentCasesState : [];
         if (!rows.length) {
             body.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No student cases for this session.</td></tr>';
+            syncSessionStudentCasesNavBadge();
             return;
         }
         body.innerHTML = rows.map((row) => {
             const status = String(row.status || 'open').toLowerCase();
             const severity = String(row.severity || 'info').toLowerCase();
-            const updated = row?.audit?.lastUpdateDateTime || row?.audit?.createDateTime || '';
-            const canResolve = canResolveStudentCases && !['resolved', 'cancelled'].includes(status);
-            const canReopen = canUpdateStudentCases && ['resolved', 'cancelled'].includes(status);
-            const canEdit = canUpdateStudentCases || (canReadStudentCases && !canUpdateStudentCases);
-            const editLabel = canUpdateStudentCases ? 'Edit' : 'View';
-            const editIcon = canUpdateStudentCases ? 'pencil-square' : 'eye';
+            const updated = formatStudentCaseUpdatedAt(resolveStudentCaseUpdatedAt(row));
+            const isClosed = ['resolved', 'cancelled'].includes(status);
+            const isLocked = row.locked === true;
+            const canResolve = canResolveStudentCases && !isClosed;
+            const canReopen = isClosed && (isLocked ? canResolveStudentCases : canUpdateStudentCases);
+            const canOpenRow = isClosed && isLocked
+              ? (canResolveStudentCases || canReadStudentCases)
+              : (canUpdateStudentCases || canReadStudentCases);
+            const canEditRow = isClosed && isLocked
+              ? canResolveStudentCases
+              : canUpdateStudentCases;
+            const canDeleteRow = isClosed && isLocked ? canResolveStudentCases : canDeleteStudentCases;
+            const editLabel = canEditRow ? 'Edit student case' : 'View student case';
+            const editIcon = canEditRow ? 'pencil-square' : 'eye';
             const studentPersonId = String(row.studentPersonId || '').trim();
             const studentLabel = studentPersonId
                 ? (row.studentName || studentPersonId)
                 : 'Session-wide';
+            const issueText = truncateStudentCaseIssueText(row.details || row.summary || '');
+            const issueTitleAttr = issueText.full && issueText.full !== issueText.preview
+                ? ` title="${scEscapeHtml(issueText.full)}"`
+                : '';
             const studentCell = studentPersonId
                 ? `${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(studentLabel, row.studentRecordId, { className: 'text-decoration-none fw-semibold' }) : scEscapeHtml(studentLabel))}<div class="small text-muted font-monospace">${scEscapeHtml(studentPersonId)}</div>`
                 : `<span class="text-muted fst-italic">${scEscapeHtml(studentLabel)}</span>`;
@@ -5346,19 +5510,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="ps-4 fw-semibold">${studentCell}</td>
                     <td class="text-capitalize">${scEscapeHtml(String(row.category || 'other').replace(/_/g, ' '))}</td>
                     <td><span class="badge ${studentCaseBadgeClass(severity, 'severity')}">${scEscapeHtml(severity.toUpperCase())}</span></td>
-                    <td><span class="badge ${studentCaseBadgeClass(status, 'status')}">${scEscapeHtml(status.replace(/_/g, ' ').toUpperCase())}</span></td>
-                    <td>${scEscapeHtml(row.details || row.summary || '-')}</td>
-                    <td class="small text-muted font-monospace">${scEscapeHtml(updated || '-')}</td>
+                    <td>
+                        <span class="student-case-status-cell">
+                            <span class="badge ${studentCaseBadgeClass(status, 'status')}">${scEscapeHtml(status.replace(/_/g, ' ').toUpperCase())}</span>${isLocked && isClosed ? '<i class="bi bi-lock-fill text-secondary" title="Locked resolved case" aria-hidden="true"></i>' : ''}
+                        </span>
+                    </td>
+                    <td class="student-case-issue-cell">
+                        <span class="student-case-issue-preview"${issueTitleAttr}>${scEscapeHtml(issueText.preview)}</span>
+                    </td>
+                    <td class="small text-muted">${scEscapeHtml(updated)}</td>
                     <td class="text-end pe-4">
-                        <div class="btn-group btn-group-sm">
-                            ${canEdit ? `<button type="button" class="btn btn-outline-primary btn-edit-student-case" data-case-id="${scEscapeHtml(row.id)}" data-read-only="${canUpdateStudentCases ? 'false' : 'true'}"><i class="bi bi-${editIcon} me-1"></i>${editLabel}</button>` : ''}
-                            ${canResolve ? `<button type="button" class="btn btn-outline-success btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="resolved"><i class="bi bi-check2-circle me-1"></i>Resolve</button>` : ''}
-                            ${canReopen ? `<button type="button" class="btn btn-outline-warning btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="reopened"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>` : ''}
-                            ${canDeleteStudentCases ? `<button type="button" class="btn btn-outline-danger btn-delete-student-case" data-case-id="${scEscapeHtml(row.id)}"><i class="bi bi-trash me-1"></i>Delete</button>` : ''}
+                        <div class="student-case-row-actions" role="group" aria-label="Student case actions">
+                            ${canOpenRow ? `<button type="button" class="btn btn-outline-primary student-case-action-btn btn-edit-student-case" data-case-id="${scEscapeHtml(row.id)}" data-read-only="${canEditRow ? 'false' : 'true'}" title="${scEscapeHtml(editLabel)}" aria-label="${scEscapeHtml(editLabel)}"><i class="bi bi-${editIcon}" aria-hidden="true"></i></button>` : ''}
+                            ${canResolve ? `<button type="button" class="btn btn-outline-success student-case-action-btn btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="resolved" title="Resolve student case" aria-label="Resolve student case"><i class="bi bi-check2-circle" aria-hidden="true"></i></button>` : ''}
+                            ${canReopen ? `<button type="button" class="btn btn-outline-warning student-case-action-btn btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="reopened" title="Reopen student case" aria-label="Reopen student case"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>` : ''}
+                            ${canDeleteRow ? `<button type="button" class="btn btn-outline-danger student-case-action-btn btn-delete-student-case" data-case-id="${scEscapeHtml(row.id)}" title="Delete student case" aria-label="Delete student case"><i class="bi bi-trash" aria-hidden="true"></i></button>` : ''}
                         </div>
                     </td>
                 </tr>`;
         }).join('');
+        syncSessionStudentCasesNavBadge();
     }
 
     function computeReportInstanceStatusCounts(rows = []) {
@@ -5983,12 +6154,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (event) => {
         const editBtn = event.target.closest('.btn-edit-student-case');
         if (editBtn) {
-            const row = getStudentCaseById(editBtn.dataset.caseId);
-            if (row) {
-                openStudentCaseModal({
-                    caseRow: row,
-                    readOnly: String(editBtn.dataset.readOnly || '').toLowerCase() === 'true'
-                });
+            const caseId = String(editBtn.dataset.caseId || '').trim();
+            if (caseId && typeof window.SessionStudentCaseModal?.openRemote === 'function') {
+                window.SessionStudentCaseModal.openRemote(caseId);
             }
             return;
         }
@@ -6516,8 +6684,8 @@ document.addEventListener('DOMContentLoaded', () => {
         requestedStudentCaseHandled = true;
         setActivePanel('student-cases');
         const row = getStudentCaseById(caseId);
-        if (row) {
-            openStudentCaseModal({ caseRow: row });
+        if (row && typeof window.SessionStudentCaseModal?.openRemote === 'function') {
+            window.SessionStudentCaseModal.openRemote(caseId);
             return;
         }
         showStudentCaseMessage('Case Not Found', 'The requested student case was not found for this session.', 'warning');

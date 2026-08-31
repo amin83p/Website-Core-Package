@@ -43,6 +43,10 @@
     return String(state?.mode || '').trim() === 'manageEnrollmentSessions';
   }
 
+  function isPartialMode() {
+    return String(state?.mode || '').trim() === 'partial';
+  }
+
   function isEventNaMarked(ev = {}) {
     if (isManageMode()) {
       return resolveManageNaState(ev) !== 'normal';
@@ -287,6 +291,20 @@
 
   const initManageModeViewRange = initDefaultViewRange;
 
+  function initPartialModeViewRange() {
+    if (!state) return;
+    const startDate = core.normalizeDateOnly(state.startDate || '');
+    const endDate = core.normalizeDateOnly(state.endDate || startDate);
+    state.viewPreset = 'custom';
+    state.anchorDate = startDate;
+    state.viewRange = {
+      startDate,
+      endDate,
+      preset: 'custom',
+      anchorDate: startDate
+    };
+  }
+
   function syncModalChromeForMode() {
     const titleEl = qs('sessionEnrollmentCalendarModalTitle');
     const hintEl = qs('sessionEnrollmentCalendarHint');
@@ -294,22 +312,33 @@
     const saveBtn = qs('btn_sessionEnrollmentCalendarSave');
     const doneBtn = qs('btn_sessionEnrollmentCalendarDone');
     const bulkNaBtn = qs('btn_sessionEnrollmentBulkNa');
+    const presetGroup = qs('sessionEnrollmentCalendarPresetGroup');
     const dialogEl = modalEl?.querySelector('.modal-dialog') || qs('sessionEnrollmentCalendarModal')?.querySelector('.modal-dialog');
     const manage = isManageMode();
+    const partial = isPartialMode();
     if (titleEl) {
-      titleEl.textContent = manage ? 'Manage enrollment sessions' : 'Select sessions';
+      titleEl.textContent = manage
+        ? 'Manage enrollment sessions'
+        : (partial ? 'Review staged sessions' : 'Select sessions');
     }
     if (hintEl) {
       hintEl.classList.toggle('d-none', false);
       hintEl.textContent = manage
         ? 'Click sessions to stage N/A mark or unmark changes, then click Save changes.'
-        : 'Click empty grid space to stage sessions; click sessions to include or exclude.';
+        : (partial
+          ? 'Click empty grid space to stage sessions; adjust staged sessions, then click Apply to schedule.'
+          : 'Click empty grid space to stage sessions; click sessions to include or exclude.');
     }
+    if (saveBtn) saveBtn.textContent = partial ? 'Apply to schedule' : 'Save selection';
     clearBtn?.classList.toggle('d-none', manage);
     saveBtn?.classList.toggle('d-none', manage);
     doneBtn?.classList.toggle('d-none', !manage);
     bulkNaBtn?.classList.toggle('d-none', !manage);
-    if (dialogEl) dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage);
+    presetGroup?.classList.toggle('d-none', partial);
+    if (dialogEl) {
+      dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage);
+      dialogEl.classList.toggle('session-enrollment-calendar-dialog--partial', partial);
+    }
     syncDoneButtonLabel();
     syncPresetButtons();
     renderSessionsLegendForMode();
@@ -320,7 +349,22 @@
       renderEnrollmentSessionsLegend();
       return;
     }
+    if (isPartialMode()) {
+      renderPartialSessionsLegend();
+      return;
+    }
     renderPickerSessionsLegend();
+  }
+
+  function renderPartialSessionsLegend() {
+    const modalBody = qs('sessionEnrollmentCalendarLegendModalBody');
+    if (!modalBody) return;
+    modalBody.innerHTML = ''
+      + '<div class="session-enrollment-legend-items">'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-attendance" aria-hidden="true"></span><span>Staged session (draft)</span></div>'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Existing class session</span></div>'
+      +   '<div class="session-enrollment-legend-item session-enrollment-legend-hint text-muted"><i class="bi bi-mouse2" aria-hidden="true"></i><span>Click empty grid space to add more staged sessions</span></div>'
+      + '</div>';
   }
 
   function renderPickerSessionsLegend() {
@@ -1757,7 +1801,92 @@
     warningEl.classList.toggle('d-none', !warningEl.textContent);
   }
 
-  function commitQuickStagedSessionsFromForm() {
+  async function collectHolidayDatesForRange(startDate, endDate) {
+    const start = core.normalizeDateOnly(startDate || '');
+    const end = core.normalizeDateOnly(endDate || '');
+    if (!start || !end) return [];
+    try {
+      const resp = await fetch(
+        `/school/holidays/api/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+        { headers: { Accept: 'application/json' } }
+      );
+      const data = await resp.json().catch(() => ({}));
+      const holidays = Array.isArray(data?.holidays) ? data.holidays : [];
+      return holidays
+        .map((row) => core.normalizeDateOnly(row?.date))
+        .filter(Boolean);
+    } catch (err) {
+      console.warn('Session enrollment stage holiday lookup failed', err);
+      return [];
+    }
+  }
+
+  function readStageSkipHolidays() {
+    const el = stageModalEl?.querySelector('#sessionEnrollmentStageSkipHolidays')
+      || qs('sessionEnrollmentStageSkipHolidays');
+    return Boolean(el?.checked);
+  }
+
+  function estimateStageGenerationEndDate() {
+    const count = readStageSessionCount();
+    const anchorDate = core.normalizeDateOnly(stageContext?.date || state?.startDate || '');
+    const weeksSpan = Math.max(2, Math.ceil(count / 2) + 1);
+    const projected = core.addDaysIso(anchorDate, weeksSpan * 7 + 14);
+    const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
+    if (enrollmentEnd && projected > enrollmentEnd) return enrollmentEnd;
+    return projected;
+  }
+
+  async function buildStageBlockedDatesForRange(startDate, endDate) {
+    if (!readStageSkipHolidays()) return [];
+    const start = core.normalizeDateOnly(startDate || stageContext?.date || '');
+    let end = core.normalizeDateOnly(endDate || '');
+    if (!end) end = estimateStageGenerationEndDate();
+    return collectHolidayDatesForRange(start, end);
+  }
+
+  async function syncStageHolidayHint(startDate, endDate) {
+    const hintEl = qs('sessionEnrollmentStageHolidayHint');
+    if (!hintEl) return;
+    if (!readStageSkipHolidays()) {
+      hintEl.classList.add('d-none');
+      hintEl.textContent = '';
+      return;
+    }
+    const holidays = await buildStageBlockedDatesForRange(startDate, endDate);
+    hintEl.classList.remove('d-none');
+    hintEl.textContent = holidays.length
+      ? `Holidays in range: ${holidays.length}`
+      : 'No holidays found in range.';
+  }
+
+  async function buildStageGenerationOptions() {
+    const weekdays = readStageWeekdays();
+    const durationHours = readStageDurationHours();
+    const count = readStageSessionCount();
+    const enrollmentStart = isPartialMode()
+      ? core.normalizeDateOnly(stageContext?.date || state?.startDate || '')
+      : state.startDate;
+    const enrollmentEnd = isPartialMode()
+      ? estimateStageGenerationEndDate()
+      : state.endDate;
+    const blockedDates = await buildStageBlockedDatesForRange(enrollmentStart, enrollmentEnd);
+    return {
+      anchorDate: stageContext.date,
+      startTime: stageContext.startTime24,
+      durationHours,
+      weekdays,
+      count,
+      enrollmentStart,
+      enrollmentEnd,
+      existingSessions: getExistingSessionsForStaging(),
+      alreadyStaged: state.sessionsToCreate || [],
+      scheduleDefaults: state.scheduleDefaults || {},
+      blockedDates
+    };
+  }
+
+  async function commitQuickStagedSessionsFromForm() {
     stageModalEl = resolveStageOverlayEl();
     if (!stageContext || !state) {
       showStageFormError('Unable to stage sessions. Close and try again.');
@@ -1768,27 +1897,26 @@
       showStageFormError('Select at least one weekday.');
       return;
     }
-    const durationHours = readStageDurationHours();
-    const count = readStageSessionCount();
-    const result = core.generateRotatingWeekdaySessions({
-      anchorDate: stageContext.date,
-      startTime: stageContext.startTime24,
-      durationHours,
-      weekdays,
-      count,
-      enrollmentStart: state.startDate,
-      enrollmentEnd: state.endDate,
-      existingSessions: getExistingSessionsForStaging(),
-      alreadyStaged: state.sessionsToCreate || [],
-      scheduleDefaults: state.scheduleDefaults || {}
-    });
-    if (!result.sessions.length) {
-      showStageFormError('No sessions fit in the enrollment window. Adjust weekdays, count, or enrollment dates.');
-      return;
+    const createBtn = qs('btn_sessionEnrollmentStageCreate');
+    if (createBtn) {
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating...';
     }
-    const clickedDate = stageContext.date;
-    hideStageQuickModalLayer();
-    commitQuickStagedSessions(result.sessions, clickedDate);
+    try {
+      const result = core.generateRotatingWeekdaySessions(await buildStageGenerationOptions());
+      if (!result.sessions.length) {
+        showStageFormError('No sessions fit in the enrollment window. Adjust weekdays, count, or enrollment dates.');
+        return;
+      }
+      const clickedDate = stageContext.date;
+      hideStageQuickModalLayer();
+      commitQuickStagedSessions(result.sessions, clickedDate);
+    } finally {
+      if (createBtn) {
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create staged sessions';
+      }
+    }
   }
 
   function resolveStageOverlayEl() {
@@ -1865,24 +1993,17 @@
     });
   }
 
-  function updateStageCapacityWarning() {
+  let stageCapacityPreviewToken = 0;
+
+  async function updateStageCapacityWarning() {
     const warningEl = qs('sessionEnrollmentStageCapacityWarning');
     if (!warningEl || !stageContext || !state) {
       if (warningEl) warningEl.classList.add('d-none');
       return;
     }
-    const preview = core.generateRotatingWeekdaySessions({
-      anchorDate: stageContext.date,
-      startTime: stageContext.startTime24,
-      durationHours: readStageDurationHours(),
-      weekdays: readStageWeekdays(),
-      count: readStageSessionCount(),
-      enrollmentStart: state.startDate,
-      enrollmentEnd: state.endDate,
-      existingSessions: getExistingSessionsForStaging(),
-      alreadyStaged: state.sessionsToCreate || [],
-      scheduleDefaults: state.scheduleDefaults || {}
-    });
+    const token = ++stageCapacityPreviewToken;
+    const preview = core.generateRotatingWeekdaySessions(await buildStageGenerationOptions());
+    if (token !== stageCapacityPreviewToken) return;
     const requested = readStageSessionCount();
     if (preview.capacity < requested) {
       warningEl.textContent = `Only ${preview.capacity} of ${requested} can fit in the enrollment window.`;
@@ -1891,6 +2012,10 @@
       warningEl.classList.add('d-none');
       warningEl.textContent = '';
     }
+    syncStageHolidayHint(
+      isPartialMode() ? stageContext?.date : state.startDate,
+      isPartialMode() ? estimateStageGenerationEndDate() : state.endDate
+    ).catch(() => {});
   }
 
   function openStageQuickModal(context) {
@@ -1922,6 +2047,13 @@
       });
     }
     syncStageCountDisplay(4);
+    const skipEl = stageModalEl?.querySelector('#sessionEnrollmentStageSkipHolidays');
+    if (skipEl) skipEl.checked = false;
+    const holidayHint = qs('sessionEnrollmentStageHolidayHint');
+    if (holidayHint) {
+      holidayHint.classList.add('d-none');
+      holidayHint.textContent = '';
+    }
     updateStageCapacityWarning();
   }
 
@@ -1934,7 +2066,10 @@
     stageModalEl?.addEventListener('click', (event) => {
       if (event.target.closest('#btn_sessionEnrollmentStageCreate')) {
         event.preventDefault();
-        commitQuickStagedSessionsFromForm();
+        commitQuickStagedSessionsFromForm().catch((err) => {
+          console.error(err);
+          showStageFormError(err?.message || 'Unable to stage sessions.');
+        });
         return;
       }
       if (event.target.closest('[data-stage-dismiss]')) {
@@ -1951,7 +2086,7 @@
         stageModalEl?.querySelectorAll('[data-stage-duration]').forEach((row) => row.classList.remove('active'));
         btn.classList.add('active');
         stageDurationHours = Number(btn.getAttribute('data-stage-duration') || 1);
-        updateStageCapacityWarning();
+        updateStageCapacityWarning().catch(() => {});
       });
     });
 
@@ -1959,24 +2094,28 @@
       btn.addEventListener('click', () => {
         btn.classList.toggle('active');
         if (!readStageWeekdays().length) btn.classList.add('active');
-        updateStageCapacityWarning();
+        updateStageCapacityWarning().catch(() => {});
       });
     });
 
     qs('btn_sessionEnrollmentStageCountDown')?.addEventListener('click', () => {
       syncStageCountDisplay(readStageSessionCount() - 1);
-      updateStageCapacityWarning();
+      updateStageCapacityWarning().catch(() => {});
     });
 
     qs('btn_sessionEnrollmentStageCountUp')?.addEventListener('click', () => {
       syncStageCountDisplay(readStageSessionCount() + 1);
-      updateStageCapacityWarning();
+      updateStageCapacityWarning().catch(() => {});
+    });
+
+    stageModalEl?.querySelector('#sessionEnrollmentStageSkipHolidays')?.addEventListener('change', () => {
+      updateStageCapacityWarning().catch(() => {});
     });
 
     stageModalEl?.querySelectorAll('[data-stage-count]').forEach((btn) => {
       btn.addEventListener('click', () => {
         syncStageCountDisplay(Number(btn.getAttribute('data-stage-count') || 1));
-        updateStageCapacityWarning();
+        updateStageCapacityWarning().catch(() => {});
       });
     });
 
@@ -2098,7 +2237,14 @@
     allEvents = Array.isArray(data.allEvents) ? data.allEvents : [];
     if (!allEvents.length && Array.isArray(data.events)) allEvents = data.events.slice();
 
-    if (!preserveViewRange) {
+    if (preserveViewRange && data.viewRange) {
+      state.viewRange = { ...data.viewRange };
+      state.viewPreset = String(data.viewRange.preset || state.viewPreset || 'custom').trim();
+      state.anchorDate = core.clampAnchorDate(
+        data.viewRange.anchorDate || data.viewRange.startDate || state.anchorDate,
+        state.startDate
+      );
+    } else if (!preserveViewRange) {
       initDefaultViewRange();
     } else {
       const clientAnchor = core.clampAnchorDate(
@@ -2222,6 +2368,14 @@
   async function fetchPickerData({ remote = false } = {}) {
     if (isManageMode()) {
       await fetchSessionWindowData({ reload: remote });
+      return;
+    }
+    if (isPartialMode()) {
+      if (!remote && allEvents.length) {
+        await refreshPickerViewLocally();
+        return;
+      }
+      await ensureHolidaysLoaded();
       return;
     }
     if (state?.localPickerMode && !remote && allEvents.length) {
@@ -2489,10 +2643,26 @@
     qs('btn_sessionEnrollmentCalendarSave')?.addEventListener('click', () => {
       if (!state) return;
       const summary = core.summarizeSelectionFromEvents(allEvents, state.selectedSet);
+      let sessionsToCreate = Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate.slice() : [];
+      if (isPartialMode()) {
+        const stagedFromEvents = allEvents
+          .filter((ev) => ev?.isStaged === true)
+          .map((ev) => ({
+            sessionId: String(ev?.sessionId || '').trim(),
+            date: core.normalizeDateOnly(ev?.date),
+            startTime: String(ev?.start || ev?.startTime || '').trim(),
+            endTime: String(ev?.end || ev?.endTime || '').trim(),
+            durationHours: Number(ev?.durationHours || 0),
+            isStaged: true
+          }))
+          .filter((row) => row.sessionId && row.date);
+        if (stagedFromEvents.length) sessionsToCreate = stagedFromEvents;
+      }
       const payload = {
         selectedSessionIds: Array.from(state.selectedSet),
-        sessionsToCreate: Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate.slice() : [],
-        summary
+        sessionsToCreate,
+        summary,
+        viewRange: state.viewRange ? { ...state.viewRange } : null
       };
       if (state.onSave) state.onSave(payload);
       getModal()?.hide();
@@ -2560,6 +2730,79 @@
     });
   }
 
+  function mapStagedRowToPartialEvent(row, classId, classLabel, selectedSet) {
+    const sessionId = String(row?.sessionId || '').trim();
+    const date = core.normalizeDateOnly(row?.date);
+    const start = String(row?.startTime || row?.start || '').trim();
+    const end = String(row?.endTime || row?.end || '').trim();
+    return {
+      sessionId,
+      classId: String(classId || '').trim(),
+      date,
+      start,
+      end,
+      durationHours: Number(row?.durationHours || 0),
+      teacherName: String(row?.teacherName || '').trim() || 'Teacher',
+      title: String(classLabel || '').trim(),
+      manageable: false,
+      manageSessionUrl: '',
+      selectable: true,
+      excludeReason: '',
+      isStaged: true,
+      selected: selectedSet.has(sessionId)
+    };
+  }
+
+  function buildPartialPickerData(options = {}) {
+    const classId = String(options.classId || '').trim();
+    const classLabel = String(options.classLabel || '').trim();
+    const sessionsToCreate = Array.isArray(options.sessionsToCreate) ? options.sessionsToCreate : [];
+    const existingEvents = Array.isArray(options.existingEvents) ? options.existingEvents : [];
+    const dates = sessionsToCreate
+      .map((row) => core.normalizeDateOnly(row?.date))
+      .filter(Boolean)
+      .sort();
+    const startDate = core.normalizeDateOnly(options.startDate || dates[0] || '');
+    const endDate = core.normalizeDateOnly(options.endDate || dates[dates.length - 1] || startDate);
+    const selectedSet = new Set(
+      sessionsToCreate.map((row) => String(row?.sessionId || '').trim()).filter(Boolean)
+    );
+    const stagedEvents = sessionsToCreate.map((row) => mapStagedRowToPartialEvent(row, classId, classLabel, selectedSet));
+    const persistedEvents = existingEvents
+      .filter((ev) => String(ev?.classId || '').trim() === classId)
+      .filter((ev) => {
+        const date = core.normalizeDateOnly(ev?.date);
+        return date && (!startDate || date >= startDate) && (!endDate || date <= endDate);
+      })
+      .map((ev) => ({
+        sessionId: String(ev?.sessionId || ev?.id || '').trim(),
+        classId,
+        date: core.normalizeDateOnly(ev?.date),
+        start: String(ev?.start || ev?.startTime || '').trim(),
+        end: String(ev?.end || ev?.endTime || '').trim(),
+        durationHours: Number(ev?.duration || ev?.durationHours || 0),
+        teacherName: String(ev?.teacherName || '').trim() || 'Teacher',
+        title: String(ev?.className || classLabel || '').trim(),
+        manageable: false,
+        selectable: false,
+        isStaged: false
+      }));
+    const allPickerEvents = [...persistedEvents, ...stagedEvents];
+    const viewRange = {
+      startDate,
+      endDate,
+      preset: 'custom',
+      anchorDate: startDate
+    };
+    return {
+      events: stagedEvents,
+      allEvents: allPickerEvents,
+      viewRange,
+      summary: core.summarizeSelectionFromEvents(allPickerEvents, selectedSet),
+      selectableSessionIds: stagedEvents.map((row) => row.sessionId).filter(Boolean)
+    };
+  }
+
   function open(options = {}) {
     const classId = String(options.classId || '').trim();
     const mode = String(options.mode || 'picker').trim();
@@ -2589,7 +2832,9 @@
 
     const viewPreset = mode === 'manageEnrollmentSessions'
       ? 'thirtyDays'
-      : String(options.viewPreset || 'thirtyDays').trim();
+      : (mode === 'partial'
+        ? 'custom'
+        : String(options.viewPreset || 'thirtyDays').trim());
     const anchorDate = mode === 'manageEnrollmentSessions'
       ? core.parseAnchorDate('')
       : core.clampAnchorDate(
@@ -2638,6 +2883,15 @@
       markSaveInFlight: false
     };
 
+    if (mode === 'partial') {
+      state.localPickerMode = true;
+      initPartialModeViewRange();
+      (Array.isArray(options.sessionsToCreate) ? options.sessionsToCreate : []).forEach((row) => {
+        const id = String(row?.sessionId || '').trim();
+        if (id) state.selectedSet.add(id);
+      });
+    }
+
     syncModalChromeForMode();
 
     const dayWidth = Number(options.dayWidth || 140);
@@ -2646,10 +2900,18 @@
     if (dayWidthInput) dayWidthInput.value = String(dayWidth);
 
     hostEl = qs('sessionEnrollmentCalendarHost');
-    if (options.prefetchedPickerData && mode !== 'manageEnrollmentSessions') {
+    if (mode === 'partial' || (options.prefetchedPickerData && mode !== 'manageEnrollmentSessions')) {
+      const pickerData = options.prefetchedPickerData || buildPartialPickerData({
+        classId,
+        classLabel: options.classLabel,
+        sessionsToCreate: options.sessionsToCreate,
+        existingEvents: options.existingEvents,
+        startDate: options.startDate,
+        endDate: options.endDate
+      });
       getModal()?.show();
       ensureHolidaysLoaded()
-        .then(() => applyPickerData(options.prefetchedPickerData))
+        .then(() => applyPickerData(pickerData, { preserveViewRange: mode === 'partial' }))
         .catch((err) => console.error(err));
       return;
     }
@@ -2676,6 +2938,8 @@
 
   global.SessionEnrollmentCalendarModal = {
     open,
+    buildPartialPickerData,
+    collectHolidayDatesForRange,
     PRESET_LABELS
   };
 })(typeof window !== 'undefined' ? window : global);

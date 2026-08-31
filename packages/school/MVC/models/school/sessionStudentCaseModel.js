@@ -127,6 +127,9 @@ function sanitizeCaseInput(input = {}, { isUpdate = false } = {}) {
     summary: cleanString(input.summary, { max: 260, allowEmpty: true }),
     details: cleanString(input.details, { max: 5000, allowEmpty: true }),
     additionalComments: cleanString(input.additionalComments, { max: 3000, allowEmpty: true }),
+    resultNote: cleanString(input.resultNote, { max: 3000, allowEmpty: true }),
+    revealResultToCreator: normalizeBoolean(input.revealResultToCreator),
+    locked: normalizeBoolean(input.locked),
     structured: sanitizeStructuredFields(input.structured || input),
     lifecycle: sanitizeLifecycle(input.lifecycle),
     revisionNo: Number.isFinite(Number(input.revisionNo)) ? Math.max(1, Math.floor(Number(input.revisionNo))) : 1

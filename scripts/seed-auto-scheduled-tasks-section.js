@@ -15,6 +15,7 @@ const SYSTEM_FRAMEWORK = {
 const CLONE_ACCESS_FROM_SECTION_ID = '920210';
 const CLONE_ACCESS_FALLBACK_SECTION_IDS = ['920210', '920200', '920106', '273755', '442039'];
 const PARENT_SECTION_ID = '920220';
+const MANAGER_SECTION_ID = '920224';
 const DEFINITIONS_SECTION_ID = '920221';
 const RUNS_SECTION_ID = '920222';
 const OUTBOX_SECTION_ID = '920223';
@@ -51,6 +52,14 @@ const SYMBOL_DOCS = [
     value: 'bi bi-envelope-paper',
     tags: ['EMAIL_OUTBOX', '920223'],
     orgId: 'SYSTEM'
+  },
+  {
+    id: 'SYM_SCHEDULED_TASK_MANAGER_920224',
+    name: 'SCHEDULED_TASK_MANAGER',
+    type: 'class',
+    value: 'bi bi-calendar2-check',
+    tags: ['SCHEDULED_TASK_MANAGER', '920224'],
+    orgId: 'SYSTEM'
   }
 ];
 
@@ -65,6 +74,25 @@ const OP_BUNDLE = [
   { id: 'OP1022', sessionAttempts: 5, sessionTime: 15, active: true },
   { id: 'OP1024', sessionAttempts: 5, sessionTime: 15, active: true }
 ];
+
+const MANAGER_SECTION_DOC = {
+  id: '920224',
+  name: 'SCHEDULED_TASK_MANAGER',
+  category: 'SECURITY',
+  description: '24-hour upcoming and completed scheduled task overview.',
+  homeURL: '/scheduled-tasks/manager',
+  message: '',
+  inactiveMessage: '',
+  active: true,
+  dashboardDisplay: true,
+  mainDashboardDisplay: false,
+  trackState: true,
+  minimumAccessRequirement: 5,
+  navigatorSection: false,
+  subsections: [],
+  related: [],
+  operations: OP_BUNDLE
+};
 
 const DEFINITIONS_SECTION_DOC = {
   id: '920221',
@@ -433,6 +461,7 @@ async function main() {
     const accesses = db.collection('accesses');
     const symbols = db.collection('symbols');
 
+    const managerRow = await upsertSection(sections, MANAGER_SECTION_DOC);
     const definitionsRow = await upsertSection(sections, DEFINITIONS_SECTION_DOC);
     const runsRow = await upsertSection(sections, RUNS_SECTION_DOC);
     const outboxRow = await upsertSection(sections, OUTBOX_SECTION_DOC);
@@ -440,15 +469,17 @@ async function main() {
     const parentRow = await upsertSection(sections, {
       ...PARENT_SECTION_DOC,
       subsections: [
+        { id: String(managerRow.id) },
         { id: String(definitionsRow.id) },
         { id: String(runsRow.id) },
         { id: String(outboxRow.id) }
       ]
     });
 
-    await attachParentUnderFramework(sections, parentRow, [definitionsRow, runsRow, outboxRow]);
+    await attachParentUnderFramework(sections, parentRow, [managerRow, definitionsRow, runsRow, outboxRow]);
     for (const sectionId of [
       PARENT_SECTION_ID,
+      MANAGER_SECTION_ID,
       DEFINITIONS_SECTION_ID,
       RUNS_SECTION_ID,
       OUTBOX_SECTION_ID

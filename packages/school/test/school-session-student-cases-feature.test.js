@@ -10,6 +10,8 @@ const schoolDataService = require('../MVC/services/school/schoolDataService');
 const classEnrollmentReadService = require('../MVC/services/school/classEnrollmentReadService');
 const taskService = require('../MVC/services/school/taskService');
 const sessionStudentCaseService = require('../MVC/services/school/sessionStudentCaseService');
+const sessionStudentCaseModel = require('../MVC/models/school/sessionStudentCaseModel');
+const sessionStudentCaseResultVisibilityService = require('../MVC/services/school/sessionStudentCaseResultVisibilityService');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.manifest.json'), 'utf8'));
 
@@ -40,25 +42,46 @@ test('class routes expose session student case endpoints under SCHOOL_SESSION_ST
   assert.match(controller, /studentCaseCapabilities/);
   assert.match(controller, /sessionStudentCaseAccessService/);
   assert.match(controller, /sessionStudentCaseService\.deleteCase/);
+  assert.match(controller, /sessionStudentCaseSummary:\s*sessionStudentCaseService\.summarizeSessionCases\(sessionStudentCases\)/);
 });
 
 test('session manager renders student cases tab, modal, and avoids attendance duplicate fields', () => {
   const src = read('MVC/views/school/class/sessionManager.ejs');
-  const modalPartial = read('MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModal.ejs');
+  const modalShell = read('MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModal.ejs');
+  const modalBody = read('MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModalBody.ejs');
+  const modalFooter = read('MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModalFooter.ejs');
+  const modalAssets = read('MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModalAssets.ejs');
   const clientSource = read('public/scripts/sessionStudentCaseModalClient.js');
   assert.match(src, /data-session-panel="student-cases"/);
   assert.match(src, /id="session-panel-student-cases"/);
-  assert.match(src, /school\/sessionStudentCase\/partials\/sessionStudentCaseModal/);
-  assert.match(modalPartial, /id="studentCaseModal"/);
+  assert.match(src, /sessionStudentCaseModalAssets/);
+  assert.match(modalAssets, /school\/sessionStudentCase\/partials\/sessionStudentCaseModal/);
+  assert.match(modalShell, /sessionStudentCaseModalBody/);
+  assert.match(modalShell, /sessionStudentCaseModalFooter/);
+  assert.match(modalShell, /id="studentCaseModal"/);
   assert.match(src, /id="btnOpenStudentCaseWizard"/);
   assert.match(clientSource, /btnResolveStudentCase/);
   assert.match(clientSource, /payload\.status = 'resolved'/);
-  assert.match(modalPartial, /name="studentCaseSeverity"/);
-  assert.match(modalPartial, /id="studentCaseDetailPresets"/);
-  assert.match(modalPartial, /id="studentCaseDetails"/);
-  assert.match(modalPartial, /student-case-details-textarea/);
-  assert.match(modalPartial, /Pick a common issue below, then adjust the detail text if needed/);
-  assert.doesNotMatch(modalPartial, /id="studentCaseDetailsWrap"/);
+  assert.match(modalBody, /name="studentCaseSeverity"/);
+  assert.match(modalBody, /id="studentCaseDetailPresets"/);
+  assert.match(modalBody, /id="studentCaseDetails"/);
+  assert.match(modalBody, /student-case-details-textarea/);
+  assert.match(modalBody, /Pick a common issue below, then adjust the detail text if needed/);
+  assert.match(modalBody, /id="studentCaseResultNote"/);
+  assert.match(modalBody, /id="studentCaseRevealResultToCreator"/);
+  assert.match(modalBody, /Reveal the Result to the Creator/);
+  assert.match(clientSource, /collectResultPayload/);
+  assert.match(clientSource, /canViewResultNote/);
+  assert.match(modalBody, /id="studentCaseLocked"/);
+  assert.match(clientSource, /studentCaseLocked/);
+  assert.match(clientSource, /canEditCase/);
+  assert.match(clientSource, /apiMode !== 'session'/);
+  assert.match(clientSource, /setResolveVisible/);
+  assert.match(src, /row\.locked === true/);
+  assert.match(src, /canOpenRow/);
+  assert.match(src, /canReadStudentCases/);
+  assert.match(src, /SessionStudentCaseModal\.openRemote\(caseId\)/);
+  assert.doesNotMatch(modalBody, /id="studentCaseDetailsWrap"/);
   assert.match(clientSource, /Issue Required/);
   assert.match(src, /canDeleteStudentCases/);
   assert.match(src, /studentCaseCapabilities/);
@@ -71,6 +94,151 @@ test('session manager renders student cases tab, modal, and avoids attendance du
   assert.doesNotMatch(src, /studentCaseLate/i);
   assert.doesNotMatch(src, /studentCaseAbsent/i);
   assert.doesNotMatch(src, /studentCaseEarly/i);
+  assert.match(src, /id="sessionStudentCasesNavBadges"/);
+  assert.match(src, /id="sessionStudentCasesActiveNavBadge"/);
+  assert.match(src, /id="sessionStudentCasesResolvedNavBadge"/);
+  assert.match(src, /session-nav-badge-group/);
+  assert.match(src, /sessionStudentCasesActiveNavBadge.*bg-danger/s);
+  assert.match(src, /sessionStudentCasesResolvedNavBadge.*bg-success/s);
+  assert.match(src, /function syncSessionStudentCasesNavBadge\(/);
+  assert.match(src, /function isActiveStudentCaseStatus\(/);
+  assert.match(src, /syncSessionStudentCasesNavBadge\(\)/);
+});
+
+test('session student case model sanitizes result note and reveal flag defaults', () => {
+  const sanitized = sessionStudentCaseModel.sanitizeCaseInput({
+    orgId: 'ORG-1',
+    classId: 'CLS-1',
+    sessionId: 'SES-1',
+    details: 'Student struggled with the lesson.',
+    resultNote: '  Follow-up scheduled. ',
+    revealResultToCreator: 'true'
+  });
+  assert.equal(sanitized.resultNote, 'Follow-up scheduled.');
+  assert.equal(sanitized.revealResultToCreator, true);
+  assert.equal(sanitized.locked, false);
+});
+
+test('session student case model sanitizes locked flag', () => {
+  const sanitized = sessionStudentCaseModel.sanitizeCaseInput({
+    orgId: 'ORG-1',
+    classId: 'CLS-1',
+    sessionId: 'SES-1',
+    details: 'Resolved and locked.',
+    locked: 'true'
+  });
+  assert.equal(sanitized.locked, true);
+});
+
+test('summarizeSessionCases splits active and resolved counts for nav badges', () => {
+  const summary = sessionStudentCaseService.summarizeSessionCases([
+    { status: 'open', severity: 'info' },
+    { status: 'in_progress', severity: 'warning' },
+    { status: 'resolved', severity: 'info' },
+    { status: 'cancelled', severity: 'info' }
+  ]);
+  assert.equal(summary.totalCount, 4);
+  assert.equal(summary.activeCount, 2);
+  assert.equal(summary.resolvedCount, 2);
+  assert.equal(summary.hasCases, true);
+  assert.equal(summary.hasActiveCases, true);
+
+  const resolvedOnly = sessionStudentCaseService.summarizeSessionCases([
+    { status: 'resolved', severity: 'info' }
+  ]);
+  assert.equal(resolvedOnly.activeCount, 0);
+  assert.equal(resolvedOnly.resolvedCount, 1);
+});
+
+test('session student case result visibility redacts fields by viewer access', () => {
+  const caseRow = {
+    id: 'SSC-1',
+    resultNote: 'Resolved after coaching.',
+    revealResultToCreator: true,
+    audit: { createdBy: 'USR_CREATOR' }
+  };
+  const resolverView = sessionStudentCaseResultVisibilityService.redactCaseForViewer(caseRow, {
+    reqUser: { id: 'USR_RESOLVER' },
+    capabilities: { canResolve: true }
+  });
+  assert.equal(resolverView.resultNote, 'Resolved after coaching.');
+  assert.equal(resolverView.revealResultToCreator, true);
+
+  const creatorView = sessionStudentCaseResultVisibilityService.redactCaseForViewer(caseRow, {
+    reqUser: { id: 'USR_CREATOR' },
+    capabilities: { canResolve: false }
+  });
+  assert.equal(creatorView.resultNote, 'Resolved after coaching.');
+  assert.equal(creatorView.revealResultToCreator, undefined);
+
+  const hiddenView = sessionStudentCaseResultVisibilityService.redactCaseForViewer(caseRow, {
+    reqUser: { id: 'USR_OTHER' },
+    capabilities: { canResolve: false }
+  });
+  assert.equal(hiddenView.resultNote, undefined);
+  assert.equal(hiddenView.revealResultToCreator, undefined);
+});
+
+test('applyResultFieldsForSave strips resolver-only writes from non-resolvers', () => {
+  const existing = {
+    resultNote: 'Existing note',
+    revealResultToCreator: false
+  };
+  const blocked = sessionStudentCaseResultVisibilityService.applyResultFieldsForSave({
+    input: {
+      resultNote: 'Tampered note',
+      revealResultToCreator: true,
+      locked: true
+    },
+    existing,
+    canManageResultFields: false
+  });
+  assert.equal(blocked.resultNote, 'Existing note');
+  assert.equal(blocked.revealResultToCreator, false);
+  assert.equal(blocked.locked, false);
+
+  const allowed = sessionStudentCaseResultVisibilityService.applyResultFieldsForSave({
+    input: {
+      resultNote: 'Updated note',
+      revealResultToCreator: true,
+      locked: true
+    },
+    existing,
+    canManageResultFields: true,
+    nextStatus: 'resolved'
+  });
+  assert.equal(allowed.resultNote, 'Updated note');
+  assert.equal(allowed.revealResultToCreator, true);
+  assert.equal(allowed.locked, true);
+});
+
+test('locked resolved case permissions require resolve access for edit and delete', () => {
+  const lockedCase = { status: 'resolved', locked: true };
+  const unlockedCase = { status: 'resolved', locked: false };
+  const editorCaps = { canUpdate: true, canDelete: true, canResolve: false };
+  const resolverCaps = { canUpdate: true, canDelete: true, canResolve: true };
+
+  assert.equal(sessionStudentCaseResultVisibilityService.canEditCase(lockedCase, editorCaps), false);
+  assert.equal(sessionStudentCaseResultVisibilityService.canDeleteCase(lockedCase, editorCaps), false);
+  assert.equal(sessionStudentCaseResultVisibilityService.canEditCase(unlockedCase, editorCaps), true);
+  assert.equal(sessionStudentCaseResultVisibilityService.canDeleteCase(unlockedCase, editorCaps), true);
+  assert.equal(sessionStudentCaseResultVisibilityService.canEditCase(lockedCase, resolverCaps), true);
+  assert.equal(sessionStudentCaseResultVisibilityService.canDeleteCase(lockedCase, resolverCaps), true);
+
+  assert.throws(
+    () => sessionStudentCaseResultVisibilityService.assertCaseMutationAllowed(lockedCase, editorCaps, { action: 'edit' }),
+    /locked/i
+  );
+});
+
+test('reopening a locked case clears locked flag on save', () => {
+  const reopened = sessionStudentCaseResultVisibilityService.applyResultFieldsForSave({
+    input: {},
+    existing: { status: 'resolved', locked: true },
+    canManageResultFields: false,
+    nextStatus: 'reopened'
+  });
+  assert.equal(reopened.locked, false);
 });
 
 test('session student case delete removes its source task and scoped case record', async () => {
@@ -106,7 +274,8 @@ test('session student case delete removes its source task and scoped case record
       classId: 'CLS-1',
       sessionId: 'SES-1',
       caseId: 'SSC-1',
-      reqUser: user
+      reqUser: user,
+      capabilities: { canDelete: true }
     });
 
     assert.equal(deleted.id, 'SSC-1');
@@ -118,6 +287,34 @@ test('session student case delete removes its source task and scoped case record
     schoolRepositories.sessionStudentCases.getById = originals.getById;
     schoolRepositories.sessionStudentCases.remove = originals.remove;
     taskService.deleteSourceTask = originals.deleteSourceTask;
+  }
+});
+
+test('deleteCase rejects locked resolved case without resolve access', async () => {
+  const originals = {
+    getById: schoolRepositories.sessionStudentCases.getById
+  };
+  try {
+    schoolRepositories.sessionStudentCases.getById = async () => ({
+      id: 'SSC-LOCKED',
+      orgId: '900000',
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      status: 'resolved',
+      locked: true
+    });
+    await assert.rejects(
+      () => sessionStudentCaseService.deleteCase({
+        classId: 'CLS-1',
+        sessionId: 'SES-1',
+        caseId: 'SSC-LOCKED',
+        reqUser: { id: 'USR-1', activeOrgId: '900000' },
+        capabilities: { canDelete: true, canResolve: false }
+      }),
+      /locked/i
+    );
+  } finally {
+    schoolRepositories.sessionStudentCases.getById = originals.getById;
   }
 });
 
@@ -186,6 +383,8 @@ test('session student case service creates and resolves source tasks', async () 
     });
     assert.equal(created.id, 'SSC-1');
     assert.equal(created.studentPersonId, 'STU-1');
+    assert.ok(created.audit?.createDateTime);
+    assert.ok(created.audit?.lastUpdateDateTime);
     assert.equal(upsertPayload.sourceType, 'student_session_case');
     assert.equal(upsertPayload.sourceId, 'SSC-1');
 
@@ -198,16 +397,68 @@ test('session student case service creates and resolves source tasks', async () 
     });
     assert.equal(savedAndResolved.status, 'resolved');
     assert.equal(savedAndResolved.lifecycle.at(-1).action, 'case_resolved');
+    assert.ok(savedAndResolved.audit?.lastUpdateDateTime);
     assert.equal(resolvePayload.sourceType, 'student_session_case');
     assert.equal(resolvePayload.sourceId, 'SSC-1');
 
+    schoolRepositories.sessionStudentCases.getById = async () => ({
+      id: 'SSC-1',
+      orgId: '900000',
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      studentPersonId: 'STU-1',
+      studentName: 'Student One',
+      classTitle: 'Class A',
+      sessionDate: '2026-06-23',
+      status: 'resolved',
+      locked: true,
+      resultNote: 'Initial note',
+      summary: 'Needs support',
+      details: 'Resolved from modal.',
+      lifecycle: savedAndResolved.lifecycle || [],
+      audit: {}
+    });
+    const updatedResultFields = await sessionStudentCaseService.saveCase({
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      caseId: 'SSC-1',
+      input: {
+        studentPersonId: 'STU-1',
+        category: 'learning',
+        details: 'Resolved from modal.',
+        resultNote: 'Updated result note',
+        revealResultToCreator: true,
+        locked: false
+      },
+      reqUser: user,
+      canManageResultFields: true,
+      capabilities: { canResolve: true }
+    });
+    assert.equal(updatedResultFields.status, 'resolved');
+    assert.equal(updatedResultFields.resultNote, 'Updated result note');
+    assert.equal(updatedResultFields.revealResultToCreator, true);
+    assert.equal(updatedResultFields.locked, false);
+    assert.equal(updatedResultFields.lifecycle.at(-1).action, 'case_updated');
+
     resolvePayload = null;
+    schoolRepositories.sessionStudentCases.getById = async () => ({
+      id: 'SSC-1',
+      orgId: '900000',
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      studentPersonId: 'STU-1',
+      status: 'resolved',
+      locked: false,
+      lifecycle: updatedResultFields.lifecycle || [],
+      audit: {}
+    });
     const resolved = await sessionStudentCaseService.updateStatus({
       classId: 'CLS-1',
       sessionId: 'SES-1',
       caseId: 'SSC-1',
       status: 'resolved',
-      reqUser: user
+      reqUser: user,
+      capabilities: { canResolve: true }
     });
     assert.equal(resolved.status, 'resolved');
     assert.equal(resolvePayload.sourceType, 'student_session_case');

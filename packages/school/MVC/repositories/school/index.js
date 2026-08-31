@@ -2397,12 +2397,15 @@ schoolRepositories.classEnrollmentPeriods.findByClassId = async (classId, option
 schoolRepositories.classEnrollmentPeriods.findByStudentId = async (studentId, options = {}) => {
   const normalizedStudentId = toPublicId(studentId);
   if (!normalizedStudentId) return [];
+  const scope = options?.scope && typeof options.scope === 'object'
+    ? options.scope
+    : { canViewAll: true };
   return runByRepositoryBackend(options, {
     json: async () => classEnrollmentPeriodModel.findByStudentId(normalizedStudentId),
     mongo: async () => {
       const rows = await schoolRepositories.classEnrollmentPeriods.list({
         query: { studentId__eq: normalizedStudentId },
-        scope: { canViewAll: true }
+        scope
       });
       return normalizeRows(rows);
     }

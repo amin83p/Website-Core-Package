@@ -6,6 +6,7 @@ const scheduledTaskOrchestratorService = require('../services/scheduledTaskOrche
 const emailOutboxService = require('../services/emailOutboxService');
 const smsOutboxService = require('../services/smsOutboxService');
 const scheduledTaskUiService = require('../services/scheduledTaskUiService');
+const scheduledTaskManagerService = require('../services/scheduledTaskManagerService');
 const { listRegisteredScheduledTaskHandlers } = require('../services/scheduledTaskRegistry');
 const { formatMsToDateTimeLocalInput, resolveDefaultTimezone } = require('../utils/timezoneUtils');
 
@@ -315,7 +316,10 @@ async function runDefinitionNow(req, res) {
     successRedirect: '/scheduled-tasks',
     successMessage: 'Task run completed successfully.'
   }, async () => {
-    const outcome = await scheduledTaskOrchestratorService.runDefinitionNow(id, { prepareMode });
+    const outcome = await scheduledTaskOrchestratorService.runDefinitionNow(id, {
+      prepareMode,
+      reqUser: req.user
+    });
     return {
       resultSummary: cleanText(outcome?.result?.resultSummary || outcome?.run?.resultSummary || ''),
       metrics: outcome?.result?.metrics || outcome?.run?.metrics || null
@@ -398,6 +402,49 @@ async function bulkDeleteOutbox(req, res) {
   });
 }
 
+async function getManagerWindow(req, res) {
+  try {
+    const windowHours = Number.parseInt(String(req.query?.windowHours || '24'), 10);
+    const payload = await scheduledTaskManagerService.getManagerWindow(req.user, {
+      windowHours: Number.isFinite(windowHours) && windowHours > 0 ? windowHours : 24
+    });
+    return res.json({ status: 'success', ...payload });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      message: cleanText(error?.message || error) || 'Unable to load scheduled task manager window.'
+    });
+  }
+}
+
+async function showManagerPage(req, res) {
+  try {
+    const manageBtns = await scheduledTaskUiService.buildNavButtons(req, 'manager');
+    return res.render('scheduledTasks/manager', buildListRenderLocals(req, {
+      title: 'Scheduled Task Manager',
+      tableName: null,
+      data: [],
+      pagination: buildPagination(0, 1, 30),
+      filters: {},
+      baseUrlPath: 'scheduled-tasks/manager',
+      searchableFields: [],
+      extra: {
+        manageBtns: manageBtns || [],
+        managerAccess: await scheduledTaskManagerService.buildManagerAccess(req.user, req.ip)
+      }
+    }));
+  } catch (error) {
+    if (isAjax(req)) {
+      return res.status(400).json({ status: 'error', message: error.message || 'Unable to load scheduled task manager.' });
+    }
+    return res.status(500).render('error', {
+      title: 'Error',
+      message: error.message || 'Unable to load scheduled task manager.',
+      user: req.user || null
+    });
+  }
+}
+
 module.exports = {
   showDefinitionList,
   showRunList,
@@ -411,5 +458,7 @@ module.exports = {
   cancelRun,
   cancelOutboxEntry,
   bulkCancelOutbox,
-  bulkDeleteOutbox
+  bulkDeleteOutbox,
+  getManagerWindow,
+  showManagerPage
 };

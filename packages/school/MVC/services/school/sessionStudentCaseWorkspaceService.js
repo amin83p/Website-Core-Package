@@ -3,6 +3,7 @@ const schoolDataService = require('./schoolDataService');
 const schoolRecordAccessService = require('./schoolRecordAccessService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
+const sessionStudentCaseRoutingService = require('./sessionStudentCaseRoutingService');
 const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -149,24 +150,42 @@ async function filterCasesByAccessScope({ rows, req, accessContext = {}, applyAc
   if (!applyAccessScope) return list;
 
   const access = await resolveAssignmentAccessContext(req, accessContext);
-  if (schoolRecordAccessService.isOrgWideScope(access)) return list;
-  if (access.scopeMode === SCOPE_MODES.USER) return [];
-
-  if (access.scopeMode === SCOPE_MODES.OWNER) {
-    return list.filter((row) => schoolRecordAccessService.isRecordOwnedByUser(row, access.userId));
-  }
-
-  if (access.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+  let scoped;
+  if (schoolRecordAccessService.isOrgWideScope(access)) {
+    scoped = list;
+  } else if (access.scopeMode === SCOPE_MODES.USER) {
+    scoped = [];
+  } else if (access.scopeMode === SCOPE_MODES.OWNER) {
+    scoped = list.filter((row) => schoolRecordAccessService.isRecordOwnedByUser(row, access.userId));
+  } else if (access.scopeMode === SCOPE_MODES.ASSIGNMENT) {
     const classes = await schoolDataService.fetchAllData('classes', {}, req.user, accessContext);
     const classIds = new Set((Array.isArray(classes) ? classes : []).map((row) => toPublicId(row?.id)).filter(Boolean));
-    return list.filter((row) => {
+    scoped = list.filter((row) => {
       const classId = toPublicId(row?.classId);
       if (classId && classIds.has(classId)) return true;
       return teacherPersonMatchesScope(row, access);
     });
+  } else {
+    scoped = [];
   }
 
-  return list;
+  if (schoolRecordAccessService.isOrgWideScope(access)) {
+    return scoped;
+  }
+
+  const orgId = getActiveOrgId(req.user);
+  const viewerPersonId = sessionStudentCaseRoutingService.getViewerPersonId(req.user);
+  if (!orgId || !viewerPersonId) return scoped;
+
+  const policy = await sessionStudentCaseRoutingService.getRoutingPolicyForOrg(orgId);
+  const scopedIds = new Set(scoped.map((row) => normalizeText(row?.id)).filter(Boolean));
+  const routedRows = list.filter((row) => {
+    const rowId = normalizeText(row?.id);
+    if (!rowId || scopedIds.has(rowId)) return false;
+    return sessionStudentCaseRoutingService.isCaseRoutedToPerson(row, viewerPersonId, policy);
+  });
+
+  return [...scoped, ...routedRows];
 }
 
 function buildClassFilterOptions(classes = []) {

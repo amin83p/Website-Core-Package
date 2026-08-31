@@ -64,6 +64,8 @@ function normalizeScheduledTaskRun(record = {}, existing = null) {
     errorMessage: cleanText(input.errorMessage || base.errorMessage, { max: 5000, allowEmpty: true }),
     metrics: input.metrics !== undefined ? input.metrics : (base.metrics || {}),
     logs: Array.isArray(input.logs) ? input.logs.slice(0, 50) : (Array.isArray(base.logs) ? base.logs : []),
+    organizedByUserId: cleanText(input.organizedByUserId !== undefined ? input.organizedByUserId : base.organizedByUserId, { max: 120, allowEmpty: true }),
+    organizedByDisplayName: cleanText(input.organizedByDisplayName !== undefined ? input.organizedByDisplayName : base.organizedByDisplayName, { max: 200, allowEmpty: true }),
     createdAt: cleanIso(base.createdAt) || nowIso,
     updatedAt: nowIso
   };

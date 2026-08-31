@@ -3641,6 +3641,14 @@ function initHeaderShortcuts() {
             return;
         }
 
+        if (key === 't') {
+            const taskManagerTrigger = document.getElementById('scheduledTaskManagerHeaderTrigger');
+            if (!taskManagerTrigger) return;
+            event.preventDefault();
+            triggerElement(taskManagerTrigger);
+            return;
+        }
+
         if (key === 'o') {
             const orgSwitchTrigger = document.getElementById('orgSwitchQuickButton');
             if (!orgSwitchTrigger) return;

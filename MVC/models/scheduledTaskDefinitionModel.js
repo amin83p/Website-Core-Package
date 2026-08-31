@@ -68,6 +68,8 @@ function normalizeScheduledTaskDefinition(record = {}, existing = null, { strict
     input: input.input !== undefined ? input.input : (base.input || {}),
     nextRunAt: cleanIso(input.nextRunAt || base.nextRunAt),
     lastRunAt: cleanIso(input.lastRunAt || base.lastRunAt),
+    createdByUserId: cleanText(input.createdByUserId !== undefined ? input.createdByUserId : base.createdByUserId, { max: 120, allowEmpty: true }),
+    createdByDisplayName: cleanText(input.createdByDisplayName !== undefined ? input.createdByDisplayName : base.createdByDisplayName, { max: 200, allowEmpty: true }),
     createdAt: cleanIso(base.createdAt) || nowIso,
     updatedAt: nowIso
   };

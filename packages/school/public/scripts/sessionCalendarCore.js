@@ -1666,6 +1666,22 @@
     }
   }
 
+  function normalizeBlockedDates(value) {
+    const blocked = new Set();
+    if (value instanceof Set) {
+      value.forEach((date) => {
+        const normalized = normalizeDateOnly(date);
+        if (normalized) blocked.add(normalized);
+      });
+      return blocked;
+    }
+    (Array.isArray(value) ? value : []).forEach((date) => {
+      const normalized = normalizeDateOnly(date);
+      if (normalized) blocked.add(normalized);
+    });
+    return blocked;
+  }
+
   function generateRotatingWeekdaySessions(options = {}) {
     const anchorDate = normalizeDateOnly(options.anchorDate);
     const startTime = String(options.startTime || '').trim();
@@ -1676,6 +1692,7 @@
     const enrollmentEnd = normalizeDateOnly(options.enrollmentEnd || '');
     const existingSessions = Array.isArray(options.existingSessions) ? options.existingSessions : [];
     const alreadyStaged = Array.isArray(options.alreadyStaged) ? options.alreadyStaged : [];
+    const blockedDates = normalizeBlockedDates(options.blockedDates);
     const scheduleDefaults = options.scheduleDefaults && typeof options.scheduleDefaults === 'object'
       ? options.scheduleDefaults
       : {};
@@ -1740,8 +1757,10 @@
     }
 
     function canPlace(dateStr) {
-      if (!dateStr || dateStr < rangeStart || dateStr > rangeEnd) return false;
-      const row = buildSessionRow(dateStr, 0);
+      const normalizedDate = normalizeDateOnly(dateStr);
+      if (!normalizedDate || normalizedDate < rangeStart || normalizedDate > rangeEnd) return false;
+      if (blockedDates.has(normalizedDate)) return false;
+      const row = buildSessionRow(normalizedDate, 0);
       const key = sessionScheduleKey(row);
       if (!key || occupiedKeys.has(key)) return false;
       return !scheduleConflicts(dateStr, row.startTime, row.endTime);

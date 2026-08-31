@@ -81,6 +81,8 @@
        const headerBuyMeACoffeeTitle = String(headerBrand.headerBuyMeACoffeeTitle || 'Support the work - one coffee at a time.').trim();
        const headerChatAccess = (typeof chatAccess !== 'undefined' && chatAccess && typeof chatAccess === 'object') ? chatAccess : {};
        const canUseHeaderChat = !!(headerChatAccess.canRead || headerChatAccess.canReadAll);
+       const headerTaskManagerAccess = (typeof scheduledTaskManagerAccess !== 'undefined' && scheduledTaskManagerAccess && typeof scheduledTaskManagerAccess === 'object') ? scheduledTaskManagerAccess : {};
+       const canUseScheduledTaskManager = headerTaskManagerAccess.canView === true;
        const headerFallbackPublicMenu = [
          { label: 'Home', href: '/', icon: 'bi-house', target: '_self', children: [] },
          { label: 'Projects', href: '/whatIOffer', icon: 'bi-stars', target: '_self', children: [] },
@@ -224,6 +226,18 @@
                                 </a>
                             </li>
                         </ul>
+                    <% } %>
+                    <% if (canUseScheduledTaskManager) { %>
+                        <button
+                            id="scheduledTaskManagerHeaderTrigger"
+                            class="nav-pill-btn px-2 position-relative"
+                            type="button"
+                            title="Task Manager (Alt+Shift+T)"
+                            aria-keyshortcuts="Alt+Shift+T"
+                            aria-label="Open scheduled task manager">
+                            <i class="bi bi-calendar2-check fs-4 text-secondary top-action-icon"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary d-none" id="scheduledTaskManagerHeaderBadge">0</span>
+                        </button>
                     <% } %>
                     
                     <div class="position-relative d-flex align-items-center">
@@ -834,4 +848,33 @@
             </div>
         </div>
     </div>
+    <% } %>
+
+    <% if (canUseScheduledTaskManager) { %>
+    <script>
+      (function () {
+        const trigger = document.getElementById('scheduledTaskManagerHeaderTrigger');
+        if (!trigger) return;
+        let loaderPromise = null;
+        function loadManagerLoader() {
+          if (window.ScheduledTaskManagerLoader) return Promise.resolve();
+          if (loaderPromise) return loaderPromise;
+          loaderPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = '<%= typeof staticAssetUrl === "function" ? staticAssetUrl("/scripts/scheduledTaskManagerLoader.js") : "/scripts/scheduledTaskManagerLoader.js" %>';
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error('Failed to load scheduled task manager.'));
+            document.body.appendChild(script);
+          });
+          return loaderPromise;
+        }
+        trigger.addEventListener('click', function (event) {
+          event.preventDefault();
+          loadManagerLoader()
+            .then(() => window.ScheduledTaskManagerLoader?.open())
+            .catch((error) => console.error('[ScheduledTaskManager]', error));
+        });
+      })();
+    </script>
     <% } %>

@@ -8,8 +8,12 @@
   let readOnly = false;
   let allowCreate = false;
   let canUpdate = false;
+  let canEditCase = false;
   let canDelete = false;
   let canResolve = false;
+  let showResolveButton = true;
+  let canViewResultNote = false;
+  let resolveMode = false;
   let classTitle = '';
   let sessionLabel = '';
   let classId = '';
@@ -190,6 +194,52 @@
     return [...selectedPersonIds].map((id) => String(id || '').trim()).filter(Boolean);
   }
 
+  function syncResultSection() {
+    const section = document.getElementById('studentCaseResultSection');
+    const editable = document.getElementById('studentCaseResultEditable');
+    const readOnly = document.getElementById('studentCaseResultReadOnly');
+    const showSection = canResolve || canViewResultNote;
+    section?.classList.toggle('d-none', !showSection);
+    editable?.classList.toggle('d-none', !canResolve);
+    readOnly?.classList.toggle('d-none', canResolve || !canViewResultNote);
+  }
+
+  function setResultFields(row = {}) {
+    const noteInput = document.getElementById('studentCaseResultNote');
+    const revealInput = document.getElementById('studentCaseRevealResultToCreator');
+    const lockedInput = document.getElementById('studentCaseLocked');
+    const readOnlyText = document.getElementById('studentCaseResultReadOnlyText');
+    const note = String(row.resultNote || '').trim();
+    if (noteInput) noteInput.value = note;
+    if (revealInput) revealInput.checked = row.revealResultToCreator === true;
+    if (lockedInput) lockedInput.checked = row.locked === true;
+    if (readOnlyText) {
+      const lockedLabel = row.locked === true ? ' Locked.' : '';
+      readOnlyText.textContent = `${note || '-'}${lockedLabel}`;
+    }
+    syncResultSection();
+  }
+
+  function clearResultFields() {
+    const noteInput = document.getElementById('studentCaseResultNote');
+    const revealInput = document.getElementById('studentCaseRevealResultToCreator');
+    const lockedInput = document.getElementById('studentCaseLocked');
+    const readOnlyText = document.getElementById('studentCaseResultReadOnlyText');
+    if (noteInput) noteInput.value = '';
+    if (revealInput) revealInput.checked = false;
+    if (lockedInput) lockedInput.checked = false;
+    if (readOnlyText) readOnlyText.textContent = '';
+    syncResultSection();
+  }
+
+  function collectResultPayload(payload = {}) {
+    if (!canResolve) return payload;
+    payload.resultNote = document.getElementById('studentCaseResultNote')?.value || '';
+    payload.revealResultToCreator = document.getElementById('studentCaseRevealResultToCreator')?.checked === true;
+    payload.locked = document.getElementById('studentCaseLocked')?.checked === true;
+    return payload;
+  }
+
   function collectDetailsValue() {
     return document.getElementById('studentCaseDetails')?.value || '';
   }
@@ -261,11 +311,11 @@
     const onDetails = !onStudents;
     const category = document.getElementById('studentCaseCategory')?.value || 'other';
     const studentOptional = !categoryRequiresStudent(category);
-    const editable = !readOnly && canUpdate;
+    const editable = !readOnly && canEditCase;
     document.getElementById('btnStudentCaseBack')?.classList.toggle('d-none', !onStudents || isEdit || !editable);
     document.getElementById('btnStudentCaseNext')?.classList.toggle('d-none', !onDetails || isEdit || !allowCreate || !editable);
     document.getElementById('btnSaveStudentCaseSessionWide')?.classList.toggle('d-none', !onDetails || isEdit || !studentOptional || !allowCreate || !editable);
-    document.getElementById('btnResolveStudentCase')?.classList.toggle('d-none', !editable || !canResolve || (onDetails && !isEdit));
+    document.getElementById('btnResolveStudentCase')?.classList.toggle('d-none', !editable || !canResolve || !showResolveButton || (onDetails && !isEdit));
     document.getElementById('btnSaveStudentCase')?.classList.toggle('d-none', !editable || (onDetails && !isEdit && !allowCreate));
   }
 
@@ -285,6 +335,9 @@
     document.getElementById('studentCaseCategory')?.toggleAttribute('disabled', disabled);
     document.querySelectorAll('input[name="studentCaseSeverity"]').forEach((input) => input.toggleAttribute('disabled', disabled));
     document.getElementById('studentCaseDetails')?.toggleAttribute('disabled', disabled);
+    document.getElementById('studentCaseResultNote')?.toggleAttribute('disabled', disabled || !canResolve);
+    document.getElementById('studentCaseRevealResultToCreator')?.toggleAttribute('disabled', disabled || !canResolve);
+    document.getElementById('studentCaseLocked')?.toggleAttribute('disabled', disabled || !canResolve);
     document.querySelectorAll('.student-case-preset-radio').forEach((input) => input.toggleAttribute('disabled', disabled));
     document.getElementById('studentCaseStudentSearch')?.toggleAttribute('disabled', disabled);
     document.getElementById('btnStudentCaseSelectAll')?.toggleAttribute('disabled', disabled);
@@ -292,7 +345,8 @@
     document.getElementById('studentCaseReadOnlyNotice')?.classList.toggle('d-none', !disabled);
     const manageLink = document.getElementById('studentCaseManageSessionLink');
     if (manageLink) {
-      manageLink.classList.toggle('d-none', !disabled || !manageSessionHref);
+      const showManageLink = disabled && manageSessionHref && config?.apiMode !== 'session';
+      manageLink.classList.toggle('d-none', !showManageLink);
       if (manageSessionHref) manageLink.href = manageSessionHref;
     }
     syncFooter(isStudentStepVisible() ? 'students' : 'details');
@@ -300,14 +354,21 @@
 
   function applyCapabilities(capabilities = {}) {
     canUpdate = capabilities.canUpdate === true || capabilities.canEdit === true;
+    canEditCase = Object.prototype.hasOwnProperty.call(capabilities, 'canEditCase')
+      ? capabilities.canEditCase === true
+      : canUpdate;
     canResolve = capabilities.canResolve === true;
     canDelete = capabilities.canDelete === true;
+    canViewResultNote = capabilities.canViewResultNote === true;
     allowCreate = capabilities.canCreate === true;
-    readOnly = capabilities.readOnly === true || (!canUpdate && (capabilities.canRead === true || capabilities.canReadAll === true));
+    readOnly = capabilities.readOnly === true
+      || (!canEditCase && (capabilities.canRead === true || capabilities.canReadAll === true));
+    syncResultSection();
   }
 
   function setResolveVisible(visible) {
-    canResolve = visible !== false && (config?.capabilities?.canResolve !== false);
+    showResolveButton = visible !== false;
+    syncResultSection();
     syncFooter(isStudentStepVisible() ? 'students' : 'details');
   }
 
@@ -319,6 +380,9 @@
     document.getElementById('studentCaseCategory').value = 'learning';
     setSelectedSeverity('info');
     document.getElementById('studentCaseDetails').value = '';
+    clearResultFields();
+    resolveMode = false;
+    showResolveButton = true;
     document.getElementById('studentCaseStudentSearch').value = '';
     selectedPersonIds = new Set();
     renderDetailOptions('learning', '');
@@ -352,8 +416,13 @@
       renderDetailOptions(category, row.details || row.summary || '');
       const status = String(row.status || '').trim().toLowerCase();
       setResolveVisible(!['resolved', 'cancelled'].includes(status));
+      setResultFields(row);
+      if (row.locked === true && ['resolved', 'cancelled'].includes(status) && !canResolve) {
+        readOnly = true;
+      }
       setWizardStep('details');
     } else {
+      clearResultFields();
       document.getElementById('studentCaseModalTitle').textContent = 'Open Student Case';
       if (pid) updateContextBanner([name]);
       else updateContextBanner();
@@ -401,7 +470,10 @@
       const res = await fetch(buildStatusUrl(token), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-ajax-request': 'true', Accept: 'application/json' },
-        body: JSON.stringify({ actionStateId: config?.actionStateId || '', status: 'resolved' })
+        body: JSON.stringify(collectResultPayload({
+          actionStateId: config?.actionStateId || '',
+          status: 'resolved'
+        }))
       });
       const result = await res.json().catch(() => ({}));
       if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to resolve student case.');
@@ -442,12 +514,12 @@
   function collectPayload() {
     const caseRowId = String(document.getElementById('studentCaseId').value || '').trim();
     const selectedIds = getSelectedPersonIds();
-    const payload = {
+    const payload = collectResultPayload({
       actionStateId: config?.actionStateId || '',
       category: document.getElementById('studentCaseCategory').value,
       severity: getSelectedSeverity(),
       details: collectDetailsValue()
-    };
+    });
     if (caseRowId) payload.studentPersonId = document.getElementById('studentCasePersonId').value;
     else if (selectedIds.length > 1) payload.studentPersonIds = selectedIds;
     else payload.studentPersonId = selectedIds[0] || '';
@@ -460,7 +532,7 @@
     if (shouldResolve && !canResolve) return showMessage('Resolve Not Allowed', 'You do not have permission to resolve this case.', 'warning');
     const { caseRowId, payload, selectedIds } = collectPayload();
     if (!caseRowId && !allowCreate) return showMessage('Create Not Allowed', 'You do not have permission to create student cases.', 'warning');
-    if (caseRowId && !canUpdate) return showMessage('Edit Not Allowed', 'You do not have permission to edit this case.', 'warning');
+    if (caseRowId && !canEditCase) return showMessage('Edit Not Allowed', 'You do not have permission to edit this case.', 'warning');
     if (shouldResolve) payload.status = 'resolved';
     if (!String(payload.details || '').trim()) {
       return showMessage('Issue Required', 'Select an issue detail before saving this case.', 'error');
@@ -537,9 +609,10 @@
     showStudentStep(payload);
   }
 
-  async function openRemote(caseId) {
+  async function openRemote(caseId, options = {}) {
     const token = String(caseId || '').trim();
     if (!token) return;
+    resolveMode = options.resolveMode === true;
     showBusy('Loading Case', 'Fetching student case details...');
     try {
       const res = await fetch(`/school/session-student-cases/${encodeURIComponent(token)}/review-context`, {
@@ -554,11 +627,18 @@
       sessionId = String(ctx.sessionId || '').trim();
       classTitle = String(ctx.classTitle || classId || 'Class').trim();
       sessionLabel = String(ctx.sessionLabel || sessionId || 'Session').trim();
-      manageSessionHref = String(ctx.manageSessionHref || '').trim();
+      manageSessionHref = config?.apiMode === 'session'
+        ? ''
+        : String(ctx.manageSessionHref || '').trim();
       applyCapabilities(ctx.capabilities || {});
       allowCreate = false;
       resetModal();
       populateFromCaseRow(ctx.case || {});
+      if (resolveMode && canResolve) {
+        setResolveVisible(true);
+        syncFooter('details');
+        document.getElementById('studentCaseResultNote')?.focus();
+      }
       ensureModalInstance()?.show();
     } catch (error) {
       hideBusy();
@@ -645,6 +725,37 @@
     });
   }
 
+  function wireListRowActions(root = document) {
+    const host = root && typeof root.addEventListener === 'function' ? root : document;
+    host.addEventListener('click', (event) => {
+      const openHereBtn = event.target.closest('.js-student-case-open-here');
+      if (openHereBtn) {
+        event.preventDefault();
+        const caseId = String(openHereBtn.dataset.caseId || '').trim();
+        if (caseId) openRemote(caseId);
+        return;
+      }
+
+      const resolveBtn = event.target.closest('.js-student-case-resolve');
+      if (resolveBtn) {
+        event.preventDefault();
+        const caseId = String(resolveBtn.dataset.caseId || '').trim();
+        if (caseId) openRemote(caseId, { resolveMode: true });
+        return;
+      }
+
+      const deleteBtn = event.target.closest('.js-student-case-delete');
+      if (deleteBtn) {
+        event.preventDefault();
+        const caseId = String(deleteBtn.dataset.caseId || '').trim();
+        if (!caseId) return;
+        deleteRemote(caseId, {
+          studentName: String(deleteBtn.dataset.studentName || '').trim()
+        }).catch(() => {});
+      }
+    });
+  }
+
   function init(nextConfig = {}) {
     config = { ...config, ...nextConfig };
     if (nextConfig.detailPresets) global.__studentCaseDetailPresets = nextConfig.detailPresets;
@@ -667,6 +778,7 @@
     openRemote,
     resolveRemote,
     deleteRemote,
-    reset: resetModal
+    reset: resetModal,
+    wireListRowActions
   };
 }(window));

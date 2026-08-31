@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/scheduledTaskController');
 const { requireAuth } = require('../middleware/authMiddleware');
-const { requireAccess } = require('../middleware/accessMiddleware');
+const { requireAccess, requireAccessAny } = require('../middleware/accessMiddleware');
 const { trackActionState } = require('../middleware/actionStateMiddleware');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
@@ -13,7 +13,26 @@ const scheduledTaskMutationActionState = Object.freeze({
   allowSectionTokenFallback: true
 });
 
+const managerReadSections = [
+  SECTIONS.SCHEDULED_TASK_MANAGER,
+  SECTIONS.AUTO_SCHEDULED_TASKS,
+  SECTIONS.AUTO_SCHEDULED_TASK_RUNS
+];
+
 router.use(requireAuth);
+
+router.get(
+  '/api/manager-window',
+  requireAccessAny(managerReadSections, OPERATIONS.READ_ALL),
+  ctrl.getManagerWindow
+);
+
+router.get(
+  '/manager',
+  requireAccessAny(managerReadSections, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHEDULED_TASK_MANAGER, OPERATIONS.READ_ALL),
+  ctrl.showManagerPage
+);
 
 router.get(
   '/',

@@ -2763,3 +2763,237 @@ a .spinner-border.spinner-border-sm,
   cursor: move;
   user-select: none;
 }
+
+/* Scheduled Task Manager */
+.scheduled-task-manager-modal {
+  pointer-events: none;
+}
+
+.scheduled-task-manager-modal.show {
+  display: block !important;
+}
+
+.scheduled-task-manager-modal .modal-dialog {
+  pointer-events: auto;
+}
+
+.scheduled-task-manager-modal .modal-backdrop.show {
+  opacity: 0.25;
+}
+
+.scheduled-task-manager-dialog {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  margin: 0;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 96px);
+}
+
+.scheduled-task-manager-dialog .modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 96px);
+}
+
+.scheduled-task-manager-dialog .modal-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scheduled-task-manager-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.scheduled-task-manager-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 12rem;
+  overflow: hidden;
+}
+
+.scheduled-task-manager-drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+
+.scheduled-task-manager-drag-handle.is-dragging {
+  cursor: grabbing;
+}
+
+.scheduled-task-manager-drag-grip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.1rem;
+  opacity: 0.55;
+}
+
+.scheduled-task-manager-tabs .nav-link {
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.scheduled-task-manager-tabs .nav-link.active {
+  background: #0d6efd;
+  color: #fff;
+}
+
+.scheduled-task-manager-pane {
+  display: none !important;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 52vh;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.scheduled-task-manager-pane.stm-pane-active:not([hidden]) {
+  display: flex !important;
+}
+
+.scheduled-task-manager-pane > .scheduled-task-manager-card,
+.scheduled-task-manager-pane > .scheduled-task-manager-empty {
+  flex: 0 0 auto;
+}
+
+.scheduled-task-manager-tabs .nav-link.active .badge {
+  color: inherit;
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.scheduled-task-manager-card {
+  position: relative;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+}
+
+.scheduled-task-manager-card-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #94a3b8;
+}
+
+.scheduled-task-manager-card-body {
+  padding: 0.9rem 1rem 0.95rem 1.1rem;
+}
+
+.scheduled-task-manager-status-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.scheduled-task-manager-avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.scheduled-task-manager-progress {
+  height: 0.35rem;
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.scheduled-task-manager-progress .progress-bar {
+  background: linear-gradient(90deg, #38bdf8, #2563eb);
+}
+
+.scheduled-task-manager-result {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  color: #334155;
+}
+
+.stm-countdown-badge {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.stm-status-scheduled,
+.stm-status-pending {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.stm-status-running {
+  color: #0f766e;
+  background: #ecfeff;
+}
+
+.stm-status-succeeded {
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.stm-status-failed {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.stm-status-cancelled {
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.scheduled-task-manager-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+@media (max-width: 576px) {
+  .scheduled-task-manager-dialog {
+    top: auto;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 82vh;
+  }
+
+  .scheduled-task-manager-dialog .modal-content {
+    border-radius: 16px 16px 0 0;
+  }
+
+  .scheduled-task-manager-pane {
+    max-height: 58vh;
+  }
+}

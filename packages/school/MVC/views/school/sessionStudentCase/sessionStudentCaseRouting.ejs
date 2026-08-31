@@ -1,0 +1,245 @@
+<%
+  const routingPolicyData = (typeof routingPolicy !== 'undefined' && routingPolicy) ? routingPolicy : { categories: {} };
+  const headerButtons = [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>',
+    '<a href="/school/session-student-cases" class="school-navigator-dashboard btn btn-outline-secondary btn-md mb-2"><i class="bi bi-folder-check me-1"></i> Student Cases</a>'
+  ];
+%>
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: 'School_SessionStudentCaseRouting',
+  btn_export: false,
+  print: false,
+  headerManageBtns: headerButtons
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-3">
+    <div class="fw-bold text-dark mb-1"><i class="bi bi-diagram-3 me-2"></i>Student Cases Routing</div>
+    <div class="small text-muted">Assign one or more reviewers per case category. Routed users can see cases in those categories on the Student Cases list, in addition to cases they already have access to. Resolve still requires the RESOLVE permission.</div>
+  </div>
+</div>
+
+<form id="studentCaseRoutingForm">
+  <input type="hidden" id="studentCaseRoutingActionStateId" value="<%= actionStateId || '' %>">
+  <div class="table-scroll-wrapper">
+    <table class="table-responsive size-md" id="first-table">
+      <thead>
+        <tr>
+          <th class="ps-4">Category</th>
+          <th>Assigned Users</th>
+          <th style="width: 8rem;">Active</th>
+          <th class="text-end pe-4" style="width: 10rem;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% (categories || []).forEach((row) => {
+          const config = routingPolicyData.categories?.[row.category] || {};
+          const assignees = Array.isArray(config.assignees) ? config.assignees : [];
+          const isActive = config.active !== false;
+        %>
+          <tr data-category="<%= row.category %>">
+            <td class="ps-4">
+              <div class="fw-semibold"><%= row.label %></div>
+              <div class="small text-muted font-monospace"><%= row.category %></div>
+            </td>
+            <td>
+              <div class="student-case-routing-assignees d-flex flex-wrap gap-2" data-category="<%= row.category %>">
+                <% if (!assignees.length) { %>
+                  <span class="text-muted small">No users assigned</span>
+                <% } %>
+                <% assignees.forEach((assignee) => { %>
+                  <span class="badge bg-light text-dark border student-case-routing-chip" data-person-id="<%= assignee.personId %>">
+                    <span><%= assignee.personName || assignee.personId %></span>
+                    <button type="button" class="btn btn-link btn-sm p-0 ms-1 student-case-routing-remove" aria-label="Remove assignee"><i class="bi bi-x-lg"></i></button>
+                  </span>
+                <% }) %>
+              </div>
+            </td>
+            <td>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input student-case-routing-active" type="checkbox" role="switch" data-category="<%= row.category %>" <%= isActive ? 'checked' : '' %>>
+              </div>
+            </td>
+            <td class="text-end pe-4">
+              <button type="button" class="btn btn-outline-primary btn-sm student-case-routing-pick" data-category="<%= row.category %>" data-category-label="<%= row.label %>">
+                <i class="bi bi-person-plus me-1"></i>Add user
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <div class="d-flex justify-content-end gap-2 mt-3">
+    <button type="submit" class="btn btn-primary" id="btnSaveStudentCaseRouting"><i class="bi bi-save me-1"></i>Save Routing</button>
+  </div>
+</form>
+
+<span id="urlRef" data-id="school/session-student-cases/routing" hidden></span>
+<%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('partials/tablePages-end') %>
+
+<script>
+  (function () {
+    const form = document.getElementById('studentCaseRoutingForm');
+    const actionStateId = String(document.getElementById('studentCaseRoutingActionStateId')?.value || '').trim();
+    const categoryRows = <%- JSON.stringify(categories || []) %>;
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    function displayNameForPickerItem(item) {
+      const preferredName = String(item?.preferredName || item?.name?.preferred || '').trim();
+      const firstName = String(item?.firstName || item?.name?.first || '').trim();
+      const lastName = String(item?.lastName || item?.name?.last || '').trim();
+      const directName = typeof item?.name === 'string' ? String(item.name).trim() : '';
+      return preferredName
+        || [firstName, lastName].filter(Boolean).join(' ').trim()
+        || directName
+        || String(item?.personId || item?.id || '').trim();
+    }
+
+    function getAssigneeHost(category) {
+      return document.querySelector(`.student-case-routing-assignees[data-category="${category}"]`);
+    }
+
+    function getAssigneesForCategory(category) {
+      const host = getAssigneeHost(category);
+      if (!host) return [];
+      return [...host.querySelectorAll('.student-case-routing-chip')].map((chip) => ({
+        personId: String(chip.dataset.personId || '').trim(),
+        personName: String(chip.querySelector('span')?.textContent || chip.dataset.personId || '').trim()
+      })).filter((row) => row.personId);
+    }
+
+    function renderEmptyState(host) {
+      if (!host) return;
+      if (host.querySelector('.student-case-routing-chip')) return;
+      if (host.querySelector('.text-muted.small')) return;
+      host.innerHTML = '<span class="text-muted small">No users assigned</span>';
+    }
+
+    function addAssigneeChip(category, assignee) {
+      const host = getAssigneeHost(category);
+      if (!host || !assignee?.personId) return;
+      const existing = getAssigneesForCategory(category);
+      if (existing.some((row) => row.personId === assignee.personId)) return;
+      const empty = host.querySelector('.text-muted.small');
+      if (empty) empty.remove();
+      const chip = document.createElement('span');
+      chip.className = 'badge bg-light text-dark border student-case-routing-chip';
+      chip.dataset.personId = assignee.personId;
+      chip.innerHTML = `<span>${escapeHtml(assignee.personName || assignee.personId)}</span><button type="button" class="btn btn-link btn-sm p-0 ms-1 student-case-routing-remove" aria-label="Remove assignee"><i class="bi bi-x-lg"></i></button>`;
+      host.appendChild(chip);
+    }
+
+    function collectPayload() {
+      const categories = {};
+      categoryRows.forEach((row) => {
+        const category = String(row.category || '').trim();
+        if (!category) return;
+        const activeToggle = document.querySelector(`.student-case-routing-active[data-category="${category}"]`);
+        categories[category] = {
+          active: activeToggle ? activeToggle.checked : true,
+          assignees: getAssigneesForCategory(category)
+        };
+      });
+      return { categories };
+    }
+
+    async function showRoutingMessage({ title, message, icon = 'info', buttons, size = 'md' } = {}) {
+      if (typeof window.showMessageModal === 'function') {
+        return window.showMessageModal({
+          title: title || 'Student Cases Routing',
+          icon,
+          message: message || '',
+          size,
+          buttons: buttons && buttons.length
+            ? buttons
+            : [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+        });
+      }
+      console.warn(`${title || 'Student Cases Routing'}: ${message || ''}`);
+      return buttons?.[0]?.text || 'OK';
+    }
+
+    document.addEventListener('click', (event) => {
+      const removeBtn = event.target.closest('.student-case-routing-remove');
+      if (removeBtn) {
+        const chip = removeBtn.closest('.student-case-routing-chip');
+        const host = chip?.closest('.student-case-routing-assignees');
+        chip?.remove();
+        renderEmptyState(host);
+        return;
+      }
+
+      const pickBtn = event.target.closest('.student-case-routing-pick');
+      if (!pickBtn || typeof window.GenericPicker?.open !== 'function') return;
+      const category = String(pickBtn.dataset.category || '').trim();
+      const categoryLabel = String(pickBtn.dataset.categoryLabel || category).trim();
+      const config = window.GenericPickerPresets.person({
+        title: `Assign reviewer: ${categoryLabel}`,
+        apiEndpoint: '/school/session-student-cases/api/routing/eligible-persons',
+        onSelect(item) {
+          const personId = String(item?.personId || item?.id || '').trim();
+          if (!personId) return;
+          addAssigneeChip(category, {
+            personId,
+            personName: displayNameForPickerItem(item)
+          });
+        }
+      });
+      window.GenericPicker.open(config);
+    });
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const saveBtn = document.getElementById('btnSaveStudentCaseRouting');
+      if (saveBtn) saveBtn.disabled = true;
+      try {
+        const res = await fetch('/school/session-student-cases/api/routing', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-AJAX-Request': 'true'
+          },
+          body: JSON.stringify({
+            ...collectPayload(),
+            actionStateId
+          })
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || result.status !== 'success') {
+          throw new Error(result.message || 'Failed to save student case routing.');
+        }
+        await showRoutingMessage({
+          title: 'Routing Saved',
+          message: result.message || 'Student case routing saved.',
+          icon: 'success'
+        });
+        window.location.reload();
+      } catch (error) {
+        await showRoutingMessage({
+          title: 'Save Failed',
+          message: error.message || 'Failed to save student case routing.',
+          icon: 'error'
+        });
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    });
+  }());
+</script>

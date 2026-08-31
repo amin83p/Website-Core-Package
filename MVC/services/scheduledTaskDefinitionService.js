@@ -4,6 +4,7 @@ const scheduledTaskDefinitionRepository = require('../repositories/scheduledTask
 const scheduledTaskOrchestratorService = require('./scheduledTaskOrchestratorService');
 const { computeNextRunAt } = require('./scheduledTaskSchedulingUtils');
 const { resolveDefaultTimezone, zonedWallClockToIso } = require('../utils/timezoneUtils');
+const { resolveSystemActor } = require('../utils/scheduledTaskActorUtils');
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -75,15 +76,25 @@ async function upsertDefinition({
   };
   payload.nextRunAt = computeNextRunAt(payload, new Date());
 
+  const actor = options.actor && typeof options.actor === 'object'
+    ? options.actor
+    : resolveSystemActor();
+
   if (Array.isArray(existingRows) && existingRows.length) {
     const existing = existingRows[0];
     const scheduleChanged = hasScheduleFieldsChanged(existing, payload);
     if (!scheduleChanged) {
       payload.nextRunAt = existing.nextRunAt;
     }
+    payload.createdByUserId = cleanText(existing.createdByUserId) || actor.userId;
+    payload.createdByDisplayName = cleanText(existing.createdByDisplayName) || actor.displayName;
     return scheduledTaskDefinitionRepository.update(existing.id, payload, options);
   }
-  return scheduledTaskDefinitionRepository.create(payload, options);
+  return scheduledTaskDefinitionRepository.create({
+    ...payload,
+    createdByUserId: actor.userId,
+    createdByDisplayName: actor.displayName
+  }, options);
 }
 
 async function ensureSystemDispatchDefinition(options = {}) {
@@ -102,7 +113,7 @@ async function ensureSystemDispatchDefinition(options = {}) {
     source: 'core.system',
     sourceRef: 'emailOutbox.dispatch',
     intervalMinutes
-  }, options);
+  }, { ...options, actor: resolveSystemActor() });
 }
 
 async function ensureSystemSmsDispatchDefinition(options = {}) {
@@ -121,7 +132,7 @@ async function ensureSystemSmsDispatchDefinition(options = {}) {
     source: 'core.system',
     sourceRef: 'smsOutbox.dispatch',
     intervalMinutes
-  }, options);
+  }, { ...options, actor: resolveSystemActor() });
 }
 
 const scheduledTaskDefinitionService = {
@@ -138,7 +149,15 @@ const scheduledTaskDefinitionService = {
   },
 
   async createDefinition(payload = {}, options = {}) {
-    const next = { ...payload, nextRunAt: computeNextRunAt(payload, new Date()) };
+    const actor = options.actor && typeof options.actor === 'object'
+      ? options.actor
+      : resolveSystemActor();
+    const next = {
+      ...payload,
+      createdByUserId: cleanText(payload.createdByUserId) || actor.userId,
+      createdByDisplayName: cleanText(payload.createdByDisplayName) || actor.displayName,
+      nextRunAt: computeNextRunAt(payload, new Date())
+    };
     return scheduledTaskDefinitionRepository.create(next, options);
   },
 

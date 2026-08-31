@@ -4,6 +4,9 @@ const sessionStudentCaseWorkspaceService = require('../../services/school/sessio
 const sessionStudentCaseReviewService = require('../../services/school/sessionStudentCaseReviewService');
 const sessionStudentCaseAccessService = require('../../services/school/sessionStudentCaseAccessService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
+const sessionStudentCaseRoutingService = require('../../services/school/sessionStudentCaseRoutingService');
+const sessionStudentCaseResultVisibilityService = require('../../services/school/sessionStudentCaseResultVisibilityService');
+const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
 const schoolDataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -11,6 +14,16 @@ const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
+
+function normalizeSearchKeyword(value = '') {
+  return String(value || '').trim();
+}
+
+function parseAllowedSchoolRoles(query = {}) {
+  const raw = String(query.allowedSchoolRoles || query.schoolRoles || '').trim();
+  if (!raw) return ['staff', 'teacher'];
+  return raw.split(',').map((item) => String(item || '').trim().toLowerCase()).filter(Boolean);
+}
 
 function formatSessionDateTime(row = {}) {
   const date = String(row.sessionDate || '').trim();
@@ -74,6 +87,7 @@ exports.listSessionStudentCases = async (req, res) => {
     );
 
     const caseCapabilities = await sessionStudentCaseAccessService.resolveListCapabilities(req);
+    const canConfigureRouting = sessionStudentCaseRoutingService.isRoutingAdminViewer(req.user);
 
     if (isAjax(req)) {
       return res.json({ status: 'success', results: rows, pagination });
@@ -101,7 +115,8 @@ exports.listSessionStudentCases = async (req, res) => {
       canReadCases: caseCapabilities.canRead || caseCapabilities.canReadAll,
       canUpdateCases: caseCapabilities.canUpdate,
       canResolveCases: caseCapabilities.canResolve,
-      canDeleteCases: caseCapabilities.canDelete
+      canDeleteCases: caseCapabilities.canDelete,
+      canConfigureRouting
     });
   } catch (error) {
     if (isAjax(req)) return res.status(500).json({ status: 'error', message: error.message });
@@ -124,18 +139,29 @@ exports.saveCase = async (req, res) => {
   try {
     getActiveOrgIdOrThrow(req.user);
     const { caseId } = req.params;
-    const { existing } = await sessionStudentCaseReviewService.assertCanMutate(req, caseId, 'edit');
+    const { existing, classData, session, capabilities } = await sessionStudentCaseReviewService.assertCanMutate(req, caseId, 'edit');
+    const shouldResolve = String(req.body?.status || '').trim().toLowerCase() === 'resolved';
+    if (shouldResolve) {
+      await sessionStudentCaseAccessService.assertCanResolve(req, classData, session, existing);
+    }
+    const resolvedCapabilities = capabilities || await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session });
     const saved = await sessionStudentCaseService.saveCase({
       classId: existing.classId,
       sessionId: existing.sessionId,
       caseId,
       input: req.body || {},
-      reqUser: req.user
+      reqUser: req.user,
+      canManageResultFields: resolvedCapabilities.canResolve === true,
+      capabilities: resolvedCapabilities
     });
     const message = String(saved?.status || '').toLowerCase() === 'resolved'
       ? 'Student case saved and resolved.'
       : 'Student case saved.';
-    return res.json({ status: 'success', message, case: saved });
+    const redacted = sessionStudentCaseResultVisibilityService.redactCaseForViewer(saved, {
+      reqUser: req.user,
+      capabilities: resolvedCapabilities
+    });
+    return res.json({ status: 'success', message, case: redacted });
   } catch (error) {
     const statusCode = Number(error.statusCode) || 400;
     return res.status(statusCode).json({ status: 'error', message: error.message });
@@ -147,17 +173,27 @@ exports.updateCaseStatus = async (req, res) => {
     getActiveOrgIdOrThrow(req.user);
     const { caseId } = req.params;
     const status = String(req.body?.status || '').trim().toLowerCase();
-    const action = status === 'resolved' ? 'resolve' : 'edit';
-    const { existing } = await sessionStudentCaseReviewService.assertCanMutate(req, caseId, action);
+    const action = status === 'resolved' ? 'resolve' : (status === 'reopened' ? 'reopen' : 'edit');
+    const { existing, classData, session, capabilities } = await sessionStudentCaseReviewService.assertCanMutate(req, caseId, action);
+    const resolvedCapabilities = capabilities || await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session });
     const saved = await sessionStudentCaseService.updateStatus({
       classId: existing.classId,
       sessionId: existing.sessionId,
       caseId,
       status: req.body?.status,
       note: req.body?.note || '',
-      reqUser: req.user
+      resultNote: req.body?.resultNote,
+      revealResultToCreator: req.body?.revealResultToCreator,
+      locked: req.body?.locked,
+      reqUser: req.user,
+      canManageResultFields: resolvedCapabilities.canResolve === true,
+      capabilities: resolvedCapabilities
     });
-    return res.json({ status: 'success', message: 'Student case updated.', case: saved });
+    const redacted = sessionStudentCaseResultVisibilityService.redactCaseForViewer(saved, {
+      reqUser: req.user,
+      capabilities: resolvedCapabilities
+    });
+    return res.json({ status: 'success', message: 'Student case updated.', case: redacted });
   } catch (error) {
     const statusCode = Number(error.statusCode) || 400;
     return res.status(statusCode).json({ status: 'error', message: error.message });
@@ -168,17 +204,82 @@ exports.deleteCase = async (req, res) => {
   try {
     getActiveOrgIdOrThrow(req.user);
     const { caseId } = req.params;
-    const { existing } = await sessionStudentCaseReviewService.assertCanMutate(req, caseId, 'delete');
+    const { existing, capabilities } = await sessionStudentCaseReviewService.assertCanMutate(req, caseId, 'delete');
     const deleted = await sessionStudentCaseService.deleteCase({
       classId: existing.classId,
       sessionId: existing.sessionId,
       caseId,
-      reqUser: req.user
+      reqUser: req.user,
+      capabilities
     });
     return res.json({ status: 'success', message: 'Student case deleted.', deleted });
   } catch (error) {
     const statusCode = Number(error.statusCode) || 400;
     return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.showRouting = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const pageData = await sessionStudentCaseRoutingService.getRoutingPageData(req.user);
+    return res.render('school/sessionStudentCase/sessionStudentCaseRouting', {
+      title: 'Student Cases Routing',
+      user: req.user,
+      includeModal: true,
+      actionStateId: req.actionStateId,
+      categories: pageData.categories,
+      routingPolicy: pageData.policy,
+      canConfigureRouting: true
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+exports.saveRouting = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const policy = await sessionStudentCaseRoutingService.saveRoutingFromRequest(req.user, req.body || {});
+    return res.json({ status: 'success', message: 'Student case routing saved.', policy });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.listRoutingEligiblePersons = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const query = await buildDataServiceQuery(req.query);
+    const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
+    if (query.q === searchDefaultKeyword) query.q = '';
+
+    const payload = await schoolIdentityLookupService.listSchoolPersons({
+      reqUser: req.user,
+      q: query.q || '',
+      query,
+      requireSchoolRole: true,
+      allowedSchoolRoles: parseAllowedSchoolRoles(req.query || {})
+    });
+    const data = (payload.rows || []).map((row) => ({
+      ...row,
+      name: {
+        first: row.firstName || '',
+        last: row.lastName || '',
+        preferred: row.preferredName || ''
+      }
+    }));
+    return res.json({
+      status: 'success',
+      data,
+      results: data,
+      items: data,
+      pagination: payload.pagination || {}
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 };
 

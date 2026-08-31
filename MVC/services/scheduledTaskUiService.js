@@ -5,6 +5,14 @@ const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
 const NAV_ACTIONS = Object.freeze([
   {
+    key: 'manager',
+    label: 'Task Manager',
+    href: '/scheduled-tasks/manager',
+    icon: 'bi-calendar2-check',
+    sectionId: SECTIONS.SCHEDULED_TASK_MANAGER,
+    operationId: OPERATIONS.READ_ALL
+  },
+  {
     key: 'definitions',
     label: 'Definitions',
     href: '/scheduled-tasks',
@@ -66,9 +74,16 @@ async function buildNavButtons(req, activeKey = '') {
   );
 }
 
+async function buildManagerAccessFlags(req) {
+  return accessUiService.accessFlags(req, SECTIONS.SCHEDULED_TASK_MANAGER, {
+    canRead: OPERATIONS.READ_ALL
+  });
+}
+
 module.exports = {
   buildDefinitionAccessFlags,
   buildOutboxAccessFlags,
   buildRunAccessFlags,
+  buildManagerAccessFlags,
   buildNavButtons
 };

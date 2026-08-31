@@ -47,10 +47,12 @@ test('resolveVerticalDragContext returns null without valid grid target', () => 
 test('personSchedule includes stage modal and drag-create binding', () => {
   const source = read('MVC/views/school/schedule/personSchedule.ejs');
   assert.match(source, /sessionEnrollmentStageModal/);
+  assert.match(source, /sessionEnrollmentCalendarModal/);
   assert.match(source, /bindScheduleDragCreate/);
   assert.match(source, /bindCalendarDragCreate/);
   assert.match(source, /session-enrollment-stage-standalone/);
   assert.match(source, /document\.body\.appendChild\(modalEl\)/);
+  assert.match(source, /openScheduleClassPickerModal/);
 });
 
 test('session-calendar.css defines full-viewport standalone stage overlay', () => {

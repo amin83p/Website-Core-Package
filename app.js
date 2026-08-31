@@ -49,6 +49,7 @@ const logger = require('./MVC/utils/logger');
 // Import Middleware & Models (Defined at top)
 const { softAuth } = require('./MVC/middleware/authMiddleware'); // New helper
 const chatAccessLocals = require('./MVC/middleware/chatAccessLocalsMiddleware');
+const scheduledTaskManagerLocals = require('./MVC/middleware/scheduledTaskManagerLocalsMiddleware');
 const orgTimezoneLocals = require('./MVC/middleware/orgTimezoneLocalsMiddleware');
 const enforceSitePolicy = require('./MVC/middleware/siteStateMiddleware');
 const sessionEnforcement = require('./MVC/middleware/sessionEnforcement');
@@ -495,6 +496,7 @@ app.use(requestPerfTracer.wrapMiddleware('track-current-path', sessionEnforcemen
 app.use(requestPerfTracer.wrapMiddleware('org-timezone-locals', orgTimezoneLocals));
 app.use(requestPerfTracer.wrapMiddleware('data-backend-status', dataBackendRecoveryMiddleware.exposeBackendStatus));
 app.use(requestPerfTracer.wrapMiddleware('chat-access-locals', chatAccessLocals));
+app.use(requestPerfTracer.wrapMiddleware('scheduled-task-manager-locals', scheduledTaskManagerLocals));
 app.use(requestPerfTracer.wrapMiddleware('app-locals', (req, res, next) => {
   res.locals.appBrand = appBrandingService.getBrand();
   res.locals.appContact = appBrandingService.getContact();
