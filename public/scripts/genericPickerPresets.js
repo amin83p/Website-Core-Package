@@ -91,7 +91,7 @@
       icon: 'bi-envelope-paper',
       apiEndpoint: '/email-management/api/templates?isActive__eq=true',
       placeholder: 'Search email templates...',
-      searchFields: 'id,label,name,packageName,eventKey,subjectTemplate'
+      searchFields: 'id,label,name,templateName,packageName,eventKey,subjectTemplate'
     },
     term: {
       title: 'Select Term',

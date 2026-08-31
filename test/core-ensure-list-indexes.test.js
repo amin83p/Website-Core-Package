@@ -9,6 +9,15 @@ const {
 } = require('../scripts/core/ensure-core-list-indexes');
 const mongoIndexManager = require('../MVC/infrastructure/mongo/mongoIndexManager');
 
+test('emailManagementTemplates event index uses mongo-supported partial filter', () => {
+  const specs = mongoIndexManager.INDEX_DEFINITIONS.emailManagementTemplates;
+  const eventIndex = specs.find((spec) => spec?.options?.name === 'idx_email_management_templates_org_event_key');
+  assert.ok(eventIndex);
+  const filter = JSON.stringify(eventIndex.options.partialFilterExpression);
+  assert.doesNotMatch(filter, /\$ne/);
+  assert.equal(eventIndex.options.partialFilterExpression.templateKind, 'event');
+});
+
 test('TARGET_COLLECTIONS includes logs for mongo-native pagination', () => {
   assert.equal(TARGET_COLLECTIONS.has('logs'), true);
 });

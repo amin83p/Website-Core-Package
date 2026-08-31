@@ -1,0 +1,85 @@
+<%
+  const modalId = 'sessionNotificationTestEmailModal';
+%>
+<style>
+  #<%= modalId %> .modal-dialog {
+    width: min(1100px, 96vw);
+    max-width: min(1100px, 96vw);
+    height: 82vh;
+    margin: 1.25rem auto;
+  }
+  #<%= modalId %> .modal-content {
+    height: 100%;
+  }
+  #<%= modalId %> .modal-body {
+    overflow: auto;
+  }
+  #<%= modalId %> .session-notification-test-email-preview-frame {
+    width: 100%;
+    min-height: 420px;
+    height: 52vh;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.65rem;
+    background: #fff;
+  }
+  #<%= modalId %> .session-notification-test-email-plain-preview {
+    min-height: 420px;
+    max-height: 52vh;
+    overflow: auto;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.65rem;
+    background: #fff;
+    padding: 1rem;
+    white-space: pre-wrap;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+</style>
+
+<div class="modal fade" id="<%= modalId %>" tabindex="-1" aria-labelledby="<%= modalId %>Label" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title d-flex align-items-center gap-2" id="<%= modalId %>Label">
+          <i class="bi bi-envelope-open text-primary"></i>
+          <span>Test email preview</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <div class="alert alert-info py-2 px-3 small d-none" id="sessionNotificationTestEmailSampleNotice" role="alert"></div>
+        <div class="alert alert-warning py-2 px-3 small d-none" id="sessionNotificationTestEmailWarnings" role="alert"></div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small text-muted mb-1" for="sessionNotificationTestEmailPreviewTo">To</label>
+            <input class="form-control form-control-sm" type="text" id="sessionNotificationTestEmailPreviewTo" readonly>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small text-muted mb-1" for="sessionNotificationTestEmailPreviewSubject">Subject</label>
+            <input class="form-control form-control-sm" type="text" id="sessionNotificationTestEmailPreviewSubject" readonly>
+          </div>
+        </div>
+        <div class="mb-2 small text-muted" id="sessionNotificationTestEmailPreviewMeta"></div>
+        <iframe
+          class="session-notification-test-email-preview-frame"
+          id="sessionNotificationTestEmailPreviewFrame"
+          title="Test email preview"
+          sandbox=""
+        ></iframe>
+        <div class="session-notification-test-email-plain-preview d-none" id="sessionNotificationTestEmailPlainPreview"></div>
+        <div class="alert alert-danger py-2 px-3 small mt-3 mb-0 d-none" id="sessionNotificationTestEmailModalError" role="alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmSessionNotificationTestEmail">
+          <span class="js-session-notification-test-email-send-label"><i class="bi bi-envelope me-1"></i>Send test email</span>
+          <span class="js-session-notification-test-email-send-spinner d-none">
+            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            Sending...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

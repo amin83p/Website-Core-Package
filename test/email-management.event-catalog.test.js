@@ -79,7 +79,7 @@ test('resolveEventForSave rejects unknown backend event key', () => {
   }, /not supported/i);
 });
 
-test('event-based list query maps event key to section/operation filters', () => {
+test('event-based list query preserves eventKey filter', () => {
   const out = normalizeTemplateListQuery({
     eventKey__eq: 'AUTH_PASSWORD_RESET_CODE',
     isActive__eq: 'true',
@@ -87,12 +87,19 @@ test('event-based list query maps event key to section/operation filters', () =>
     limit: 25
   });
   assert.ok(out && out.query);
-  assert.equal(out.query.sectionId__eq, 'USERS');
-  assert.equal(out.query.operationId__eq, 'UPDATE');
-  assert.equal(out.query.eventKey__eq, undefined);
+  assert.equal(out.query.eventKey__eq, 'AUTH_PASSWORD_RESET_CODE');
   assert.equal(out.query.isActive__eq, 'true');
   assert.equal(out.query.page, 2);
   assert.equal(out.query.limit, 25);
+});
+
+test('core catalog registers contact and newsletter events', () => {
+  const contact = getEmailEventByKey('CONTACT_NOTIFICATION', { includeInactive: true });
+  const newsletter = getEmailEventByKey('NEWSLETTER_WELCOME', { includeInactive: true });
+  assert.ok(contact);
+  assert.ok(newsletter);
+  assert.equal(contact.sectionId, 'CONTACT_MESSAGES');
+  assert.equal(newsletter.sectionId, 'NEWSLETTERS');
 });
 
 test('school package registers uncompleted session email event with runtime placeholders', () => {
@@ -126,6 +133,7 @@ test('template save context includes packageName from selected event', () => {
     bodyTemplate: 'Hi {{TEACHER_NAME}}\n{{BODY_CONTENT}}'
   }, 'ORG_EVENT_CATALOG_TEST', event);
   assert.equal(context.packageName, 'SCHOOL');
+  assert.equal(context.eventKey, 'SCHOOL_UNCOMPLETED_SESSION_EMAIL');
   assert.equal(context.sectionId, 'SCHOOL_SESSION_ACCESS');
   assert.equal(context.operationId, 'NOTIFY');
 });

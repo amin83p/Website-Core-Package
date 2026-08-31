@@ -67,7 +67,8 @@ const packageNavigationService = require('./MVC/services/packageNavigationServic
 const { getPackageStorageRootAbsolute } = require('./MVC/utils/packageStoragePathUtils');
 const startupLogger = require('./MVC/utils/startupLogger');
 const actionStateRetentionService = require('./MVC/services/actionStateRetentionService');
-const sessionNotificationSchedulerService = require('./packages/school/MVC/services/school/sessionNotificationSchedulerService');
+const { registerCoreScheduledTasks } = require('./MVC/services/coreScheduledTaskRegistration');
+const scheduledTaskSchedulerService = require('./MVC/services/scheduledTaskSchedulerService');
 const { runWithRequestContext } = require('./MVC/utils/requestContextStore');
 const uploadPathUtils = require('./MVC/utils/uploadPathUtils');
 const { isRailwayProxyMode, getGatewayBaseUrl } = require('./MVC/utils/uploadModeUtils');
@@ -586,6 +587,7 @@ const systemSettingsRoutes = require('./MVC/routes/systemSettingsRoutes');
 const helpRoutes = require('./MVC/routes/helpRoutes');
 const docsRoutes = require('./MVC/routes/docsRoutes');
 const emailManagementRoutes = require('./MVC/routes/emailManagementRoutes');
+const scheduledTaskRoutes = require('./MVC/routes/scheduledTaskRoutes');
 const activityQuotaRoutes = require('./MVC/routes/activityQuota/activityQuotaMainRoute');
 const fileGatewayRoutes = require('./MVC/routes/internal/fileGatewayRoutes');
 app.use('/', authRoutes);
@@ -629,6 +631,7 @@ app.use('/systemSettings', systemSettingsRoutes);
 app.use('/help', helpRoutes);
 app.use('/docs', docsRoutes);
 app.use('/email-management', emailManagementRoutes);
+app.use('/scheduled-tasks', scheduledTaskRoutes);
 app.use('/activity-quota', activityQuotaRoutes);
 
 
@@ -1086,7 +1089,8 @@ async function startServer() {
       startupLogger.info('APP', 'SETTINGS_SNAPSHOT', 'Loaded settings summary.', appSettingsSnapshot);
     });
     actionStateRetentionService.start({ enabled: dataBackend.mode === 'mongo' });
-    sessionNotificationSchedulerService.start({ enabled: dataBackend.mode === 'mongo' });
+    registerCoreScheduledTasks();
+    scheduledTaskSchedulerService.start();
     smsProviderService.logStartupDiagnostics();
   } catch (err) {
     if (err?.code === 'EADDRINUSE') {

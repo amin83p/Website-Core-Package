@@ -47,12 +47,14 @@ test('session access policy service normalizes defaults and validates templates'
           enabled: true,
           emailTemplateId: TEST_EMAIL_TEMPLATE_ID,
           sendWhen: 'next_day',
+          prepareAtTime: '06:00',
           sendAtTime: '07:30',
           sessionDateRange: { type: 'this_month', daysBeforeToday: null }
         },
         sms: {
           enabled: true,
           sendWhen: 'daily_all',
+          prepareAtTime: '07:00',
           sendAtTime: '08:00',
           sessionDateRange: { type: 'days_before_today', daysBeforeToday: 5 },
           bodyTemplate: 'Reminder {{teacherName}}'
@@ -497,6 +499,14 @@ test('uncompleted notification digest helpers build session list and context', (
   assert.match(sessionList, /https:\/\/example\.test\/school\/classes\/CLS-1\/sessions\/SES-1/);
   assert.match(sessionList, /https:\/\/example\.test\/school\/classes\/CLS-2\/sessions\/SES-2/);
 
+  const sessionListHtml = sessionUncompletedNotificationService.buildSessionListHtml(entries, {
+    baseUrl: 'https://example.test'
+  });
+  assert.match(sessionListHtml, /<ul/);
+  assert.match(sessionListHtml, /Algebra I/);
+  assert.match(sessionListHtml, /href="https:\/\/example\.test\/school\/classes\/CLS-1\/sessions\/SES-1"/);
+  assert.match(sessionListHtml, /Open session manager/);
+
   const grouped = sessionUncompletedNotificationService.groupSessionsByTeacher(entries);
   assert.equal(grouped.get('TEA-1')?.length, 2);
 
@@ -508,6 +518,8 @@ test('uncompleted notification digest helpers build session list and context', (
   });
   assert.equal(context.sessionCount, '2');
   assert.match(context.sessionList, /Algebra I/);
+  assert.match(context.sessionListHtml, /Algebra I/);
+  assert.match(context.sessionListHtml, /<ul/);
   assert.equal(context.teacherName, 'Taylor Smith');
 });
 
@@ -543,8 +555,10 @@ test('session access settings routes, controller, and session manager enforcemen
   const appSource = read('app.js');
 
   assert.match(routes, /router\.post\('\/session-access'/);
+  assert.match(routes, /router\.post\('\/session-access\/test-notification\/preview'/);
   assert.match(routes, /router\.post\('\/session-access\/test-notification'/);
   assert.match(controller, /saveSessionAccessPolicy/);
+  assert.match(controller, /previewSessionAccessTestNotification/);
   assert.match(controller, /sendSessionAccessTestNotification/);
   assert.match(controller, /sessionAccessPolicyModel\.getPolicyForOrg/);
   assert.match(classController, /sessionAttendanceEditAccessService/);
@@ -558,8 +572,25 @@ test('session access settings routes, controller, and session manager enforcemen
   assert.match(settingsView, /sessionNotificationSmsDailyAll/);
   assert.match(settingsView, /sessionNotificationEmailRangeType/);
   assert.match(settingsView, /sessionNotificationSmsRangeType/);
+  assert.match(settingsView, /sessionNotificationEmailBody/);
+  assert.match(settingsView, /sessionNotificationEmailBodyEditBtn/);
+  assert.match(settingsView, /sessionNotificationEmailBodySummary/);
+  assert.match(settingsView, /refreshSessionNotificationEmailBodySummary/);
+  assert.match(settingsView, /sessionNotificationEmailBodyModal/);
+  assert.match(settingsView, /sessionNotificationEmailWrapperMappings/);
+  assert.match(settingsView, /school\/settings\/partials\/sessionNotificationEmailBodyModal/);
+  assert.doesNotMatch(settingsView, /sessionNotificationEmailBodyTokenList/);
+  assert.doesNotMatch(settingsView, /sessionNotificationEmailBodyRichEditorBtn/);
+  assert.match(settingsView, /BODY_CONTENT/);
   assert.match(settingsView, /\/school\/settings\/session-access\/test-notification/);
+  assert.match(settingsView, /\/school\/settings\/session-access\/test-notification\/preview/);
+  assert.match(settingsView, /sessionNotificationTestEmailModal/);
+  assert.match(settingsView, /sessionNotificationTestEmailPreviewFrame/);
+  assert.match(settingsView, /btnConfirmSessionNotificationTestEmail/);
+  assert.match(settingsView, /confirmSessionNotificationTestEmailSend/);
   assert.match(settingsView, /btnSendSessionNotificationTestEmail/);
   assert.match(settingsView, /policy:\s*JSON\.stringify\(policyPayload\)/);
-  assert.match(appSource, /sessionNotificationSchedulerService\.start/);
+  assert.match(appSource, /registerCoreScheduledTasks\(\)/);
+  assert.match(appSource, /scheduledTaskSchedulerService\.start/);
+  assert.doesNotMatch(appSource, /sessionNotificationSchedulerService\.start/);
 });

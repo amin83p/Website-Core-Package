@@ -56,6 +56,30 @@
     .attendance-cell-history-btn:focus {
       color: #0d6efd;
     }
+    .attendance-history-status-cell {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      min-width: 8rem;
+    }
+    .attendance-history-status-icon {
+      flex: 0 0 auto;
+      line-height: 1;
+      margin-top: 0.1rem;
+    }
+    .attendance-history-status-text {
+      min-width: 0;
+    }
+    .attendance-history-status-label {
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .attendance-history-status-timing {
+      font-size: 0.8rem;
+      color: #6c757d;
+      line-height: 1.2;
+      margin-top: 0.15rem;
+    }
     .attendance-legend-modal-body .attendance-legend-items {
       display: flex;
       flex-direction: column;
@@ -494,7 +518,6 @@
 // Store the loaded matrix globally so we can access it on clicks
 window.currentMatrixData = null;
 window.attendanceHistoryModeOn = false;
-const attendanceChangeLogCache = new Map();
 window.attendanceVisiblePersonIds = null;
 let currentMentions = [];
 let detailsModalInstance = null;
@@ -1371,13 +1394,96 @@ document.addEventListener('DOMContentLoaded', () => {
             : '';
         const classId = String(window.currentMatrixData?.classId || document.getElementById('filter_classId')?.value || '').trim();
         const historyBtn = window.attendanceHistoryModeOn
-            ? `<button type="button" class="btn btn-link btn-sm p-0 position-absolute top-0 start-0 ps-1 pt-1 attendance-cell-history-btn" title="View change history" aria-label="View change history" data-class-id="${attEscapeHtml(classId)}" data-session-id="${attEscapeHtml(rec.sessionId)}" data-person-id="${attEscapeHtml(stu.personId)}" onclick="event.stopPropagation(); openAttendanceCellHistory(this);"><i class="bi bi-info-circle" style="font-size:0.65rem;"></i></button>`
+            ? `<button type="button" class="btn btn-link btn-sm p-0 position-absolute top-0 start-0 ps-1 pt-1 attendance-cell-history-btn" title="View change history" aria-label="View change history" data-class-id="${attEscapeHtml(classId)}" data-session-id="${attEscapeHtml(rec.sessionId)}" data-session-date="${attEscapeHtml(rec.date || '')}" data-person-id="${attEscapeHtml(stu.personId)}" data-student-name="${attEscapeHtml(stu.name || '')}" onclick="event.stopPropagation(); openAttendanceCellHistory(this);"><i class="bi bi-info-circle" style="font-size:0.65rem;"></i></button>`
             : '';
         return `<td class="att-cell" title="${tooltip} (Click for Details)" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">${historyBtn}${icon}${noteBadge}</td>`;
     }
 
-    function buildAttendanceChangeLogCellKey(sessionId, personId) {
-        return `${String(sessionId || '').trim()}::${String(personId || '').trim()}`;
+    function formatAttendanceHistorySessionDate(ymd) {
+        const raw = String(ymd || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw || '';
+        const d = new Date(`${raw}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return raw;
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function resolveAttendanceHistoryStudentName(personId, buttonEl) {
+        const fromDataset = String(buttonEl?.dataset?.studentName || '').trim();
+        if (fromDataset) return fromDataset;
+        const row = (window.currentMatrixData?.matrix || []).find((stu) => String(stu?.personId || '').trim() === String(personId || '').trim());
+        return String(row?.name || personId || '').trim() || 'Student';
+    }
+
+    function buildHistoryAttendanceSnapshot(entry, side) {
+        const prefix = side === 'to' ? 'to' : 'from';
+        return {
+            status: String(entry?.[`${prefix}Status`] || '').trim(),
+            lateMinutes: Number(entry?.[`${prefix}LateMinutes`]) || 0,
+            earlyLeaveMinutes: Number(entry?.[`${prefix}EarlyLeaveMinutes`]) || 0,
+            lateExcused: attendanceFlagIsTrue(entry?.[`${prefix}LateExcused`]),
+            earlyLeaveExcused: attendanceFlagIsTrue(entry?.[`${prefix}EarlyLeaveExcused`]),
+            absenceExcused: attendanceFlagIsTrue(entry?.[`${prefix}AbsenceExcused`])
+        };
+    }
+
+    function buildHistoryAttendanceIcon(snapshot) {
+        const markAppearance = window.AttendanceMarkAppearance;
+        const buildIcon = (key, ringClass) => {
+            if (markAppearance?.buildMarkIconHtml) {
+                return ringClass
+                    ? markAppearance.buildMarkIconHtml(key, { ringClass })
+                    : markAppearance.buildMarkIconHtml(key);
+            }
+            return '';
+        };
+        const rec = snapshot || {};
+        if (!rec.status) return buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
+        if (rec.status === 'present') return buildIcon('present');
+        if (rec.status === 'late') return buildLateTimingIcon(rec);
+        if (rec.status === 'excused' || (rec.status === 'absent' && attendanceAbsenceIsExcused(rec))) {
+            return buildIcon('excused_absence', 'attendance-timing-excuse-full');
+        }
+        if (rec.status === 'absent') return buildIcon('absent');
+        if (rec.status === 'acf' && attendanceAbsenceIsExcused(rec)) {
+            return buildIcon('excused_absence', 'attendance-timing-excuse-full');
+        }
+        if (rec.status === 'acf') return buildIcon('acf');
+        if (rec.status === 'not_applicable') return buildIcon('not_applicable');
+        return buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
+    }
+
+    function buildHistoryAttendanceTimingText(snapshot) {
+        const rec = snapshot || {};
+        const parts = [];
+        const late = Number(rec.lateMinutes) || 0;
+        const early = Number(rec.earlyLeaveMinutes) || 0;
+        if (late > 0) {
+            parts.push(`Late ${late} min${late === 1 ? '' : 's'}${attendanceFlagIsTrue(rec.lateExcused) ? ' (excused)' : ''}`);
+        }
+        if (early > 0) {
+            parts.push(`Left early ${early} min${early === 1 ? '' : 's'}${attendanceFlagIsTrue(rec.earlyLeaveExcused) ? ' (excused)' : ''}`);
+        }
+        return parts.join(' · ');
+    }
+
+    function buildHistoryAttendanceCellHtml(entry, side) {
+        const snapshot = buildHistoryAttendanceSnapshot(entry, side);
+        const label = side === 'to'
+            ? (entry?.toLabel || entry?.toStatus || 'Unmarked')
+            : (entry?.fromLabel || entry?.fromStatus || 'Unmarked');
+        const timingText = buildHistoryAttendanceTimingText(snapshot);
+        const timingHtml = timingText
+            ? `<div class="attendance-history-status-timing">${attEscapeHtml(timingText)}</div>`
+            : '';
+        return `
+            <div class="attendance-history-status-cell">
+                <div class="attendance-history-status-icon">${buildHistoryAttendanceIcon(snapshot)}</div>
+                <div class="attendance-history-status-text">
+                    <div class="attendance-history-status-label">${attEscapeHtml(label)}</div>
+                    ${timingHtml}
+                </div>
+            </div>
+        `;
     }
 
     function formatAttendanceHistoryWhen(isoValue) {
@@ -1406,17 +1512,19 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
                 <td>${attEscapeHtml(formatAttendanceHistoryWhen(entry.changedAt))}</td>
                 <td>${attEscapeHtml(entry?.changedBy?.displayName || entry?.changedBy?.username || entry?.changedBy?.userId || '—')}</td>
-                <td>${attEscapeHtml(entry?.fromLabel || entry?.fromStatus || 'Unmarked')}</td>
-                <td>${attEscapeHtml(entry?.toLabel || entry?.toStatus || 'Unmarked')}</td>
+                <td>${buildHistoryAttendanceCellHtml(entry, 'from')}</td>
+                <td>${buildHistoryAttendanceCellHtml(entry, 'to')}</td>
             </tr>
         `).join('');
     }
 
-    async function fetchAttendanceChangeLogForCell({ classId, sessionId, personId, useCache = true }) {
-        const cacheKey = buildAttendanceChangeLogCellKey(sessionId, personId);
-        if (useCache && attendanceChangeLogCache.has(cacheKey)) {
-            return attendanceChangeLogCache.get(cacheKey);
-        }
+    function entrySessionDateFromMatrix(personId, sessionId) {
+        const row = (window.currentMatrixData?.matrix || []).find((stu) => String(stu?.personId || '').trim() === String(personId || '').trim());
+        const rec = (row?.records || []).find((item) => String(item?.sessionId || '').trim() === String(sessionId || '').trim());
+        return String(rec?.date || '').trim();
+    }
+
+    async function fetchAttendanceChangeLogForCell({ classId, sessionId, personId }) {
         const params = new URLSearchParams({
             classId: String(classId || '').trim(),
             sessionId: String(sessionId || '').trim(),
@@ -1427,9 +1535,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const result = await res.json();
         if (result.status !== 'success') throw new Error(result.message || 'Unable to load change history.');
-        const entries = Array.isArray(result.entries) ? result.entries : [];
-        attendanceChangeLogCache.set(cacheKey, entries);
-        return entries;
+        return Array.isArray(result.entries) ? result.entries : [];
     }
 
     async function openAttendanceCellHistory(buttonEl) {
@@ -1444,7 +1550,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!modalEl) return;
 
         if (metaEl) {
-            metaEl.textContent = `Session ${sessionId} · Student ${personId}`;
+            const studentName = resolveAttendanceHistoryStudentName(personId, buttonEl);
+            const sessionDate = formatAttendanceHistorySessionDate(buttonEl?.dataset?.sessionDate || entrySessionDateFromMatrix(personId, sessionId));
+            metaEl.textContent = sessionDate ? `${studentName} · ${sessionDate}` : studentName;
         }
         renderAttendanceCellHistoryTable([]);
         if (loadingEl) loadingEl.classList.remove('d-none');
@@ -1461,49 +1569,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     window.openAttendanceCellHistory = openAttendanceCellHistory;
-
-    function collectVisibleAttendanceChangeLogCells() {
-        const data = window.currentMatrixData;
-        if (!data?.classId || !Array.isArray(data.matrix)) return [];
-        const cells = [];
-        data.matrix.forEach((stu) => {
-            const personId = String(stu?.personId || '').trim();
-            if (!personId) return;
-            (stu.records || []).forEach((rec) => {
-                const sessionId = String(rec?.sessionId || '').trim();
-                if (!sessionId) return;
-                cells.push({ sessionId, studentPersonId: personId });
-            });
-        });
-        return cells;
-    }
-
-    async function prefetchAttendanceChangeLogsForVisibleCells() {
-        const data = window.currentMatrixData;
-        if (!data?.classId) return;
-        const cells = collectVisibleAttendanceChangeLogCells();
-        if (!cells.length) return;
-        const startDate = String(document.getElementById('filter_startDate')?.value || data.startDate || '').trim();
-        const endDate = String(document.getElementById('filter_endDate')?.value || data.endDate || '').trim();
-        try {
-            const res = await fetch('/school/attendances/api/change-log/query', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
-                body: JSON.stringify({
-                    classId: data.classId,
-                    startDate,
-                    endDate,
-                    cells
-                })
-            });
-            const result = await res.json();
-            if (result.status !== 'success') return;
-            const entriesByCell = result.entriesByCell || {};
-            Object.entries(entriesByCell).forEach(([key, entries]) => {
-                attendanceChangeLogCache.set(key, Array.isArray(entries) ? entries : []);
-            });
-        } catch (_) {}
-    }
 
     function rerenderAttendanceMatrixCellsForHistoryMode() {
         const data = window.currentMatrixData;
@@ -1537,9 +1602,6 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleBtn.setAttribute('aria-pressed', window.attendanceHistoryModeOn ? 'true' : 'false');
         }
         rerenderAttendanceMatrixCellsForHistoryMode();
-        if (window.attendanceHistoryModeOn) {
-            prefetchAttendanceChangeLogsForVisibleCells();
-        }
     }
 
     function buildAttendanceStudentRowHtml(stu) {
@@ -1715,7 +1777,6 @@ document.addEventListener('DOMContentLoaded', () => {
             window.currentMatrixData = result;
             if (!mergeMode) {
                 resetAttendanceStudentVisibility(result.matrix);
-                attendanceChangeLogCache.clear();
             }
             document.getElementById('resultsContainer').classList.remove('d-none');
             renderAttendanceMatrixLegend();
@@ -1741,7 +1802,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
                 await refreshAttendanceDisplayRollups();
-                if (window.attendanceHistoryModeOn) await prefetchAttendanceChangeLogsForVisibleCells();
                 return;
             }
 
@@ -1752,7 +1812,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
                 await refreshAttendanceDisplayRollups();
-                if (window.attendanceHistoryModeOn) await prefetchAttendanceChangeLogsForVisibleCells();
                 return;
             }
 
@@ -1796,7 +1855,6 @@ document.addEventListener('DOMContentLoaded', () => {
             bindAttendanceStudentVisibilityDropdown();
             applyAttendanceStudentVisibility();
             await refreshAttendanceDisplayRollups();
-            if (window.attendanceHistoryModeOn) await prefetchAttendanceChangeLogsForVisibleCells();
 
             const currentUrlParams = new URLSearchParams(window.location.search);
             const targetStudentId = currentUrlParams.get('studentId');

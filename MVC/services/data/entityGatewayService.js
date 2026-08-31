@@ -21,6 +21,8 @@ const newsletterRepository = require('../../repositories/newsletterRepository');
 const subscriptionGroupRepository = require('../../repositories/subscriptionGroupRepository');
 const userMembershipRepository = require('../../repositories/userMembershipRepository');
 const emailManagementTemplateRepository = require('../../repositories/emailManagementTemplateRepository');
+const emailProviderProfileRepository = require('../../repositories/emailProviderProfileRepository');
+const emailEventDefinitionRepository = require('../../repositories/emailEventDefinitionRepository');
 const deleteIntegrityService = require('../deleteIntegrityService');
 const { toPublicId, toStorageId } = require('../../utils/idAdapter');
 const { normalizeQueryOptions } = require('../../utils/queryOptionsAdapter');
@@ -43,7 +45,9 @@ const {
   buildSubscriptionGroupScope,
   buildNewsScope,
   buildUserMembershipScope,
-  buildEmailManagementTemplateScope
+  buildEmailManagementTemplateScope,
+  buildEmailProviderProfileScope,
+  buildEmailEventDefinitionScope
 } = require('../security/dataScopeBuilder');
 
 const COUNT_CACHE_TTL_MS = 30000;
@@ -253,6 +257,14 @@ const FETCH_ENTITY_REGISTRY = Object.freeze({
     repository: emailManagementTemplateRepository,
     buildScope: buildEmailManagementTemplateScope
   },
+  emailProviderProfiles: {
+    repository: emailProviderProfileRepository,
+    buildScope: buildEmailProviderProfileScope
+  },
+  emailEventDefinitions: {
+    repository: emailEventDefinitionRepository,
+    buildScope: buildEmailEventDefinitionScope
+  },
   userMemberships: {
     repository: userMembershipRepository,
     buildScope: buildUserMembershipScope
@@ -434,6 +446,8 @@ const entityGatewayService = {
         return await trackCreate(subscriptionGroupRepository.create(data, options));
       case 'emailManagementTemplates':
         return await trackCreate(emailManagementTemplateRepository.create(data, options));
+      case 'emailProviderProfiles':
+        return await trackCreate(emailProviderProfileRepository.create(data, options));
       case 'userMemberships':
         return await trackCreate(userMembershipRepository.create(data, options));
       default: throw new Error(`Unknown entity type for add: ${entityType}`);
@@ -502,6 +516,8 @@ const entityGatewayService = {
         return await trackUpdate(subscriptionGroupRepository.update(id, data, options));
       case 'emailManagementTemplates':
         return await trackUpdate(emailManagementTemplateRepository.update(id, data, options));
+      case 'emailProviderProfiles':
+        return await trackUpdate(emailProviderProfileRepository.update(id, data, options));
       case 'userMemberships':
         return await trackUpdate(userMembershipRepository.update(id, data, options));
       default: throw new Error(`Unknown entity type for update: ${entityType}`);
@@ -594,6 +610,8 @@ const entityGatewayService = {
         return await trackDelete(subscriptionGroupRepository.remove(id, toStorageId(requestingUser?.activeOrgId), options));
       case 'emailManagementTemplates':
         return await trackDelete(emailManagementTemplateRepository.remove(id, options));
+      case 'emailProviderProfiles':
+        return await trackDelete(emailProviderProfileRepository.remove(id, options));
       case 'userMemberships':
         return await trackDelete(userMembershipRepository.remove(id, options));
       default: throw new Error(`Unknown entity type for delete: ${entityType}`);

@@ -4,12 +4,16 @@ const router = express.Router();
 const { SECTIONS } = require('./schoolRouteDependencies');
 const { registerSchoolUploadCategoryResolvers } = require('../services/school/schoolUploadCategoryRegistration');
 const { registerSchoolEmailEvents } = require('../services/school/schoolEmailEventRegistration');
+const { registerSchoolScheduledTasks } = require('../services/school/schoolScheduledTaskRegistration');
+const { syncAllSessionAccessPolicyTasks } = require('../services/school/sessionAccessPolicyTaskSyncService');
 const schoolStudentProfileLinkService = require('../services/school/schoolStudentProfileLinkService');
 
 const SCHOOL_MOUNT_GUARD_KEY = '__schoolMainRouteMounted';
 
 registerSchoolUploadCategoryResolvers();
 registerSchoolEmailEvents();
+registerSchoolScheduledTasks();
+syncAllSessionAccessPolicyTasks().catch(() => null);
 
 router.use((req, _res, next) => {
   if (req?.[SCHOOL_MOUNT_GUARD_KEY]) return next('router');
@@ -72,6 +76,7 @@ router.use('/attendances', require('./attendanceRoutes'));
 router.use('/grades-matrix', require('./gradesMatrixRoutes'));
 router.use('/holidays', require('./holidayRoutes'));
 router.use('/sessions', require('./sessionRoutes'));
+router.use('/session-student-cases', require('./sessionStudentCaseRoutes'));
 router.use('/reports', require('./reportRoutes'));
 router.use('/exams', require('./examRoutes'));
 router.use('/leave-requests', require('./leaveRequestRoutes'));

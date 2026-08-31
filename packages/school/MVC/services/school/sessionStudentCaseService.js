@@ -581,7 +581,7 @@ async function deleteCase({ classId, sessionId, caseId, reqUser }) {
     orgId: existing.orgId,
     sourceType: 'student_session_case',
     sourceId: existing.id
-  }, reqUser);
+  }, reqUser, { skipAdminCheck: true });
   await schoolRepositories.sessionStudentCases.remove(existing.id, normalizeScope(reqUser));
 
   return {

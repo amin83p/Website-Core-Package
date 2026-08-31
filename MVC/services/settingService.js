@@ -42,10 +42,8 @@ const settingService = {
    */
   get: () => {
     if (!_cache) {
-      startupLogger.warn('SETTINGS', 'CACHE', 'Settings accessed before init. Returning defaults.');
-      return { ...settingsModel.DEFAULTS };
+      _cache = settingsModel.getSettingsSync();
     }
-    //console.log(_cache);
     return _cache;
   },
 

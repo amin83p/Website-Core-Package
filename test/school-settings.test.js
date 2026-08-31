@@ -16,6 +16,22 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+const SCHOOL_SETTINGS_VIEW_ROOTS = [
+  path.join(ROOT_DIR, 'MVC/views'),
+  path.join(ROOT_DIR, 'packages/school/MVC/views')
+];
+
+function renderSchoolSettingsView(locals = {}) {
+  const templatePath = path.join(
+    ROOT_DIR,
+    'packages/school/MVC/views/school/settings/index.ejs'
+  );
+  return ejs.renderFile(templatePath, locals, {
+    views: SCHOOL_SETTINGS_VIEW_ROOTS,
+    filename: templatePath
+  });
+}
+
 test('School Settings section and symbol are registered without automatic role grants', () => {
   const sections = readJson('data/sections.json');
   const symbols = readJson('data/symbols.json');
@@ -72,6 +88,10 @@ test('School Settings routes use standard access and action-state protection', (
   assert.match(
     routes,
     /router\.post\('\/session-access'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
+  );
+  assert.match(
+    routes,
+    /router\.get\('\/session-access\/email-template-check'[\s\S]*?checkSessionNotificationEmailTemplate/
   );
   assert.doesNotMatch(routes, /AdminMiddleware|adminAuthority|schoolAdminAccessService/);
 });
@@ -137,6 +157,18 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.match(view, /\/school\/settings\/autosave/);
   assert.match(view, /id="session-access"/);
   assert.match(view, /\/school\/settings\/session-access/);
+  assert.match(view, /sessionNotificationEmailBody/);
+  assert.match(view, /sessionNotificationEmailBodyEditBtn/);
+  assert.match(view, /templateKind__eq=general/);
+  assert.match(view, /sessionNotificationEmailBodyModal/);
+  assert.match(view, /sessionNotificationEmailWrapperMappings/);
+  assert.match(view, /school\/settings\/partials\/sessionNotificationEmailBodyModal/);
+  assert.match(view, /custom wrapper mappings/);
+  assert.match(view, /sessionNotificationEmailBodyModal\.js/);
+  assert.match(view, /sessionNotificationTestEmailModal/);
+  assert.match(view, /school\/settings\/partials\/sessionNotificationTestEmailModal/);
+  assert.match(view, /test-notification\/preview/);
+  assert.match(view, /confirmSessionNotificationTestEmailSend/);
   assert.match(view, /stored on their device only/);
   assert.match(view, /window\.showMessageModal/);
   assert.match(view, /window\.alert/);
@@ -162,13 +194,11 @@ test('settings page uses a collapsible left sidebar and displays one selected ed
 });
 
 test('settings page renders in editable and read-only modes with valid client JavaScript', async () => {
-  const templatePath = path.join(
-    ROOT_DIR,
-    'packages/school/MVC/views/school/settings/index.ejs'
-  );
   const baseLocals = {
     activeOrgId: 'ORG-1',
     activeOrgName: 'Example School',
+    includeGenericPicker: true,
+    user: { id: 'USR-1' },
     groups: require('../packages/school/MVC/config/schoolSettingsCatalog').listSchoolSettingsGroups(),
     conductPolicy: {
       levels: [
@@ -230,10 +260,14 @@ test('settings page renders in editable and read-only modes with valid client Ja
       }
     },
     autosaveSections: require('../packages/school/MVC/config/autosaveSectionCatalog').listAutosaveSections(),
+    sessionNotificationEmailTokens: require('../packages/school/MVC/services/school/sessionAccessPolicyService').TEMPLATE_TOKENS,
+    sessionNotificationEmailWrapperTokens: require('../packages/school/MVC/services/school/sessionNotificationEmailWrapperPlaceholders').WRAPPER_PLACEHOLDER_DEFINITIONS,
+    sessionNotificationEmailDefaultBody: require('../packages/school/MVC/services/school/sessionAccessPolicyService').DEFAULT_POLICY
+      .uncompletedSessionNotification.channels.email.bodyTemplate,
     actionStateId: 'state-1',
     schoolSectionDashboardHref: '/dashboard/section-nav/SCHOOL'
   };
-  const editableHtml = await ejs.renderFile(templatePath, { ...baseLocals, canUpdate: true });
+  const editableHtml = await renderSchoolSettingsView({ ...baseLocals, canUpdate: true });
   assert.match(editableHtml, /Save Conduct Scale/);
   assert.match(editableHtml, /Save Attendance Thresholds/);
   assert.match(editableHtml, /Save Rollup Formula/);
@@ -252,7 +286,7 @@ test('settings page renders in editable and read-only modes with valid client Ja
   const script = editableHtml.match(/<script>([\s\S]*?)<\/script>/)?.[1] || '';
   assert.doesNotThrow(() => new Function(script));
 
-  const readOnlyHtml = await ejs.renderFile(templatePath, { ...baseLocals, canUpdate: false });
+  const readOnlyHtml = await renderSchoolSettingsView({ ...baseLocals, canUpdate: false });
   assert.match(readOnlyHtml, /read-only access/);
   assert.doesNotMatch(readOnlyHtml, /id="btnSaveConductSettings"/);
   assert.doesNotMatch(readOnlyHtml, /id="btnSaveAttendanceSettings"/);

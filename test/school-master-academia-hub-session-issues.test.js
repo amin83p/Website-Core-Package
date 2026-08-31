@@ -46,20 +46,21 @@ test('master academia hub session issues workspace has filters and endpoint wiri
 test('master academia hub service returns scoped session issue rows', () => {
   const routeSource = read('packages/school/MVC/routes/schoolMasterAcademiaHubRoutes.js');
   const serviceSource = read('packages/school/MVC/services/school/schoolMasterAcademiaHubService.js');
+  const workspaceSource = read('packages/school/MVC/services/school/sessionStudentCaseWorkspaceService.js');
 
   assert.match(routeSource, /SECTIONS\.SCHOOL_SESSIONS/);
   assert.match(serviceSource, /key === 'session-issues'/);
   assert.match(serviceSource, /sectionId:\s*SECTIONS\.SCHOOL_SESSIONS/);
-  assert.match(serviceSource, /schoolRepositories\.sessionStudentCases\.list/);
-  assert.match(serviceSource, /statusGroup === 'open'[\s\S]*open[\s\S]*in_progress[\s\S]*reopened/);
-  assert.match(serviceSource, /statusGroup === 'resolved'[\s\S]*resolved[\s\S]*cancelled/);
-  assert.match(serviceSource, /scope:\s*\{ activeOrgId: getHubActiveOrgId\(req\.user\) \}/);
-  assert.match(serviceSource, /sessionIssueMatchesFilters/);
-  assert.match(serviceSource, /studentIds = splitFilterIds/);
-  assert.match(serviceSource, /studentIds\.length[\s\S]*studentPersonId/);
-  assert.match(serviceSource, /CASE_SEVERITIES/);
-  assert.match(serviceSource, /CASE_CATEGORIES/);
-  assert.match(serviceSource, /caseId=\$\{encodeURIComponent\(caseId\)\}/);
+  assert.match(serviceSource, /sessionStudentCaseWorkspaceService\.listSessionStudentCasesForRequest/);
+  assert.match(serviceSource, /applyAccessScope:\s*false/);
+  assert.match(serviceSource, /sourceUrl:\s*'\/school\/session-student-cases'/);
+  assert.match(workspaceSource, /statusGroup === 'open'[\s\S]*open[\s\S]*in_progress[\s\S]*reopened/);
+  assert.match(workspaceSource, /statusGroup === 'resolved'[\s\S]*resolved[\s\S]*cancelled/);
+  assert.match(workspaceSource, /sessionIssueMatchesFilters/);
+  assert.match(workspaceSource, /studentIds\.length[\s\S]*studentPersonId/);
+  assert.match(workspaceSource, /CASE_SEVERITIES/);
+  assert.match(workspaceSource, /CASE_CATEGORIES/);
+  assert.match(workspaceSource, /caseId=\$\{encodeURIComponent\(caseId\)\}/);
 });
 
 test('session manager auto-opens requested student case from caseId query', () => {

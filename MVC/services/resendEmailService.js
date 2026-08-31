@@ -73,7 +73,7 @@ function isConfigured(options = {}) {
   return hasApiKey();
 }
 
-async function sendEmail({ to, subject, html, text, replyTo, from, meta } = {}) {
+async function sendEmail({ to, subject, html, text, replyTo, from, meta, credentials } = {}) {
   const cfg = getConfig();
   const sendMeta = meta && typeof meta === 'object' ? meta : {};
   const createdAt = new Date().toISOString();
@@ -83,17 +83,19 @@ async function sendEmail({ to, subject, html, text, replyTo, from, meta } = {}) 
   let normalizedReplyTo = '';
   let contentText = '';
   let contentHtml = '';
+  const apiKey = cleanText(credentials?.apiKey) || cfg.apiKey;
+  const defaultFrom = cleanText(credentials?.from) || cfg.from;
 
   startupLogger.info('RESEND', 'SEND_EMAIL', 'Preparing outbound email request.', {
-    hasApiKey: Boolean(cfg.apiKey),
-    apiKeyPreview: maskSecret(cfg.apiKey),
-    defaultFrom: cfg.from || ''
+    hasApiKey: Boolean(apiKey),
+    apiKeyPreview: maskSecret(apiKey),
+    defaultFrom: defaultFrom || ''
   });
   try {
-    if (!cfg.apiKey) {
+    if (!apiKey) {
       throw new Error('RESEND_API_KEY is missing.');
     }
-    sender = cleanText(from || cfg.from);
+    sender = cleanText(from || defaultFrom);
     if (!sender) {
       throw new Error('RESEND_FROM_EMAIL is missing.');
     }
@@ -147,7 +149,7 @@ async function sendEmail({ to, subject, html, text, replyTo, from, meta } = {}) 
       response = await fetch(RESEND_API_URL, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${cfg.apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload),

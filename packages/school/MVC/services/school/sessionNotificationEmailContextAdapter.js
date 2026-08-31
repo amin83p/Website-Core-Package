@@ -1,25 +1,21 @@
 'use strict';
 
-function cleanText(value) {
-  return String(value ?? '').trim();
-}
+const {
+  resolveWrapperPlaceholderValues
+} = require('./sessionNotificationEmailPlaceholderMappingService');
 
-function mapNotificationContextToEmailPlaceholders(context = {}) {
-  const sessionList = cleanText(context.sessionList);
-  return {
-    TEACHER_NAME: cleanText(context.teacherName),
-    ORG_NAME: cleanText(context.orgName),
-    SESSION_COUNT: cleanText(context.sessionCount),
-    SESSION_LIST: sessionList,
-    BODY_CONTENT: sessionList,
-    CLASS_NAME: cleanText(context.className),
-    CLASS_ID: cleanText(context.classId),
-    SESSION_NAME: cleanText(context.sessionName),
-    SESSION_ID: cleanText(context.sessionId),
-    SESSION_DATE: cleanText(context.sessionDate),
-    SESSION_TIME: cleanText(context.sessionTime),
-    SESSION_MANAGER_URL: cleanText(context.sessionManagerUrl)
-  };
+function mapNotificationContextToEmailPlaceholders(context = {}, options = {}) {
+  const emailChannel = options?.emailChannel || {};
+  const customMappings = Array.isArray(emailChannel?.wrapperPlaceholderMappings)
+    ? emailChannel.wrapperPlaceholderMappings
+    : (Array.isArray(options?.customMappings) ? options.customMappings : []);
+  return resolveWrapperPlaceholderValues({
+    context,
+    emailChannel,
+    customMappings,
+    bodyContent: options?.bodyContent,
+    teacher: options?.teacher || null
+  });
 }
 
 module.exports = {

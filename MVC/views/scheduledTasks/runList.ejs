@@ -1,0 +1,227 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  user,
+  tableName,
+  print,
+  btn_export: false,
+  headerManageBtns: [
+    '<a href="/dashboard/section-nav/SCHEDULED_TASK_MANAGEMENT" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Tasks Dashboard</a>'
+  ],
+  manageBtns: Array.isArray(manageBtns) ? manageBtns : []
+}) %>
+
+<%
+  const access = (runAccess && typeof runAccess === 'object') ? runAccess : {};
+  const canCancel = access.canCancel === true;
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const selectedTaskKeyFilter = String(stateFilters?.taskKey__eq || '').trim();
+  const selectedOrgFilter = String(stateFilters?.orgId__eq || '').trim();
+  const selectedStatusFilter = String(stateFilters?.status__eq || '').toLowerCase();
+  const hasRunFiltersApplied = Boolean(
+    selectedTaskKeyFilter
+    || selectedOrgFilter
+    || selectedStatusFilter
+  );
+%>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Task Runs</div>
+    <button
+      id="scheduledTaskRunFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#scheduledTaskRunFilterCollapse"
+      aria-expanded="<%= hasRunFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="scheduledTaskRunFilterCollapse"
+      aria-label="<%= hasRunFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="scheduledTaskRunFilterToggleIcon" class="bi <%= hasRunFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasRunFiltersApplied ? ' show' : '' %>" id="scheduledTaskRunFilterCollapse">
+    <form method="GET" action="/scheduled-tasks/runs" id="scheduledTaskRunFilterForm" class="card-body p-3">
+      <% if (stateFilters?.q) { %><input type="hidden" name="q" value="<%= stateFilters.q %>"><% } %>
+      <% if (stateFilters?.type) { %><input type="hidden" name="type" value="<%= stateFilters.type %>"><% } %>
+      <% if (stateFilters?.searchFields) { %><input type="hidden" name="searchFields" value="<%= stateFilters.searchFields %>"><% } %>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label mb-1">Task Key</label>
+          <input type="text" class="form-control size-md font-monospace" name="taskKey__eq" value="<%= selectedTaskKeyFilter %>" placeholder="core.emailOutbox.dispatch">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Organization ID</label>
+          <input type="text" class="form-control size-md font-monospace" name="orgId__eq" value="<%= selectedOrgFilter %>" placeholder="Leave blank for system runs">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Status</label>
+          <select class="form-select size-md" name="status__eq">
+            <option value="">All</option>
+            <option value="pending" <%= selectedStatusFilter === 'pending' ? 'selected' : '' %>>Pending</option>
+            <option value="running" <%= selectedStatusFilter === 'running' ? 'selected' : '' %>>Running</option>
+            <option value="succeeded" <%= selectedStatusFilter === 'succeeded' ? 'selected' : '' %>>Succeeded</option>
+            <option value="failed" <%= selectedStatusFilter === 'failed' ? 'selected' : '' %>>Failed</option>
+            <option value="cancelled" <%= selectedStatusFilter === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2 justify-content-md-end">
+          <a href="/scheduled-tasks/runs" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search task key, status, summary, org, run id...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="taskKey">Task <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="orgId">Organization <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="scheduledFor">Scheduled For <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="finishedAt">Finished <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="resultSummary">Summary <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">No task runs found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr data-entity-row-id="<%= row.id %>">
+          <td class="ps-4">
+            <div class="fw-semibold font-monospace small"><%= row.taskKey %></div>
+            <div class="x-small text-muted font-monospace"><%= row.id %></div>
+          </td>
+          <td><%= row.orgId || 'System' %></td>
+          <td class="small" data-sort-value="<%= row.scheduledFor || '' %>">
+            <%= row.scheduledFor ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.scheduledFor) : row.scheduledFor) : '—' %>
+          </td>
+          <td class="small" data-sort-value="<%= row.finishedAt || '' %>">
+            <%= row.finishedAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.finishedAt) : row.finishedAt) : '—' %>
+          </td>
+          <td data-sort-value="<%= row.status || '' %>">
+            <% if (row.status === 'succeeded') { %>
+              <span class="badge bg-success-subtle text-success border"><%= row.status %></span>
+            <% } else if (row.status === 'failed') { %>
+              <span class="badge bg-danger-subtle text-danger border"><%= row.status %></span>
+            <% } else if (row.status === 'running') { %>
+              <span class="badge bg-primary-subtle text-primary border"><%= row.status %></span>
+            <% } else { %>
+              <span class="badge bg-secondary-subtle text-secondary border"><%= row.status %></span>
+            <% } %>
+          </td>
+          <td class="small text-truncate" style="max-width: 320px;" title="<%= row.resultSummary || row.errorMessage || '' %>">
+            <%= row.resultSummary || row.errorMessage || '—' %>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <% if (row.status === 'pending') { %>
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= row.id %>"
+                  title="Run actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                  <% if (canCancel) { %>
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger btn-sm scheduled-task-run-cancel-btn"
+                      data-id="<%= row.id %>"
+                      data-task-key="<%= row.taskKey || row.id %>">
+                      <i class="bi bi-x-circle me-2"></i>Cancel
+                    </button>
+                  <% } else { %>
+                    <span class="text-muted small px-2 py-1">No actions available</span>
+                  <% } %>
+                </div>
+              </div>
+            <% } else { %>
+              <span class="text-muted small">—</span>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: baseUrlPath || 'scheduled-tasks/runs'
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+<%- include('./partials/scheduledTaskClientActions') %>
+
+<script>
+  (function () {
+    const actions = window.ScheduledTaskClientActions || {};
+
+    function initCollapseToggleIcon(options = {}) {
+      const collapseEl = document.getElementById(String(options.collapseId || ''));
+      const buttonEl = document.getElementById(String(options.buttonId || ''));
+      const iconEl = document.getElementById(String(options.iconId || ''));
+      if (!collapseEl || !buttonEl || !iconEl) return;
+
+      const openIcon = String(options.openIcon || 'bi-chevron-down');
+      const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+      const setState = (expanded) => {
+        iconEl.classList.remove(openIcon, closeIcon);
+        iconEl.classList.add(expanded ? closeIcon : openIcon);
+        buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      };
+
+      setState(collapseEl.classList.contains('show'));
+      collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+      collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+      collapseId: 'scheduledTaskRunFilterCollapse',
+      buttonId: 'scheduledTaskRunFilterToggleBtn',
+      iconId: 'scheduledTaskRunFilterToggleIcon'
+    });
+
+    document.querySelectorAll('.scheduled-task-run-cancel-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = String(btn.dataset.id || '').trim();
+        const taskKey = String(btn.dataset.taskKey || 'this run').trim();
+        if (!id) return;
+
+        const confirmed = await actions.showModalMessage({
+          title: 'Cancel Task Run',
+          icon: 'warning',
+          message: `Cancel pending run for ${taskKey}?`,
+          buttons: [
+            { text: 'Keep', class: 'btn-secondary', value: 'cancel' },
+            { text: 'Cancel run', class: 'btn-danger', value: 'confirm' }
+          ]
+        });
+        if (confirmed !== 'confirm') return;
+
+        await actions.runScheduledTaskMutation({
+          url: `/scheduled-tasks/runs/${encodeURIComponent(id)}/cancel`,
+          loadingNote: 'Cancelling task run...',
+          successTitle: 'Run Cancelled',
+          successMessage: 'The pending task run was cancelled.'
+        });
+      });
+    });
+  })();
+</script>

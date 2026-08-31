@@ -22,6 +22,38 @@ const CORE_EMAIL_EVENTS = Object.freeze([
     requiredPlaceholders: ['USER_EMAIL', 'RESET_CODE'],
     runtimePlaceholders: [],
     isActive: true
+  }),
+  freezeEvent({
+    eventKey: 'CONTACT_NOTIFICATION',
+    label: 'Contact Form Notification',
+    packageName: 'CORE',
+    sectionId: SECTIONS.CONTACT_MESSAGES,
+    operationId: OPERATIONS.CREATE,
+    resolverId: 'CONTACT_NOTIFICATION',
+    allowedPlaceholders: [
+      'CONTACT_REF_ID',
+      'CONTACT_NAME',
+      'CONTACT_EMAIL',
+      'CONTACT_TYPE',
+      'CONTACT_TIMELINE',
+      'CONTACT_SUBJECT',
+      'CONTACT_MESSAGE'
+    ],
+    requiredPlaceholders: ['CONTACT_SUBJECT'],
+    runtimePlaceholders: [],
+    isActive: true
+  }),
+  freezeEvent({
+    eventKey: 'NEWSLETTER_WELCOME',
+    label: 'Newsletter Welcome',
+    packageName: 'CORE',
+    sectionId: SECTIONS.NEWSLETTERS,
+    operationId: OPERATIONS.CREATE,
+    resolverId: 'NEWSLETTER_WELCOME',
+    allowedPlaceholders: ['SUBSCRIBER_EMAIL', 'UNSUBSCRIBE_URL'],
+    requiredPlaceholders: ['SUBSCRIBER_EMAIL'],
+    runtimePlaceholders: [],
+    isActive: true
   })
 ]);
 

@@ -8,6 +8,7 @@ const PUBLIC_EXACT_PATHS = new Set([
   '/logout',
   '/password-reset',
   '/password-reset/request',
+  '/password-reset/email/start',
   '/password-reset/sms/start',
   '/password-reset/verify',
   '/password-reset/complete',

@@ -7,8 +7,28 @@
   print,
   btn_export: false,
   headerManageBtns: ['<a href="/dashboard/section-nav/EMAIL_MANAGEMENT" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-speedometer2 me-1"></i> Email Dashboard</a>'],
-  manageBtns: ['<a href="/email-management/ledger" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-journal-check me-1"></i> Email Ledger</a>']
+  manageBtns: [
+    '<a href="/email-management/routing" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-signpost-split me-1"></i> Event Routing</a>',
+    '<a href="/email-management/providers" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-key me-1"></i> Provider Profiles</a>',
+    '<a href="/email-management/ledger" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-journal-check me-1"></i> Email Ledger</a>'
+  ]
 }) %>
+
+<%
+  const orgContext = (activeOrgContext && typeof activeOrgContext === 'object') ? activeOrgContext : {};
+  const orgLabel = String(orgContext.activeOrgLabel || 'Current organization').trim();
+  const isSystemOrgContext = orgContext.isSystemOrg === true;
+%>
+
+<div class="alert alert-light border mb-3 py-2 px-3 small">
+  <i class="bi bi-building me-1"></i>
+  Showing email templates for <strong><%= orgLabel %></strong>.
+  <% if (isSystemOrgContext) { %>
+    These are platform defaults used when an organization has no override.
+  <% } else { %>
+    Only this organization's templates are listed here. SYSTEM defaults apply at send time when no org override exists.
+  <% } %>
+</div>
 
 <%
   const stateFilters = (filters && typeof filters === 'object') ? filters : {};
@@ -16,10 +36,12 @@
   const selectedEventFilter = String(stateFilters?.eventKey__eq || '').toUpperCase();
   const selectedStatusFilter = String(stateFilters?.isActive__eq || '').toLowerCase();
   const selectedPackageFilter = String(stateFilters?.packageName__eq || '').toUpperCase();
+  const selectedTemplateKindFilter = String(stateFilters?.templateKind__eq || '').toLowerCase();
   const safePackageOptions = Array.isArray(packageFilterOptions) ? packageFilterOptions : ['CORE'];
   const hasEmailManagementFiltersApplied = Boolean(
     String(stateFilters?.eventKey__eq || '').trim()
     || String(stateFilters?.packageName__eq || '').trim()
+    || String(stateFilters?.templateKind__eq || '').trim()
     || String(stateFilters?.isActive__eq || '').trim()
   );
 %>
@@ -54,6 +76,14 @@
                 <%= (event.packageName ? event.packageName + ' — ' : '') + (event.label || event.eventKey) %>
               </option>
             <% }) %>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label mb-1">Type</label>
+          <select class="form-select size-md" name="templateKind__eq">
+            <option value="">All types</option>
+            <option value="event" <%= selectedTemplateKindFilter === 'event' ? 'selected' : '' %>>Event-bound</option>
+            <option value="general" <%= selectedTemplateKindFilter === 'general' ? 'selected' : '' %>>General</option>
           </select>
         </div>
         <div class="col-md-2">
@@ -97,6 +127,7 @@
         <th class="draggable" data-column="packageName">Package <span class="sort-icon"></span></th>
         <th class="draggable" data-column="orgId">Org <span class="sort-icon"></span></th>
         <th class="draggable" data-column="eventLabel">Email Event <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="routeRole">Route <span class="sort-icon"></span></th>
         <th class="draggable" data-column="senderTemplate">Sender <span class="sort-icon"></span></th>
         <th class="draggable" data-column="recipientTemplate">Recipient <span class="sort-icon"></span></th>
         <th class="draggable" data-column="subjectTemplate">Subject <span class="sort-icon"></span></th>
@@ -108,7 +139,7 @@
     <tbody>
       <% if (!data || !data.length) { %>
         <tr>
-          <td colspan="10" class="text-center text-muted py-4">No email templates found.</td>
+          <td colspan="11" class="text-center text-muted py-4">No email templates found.</td>
         </tr>
       <% } %>
       <% (data || []).forEach((row) => { %>
@@ -117,9 +148,18 @@
           <td><span class="badge bg-light text-dark border"><%= row.packageName || 'CORE' %></span></td>
           <td class="font-monospace small"><%= row.orgId || '-' %></td>
           <td>
-            <div class="fw-semibold"><%= row.eventLabel || row.eventKey || '-' %></div>
-            <% if (row.sectionId || row.operationId) { %>
+            <div class="fw-semibold"><%= String(row.templateKind || '').toLowerCase() === 'general' ? (row.templateName || row.eventLabel || 'General template') : (row.eventLabel || row.eventKey || '-') %></div>
+            <% if (String(row.templateKind || '').toLowerCase() === 'general') { %>
+              <span class="badge bg-secondary-subtle text-secondary border">General</span>
+            <% } else if (row.sectionId || row.operationId) { %>
               <div class="small text-muted font-monospace"><%= (row.sectionId || '-') + '::' + (row.operationId || '-') %></div>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <% if (row.routeRole === 'platform_default') { %>
+              <span class="badge bg-info-subtle text-info border">Platform default</span>
+            <% } else { %>
+              <span class="badge bg-primary-subtle text-primary border">Org override</span>
             <% } %>
           </td>
           <td class="font-monospace text-truncate" style="max-width: 220px;"><%= row.senderTemplate || '-' %></td>

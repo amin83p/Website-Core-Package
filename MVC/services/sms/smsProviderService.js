@@ -3,6 +3,7 @@ const emailLedgerService = require('../emailLedgerService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { maskPhone, validateSmsPhoneE164 } = require('../../utils/phoneUtils');
 const twilioVerifyProvider = require('./providers/twilioVerifyProvider');
+const twilioMessagingProvider = require('./providers/twilioMessagingProvider');
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -98,6 +99,107 @@ async function recordSmsLedger({
     providerMessageId: cleanText(providerMessageId || ''),
     providerRaw: {}
   });
+}
+
+function resolveMessagingProvider() {
+  return twilioMessagingProvider;
+}
+
+function getMessagingReadiness() {
+  const provider = resolveMessagingProvider();
+  const configured = Boolean(provider && typeof provider.isConfigured === 'function' && provider.isConfigured());
+  const enabled = parseBoolean(process.env.SMS_MESSAGING_ENABLED, true);
+  return {
+    providerId: configured ? 'twilio_messaging' : '',
+    enabled,
+    configured,
+    active: Boolean(configured && enabled)
+  };
+}
+
+function isMessagingConfigured() {
+  return getMessagingReadiness().active;
+}
+
+async function sendMessage({
+  phoneE164 = '',
+  body = '',
+  orgId = '',
+  userId = '',
+  eventKey = '',
+  purpose = 'notification',
+  meta = {}
+} = {}) {
+  const readiness = getMessagingReadiness();
+  if (!readiness.active) {
+    const error = new Error('SMS messaging provider is not configured.');
+    error.code = 'SMS_MESSAGING_NOT_CONFIGURED';
+    throw error;
+  }
+
+  const provider = resolveMessagingProvider();
+  const phoneValidation = validateSmsPhoneE164(phoneE164);
+  if (!phoneValidation.ok) {
+    const error = new Error('A valid phone number is required for SMS delivery.');
+    error.code = 'SMS_PHONE_INVALID';
+    throw error;
+  }
+  const normalizedPhone = phoneValidation.phoneE164;
+  const messageBody = cleanText(body).slice(0, 320);
+  if (!messageBody) {
+    const error = new Error('SMS body is required.');
+    error.code = 'SMS_BODY_REQUIRED';
+    throw error;
+  }
+
+  startupLogger.info('SMS', 'MESSAGE_SEND', 'Sending SMS message.', {
+    provider: readiness.providerId,
+    purpose: cleanText(purpose),
+    phone: maskPhone(normalizedPhone),
+    eventKey: cleanText(eventKey)
+  });
+
+  try {
+    const result = await provider.sendMessage({
+      to: normalizedPhone,
+      body: messageBody
+    });
+    await recordSmsLedger({
+      status: 'accepted',
+      phoneE164: normalizedPhone,
+      purpose,
+      orgId,
+      userId,
+      providerId: readiness.providerId,
+      eventKey: eventKey || 'SMS_OUTBOX',
+      providerMessageId: cleanText(result?.sid || ''),
+      providerStatusCode: 200,
+      meta: {
+        ...(meta && typeof meta === 'object' ? meta : {}),
+        channel: 'sms',
+        providerStatus: cleanText(result?.status || '')
+      }
+    });
+    return result;
+  } catch (error) {
+    await recordSmsLedger({
+      status: 'failed',
+      phoneE164: normalizedPhone,
+      purpose,
+      orgId,
+      userId,
+      providerId: readiness.providerId,
+      eventKey: eventKey || 'SMS_OUTBOX',
+      providerMessageId: '',
+      providerStatusCode: Number(error?.statusCode || 0) || 0,
+      errorMessage: cleanText(error?.message || String(error)),
+      meta: {
+        ...(meta && typeof meta === 'object' ? meta : {}),
+        channel: 'sms'
+      }
+    });
+    throw error;
+  }
 }
 
 async function startVerification({
@@ -276,8 +378,11 @@ function logStartupDiagnostics() {
 
 module.exports = {
   getReadiness,
+  getMessagingReadiness,
   isConfigured: () => getReadiness().active,
+  isMessagingConfigured,
   startVerification,
   checkVerification,
+  sendMessage,
   logStartupDiagnostics
 };

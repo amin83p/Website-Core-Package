@@ -5,10 +5,19 @@ const conductRatingScalePolicyModel = require('../../models/school/conductRating
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const attendanceMarkAppearanceService = require('../../services/school/attendanceMarkAppearanceService');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
+const sessionAccessPolicyTaskSyncService = require('../../services/school/sessionAccessPolicyTaskSyncService');
 const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const sessionAccessPolicyService = require('../../services/school/sessionAccessPolicyService');
 const sessionUncompletedNotificationService = require('../../services/school/sessionUncompletedNotificationService');
 const sessionNotificationDeliveryService = require('../../services/school/sessionNotificationDeliveryService');
+const {
+  validateSessionNotificationEmailWrapperTemplate,
+  WRAPPER_PLACEHOLDER_DEFINITIONS
+} = require('../../services/school/sessionNotificationEmailWrapperPlaceholders');
+const {
+  listBuiltinMappingRows,
+  getWrapperContextSources
+} = require('../../services/school/sessionNotificationEmailPlaceholderMappingService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const { requireCoreModule } = require('../../services/school/schoolCoreModuleResolver');
 const emailManagementService = requireCoreModule('MVC/services/emailManagementService');
@@ -244,14 +253,33 @@ async function resolveStudentAttendanceReportLabels(policy = {}, reqUser) {
   };
 }
 
+function emailTemplateHasBodyContentSlot(template = {}) {
+  return validateSessionNotificationEmailWrapperTemplate(template).hasBodyContentSlot;
+}
+
+async function resolveEmailTemplateWrapperWarnings(templateId = '', reqUser = null) {
+  const normalizedTemplateId = String(templateId || '').trim();
+  if (!normalizedTemplateId) return [];
+  try {
+    const template = await emailManagementService.getTemplateById(normalizedTemplateId, reqUser);
+    if (!template) return [];
+    return validateSessionNotificationEmailWrapperTemplate(template).warnings;
+  } catch (_) {
+    return [];
+  }
+}
+
+async function resolveEmailTemplateBodyContentWarning(templateId = '', reqUser = null) {
+  const warnings = await resolveEmailTemplateWrapperWarnings(templateId, reqUser);
+  return warnings.length ? warnings.join(' ') : null;
+}
+
 async function enrichSessionAccessPolicyForView(policy = {}, reqUser = null) {
   const resolved = sessionAccessPolicyService.resolvePolicy(policy);
   const emailChannel = resolved?.uncompletedSessionNotification?.channels?.email || {};
   const templateId = String(emailChannel.emailTemplateId || '').trim();
-  if (!templateId) return resolved;
-  try {
-    const template = await emailManagementService.getTemplateById(templateId, reqUser);
-    if (!template) return resolved;
+  const bodyContentWarning = await resolveEmailTemplateBodyContentWarning(templateId, reqUser);
+  if (!templateId) {
     return {
       ...resolved,
       uncompletedSessionNotification: {
@@ -260,13 +288,61 @@ async function enrichSessionAccessPolicyForView(policy = {}, reqUser = null) {
           ...resolved.uncompletedSessionNotification.channels,
           email: {
             ...emailChannel,
-            emailTemplateLabel: String(template.eventLabel || template.subjectTemplate || template.id || templateId).trim()
+            emailTemplateMissingBodyContentSlot: false,
+            emailTemplateBodyContentWarning: bodyContentWarning || ''
+          }
+        }
+      }
+    };
+  }
+  try {
+    const template = await emailManagementService.getTemplateById(templateId, reqUser);
+    if (!template) {
+      return {
+        ...resolved,
+        uncompletedSessionNotification: {
+          ...resolved.uncompletedSessionNotification,
+          channels: {
+            ...resolved.uncompletedSessionNotification.channels,
+            email: {
+              ...emailChannel,
+              emailTemplateMissingBodyContentSlot: true,
+              emailTemplateBodyContentWarning: bodyContentWarning || ''
+            }
+          }
+        }
+      };
+    }
+    return {
+      ...resolved,
+      uncompletedSessionNotification: {
+        ...resolved.uncompletedSessionNotification,
+        channels: {
+          ...resolved.uncompletedSessionNotification.channels,
+          email: {
+            ...emailChannel,
+            emailTemplateLabel: String(template.eventLabel || template.subjectTemplate || template.id || templateId).trim(),
+            emailTemplateMissingBodyContentSlot: !emailTemplateHasBodyContentSlot(template),
+            emailTemplateBodyContentWarning: bodyContentWarning || ''
           }
         }
       }
     };
   } catch (_) {
-    return resolved;
+    return {
+      ...resolved,
+      uncompletedSessionNotification: {
+        ...resolved.uncompletedSessionNotification,
+        channels: {
+          ...resolved.uncompletedSessionNotification.channels,
+          email: {
+            ...emailChannel,
+            emailTemplateMissingBodyContentSlot: false,
+            emailTemplateBodyContentWarning: bodyContentWarning || ''
+          }
+        }
+      }
+    };
   }
 }
 
@@ -311,6 +387,12 @@ async function loadSettingsPageData(req) {
     rollupFormula: attendanceConfig.rollupFormula || defaultAttendanceRollupFormula(),
     autosavePolicy,
     sessionAccessPolicy: enrichedSessionAccessPolicy,
+    sessionNotificationEmailTokens: sessionAccessPolicyService.TEMPLATE_TOKENS,
+    sessionNotificationEmailWrapperTokens: WRAPPER_PLACEHOLDER_DEFINITIONS,
+    sessionNotificationEmailWrapperBuiltinMappings: listBuiltinMappingRows(),
+    sessionNotificationEmailContextSources: getWrapperContextSources(),
+    sessionNotificationEmailDefaultBody: sessionAccessPolicyService.DEFAULT_POLICY
+      .uncompletedSessionNotification.channels.email.bodyTemplate,
     autosaveSections: listAutosaveSections(),
     studentAttendanceReportPolicy,
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
@@ -516,10 +598,12 @@ async function saveSessionAccessPolicy(req, res) {
       req.body || {},
       req.user?.id
     );
+    await sessionAccessPolicyTaskSyncService.syncSessionAccessPolicyTasks(activeOrgId, policy);
+    const enrichedPolicy = await enrichSessionAccessPolicyForView(policy, req.user);
     return res.json({
       status: 'success',
       message: 'Session access settings were updated.',
-      policy
+      policy: enrichedPolicy
     });
   } catch (error) {
     return res.status(Number(error?.statusCode) || 500).json({
@@ -529,80 +613,160 @@ async function saveSessionAccessPolicy(req, res) {
   }
 }
 
+async function buildSessionAccessTestNotificationRequest(req) {
+  const activeOrgId = activeOrgIdOrThrow(req.user);
+  const teacherId = String(req.body?.teacherId || '').trim();
+  if (!teacherId) {
+    const error = new Error('Select a teacher before sending a test email.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const policy = req.body?.policy
+    ? sessionAccessPolicyService.validatePolicyInput(req.body)
+    : await sessionAccessPolicyModel.getPolicyForOrg(activeOrgId);
+  if (policy?.uncompletedSessionNotification?.channels?.email?.enabled !== true) {
+    const error = new Error('Enable email notifications before sending a test email.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const teacher = await schoolPersonAccessService.getPersonById({
+    reqUser: req.user,
+    personId: teacherId
+  }).catch(() => null);
+  if (!teacher) {
+    const error = new Error('Selected teacher was not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const orgTimeZone = await resolveOrgTimeZone(activeOrgId);
+  const throughDate = getTodayDateKeyInTimezone(orgTimeZone, Date.now());
+  const emailChannel = policy?.uncompletedSessionNotification?.channels?.email || {};
+  const sessionDateRange = emailChannel.sessionDateRange || {};
+  const { fromDate } = await sessionUncompletedNotificationService.resolveSessionDateRangeBounds({
+    orgId: activeOrgId,
+    throughDate,
+    rangeType: sessionDateRange.type,
+    daysBeforeToday: sessionDateRange.daysBeforeToday
+  });
+  const rangeLabel = sessionUncompletedNotificationService.describeSessionDateRange(sessionDateRange);
+  const { sessions, usedSampleData } = await sessionUncompletedNotificationService.resolveTeacherSessionsForDigest({
+    orgId: activeOrgId,
+    teacherId,
+    fromDate,
+    throughDate,
+    reqUser: req.user
+  });
+
+  const orgName = resolveActiveOrgName(req.user, activeOrgId);
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const context = sessionUncompletedNotificationService.buildDigestContext({
+    teacher,
+    sessions,
+    orgName,
+    baseUrl
+  });
+
+  const bodyContentWarning = await resolveEmailTemplateBodyContentWarning(
+    emailChannel.emailTemplateId,
+    req.user
+  );
+  const warnings = bodyContentWarning ? [bodyContentWarning] : [];
+
+  return {
+    activeOrgId,
+    teacherId,
+    policy,
+    teacher,
+    context,
+    sessions,
+    usedSampleData,
+    warnings,
+    fromDate,
+    throughDate,
+    rangeLabel
+  };
+}
+
+function assertSessionAccessTestEmailOutcome(outcome) {
+  if (outcome?.status === 'skipped_email_not_configured') {
+    const error = new Error('Email delivery is not configured. Configure Resend before sending test emails.');
+    error.statusCode = 503;
+    throw error;
+  }
+  if (outcome?.status === 'skipped_no_contact') {
+    const error = new Error('Selected teacher does not have an email address on file.');
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+function buildSessionAccessTestEmailPreviewMessage(usedSampleData, rangeLabel) {
+  return usedSampleData
+    ? `This preview uses sample session data because this teacher has no uncompleted sessions for ${rangeLabel}.`
+    : `This preview uses this teacher's uncompleted sessions for ${rangeLabel}.`;
+}
+
+function buildSessionAccessTestEmailSentMessage(usedSampleData, rangeLabel) {
+  return usedSampleData
+    ? `Test email sent using sample session data because this teacher has no uncompleted sessions for ${rangeLabel}.`
+    : `Test email sent using this teacher's uncompleted sessions for ${rangeLabel}.`;
+}
+
+async function previewSessionAccessTestNotification(req, res) {
+  try {
+    const data = await buildSessionAccessTestNotificationRequest(req);
+    const outcome = await sessionNotificationDeliveryService.previewDigestEmailNotification({
+      policy: data.policy,
+      teacher: data.teacher,
+      context: data.context,
+      orgId: data.activeOrgId,
+      subjectPrefix: '[TEST] '
+    });
+    assertSessionAccessTestEmailOutcome(outcome);
+    if (outcome.status !== 'preview') {
+      const error = new Error('Unable to build the test email preview.');
+      error.statusCode = 500;
+      throw error;
+    }
+
+    return res.json({
+      status: 'success',
+      message: buildSessionAccessTestEmailPreviewMessage(data.usedSampleData, data.rangeLabel),
+      recipient: outcome.recipient,
+      subject: outcome.subject,
+      preview: {
+        html: outcome.html,
+        text: outcome.text
+      },
+      sessionCount: data.sessions.length,
+      usedSampleData: data.usedSampleData,
+      dateRange: { fromDate: data.fromDate, throughDate: data.throughDate, label: data.rangeLabel },
+      warnings: data.warnings
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to preview session access test email.'
+    });
+  }
+}
+
 async function sendSessionAccessTestNotification(req, res) {
   try {
-    const activeOrgId = activeOrgIdOrThrow(req.user);
-    const teacherId = String(req.body?.teacherId || '').trim();
-    if (!teacherId) {
-      const error = new Error('Select a teacher before sending a test email.');
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const policy = req.body?.policy
-      ? sessionAccessPolicyService.validatePolicyInput(req.body)
-      : await sessionAccessPolicyModel.getPolicyForOrg(activeOrgId);
-    if (policy?.uncompletedSessionNotification?.channels?.email?.enabled !== true) {
-      const error = new Error('Enable email notifications before sending a test email.');
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const teacher = await schoolPersonAccessService.getPersonById({
-      reqUser: req.user,
-      personId: teacherId
-    }).catch(() => null);
-    if (!teacher) {
-      const error = new Error('Selected teacher was not found.');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const orgTimeZone = await resolveOrgTimeZone(activeOrgId);
-    const throughDate = getTodayDateKeyInTimezone(orgTimeZone, Date.now());
-    const emailChannel = policy?.uncompletedSessionNotification?.channels?.email || {};
-    const sessionDateRange = emailChannel.sessionDateRange || {};
-    const { fromDate } = await sessionUncompletedNotificationService.resolveSessionDateRangeBounds({
-      orgId: activeOrgId,
-      throughDate,
-      rangeType: sessionDateRange.type,
-      daysBeforeToday: sessionDateRange.daysBeforeToday
-    });
-    const rangeLabel = sessionUncompletedNotificationService.describeSessionDateRange(sessionDateRange);
-    const { sessions, usedSampleData } = await sessionUncompletedNotificationService.resolveTeacherSessionsForDigest({
-      orgId: activeOrgId,
-      teacherId,
-      fromDate,
-      throughDate
-    });
-
-    const orgName = resolveActiveOrgName(req.user, activeOrgId);
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const context = sessionUncompletedNotificationService.buildDigestContext({
-      teacher,
-      sessions,
-      orgName,
-      baseUrl
-    });
+    const data = await buildSessionAccessTestNotificationRequest(req);
 
     const outcome = await sessionNotificationDeliveryService.sendDigestEmailNotification({
-      policy,
-      teacher,
-      context,
-      orgId: activeOrgId,
+      policy: data.policy,
+      teacher: data.teacher,
+      context: data.context,
+      orgId: data.activeOrgId,
       subjectPrefix: '[TEST] '
     });
 
-    if (outcome.status === 'skipped_email_not_configured') {
-      const error = new Error('Email delivery is not configured. Configure Resend before sending test emails.');
-      error.statusCode = 503;
-      throw error;
-    }
-    if (outcome.status === 'skipped_no_contact') {
-      const error = new Error('Selected teacher does not have an email address on file.');
-      error.statusCode = 400;
-      throw error;
-    }
+    assertSessionAccessTestEmailOutcome(outcome);
     if (outcome.status !== 'sent') {
       const error = new Error('Unable to send the test email.');
       error.statusCode = 500;
@@ -611,22 +775,49 @@ async function sendSessionAccessTestNotification(req, res) {
 
     return res.json({
       status: 'success',
-      message: usedSampleData
-        ? `Test email sent using sample session data because this teacher has no uncompleted sessions for ${rangeLabel}.`
-        : `Test email sent using this teacher's uncompleted sessions for ${rangeLabel}.`,
-      sessionCount: sessions.length,
-      usedSampleData,
-      dateRange: { fromDate, throughDate, label: rangeLabel },
-      recipient: outcome.recipient,
-      preview: {
-        subject: outcome.subject,
-        body: outcome.text
-      }
+      message: buildSessionAccessTestEmailSentMessage(data.usedSampleData, data.rangeLabel),
+      sessionCount: data.sessions.length,
+      usedSampleData: data.usedSampleData,
+      recipient: outcome.recipient
     });
   } catch (error) {
     return res.status(Number(error?.statusCode) || 500).json({
       status: 'error',
       message: error?.message || 'Failed to send session access test email.'
+    });
+  }
+}
+
+async function checkSessionNotificationEmailTemplate(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const templateId = String(req.query?.templateId || '').trim();
+    const policy = await sessionAccessPolicyModel.getPolicyForOrg(activeOrgId);
+    const customMappings = policy?.uncompletedSessionNotification?.channels?.email?.wrapperPlaceholderMappings || [];
+    let validation = {
+      hasBodyContentSlot: false,
+      warnings: [],
+      unsupportedTokens: []
+    };
+    if (templateId) {
+      const template = await emailManagementService.getTemplateById(templateId, req.user);
+      if (template) {
+        validation = validateSessionNotificationEmailWrapperTemplate(template, { customMappings });
+      }
+    }
+    const warnings = Array.isArray(validation.warnings) ? validation.warnings : [];
+    return res.json({
+      status: 'success',
+      templateId,
+      hasBodyContentSlot: validation.hasBodyContentSlot === true,
+      warnings,
+      unsupportedTokens: Array.isArray(validation.unsupportedTokens) ? validation.unsupportedTokens : [],
+      warning: warnings.join(' ')
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Unable to check email template.'
     });
   }
 }
@@ -675,7 +866,9 @@ module.exports = {
   saveStudentAttendanceReportSettings,
   saveAutosavePolicy,
   saveSessionAccessPolicy,
+  previewSessionAccessTestNotification,
   sendSessionAccessTestNotification,
+  checkSessionNotificationEmailTemplate,
   redirectLegacyConductSettings,
   redirectLegacyAttendanceSettings
 };

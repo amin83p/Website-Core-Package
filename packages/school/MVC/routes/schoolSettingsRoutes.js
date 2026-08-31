@@ -61,10 +61,20 @@ router.post('/session-access',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveSessionAccessPolicy);
 
+router.post('/session-access/test-notification/preview',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
+  ctrl.previewSessionAccessTestNotification);
+
 router.post('/session-access/test-notification',
   requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.sendSessionAccessTestNotification);
+
+router.get('/session-access/email-template-check',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.checkSessionNotificationEmailTemplate);
 
 router.post('/student-attendance-report',
   requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),

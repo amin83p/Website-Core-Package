@@ -13,7 +13,6 @@ const sessionAccessPolicyService = require('./sessionAccessPolicyService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionNotificationDeliveryService = require('./sessionNotificationDeliveryService');
 const sessionUncompletedNotificationService = require('./sessionUncompletedNotificationService');
-const classModel = require('../../models/school/classModel');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const sessionAttendanceEditAccessService = require('./sessionAttendanceEditAccessService');
 
@@ -68,9 +67,11 @@ async function processChannelDailyDigest({
   const allEntries = await sessionUncompletedNotificationService.listUncompletedSessionsForOrg(orgId, {
     fromDate,
     throughDate,
-    statusMap
+    statusMap,
+    reqUser: { activeOrgId: orgId }
   });
-  const grouped = sessionUncompletedNotificationService.groupSessionsByTeacher(allEntries);
+  const teacherPersonMap = await sessionUncompletedNotificationService.loadTeacherPersonMap(orgId, { activeOrgId: orgId });
+  const grouped = sessionUncompletedNotificationService.groupSessionsByTeacher(allEntries, { teacherPersonMap });
   let sentCount = 0;
 
   for (const [teacherId, sessions] of grouped.entries()) {
@@ -112,14 +113,14 @@ async function processChannelPerSession({
 }) {
   const channelConfig = policy?.uncompletedSessionNotification?.channels?.[channel] || {};
   const targetSessionDate = resolveTargetSessionDate(channelConfig, orgTimeZone, now);
-  const classes = await classModel.getAllClasses();
-  const orgClasses = (Array.isArray(classes) ? classes : [])
-    .filter((row) => cleanText(row?.orgId) === cleanText(orgId));
+  const classes = await sessionUncompletedNotificationService.listOrgClasses(orgId, { activeOrgId: orgId });
   let sentCount = 0;
   let candidateCount = 0;
 
-  for (const classData of orgClasses) {
-    const sessions = Array.isArray(classData?.sessions) ? classData.sessions : [];
+  for (const classData of classes) {
+    if (cleanText(classData?.orgId) !== cleanText(orgId)) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const sessions = await sessionUncompletedNotificationService.listClassSessions(classData, { activeOrgId: orgId });
     for (const session of sessions) {
       if (cleanText(session?.date) !== targetSessionDate) continue;
       if (session?.locked === true) continue;

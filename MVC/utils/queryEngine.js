@@ -1,4 +1,4 @@
-const ALLOWED_OPERATORS = Object.freeze(['eq', 'neq', 'in', 'starts_with', 'contains']);
+const ALLOWED_OPERATORS = Object.freeze(['eq', 'neq', 'in', 'starts_with', 'contains', 'lt', 'lte', 'gt', 'gte']);
 const RESERVED_QUERY_KEYS = Object.freeze([
   'q',
   'type',
@@ -6,7 +6,11 @@ const RESERVED_QUERY_KEYS = Object.freeze([
   'page',
   'limit',
   'sort',
-  'order'
+  'order',
+  'sortBy',
+  'sortDir',
+  'startDate',
+  'endDate'
 ]);
 
 const STRICT_EQUALITY_FIELD_PATTERN = /(^|\.)(id|_id|code|slug|username|email|orgId|userId|personId|sectionId|operationId)$/i;
@@ -147,7 +151,9 @@ function compareUnknownValues(left, right) {
 }
 
 function applySort(rows, query) {
-  const instructions = parseSortInstructions(query?.sort, query?.order);
+  const sortValue = query?.sort || query?.sortBy;
+  const orderValue = query?.order || query?.sortDir;
+  const instructions = parseSortInstructions(sortValue, orderValue);
   if (!instructions.length) return rows;
 
   const output = [...rows];
@@ -192,6 +198,18 @@ function parseInValues(value) {
     .filter(Boolean);
 }
 
+function compareFilterValues(left, right) {
+  const leftDate = Date.parse(left);
+  const rightDate = Date.parse(right);
+  if (!Number.isNaN(leftDate) && !Number.isNaN(rightDate)) return leftDate - rightDate;
+
+  const leftNum = Number(left);
+  const rightNum = Number(right);
+  if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) return leftNum - rightNum;
+
+  return String(left).localeCompare(String(right), undefined, { sensitivity: 'base' });
+}
+
 function matchesOperator(itemValue, filterValue, operator) {
   const itemCandidates = asComparableList(itemValue).filter((item) => item !== '');
   if (itemCandidates.length === 0) return false;
@@ -203,7 +221,7 @@ function matchesOperator(itemValue, filterValue, operator) {
   }
 
   const target = normalizeString(filterValue);
-  if (!target) return false;
+  if (!target && operator !== 'eq' && operator !== 'neq') return false;
 
   if (operator === 'eq') {
     return itemCandidates.some((candidate) => candidate === target);
@@ -215,6 +233,16 @@ function matchesOperator(itemValue, filterValue, operator) {
 
   if (operator === 'starts_with') {
     return itemCandidates.some((candidate) => candidate.startsWith(target));
+  }
+
+  if (operator === 'lt' || operator === 'lte' || operator === 'gt' || operator === 'gte') {
+    return itemCandidates.some((candidate) => {
+      const comparison = compareFilterValues(candidate, filterValue);
+      if (operator === 'lt') return comparison < 0;
+      if (operator === 'lte') return comparison <= 0;
+      if (operator === 'gt') return comparison > 0;
+      return comparison >= 0;
+    });
   }
 
   // contains

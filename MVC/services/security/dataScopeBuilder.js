@@ -168,13 +168,23 @@ function buildUserMembershipScope(requestingUser) {
   };
 }
 
-function buildEmailManagementTemplateScope(requestingUser) {
+function buildActiveOrgEmailScope(requestingUser) {
   if (!requestingUser) return { canViewAll: false, orgIds: [] };
-  if (adminChekersService.isSuperAdmin(requestingUser)) return { canViewAll: true };
-
   const activeOrgId = toPublicId(requestingUser?.activeOrgId);
   if (!activeOrgId) return { canViewAll: false, orgIds: [] };
   return { canViewAll: false, orgIds: [activeOrgId] };
+}
+
+function buildEmailManagementTemplateScope(requestingUser) {
+  return buildActiveOrgEmailScope(requestingUser);
+}
+
+function buildEmailProviderProfileScope(requestingUser) {
+  return buildActiveOrgEmailScope(requestingUser);
+}
+
+function buildEmailEventDefinitionScope(_requestingUser) {
+  return { canViewAll: true };
 }
 
 module.exports = {
@@ -193,5 +203,8 @@ module.exports = {
   buildSubscriptionGroupScope,
   buildNewsScope,
   buildUserMembershipScope,
-  buildEmailManagementTemplateScope
+  buildActiveOrgEmailScope,
+  buildEmailManagementTemplateScope,
+  buildEmailProviderProfileScope,
+  buildEmailEventDefinitionScope
 };

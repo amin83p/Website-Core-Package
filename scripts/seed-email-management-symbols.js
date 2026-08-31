@@ -32,6 +32,14 @@ const SYMBOL_DOCS = [
     value: 'bi bi-journal-check',
     tags: ['EMAIL_LEDGER', '920212'],
     orgId: 'SYSTEM'
+  },
+  {
+    id: 'SYM_EMAIL_PROVIDERS_920214',
+    name: 'EMAIL_PROVIDERS',
+    type: 'class',
+    value: 'bi bi-key-fill',
+    tags: ['EMAIL_PROVIDERS', '920214'],
+    orgId: 'SYSTEM'
   }
 ];
 

@@ -396,6 +396,11 @@ function attachOrgTimezoneContext(req, res) {
     res.locals.orgToday = context.today;
     res.locals.formatOrgDateTime = (value, opts = {}) => formatInstantInTimezone(value, context.timeZone, opts);
     res.locals.formatOrgDate = (value, opts = {}) => formatDateKeyInTimezone(value, context.timeZone, opts);
+    res.locals.formatInstantInTimezone = (value, timeZone, opts = {}) => formatInstantInTimezone(
+      value,
+      cleanTimezoneToken(timeZone) || context.timeZone,
+      opts
+    );
   }
   return context;
 }

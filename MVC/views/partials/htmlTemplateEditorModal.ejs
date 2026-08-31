@@ -1,6 +1,7 @@
 <%
   const modalId = String(htmlEditorModalId || 'htmlTemplateEditorModal').trim();
   const editorId = String(htmlEditorModalEditorId || (modalId + 'Editor')).trim();
+  const modalHelpHtmlValue = String(typeof modalHelpHtml !== 'undefined' ? modalHelpHtml : '').trim();
 %>
 <style>
   #<%= modalId %> .modal-dialog {
@@ -28,6 +29,9 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body pt-2">
+        <% if (modalHelpHtmlValue) { %>
+          <div class="alert alert-light border small mb-3"><%- modalHelpHtmlValue %></div>
+        <% } %>
         <%- include('./htmlTemplateEditor', {
           id: editorId,
           sourceId: editorId + 'Source',

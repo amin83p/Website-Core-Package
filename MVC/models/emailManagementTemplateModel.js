@@ -3,6 +3,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = require('./fileQueue');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
+const { getEmailEventBySectionOperation } = require('../../config/emailEventCatalog');
 
 const DATA_PATH = path.join(__dirname, '../../data/emailManagementTemplates.json');
 
@@ -125,6 +126,24 @@ function normalizePackageName(value = '') {
   return normalizeKeyToken(value || 'CORE') || 'CORE';
 }
 
+function normalizeTemplateKind(value = '', fallback = 'event') {
+  const token = cleanString(value, { max: 20, allowEmpty: true }).toLowerCase();
+  if (token === 'general') return 'general';
+  if (token === 'event') return 'event';
+  return fallback === 'general' ? 'general' : 'event';
+}
+
+function resolveTemplateKind(input = {}, base = {}) {
+  if (hasOwn(input, 'templateKind')) {
+    return normalizeTemplateKind(input.templateKind);
+  }
+  if (normalizeTemplateKind(base.templateKind, '') === 'general') {
+    return 'general';
+  }
+  const eventKey = normalizeKeyToken(input.eventKey || base.eventKey || '');
+  return eventKey ? 'event' : 'event';
+}
+
 function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
   const input = isPlainObject(record) ? record : {};
   const base = isPlainObject(existing) ? existing : {};
@@ -132,9 +151,34 @@ function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
 
   const id = cleanId(input.id || base.id, { max: 120, allowEmpty: true }) || '';
   const orgId = cleanId(input.orgId || base.orgId, { max: 120, allowEmpty: false });
-  const packageName = normalizePackageName(input.packageName || base.packageName || 'CORE');
-  const sectionId = normalizeKeyToken(input.sectionId || base.sectionId || '');
-  const operationId = normalizeKeyToken(input.operationId || base.operationId || '');
+  const templateKind = resolveTemplateKind(input, base);
+  let eventKey = normalizeKeyToken(input.eventKey || base.eventKey || '');
+  const providerProfileId = cleanId(
+    hasOwn(input, 'providerProfileId') ? input.providerProfileId : base.providerProfileId,
+    { max: 120, allowEmpty: true }
+  ) || '';
+  let packageName = normalizePackageName(input.packageName || base.packageName || 'CORE');
+  let sectionId = normalizeKeyToken(input.sectionId || base.sectionId || '');
+  let operationId = normalizeKeyToken(input.operationId || base.operationId || '');
+  let templateName = cleanString(
+    hasOwn(input, 'templateName') ? input.templateName : base.templateName,
+    { max: 180, allowEmpty: true }
+  );
+  if (templateKind === 'general') {
+    eventKey = '';
+    sectionId = '';
+    operationId = '';
+    packageName = 'CORE';
+  } else {
+    templateName = '';
+    if (!eventKey && sectionId && operationId) {
+      const mappedEvent = getEmailEventBySectionOperation(sectionId, operationId, {
+        includeInactive: true,
+        packageName
+      });
+      eventKey = normalizeKeyToken(mappedEvent?.eventKey || '');
+    }
+  }
   const recipientTemplate = cleanString(
     hasOwn(input, 'recipientTemplate') ? input.recipientTemplate : base.recipientTemplate,
     { max: 600, allowEmpty: true }
@@ -164,8 +208,14 @@ function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
 
   if (strict) {
     if (!orgId) throw new Error('Organization is required.');
-    if (!sectionId) throw new Error('Section is required.');
-    if (!operationId) throw new Error('Operation is required.');
+    if (templateKind === 'event') {
+      if (!eventKey) throw new Error('Event key is required.');
+      if (!sectionId) throw new Error('Section is required.');
+      if (!operationId) throw new Error('Operation is required.');
+    }
+    if (templateKind === 'general' && !templateName) {
+      throw new Error('Template name is required for general templates.');
+    }
     if (!senderTemplate) throw new Error('Sender template is required.');
     if (!recipientTemplate) throw new Error('Recipient template is required.');
     if (!subjectTemplate) throw new Error('Subject template is required.');
@@ -176,6 +226,10 @@ function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
     ...base,
     id,
     orgId,
+    templateKind,
+    eventKey,
+    templateName: templateName || '',
+    providerProfileId,
     packageName,
     sectionId,
     operationId,
@@ -191,8 +245,18 @@ function normalizeTemplateRecord(record = {}, existing = null, strict = false) {
   };
 }
 
+function inferTemplateKind(row = {}) {
+  if (normalizeTemplateKind(row.templateKind, '') === 'general') return 'general';
+  if (normalizeKeyToken(row.eventKey || '')) return 'event';
+  return 'event';
+}
+
 function sanitizeTemplateForRead(record = {}) {
   const row = isPlainObject(record) ? { ...record } : {};
+  row.templateKind = inferTemplateKind(row);
+  row.eventKey = normalizeKeyToken(row.eventKey || '');
+  row.templateName = cleanString(row.templateName, { max: 180, allowEmpty: true }) || '';
+  row.providerProfileId = cleanId(row.providerProfileId, { max: 120, allowEmpty: true }) || '';
   row.packageName = normalizePackageName(row.packageName || 'CORE');
   row.sectionId = normalizeKeyToken(row.sectionId || '');
   row.operationId = normalizeKeyToken(row.operationId || '');
@@ -200,18 +264,26 @@ function sanitizeTemplateForRead(record = {}) {
 }
 
 function buildCompositeKey(row = {}) {
+  if (normalizeTemplateKind(row?.templateKind, '') === 'general') {
+    return '';
+  }
+  const eventKey = normalizeKeyToken(row?.eventKey || '');
+  if (eventKey) {
+    return `${toPublicId(row?.orgId) || ''}::${eventKey}`;
+  }
   return `${toPublicId(row?.orgId) || ''}::${normalizePackageName(row?.packageName || 'CORE')}::${normalizeKeyToken(row?.sectionId || '')}::${normalizeKeyToken(row?.operationId || '')}`;
 }
 
 function assertUniqueKey(rows = [], targetRow = {}, excludeId = '') {
+  if (normalizeTemplateKind(targetRow?.templateKind, '') === 'general') return;
   const targetKey = buildCompositeKey(targetRow);
-  if (!targetKey || targetKey.startsWith('::')) return;
+  if (!targetKey || targetKey.endsWith('::')) return;
   const conflict = (Array.isArray(rows) ? rows : []).find((row) => {
     if (excludeId && idsEqual(row?.id, excludeId)) return false;
     return buildCompositeKey(row) === targetKey;
   });
   if (conflict) {
-    throw new Error('A template for this package/section/operation already exists in the selected organization.');
+    throw new Error('A template for this event already exists in the selected organization.');
   }
 }
 
@@ -281,6 +353,7 @@ async function deleteTemplate(id) {
 }
 
 module.exports = {
+  normalizeTemplateKind,
   normalizeTemplateRecord,
   sanitizeTemplateForRead,
   getAllTemplates: readAllTemplates,

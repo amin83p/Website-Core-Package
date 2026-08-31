@@ -1,0 +1,225 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName,
+  print,
+  btn_export: false,
+  headerManageBtns: ['<a href="/dashboard/section-nav/EMAIL_MANAGEMENT" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-speedometer2 me-1"></i> Email Dashboard</a>'],
+  manageBtns: [
+    '<a href="/email-management/templates" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-envelope-paper me-1"></i> Email Templates</a>',
+    '<a href="/email-management/providers" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-key me-1"></i> Provider Profiles</a>',
+    '<a href="/email-management/ledger" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-journal-check me-1"></i> Email Ledger</a>'
+  ]
+}) %>
+
+<%
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const safeEventCatalog = Array.isArray(eventCatalog) ? eventCatalog : [];
+  const selectedEventFilter = String(stateFilters?.eventKey__eq || '').toUpperCase();
+  const selectedRouteFilter = String(stateFilters?.effectiveRoute__eq || '').toLowerCase();
+  const hasRoutingFiltersApplied = Boolean(
+    String(stateFilters?.eventKey__eq || '').trim()
+    || String(stateFilters?.effectiveRoute__eq || '').trim()
+  );
+
+  function renderRouteBadge(routeSource) {
+    const token = String(routeSource || '').toLowerCase();
+    if (token === 'org_override') {
+      return '<span class="badge bg-primary-subtle text-primary border">Org override</span>';
+    }
+    if (token === 'system_default') {
+      return '<span class="badge bg-info-subtle text-info border">SYSTEM default</span>';
+    }
+    if (token === 'unconfigured') {
+      return '<span class="badge bg-secondary-subtle text-secondary border">Unconfigured</span>';
+    }
+    return '<span class="badge bg-light text-muted border">-</span>';
+  }
+%>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Event Routing</div>
+    <button
+      id="emailRoutingFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#emailRoutingFilterCollapse"
+      aria-expanded="<%= hasRoutingFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="emailRoutingFilterCollapse"
+      aria-label="<%= hasRoutingFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="emailRoutingFilterToggleIcon" class="bi <%= hasRoutingFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasRoutingFiltersApplied ? ' show' : '' %>" id="emailRoutingFilterCollapse">
+    <form method="GET" action="/email-management/routing" id="emailRoutingFilterForm" class="card-body p-3">
+      <% if (stateFilters?.q) { %><input type="hidden" name="q" value="<%= stateFilters.q %>"><% } %>
+      <% if (stateFilters?.type) { %><input type="hidden" name="type" value="<%= stateFilters.type %>"><% } %>
+      <% if (stateFilters?.searchFields) { %><input type="hidden" name="searchFields" value="<%= stateFilters.searchFields %>"><% } %>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <label class="form-label mb-1">Email Event</label>
+          <select class="form-select size-md" name="eventKey__eq">
+            <option value="">All accessible events</option>
+            <% safeEventCatalog.forEach((event) => { %>
+              <option value="<%= event.eventKey %>" <%= String(event.eventKey || '').toUpperCase() === selectedEventFilter ? 'selected' : '' %>>
+                <%= (event.packageName ? event.packageName + ' — ' : '') + (event.label || event.eventKey) %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Effective Route</label>
+          <select class="form-select size-md" name="effectiveRoute__eq">
+            <option value="">All routes</option>
+            <option value="org_override" <%= selectedRouteFilter === 'org_override' ? 'selected' : '' %>>Org override</option>
+            <option value="system_default" <%= selectedRouteFilter === 'system_default' ? 'selected' : '' %>>SYSTEM default</option>
+            <option value="unconfigured" <%= selectedRouteFilter === 'unconfigured' ? 'selected' : '' %>>Unconfigured</option>
+          </select>
+        </div>
+        <div class="col-md-4 d-flex gap-2 justify-content-md-end">
+          <a href="/email-management/routing" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search event key, label, package, section, template subject...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="eventKey">Event Key <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="eventLabel">Email Event <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="packageName">Package <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="sectionId">Section <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="orgTemplateSubject">Org Template <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="systemTemplateSubject">SYSTEM Template <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="effectiveRoute">Effective Route <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr>
+          <td colspan="8" class="text-center text-muted py-5">No event routing rows found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr data-routing-row-id="<%= row.eventKey || '' %>">
+          <td class="ps-4 font-monospace small" data-sort-value="<%= row.eventKey || '' %>"><%= row.eventKey || '-' %></td>
+          <td data-sort-value="<%= row.eventLabel || row.eventKey || '' %>">
+            <div class="fw-semibold text-dark"><%= row.eventLabel || row.eventKey || '-' %></div>
+            <% if (row.sectionId || row.operationId) { %>
+              <div class="small text-muted font-monospace"><%= (row.sectionId || '-') + '::' + (row.operationId || '-') %></div>
+            <% } %>
+          </td>
+          <td data-sort-value="<%= row.packageName || 'CORE' %>">
+            <span class="badge bg-light text-dark border"><%= row.packageName || 'CORE' %></span>
+          </td>
+          <td class="font-monospace small" data-sort-value="<%= row.sectionId || '' %>"><%= row.sectionId || '-' %></td>
+          <td class="text-truncate" style="max-width: 220px;" data-sort-value="<%= row.orgTemplateSubject || row.orgTemplateId || '' %>">
+            <% if (row.orgTemplateId) { %>
+              <div class="small font-monospace text-muted"><%= row.orgTemplateId %></div>
+              <div><%= row.orgTemplateSubject || '-' %></div>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+          <td class="text-truncate" style="max-width: 220px;" data-sort-value="<%= row.systemTemplateSubject || row.systemTemplateId || '' %>">
+            <% if (row.systemTemplateId) { %>
+              <div class="small font-monospace text-muted"><%= row.systemTemplateId %></div>
+              <div><%= row.systemTemplateSubject || '-' %></div>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+          <td class="text-center" data-sort-value="<%= row.effectiveRoute || row.routeSource || '' %>"><%- renderRouteBadge(row.effectiveRoute || row.routeSource) %></td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.eventKey %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.eventKey %>">
+                <% if (!row.orgTemplateId) { %>
+                  <a href="/email-management/templates/new?eventKey=<%= encodeURIComponent(row.eventKey || '') %>" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-plus-circle me-2"></i>Create Org Override
+                  </a>
+                <% } else { %>
+                  <a href="/email-management/templates/<%= row.orgTemplateId %>" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil-square me-2"></i>Edit Org Template
+                  </a>
+                <% } %>
+                <% if (row.systemTemplateId) { %>
+                  <a href="/email-management/templates/<%= row.systemTemplateId %>" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-globe2 me-2"></i>Edit SYSTEM Template
+                  </a>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: 'email-management/routing'
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+  (function () {
+    function initCollapseToggleIcon(options = {}) {
+      const collapseEl = document.getElementById(String(options.collapseId || ''));
+      const buttonEl = document.getElementById(String(options.buttonId || ''));
+      const iconEl = document.getElementById(String(options.iconId || ''));
+      if (!collapseEl || !buttonEl || !iconEl) return;
+
+      const openIcon = String(options.openIcon || 'bi-chevron-down');
+      const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+      const openLabel = String(options.openLabel || 'Open filters');
+      const closeLabel = String(options.closeLabel || 'Close filters');
+
+      const setState = (expanded) => {
+        iconEl.classList.remove(openIcon, closeIcon);
+        iconEl.classList.add(expanded ? closeIcon : openIcon);
+        buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+      };
+
+      setState(collapseEl.classList.contains('show'));
+      collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+      collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+      collapseId: 'emailRoutingFilterCollapse',
+      buttonId: 'emailRoutingFilterToggleBtn',
+      iconId: 'emailRoutingFilterToggleIcon',
+      openIcon: 'bi-chevron-down',
+      closeIcon: 'bi-chevron-up',
+      openLabel: 'Open filters',
+      closeLabel: 'Close filters'
+    });
+  })();
+</script>

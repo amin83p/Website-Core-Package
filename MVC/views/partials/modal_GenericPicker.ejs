@@ -673,21 +673,21 @@ window.GenericPicker = (function() {
         const isMulti = currentConfig.multiselect === true;
 
         if (queryTerm.length < 2 && !forceShowAll) {
-            const multiHint = currentConfig.multiselect ? ' (type <kbd>---</kbd> to show all)' : '';
+            const showAllHint = ' (type <kbd>---</kbd> to show all)';
             if (isMulti) {
                 resetResultStatePreserveSelection();
                 renderList([], { append: false });
                 const selectedCount = pickerState.selectedItemsMap.size;
                 if (selectedCount > 0) {
-                    setFooterSummary(`Selected ${selectedCount} item(s). Type at least 2 characters to add more${multiHint}.`, 'bi-check2-square');
+                    setFooterSummary(`Selected ${selectedCount} item(s). Type at least 2 characters to add more${showAllHint}.`, 'bi-check2-square');
                 } else {
-                    listEl.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-keyboard fs-1 opacity-25 mb-2 d-block"></i>Type at least 2 characters to search${multiHint}...</div>`;
+                    listEl.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-keyboard fs-1 opacity-25 mb-2 d-block"></i>Type at least 2 characters to search${showAllHint}...</div>`;
                     setFooterSummary('Type at least 2 characters', 'bi-keyboard');
                 }
                 if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
                 updateAddSelectedUI();
             } else {
-                listEl.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-keyboard fs-1 opacity-25 mb-2 d-block"></i>Type at least 2 characters to search${multiHint}...</div>`;
+                listEl.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-keyboard fs-1 opacity-25 mb-2 d-block"></i>Type at least 2 characters to search${showAllHint}...</div>`;
                 setFooterSummary('Type at least 2 characters', 'bi-keyboard');
                 if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
                 resetPickerState();

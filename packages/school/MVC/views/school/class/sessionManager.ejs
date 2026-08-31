@@ -21,6 +21,25 @@
     .att-label:hover { background-color: #f8f9fa; color: #495057; }
     .btn-check[value="present"]:checked + .att-label { background-color: #198754; color: #fff; font-weight: bold; }
     .btn-check[value="late"]:checked + .att-label { background-color: #ffc107; color: #000; font-weight: bold; }
+    .att-label-late-le {
+        letter-spacing: 0.02em;
+        min-width: 3.25rem;
+    }
+    .att-label-late-le .att-l-part,
+    .att-label-late-le .att-le-part {
+        opacity: 0.45;
+        font-weight: 600;
+    }
+    .att-label-late-le.has-late-part .att-l-part,
+    .att-label-late-le.has-early-part .att-le-part {
+        opacity: 1;
+        font-weight: 800;
+    }
+    .btn-check[value="late"]:checked + .att-label-late-le.has-late-part .att-l-part,
+    .btn-check[value="late"]:checked + .att-label-late-le.has-early-part .att-le-part {
+        text-decoration: underline;
+        text-underline-offset: 0.12em;
+    }
     .btn-check[value="excused"]:checked + .att-label { background-color: #0dcaf0; color: #000; font-weight: bold; }
     .btn-check[value="absent"]:checked + .att-label { background-color: #dc3545; color: #fff; font-weight: bold; }
     .btn-check[value="acf"]:checked + .att-label { background-color: #b02a37; color: #fff; font-weight: bold; }
@@ -34,6 +53,46 @@
         justify-content: center;
         gap: 0.35rem;
         width: 100%;
+    }
+    .attendance-timing-table {
+        margin-bottom: 0;
+    }
+    .attendance-timing-table th,
+    .attendance-timing-table td {
+        vertical-align: middle;
+        padding: 0.35rem 0.5rem;
+    }
+    .attendance-timing-table thead th {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6c757d;
+        border-bottom-width: 1px;
+    }
+    .attendance-timing-table tbody th[scope="row"] {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #0d6efd;
+        white-space: nowrap;
+        width: 1%;
+    }
+    .attendance-timing-table .attendance-timing-input-time {
+        width: 7.25rem;
+        max-width: 100%;
+    }
+    .attendance-timing-table .attendance-timing-input-mins {
+        width: 5.5rem;
+        max-width: 100%;
+    }
+    .attendance-timing-table .attendance-timing-total {
+        min-width: 4.5rem;
+        white-space: nowrap;
+        text-align: right;
+        font-weight: 700;
+    }
+    .attendance-timing-table .attendance-timing-break-hint {
+        font-size: 0.7rem;
+        font-weight: 400;
+        color: #6c757d;
     }
     .conduct-rating-input {
         max-width: 7rem;
@@ -189,16 +248,6 @@
     .conduct-scale-level-row td {
         vertical-align: middle;
     }
-    .student-case-severity-group {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem;
-    }
-    .student-case-severity-label {
-        min-width: 5.5rem;
-        font-weight: 600;
-        border-radius: 999px;
-    }
     #attendanceTable th.attendance-order-col,
     #attendanceTable td.attendance-order-cell {
         width: 3rem;
@@ -228,44 +277,6 @@
         font-size: 0.55rem;
         padding: 0.15rem;
     }
-    .btn-check[value="info"]:checked + .student-case-severity-label--info {
-        background-color: #0d6efd;
-        border-color: #0d6efd;
-        color: #fff;
-    }
-    .btn-check[value="warning"]:checked + .student-case-severity-label--warning {
-        background-color: #ffc107;
-        border-color: #ffc107;
-        color: #000;
-    }
-    .btn-check[value="urgent"]:checked + .student-case-severity-label--urgent {
-        background-color: #dc3545;
-        border-color: #dc3545;
-        color: #fff;
-    }
-    .student-case-detail-presets {
-        display: grid;
-        gap: 0.45rem;
-    }
-    .student-case-details-textarea {
-        margin-top: 0.75rem;
-    }
-    .student-case-preset-option {
-        margin: 0;
-        padding: 0.55rem 0.75rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        background: #fff;
-        transition: border-color 0.15s ease, background-color 0.15s ease;
-    }
-    .student-case-preset-option:has(.student-case-preset-radio:checked) {
-        border-color: #2563eb;
-        background: #eff6ff;
-    }
-    .student-case-preset-option .form-check-input {
-        margin-top: 0.2rem;
-    }
-
     .comment-thread { max-height: 250px; overflow-y: auto; background: #f8f9fa; border-radius: 6px; padding: 10px; }
     .comment-bubble { background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .comment-author { font-weight: bold; font-size: 0.8rem; color: #495057; }
@@ -1035,84 +1046,6 @@
     }
     .session-panel-open-btn--primary {
         box-shadow: none;
-    }
-    .student-case-student-picker {
-        max-height: min(48vh, 420px);
-        overflow-y: auto;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.65rem;
-        padding: 0.85rem;
-        background: #f8fafc;
-    }
-    .student-case-student-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 0.65rem;
-    }
-    .student-case-student-card {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.75rem;
-        margin: 0;
-        padding: 0.85rem 0.9rem;
-        border: 2px solid #e2e8f0;
-        border-radius: 0.75rem;
-        background: #fff;
-        cursor: pointer;
-        transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .student-case-student-card:hover {
-        border-color: #93c5fd;
-        box-shadow: 0 0.15rem 0.45rem rgba(37, 99, 235, 0.08);
-    }
-    .student-case-student-card:has(.student-case-student-checkbox:checked) {
-        border-color: #2563eb;
-        background: #eff6ff;
-        box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.12);
-    }
-    .student-case-student-card .form-check-input {
-        margin-top: 0.35rem;
-        flex-shrink: 0;
-    }
-    .student-case-student-card-body {
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-        min-width: 0;
-    }
-    .student-case-student-initial {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 2.35rem;
-        height: 2.35rem;
-        border-radius: 999px;
-        background: #dbeafe;
-        color: #1d4ed8;
-        font-size: 0.82rem;
-        font-weight: 800;
-        flex-shrink: 0;
-    }
-    .student-case-student-name {
-        font-weight: 700;
-        color: #0f172a;
-        line-height: 1.25;
-        word-break: break-word;
-    }
-    .student-case-pending-summary {
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        background: #fff;
-    }
-    .student-case-student-option {
-        display: flex;
-        align-items: center;
-        gap: 0.65rem;
-        padding: 0.45rem 0.35rem;
-        border-bottom: 1px solid #edf2f7;
-    }
-    .student-case-student-option:last-child {
-        border-bottom: 0;
     }
     .session-report-step-nav {
         display: flex;
@@ -1961,9 +1894,11 @@
                     <span id="sessionBookCoveringNavBadge" class="badge rounded-pill session-nav-badge <%= sessionBookCoveringSummary?.status === 'submitted' ? 'bg-success' : 'bg-danger' %><%= hasSessionBookCoveringReport ? '' : ' d-none' %>" aria-hidden="<%= hasSessionBookCoveringReport ? 'false' : 'true' %>" title="<%= sessionBookCoveringSummary?.status === 'submitted' ? 'Book covering report submitted' : (hasSessionBookCoveringReport ? 'Book covering report draft' : 'Book covering report') %>"><%= hasSessionBookCoveringReport ? 'BR' : '' %></span>
                 </button>
                 <% } %>
+                <% if (typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canReadAll) { %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-folder-check fs-5"></i><span class="session-manager-nav-label">Student Cases</span>
                 </button>
+                <% } %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="gradebook" title="<%= isInstructionalInactive ? 'Inactive original session' : 'Coming soon' %>" <%= isInstructionalInactive ? 'disabled' : '' %>>
                     <i class="bi bi-journal-bookmark fs-5"></i><span class="session-manager-nav-label">Grade book</span>
                 </button>
@@ -2104,7 +2039,7 @@
                                                             <% } %>
                                                             <% if (isAttendanceStatusShown('late', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="l_<%= i %>" value="late" <%= student.attendance === 'late' ? 'checked' : '' %> <%- rowDisabledAttr %>>
-                                                            <label class="btn att-label" for="l_<%= i %>" title="Late"><i class="bi bi-clock-history"></i> Late</label>
+                                                            <label class="btn att-label att-label-late-le<%= (student.lateMinutes > 0) ? ' has-late-part' : '' %><%= (student.earlyLeaveMinutes > 0) ? ' has-early-part' : '' %>" for="l_<%= i %>" title="Late / left early"><span class="att-l-part">L</span>/<span class="att-le-part">LE</span></label>
                                                             <% } %>
                                                             <% if (isAttendanceStatusShown('absent', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="a_<%= i %>" value="absent" <%= student.attendance === 'absent' ? 'checked' : '' %> <%- rowDisabledAttr %>>
@@ -2129,6 +2064,10 @@
                                                     </div>
                                                     <input type="hidden" class="att-late" value="<%= student.lateMinutes || '' %>">
                                                     <input type="hidden" class="att-leave" value="<%= student.earlyLeaveMinutes || '' %>">
+                                                    <input type="hidden" class="att-arrival-time" value="<%= student.attendanceArrivalTime || '' %>">
+                                                    <input type="hidden" class="att-leave-time" value="<%= student.attendanceLeaveTime || '' %>">
+                                                    <input type="hidden" class="att-break-late" value="<%= student.breakLateMinutes || '' %>">
+                                                    <input type="hidden" class="att-break-early" value="<%= student.breakEarlyLeaveMinutes || '' %>">
                                                     <input type="hidden" class="att-late-excused" value="<%= student.lateMinutes && student.lateExcused ? 'true' : 'false' %>">
                                                     <input type="hidden" class="att-early-excused" value="<%= student.earlyLeaveMinutes && student.earlyLeaveExcused ? 'true' : 'false' %>">
                                                     <input type="hidden" class="att-absence-excused" value="<%= student.absenceExcused && (student.attendance === 'absent' || student.attendance === 'acf') ? 'true' : 'false' %>">
@@ -2618,7 +2557,7 @@
                         <h5 class="m-0 fw-bold text-primary"><i class="bi bi-folder-check me-2"></i>Student Cases</h5>
                         <div class="small text-muted mt-1">Open a case when one or more students need extra reflection, support, or office follow-up.</div>
                     </div>
-                    <% if (!isReadOnly) { %>
+                    <% if (!isReadOnly && typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canCreate) { %>
                     <div class="student-case-cta-zone">
                         <button type="button" class="btn btn-outline-secondary student-case-open-btn w-100" id="btnOpenStudentCaseWizard">
                             <i class="bi bi-folder-plus me-2"></i>Open Student Case
@@ -2736,36 +2675,67 @@
                 <div class="attendance-timing-panel border rounded bg-light-subtle p-3 mb-3">
                     <div class="small text-muted mb-3" id="modalAttendanceSessionWindow">Session: —</div>
                     <div id="modalAttendanceTimingError" class="small text-danger mb-2 d-none" role="alert"></div>
-                    <div class="row g-3">
+                    <div class="table-responsive">
+                        <table class="table table-sm attendance-timing-table align-middle">
+                            <tbody>
+                                <tr class="table-light">
+                                    <th scope="col"></th>
+                                    <th scope="col">Arrived at</th>
+                                    <th scope="col">
+                                        Minutes late returning from breaks
+                                        <div class="attendance-timing-break-hint">Total across all breaks</div>
+                                    </th>
+                                    <th scope="col" class="text-end">Total</th>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Late arrival</th>
+                                    <td>
+                                        <input type="time" class="form-control form-control-sm attendance-timing-input-time" id="modalArrivalTime" step="60" <%- disabledAttr %>>
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm attendance-timing-input-mins" id="modalBreakLateMins" placeholder="0" min="0" step="1" <%- disabledAttr %>>
+                                    </td>
+                                    <td class="attendance-timing-total"><span id="modalAttendanceTotalLate">0</span> min</td>
+                                </tr>
+                                <tr class="table-light">
+                                    <th scope="col"></th>
+                                    <th scope="col">Left at</th>
+                                    <th scope="col">
+                                        Minutes left early during breaks
+                                        <div class="attendance-timing-break-hint">Total across all breaks</div>
+                                    </th>
+                                    <th scope="col" class="text-end">Total</th>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Leaving early</th>
+                                    <td>
+                                        <input type="time" class="form-control form-control-sm attendance-timing-input-time" id="modalLeaveTime" step="60" <%- disabledAttr %>>
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm attendance-timing-input-mins" id="modalBreakEarlyMins" placeholder="0" min="0" step="1" <%- disabledAttr %>>
+                                    </td>
+                                    <td class="attendance-timing-total"><span id="modalAttendanceTotalEarly">0</span> min</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="small text-muted mt-1">Totals are saved to attendance when you apply.</div>
+                    <% if (canEditSessionMetadataPageFlag) { %>
+                    <div class="row g-2 mt-2">
                         <div class="col-md-6">
-                            <div class="fw-semibold small text-primary mb-2">Late arrival</div>
-                            <label class="form-label fw-bold small" for="modalArrivalTime">Arrived at</label>
-                            <input type="time" class="form-control" id="modalArrivalTime" step="60" <%- disabledAttr %>>
-                            <label class="form-label fw-bold small mt-2" for="modalLateMins">Minutes late</label>
-                            <input type="number" class="form-control" id="modalLateMins" placeholder="0" min="0" step="1" <%- disabledAttr %>>
-                            <% if (canEditSessionMetadataPageFlag) { %>
-                            <div class="mt-2 d-none" id="wrap_modalLateExcused">
+                            <div class="d-none" id="wrap_modalLateExcused">
                                 <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalLateExcused" aria-pressed="false" <%- disabledAttr %>>
                                     <i class="bi bi-shield-plus"></i><span>Mark late excused</span>
                                 </button>
                             </div>
-                            <% } %>
                         </div>
                         <div class="col-md-6">
-                            <div class="fw-semibold small text-primary mb-2">Left early</div>
-                            <label class="form-label fw-bold small" for="modalLeaveTime">Left at</label>
-                            <input type="time" class="form-control" id="modalLeaveTime" step="60" <%- disabledAttr %>>
-                            <label class="form-label fw-bold small mt-2" for="modalLeaveMins">Minutes early</label>
-                            <input type="number" class="form-control" id="modalLeaveMins" placeholder="0" min="0" step="1" <%- disabledAttr %>>
-                            <% if (canEditSessionMetadataPageFlag) { %>
-                            <div class="mt-2 d-none" id="wrap_modalEarlyLeaveExcused">
+                            <div class="d-none" id="wrap_modalEarlyLeaveExcused">
                                 <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalEarlyLeaveExcused" aria-pressed="false" <%- disabledAttr %>>
                                     <i class="bi bi-shield-plus"></i><span>Mark early leave excused</span>
                                 </button>
                             </div>
-                            <% } %>
                         </div>
-                        <% if (canEditSessionMetadataPageFlag) { %>
                         <div class="col-12">
                             <div class="d-none" id="wrap_modalAbsenceExcused">
                                 <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalAbsenceExcused" aria-pressed="false" <%- disabledAttr %>>
@@ -2773,8 +2743,8 @@
                                 </button>
                             </div>
                         </div>
-                        <% } %>
                     </div>
+                    <% } %>
                 </div>
 
                 <div class="row g-3 mb-2">
@@ -2980,82 +2950,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="studentCaseModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-folder-plus me-2"></i><span id="studentCaseModalTitle">Student Case</span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="studentCaseId">
-                <input type="hidden" id="studentCasePersonId">
-                <div id="studentCaseStepDetails">
-                    <div class="alert alert-light border small mb-3" id="studentCaseContext"></div>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold" for="studentCaseCategory">Category</label>
-                            <select class="form-select" id="studentCaseCategory">
-                                <option value="learning">Learning</option>
-                                <option value="technology">Technology</option>
-                                <option value="engagement">Engagement</option>
-                                <option value="behavior">Behavior</option>
-                                <option value="support">Additional Support</option>
-                                <option value="resources">Resources</option>
-                                <option value="lesson_delivery">Lesson Delivery</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div class="col-md-8">
-                            <div class="form-label fw-bold">Severity</div>
-                            <div class="student-case-severity-group" role="group" aria-label="Case severity">
-                                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityInfo" value="info" checked>
-                                <label class="btn btn-sm btn-outline-primary student-case-severity-label student-case-severity-label--info" for="studentCaseSeverityInfo">Info</label>
-                                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityWarning" value="warning">
-                                <label class="btn btn-sm btn-outline-warning student-case-severity-label student-case-severity-label--warning" for="studentCaseSeverityWarning">Warning</label>
-                                <input type="radio" class="btn-check" name="studentCaseSeverity" id="studentCaseSeverityUrgent" value="urgent">
-                                <label class="btn btn-sm btn-outline-danger student-case-severity-label student-case-severity-label--urgent" for="studentCaseSeverityUrgent">Urgent</label>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label>
-                            <div id="studentCaseDetailPresetsWrap">
-                                <div id="studentCaseDetailPresets" class="student-case-detail-presets"></div>
-                            </div>
-                            <textarea class="form-control student-case-details-textarea" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea>
-                            <div class="form-text">Pick a common issue below, then adjust the detail text if needed.</div>
-                        </div>
-                    </div>
-                </div>
-                <div id="studentCaseStepStudents" class="d-none">
-                    <div class="alert alert-primary border-0 mb-3" style="background: #eff6ff;">
-                        <h6 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i>Assign students</h6>
-                        <p class="small mb-0 text-muted" id="studentCaseStudentStepIntro">Select students if this case applies to specific learners.</p>
-                    </div>
-                    <div class="student-case-pending-summary card mb-3">
-                        <div class="card-body py-3" id="studentCasePendingSummary"></div>
-                    </div>
-                    <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
-                        <input type="search" class="form-control form-control-sm flex-grow-1" id="studentCaseStudentSearch" placeholder="Search students by name..." style="min-width: 14rem;">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnStudentCaseSelectAll">Select all</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnStudentCaseClearAll">Clear</button>
-                    </div>
-                    <div id="studentCaseStudentPicker" class="student-case-student-picker"></div>
-                </div>
-            </div>
-            <div class="modal-footer bg-light d-flex justify-content-between flex-wrap gap-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-outline-secondary d-none" id="btnStudentCaseBack"><i class="bi bi-arrow-left me-1"></i>Back to details</button>
-                    <button type="button" class="btn btn-outline-primary d-none" id="btnSaveStudentCaseSessionWide"><i class="bi bi-globe2 me-1"></i>Save session-wide</button>
-                    <button type="button" class="btn btn-primary fw-bold d-none" id="btnStudentCaseNext"><i class="bi bi-people me-1"></i>Assign students</button>
-                    <button type="button" class="btn btn-outline-success fw-bold d-none" id="btnResolveStudentCase"><i class="bi bi-check2-circle me-1"></i>Save &amp; Resolve</button>
-                    <button type="button" class="btn btn-primary fw-bold d-none" id="btnSaveStudentCase"><i class="bi bi-save me-1"></i>Save Case</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<%- include('school/sessionStudentCase/partials/sessionStudentCaseModal') %>
 <div class="modal fade" id="sessionReportAssignmentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -3146,6 +3041,9 @@
 <script src="/scripts/outlineSessionPlanUtils.js"></script>
 <script src="/scripts/visibilityInterval.js"></script>
 <script src="/scripts/schoolAutosave.js"></script>
+<script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
+<link rel="stylesheet" href="/styles/sessionStudentCaseModal.css">
+<script src="/scripts/sessionStudentCaseModalClient.js"></script>
 
 <script>
 let detailsModalInstance = null;
@@ -3166,13 +3064,6 @@ function isAbsentLikeAttendanceStatus(attendance) {
 function truthyAttendanceFlag(value) {
     return value === true || value === 1 || ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
 }
-
-function parseModalAttendanceMinutes(id) {
-    const n = Number(document.getElementById(id)?.value || 0);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-}
-
-let attendanceTimingSyncLock = false;
 
 function parseAttendanceClockToMinutes(clock) {
     const token = String(clock || '').trim();
@@ -3241,30 +3132,195 @@ function updateAttendanceTimingSessionLabel() {
     if (leaveInput && end) leaveInput.max = end;
 }
 
-function validateAttendanceTimingPair(start, end, arrival, leave) {
+function validateAttendanceTimingInputs(start, end, arrival, leave) {
     if (!start || !end) {
         return { valid: false, message: 'Session start and end times are required.' };
     }
     const startM = parseAttendanceClockToMinutes(start);
     const endM = parseAttendanceClockToMinutes(end);
-    const arrivalM = parseAttendanceClockToMinutes(arrival);
-    const leaveM = parseAttendanceClockToMinutes(leave);
     if (startM == null || endM == null || endM <= startM) {
         return { valid: false, message: 'Session start and end times are required.' };
     }
-    if (arrivalM == null || leaveM == null) {
-        return { valid: false, message: 'Enter valid arrival and leave times.' };
+    const arrivalToken = String(arrival || '').trim();
+    const leaveToken = String(leave || '').trim();
+    let arrivalM = null;
+    let leaveM = null;
+    if (arrivalToken) {
+        arrivalM = parseAttendanceClockToMinutes(arrivalToken);
+        if (arrivalM == null) {
+            return { valid: false, message: 'Enter a valid arrival time.' };
+        }
+        if (arrivalM < startM || arrivalM > endM) {
+            return { valid: false, message: 'Arrival must be within the session time.' };
+        }
     }
-    if (arrivalM < startM || arrivalM > endM) {
-        return { valid: false, message: 'Arrival must be within the session time.' };
+    if (leaveToken) {
+        leaveM = parseAttendanceClockToMinutes(leaveToken);
+        if (leaveM == null) {
+            return { valid: false, message: 'Enter a valid leave time.' };
+        }
+        if (leaveM < startM || leaveM > endM) {
+            return { valid: false, message: 'Leave time must be within the session time.' };
+        }
     }
-    if (leaveM < startM || leaveM > endM) {
-        return { valid: false, message: 'Leave time must be within the session time.' };
-    }
-    if (arrivalM > leaveM) {
+    if (arrivalM != null && leaveM != null && arrivalM > leaveM) {
         return { valid: false, message: 'Arrival cannot be after leave time.' };
     }
     return { valid: true, message: '' };
+}
+
+function getTimingDetailApi() {
+    return window.SessionAttendanceTimingDetail || {};
+}
+
+function parseNonNegAttendanceMins(v) {
+    const n = Number(String(v ?? '').trim());
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+}
+
+function computeBoundaryLateMinutes(start, arrival) {
+    const api = getTimingDetailApi();
+    if (typeof api.computeBoundaryLateMinutes === 'function') {
+        return api.computeBoundaryLateMinutes(start, arrival);
+    }
+    const startM = parseAttendanceClockToMinutes(start);
+    if (startM == null) return 0;
+    const arrivalToken = String(arrival || '').trim();
+    const effectiveArrival = arrivalToken || String(start || '').trim();
+    const arrivalM = parseAttendanceClockToMinutes(effectiveArrival);
+    if (arrivalM == null) return 0;
+    return Math.max(0, arrivalM - startM);
+}
+
+function computeBoundaryEarlyMinutes(end, leave) {
+    const api = getTimingDetailApi();
+    if (typeof api.computeBoundaryEarlyMinutes === 'function') {
+        return api.computeBoundaryEarlyMinutes(end, leave);
+    }
+    const endM = parseAttendanceClockToMinutes(end);
+    if (endM == null) return 0;
+    const leaveToken = String(leave || '').trim();
+    const effectiveLeave = leaveToken || String(end || '').trim();
+    const leaveM = parseAttendanceClockToMinutes(effectiveLeave);
+    if (leaveM == null) return 0;
+    return Math.max(0, endM - leaveM);
+}
+
+function computeAttendanceTimingTotals({ start, end, arrival, leave, breakLate, breakEarly }) {
+    const api = getTimingDetailApi();
+    if (typeof api.computeAttendanceTimingTotals === 'function') {
+        return api.computeAttendanceTimingTotals({ start, end, arrival, leave, breakLate, breakEarly });
+    }
+    const maxSpan = calculateAttendanceClockRangeMinutes(start, end);
+    const boundaryLate = clampAttendanceMinuteValue(computeBoundaryLateMinutes(start, arrival), maxSpan);
+    const boundaryEarly = clampAttendanceMinuteValue(computeBoundaryEarlyMinutes(end, leave), maxSpan);
+    const breakLateMinutes = clampAttendanceMinuteValue(breakLate, maxSpan);
+    const breakEarlyLeaveMinutes = clampAttendanceMinuteValue(breakEarly, maxSpan);
+    return {
+        boundaryLate,
+        boundaryEarly,
+        breakLateMinutes,
+        breakEarlyLeaveMinutes,
+        lateMinutes: clampAttendanceMinuteValue(boundaryLate + breakLateMinutes, maxSpan),
+        earlyLeaveMinutes: clampAttendanceMinuteValue(boundaryEarly + breakEarlyLeaveMinutes, maxSpan)
+    };
+}
+
+function readRowTimingDetail(row) {
+    if (!row) {
+        return {
+            attendanceArrivalTime: '',
+            attendanceLeaveTime: '',
+            breakLateMinutes: '',
+            breakEarlyLeaveMinutes: ''
+        };
+    }
+    return {
+        attendanceArrivalTime: String(row.querySelector('.att-arrival-time')?.value || '').trim(),
+        attendanceLeaveTime: String(row.querySelector('.att-leave-time')?.value || '').trim(),
+        breakLateMinutes: String(row.querySelector('.att-break-late')?.value || '').trim(),
+        breakEarlyLeaveMinutes: String(row.querySelector('.att-break-early')?.value || '').trim()
+    };
+}
+
+function writeRowTimingDetail(row, detail = {}) {
+    if (!row) return;
+    const arrivalInput = row.querySelector('.att-arrival-time');
+    const leaveTimeInput = row.querySelector('.att-leave-time');
+    const breakLateInput = row.querySelector('.att-break-late');
+    const breakEarlyInput = row.querySelector('.att-break-early');
+    if (arrivalInput) arrivalInput.value = String(detail.attendanceArrivalTime || '').trim();
+    if (leaveTimeInput) leaveTimeInput.value = String(detail.attendanceLeaveTime || '').trim();
+    if (breakLateInput) {
+        const breakLate = Math.max(0, Math.floor(Number(detail.breakLateMinutes) || 0));
+        breakLateInput.value = breakLate > 0 ? String(breakLate) : '';
+    }
+    if (breakEarlyInput) {
+        const breakEarly = Math.max(0, Math.floor(Number(detail.breakEarlyLeaveMinutes) || 0));
+        breakEarlyInput.value = breakEarly > 0 ? String(breakEarly) : '';
+    }
+}
+
+function initAttendanceTimingFromSavedDetail(row) {
+    const { start, end } = getSessionClockBounds();
+    const detail = readRowTimingDetail(row);
+    const api = getTimingDetailApi();
+    const display = typeof api.resolveModalDisplayTimes === 'function'
+        ? api.resolveModalDisplayTimes({
+            startTime: start,
+            endTime: end,
+            attendanceArrivalTime: detail.attendanceArrivalTime,
+            attendanceLeaveTime: detail.attendanceLeaveTime
+        })
+        : {
+            arrivalDisplay: detail.attendanceArrivalTime || start,
+            leaveDisplay: detail.attendanceLeaveTime || end
+        };
+    const breakLateInput = document.getElementById('modalBreakLateMins');
+    const breakEarlyInput = document.getElementById('modalBreakEarlyMins');
+    const arrivalInput = document.getElementById('modalArrivalTime');
+    const leaveInput = document.getElementById('modalLeaveTime');
+    const breakLate = Math.max(0, Math.floor(Number(detail.breakLateMinutes) || 0));
+    const breakEarly = Math.max(0, Math.floor(Number(detail.breakEarlyLeaveMinutes) || 0));
+    if (breakLateInput) breakLateInput.value = breakLate > 0 ? String(breakLate) : '0';
+    if (breakEarlyInput) breakEarlyInput.value = breakEarly > 0 ? String(breakEarly) : '0';
+    if (arrivalInput) arrivalInput.value = display.arrivalDisplay || '';
+    if (leaveInput) leaveInput.value = display.leaveDisplay || '';
+}
+
+function updateLateLeLabelState(row) {
+    if (!row) return;
+    const label = row.querySelector('.att-label-late-le');
+    if (!label) return;
+    const late = parseNonNegAttendanceMins(row.querySelector('.att-late')?.value);
+    const early = parseNonNegAttendanceMins(row.querySelector('.att-leave')?.value);
+    label.classList.toggle('has-late-part', late > 0);
+    label.classList.toggle('has-early-part', early > 0);
+}
+
+function readAttendanceTimingFormState() {
+    const { start, end } = getSessionClockBounds();
+    return {
+        start,
+        end,
+        arrival: String(document.getElementById('modalArrivalTime')?.value || '').trim(),
+        leave: String(document.getElementById('modalLeaveTime')?.value || '').trim(),
+        breakLate: document.getElementById('modalBreakLateMins')?.value || 0,
+        breakEarly: document.getElementById('modalBreakEarlyMins')?.value || 0
+    };
+}
+
+function recalculateAttendanceTimingTotals() {
+    const form = readAttendanceTimingFormState();
+    const validation = validateAttendanceTimingInputs(form.start, form.end, form.arrival, form.leave);
+    setAttendanceTimingError(validation.valid ? '' : validation.message);
+    const totals = computeAttendanceTimingTotals(form);
+    const lateEl = document.getElementById('modalAttendanceTotalLate');
+    const earlyEl = document.getElementById('modalAttendanceTotalEarly');
+    if (lateEl) lateEl.textContent = String(totals.lateMinutes);
+    if (earlyEl) earlyEl.textContent = String(totals.earlyLeaveMinutes);
+    syncModalTimingExcuseControls(totals);
+    return totals;
 }
 
 function clampAttendanceMinuteValue(minutes, maxMinutes) {
@@ -3274,64 +3330,9 @@ function clampAttendanceMinuteValue(minutes, maxMinutes) {
     return Math.max(0, Math.min(max, n));
 }
 
-function syncAttendanceTimingFromMinutes() {
-    if (attendanceTimingSyncLock) return;
-    attendanceTimingSyncLock = true;
-    try {
-        const { start, end } = getSessionClockBounds();
-        const maxSpan = calculateAttendanceClockRangeMinutes(start, end);
-        const lateInput = document.getElementById('modalLateMins');
-        const leaveInput = document.getElementById('modalLeaveMins');
-        const arrivalInput = document.getElementById('modalArrivalTime');
-        const leaveTimeInput = document.getElementById('modalLeaveTime');
-        const late = clampAttendanceMinuteValue(lateInput?.value, maxSpan);
-        const early = clampAttendanceMinuteValue(leaveInput?.value, maxSpan);
-        if (lateInput) lateInput.value = String(late);
-        if (leaveInput) leaveInput.value = String(early);
-        if (arrivalInput && start) arrivalInput.value = addMinutesToAttendanceClock(start, late);
-        if (leaveTimeInput && end) leaveTimeInput.value = subtractMinutesFromAttendanceClock(end, early);
-        const validation = validateAttendanceTimingPair(start, end, arrivalInput?.value, leaveTimeInput?.value);
-        setAttendanceTimingError(validation.valid ? '' : validation.message);
-    } finally {
-        attendanceTimingSyncLock = false;
-    }
-}
-
-function syncAttendanceTimingFromTimes() {
-    if (attendanceTimingSyncLock) return;
-    attendanceTimingSyncLock = true;
-    try {
-        const { start, end } = getSessionClockBounds();
-        const maxSpan = calculateAttendanceClockRangeMinutes(start, end);
-        const arrivalInput = document.getElementById('modalArrivalTime');
-        const leaveTimeInput = document.getElementById('modalLeaveTime');
-        const lateInput = document.getElementById('modalLateMins');
-        const leaveInput = document.getElementById('modalLeaveMins');
-        const validation = validateAttendanceTimingPair(start, end, arrivalInput?.value, leaveTimeInput?.value);
-        if (!validation.valid) {
-            setAttendanceTimingError(validation.message);
-            return;
-        }
-        setAttendanceTimingError('');
-        const arrivalM = parseAttendanceClockToMinutes(arrivalInput?.value);
-        const leaveM = parseAttendanceClockToMinutes(leaveTimeInput?.value);
-        const startM = parseAttendanceClockToMinutes(start);
-        const endM = parseAttendanceClockToMinutes(end);
-        const late = clampAttendanceMinuteValue(arrivalM - startM, maxSpan);
-        const early = clampAttendanceMinuteValue(endM - leaveM, maxSpan);
-        if (lateInput) lateInput.value = String(late);
-        if (leaveInput) leaveInput.value = String(early);
-        if (arrivalInput && start) arrivalInput.value = addMinutesToAttendanceClock(start, late);
-        if (leaveTimeInput && end) leaveTimeInput.value = subtractMinutesFromAttendanceClock(end, early);
-    } finally {
-        attendanceTimingSyncLock = false;
-    }
-}
-
 function refreshAttendanceTimingUi() {
     updateAttendanceTimingSessionLabel();
-    syncAttendanceTimingFromMinutes();
-    syncModalTimingExcuseControls();
+    recalculateAttendanceTimingTotals();
 }
 
 function hasAttendanceTimingValidationError() {
@@ -3339,8 +3340,7 @@ function hasAttendanceTimingValidationError() {
     return el && !el.classList.contains('d-none') && String(el.textContent || '').trim();
 }
 
-function syncModalTimingExcuseButton({ minutesInputId, wrapperId, buttonId, stateKey, inactiveText, activeText }) {
-    const minutes = parseModalAttendanceMinutes(minutesInputId);
+function syncModalTimingExcuseButton({ minutes, wrapperId, buttonId, stateKey, inactiveText, activeText }) {
     const wrapper = document.getElementById(wrapperId);
     const button = document.getElementById(buttonId);
     if (!wrapper || !button) return;
@@ -3381,9 +3381,10 @@ function syncModalAbsenceExcuseControls() {
         : '<i class="bi bi-shield-plus"></i><span>Mark absence excused</span>';
 }
 
-function syncModalTimingExcuseControls() {
+function syncModalTimingExcuseControls(totals) {
+    const computed = totals || computeAttendanceTimingTotals(readAttendanceTimingFormState());
     syncModalTimingExcuseButton({
-        minutesInputId: 'modalLateMins',
+        minutes: computed.lateMinutes,
         wrapperId: 'wrap_modalLateExcused',
         buttonId: 'btn_modalLateExcused',
         stateKey: 'late',
@@ -3391,7 +3392,7 @@ function syncModalTimingExcuseControls() {
         activeText: 'Late excused'
     });
     syncModalTimingExcuseButton({
-        minutesInputId: 'modalLeaveMins',
+        minutes: computed.earlyLeaveMinutes,
         wrapperId: 'wrap_modalEarlyLeaveExcused',
         buttonId: 'btn_modalEarlyLeaveExcused',
         stateKey: 'early',
@@ -3408,8 +3409,10 @@ function captureDetailsModalFormSnapshot() {
         : null;
     const excuseAttachment = details?.excuseAttachment || null;
     return {
-        late: String(document.getElementById('modalLateMins')?.value || '').trim(),
-        leave: String(document.getElementById('modalLeaveMins')?.value || '').trim(),
+        arrival: String(document.getElementById('modalArrivalTime')?.value || '').trim(),
+        leave: String(document.getElementById('modalLeaveTime')?.value || '').trim(),
+        breakLate: String(document.getElementById('modalBreakLateMins')?.value || '').trim(),
+        breakEarly: String(document.getElementById('modalBreakEarlyMins')?.value || '').trim(),
         lateExcused: modalLateExcused === true,
         earlyLeaveExcused: modalEarlyLeaveExcused === true,
         absenceExcused: modalAbsenceExcused === true,
@@ -3426,8 +3429,10 @@ function isDetailsModalDirty() {
     if (!detailsModalSnapshot) return false;
     const current = captureDetailsModalFormSnapshot();
     return (
-        current.late !== detailsModalSnapshot.late ||
+        current.arrival !== detailsModalSnapshot.arrival ||
         current.leave !== detailsModalSnapshot.leave ||
+        current.breakLate !== detailsModalSnapshot.breakLate ||
+        current.breakEarly !== detailsModalSnapshot.breakEarly ||
         current.lateExcused !== detailsModalSnapshot.lateExcused ||
         current.earlyLeaveExcused !== detailsModalSnapshot.earlyLeaveExcused ||
         current.absenceExcused !== detailsModalSnapshot.absenceExcused ||
@@ -5247,15 +5252,17 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSessionConductStepStatusUi();
 
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
-    const canDeleteStudentCases = <%- jsonForScript(typeof canDeleteStudentCases !== 'undefined' && Boolean(canDeleteStudentCases)) %>;
+    const studentCaseCapabilities = <%- jsonForScript(typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities ? studentCaseCapabilities : {}) %>;
+    const canDeleteStudentCases = Boolean(studentCaseCapabilities.canDelete);
+    const canCreateStudentCases = Boolean(studentCaseCapabilities.canCreate);
+    const canUpdateStudentCases = Boolean(studentCaseCapabilities.canUpdate);
+    const canResolveStudentCases = Boolean(studentCaseCapabilities.canResolve);
+    const canReadStudentCases = Boolean(studentCaseCapabilities.canRead || studentCaseCapabilities.canReadAll);
     let sessionReportInstancesState = <%- jsonForScript(Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : []) %>;
     let sessionRosterReconciliationState = <%- jsonForScript(Array.isArray(sessionRosterReconciliation) ? sessionRosterReconciliation : []) %>;
     const dismissedRosterReconciliationKeys = new Set();
     const requestedStudentCaseId = new URLSearchParams(window.location.search || '').get('caseId') || '';
     let requestedStudentCaseHandled = false;
-    let studentCaseModalInstance = null;
-    const studentCaseModalEl = document.getElementById('studentCaseModal');
-    if (studentCaseModalEl && window.bootstrap) studentCaseModalInstance = new bootstrap.Modal(studentCaseModalEl);
 
     function scEscapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({
@@ -5322,7 +5329,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const status = String(row.status || 'open').toLowerCase();
             const severity = String(row.severity || 'info').toLowerCase();
             const updated = row?.audit?.lastUpdateDateTime || row?.audit?.createDateTime || '';
-            const canResolve = !['resolved', 'cancelled'].includes(status);
+            const canResolve = canResolveStudentCases && !['resolved', 'cancelled'].includes(status);
+            const canReopen = canUpdateStudentCases && ['resolved', 'cancelled'].includes(status);
+            const canEdit = canUpdateStudentCases || (canReadStudentCases && !canUpdateStudentCases);
+            const editLabel = canUpdateStudentCases ? 'Edit' : 'View';
+            const editIcon = canUpdateStudentCases ? 'pencil-square' : 'eye';
             const studentPersonId = String(row.studentPersonId || '').trim();
             const studentLabel = studentPersonId
                 ? (row.studentName || studentPersonId)
@@ -5340,8 +5351,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="small text-muted font-monospace">${scEscapeHtml(updated || '-')}</td>
                     <td class="text-end pe-4">
                         <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-primary btn-edit-student-case" data-case-id="${scEscapeHtml(row.id)}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
-                            ${canResolve ? `<button type="button" class="btn btn-outline-success btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="resolved"><i class="bi bi-check2-circle me-1"></i>Resolve</button>` : `<button type="button" class="btn btn-outline-warning btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="reopened"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>`}
+                            ${canEdit ? `<button type="button" class="btn btn-outline-primary btn-edit-student-case" data-case-id="${scEscapeHtml(row.id)}" data-read-only="${canUpdateStudentCases ? 'false' : 'true'}"><i class="bi bi-${editIcon} me-1"></i>${editLabel}</button>` : ''}
+                            ${canResolve ? `<button type="button" class="btn btn-outline-success btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="resolved"><i class="bi bi-check2-circle me-1"></i>Resolve</button>` : ''}
+                            ${canReopen ? `<button type="button" class="btn btn-outline-warning btn-status-student-case" data-case-id="${scEscapeHtml(row.id)}" data-status="reopened"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>` : ''}
                             ${canDeleteStudentCases ? `<button type="button" class="btn btn-outline-danger btn-delete-student-case" data-case-id="${scEscapeHtml(row.id)}"><i class="bi bi-trash me-1"></i>Delete</button>` : ''}
                         </div>
                     </td>
@@ -5858,330 +5870,50 @@ document.addEventListener('DOMContentLoaded', () => {
         return (Array.isArray(studentCasesState) ? studentCasesState : []).find((row) => String(row.id) === String(id)) || null;
     }
 
-    function setStudentCaseResolveButtonVisible(visible) {
-        const button = document.getElementById('btnResolveStudentCase');
-        if (button) button.classList.toggle('d-none', !visible);
-    }
-
-    window.__studentCaseDetailPresets = <%- JSON.stringify(typeof studentCaseDetailPresets !== 'undefined' && studentCaseDetailPresets ? studentCaseDetailPresets : { labels: {}, presets: {} }) %>;
-
-    function getStudentCasePresetConfig() {
-        return window.__studentCaseDetailPresets || { labels: {}, presets: {} };
-    }
-
-    function getSelectedStudentCaseSeverity() {
-        const checked = document.querySelector('input[name="studentCaseSeverity"]:checked');
-        return checked?.value || 'info';
-    }
-
-    function setSelectedStudentCaseSeverity(value) {
-        const token = String(value || 'info').trim().toLowerCase();
-        const input = document.querySelector(`input[name="studentCaseSeverity"][value="${token}"]`);
-        if (input) input.checked = true;
-    }
-
-    function studentCaseCategoryRequiresStudent(category) {
-        const key = String(category || 'learning').trim().toLowerCase();
-        const optional = getStudentCasePresetConfig().studentOptionalCategories;
-        if (Array.isArray(optional)) return !optional.includes(key);
-        return ['learning', 'engagement', 'behavior', 'support'].includes(key);
-    }
-
-    function studentCasePresetList(category) {
-        const key = String(category || 'learning').trim().toLowerCase();
-        const presets = getStudentCasePresetConfig().presets?.[key];
-        return Array.isArray(presets) ? presets : [];
-    }
-
-    function renderStudentCaseDetailOptions(category, selectedDetails = '') {
-        const presetsWrap = document.getElementById('studentCaseDetailPresetsWrap');
-        const presetsHost = document.getElementById('studentCaseDetailPresets');
-        const detailsInput = document.getElementById('studentCaseDetails');
-        const key = String(category || 'learning').trim().toLowerCase();
-        const presets = studentCasePresetList(key);
-        const selected = String(selectedDetails || '').trim();
-
-        if (detailsInput) detailsInput.value = selected;
-
-        if (key === 'other' || !presets.length) {
-            presetsWrap?.classList.add('d-none');
-            if (presetsHost) presetsHost.innerHTML = '';
-            return;
-        }
-
-        presetsWrap?.classList.remove('d-none');
-        if (!presetsHost) return;
-        const matchedPreset = presets.includes(selected);
-        presetsHost.innerHTML = presets.map((label, index) => {
-            const id = `studentCasePreset_${index}`;
-            const checked = matchedPreset && label === selected;
-            return `<div class="form-check student-case-preset-option"><input class="form-check-input student-case-preset-radio" type="radio" name="studentCasePreset" id="${id}" value="${scEscapeHtml(label)}"${checked ? ' checked' : ''}><label class="form-check-label" for="${id}">${scEscapeHtml(label)}</label></div>`;
-        }).join('');
-    }
-
-    function collectStudentCaseDetailsValue() {
-        return document.getElementById('studentCaseDetails')?.value || '';
-    }
-
     const sessionCaseRoster = <%- jsonForScript((session.roster || []).map((student) => ({
         personId: String(student.personId || '').trim(),
         name: String(student.name || '').trim()
     })).filter((student) => student.personId)) %>;
-    let studentCaseSelectedPersonIds = new Set();
 
-    function getSessionCaseRosterRows() {
-        return (Array.isArray(sessionCaseRoster) ? sessionCaseRoster : []).filter((row) => String(row?.personId || '').trim());
-    }
-
-    function studentCaseStudentInitials(name = '') {
-        const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-        if (!parts.length) return '?';
-        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-        return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
-    }
-
-    function renderStudentCaseStudentPicker(filterText = '') {
-        const host = document.getElementById('studentCaseStudentPicker');
-        if (!host) return;
-        const query = String(filterText || '').trim().toLowerCase();
-        const rows = getSessionCaseRosterRows().filter((row) => {
-            if (!query) return true;
-            return String(row.name || '').toLowerCase().includes(query) || String(row.personId || '').toLowerCase().includes(query);
-        });
-        if (!rows.length) {
-            host.innerHTML = '<div class="text-muted small text-center py-3">No students match this search.</div>';
-            return;
-        }
-        host.innerHTML = `<div class="student-case-student-grid">${rows.map((row) => {
-            const personId = String(row.personId || '').trim();
-            const displayName = String(row.name || personId).trim();
-            const checked = studentCaseSelectedPersonIds.has(personId) ? ' checked' : '';
-            return `<label class="student-case-student-card">
-                <input type="checkbox" class="form-check-input student-case-student-checkbox" value="${scEscapeHtml(personId)}"${checked}>
-                <span class="student-case-student-card-body">
-                    <span class="student-case-student-initial" aria-hidden="true">${scEscapeHtml(studentCaseStudentInitials(displayName))}</span>
-                    <span class="student-case-student-name">${scEscapeHtml(displayName)}</span>
-                </span>
-            </label>`;
-        }).join('')}</div>`;
-    }
-
-    function getSelectedStudentCasePersonIds() {
-        return [...studentCaseSelectedPersonIds].map((id) => String(id || '').trim()).filter(Boolean);
-    }
-
-    function isStudentCaseEditMode() {
-        return Boolean(String(document.getElementById('studentCaseId')?.value || '').trim());
-    }
-
-    function isStudentCaseStudentStepVisible() {
-        return !document.getElementById('studentCaseStepStudents')?.classList.contains('d-none');
-    }
-
-    function updateStudentCaseStudentStepIntro(category = '') {
-        const intro = document.getElementById('studentCaseStudentStepIntro');
-        if (!intro) return;
-        const key = String(category || document.getElementById('studentCaseCategory')?.value || 'other').trim().toLowerCase();
-        if (studentCaseCategoryRequiresStudent(key)) {
-            intro.textContent = 'This case type requires at least one student. Select everyone the issue applies to, then save.';
-        } else {
-            intro.textContent = 'You can assign specific students even for session-wide issues such as technology or lesson delivery. Leave everyone unselected to save as a session-wide case.';
-        }
-    }
-
-    function syncStudentCaseFooter(step = 'details') {
-        const isEdit = isStudentCaseEditMode();
-        const onStudents = step === 'students';
-        const onDetails = !onStudents;
-        const category = document.getElementById('studentCaseCategory')?.value || 'other';
-        const studentOptional = !studentCaseCategoryRequiresStudent(category);
-
-        document.getElementById('btnStudentCaseBack')?.classList.toggle('d-none', !onStudents || isEdit);
-        document.getElementById('btnStudentCaseNext')?.classList.toggle('d-none', !onDetails || isEdit);
-        document.getElementById('btnSaveStudentCaseSessionWide')?.classList.toggle('d-none', !onDetails || isEdit || !studentOptional);
-        document.getElementById('btnResolveStudentCase')?.classList.toggle('d-none', onDetails && !isEdit);
-        document.getElementById('btnSaveStudentCase')?.classList.toggle('d-none', onDetails && !isEdit);
-    }
-
-    function setStudentCaseWizardStep(step) {
-        const showStudents = step === 'students';
-        document.getElementById('studentCaseStepStudents')?.classList.toggle('d-none', !showStudents);
-        document.getElementById('studentCaseStepDetails')?.classList.toggle('d-none', showStudents);
-        syncStudentCaseFooter(step);
-        const modalTitle = document.getElementById('studentCaseModalTitle');
-        if (modalTitle && !isStudentCaseEditMode()) {
-            modalTitle.textContent = showStudents ? 'Assign Students' : 'Open Student Case';
-        }
-    }
-
-    function updateStudentCaseContextBanner(names = [], { sessionWide = false } = {}) {
-        const list = (Array.isArray(names) ? names : []).map((name) => String(name || '').trim()).filter(Boolean);
-        const classTitle = <%- jsonForScript(classData.title || classData.id) %>;
-        const sessionLabel = <%- jsonForScript(session.date || session.sessionId) %>;
-        let body = `Case for <strong>${scEscapeHtml(classTitle)}</strong> on <strong>${scEscapeHtml(sessionLabel)}</strong>.`;
-        if (sessionWide) {
-            body += ' This will be saved as a <strong>session-wide</strong> case.';
-        } else if (list.length === 1) {
-            body += ` Student: <strong>${scEscapeHtml(list[0])}</strong>.`;
-        } else if (list.length > 1) {
-            body += ` Students: <strong>${list.length} selected</strong>.`;
-        } else {
-            body += ' Use <strong>Assign students</strong> to link specific learners, or save as session-wide when this case type allows it.';
-        }
-        document.getElementById('studentCaseContext').innerHTML = body;
-    }
-
-    function renderStudentCasePendingSummary(payload = {}) {
-        const host = document.getElementById('studentCasePendingSummary');
-        if (!host) return;
-        const category = String(payload.category || document.getElementById('studentCaseCategory')?.value || 'other').trim();
-        const labels = getStudentCasePresetConfig().labels || {};
-        const categoryLabel = labels[category] || category.replace(/_/g, ' ');
-        const severity = String(payload.severity || getSelectedStudentCaseSeverity() || 'info').trim().toUpperCase();
-        const details = String(payload.details || collectStudentCaseDetailsValue() || '').trim();
-        const preview = details.length > 180 ? `${details.slice(0, 177)}...` : details;
-        host.innerHTML = `
-            <div class="d-flex flex-wrap gap-2 mb-2">
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">${scEscapeHtml(categoryLabel)}</span>
-                <span class="badge bg-light text-dark border">${scEscapeHtml(severity)}</span>
-            </div>
-            <div class="small text-muted mb-1">Issue details</div>
-            <div>${scEscapeHtml(preview || '-')}</div>
-        `;
-    }
-
-    function showStudentCaseStudentStep(payload = {}) {
-        const category = payload.category || document.getElementById('studentCaseCategory')?.value || 'other';
-        renderStudentCasePendingSummary(payload);
-        updateStudentCaseStudentStepIntro(category);
-        renderStudentCaseStudentPicker(document.getElementById('studentCaseStudentSearch')?.value || '');
-        setStudentCaseWizardStep('students');
-        document.getElementById('studentCaseStudentSearch')?.focus();
-    }
-
-    function advanceStudentCaseWizard() {
-        const payload = {
-            category: document.getElementById('studentCaseCategory')?.value,
-            severity: getSelectedStudentCaseSeverity(),
-            details: collectStudentCaseDetailsValue()
-        };
-        if (!String(payload.details || '').trim()) {
-            return showStudentCaseMessage('Issue Required', 'Enter issue details before assigning students.', 'error');
-        }
-        showStudentCaseStudentStep(payload);
-    }
-
-    function resetStudentCaseModal() {
-        document.getElementById('studentCaseId').value = '';
-        document.getElementById('studentCasePersonId').value = '';
-        document.getElementById('studentCaseCategory').value = 'learning';
-        setSelectedStudentCaseSeverity('info');
-        document.getElementById('studentCaseDetails').value = '';
-        document.getElementById('studentCaseStudentSearch').value = '';
-        studentCaseSelectedPersonIds = new Set();
-        renderStudentCaseDetailOptions('learning', '');
-        setStudentCaseResolveButtonVisible(true);
-        renderStudentCaseStudentPicker('');
-        setStudentCaseWizardStep('details');
-        updateStudentCaseContextBanner();
-    }
-
-    function openStudentCaseModal({ personId, studentName, caseRow = null } = {}) {
-        resetStudentCaseModal();
-        const row = caseRow || {};
-        const pid = String(row.studentPersonId || personId || '').trim();
-        const name = String(row.studentName || studentName || pid || 'Student').trim();
-        if (pid) studentCaseSelectedPersonIds.add(pid);
-        if (row.id) {
-            document.getElementById('studentCaseId').value = row.id;
-            document.getElementById('studentCasePersonId').value = pid;
-            const editLabel = pid ? name : 'Session-wide';
-            document.getElementById('studentCaseModalTitle').textContent = `Edit Case - ${editLabel}`;
-            updateStudentCaseContextBanner(pid ? [name] : [], { sessionWide: !pid });
-            const category = row.category || 'learning';
-            document.getElementById('studentCaseCategory').value = category;
-            setSelectedStudentCaseSeverity(row.severity || 'info');
-            renderStudentCaseDetailOptions(category, row.details || '');
-            const status = String(row.status || '').trim().toLowerCase();
-            setStudentCaseResolveButtonVisible(!['resolved', 'cancelled'].includes(status));
-            setStudentCaseWizardStep('details');
-        } else {
-            document.getElementById('studentCaseModalTitle').textContent = 'Open Student Case';
-            if (pid) updateStudentCaseContextBanner([name]);
-            else updateStudentCaseContextBanner();
-            setStudentCaseWizardStep('details');
-        }
-        if (studentCaseModalInstance) studentCaseModalInstance.show();
-    }
-
-    function collectStudentCasePayload() {
-        const caseId = String(document.getElementById('studentCaseId').value || '').trim();
-        const selectedIds = getSelectedStudentCasePersonIds();
-        const payload = {
-            actionStateId,
-            category: document.getElementById('studentCaseCategory').value,
-            severity: getSelectedStudentCaseSeverity(),
-            details: collectStudentCaseDetailsValue()
-        };
-        if (caseId) {
-            payload.studentPersonId = document.getElementById('studentCasePersonId').value;
-        } else if (selectedIds.length > 1) {
-            payload.studentPersonIds = selectedIds;
-        } else {
-            payload.studentPersonId = selectedIds[0] || '';
-        }
-        return payload;
-    }
-
-    async function saveStudentCase(options = {}) {
-        const caseId = document.getElementById('studentCaseId').value;
-        const shouldResolve = options && options.resolve === true;
-        const payload = collectStudentCasePayload();
-        if (shouldResolve) payload.status = 'resolved';
-        if (!String(payload.details || '').trim()) return showStudentCaseMessage('Issue Required', 'Select an issue detail before saving this case.', 'error');
-
-        const hasStudent = Boolean(
-            caseId
-                ? String(payload.studentPersonId || '').trim()
-                : (Array.isArray(payload.studentPersonIds) ? payload.studentPersonIds.length : String(payload.studentPersonId || '').trim())
-        );
-        if (!caseId && studentCaseCategoryRequiresStudent(payload.category) && !hasStudent) {
-            if (!isStudentCaseStudentStepVisible()) {
-                showStudentCaseStudentStep(payload);
-                return;
+    window.SessionStudentCaseModal.init({
+        apiMode: 'session',
+        actionStateId,
+        detailPresets: <%- JSON.stringify(typeof studentCaseDetailPresets !== 'undefined' && studentCaseDetailPresets ? studentCaseDetailPresets : { labels: {}, presets: {} }) %>,
+        classId: String(sessionManagerClassId || ''),
+        sessionId: String(sessionManagerSessionId || ''),
+        classTitle: <%- jsonForScript(classData.title || classData.id) %>,
+        sessionLabel: <%- jsonForScript(session.date || session.sessionId) %>,
+        roster: sessionCaseRoster,
+        allowCreate: canCreateStudentCases,
+        capabilities: studentCaseCapabilities,
+        messageBox: (options) => sessionMessageBox({
+            title: options.title || 'Student Case',
+            message: options.message || '',
+            icon: options.icon || 'info',
+            okClass: options.icon === 'error' ? 'btn-danger' : 'btn-primary'
+        }),
+        showLoading: (options) => (typeof window.showLoading === 'function' ? window.showLoading(options) : null),
+        hideLoading: (token) => {
+            if (typeof window.hideLoading === 'function') {
+                if (token) window.hideLoading(token);
+                else window.hideLoading({ force: true });
             }
-            return showStudentCaseMessage('Student Required', 'Select at least one student for this case category.', 'error');
+        },
+        onSaved() {
+            return refreshStudentCases();
         }
+    });
 
-        const url = caseId
-            ? `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases/${encodeURIComponent(caseId)}`
-            : `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases`;
-        const selectedCount = Array.isArray(payload.studentPersonIds)
-            ? payload.studentPersonIds.length
-            : (String(payload.studentPersonId || '').trim() ? 1 : 0);
-        const savingCount = selectedCount || 1;
-        showStudentCaseBusy(
-            shouldResolve ? 'Resolving Case' : (caseId ? 'Updating Case' : 'Saving Case'),
-            shouldResolve
-                ? 'Saving changes and resolving the student case...'
-                : (caseId ? 'Updating the student case...' : `Saving ${savingCount} student case${savingCount === 1 ? '' : 's'}...`)
-        );
-        try {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-ajax-request': 'true', 'Accept': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const result = await res.json().catch(() => ({}));
-            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to save student case.');
-            if (studentCaseModalInstance) studentCaseModalInstance.hide();
-            await refreshStudentCases();
-            hideStudentCaseBusy();
-            return showStudentCaseMessage(shouldResolve ? 'Case Resolved' : 'Case Saved', result.message || (shouldResolve ? 'Student case saved and resolved.' : 'Student case saved.'), 'success');
-        } catch (error) {
-            hideStudentCaseBusy();
-            throw error;
-        }
+    function openStudentCaseModal({ personId, studentName, caseRow = null, readOnly = false } = {}) {
+        window.SessionStudentCaseModal.open({
+            personId,
+            studentName,
+            caseRow,
+            roster: sessionCaseRoster,
+            readOnly: readOnly === true || (!canUpdateStudentCases && canReadStudentCases),
+            allowCreate: canCreateStudentCases,
+            capabilities: studentCaseCapabilities
+        });
     }
 
     async function refreshStudentCases() {
@@ -6247,62 +5979,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    document.getElementById('studentCaseCategory')?.addEventListener('change', (event) => {
-        const category = event.target.value;
-        renderStudentCaseDetailOptions(category, '');
-        updateStudentCaseStudentStepIntro(category);
-        if (!isStudentCaseStudentStepVisible() && !isStudentCaseEditMode()) {
-            const selected = getSelectedStudentCasePersonIds();
-            if (selected.length) {
-                const names = getSessionCaseRosterRows()
-                    .filter((row) => selected.includes(String(row.personId || '').trim()))
-                    .map((row) => row.name || row.personId);
-                updateStudentCaseContextBanner(names);
-            } else {
-                updateStudentCaseContextBanner([], { sessionWide: !studentCaseCategoryRequiresStudent(category) });
-            }
-            syncStudentCaseFooter('details');
-        }
-    });
-    document.getElementById('studentCaseDetailPresets')?.addEventListener('change', (event) => {
-        const radio = event.target.closest('.student-case-preset-radio');
-        if (!radio) return;
-        const detailsInput = document.getElementById('studentCaseDetails');
-        if (detailsInput) detailsInput.value = radio.value;
-    });
-    document.getElementById('studentCaseStudentPicker')?.addEventListener('change', (event) => {
-        const checkbox = event.target.closest('.student-case-student-checkbox');
-        if (!checkbox) return;
-        const personId = String(checkbox.value || '').trim();
-        if (!personId) return;
-        if (checkbox.checked) studentCaseSelectedPersonIds.add(personId);
-        else studentCaseSelectedPersonIds.delete(personId);
-    });
-    document.getElementById('studentCaseStudentSearch')?.addEventListener('input', (event) => {
-        renderStudentCaseStudentPicker(event.target.value || '');
-    });
-    document.getElementById('btnStudentCaseSelectAll')?.addEventListener('click', () => {
-        getSessionCaseRosterRows().forEach((row) => {
-            const personId = String(row.personId || '').trim();
-            if (personId) studentCaseSelectedPersonIds.add(personId);
-        });
-        renderStudentCaseStudentPicker(document.getElementById('studentCaseStudentSearch')?.value || '');
-    });
-    document.getElementById('btnStudentCaseClearAll')?.addEventListener('click', () => {
-        studentCaseSelectedPersonIds = new Set();
-        renderStudentCaseStudentPicker(document.getElementById('studentCaseStudentSearch')?.value || '');
-    });
     document.getElementById('btnOpenStudentCaseWizard')?.addEventListener('click', () => openStudentCaseModal());
-    document.getElementById('btnStudentCaseNext')?.addEventListener('click', () => advanceStudentCaseWizard());
-    document.getElementById('btnStudentCaseBack')?.addEventListener('click', () => setStudentCaseWizardStep('details'));
-    document.getElementById('btnSaveStudentCaseSessionWide')?.addEventListener('click', () => {
-        saveStudentCase().catch((error) => showStudentCaseMessage('Save Failed', error.message, 'error'));
-    });
     document.addEventListener('click', (event) => {
         const editBtn = event.target.closest('.btn-edit-student-case');
         if (editBtn) {
             const row = getStudentCaseById(editBtn.dataset.caseId);
-            if (row) openStudentCaseModal({ caseRow: row });
+            if (row) {
+                openStudentCaseModal({
+                    caseRow: row,
+                    readOnly: String(editBtn.dataset.readOnly || '').toLowerCase() === 'true'
+                });
+            }
             return;
         }
         const statusBtn = event.target.closest('.btn-status-student-case');
@@ -6318,12 +6005,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 showStudentCaseMessage('Delete Failed', error.message, 'error');
             });
         }
-    });
-    document.getElementById('btnSaveStudentCase')?.addEventListener('click', () => {
-        saveStudentCase().catch((error) => showStudentCaseMessage('Save Failed', error.message, 'error'));
-    });
-    document.getElementById('btnResolveStudentCase')?.addEventListener('click', () => {
-        saveStudentCase({ resolve: true }).catch((error) => showStudentCaseMessage('Resolve Failed', error.message, 'error'));
     });
     renderStudentCases();
     syncReportWorkflowStepUi();
@@ -6567,11 +6248,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function parseNonNegAttendanceMins(v) {
-        const n = Number(String(v ?? '').trim());
-        return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
-    }
-
     function getRosterStudentName(row) {
         const fromDataset = String(row?.dataset?.studentName || '').trim();
         if (fromDataset) return fromDataset;
@@ -6599,11 +6275,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function focusLateInputInDetailsModal() {
-        const lateInput = document.getElementById('modalLateMins');
-        if (!lateInput) return;
+        const arrivalInput = document.getElementById('modalArrivalTime');
+        if (!arrivalInput) return;
         window.setTimeout(() => {
-            lateInput.focus();
-            if (typeof lateInput.select === 'function') lateInput.select();
+            arrivalInput.focus();
         }, 220);
     }
 
@@ -6611,6 +6286,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!row) return;
         const personId = row.getAttribute('data-personid');
         if (!personId) return;
+        if (!row.dataset.lateModalPriorAttendance) {
+            row.dataset.lateModalPriorAttendance = row.querySelector('.att-radio:checked')?.value || 'present';
+        }
         openDetailsModal(personId, getRosterStudentName(row));
         focusLateInputInDetailsModal();
     }
@@ -6662,14 +6340,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (lateExcusedInput) lateExcusedInput.value = 'false';
             if (earlyExcusedInput) earlyExcusedInput.value = 'false';
             if (absenceExcusedInput) absenceExcusedInput.value = 'false';
+            updateLateLeLabelState(row);
             return;
         }
 
         if (window.__attendanceThresholdsEnabled === false) {
             if (!att || att === 'acf') return;
-            if (late > 0 || early > 0 || att === 'late') {
+            if (late > 0 || early > 0) {
                 if (!setAttendanceRadio(row, 'late')) setAttendanceRadio(row, 'present');
+            } else if (att === 'late') {
+                setAttendanceRadio(row, 'present');
             }
+            updateLateLeLabelState(row);
             return;
         }
 
@@ -6703,8 +6385,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if ((late > 0 || early > 0) && att === 'present') {
             setAttendanceRadio(row, 'late');
+        } else if (late === 0 && early === 0 && att === 'late') {
+            setAttendanceRadio(row, 'present');
         }
         clearAbsenceExcusedUnlessAbsentLike(row);
+        updateLateLeLabelState(row);
     }
 
     function clearAbsenceExcusedUnlessAbsentLike(row) {
@@ -6746,6 +6431,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailsModalAllowClose = true;
                 if (detailsModalInstance) detailsModalInstance.hide();
             })();
+        });
+
+        attendanceDetailsModalEl.addEventListener('hidden.bs.modal', () => {
+            const personId = document.getElementById('modalPersonId')?.value;
+            if (!personId) return;
+            const row = document.querySelector(`.roster-row[data-personid="${personId}"]`);
+            if (!row) return;
+            const prior = String(row.dataset.lateModalPriorAttendance || '').trim();
+            if (!prior) return;
+            const late = parseNonNegAttendanceMins(row.querySelector('.att-late')?.value);
+            const early = parseNonNegAttendanceMins(row.querySelector('.att-leave')?.value);
+            if (late <= 0 && early <= 0) {
+                setAttendanceRadio(row, prior && prior !== 'late' ? prior : 'present');
+            }
+            delete row.dataset.lateModalPriorAttendance;
+            applyAttendanceRulesToRow(row);
+            updateLateMissingMinuteState(row);
+            if (typeof refreshAttendanceStatusSummary === 'function') refreshAttendanceStatusSummary();
+            if (typeof gbOnAttendanceChanged === 'function') gbOnAttendanceChanged();
         });
 
         attendanceDetailsModalEl.addEventListener('paste', (event) => {
@@ -7652,21 +7356,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const btnSaveDetails = document.getElementById('btnSaveDetails');
-    function onAttendanceMinutesInput() {
-        syncAttendanceTimingFromMinutes();
-        syncModalTimingExcuseControls();
+    function onAttendanceTimingInput() {
+        recalculateAttendanceTimingTotals();
     }
-    function onAttendanceTimesInput() {
-        syncAttendanceTimingFromTimes();
-        syncModalTimingExcuseControls();
-    }
-    ['modalLateMins', 'modalLeaveMins'].forEach((id) => {
-        document.getElementById(id)?.addEventListener('input', onAttendanceMinutesInput);
-        document.getElementById(id)?.addEventListener('change', onAttendanceMinutesInput);
-    });
-    ['modalArrivalTime', 'modalLeaveTime'].forEach((id) => {
-        document.getElementById(id)?.addEventListener('input', onAttendanceTimesInput);
-        document.getElementById(id)?.addEventListener('change', onAttendanceTimesInput);
+    ['modalArrivalTime', 'modalLeaveTime', 'modalBreakLateMins', 'modalBreakEarlyMins'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('input', onAttendanceTimingInput);
+        document.getElementById(id)?.addEventListener('change', onAttendanceTimingInput);
     });
     document.getElementById('btn_modalLateExcused')?.addEventListener('click', () => {
         if (!sessionCanEditMetadata) return;
@@ -7713,14 +7408,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     const lateExcusedInput = row.querySelector('.att-late-excused');
                     const earlyExcusedInput = row.querySelector('.att-early-excused');
                     const absenceExcusedInput = row.querySelector('.att-absence-excused');
-                    const lateVal = document.getElementById('modalLateMins').value;
-                    const leaveVal = document.getElementById('modalLeaveMins').value;
+                    const form = readAttendanceTimingFormState();
+                    const api = getTimingDetailApi();
+                    const normalized = typeof api.normalizeAttendanceTimingDetailForSave === 'function'
+                        ? api.normalizeAttendanceTimingDetailForSave({
+                            startTime: form.start,
+                            endTime: form.end,
+                            arrivalTime: form.arrival,
+                            leaveTime: form.leave,
+                            breakLateMinutes: form.breakLate,
+                            breakEarlyLeaveMinutes: form.breakEarly
+                        })
+                        : {
+                            attendanceArrivalTime: '',
+                            attendanceLeaveTime: '',
+                            breakLateMinutes: Math.max(0, Math.floor(Number(form.breakLate) || 0)),
+                            breakEarlyLeaveMinutes: Math.max(0, Math.floor(Number(form.breakEarly) || 0)),
+                            lateMinutes: recalculateAttendanceTimingTotals().lateMinutes,
+                            earlyLeaveMinutes: recalculateAttendanceTimingTotals().earlyLeaveMinutes
+                        };
+                    writeRowTimingDetail(row, normalized);
+                    const lateVal = normalized.lateMinutes > 0 ? String(normalized.lateMinutes) : '';
+                    const leaveVal = normalized.earlyLeaveMinutes > 0 ? String(normalized.earlyLeaveMinutes) : '';
                     row.querySelector('.att-late').value = lateVal;
                     row.querySelector('.att-leave').value = leaveVal;
 
                     if (sessionCanEditMetadata) {
-                        if (lateExcusedInput) lateExcusedInput.value = parseModalAttendanceMinutes('modalLateMins') > 0 && modalLateExcused ? 'true' : 'false';
-                        if (earlyExcusedInput) earlyExcusedInput.value = parseModalAttendanceMinutes('modalLeaveMins') > 0 && modalEarlyLeaveExcused ? 'true' : 'false';
+                        if (lateExcusedInput) lateExcusedInput.value = normalized.lateMinutes > 0 && modalLateExcused ? 'true' : 'false';
+                        if (earlyExcusedInput) earlyExcusedInput.value = normalized.earlyLeaveMinutes > 0 && modalEarlyLeaveExcused ? 'true' : 'false';
                         if (absenceExcusedInput) {
                             const attendance = row.querySelector('.att-radio:checked')?.value || '';
                             absenceExcusedInput.value = isAbsentLikeAttendanceStatus(attendance) && modalAbsenceExcused ? 'true' : 'false';
@@ -7729,6 +7444,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const excuseVal = document.getElementById('modalExcuseRef').value;
                     row.querySelector('.att-excuse').value = excuseVal;
+
+                    if (normalized.lateMinutes > 0 || normalized.earlyLeaveMinutes > 0) {
+                        setAttendanceRadio(row, 'late');
+                    } else {
+                        const prior = String(row.dataset.lateModalPriorAttendance || '').trim();
+                        setAttendanceRadio(row, prior && prior !== 'late' ? prior : 'present');
+                    }
+                    delete row.dataset.lateModalPriorAttendance;
 
                     applyAttendanceRulesToRow(row);
                     updateLateMissingMinuteState(row);
@@ -7742,7 +7465,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const hasComments = (details.comments || []).length > 0;
                     const hasTimingExcuse = (lateExcusedInput?.value === 'true') || (earlyExcusedInput?.value === 'true');
                     const hasAbsenceExcuse = absenceExcusedInput?.value === 'true';
-                    if (lateVal || leaveVal || excuseVal || excuseAttachment || hasComments || hasTimingExcuse || hasAbsenceExcuse) {
+                    const hasLateMinutes = normalized.lateMinutes > 0;
+                    const hasEarlyMinutes = normalized.earlyLeaveMinutes > 0;
+                    const showYellow = hasLateMinutes || hasEarlyMinutes || excuseVal || excuseAttachment || hasComments || hasTimingExcuse || hasAbsenceExcuse;
+                    if (showYellow) {
                         btn.className = 'btn btn-sm btn-details btn-warning text-dark';
                         icon.className = 'bi bi-sticky-fill';
                     } else {
@@ -7751,6 +7477,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                detailsModalSnapshot = captureDetailsModalFormSnapshot();
                 detailsModalAllowClose = true;
                 if (detailsModalInstance) detailsModalInstance.hide();
             } finally {
@@ -9823,16 +9550,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateAttendanceSortHeader();
             });
         }
+        attendanceTableEl.addEventListener('mousedown', (e) => {
+            const radio = e.target.closest('.att-radio');
+            if (!radio || radio.disabled) return;
+            const row = radio.closest('.roster-row');
+            if (!row) return;
+            row.dataset.attendanceRadioBeforeChange = row.querySelector('.att-radio:checked')?.value || '';
+        });
         attendanceTableEl.addEventListener('change', (e) => {
             if (!e.target || !e.target.classList.contains('att-radio')) return;
             const row = e.target.closest('.roster-row');
             if (row) {
+                if (e.target.value === 'late') {
+                    const prior = String(row.dataset.attendanceRadioBeforeChange || row.querySelector('.att-radio:checked')?.value || 'present').trim();
+                    row.dataset.lateModalPriorAttendance = prior;
+                    if (prior !== 'late') {
+                        setAttendanceRadio(row, prior || 'present');
+                    }
+                    openLateDetailsForRow(row);
+                    delete row.dataset.attendanceRadioBeforeChange;
+                    refreshAttendanceStatusSummary();
+                    gbOnAttendanceChanged();
+                    return;
+                }
+                delete row.dataset.lateModalPriorAttendance;
                 applyAttendanceRulesToRow(row);
                 clearAbsenceExcusedUnlessAbsentLike(row);
                 updateLateMissingMinuteState(row);
-                if (e.target.value === 'late' && isLateMissingMinutes(row)) {
-                    openLateDetailsForRow(row);
-                }
             }
             refreshAttendanceStatusSummary();
             gbOnAttendanceChanged();
@@ -9898,7 +9642,10 @@ document.addEventListener('DOMContentLoaded', () => {
     gbRenderList();
 
     if (!contentReadOnly) {
-        document.querySelectorAll('.roster-row').forEach((row) => applyAttendanceRulesToRow(row));
+        document.querySelectorAll('.roster-row').forEach((row) => {
+            applyAttendanceRulesToRow(row);
+            updateLateLeLabelState(row);
+        });
     }
 
     function buildSessionAutosavePayload() {
@@ -9993,11 +9740,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const classParticipationPercent = readConductRating(conductRow, '.conduct-class-participation');
             const respectsTeachersPercent = readConductRating(conductRow, '.conduct-respects-teachers');
             const respectsStudentsPercent = readConductRating(conductRow, '.conduct-respects-students');
+            const timingDetail = readRowTimingDetail(row);
             const rosterRow = {
                 personId,
                 attendance,
                 lateMinutes,
                 earlyLeaveMinutes,
+                attendanceArrivalTime: timingDetail.attendanceArrivalTime || null,
+                attendanceLeaveTime: timingDetail.attendanceLeaveTime || null,
+                breakLateMinutes: timingDetail.breakLateMinutes === '' ? 0 : Number(timingDetail.breakLateMinutes || 0),
+                breakEarlyLeaveMinutes: timingDetail.breakEarlyLeaveMinutes === '' ? 0 : Number(timingDetail.breakEarlyLeaveMinutes || 0),
                 lateExcused,
                 earlyLeaveExcused,
                 absenceExcused,
@@ -10293,15 +10045,19 @@ function openDetailsModal(personId, name) {
 
     const row = document.querySelector(`.roster-row[data-personid="${personId}"]`);
     if (row) {
-        document.getElementById('modalLateMins').value = row.querySelector('.att-late').value;
-        document.getElementById('modalLeaveMins').value = row.querySelector('.att-leave').value;
+        const savedLate = row.querySelector('.att-late')?.value || '';
+        const savedEarly = row.querySelector('.att-leave')?.value || '';
         document.getElementById('modalExcuseRef').value = row.querySelector('.att-excuse').value;
-        modalLateExcused = parseModalAttendanceMinutes('modalLateMins') > 0 && truthyAttendanceFlag(row.querySelector('.att-late-excused')?.value);
-        modalEarlyLeaveExcused = parseModalAttendanceMinutes('modalLeaveMins') > 0 && truthyAttendanceFlag(row.querySelector('.att-early-excused')?.value);
+        const savedLateNum = Math.max(0, Math.floor(Number(savedLate) || 0));
+        const savedEarlyNum = Math.max(0, Math.floor(Number(savedEarly) || 0));
+        modalLateExcused = savedLateNum > 0 && truthyAttendanceFlag(row.querySelector('.att-late-excused')?.value);
+        modalEarlyLeaveExcused = savedEarlyNum > 0 && truthyAttendanceFlag(row.querySelector('.att-early-excused')?.value);
         const rowAttendance = row.querySelector('.att-radio:checked')?.value || '';
         modalAbsenceExcused = isAbsentLikeAttendanceStatus(rowAttendance)
             && truthyAttendanceFlag(row.querySelector('.att-absence-excused')?.value);
-        refreshAttendanceTimingUi();
+        updateAttendanceTimingSessionLabel();
+        initAttendanceTimingFromSavedDetail(row);
+        recalculateAttendanceTimingTotals();
         const details = window.getAttendanceDetails(personId);
         const excuseAttachment = details.excuseAttachment || null;
         const excuseFileInput = document.getElementById('modalExcuseFile');
@@ -10333,13 +10089,15 @@ function openDetailsModal(personId, name) {
             thread.innerHTML = '<div class="text-muted small text-center py-2">No notes yet. Be the first to comment.</div>';
         }
     } else {
-        document.getElementById('modalLateMins').value = '';
-        document.getElementById('modalLeaveMins').value = '';
+        document.getElementById('modalBreakLateMins').value = '';
+        document.getElementById('modalBreakEarlyMins').value = '';
         document.getElementById('modalExcuseRef').value = '';
         modalLateExcused = false;
         modalEarlyLeaveExcused = false;
         modalAbsenceExcused = false;
-        refreshAttendanceTimingUi();
+        updateAttendanceTimingSessionLabel();
+        initAttendanceTimingFromSavedDetail(null);
+        recalculateAttendanceTimingTotals();
     }
 
     document.getElementById('inp_newComment').value = '';

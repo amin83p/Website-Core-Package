@@ -1,0 +1,115 @@
+.student-case-severity-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.student-case-severity-label {
+    min-width: 5.5rem;
+    font-weight: 600;
+    border-radius: 999px;
+}
+.btn-check[value="info"]:checked + .student-case-severity-label--info {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+.btn-check[value="warning"]:checked + .student-case-severity-label--warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+.btn-check[value="urgent"]:checked + .student-case-severity-label--urgent {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+}
+.student-case-detail-presets {
+    display: grid;
+    gap: 0.45rem;
+}
+.student-case-details-textarea {
+    margin-top: 0.75rem;
+}
+.student-case-preset-option {
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.student-case-preset-option:has(.student-case-preset-radio:checked) {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+.student-case-preset-option .form-check-input {
+    margin-top: 0.2rem;
+}
+.student-case-student-picker {
+    max-height: min(48vh, 420px);
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    padding: 0.85rem;
+    background: #f8fafc;
+}
+.student-case-student-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.65rem;
+}
+.student-case-student-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.85rem 0.9rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.student-case-student-card:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 0.15rem 0.45rem rgba(37, 99, 235, 0.08);
+}
+.student-case-student-card:has(.student-case-student-checkbox:checked) {
+    border-color: #2563eb;
+    background: #eff6ff;
+    box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.12);
+}
+.student-case-student-card .form-check-input {
+    margin-top: 0.35rem;
+    flex-shrink: 0;
+}
+.student-case-student-card-body {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+}
+.student-case-student-initial {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.35rem;
+    height: 2.35rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.82rem;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+.student-case-student-name {
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+    word-break: break-word;
+}
+.student-case-pending-summary {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+}

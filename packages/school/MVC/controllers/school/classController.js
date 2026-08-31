@@ -51,6 +51,8 @@ const finalGradesWorkflowService = require('../../services/school/finalGradesWor
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
+const sessionStudentCaseAccessService = require('../../services/school/sessionStudentCaseAccessService');
+const sessionStudentCaseReviewService = require('../../services/school/sessionStudentCaseReviewService');
 const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
 const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
 const bookCoveringReportService = require('../../services/school/bookCoveringReportService');
@@ -82,6 +84,7 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
+const sessionAttendanceTimingDetailService = require('../../services/school/sessionAttendanceTimingDetailService');
 const attendanceChangeLogService = require('../../services/school/attendanceChangeLogService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
@@ -183,6 +186,38 @@ function assertLateAttendanceMinutesPresent(record = {}) {
     if (late <= 0 && early <= 0) {
         throw createLateMinutesRequiredError(toPublicId(record.personId || ''));
     }
+}
+
+function resolveAttendanceTimingFieldsForSave(incRec = {}, existRec = {}, session = {}, sessionMinutes) {
+    const startTime = String(session?.startTime || '').trim();
+    const endTime = String(session?.endTime || '').trim();
+    const incomingHasDetail = ['attendanceArrivalTime', 'attendanceLeaveTime', 'breakLateMinutes', 'breakEarlyLeaveMinutes']
+        .some((key) => incRec[key] !== undefined);
+
+    const detail = incomingHasDetail
+        ? sessionAttendanceTimingDetailService.normalizeAttendanceTimingDetailForSave({
+            startTime,
+            endTime,
+            arrivalTime: incRec.attendanceArrivalTime,
+            leaveTime: incRec.attendanceLeaveTime,
+            breakLateMinutes: incRec.breakLateMinutes,
+            breakEarlyLeaveMinutes: incRec.breakEarlyLeaveMinutes
+        })
+        : {
+            attendanceArrivalTime: String(existRec.attendanceArrivalTime || '').trim(),
+            attendanceLeaveTime: String(existRec.attendanceLeaveTime || '').trim(),
+            breakLateMinutes: Math.max(0, Math.floor(Number(existRec.breakLateMinutes) || 0)),
+            breakEarlyLeaveMinutes: Math.max(0, Math.floor(Number(existRec.breakEarlyLeaveMinutes) || 0))
+        };
+
+    return {
+        attendanceArrivalTime: detail.attendanceArrivalTime,
+        attendanceLeaveTime: detail.attendanceLeaveTime,
+        breakLateMinutes: detail.breakLateMinutes,
+        breakEarlyLeaveMinutes: detail.breakEarlyLeaveMinutes,
+        lateMinutes: clampAttendanceMinuteForSession(incRec.lateMinutes, sessionMinutes),
+        earlyLeaveMinutes: clampAttendanceMinuteForSession(incRec.earlyLeaveMinutes, sessionMinutes)
+    };
 }
 
 function resolveAttendanceExcuseFieldsForSave({ canOverride, incoming = {}, existing = {} }) {
@@ -3836,11 +3871,16 @@ async function saveSession1(req, res) {
                     incoming: incRec,
                     existing: existRec
                 });
+                const timingFields = resolveAttendanceTimingFieldsForSave(
+                    incRec,
+                    existRec,
+                    sessions[sessionIndex],
+                    sessionMinutesSave1
+                );
                 const merged = {
                     personId: incomingPersonId,
                     attendance,
-                    lateMinutes: clampAttendanceMinuteForSession(incRec.lateMinutes, sessionMinutesSave1),
-                    earlyLeaveMinutes: clampAttendanceMinuteForSession(incRec.earlyLeaveMinutes, sessionMinutesSave1),
+                    ...timingFields,
                     lateExcused: excuseFields.lateExcused,
                     earlyLeaveExcused: excuseFields.earlyLeaveExcused,
                     absenceExcused: excuseFields.absenceExcused,
@@ -4118,7 +4158,7 @@ async function manageSession(req, res) {
             bookCoveringCreateAccess,
             bookCoveringReadAccess,
             bookCoveringDeleteAccess,
-            sessionStudentCaseDeleteAccess
+            studentCaseCapabilities
         ] = await Promise.all([
             sessionReportInstanceService.buildSessionReportViewerContext({
                 classId,
@@ -4162,12 +4202,7 @@ async function manageSession(req, res) {
                 operationId: OPERATIONS.DELETE,
                 ipAddress: req.ip
             }).catch(() => null),
-            accessService.evaluateAccess({
-                user: req.user,
-                sectionId: SECTIONS.SCHOOL_SESSIONS,
-                operationId: OPERATIONS.DELETE,
-                ipAddress: req.ip
-            }).catch(() => null)
+            sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session })
         ]);
         logManageSessionStep(req, 'parallel_context', parallelStart);
 
@@ -4380,7 +4415,8 @@ async function manageSession(req, res) {
             mergedPartnerSessionReference,
             canUndoSessionMerge,
             canViewSchoolSettings,
-            canDeleteStudentCases: Boolean(sessionStudentCaseDeleteAccess?.allowed),
+            canDeleteStudentCases: Boolean(studentCaseCapabilities?.canDelete),
+            studentCaseCapabilities,
             canDeleteSession,
             sessionCoTeachers,
             canManageCoTeachers,
@@ -4610,7 +4646,13 @@ async function saveSessionStudentCase(req, res) {
     try {
         const { id: classId, sessionId, caseId = '' } = req.params;
         await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
+        const { classData, session } = await sessionStudentCaseReviewService.loadClassSessionContext(req, classId, sessionId);
         const body = req.body || {};
+        const shouldResolve = String(body.status || '').trim().toLowerCase() === 'resolved';
+        await sessionStudentCaseAccessService.assertCanSave(req, classData, session, {
+            isCreate: !caseId,
+            resolve: shouldResolve
+        });
         if (caseId) {
             const saved = await sessionStudentCaseService.saveCase({
                 classId,
@@ -4664,7 +4706,7 @@ async function saveSessionStudentCase(req, res) {
             : 'Student case saved.';
         return res.json({ status: 'success', message, case: saved });
     } catch (error) {
-        return res.status(400).json({ status: 'error', message: error.message });
+        return res.status(error.statusCode || 400).json({ status: 'error', message: error.message });
     }
 }
 
@@ -4672,6 +4714,13 @@ async function updateSessionStudentCaseStatus(req, res) {
     try {
         const { id: classId, sessionId, caseId } = req.params;
         await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
+        const { classData, session } = await sessionStudentCaseReviewService.loadClassSessionContext(req, classId, sessionId);
+        const status = String(req.body?.status || '').trim().toLowerCase();
+        if (status === 'resolved') {
+            await sessionStudentCaseAccessService.assertCanResolve(req, classData, session);
+        } else {
+            await sessionStudentCaseAccessService.assertCanUpdate(req, classData, session);
+        }
         const saved = await sessionStudentCaseService.updateStatus({
             classId,
             sessionId,
@@ -4682,7 +4731,7 @@ async function updateSessionStudentCaseStatus(req, res) {
         });
         return res.json({ status: 'success', message: 'Student case updated.', case: saved });
     } catch (error) {
-        return res.status(400).json({ status: 'error', message: error.message });
+        return res.status(error.statusCode || 400).json({ status: 'error', message: error.message });
     }
 }
 
@@ -4690,6 +4739,8 @@ async function deleteSessionStudentCase(req, res) {
     try {
         const { id: classId, sessionId, caseId } = req.params;
         await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
+        const { classData, session } = await sessionStudentCaseReviewService.loadClassSessionContext(req, classId, sessionId);
+        await sessionStudentCaseAccessService.assertCanDelete(req, classData, session);
         const deleted = await sessionStudentCaseService.deleteCase({
             classId,
             sessionId,
@@ -5614,11 +5665,16 @@ async function saveSession(req, res) {
                     incoming: incRec,
                     existing: existRec
                 });
+                const timingFields = resolveAttendanceTimingFieldsForSave(
+                    incRec,
+                    existRec,
+                    sessionForAttendanceWindow,
+                    sessionMinutesSave
+                );
                 const merged = {
                     personId: incomingPersonId,
                     attendance,
-                    lateMinutes: clampAttendanceMinuteForSession(incRec.lateMinutes, sessionMinutesSave),
-                    earlyLeaveMinutes: clampAttendanceMinuteForSession(incRec.earlyLeaveMinutes, sessionMinutesSave),
+                    ...timingFields,
                     lateExcused: excuseFields.lateExcused,
                     earlyLeaveExcused: excuseFields.earlyLeaveExcused,
                     absenceExcused: excuseFields.absenceExcused,
@@ -5743,7 +5799,7 @@ async function saveSession(req, res) {
         await schoolDataService.saveClassSessions(classId, sessions, req.user);
 
         if (pendingAttendanceChangeLog) {
-            const rosterChanges = attendanceChangeLogService.diffRosterAttendanceStatusChanges(
+            const rosterChanges = attendanceChangeLogService.diffRosterAttendanceChanges(
                 pendingAttendanceChangeLog.beforeRoster,
                 pendingAttendanceChangeLog.afterRoster
             );

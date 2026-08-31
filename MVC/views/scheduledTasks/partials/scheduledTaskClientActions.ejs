@@ -1,0 +1,129 @@
+<script>
+  (function () {
+    function getActionStateId() {
+      return String(document.getElementById('actionStateIdRef')?.dataset?.id || '').trim();
+    }
+
+    function cleanText(value) {
+      return String(value || '').trim();
+    }
+
+    async function showModalMessage(config = {}) {
+      if (typeof window.showMessageModal !== 'function') {
+        console.error('showMessageModal is unavailable.', config);
+        return null;
+      }
+      const result = await window.showMessageModal(config);
+      const buttons = Array.isArray(config.buttons) ? config.buttons : [];
+      const matched = buttons.find((btn) => String(btn.text || '').trim() === String(result || '').trim());
+      if (matched && matched.value !== undefined && matched.value !== null && String(matched.value).trim() !== '') {
+        return matched.value;
+      }
+      return result;
+    }
+
+    function withLoading(note, fn) {
+      let token = null;
+      if (typeof window.showLoading === 'function') {
+        token = window.showLoading({ note: note || 'Processing...' });
+      }
+      return Promise.resolve()
+        .then(fn)
+        .finally(() => {
+          if (typeof window.hideLoading === 'function') {
+            if (token) window.hideLoading(token);
+            else window.hideLoading({ force: true });
+          }
+        });
+    }
+
+    async function postScheduledTaskAction(url, options = {}) {
+      const actionStateId = String(options.actionStateId || getActionStateId() || '').trim();
+      const payload = new URLSearchParams();
+      if (actionStateId) payload.set('actionStateId', actionStateId);
+      const extraBody = options.body && typeof options.body === 'object' ? options.body : {};
+      Object.entries(extraBody).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        if (Array.isArray(value)) {
+          payload.set(key, value.map((item) => String(item)).join(','));
+          return;
+        }
+        payload.set(key, String(value));
+      });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'x-ajax-request': 'true',
+          ...(actionStateId ? { 'x-action-state-id': actionStateId } : {})
+        },
+        credentials: 'same-origin',
+        body: payload.toString()
+      });
+
+      const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+      let result = null;
+      if (contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch (_) {
+          result = { status: 'error', message: 'Unexpected JSON response from server.' };
+        }
+      } else {
+        const text = await response.text();
+        const plain = String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        result = {
+          status: 'error',
+          message: plain || `Request failed with status ${response.status}.`
+        };
+      }
+
+      if (!response.ok || result.status !== 'success') {
+        const err = new Error(String(result.message || 'Request failed.').replace(/<[^>]*>/g, ' ').trim());
+        err.payload = result;
+        throw err;
+      }
+      return result;
+    }
+
+    async function runScheduledTaskMutation({
+      url,
+      loadingNote = 'Processing...',
+      successTitle = 'Success',
+      successMessage = 'Operation completed successfully.',
+      reloadOnSuccess = true,
+      body = null
+    } = {}) {
+      if (!url) return;
+      try {
+        const result = await withLoading(loadingNote, () => postScheduledTaskAction(url, { body }));
+        const displayMessage = cleanText(result?.resultSummary || result?.message || successMessage);
+        await showModalMessage({
+          title: successTitle,
+          icon: 'success',
+          message: displayMessage,
+          buttons: [{ text: 'OK', class: 'btn-primary', value: 'ok' }]
+        });
+        if (reloadOnSuccess) window.location.reload();
+      } catch (error) {
+        await showModalMessage({
+          title: 'Operation Failed',
+          icon: 'error',
+          message: error.message || 'Unable to complete the operation.',
+          buttons: [{ text: 'OK', class: 'btn-primary', value: 'ok' }]
+        });
+      }
+    }
+
+    window.ScheduledTaskClientActions = {
+      getActionStateId,
+      showModalMessage,
+      withLoading,
+      postScheduledTaskAction,
+      runScheduledTaskMutation
+    };
+  })();
+</script>

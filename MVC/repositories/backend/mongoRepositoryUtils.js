@@ -9,6 +9,8 @@ const RESERVED_QUERY_KEYS = new Set([
   'limit',
   'sort',
   'order',
+  'sortBy',
+  'sortDir',
   'startDate',
   'endDate'
 ]);
@@ -24,7 +26,8 @@ function normalizeOperator(value, fallback = 'contains') {
   if (!token) return fallback;
   if (token === 'exact_match' || token === 'exact') return 'eq';
   if (token === 'ne' || token === 'not_equal' || token === 'not_equals') return 'neq';
-  if (token === 'eq' || token === 'neq' || token === 'in' || token === 'starts_with' || token === 'contains') return token;
+  if (token === 'eq' || token === 'neq' || token === 'in' || token === 'starts_with' || token === 'contains'
+    || token === 'lt' || token === 'lte' || token === 'gt' || token === 'gte') return token;
   return fallback;
 }
 
@@ -147,6 +150,11 @@ function buildFieldClause(field, operator, value) {
     return { [field]: { $regex: new RegExp(`^${escapeRegex(value)}`, 'i') } };
   }
 
+  if (operator === 'lt') return { [field]: { $lt: value } };
+  if (operator === 'lte') return { [field]: { $lte: value } };
+  if (operator === 'gt') return { [field]: { $gt: value } };
+  if (operator === 'gte') return { [field]: { $gte: value } };
+
   return { [field]: { $regex: new RegExp(escapeRegex(value), 'i') } };
 }
 
@@ -233,7 +241,7 @@ function buildMongoSortFromQuery(query = {}, explicitSort = null) {
     if (keys.length) return explicitSort;
   }
 
-  const rawSort = query?.sort;
+  const rawSort = query?.sort || query?.sortBy;
   if (!rawSort) return { id: 1 };
 
   const fields = Array.isArray(rawSort)
@@ -244,7 +252,7 @@ function buildMongoSortFromQuery(query = {}, explicitSort = null) {
       .filter(Boolean);
   if (!fields.length) return { id: 1 };
 
-  const baseOrder = parseSortOrder(query?.order, 1);
+  const baseOrder = parseSortOrder(query?.order ?? query?.sortDir, 1);
   return fields.reduce((acc, field) => {
     if (!field) return acc;
     if (field.startsWith('-')) {

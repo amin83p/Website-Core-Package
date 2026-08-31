@@ -23,7 +23,7 @@ test('school manifest declares session student cases data entity', () => {
   assert.equal(entity.collectionName, 'schoolSessionStudentCases');
 });
 
-test('class routes expose session student case endpoints under SCHOOL_SESSIONS', () => {
+test('class routes expose session student case endpoints under SCHOOL_SESSION_STUDENT_CASES', () => {
   const src = read('MVC/routes/classRoutes.js');
   const controller = read('MVC/controllers/school/classController.js');
   assert.match(src, /\/:id\/sessions\/:sessionId\/cases/);
@@ -32,34 +32,38 @@ test('class routes expose session student case endpoints under SCHOOL_SESSIONS',
   assert.match(src, /classCtrl\.updateSessionStudentCaseStatus/);
   assert.match(src, /router\.delete\('\/:id\/sessions\/:sessionId\/cases\/:caseId'/);
   assert.match(src, /classCtrl\.deleteSessionStudentCase/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.READ_ALL\)/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.UPDATE\)/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.DELETE\)/);
-  assert.match(controller, /sessionStudentCaseDeleteAccess/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.READ_ALL\)/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.CREATE\)/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.UPDATE\)/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.DELETE\)/);
+  assert.match(src, /requireCaseStatusMutationAccess/);
+  assert.match(controller, /studentCaseCapabilities/);
+  assert.match(controller, /sessionStudentCaseAccessService/);
   assert.match(controller, /sessionStudentCaseService\.deleteCase/);
 });
 
 test('session manager renders student cases tab, modal, and avoids attendance duplicate fields', () => {
   const src = read('MVC/views/school/class/sessionManager.ejs');
+  const modalPartial = read('MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModal.ejs');
+  const clientSource = read('public/scripts/sessionStudentCaseModalClient.js');
   assert.match(src, /data-session-panel="student-cases"/);
   assert.match(src, /id="session-panel-student-cases"/);
-  assert.match(src, /id="studentCaseModal"/);
+  assert.match(src, /school\/sessionStudentCase\/partials\/sessionStudentCaseModal/);
+  assert.match(modalPartial, /id="studentCaseModal"/);
   assert.match(src, /id="btnOpenStudentCaseWizard"/);
-  assert.match(src, /id="btnStudentCaseNext"/);
-  assert.match(src, /id="btnSaveStudentCaseSessionWide"/);
-  assert.match(src, /id="btnResolveStudentCase"/);
-  assert.match(src, /saveStudentCase\(\{ resolve: true \}\)/);
-  assert.match(src, /payload\.status = 'resolved'/);
-  assert.match(src, /name="studentCaseSeverity"/);
-  assert.match(src, /id="studentCaseDetailPresets"/);
-  assert.match(src, /id="studentCaseDetails"/);
-  assert.match(src, /student-case-details-textarea/);
-  assert.match(src, /Pick a common issue below, then adjust the detail text if needed/);
-  assert.doesNotMatch(src, /id="studentCaseDetailsWrap"/);
-  assert.match(src, /studentCaseDetailPresets.*addEventListener\('change'/s);
-  assert.match(src, /function collectStudentCaseDetailsValue\(\)[\s\S]*?getElementById\('studentCaseDetails'\)/);
-  assert.match(src, /Issue Required/);
+  assert.match(clientSource, /btnResolveStudentCase/);
+  assert.match(clientSource, /payload\.status = 'resolved'/);
+  assert.match(modalPartial, /name="studentCaseSeverity"/);
+  assert.match(modalPartial, /id="studentCaseDetailPresets"/);
+  assert.match(modalPartial, /id="studentCaseDetails"/);
+  assert.match(modalPartial, /student-case-details-textarea/);
+  assert.match(modalPartial, /Pick a common issue below, then adjust the detail text if needed/);
+  assert.doesNotMatch(modalPartial, /id="studentCaseDetailsWrap"/);
+  assert.match(clientSource, /Issue Required/);
   assert.match(src, /canDeleteStudentCases/);
+  assert.match(src, /studentCaseCapabilities/);
+  assert.match(src, /canCreateStudentCases/);
+  assert.match(src, /canResolveStudentCases/);
   assert.match(src, /btn-delete-student-case/);
   assert.match(src, /method: 'DELETE'/);
   assert.match(src, /function confirmStudentCaseDelete\(row\)/);
@@ -78,6 +82,7 @@ test('session student case delete removes its source task and scoped case record
   const user = { id: 'ADM-1', activeOrgId: '900000', roles: ['admin'] };
   let removedId = '';
   let deletedTask = null;
+  let deletedTaskOptions = null;
   try {
     schoolRepositories.sessionStudentCases.getById = async () => ({
       id: 'SSC-1',
@@ -91,8 +96,9 @@ test('session student case delete removes its source task and scoped case record
       removedId = id;
       return true;
     };
-    taskService.deleteSourceTask = async (payload) => {
+    taskService.deleteSourceTask = async (payload, reqUser, options = {}) => {
       deletedTask = payload;
+      deletedTaskOptions = options;
       return true;
     };
 
@@ -107,6 +113,7 @@ test('session student case delete removes its source task and scoped case record
     assert.equal(removedId, 'SSC-1');
     assert.equal(deletedTask.sourceType, 'student_session_case');
     assert.equal(deletedTask.sourceId, 'SSC-1');
+    assert.equal(deletedTaskOptions?.skipAdminCheck, true);
   } finally {
     schoolRepositories.sessionStudentCases.getById = originals.getById;
     schoolRepositories.sessionStudentCases.remove = originals.remove;

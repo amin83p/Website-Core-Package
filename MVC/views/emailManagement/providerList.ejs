@@ -1,0 +1,300 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: false,
+  headerManageBtns: ['<a href="/dashboard/section-nav/EMAIL_MANAGEMENT" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-speedometer2 me-1"></i> Email Dashboard</a>'],
+  manageBtns: [
+    '<a href="/email-management/templates" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-envelope-paper me-1"></i> Email Templates</a>',
+    '<a href="/email-management/routing" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-signpost-split me-1"></i> Event Routing</a>',
+    '<a href="/email-management/ledger" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-journal-check me-1"></i> Email Ledger</a>'
+  ]
+}) %>
+
+<%
+  const orgContext = (activeOrgContext && typeof activeOrgContext === 'object') ? activeOrgContext : {};
+  const orgLabel = String(orgContext.activeOrgLabel || 'Current organization').trim();
+  const isSystemOrgContext = orgContext.isSystemOrg === true;
+%>
+
+<div class="alert alert-light border mb-3 py-2 px-3 small">
+  <i class="bi bi-building me-1"></i>
+  Showing provider profiles for <strong><%= orgLabel %></strong>.
+  <% if (isSystemOrgContext) { %>
+    These profiles are platform defaults used when an organization has no provider configured.
+  <% } else { %>
+    Only this organization's provider profiles are listed here.
+  <% } %>
+</div>
+
+<%
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const selectedStatusFilter = String(stateFilters?.isActive__eq || '').toLowerCase();
+  const selectedProviderFilter = String(stateFilters?.provider__eq || '').toLowerCase();
+  const selectedDefaultFilter = String(stateFilters?.isDefault__eq || '').toLowerCase();
+  const hasProviderFiltersApplied = Boolean(
+    String(stateFilters?.isActive__eq || '').trim()
+    || String(stateFilters?.provider__eq || '').trim()
+    || String(stateFilters?.isDefault__eq || '').trim()
+  );
+%>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Provider Profiles</div>
+    <button
+      id="emailProviderFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#emailProviderFilterCollapse"
+      aria-expanded="<%= hasProviderFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="emailProviderFilterCollapse"
+      aria-label="<%= hasProviderFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="emailProviderFilterToggleIcon" class="bi <%= hasProviderFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasProviderFiltersApplied ? ' show' : '' %>" id="emailProviderFilterCollapse">
+    <form method="GET" action="/email-management/providers" id="emailProviderFilterForm" class="card-body p-3">
+      <% if (stateFilters?.q) { %><input type="hidden" name="q" value="<%= stateFilters.q %>"><% } %>
+      <% if (stateFilters?.type) { %><input type="hidden" name="type" value="<%= stateFilters.type %>"><% } %>
+      <% if (stateFilters?.searchFields) { %><input type="hidden" name="searchFields" value="<%= stateFilters.searchFields %>"><% } %>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label mb-1">Provider</label>
+          <select class="form-select size-md" name="provider__eq">
+            <option value="">All providers</option>
+            <option value="resend" <%= selectedProviderFilter === 'resend' ? 'selected' : '' %>>Resend</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Status</label>
+          <select class="form-select size-md" name="isActive__eq">
+            <option value="">All</option>
+            <option value="true" <%= selectedStatusFilter === 'true' ? 'selected' : '' %>>Active</option>
+            <option value="false" <%= selectedStatusFilter === 'false' ? 'selected' : '' %>>Inactive</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Default Profile</label>
+          <select class="form-select size-md" name="isDefault__eq">
+            <option value="">All</option>
+            <option value="true" <%= selectedDefaultFilter === 'true' ? 'selected' : '' %>>Default</option>
+            <option value="false" <%= selectedDefaultFilter === 'false' ? 'selected' : '' %>>Not default</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2 justify-content-md-end">
+          <a href="/email-management/providers" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search label, sender, provider, id...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="label">Label <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="provider">Provider <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="defaultFromEmail">Default From <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="verifiedDomains">Verified Domains <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="apiKeyMasked">API Key <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="isActive">Status <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="isDefault">Default <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="updatedAt">Updated <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr>
+          <td colspan="9" class="text-center text-muted py-4">No provider profiles found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-semibold text-dark"><%= row.label || row.id %></div>
+            <div class="x-small text-muted font-monospace"><%= row.id %></div>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border text-uppercase"><%= row.provider || 'resend' %></span>
+          </td>
+          <td class="font-monospace small"><%= row.defaultFromEmail || '-' %></td>
+          <td>
+            <% if (Array.isArray(row.verifiedDomains) && row.verifiedDomains.length) { %>
+              <div class="small text-truncate" style="max-width: 220px;" title="<%= row.verifiedDomains.join(', ') %>">
+                <%= row.verifiedDomains.join(', ') %>
+              </div>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+          <td><code class="small"><%= row.apiKeyMasked || 'Not set' %></code></td>
+          <td class="text-center">
+            <% if (row.isActive !== false) { %>
+              <span class="badge bg-success-subtle text-success border">Active</span>
+            <% } else { %>
+              <span class="badge bg-secondary-subtle text-secondary border">Inactive</span>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <% if (row.isDefault) { %>
+              <span class="badge bg-primary-subtle text-primary border">Default</span>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (row.updatedAt) { %>
+              <%= typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.updatedAt) : new Date(row.updatedAt).toLocaleString() %>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <a href="/email-management/providers/<%= row.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button
+                  type="button"
+                  class="btn btn-outline-danger btn-sm email-provider-delete-btn"
+                  data-id="<%= row.id %>"
+                  data-action-state-id="<%= actionStateId || '' %>"
+                >
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: 'email-management/providers'
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+  (function () {
+    async function showModalMessage(config = {}) {
+      if (typeof showMessageModal === 'function') {
+        return showMessageModal(config);
+      }
+      console.error('showMessageModal is unavailable.', config);
+      return null;
+    }
+
+    function initCollapseToggleIcon(options = {}) {
+      const collapseEl = document.getElementById(String(options.collapseId || ''));
+      const buttonEl = document.getElementById(String(options.buttonId || ''));
+      const iconEl = document.getElementById(String(options.iconId || ''));
+      if (!collapseEl || !buttonEl || !iconEl) return;
+
+      const openIcon = String(options.openIcon || 'bi-chevron-down');
+      const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+      const openLabel = String(options.openLabel || 'Open filters');
+      const closeLabel = String(options.closeLabel || 'Close filters');
+
+      const setState = (expanded) => {
+        iconEl.classList.remove(openIcon, closeIcon);
+        iconEl.classList.add(expanded ? closeIcon : openIcon);
+        buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+      };
+
+      setState(collapseEl.classList.contains('show'));
+      collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+      collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+      collapseId: 'emailProviderFilterCollapse',
+      buttonId: 'emailProviderFilterToggleBtn',
+      iconId: 'emailProviderFilterToggleIcon',
+      openIcon: 'bi-chevron-down',
+      closeIcon: 'bi-chevron-up',
+      openLabel: 'Open filters',
+      closeLabel: 'Close filters'
+    });
+
+    async function confirmDelete(id, actionStateId) {
+      if (!id) return;
+      const result = await showModalMessage({
+        title: 'Confirm Delete',
+        icon: 'warning',
+        message: 'Delete this provider profile?',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: 'cancel' },
+          { text: 'Delete', class: 'btn-danger', value: 'delete' }
+        ]
+      });
+      if (result !== 'delete') {
+        return;
+      }
+
+      const payload = new URLSearchParams();
+      if (actionStateId) payload.set('actionStateId', actionStateId);
+      const response = await fetch('/email-management/providers/' + encodeURIComponent(id) + '/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-ajax-request': 'true' },
+        body: payload.toString()
+      });
+      let deleteResult = null;
+      try {
+        deleteResult = await response.json();
+      } catch (_) {
+        deleteResult = { status: 'error', message: 'Unexpected response while deleting provider profile.' };
+      }
+      if (!response.ok || deleteResult.status !== 'success') {
+        const msg = deleteResult.message || 'Failed to delete provider profile.';
+        await showModalMessage({
+          title: 'Delete Failed',
+          icon: 'error',
+          message: msg,
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+      window.location.reload();
+    }
+
+    document.querySelectorAll('.email-provider-delete-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await confirmDelete(btn.dataset.id || '', btn.dataset.actionStateId || '');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  })();
+</script>

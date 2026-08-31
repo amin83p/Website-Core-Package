@@ -36,6 +36,13 @@ const requestPasswordResetSchema = z.object({
   })
 });
 
+const startPasswordResetEmailSchema = z.object({
+  body: z.object({
+    email: z.string().email('Valid email is required.'),
+    orgId: z.union([z.string(), z.number()]).transform((val) => String(val))
+  })
+});
+
 const startPasswordResetSmsSchema = z.object({
   body: z.object({
     email: z.string().email('Valid email is required.'),
@@ -68,6 +75,7 @@ module.exports = {
   switchOrgSchema,
   switchModeSchema,
   requestPasswordResetSchema,
+  startPasswordResetEmailSchema,
   startPasswordResetSmsSchema,
   verifyPasswordResetSchema,
   completePasswordResetSchema

@@ -1,0 +1,463 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  user,
+  tableName,
+  print,
+  btn_export: false,
+  headerManageBtns: [
+    '<a href="/dashboard/section-nav/SCHEDULED_TASK_MANAGEMENT" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Tasks Dashboard</a>'
+  ],
+  manageBtns: Array.isArray(manageBtns) ? manageBtns : []
+}) %>
+
+<%
+  const access = (definitionAccess && typeof definitionAccess === 'object') ? definitionAccess : {};
+  const canRun = access.canRun === true;
+  const canUpdate = access.canUpdate === true;
+  const canDelete = access.canDelete === true;
+  const formatNextRunLocal = (typeof toNextRunLocalInput === 'function')
+    ? toNextRunLocalInput
+    : ((iso) => String(iso || '').slice(0, 16));
+  const taskTimezone = String(typeof schedulingTimezone !== 'undefined' ? schedulingTimezone : (typeof orgTimeZone !== 'undefined' ? orgTimeZone : 'UTC')).trim() || 'UTC';
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const selectedPackageFilter = String(stateFilters?.packageName__eq || '').toUpperCase();
+  const selectedTaskKeyFilter = String(stateFilters?.taskKey__eq || '').trim();
+  const selectedOrgFilter = String(stateFilters?.orgId__eq || '').trim();
+  const selectedEnabledFilter = String(stateFilters?.enabled__eq || '').toLowerCase();
+  const selectedPausedFilter = String(stateFilters?.paused__eq || '').toLowerCase();
+  const safePackageOptions = Array.isArray(packageOptions) ? packageOptions : [];
+  const hasDefinitionFiltersApplied = Boolean(
+    selectedPackageFilter
+    || selectedTaskKeyFilter
+    || selectedOrgFilter
+    || selectedEnabledFilter
+    || selectedPausedFilter
+  );
+%>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Task Definitions</div>
+    <button
+      id="scheduledTaskDefinitionFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#scheduledTaskDefinitionFilterCollapse"
+      aria-expanded="<%= hasDefinitionFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="scheduledTaskDefinitionFilterCollapse"
+      aria-label="<%= hasDefinitionFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="scheduledTaskDefinitionFilterToggleIcon" class="bi <%= hasDefinitionFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasDefinitionFiltersApplied ? ' show' : '' %>" id="scheduledTaskDefinitionFilterCollapse">
+    <form method="GET" action="/scheduled-tasks" id="scheduledTaskDefinitionFilterForm" class="card-body p-3">
+      <% if (stateFilters?.q) { %><input type="hidden" name="q" value="<%= stateFilters.q %>"><% } %>
+      <% if (stateFilters?.type) { %><input type="hidden" name="type" value="<%= stateFilters.type %>"><% } %>
+      <% if (stateFilters?.searchFields) { %><input type="hidden" name="searchFields" value="<%= stateFilters.searchFields %>"><% } %>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label mb-1">Package</label>
+          <select class="form-select size-md" name="packageName__eq">
+            <option value="">All packages</option>
+            <% safePackageOptions.forEach((pkg) => { %>
+              <option value="<%= pkg %>" <%= String(pkg || '').toUpperCase() === selectedPackageFilter ? 'selected' : '' %>><%= pkg %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Task Key</label>
+          <input type="text" class="form-control size-md font-monospace" name="taskKey__eq" value="<%= selectedTaskKeyFilter %>" placeholder="school.uncompletedSessionEmail.prepare">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Organization ID</label>
+          <input type="text" class="form-control size-md font-monospace" name="orgId__eq" value="<%= selectedOrgFilter %>" placeholder="Leave blank for system tasks">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label mb-1">Enabled</label>
+          <select class="form-select size-md" name="enabled__eq">
+            <option value="">All</option>
+            <option value="true" <%= selectedEnabledFilter === 'true' ? 'selected' : '' %>>Enabled</option>
+            <option value="false" <%= selectedEnabledFilter === 'false' ? 'selected' : '' %>>Disabled</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label mb-1">Paused</label>
+          <select class="form-select size-md" name="paused__eq">
+            <option value="">All</option>
+            <option value="true" <%= selectedPausedFilter === 'true' ? 'selected' : '' %>>Paused</option>
+            <option value="false" <%= selectedPausedFilter === 'false' ? 'selected' : '' %>>Running</option>
+          </select>
+        </div>
+        <div class="col-12 d-flex justify-content-lg-end gap-2 pt-2">
+          <a href="/scheduled-tasks" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search label, task key, package, org, source...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="label">Label <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="taskKey">Task Key <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="orgId">Organization <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="schedule">Schedule <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="nextRunAt">Next Run <span class="sort-icon"></span><div class="x-small text-muted fw-normal"><%= taskTimezone %></div></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">No scheduled task definitions found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr data-entity-row-id="<%= row.id %>">
+          <td class="ps-4">
+            <div class="fw-semibold text-dark"><%= row.label || row.taskKey %></div>
+            <div class="x-small text-muted"><%= row.packageName || 'CORE' %> · <%= row.source || 'manual' %></div>
+          </td>
+          <td class="font-monospace small"><%= row.taskKey %></td>
+          <td><%= row.orgId || 'System' %></td>
+          <td>
+            <% if (row.scheduleType === 'interval') { %>
+              Every <%= row.input?.intervalMinutes || 5 %> min
+            <% } else { %>
+              Daily <%= row.runAtTime %> (<%= taskTimezone %>)
+              <% if (row.source === 'school.sessionAccessPolicy' && row.input) { %>
+                <div class="x-small text-muted mt-1">
+                  <% if (row.input.prepareAtTime) { %>Prepare <%= row.input.prepareAtTime %><% } %>
+                  <% if (row.input.sendAtTime) { %><%= row.input.prepareAtTime ? ' · ' : '' %>Send <%= row.input.sendAtTime %><% } %>
+                  <% if (row.input.sendWhen) { %> · <%= row.input.sendWhen %><% } %>
+                </div>
+              <% } %>
+            <% } %>
+          </td>
+          <td class="small scheduled-task-next-run-cell" data-sort-value="<%= row.nextRunAt || '' %>">
+            <div class="scheduled-task-next-run-display" data-definition-id="<%= row.id %>">
+              <% if (row.nextRunAt) { %>
+                <span class="scheduled-task-next-run-text">
+                  <%= typeof formatInstantInTimezone === 'function'
+                    ? formatInstantInTimezone(row.nextRunAt, taskTimezone)
+                    : (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.nextRunAt) : row.nextRunAt) %>
+                </span>
+              <% } else { %>
+                <span class="scheduled-task-next-run-text text-muted">—</span>
+              <% } %>
+              <% if (canUpdate) { %>
+                <button
+                  type="button"
+                  class="btn btn-link btn-sm p-0 ms-1 scheduled-task-next-run-edit-btn"
+                  data-id="<%= row.id %>"
+                  data-timezone="<%= taskTimezone %>"
+                  data-next-run-local="<%= formatNextRunLocal(row.nextRunAt) %>"
+                  title="Edit next run">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+              <% } %>
+            </div>
+            <% if (canUpdate) { %>
+              <div class="scheduled-task-next-run-editor d-none" data-definition-id="<%= row.id %>">
+                <div class="d-flex flex-wrap align-items-center gap-1">
+                  <input
+                    type="datetime-local"
+                    class="form-control form-control-sm scheduled-task-next-run-input"
+                    value="<%= formatNextRunLocal(row.nextRunAt) %>"
+                    style="max-width: 220px;">
+                  <button type="button" class="btn btn-primary btn-sm scheduled-task-next-run-save-btn" data-id="<%= row.id %>">Save</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm scheduled-task-next-run-cancel-btn" data-id="<%= row.id %>">Cancel</button>
+                </div>
+              </div>
+            <% } %>
+          </td>
+          <td data-sort-value="<%= row.paused ? 'paused' : (row.enabled === false ? 'disabled' : 'active') %>">
+            <% if (row.paused) { %>
+              <span class="badge bg-warning-subtle text-warning-emphasis border">Paused</span>
+            <% } else if (row.enabled === false) { %>
+              <span class="badge bg-secondary-subtle text-secondary border">Disabled</span>
+            <% } else { %>
+              <span class="badge bg-success-subtle text-success border">Active</span>
+            <% } %>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Task definition actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <% if (canRun) { %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm scheduled-task-run-btn"
+                    data-id="<%= row.id %>"
+                    data-label="<%= row.label || row.taskKey %>"
+                    data-task-key="<%= row.taskKey %>"
+                    data-org-id="<%= row.orgId || '' %>">
+                    <i class="bi bi-play-fill me-2"></i>Run now
+                  </button>
+                <% } %>
+                <% if (canUpdate) { %>
+                  <% if (row.paused) { %>
+                    <button
+                      type="button"
+                      class="btn btn-outline-success btn-sm mt-1 scheduled-task-resume-btn"
+                      data-id="<%= row.id %>"
+                      data-label="<%= row.label || row.taskKey %>">
+                      <i class="bi bi-play-circle me-2"></i>Resume
+                    </button>
+                  <% } else { %>
+                    <button
+                      type="button"
+                      class="btn btn-outline-warning btn-sm mt-1 scheduled-task-pause-btn"
+                      data-id="<%= row.id %>"
+                      data-label="<%= row.label || row.taskKey %>">
+                      <i class="bi bi-pause-circle me-2"></i>Pause
+                    </button>
+                  <% } %>
+                <% } %>
+                <% if (canDelete) { %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-sm mt-1 scheduled-task-delete-btn"
+                    data-id="<%= row.id %>"
+                    data-label="<%= row.label || row.taskKey %>">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </button>
+                <% } %>
+                <% if (!canRun && !canUpdate && !canDelete) { %>
+                  <span class="text-muted small px-2 py-1">No actions available</span>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: baseUrlPath || 'scheduled-tasks'
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+<%- include('./partials/scheduledTaskClientActions') %>
+
+<script>
+  (function () {
+    const actions = window.ScheduledTaskClientActions || {};
+    const schedulingTimezone = <%- JSON.stringify(taskTimezone) %>;
+
+    function initCollapseToggleIcon(options = {}) {
+      const collapseEl = document.getElementById(String(options.collapseId || ''));
+      const buttonEl = document.getElementById(String(options.buttonId || ''));
+      const iconEl = document.getElementById(String(options.iconId || ''));
+      if (!collapseEl || !buttonEl || !iconEl) return;
+
+      const openIcon = String(options.openIcon || 'bi-chevron-down');
+      const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+      const setState = (expanded) => {
+        iconEl.classList.remove(openIcon, closeIcon);
+        iconEl.classList.add(expanded ? closeIcon : openIcon);
+        buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      };
+
+      setState(collapseEl.classList.contains('show'));
+      collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+      collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+      collapseId: 'scheduledTaskDefinitionFilterCollapse',
+      buttonId: 'scheduledTaskDefinitionFilterToggleBtn',
+      iconId: 'scheduledTaskDefinitionFilterToggleIcon'
+    });
+
+    document.querySelectorAll('.scheduled-task-next-run-edit-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.dataset.id || '').trim();
+        if (!id) return;
+        const display = document.querySelector(`.scheduled-task-next-run-display[data-definition-id="${id}"]`);
+        const editor = document.querySelector(`.scheduled-task-next-run-editor[data-definition-id="${id}"]`);
+        if (!display || !editor) return;
+        display.classList.add('d-none');
+        editor.classList.remove('d-none');
+      });
+    });
+
+    document.querySelectorAll('.scheduled-task-next-run-cancel-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.dataset.id || '').trim();
+        if (!id) return;
+        const display = document.querySelector(`.scheduled-task-next-run-display[data-definition-id="${id}"]`);
+        const editor = document.querySelector(`.scheduled-task-next-run-editor[data-definition-id="${id}"]`);
+        if (!display || !editor) return;
+        editor.classList.add('d-none');
+        display.classList.remove('d-none');
+      });
+    });
+
+    document.querySelectorAll('.scheduled-task-next-run-save-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = String(btn.dataset.id || '').trim();
+        if (!id) return;
+        const editor = document.querySelector(`.scheduled-task-next-run-editor[data-definition-id="${id}"]`);
+        const input = editor?.querySelector('.scheduled-task-next-run-input');
+        const nextRunAt = String(input?.value || '').trim();
+        if (!nextRunAt) {
+          await actions.showModalMessage({
+            title: 'Next Run Required',
+            icon: 'warning',
+            message: 'Choose a date and time for the next run.',
+            buttons: [{ text: 'OK', class: 'btn-primary', value: 'ok' }]
+          });
+          return;
+        }
+        await actions.runScheduledTaskMutation({
+          url: `/scheduled-tasks/definitions/${encodeURIComponent(id)}/next-run`,
+          loadingNote: 'Updating next run...',
+          successTitle: 'Next Run Updated',
+          successMessage: 'The next run time was updated.',
+          body: { nextRunAt, timezone: schedulingTimezone }
+        });
+      });
+    });
+
+    async function resolvePrepareMode(taskKey, orgId) {
+      const key = String(taskKey || '').trim().toLowerCase();
+      if (!key.endsWith('.prepare') || !String(orgId || '').trim()) return 'additive';
+      const channel = key.includes('sms') ? 'sms' : 'email';
+      const label = channel === 'sms' ? 'SMS message(s)' : 'email(s)';
+      try {
+        const response = await fetch(`/scheduled-tasks/outbox/prepare-conflicts?orgId=${encodeURIComponent(orgId)}&channel=${encodeURIComponent(channel)}`, {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        });
+        const result = await response.json();
+        const count = Number(result?.count || 0);
+        if (!response.ok || count <= 0) return 'additive';
+        const choice = await actions.showModalMessage({
+          title: 'Queued Notifications Found',
+          icon: 'info',
+          message: `${count} queued notification ${label} already exist for this organization. Add new rows and keep the existing ones, or replace the queued notifications?`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary', value: 'cancel' },
+            { text: 'Add new (keep existing)', class: 'btn-outline-primary', value: 'additive' },
+            { text: 'Replace existing', class: 'btn-primary', value: 'replace' }
+          ]
+        });
+        if (choice === 'replace') return 'replace';
+        if (choice === 'additive') return 'additive';
+        return null;
+      } catch (_) {
+        return 'additive';
+      }
+    }
+
+    document.querySelectorAll('.scheduled-task-run-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = String(btn.dataset.id || '').trim();
+        const label = String(btn.dataset.label || 'this task definition').trim();
+        const taskKey = String(btn.dataset.taskKey || '').trim();
+        const orgId = String(btn.dataset.orgId || '').trim();
+        if (!id) return;
+        const confirmed = await actions.showModalMessage({
+          title: 'Run Task Now',
+          icon: 'info',
+          message: `Run ${label} now?`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary', value: 'cancel' },
+            { text: 'Run now', class: 'btn-primary', value: 'run' }
+          ]
+        });
+        if (confirmed !== 'run') return;
+
+        let prepareMode = 'additive';
+        if (taskKey.toLowerCase().endsWith('.prepare')) {
+          const resolvedMode = await resolvePrepareMode(taskKey, orgId);
+          if (!resolvedMode) return;
+          prepareMode = resolvedMode;
+        }
+
+        await actions.runScheduledTaskMutation({
+          url: `/scheduled-tasks/definitions/${encodeURIComponent(id)}/run-now`,
+          loadingNote: 'Starting task run...',
+          successTitle: 'Task Started',
+          successMessage: 'The task run started successfully.',
+          body: { prepareMode }
+        });
+      });
+    });
+
+    document.querySelectorAll('.scheduled-task-pause-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = String(btn.dataset.id || '').trim();
+        if (!id) return;
+        await actions.runScheduledTaskMutation({
+          url: `/scheduled-tasks/definitions/${encodeURIComponent(id)}/pause`,
+          loadingNote: 'Pausing task...',
+          successTitle: 'Task Paused',
+          successMessage: 'The task definition was paused.'
+        });
+      });
+    });
+
+    document.querySelectorAll('.scheduled-task-resume-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = String(btn.dataset.id || '').trim();
+        if (!id) return;
+        await actions.runScheduledTaskMutation({
+          url: `/scheduled-tasks/definitions/${encodeURIComponent(id)}/resume`,
+          loadingNote: 'Resuming task...',
+          successTitle: 'Task Resumed',
+          successMessage: 'The task definition was resumed.'
+        });
+      });
+    });
+
+    document.querySelectorAll('.scheduled-task-delete-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = String(btn.dataset.id || '').trim();
+        const label = String(btn.dataset.label || 'this task definition').trim();
+        if (!id) return;
+
+        const confirmed = await actions.showModalMessage({
+          title: 'Delete Task Definition',
+          icon: 'warning',
+          message: `Delete ${label}?`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary', value: 'cancel' },
+            { text: 'Delete', class: 'btn-danger', value: 'delete' }
+          ]
+        });
+        if (confirmed !== 'delete') return;
+
+        await actions.runScheduledTaskMutation({
+          url: `/scheduled-tasks/definitions/${encodeURIComponent(id)}/delete`,
+          loadingNote: 'Deleting task definition...',
+          successTitle: 'Task Deleted',
+          successMessage: 'The task definition was deleted.'
+        });
+      });
+    });
+  })();
+</script>

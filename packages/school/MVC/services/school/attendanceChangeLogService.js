@@ -3,37 +3,111 @@
 const schoolRepositories = require('../../repositories/school');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceMarkAppearanceService = require('./attendanceMarkAppearanceService');
+const { buildSchoolListScope } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+
+function resolveListScope(options = {}) {
+  const scope = options?.scope;
+  if (scope && (scope.canViewAll === true || scope.denyAll === true || scope.activeOrgId)) {
+    return scope;
+  }
+  return buildSchoolListScope(options?.reqUser, {
+    accessContext: options?.accessContext || scope || { scopeId: 'SCP_ORG' }
+  });
+}
 
 function normalizeLoggedStatus(status) {
   const normalized = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(status, '');
   return normalized || '';
 }
 
-function rosterStatusMap(roster) {
+function parseNonNegInt(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
+}
+
+function normalizeExcuseFlag(value) {
+  return attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(value);
+}
+
+function rosterAttendanceSnapshot(row = {}) {
+  const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(row);
+  const absenceFields = attendanceMatrixMetricsService.normalizeAbsenceExcusedFields({
+    ...row,
+    attendance: normalizeLoggedStatus(row?.attendance)
+  });
+  return {
+    status: normalizeLoggedStatus(row?.attendance),
+    lateMinutes: timing.lateMinutes,
+    earlyLeaveMinutes: timing.earlyLeaveMinutes,
+    lateExcused: timing.lateExcused,
+    earlyLeaveExcused: timing.earlyLeaveExcused,
+    absenceExcused: Boolean(absenceFields.absenceExcused)
+  };
+}
+
+function snapshotsEqual(left, right) {
+  return left.status === right.status
+    && left.lateMinutes === right.lateMinutes
+    && left.earlyLeaveMinutes === right.earlyLeaveMinutes
+    && left.lateExcused === right.lateExcused
+    && left.earlyLeaveExcused === right.earlyLeaveExcused
+    && left.absenceExcused === right.absenceExcused;
+}
+
+function buildChangeFromSnapshots(personId, fromSnapshot, toSnapshot) {
+  return {
+    personId,
+    fromStatus: fromSnapshot.status,
+    toStatus: toSnapshot.status,
+    fromLateMinutes: fromSnapshot.lateMinutes,
+    toLateMinutes: toSnapshot.lateMinutes,
+    fromEarlyLeaveMinutes: fromSnapshot.earlyLeaveMinutes,
+    toEarlyLeaveMinutes: toSnapshot.earlyLeaveMinutes,
+    fromLateExcused: fromSnapshot.lateExcused,
+    toLateExcused: toSnapshot.lateExcused,
+    fromEarlyLeaveExcused: fromSnapshot.earlyLeaveExcused,
+    toEarlyLeaveExcused: toSnapshot.earlyLeaveExcused,
+    fromAbsenceExcused: fromSnapshot.absenceExcused,
+    toAbsenceExcused: toSnapshot.absenceExcused
+  };
+}
+
+function rosterSnapshotMap(roster) {
   const map = new Map();
   (Array.isArray(roster) ? roster : []).forEach((row) => {
     const personId = String(row?.personId || '').trim();
     if (!personId) return;
-    map.set(personId, normalizeLoggedStatus(row?.attendance));
+    map.set(personId, rosterAttendanceSnapshot(row));
   });
   return map;
 }
 
-function diffRosterAttendanceStatusChanges(beforeRoster, afterRoster) {
-  const before = rosterStatusMap(beforeRoster);
-  const after = rosterStatusMap(afterRoster);
+function diffRosterAttendanceChanges(beforeRoster, afterRoster) {
+  const before = rosterSnapshotMap(beforeRoster);
+  const after = rosterSnapshotMap(afterRoster);
   const personIds = new Set([...before.keys(), ...after.keys()]);
   const changes = [];
+  const emptySnapshot = rosterAttendanceSnapshot({});
+
   personIds.forEach((personId) => {
-    const fromStatus = before.has(personId) ? before.get(personId) : '';
-    const toStatus = after.has(personId) ? after.get(personId) : '';
-    if (fromStatus !== toStatus) {
-      changes.push({ personId, fromStatus, toStatus });
+    const fromSnapshot = before.get(personId) || emptySnapshot;
+    const toSnapshot = after.get(personId) || emptySnapshot;
+    if (!snapshotsEqual(fromSnapshot, toSnapshot)) {
+      changes.push(buildChangeFromSnapshots(personId, fromSnapshot, toSnapshot));
     }
   });
   return changes;
+}
+
+function diffRosterAttendanceStatusChanges(beforeRoster, afterRoster) {
+  return diffRosterAttendanceChanges(beforeRoster, afterRoster).map((change) => ({
+    personId: change.personId,
+    fromStatus: change.fromStatus,
+    toStatus: change.toStatus
+  })).filter((change) => change.fromStatus !== change.toStatus);
 }
 
 function resolveChangedBy(reqUser = {}) {
@@ -58,16 +132,46 @@ function statusToMarkKey(status) {
   return normalized || 'unmarked';
 }
 
-function formatStatusLabel(markPolicy, status) {
+function formatStatusLabel(markPolicy, status, snapshot = null) {
+  const normalized = normalizeLoggedStatus(status);
+  if (normalized === 'excused' || (normalized === 'absent' && snapshot?.absenceExcused)) {
+    const mark = attendanceMarkAppearanceService.getMark(markPolicy, 'excused_absence');
+    if (mark?.label) return mark.label;
+    return 'Excused absence';
+  }
+  if (normalized === 'acf' && snapshot?.absenceExcused) {
+    const mark = attendanceMarkAppearanceService.getMark(markPolicy, 'excused_absence');
+    if (mark?.label) return mark.label;
+    return 'Excused ACF';
+  }
   const markKey = statusToMarkKey(status);
   const mark = attendanceMarkAppearanceService.getMark(markPolicy, markKey);
   if (mark?.label) return mark.label;
-  if (!normalizeLoggedStatus(status)) return 'Unmarked';
+  if (!normalized) return 'Unmarked';
   return String(status || '').trim() || 'Unmarked';
+}
+
+function formatTimingFields(entry = {}, prefix) {
+  const lateMinutes = parseNonNegInt(entry[`${prefix}LateMinutes`]);
+  const earlyLeaveMinutes = parseNonNegInt(entry[`${prefix}EarlyLeaveMinutes`]);
+  return {
+    lateMinutes,
+    earlyLeaveMinutes,
+    lateExcused: normalizeExcuseFlag(entry[`${prefix}LateExcused`]),
+    earlyLeaveExcused: normalizeExcuseFlag(entry[`${prefix}EarlyLeaveExcused`]),
+    absenceExcused: normalizeExcuseFlag(entry[`${prefix}AbsenceExcused`])
+  };
 }
 
 function formatEntry(entry, markPolicy) {
   const changedBy = entry?.changedBy && typeof entry.changedBy === 'object' ? entry.changedBy : {};
+  const fromTiming = formatTimingFields(entry, 'from');
+  const toTiming = formatTimingFields(entry, 'to');
+  const fromStatus = normalizeLoggedStatus(entry?.fromStatus);
+  const toStatus = normalizeLoggedStatus(entry?.toStatus);
+  const fromSnapshot = { status: fromStatus, ...fromTiming };
+  const toSnapshot = { status: toStatus, ...toTiming };
+
   return {
     id: entry?.id || '',
     classId: entry?.classId || '',
@@ -81,10 +185,20 @@ function formatEntry(entry, markPolicy) {
       username: changedBy.username || '',
       displayName: changedBy.displayName || changedBy.username || changedBy.userId || ''
     },
-    fromStatus: normalizeLoggedStatus(entry?.fromStatus),
-    toStatus: normalizeLoggedStatus(entry?.toStatus),
-    fromLabel: formatStatusLabel(markPolicy, entry?.fromStatus),
-    toLabel: formatStatusLabel(markPolicy, entry?.toStatus)
+    fromStatus,
+    toStatus,
+    fromLabel: formatStatusLabel(markPolicy, fromStatus, fromSnapshot),
+    toLabel: formatStatusLabel(markPolicy, toStatus, toSnapshot),
+    fromLateMinutes: fromTiming.lateMinutes,
+    toLateMinutes: toTiming.lateMinutes,
+    fromEarlyLeaveMinutes: fromTiming.earlyLeaveMinutes,
+    toEarlyLeaveMinutes: toTiming.earlyLeaveMinutes,
+    fromLateExcused: fromTiming.lateExcused,
+    toLateExcused: toTiming.lateExcused,
+    fromEarlyLeaveExcused: fromTiming.earlyLeaveExcused,
+    toEarlyLeaveExcused: toTiming.earlyLeaveExcused,
+    fromAbsenceExcused: fromTiming.absenceExcused,
+    toAbsenceExcused: toTiming.absenceExcused
   };
 }
 
@@ -100,9 +214,12 @@ function sortEntriesOldestFirst(entries) {
 async function listRawForClass(classId, options = {}) {
   const normalizedClassId = String(classId || '').trim();
   if (!normalizedClassId) return [];
+  const scope = resolveListScope(options);
+  if (scope?.denyAll) return [];
+
   const rows = await schoolRepositories.attendanceChangeLogs.list({
     query: {},
-    scope: options?.scope || { canViewAll: true }
+    scope
   });
   const startDate = String(options?.startDate || '').trim();
   const endDate = String(options?.endDate || '').trim();
@@ -113,6 +230,26 @@ async function listRawForClass(classId, options = {}) {
     if (endDate && sessionDate && sessionDate > endDate) return false;
     return true;
   });
+}
+
+function hasAttendanceChange(change = {}) {
+  const fromSnapshot = rosterAttendanceSnapshot({
+    attendance: change.fromStatus,
+    lateMinutes: change.fromLateMinutes,
+    earlyLeaveMinutes: change.fromEarlyLeaveMinutes,
+    lateExcused: change.fromLateExcused,
+    earlyLeaveExcused: change.fromEarlyLeaveExcused,
+    absenceExcused: change.fromAbsenceExcused
+  });
+  const toSnapshot = rosterAttendanceSnapshot({
+    attendance: change.toStatus,
+    lateMinutes: change.toLateMinutes,
+    earlyLeaveMinutes: change.toEarlyLeaveMinutes,
+    lateExcused: change.toLateExcused,
+    earlyLeaveExcused: change.toEarlyLeaveExcused,
+    absenceExcused: change.toAbsenceExcused
+  });
+  return !snapshotsEqual(fromSnapshot, toSnapshot);
 }
 
 async function appendChanges({
@@ -136,9 +273,27 @@ async function appendChanges({
     .map((change) => {
       const studentPersonId = String(change?.personId || change?.studentPersonId || '').trim();
       if (!studentPersonId) return null;
-      const fromStatus = normalizeLoggedStatus(change?.fromStatus);
-      const toStatus = normalizeLoggedStatus(change?.toStatus);
-      if (fromStatus === toStatus) return null;
+      const normalizedChange = buildChangeFromSnapshots(
+        studentPersonId,
+        rosterAttendanceSnapshot({
+          attendance: change?.fromStatus,
+          lateMinutes: change?.fromLateMinutes,
+          earlyLeaveMinutes: change?.fromEarlyLeaveMinutes,
+          lateExcused: change?.fromLateExcused,
+          earlyLeaveExcused: change?.fromEarlyLeaveExcused,
+          absenceExcused: change?.fromAbsenceExcused
+        }),
+        rosterAttendanceSnapshot({
+          attendance: change?.toStatus,
+          lateMinutes: change?.toLateMinutes,
+          earlyLeaveMinutes: change?.toEarlyLeaveMinutes,
+          lateExcused: change?.toLateExcused,
+          earlyLeaveExcused: change?.toEarlyLeaveExcused,
+          absenceExcused: change?.toAbsenceExcused
+        })
+      );
+      if (!hasAttendanceChange(normalizedChange)) return null;
+      const { personId: _ignoredPersonId, ...changeFields } = normalizedChange;
       return {
         orgId: normalizedOrgId,
         classId: normalizedClassId,
@@ -148,8 +303,7 @@ async function appendChanges({
         source: normalizedSource,
         changedAt,
         changedBy: actor,
-        fromStatus,
-        toStatus
+        ...changeFields
       };
     })
     .filter(Boolean);
@@ -200,9 +354,12 @@ async function listForCells({
 
 module.exports = {
   normalizeLoggedStatus,
+  rosterAttendanceSnapshot,
+  diffRosterAttendanceChanges,
   diffRosterAttendanceStatusChanges,
   resolveChangedBy,
   buildCellKey,
+  resolveListScope,
   appendChanges,
   listForCell,
   listForCells,

@@ -1,1 +1,64 @@
-[]
+[
+  {
+    "id": "EMTPL_RESOLVE_BY_ID_TEST",
+    "orgId": "ORG_EMAIL_RESOLVE_TEST",
+    "eventKey": "SCHOOL_UNCOMPLETED_SESSION_EMAIL",
+    "providerProfileId": "",
+    "packageName": "SCHOOL",
+    "sectionId": "SCHOOL_SESSION_ACCESS",
+    "operationId": "NOTIFY",
+    "senderTemplate": "school@example.com",
+    "recipientTemplate": "{{TEACHER_NAME}} <teacher@example.com>",
+    "subjectTemplate": "Reminder: {{SESSION_COUNT}} session(s)",
+    "bodyTemplate": "Hi {{TEACHER_NAME}},\n\n{{BODY_CONTENT}}\n\n{{ORG_NAME}}",
+    "isActive": true,
+    "creator": {
+      "type": "system",
+      "displayName": "System",
+      "userId": "",
+      "username": "",
+      "email": "",
+      "orgId": "ORG_EMAIL_RESOLVE_TEST"
+    },
+    "audit": {
+      "createUser": "System",
+      "createDateTime": "2026-08-28T19:32:44.236Z",
+      "lastUpdateUser": "System",
+      "lastUpdateDateTime": "2026-08-28T19:32:44.236Z"
+    },
+    "createdAt": "2026-08-28T19:32:44.235Z",
+    "updatedAt": "2026-08-28T19:32:44.235Z"
+  },
+  {
+    "id": "EMTPL_GENERAL_TEST_001",
+    "orgId": "ORG_EMAIL_GENERAL_TEST",
+    "templateKind": "general",
+    "templateName": "School session notification wrapper",
+    "eventKey": "",
+    "providerProfileId": "",
+    "packageName": "CORE",
+    "sectionId": "",
+    "operationId": "",
+    "senderTemplate": "school@example.com",
+    "recipientTemplate": "{{TEACHER_NAME}} <teacher@example.com>",
+    "subjectTemplate": "Reminder: {{SESSION_COUNT}} session(s)",
+    "bodyTemplate": "Hi {{TEACHER_NAME}},\n\n{{BODY_CONTENT}}\n\n{{ORG_NAME}}",
+    "isActive": true,
+    "creator": {
+      "type": "system",
+      "displayName": "System",
+      "userId": "",
+      "username": "",
+      "email": "",
+      "orgId": "ORG_EMAIL_GENERAL_TEST"
+    },
+    "audit": {
+      "createUser": "System",
+      "createDateTime": "2026-08-29T06:43:03.099Z",
+      "lastUpdateUser": "System",
+      "lastUpdateDateTime": "2026-08-29T06:43:03.099Z"
+    },
+    "createdAt": "2026-08-29T06:43:03.098Z",
+    "updatedAt": "2026-08-29T06:43:03.098Z"
+  }
+]

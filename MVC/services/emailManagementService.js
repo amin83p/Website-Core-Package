@@ -1,10 +1,15 @@
 const adminChekersService = require('./adminChekersService');
 const dataService = require('./dataService');
 const emailManagementTemplateRepository = require('../repositories/emailManagementTemplateRepository');
+const emailEventDefinitionService = require('./emailEventDefinitionService');
+const emailProviderProfileService = require('./emailProviderProfileService');
 const appBrandingService = require('./appBrandingService');
 const startupLogger = require('../utils/startupLogger');
 const { toPublicId, idsEqual } = require('../utils/idAdapter');
 const { assertCreateOrgContextOrThrow } = require('../utils/orgContextUtils');
+const { resolveEmailTemplateOrgContext } = require('../utils/emailTemplateOrgContext');
+const paginate = require('../utils/paginationHelper');
+const { applyGenericFilter } = require('../utils/queryEngine');
 const {
   listSupportedEmailEvents,
   getEmailEventByKey,
@@ -12,6 +17,23 @@ const {
 } = require('../../config/emailEventCatalog');
 
 const RESET_TEMPLATE_EVENT_KEY = 'AUTH_PASSWORD_RESET_CODE';
+
+const CORE_GENERAL_TEMPLATE_SLOTS = Object.freeze([
+  'BODY_CONTENT'
+]);
+
+const EVENT_ROUTING_SEARCH_FIELDS = Object.freeze([
+  'eventKey',
+  'eventLabel',
+  'packageName',
+  'sectionId',
+  'operationId',
+  'orgTemplateId',
+  'orgTemplateSubject',
+  'systemTemplateId',
+  'systemTemplateSubject',
+  'effectiveRoute'
+]);
 
 const PLACEHOLDER_TOKEN_REGEX = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 const EMAIL_EVENT_RESOLVERS = Object.freeze({
@@ -25,6 +47,23 @@ const EMAIL_EVENT_RESOLVERS = Object.freeze({
         { max: 200, allowEmpty: true }
       ),
       ORG_NAME: cleanString(context.orgName, { max: 200, allowEmpty: true })
+    };
+  },
+  CONTACT_NOTIFICATION(context = {}) {
+    return {
+      CONTACT_REF_ID: cleanString(context.contactRefId || context.refId || context.id, { max: 120, allowEmpty: true }),
+      CONTACT_NAME: cleanString(context.contactName || context.name, { max: 200, allowEmpty: true }),
+      CONTACT_EMAIL: cleanString(context.contactEmail || context.email, { max: 320, allowEmpty: true }),
+      CONTACT_TYPE: cleanString(context.contactType || context.type, { max: 120, allowEmpty: true }),
+      CONTACT_TIMELINE: cleanString(context.contactTimeline || context.timeline, { max: 120, allowEmpty: true }),
+      CONTACT_SUBJECT: cleanString(context.contactSubject || context.subject, { max: 260, allowEmpty: true }),
+      CONTACT_MESSAGE: cleanString(context.contactMessage || context.message, { max: 20000, allowEmpty: true })
+    };
+  },
+  NEWSLETTER_WELCOME(context = {}) {
+    return {
+      SUBSCRIBER_EMAIL: cleanString(context.subscriberEmail || context.toEmail || context.email, { max: 320, allowEmpty: true }),
+      UNSUBSCRIBE_URL: cleanString(context.unsubscribeUrl, { max: 2000, allowEmpty: true })
     };
   }
 });
@@ -97,6 +136,68 @@ function resolveValuesByResolverId(resolverId = '', context = {}) {
   return resolver(context || {});
 }
 
+function normalizeTemplateKind(value = '', fallback = 'event') {
+  const token = cleanString(value, { max: 20, allowEmpty: true }).toLowerCase();
+  if (token === 'general') return 'general';
+  if (token === 'event') return 'event';
+  return fallback === 'general' ? 'general' : 'event';
+}
+
+function isGeneralTemplate(payload = {}) {
+  return normalizeTemplateKind(payload?.templateKind, '') === 'general'
+    || (normalizeTemplateKind(payload?.templateKind, 'event') === 'general');
+}
+
+function resolveTemplateKindFromPayload(payload = {}, existing = null) {
+  if (payload && hasOwn(payload, 'templateKind')) {
+    return normalizeTemplateKind(payload.templateKind);
+  }
+  if (existing && normalizeTemplateKind(existing.templateKind, '') === 'general') {
+    return 'general';
+  }
+  if (normalizeKeyToken(payload?.eventKey || existing?.eventKey || '')) {
+    return 'event';
+  }
+  return 'event';
+}
+
+function buildGeneralTemplateDefinition(usedPlaceholders = []) {
+  const runtime = (Array.isArray(usedPlaceholders) ? usedPlaceholders : [])
+    .map((token) => normalizeKeyToken(token))
+    .filter(Boolean);
+  return {
+    key: 'GENERAL::MANUAL',
+    eventKey: '',
+    packageName: 'CORE',
+    sectionId: '',
+    operationId: '',
+    label: 'General template',
+    allowed: runtime,
+    required: [],
+    runtime,
+    resolve() {
+      return {};
+    }
+  };
+}
+
+function validateGeneralTemplatePlaceholders({
+  senderTemplate = '',
+  recipientTemplate = '',
+  subjectTemplate = '',
+  bodyTemplate = '',
+  requireSupported = false
+} = {}) {
+  const usedPlaceholders = extractPlaceholders(senderTemplate, recipientTemplate, subjectTemplate, bodyTemplate);
+  if (requireSupported && !Array.isArray(usedPlaceholders)) {
+    throw new Error('General template placeholders are not configured.');
+  }
+  return {
+    definition: buildGeneralTemplateDefinition(usedPlaceholders),
+    usedPlaceholders
+  };
+}
+
 function normalizePackageName(value = '') {
   return normalizeKeyToken(value || 'CORE') || 'CORE';
 }
@@ -138,6 +239,40 @@ function buildDefinitionFromEvent(event = null) {
   };
 }
 
+function buildDefinitionFromStored(stored = null, event = null) {
+  if (!stored) return buildDefinitionFromEvent(event);
+  const resolverId = cleanString(stored.resolverId || event?.resolverId, { max: 120, allowEmpty: true }) || '';
+  return {
+    key: `${normalizeKeyToken(stored.sectionId)}::${normalizeKeyToken(stored.operationId)}`,
+    eventKey: normalizeKeyToken(stored.eventKey || event?.eventKey),
+    packageName: normalizePackageName(stored.packageName || event?.packageName || 'CORE'),
+    sectionId: normalizeKeyToken(stored.sectionId || event?.sectionId),
+    operationId: normalizeKeyToken(stored.operationId || event?.operationId),
+    label: cleanString(stored.label || event?.label, { max: 160, allowEmpty: true })
+      || normalizeKeyToken(stored.eventKey)
+      || 'Email Event',
+    allowed: Array.isArray(stored.allowedPlaceholders)
+      ? stored.allowedPlaceholders.map((token) => normalizeKeyToken(token)).filter(Boolean)
+      : [],
+    required: Array.isArray(stored.requiredPlaceholders)
+      ? stored.requiredPlaceholders.map((token) => normalizeKeyToken(token)).filter(Boolean)
+      : [],
+    runtime: Array.isArray(stored.runtimePlaceholders)
+      ? stored.runtimePlaceholders.map((token) => normalizeKeyToken(token)).filter(Boolean)
+      : [],
+    resolve(context = {}) {
+      return resolveValuesByResolverId(resolverId, context);
+    }
+  };
+}
+
+async function resolveDefinitionForValidation(payload = {}, { requireActive = true } = {}) {
+  const event = resolveEventForSave(payload, { requireActive });
+  const stored = await emailEventDefinitionService.getDefinitionByEventKey(event.eventKey);
+  if (stored) return buildDefinitionFromStored(stored, event);
+  return buildDefinitionFromEvent(event);
+}
+
 function resolveDefinition(sectionId = '', operationId = '', { includeInactive = true, packageName = '' } = {}) {
   const event = getEmailEventBySectionOperation(sectionId, operationId, { includeInactive, packageName });
   return buildDefinitionFromEvent(event);
@@ -174,7 +309,8 @@ function validateTemplatePlaceholders({
   subjectTemplate = '',
   bodyTemplate = '',
   requireSupported = false,
-  requireActive = true
+  requireActive = true,
+  definitionOverride = null
 } = {}) {
   const event = normalizeKeyToken(eventKey)
     ? getEmailEventByKey(eventKey, { includeInactive: true })
@@ -186,7 +322,7 @@ function validateTemplatePlaceholders({
     throw new Error('Selected email event is currently disabled.');
   }
 
-  const definition = buildDefinitionFromEvent(event);
+  const definition = definitionOverride || buildDefinitionFromEvent(event);
   const usedPlaceholders = extractPlaceholders(senderTemplate, recipientTemplate, subjectTemplate, bodyTemplate);
   const usedSet = new Set(usedPlaceholders);
 
@@ -244,14 +380,83 @@ function buildFallbackPasswordResetTemplate() {
   };
 }
 
+function buildFallbackContactTemplate() {
+  return {
+    senderTemplate: '',
+    recipientTemplate: '',
+    subjectTemplate: '[Contact] {{CONTACT_SUBJECT}} ({{CONTACT_REF_ID}})',
+    bodyTemplate: [
+      'New Contact Message',
+      'Reference: {{CONTACT_REF_ID}}',
+      'Name: {{CONTACT_NAME}}',
+      'Email: {{CONTACT_EMAIL}}',
+      'Type: {{CONTACT_TYPE}}',
+      'Timeline: {{CONTACT_TIMELINE}}',
+      'Subject: {{CONTACT_SUBJECT}}',
+      '',
+      '{{CONTACT_MESSAGE}}'
+    ].join('\n'),
+    isFallback: true
+  };
+}
+
+function buildFallbackNewsletterTemplate() {
+  return {
+    senderTemplate: '',
+    recipientTemplate: '{{SUBSCRIBER_EMAIL}}',
+    subjectTemplate: 'Welcome to our newsletter',
+    bodyTemplate: [
+      'Welcome to our newsletter.',
+      'Thanks for subscribing. We will send practical updates when new content is available.',
+      '{{UNSUBSCRIBE_URL}}'
+    ].join('\n'),
+    isFallback: true
+  };
+}
+
+function buildFallbackTemplateForEvent(eventKey = '') {
+  const token = normalizeKeyToken(eventKey);
+  if (token === RESET_TEMPLATE_EVENT_KEY) return buildFallbackPasswordResetTemplate();
+  if (token === 'CONTACT_NOTIFICATION') return buildFallbackContactTemplate();
+  if (token === 'NEWSLETTER_WELCOME') return buildFallbackNewsletterTemplate();
+  return null;
+}
+
 function buildTemplateContextForSave(payload = {}, activeOrgId = '', event = null) {
+  const templateKind = event
+    ? 'event'
+    : resolveTemplateKindFromPayload(payload);
+  if (templateKind === 'general') {
+    return {
+      orgId: toPublicId(activeOrgId || payload?.orgId) || '',
+      templateKind: 'general',
+      templateName: cleanString(payload?.templateName, { max: 180, allowEmpty: true }) || '',
+      eventKey: '',
+      providerProfileId: cleanString(payload?.providerProfileId, { max: 120, allowEmpty: true }) || '',
+      packageName: 'CORE',
+      sectionId: '',
+      operationId: '',
+      senderTemplate: cleanString(payload?.senderTemplate, { max: 320, allowEmpty: true }) || '',
+      recipientTemplate: cleanString(payload?.recipientTemplate, { max: 600, allowEmpty: true }) || '',
+      subjectTemplate: cleanString(payload?.subjectTemplate, { max: 260, allowEmpty: true }) || '',
+      bodyTemplate: cleanString(payload?.bodyTemplate, { max: 30000, allowEmpty: true }) || '',
+      isActive: normalizeBoolean(payload?.isActive, true)
+    };
+  }
   const sectionId = event ? normalizeKeyToken(event.sectionId) : normalizeKeyToken(payload?.sectionId || '');
   const operationId = event ? normalizeKeyToken(event.operationId) : normalizeKeyToken(payload?.operationId || '');
   const packageName = event
     ? normalizePackageName(event.packageName || 'CORE')
     : normalizePackageName(payload?.packageName || 'CORE');
+  const eventKey = event
+    ? normalizeKeyToken(event.eventKey)
+    : normalizeKeyToken(payload?.eventKey || '');
   return {
     orgId: toPublicId(activeOrgId || payload?.orgId) || '',
+    templateKind: 'event',
+    templateName: '',
+    eventKey,
+    providerProfileId: cleanString(payload?.providerProfileId, { max: 120, allowEmpty: true }) || '',
     packageName,
     sectionId,
     operationId,
@@ -265,14 +470,37 @@ function buildTemplateContextForSave(payload = {}, activeOrgId = '', event = nul
 
 function decorateTemplateRowWithEvent(row = null) {
   if (!row || typeof row !== 'object') return row;
-  const event = getEmailEventBySectionOperation(row.sectionId, row.operationId, {
-    includeInactive: true,
-    packageName: row.packageName
-  });
+  const templateKind = resolveTemplateKindFromPayload(row, row);
+  if (templateKind === 'general') {
+    const templateName = cleanString(row.templateName, { max: 180, allowEmpty: true }) || '';
+    return {
+      ...row,
+      templateKind: 'general',
+      templateName,
+      eventKey: '',
+      packageName: 'CORE',
+      sectionId: '',
+      operationId: '',
+      providerProfileId: cleanString(row.providerProfileId, { max: 120, allowEmpty: true }) || '',
+      eventLabel: templateName || 'General template',
+      eventIsActive: true
+    };
+  }
+  const storedEventKey = normalizeKeyToken(row.eventKey || '');
+  const event = storedEventKey
+    ? getEmailEventByKey(storedEventKey, { includeInactive: true })
+    : getEmailEventBySectionOperation(row.sectionId, row.operationId, {
+      includeInactive: true,
+      packageName: row.packageName
+    });
   return {
     ...row,
-    packageName: normalizePackageName(row.packageName || 'CORE'),
-    eventKey: cleanString(event?.eventKey, { max: 120, allowEmpty: true }) || '',
+    templateKind: 'event',
+    eventKey: storedEventKey || cleanString(event?.eventKey, { max: 120, allowEmpty: true }) || '',
+    packageName: normalizePackageName(row.packageName || event?.packageName || 'CORE'),
+    sectionId: normalizeKeyToken(row.sectionId || event?.sectionId || ''),
+    operationId: normalizeKeyToken(row.operationId || event?.operationId || ''),
+    providerProfileId: cleanString(row.providerProfileId, { max: 120, allowEmpty: true }) || '',
     eventLabel: cleanString(event?.label, { max: 180, allowEmpty: true }) || '',
     eventIsActive: event ? event.isActive !== false : false
   };
@@ -281,23 +509,55 @@ function decorateTemplateRowWithEvent(row = null) {
 function normalizeTemplateListQuery(query = {}) {
   const source = query && typeof query === 'object' ? { ...query } : {};
   const eventKeyFilter = normalizeKeyToken(source.eventKey__eq || '');
-  delete source.eventKey__eq;
-
   if (eventKeyFilter) {
-    const event = getEmailEventByKey(eventKeyFilter, { includeInactive: true });
-    if (!event) {
-      return {
-        query: {
-          ...source,
-          id__eq: '__NO_MATCH_EMAIL_EVENT__'
-        }
-      };
-    }
-    source.sectionId__eq = normalizeKeyToken(event.sectionId);
-    source.operationId__eq = normalizeKeyToken(event.operationId);
+    source.eventKey__eq = eventKeyFilter;
   }
-
   return { query: source };
+}
+
+function buildDuplicateEventTemplateError(eventKey = '', existingTemplate = null) {
+  const token = normalizeKeyToken(eventKey);
+  const existingId = cleanString(existingTemplate?.id, { max: 120, allowEmpty: true }) || 'unknown';
+  return `This organization already has a template for event '${token}' (ID: ${existingId}). Edit the existing template or choose a different event.`;
+}
+
+function assertGeneralTemplateNameOrThrow(normalized = {}) {
+  const templateName = cleanString(normalized?.templateName, { max: 180, allowEmpty: true });
+  if (!templateName) {
+    throw new Error('Template name is required for general templates.');
+  }
+}
+
+async function assertUniqueEventTemplateOrThrow({
+  orgId = '',
+  eventKey = '',
+  excludeTemplateId = ''
+} = {}) {
+  const conflict = await emailManagementTemplateRepository.findTemplateByOrgAndEventKey(
+    orgId,
+    eventKey,
+    { excludeId: excludeTemplateId }
+  );
+  if (conflict) {
+    throw new Error(buildDuplicateEventTemplateError(eventKey, conflict));
+  }
+}
+
+async function assertTemplateProviderSenderOrThrow({
+  orgId = '',
+  providerProfileId = '',
+  senderTemplate = ''
+} = {}) {
+  const profileId = cleanString(providerProfileId, { max: 120, allowEmpty: true });
+  if (!profileId) return;
+  const profile = await emailProviderProfileService.resolveSelectableProviderProfile(profileId, orgId);
+  if (!profile) {
+    throw new Error('Email provider profile is not available for this organization.');
+  }
+  if (!Array.isArray(profile.verifiedDomains) || !profile.verifiedDomains.length) {
+    throw new Error('Selected provider profile has no verified domains configured.');
+  }
+  emailProviderProfileService.validateSenderDomain(senderTemplate, profile.verifiedDomains);
 }
 
 function buildCreator(requestingUser = null, orgId = '') {
@@ -406,7 +666,7 @@ const emailManagementService = {
 
   getPlaceholderRegistrySnapshot() {
     return this.getSupportedEventCatalog({ includeInactive: true }).map((event) => ({
-      key: `${event.sectionId}::${event.operationId}`,
+      key: event.eventKey,
       eventKey: event.eventKey,
       packageName: event.packageName,
       sectionId: event.sectionId,
@@ -416,6 +676,18 @@ const emailManagementService = {
       required: Array.isArray(event.requiredPlaceholders) ? event.requiredPlaceholders.slice() : [],
       runtime: Array.isArray(event.runtimePlaceholders) ? event.runtimePlaceholders.slice() : []
     }));
+  },
+
+  async getAccessibleEventDefinitions(requestingUser = null, options = {}) {
+    return emailEventDefinitionService.getAccessibleEventDefinitions(requestingUser, options);
+  },
+
+  async getAccessiblePlaceholderRegistry(requestingUser = null, options = {}) {
+    return emailEventDefinitionService.getAccessiblePlaceholderRegistry(requestingUser, options);
+  },
+
+  async syncEventDefinitionsFromCatalog() {
+    return emailEventDefinitionService.syncFromCodeCatalog();
   },
 
   async listTemplates(query = {}, requestingUser = null) {
@@ -449,17 +721,40 @@ const emailManagementService = {
 
   async createTemplate(payload = {}, requestingUser = null) {
     ensureOrgAdmin(requestingUser);
-    const activeOrgId = await assertCreateOrgContextOrThrow(requestingUser, { scopeLabel: 'email templates' });
-
-    const event = resolveEventForSave(payload, { requireActive: true });
-    const normalized = buildTemplateContextForSave(payload, activeOrgId, event);
-    validateTemplatePlaceholders({
-      eventKey: event.eventKey,
-      ...normalized,
-      requireSupported: true,
-      requireActive: true
-    });
+    const activeOrgId = await resolveEmailTemplateOrgContext(requestingUser, { scopeLabel: 'email templates' });
+    const templateKind = resolveTemplateKindFromPayload(payload);
+    let normalized;
+    if (templateKind === 'general') {
+      normalized = buildTemplateContextForSave(payload, activeOrgId, null);
+      assertGeneralTemplateNameOrThrow(normalized);
+      validateGeneralTemplatePlaceholders({
+        ...normalized,
+        requireSupported: true
+      });
+    } else {
+      const event = resolveEventForSave(payload, { requireActive: true });
+      normalized = buildTemplateContextForSave(payload, activeOrgId, event);
+      const definition = await resolveDefinitionForValidation(payload, { requireActive: true });
+      validateTemplatePlaceholders({
+        eventKey: event.eventKey,
+        ...normalized,
+        requireSupported: true,
+        requireActive: true,
+        definitionOverride: definition
+      });
+      await assertUniqueEventTemplateOrThrow({
+        orgId: activeOrgId,
+        eventKey: normalized.eventKey,
+        excludeTemplateId: ''
+      });
+    }
     const creator = buildCreator(requestingUser, activeOrgId);
+
+    await assertTemplateProviderSenderOrThrow({
+      orgId: activeOrgId,
+      providerProfileId: normalized.providerProfileId,
+      senderTemplate: normalized.senderTemplate
+    });
 
     try {
       return await dataService.addData('emailManagementTemplates', {
@@ -469,7 +764,11 @@ const emailManagementService = {
       }, requestingUser);
     } catch (error) {
       if (emailManagementTemplateRepository.isUniqueConflict(error)) {
-        throw new Error('A template for this section/operation already exists in this organization.');
+        const conflict = await emailManagementTemplateRepository.findTemplateByOrgAndEventKey(
+          activeOrgId,
+          normalized.eventKey
+        );
+        throw new Error(buildDuplicateEventTemplateError(normalized.eventKey, conflict));
       }
       throw error;
     }
@@ -480,28 +779,40 @@ const emailManagementService = {
     const existing = await dataService.getDataById('emailManagementTemplates', id, requestingUser);
     if (!existing) throw new Error('Email template not found.');
 
-    const event = resolveEventForSave(
-      {
-        ...existing,
-        ...(payload || {})
-      },
-      { requireActive: true }
-    );
-    const normalized = buildTemplateContextForSave(
-      {
-        ...existing,
-        ...(payload || {})
-      },
-      existing.orgId,
-      event
-    );
-    validateTemplatePlaceholders({
-      eventKey: event.eventKey,
-      ...normalized,
-      requireSupported: true,
-      requireActive: true
-    });
+    const mergedPayload = { ...existing, ...(payload || {}) };
+    const templateKind = resolveTemplateKindFromPayload(payload, existing);
+    let normalized;
+    if (templateKind === 'general') {
+      normalized = buildTemplateContextForSave(mergedPayload, existing.orgId, null);
+      assertGeneralTemplateNameOrThrow(normalized);
+      validateGeneralTemplatePlaceholders({
+        ...normalized,
+        requireSupported: true
+      });
+    } else {
+      const event = resolveEventForSave(mergedPayload, { requireActive: true });
+      normalized = buildTemplateContextForSave(mergedPayload, existing.orgId, event);
+      const definition = await resolveDefinitionForValidation(mergedPayload, { requireActive: true });
+      validateTemplatePlaceholders({
+        eventKey: event.eventKey,
+        ...normalized,
+        requireSupported: true,
+        requireActive: true,
+        definitionOverride: definition
+      });
+      await assertUniqueEventTemplateOrThrow({
+        orgId: existing.orgId,
+        eventKey: normalized.eventKey,
+        excludeTemplateId: existing.id
+      });
+    }
     const creator = buildCreator(requestingUser, existing.orgId);
+
+    await assertTemplateProviderSenderOrThrow({
+      orgId: existing.orgId,
+      providerProfileId: normalized.providerProfileId,
+      senderTemplate: normalized.senderTemplate
+    });
 
     try {
       return await dataService.updateData('emailManagementTemplates', id, {
@@ -516,7 +827,12 @@ const emailManagementService = {
       }, requestingUser);
     } catch (error) {
       if (emailManagementTemplateRepository.isUniqueConflict(error)) {
-        throw new Error('A template for this section/operation already exists in this organization.');
+        const conflict = await emailManagementTemplateRepository.findTemplateByOrgAndEventKey(
+          existing.orgId,
+          normalized.eventKey,
+          { excludeId: existing.id }
+        );
+        throw new Error(buildDuplicateEventTemplateError(normalized.eventKey, conflict));
       }
       throw error;
     }
@@ -525,6 +841,105 @@ const emailManagementService = {
   async deleteTemplate(id, requestingUser = null) {
     ensureOrgAdmin(requestingUser);
     return dataService.deleteData('emailManagementTemplates', id, requestingUser);
+  },
+
+  async resolveTemplateForEvent({
+    orgId = '',
+    eventKey = '',
+    to = '',
+    context = {},
+    injectedValues = {},
+    templateId = ''
+  } = {}) {
+    const activeOrgId = toPublicId(orgId) || 'SYSTEM';
+    const token = normalizeKeyToken(eventKey);
+    if (!token) throw new Error('Event key is required.');
+
+    const event = getEmailEventByKey(token, { includeInactive: true });
+    if (!event) throw new Error('Selected email event is not supported by backend.');
+    if (event.isActive === false) throw new Error('Selected email event is currently disabled.');
+
+    if (templateId) {
+      return this.resolveTemplateById({
+        templateId,
+        orgId: activeOrgId,
+        to,
+        context,
+        injectedValues
+      });
+    }
+
+    const { template: activeTemplate, routeSource } = await emailManagementTemplateRepository
+      .getActiveTemplateByEventKeyWithFallback(activeOrgId, token);
+    if (!activeTemplate) {
+      const fallback = buildFallbackTemplateForEvent(token);
+      if (!fallback) {
+        throw new Error(`No active email template configured for event '${token}'.`);
+      }
+
+      const templateContext = {
+        eventKey: token,
+        sectionId: normalizeKeyToken(event.sectionId),
+        operationId: normalizeKeyToken(event.operationId),
+        senderTemplate: fallback.senderTemplate,
+        recipientTemplate: fallback.recipientTemplate,
+        subjectTemplate: fallback.subjectTemplate,
+        bodyTemplate: fallback.bodyTemplate
+      };
+      const storedDefinition = await emailEventDefinitionService.getDefinitionByEventKey(token);
+      const definition = storedDefinition
+        ? buildDefinitionFromStored(storedDefinition, event)
+        : buildDefinitionFromEvent(event);
+      const resolverValues = definition ? definition.resolve(context || {}) : {};
+      const mergedValues = {
+        ...resolverValues,
+        ...normalizeInjectedValues(injectedValues)
+      };
+      const renderedFrom = cleanString(applyPlaceholderValues(templateContext.senderTemplate, mergedValues), { max: 320, allowEmpty: true });
+      const overrideRecipient = cleanString(to, { max: 320, allowEmpty: true });
+      const renderedTo = overrideRecipient || applyPlaceholderValues(templateContext.recipientTemplate, mergedValues);
+      const recipients = parseAddressList(renderedTo);
+      if (!recipients.length) {
+        throw new Error('Resolved recipient list is empty.');
+      }
+      const renderedSubject = applyPlaceholderValues(templateContext.subjectTemplate, mergedValues);
+      const renderedBody = applyPlaceholderValues(templateContext.bodyTemplate, mergedValues);
+      const subject = cleanString(renderedSubject, { max: 260, allowEmpty: true });
+      if (!subject) throw new Error('Resolved email subject is empty.');
+      const bodyOutputs = buildRuntimeBodyOutputs(renderedBody);
+      const bodyText = cleanString(bodyOutputs.text, { max: 60000, allowEmpty: true });
+      const bodyHtml = cleanString(bodyOutputs.html, { max: 60000, allowEmpty: true });
+      if (!bodyText || !bodyHtml) throw new Error('Resolved email body is empty.');
+
+      return {
+        from: renderedFrom || '',
+        to: recipients,
+        subject,
+        text: bodyText,
+        html: bodyHtml,
+        body: bodyText,
+        templateId: '',
+        providerProfileId: '',
+        packageName: normalizePackageName(event.packageName || 'CORE'),
+        sectionId: templateContext.sectionId,
+        operationId: templateContext.operationId,
+        eventKey: token,
+        routeSource: 'code_fallback',
+        usedFallback: true
+      };
+    }
+
+    const resolved = await this.resolveTemplateById({
+      templateId: activeTemplate.id,
+      orgId: activeOrgId,
+      to,
+      context,
+      injectedValues
+    });
+    return {
+      ...resolved,
+      routeSource: routeSource || 'org_override'
+    };
   },
 
   resolveTemplateForRuntime({ orgId = '', sectionId = '', operationId = '', context = {} } = {}) {
@@ -624,7 +1039,11 @@ const emailManagementService = {
       throw new Error('Email template is not active.');
     }
 
+    const isGeneral = resolveTemplateKindFromPayload(row, row) === 'general';
     const templateContext = {
+      templateKind: isGeneral ? 'general' : 'event',
+      eventKey: normalizeKeyToken(row.eventKey || ''),
+      providerProfileId: cleanString(row.providerProfileId, { max: 120, allowEmpty: true }) || '',
       packageName: normalizePackageName(row.packageName || 'CORE'),
       sectionId: normalizeKeyToken(row.sectionId || ''),
       operationId: normalizeKeyToken(row.operationId || ''),
@@ -634,11 +1053,18 @@ const emailManagementService = {
       bodyTemplate: cleanString(row.bodyTemplate, { max: 30000, allowEmpty: true }) || ''
     };
 
-    const event = getEmailEventBySectionOperation(templateContext.sectionId, templateContext.operationId, {
-      includeInactive: true,
-      packageName: templateContext.packageName
-    });
-    const definition = buildDefinitionFromEvent(event);
+    let definition;
+    let event = null;
+    if (!isGeneral) {
+      event = getEmailEventBySectionOperation(templateContext.sectionId, templateContext.operationId, {
+        includeInactive: true,
+        packageName: templateContext.packageName
+      });
+      if (!event && templateContext.eventKey) {
+        event = getEmailEventByKey(templateContext.eventKey, { includeInactive: true });
+      }
+      definition = buildDefinitionFromEvent(event);
+    }
     const resolverValues = definition ? definition.resolve(context || {}) : {};
     const mergedValues = {
       ...resolverValues,
@@ -652,7 +1078,14 @@ const emailManagementService = {
       templateContext.bodyTemplate
     );
 
-    if (definition) {
+    if (isGeneral) {
+      const missingRuntime = usedPlaceholders.filter((token) => (
+        !cleanString(mergedValues?.[token], { max: 60000, allowEmpty: true })
+      ));
+      if (missingRuntime.length > 0) {
+        throw new Error(`Missing runtime placeholder values: ${missingRuntime.join(', ')}.`);
+      }
+    } else if (definition) {
       const allowedSet = new Set(definition.allowed || []);
       const unknown = usedPlaceholders.filter((token) => !allowedSet.has(token));
       if (unknown.length > 0) {
@@ -701,9 +1134,87 @@ const emailManagementService = {
       html: bodyHtml,
       body: bodyText,
       templateId: token,
+      providerProfileId: templateContext.providerProfileId,
       packageName: templateContext.packageName,
-      eventKey: cleanString(definition?.eventKey || event?.eventKey, { max: 120, allowEmpty: true }) || '',
+      sectionId: templateContext.sectionId,
+      operationId: templateContext.operationId,
+      eventKey: cleanString(definition?.eventKey || event?.eventKey || templateContext.eventKey, { max: 120, allowEmpty: true }) || '',
       usedFallback: false
+    };
+  },
+
+  async listEventRoutingCoverage(query = {}, requestingUser = null) {
+    ensureOrgAdmin(requestingUser);
+    const activeOrgId = toPublicId(requestingUser?.activeOrgId) || 'SYSTEM';
+    const forceEventKeys = cleanString(query?.eventKey__eq, { max: 120, allowEmpty: true }).toUpperCase();
+
+    const definitions = await this.getAccessibleEventDefinitions(requestingUser, {
+      includeInactive: false,
+      forceEventKeys: forceEventKeys ? [forceEventKeys] : []
+    });
+
+    const orgTemplateResult = await this.listTemplates({
+      ...(query || {}),
+      isActive__eq: 'true',
+      page: 1,
+      limit: 5000
+    }, requestingUser);
+    const orgTemplates = Array.isArray(orgTemplateResult?.rows) ? orgTemplateResult.rows : [];
+    const orgByEvent = new Map(
+      orgTemplates.map((row) => [normalizeKeyToken(row.eventKey), row])
+    );
+
+    let systemTemplates = await emailManagementTemplateRepository.list({
+      scope: { canViewAll: true },
+      query: { orgId__eq: 'SYSTEM', isActive__eq: 'true', page: 1, limit: 5000 }
+    });
+    const systemByEvent = new Map(
+      systemTemplates.map((row) => [normalizeKeyToken(row.eventKey), row])
+    );
+
+    const routeFilter = cleanString(query?.effectiveRoute__eq, { max: 40, allowEmpty: true }).toLowerCase();
+
+    let rows = definitions.map((definition) => {
+      const eventKey = normalizeKeyToken(definition.eventKey);
+      const orgTemplate = orgByEvent.get(eventKey) || null;
+      const systemTemplate = systemByEvent.get(eventKey) || null;
+      let effectiveRoute = 'unconfigured';
+      let routeSource = 'unconfigured';
+      if (orgTemplate) {
+        effectiveRoute = 'org_override';
+        routeSource = 'org_override';
+      } else if (systemTemplate) {
+        effectiveRoute = 'system_default';
+        routeSource = 'system_default';
+      }
+      return {
+        eventKey,
+        eventLabel: definition.label || eventKey,
+        packageName: definition.packageName || 'CORE',
+        sectionId: definition.sectionId || '',
+        operationId: definition.operationId || '',
+        orgTemplateId: orgTemplate?.id || '',
+        orgTemplateSubject: orgTemplate?.subjectTemplate || '',
+        systemTemplateId: systemTemplate?.id || '',
+        systemTemplateSubject: systemTemplate?.subjectTemplate || '',
+        effectiveRoute,
+        routeSource,
+        readOnly: definition.readOnly === true
+      };
+    });
+
+    if (routeFilter) {
+      rows = rows.filter((row) => String(row?.effectiveRoute || '').toLowerCase() === routeFilter);
+    }
+
+    rows = applyGenericFilter(rows, query || {}, {
+      defaultSearchFields: EVENT_ROUTING_SEARCH_FIELDS
+    });
+
+    const pagination = paginate(rows, query?.page, query?.limit);
+    return {
+      rows: pagination.data,
+      pagination: pagination.pagination
     };
   },
 
@@ -713,31 +1224,72 @@ const emailManagementService = {
     if (!source.isActive__eq) source.isActive__eq = 'true';
     const result = await this.listTemplates(source, requestingUser);
     const rows = Array.isArray(result?.rows) ? result.rows : (Array.isArray(result) ? result : []);
-    return rows.map((row) => ({
-      id: row.id,
-      label: [
-        row.eventLabel || row.eventKey || row.id,
-        row.subjectTemplate ? `— ${String(row.subjectTemplate).slice(0, 80)}` : ''
-      ].join(' ').trim(),
-      name: row.eventLabel || row.eventKey || row.id,
-      packageName: normalizePackageName(row.packageName || 'CORE'),
-      eventKey: row.eventKey || '',
-      subjectTemplate: row.subjectTemplate || '',
-      isActive: row.isActive !== false
-    }));
+    return rows.map((row) => {
+      const isGeneral = resolveTemplateKindFromPayload(row, row) === 'general';
+      const labelPrefix = isGeneral
+        ? (cleanString(row.templateName, { max: 180, allowEmpty: true }) || 'General template')
+        : (row.eventLabel || row.eventKey || row.id);
+      return {
+        id: row.id,
+        label: [
+          labelPrefix,
+          row.subjectTemplate ? `— ${String(row.subjectTemplate).slice(0, 80)}` : ''
+        ].join(' ').trim(),
+        name: isGeneral
+          ? (cleanString(row.templateName, { max: 180, allowEmpty: true }) || 'General template')
+          : (row.eventLabel || row.eventKey || row.id),
+        templateName: cleanString(row.templateName, { max: 180, allowEmpty: true }) || '',
+        templateKind: isGeneral ? 'general' : 'event',
+        packageName: normalizePackageName(row.packageName || 'CORE'),
+        eventKey: row.eventKey || '',
+        providerProfileId: row.providerProfileId || '',
+        subjectTemplate: row.subjectTemplate || '',
+        isActive: row.isActive !== false
+      };
+    });
+  },
+
+  async getEventAssignmentsForOrg(requestingUser = null) {
+    ensureOrgAdmin(requestingUser);
+    const activeOrgId = await resolveEmailTemplateOrgContext(requestingUser, { scopeLabel: 'email templates' });
+    const result = await this.listTemplates({ page: 1, limit: 5000 }, requestingUser);
+    const rows = Array.isArray(result?.rows) ? result.rows : (Array.isArray(result) ? result : []);
+    const assignments = {};
+    rows.forEach((row) => {
+      const eventKey = normalizeKeyToken(row?.eventKey || '');
+      if (!eventKey) return;
+      assignments[eventKey] = {
+        id: cleanString(row?.id, { max: 120, allowEmpty: true }) || '',
+        subjectTemplate: cleanString(row?.subjectTemplate, { max: 260, allowEmpty: true }) || '',
+        isActive: row?.isActive !== false
+      };
+    });
+    return { orgId: activeOrgId, assignments };
   },
 
   __testables: Object.freeze({
     validateTemplatePlaceholders,
+    validateGeneralTemplatePlaceholders,
     resolveEventForSave,
+    resolveTemplateKindFromPayload,
+    normalizeTemplateKind,
+    buildGeneralTemplateDefinition,
+    CORE_GENERAL_TEMPLATE_SLOTS,
     normalizeTemplateListQuery,
     buildTemplateContextForSave,
     decorateTemplateRowWithEvent,
+    assertGeneralTemplateNameOrThrow,
+    EVENT_ROUTING_SEARCH_FIELDS,
     normalizeInjectedValues,
     applyPlaceholderValues,
     buildRuntimeBodyOutputs,
     extractPlaceholders,
-    buildDefinitionFromEvent
+    buildDefinitionFromEvent,
+    buildDefinitionFromStored,
+    resolveDefinitionForValidation,
+    buildDuplicateEventTemplateError,
+    assertUniqueEventTemplateOrThrow,
+    assertTemplateProviderSenderOrThrow
   })
 };
 

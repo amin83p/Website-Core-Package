@@ -1,5 +1,10 @@
 'use strict';
 
+/**
+ * @deprecated Replaced by the core scheduled task orchestrator and
+ * school.uncompletedSessionEmail.prepare handler. Kept for one release only.
+ */
+
 const { requireCoreModule } = require('./schoolCoreModuleResolver');
 const startupLogger = requireCoreModule('MVC/utils/startupLogger');
 const sessionNotificationJob = require('./sessionNotificationJob');

@@ -13,6 +13,9 @@ const SYSTEM_FRAMEWORK = {
   name: 'SYSTEM_FRAMEWORK'
 };
 
+const CLONE_ACCESS_FROM_SECTION_ID = '920210';
+const PROVIDERS_SECTION_ID = '920214';
+
 const OP_BUNDLE = [
   { id: 'OP1001', sessionAttempts: 5, sessionTime: 15, active: true },
   { id: 'OP1002', sessionAttempts: 5, sessionTime: 15, active: true },
@@ -62,11 +65,30 @@ const LEDGER_SECTION_DOC = {
   operations: OP_BUNDLE
 };
 
+const PROVIDERS_SECTION_DOC = {
+  id: '920214',
+  name: 'EMAIL_PROVIDERS',
+  category: 'SECURITY',
+  description: 'Manage encrypted org-scoped email provider profiles and verified sender domains.',
+  homeURL: '/email-management/providers',
+  message: '',
+  inactiveMessage: '',
+  active: true,
+  dashboardDisplay: true,
+  mainDashboardDisplay: false,
+  trackState: true,
+  minimumAccessRequirement: 5,
+  navigatorSection: false,
+  subsections: [],
+  related: [],
+  operations: OP_BUNDLE
+};
+
 const PARENT_SECTION_DOC = {
   id: '920200',
   name: 'EMAIL_MANAGEMENT',
   category: 'SECURITY',
-  description: 'Navigator for Email Templates and Email Ledger sections.',
+  description: 'Navigator for Email Templates, Provider Profiles, and Email Ledger sections.',
   homeURL: '/dashboard/section-nav/EMAIL_MANAGEMENT',
   message: '',
   inactiveMessage: '',
@@ -199,6 +221,48 @@ async function attachParentUnderFramework(sections, parentRow, childRows) {
   console.log(`Linked EMAIL_MANAGEMENT (${parentId}) under ${SYSTEM_FRAMEWORK.name} and removed direct child links.`);
 }
 
+async function grantProvidersAccessFromTemplates(accesses) {
+  const profiles = await accesses.find({ 'sections.sectionId': CLONE_ACCESS_FROM_SECTION_ID }).toArray();
+  let updated = 0;
+  for (const profile of profiles) {
+    const sampleGrant = (Array.isArray(profile.sections) ? profile.sections : [])
+      .find((row) => String(row?.sectionId || '') === CLONE_ACCESS_FROM_SECTION_ID);
+    const operations = Array.isArray(sampleGrant?.operations) && sampleGrant.operations.length
+      ? sampleGrant.operations
+      : OP_BUNDLE.map((row) => row.id);
+    const adminAccess = sampleGrant?.adminAccess === true;
+    const existing = (Array.isArray(profile.sections) ? profile.sections : [])
+      .find((row) => String(row?.sectionId || '') === PROVIDERS_SECTION_ID);
+    if (existing) {
+      await accesses.updateOne(
+        { _id: profile._id, 'sections.sectionId': PROVIDERS_SECTION_ID },
+        {
+          $set: {
+            'sections.$.adminAccess': adminAccess,
+            'sections.$.operations': operations,
+            updatedAt: new Date(),
+            updatedBy: 'system'
+          }
+        }
+      );
+    } else {
+      await accesses.updateOne(
+        { _id: profile._id },
+        {
+          $push: { sections: { sectionId: PROVIDERS_SECTION_ID, adminAccess, operations } },
+          $set: { updatedAt: new Date(), updatedBy: 'system' }
+        }
+      );
+    }
+    updated += 1;
+  }
+  if (!updated) {
+    console.warn(`WARNING: No access profiles with ${CLONE_ACCESS_FROM_SECTION_ID}; grant ${PROVIDERS_SECTION_ID} manually.`);
+  } else {
+    console.log(`Granted EMAIL_PROVIDERS access on ${updated} profile(s) cloned from EMAIL_TEMPLATES.`);
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const uri = String(
@@ -225,16 +289,23 @@ async function main() {
   try {
     const db = client.db(dbName);
     const sections = db.collection('sections');
+    const accesses = db.collection('accesses');
 
     const templateRow = await upsertSection(sections, TEMPLATE_SECTION_DOC);
     const ledgerRow = await upsertSection(sections, LEDGER_SECTION_DOC);
+    const providersRow = await upsertSection(sections, PROVIDERS_SECTION_DOC);
 
     const parentRow = await upsertSection(sections, {
       ...PARENT_SECTION_DOC,
-      subsections: [{ id: String(templateRow.id) }, { id: String(ledgerRow.id) }]
+      subsections: [
+        { id: String(templateRow.id) },
+        { id: String(ledgerRow.id) },
+        { id: String(providersRow.id) }
+      ]
     });
 
-    await attachParentUnderFramework(sections, parentRow, [templateRow, ledgerRow]);
+    await attachParentUnderFramework(sections, parentRow, [templateRow, ledgerRow, providersRow]);
+    await grantProvidersAccessFromTemplates(accesses);
     console.log('Email Management section seed complete.');
   } finally {
     await client.close();

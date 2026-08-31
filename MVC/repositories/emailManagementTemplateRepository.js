@@ -19,6 +19,9 @@ const COLLECTION_NAME = 'emailManagementTemplates';
 const DEFAULT_SEARCH_FIELDS = Object.freeze([
   'id',
   'orgId',
+  'templateKind',
+  'eventKey',
+  'providerProfileId',
   'packageName',
   'sectionId',
   'operationId',
@@ -78,7 +81,22 @@ function normalizePackageName(value = '') {
 }
 
 function assertUniquePair(rows = [], targetRow = {}, excludeId = '') {
+  if (normalizeKeyToken(targetRow?.templateKind || '').toLowerCase() === 'general') {
+    return;
+  }
   const orgId = toPublicId(targetRow?.orgId || '');
+  const eventKey = normalizeKeyToken(targetRow?.eventKey || '');
+  if (orgId && eventKey) {
+    const conflict = (Array.isArray(rows) ? rows : []).find((row) => {
+      if (excludeId && idsEqual(row?.id, excludeId)) return false;
+      return idsEqual(row?.orgId, orgId) && normalizeKeyToken(row?.eventKey || '') === eventKey;
+    });
+    if (conflict) {
+      throw new Error('A template for this event already exists in the selected organization.');
+    }
+    return;
+  }
+
   const packageName = normalizePackageName(targetRow?.packageName || 'CORE');
   const sectionId = normalizeKeyToken(targetRow?.sectionId || '');
   const operationId = normalizeKeyToken(targetRow?.operationId || '');
@@ -195,9 +213,7 @@ const emailManagementTemplateRepository = {
           scope: { canViewAll: true },
           query: {
             orgId__eq: toPublicId(data?.orgId || ''),
-            packageName__eq: normalizePackageName(data?.packageName || 'CORE'),
-            sectionId__eq: normalizeKeyToken(data?.sectionId || ''),
-            operationId__eq: normalizeKeyToken(data?.operationId || ''),
+            eventKey__eq: normalizeKeyToken(data?.eventKey || ''),
             page: 1,
             limit: 5
           }
@@ -247,9 +263,7 @@ const emailManagementTemplateRepository = {
           scope: { canViewAll: true },
           query: {
             orgId__eq: normalized.orgId,
-            packageName__eq: normalized.packageName,
-            sectionId__eq: normalized.sectionId,
-            operationId__eq: normalized.operationId,
+            eventKey__eq: normalized.eventKey,
             page: 1,
             limit: 10
           }
@@ -279,6 +293,65 @@ const emailManagementTemplateRepository = {
         return Number(result?.deletedCount || 0) > 0;
       }
     }, 'core.emailTemplates.remove');
+  },
+
+  async getActiveTemplateByEventKey(orgId = '', eventKey = '', options = {}) {
+    const query = {
+      orgId__eq: toPublicId(orgId),
+      eventKey__eq: normalizeKeyToken(eventKey),
+      isActive__eq: true,
+      page: 1,
+      limit: 5
+    };
+    const rows = await this.list({
+      ...options,
+      scope: { canViewAll: true },
+      query,
+      sort: { updatedAt: -1, id: -1 }
+    });
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+  },
+
+  async findTemplateByOrgAndEventKey(orgId = '', eventKey = '', options = {}) {
+    const activeOrgId = toPublicId(orgId);
+    const token = normalizeKeyToken(eventKey);
+    if (!activeOrgId || !token) return null;
+    const excludeId = String(options?.excludeId || '').trim();
+    const rows = await this.list({
+      ...(options || {}),
+      scope: { canViewAll: true },
+      query: {
+        orgId__eq: activeOrgId,
+        eventKey__eq: token,
+        page: 1,
+        limit: 10
+      }
+    });
+    const match = (Array.isArray(rows) ? rows : []).find((row) => {
+      if (excludeId && idsEqual(row?.id, excludeId)) return false;
+      return true;
+    });
+    return match || null;
+  },
+
+  async getActiveTemplateByEventKeyWithFallback(orgId = '', eventKey = '', options = {}) {
+    const activeOrgId = toPublicId(orgId) || 'SYSTEM';
+    const token = normalizeKeyToken(eventKey);
+    if (!token) return { template: null, routeSource: 'unconfigured' };
+
+    const orgTemplate = await this.getActiveTemplateByEventKey(activeOrgId, token, options);
+    if (orgTemplate) {
+      return { template: orgTemplate, routeSource: 'org_override' };
+    }
+
+    if (String(activeOrgId).toUpperCase() !== 'SYSTEM') {
+      const systemTemplate = await this.getActiveTemplateByEventKey('SYSTEM', token, options);
+      if (systemTemplate) {
+        return { template: systemTemplate, routeSource: 'system_default' };
+      }
+    }
+
+    return { template: null, routeSource: 'unconfigured' };
   },
 
   async getActiveTemplate(orgId = '', sectionId = '', operationId = '', options = {}) {

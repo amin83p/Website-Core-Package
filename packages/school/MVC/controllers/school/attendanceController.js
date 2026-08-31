@@ -1075,6 +1075,7 @@ async function updateAttendanceRosterCell(req, res) {
 
         const existingRosterRecord = session.roster?.find((r) => idsEqual(r.personId, studentPersonId)) || null;
         const previousAttendance = existingRosterRecord?.attendance;
+        const previousSnapshot = attendanceChangeLogService.rosterAttendanceSnapshot(existingRosterRecord || {});
         const savedExcuseState = {
             lateExcused: Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(existingRosterRecord).lateExcused),
             earlyLeaveExcused: Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(existingRosterRecord).earlyLeaveExcused),
@@ -1163,16 +1164,26 @@ async function updateAttendanceRosterCell(req, res) {
 
         await schoolDataService.saveClassSessions(classId, sessions, req.user, routeAccessContext);
 
-        const fromStatus = attendanceChangeLogService.normalizeLoggedStatus(previousAttendance);
-        const toStatus = attendanceChangeLogService.normalizeLoggedStatus(rosterRecord.attendance);
-        if (fromStatus !== toStatus) {
+        const rosterChanges = attendanceChangeLogService.diffRosterAttendanceChanges(
+            [{
+                personId: studentPersonId,
+                attendance: previousSnapshot.status,
+                lateMinutes: previousSnapshot.lateMinutes,
+                earlyLeaveMinutes: previousSnapshot.earlyLeaveMinutes,
+                lateExcused: previousSnapshot.lateExcused,
+                earlyLeaveExcused: previousSnapshot.earlyLeaveExcused,
+                absenceExcused: previousSnapshot.absenceExcused
+            }],
+            [rosterRecord]
+        );
+        if (rosterChanges.length) {
             await attendanceChangeLogService.appendChanges({
                 orgId: classData?.orgId || req.user?.activeOrgId || '',
                 classId,
                 sessionId,
                 sessionDate: String(session?.date || '').trim(),
                 source: 'matrix_cell',
-                changes: [{ personId: studentPersonId, fromStatus, toStatus }],
+                changes: rosterChanges,
                 reqUser: req.user
             });
         }
@@ -1378,7 +1389,10 @@ async function getAttendanceChangeLog(req, res) {
             sessionId,
             studentPersonId,
             markPolicy
-        }, { scope: buildAttendanceRouteAccessContext(req) });
+        }, {
+            reqUser: req.user,
+            accessContext: buildAttendanceRouteAccessContext(req)
+        });
 
         return res.json({ status: 'success', entries });
     } catch (error) {
@@ -1403,7 +1417,10 @@ async function queryAttendanceChangeLogs(req, res) {
             endDate,
             cells,
             markPolicy
-        }, { scope: buildAttendanceRouteAccessContext(req) });
+        }, {
+            reqUser: req.user,
+            accessContext: buildAttendanceRouteAccessContext(req)
+        });
 
         return res.json({ status: 'success', entriesByCell });
     } catch (error) {

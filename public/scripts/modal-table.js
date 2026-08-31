@@ -662,30 +662,36 @@ function applyColumnHeaderPresentation(headerCell, col) {
   // Preserve select-all checkbox column; do not replace its content
   if (col.key === 'select') {
     headerCell.classList.remove('draggable');
-    const existingCheckbox = headerCell.querySelector('#selectAll');
-    if (!existingCheckbox) {
-      const label = document.createElement('label');
-      label.className = 'd-flex flex-column align-items-center gap-0 mb-0';
-      label.style.cursor = 'pointer';
-      label.htmlFor = 'selectAll';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.className = 'form-check-input';
-      cb.id = 'selectAll';
-      cb.onclick = function () {
-        document.querySelectorAll('.session-checkbox').forEach((c) => { c.checked = cb.checked; });
-        const sa = document.getElementById('selectAll');
-        if (sa) sa.indeterminate = false;
-        if (typeof updateCompareState === 'function') updateCompareState();
-      };
-      const span = document.createElement('span');
-      span.className = 'small text-muted';
-      span.textContent = 'Select all';
-      label.appendChild(cb);
-      label.appendChild(span);
-      headerCell.innerHTML = '';
-      headerCell.appendChild(label);
+    const existingCheckbox = headerCell.querySelector('input[type="checkbox"]');
+    if (existingCheckbox) {
+      const labelNode = headerCell.querySelector('.header-label')
+        || headerCell.querySelector('label span.small');
+      if (labelNode) {
+        labelNode.textContent = col.label || col.defaultLabel || 'Select all';
+      }
+      return;
     }
+    const label = document.createElement('label');
+    label.className = 'd-flex flex-column align-items-center gap-0 mb-0';
+    label.style.cursor = 'pointer';
+    label.htmlFor = 'selectAll';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'form-check-input';
+    cb.id = 'selectAll';
+    cb.onclick = function () {
+      document.querySelectorAll('.session-checkbox').forEach((c) => { c.checked = cb.checked; });
+      const sa = document.getElementById('selectAll');
+      if (sa) sa.indeterminate = false;
+      if (typeof updateCompareState === 'function') updateCompareState();
+    };
+    const span = document.createElement('span');
+    span.className = 'small text-muted';
+    span.textContent = 'Select all';
+    label.appendChild(cb);
+    label.appendChild(span);
+    headerCell.innerHTML = '';
+    headerCell.appendChild(label);
     return;
   }
 

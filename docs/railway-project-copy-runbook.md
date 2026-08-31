@@ -65,9 +65,6 @@ PUBLIC_APP_URL
 WEBSITE_BASE_URL
 APP_URL
 BASE_URL
-RESEND_API_KEY
-RESEND_FROM_EMAIL
-EMAIL_FROM
 MICROSOFT_AUTH_ENABLED
 MICROSOFT_TENANT_ID
 MICROSOFT_AUTHORITY_TENANT
@@ -79,6 +76,8 @@ MICROSOFT_ENFORCE_TENANT
 SESSION_SECRET
 JWT_SECRET
 ```
+
+Outbound email is configured through **Email Management -> Provider Profiles** and templates in MongoDB, not mandatory `RESEND_*` Railway variables. Legacy `RESEND_API_KEY` / `RESEND_FROM_EMAIL` env vars are optional during migration only.
 
 Keep secrets out of Git. Do not copy `.env` into commits.
 
@@ -108,7 +107,6 @@ Copy as-is if still valid:
 DATA_BACKEND=MONGO
 SESSION_SECRET
 JWT_SECRET
-RESEND_API_KEY
 MICROSOFT_TENANT_ID
 MICROSOFT_AUTHORITY_TENANT
 MICROSOFT_CLIENT_ID
@@ -129,16 +127,27 @@ PUBLIC_APP_URL / WEBSITE_BASE_URL     -> TARGET_DOMAIN
 APP_URL / BASE_URL                    -> TARGET_DOMAIN
 MICROSOFT_REDIRECT_URI                -> TARGET_DOMAIN/auth/microsoft/callback
 RAILWAY_GATEWAY_BASE_URL              -> target internal/public app URL if railway_proxy is used
-RESEND_FROM_EMAIL / EMAIL_FROM        -> verified sender for the target domain, if changing sender domain
 ```
 
-If you are testing only, consider disabling outbound email first:
+Configure outbound email in the app after restore:
+
+```text
+Email Management -> Provider Profiles
+  - SYSTEM default provider profile (guest flows: contact form, newsletter)
+  - per-org default provider profile (password reset, school notifications, etc.)
+Email Management -> Email Templates / Event Routing
+System Settings -> contact.notifyRecipients
+```
+
+Legacy env vars are optional during migration:
 
 ```text
 RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+RESEND_CONTACT_TO=
 ```
 
-or use a test sender/domain until you confirm the clone is safe.
+If provider profiles are not configured yet, outbound email is skipped rather than falling back to platform env credentials.
 
 ## 5. Copy MongoDB Data
 
@@ -315,22 +324,32 @@ MICROSOFT_REDIRECT_URI=https://new-domain.com/auth/microsoft/callback
 
 5. Test Microsoft login with an existing local user whose email matches the Microsoft account.
 
-## 10. Update Resend
+## 10. Configure Email Provider Profiles
 
-If the target uses a different sender domain:
+Provider profiles replace mandatory `RESEND_*` Railway variables.
 
-1. Verify the new domain in Resend.
-2. Update DNS records required by Resend.
-3. Update templates in Email Management if sender templates use the old domain.
-4. Confirm Railway target variables:
+1. In **Email Management -> Provider Profiles**, create or verify:
+   - a **SYSTEM** default profile for guest/public flows (contact form, newsletter welcome)
+   - a default profile for each organization that sends email (password reset, school notifications, etc.)
+2. Each profile needs:
+   - API key
+   - verified domains
+   - default from email on a verified domain
+3. Confirm event routing/templates in **Email Management** for:
+   - `AUTH_PASSWORD_RESET_CODE`
+   - `CONTACT_NOTIFICATION`
+   - `NEWSLETTER_WELCOME`
+   - school notification events as needed
+4. Set **System Settings -> contact.notifyRecipients** (comma-separated admin inboxes) for contact-form notifications.
+5. If the target uses a different sender domain, verify that domain in Resend and update provider profile verified domains / template sender values.
+
+Optional legacy env bridge during rollout:
 
 ```text
-RESEND_API_KEY=...
-RESEND_FROM_EMAIL=support@new-domain.com
-EMAIL_FROM=support@new-domain.com
+RESEND_CONTACT_TO=admin@example.com
 ```
 
-If Email Management templates contain sender addresses, those template sender values override the generic sender in normal template-based sends.
+This is only used when `contact.notifyRecipients` is empty.
 
 ## 11. App-Level Settings to Review After Mongo Restore
 
@@ -342,8 +361,11 @@ Review these in the target app:
 System Settings -> app.uploadsPath
 System Settings -> organization.pteJoinOrgId
 System Settings -> organization.freeOrgId
+System Settings -> contact.notifyRecipients
 Data Backend Settings
+Email Management -> Provider Profiles
 Email Management -> Email Templates
+Email Management -> Event Routing
 PTE AI API Providers
 PTE Scoring Defaults
 ```

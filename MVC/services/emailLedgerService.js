@@ -50,7 +50,6 @@ function ensureOrgAdmin(requestingUser = null) {
 }
 
 function buildScope(requestingUser = null) {
-  if (adminChekersService.isSuperAdmin(requestingUser)) return { canViewAll: true };
   const activeOrgId = toPublicId(requestingUser?.activeOrgId || '');
   if (!activeOrgId) return { canViewAll: false, orgIds: [] };
   return { canViewAll: false, orgIds: [activeOrgId] };
@@ -123,12 +122,6 @@ function normalizeListQuery(raw = {}, requestingUser = null) {
 
   const provider = cleanString(source.provider__eq || source.provider, { max: 80, allowEmpty: true }).toLowerCase();
   if (provider) query.provider__eq = provider;
-
-  const scope = buildScope(requestingUser);
-  if (scope.canViewAll && source.orgId__eq) {
-    const orgId = toPublicId(source.orgId__eq);
-    if (orgId) query.orgId__eq = orgId;
-  }
 
   return query;
 }

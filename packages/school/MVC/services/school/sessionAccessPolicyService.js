@@ -1,5 +1,6 @@
 'use strict';
 
+const { validateCustomMappings } = require('./sessionNotificationEmailPlaceholderMappingService');
 const SEND_WHEN_VALUES = Object.freeze(['same_day', 'next_day', 'daily_all']);
 const DAILY_DIGEST_SESSION_ID = 'daily_digest';
 const SESSION_DATE_RANGE_TYPES = Object.freeze([
@@ -24,10 +25,12 @@ const TEMPLATE_TOKENS = Object.freeze([
   'sessionDate',
   'sessionTime',
   'teacherName',
+  'teacherEmail',
   'orgName',
   'sessionManagerUrl',
   'sessionCount',
-  'sessionList'
+  'sessionList',
+  'sessionListHtml'
 ]);
 
 const DEFAULT_SESSION_DATE_RANGE = Object.freeze({
@@ -38,6 +41,7 @@ const DEFAULT_SESSION_DATE_RANGE = Object.freeze({
 const DEFAULT_CHANNEL_SCHEDULE = Object.freeze({
   sendWhen: 'same_day',
   sendAtTime: '18:00',
+  prepareAtTime: '17:00',
   sessionDateRange: DEFAULT_SESSION_DATE_RANGE
 });
 
@@ -49,16 +53,26 @@ const DEFAULT_POLICY = Object.freeze({
         enabled: true,
         sendWhen: 'daily_all',
         sendAtTime: '18:00',
+        prepareAtTime: '17:00',
         sessionDateRange: DEFAULT_SESSION_DATE_RANGE,
         emailTemplateId: '',
         fromEmail: '',
         subjectTemplate: 'Reminder: {{sessionCount}} uncompleted session(s) need attention',
-        bodyTemplate: 'Hi {{teacherName}},\n\nThe following uncompleted sessions need your attention:\n\n{{sessionList}}\n\nThank you,\n{{orgName}}'
+        bodyTemplate: [
+          '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#212529;">',
+          '<p style="margin:0 0 16px;">Hi {{teacherName}},</p>',
+          '<p style="margin:0 0 16px;">You have <strong>{{sessionCount}}</strong> uncompleted session(s) that still need your attention. Please review each session below and complete attendance when you are ready.</p>',
+          '{{sessionListHtml}}',
+          '<p style="margin:24px 0 0;font-size:13px;color:#6c757d;">Thank you,<br>{{orgName}}</p>',
+          '</div>'
+        ].join(''),
+        wrapperPlaceholderMappings: []
       }),
       sms: Object.freeze({
         enabled: false,
         sendWhen: 'same_day',
         sendAtTime: '18:00',
+        prepareAtTime: '17:00',
         sessionDateRange: DEFAULT_SESSION_DATE_RANGE,
         bodyTemplate: '{{orgName}}: {{sessionCount}} uncompleted session(s) need attention.'
       })
@@ -96,6 +110,49 @@ function normalizeTimeHm(value, fallback = '18:00') {
     }
   }
   return normalizeTimeHm(fallback, '18:00');
+}
+
+function timeHmToMinutes(value = '') {
+  const token = normalizeTimeHm(value, '00:00');
+  const [hours, minutes] = token.split(':').map((part) => Number(part));
+  return (hours * 60) + minutes;
+}
+
+const MIN_PREPARE_SEND_GAP_MINUTES = 10;
+
+function computePrepareSendGapMinutes(prepareAtTime = '', sendAtTime = '') {
+  const prep = timeHmToMinutes(prepareAtTime || '17:00');
+  const send = timeHmToMinutes(sendAtTime || '18:00');
+  return send > prep ? (send - prep) : ((24 * 60) - prep) + send;
+}
+
+function isChannelScheduleGapValid(channel = {}) {
+  const gap = computePrepareSendGapMinutes(
+    channel.prepareAtTime || channel.sendAtTime || '17:00',
+    channel.sendAtTime || '18:00'
+  );
+  return gap >= MIN_PREPARE_SEND_GAP_MINUTES;
+}
+
+function validateChannelScheduleGap(channel = {}, channelLabel = 'Notification channel') {
+  if (!isChannelScheduleGapValid(channel)) {
+    const error = new Error(
+      `${channelLabel}: Prepare and Send must be at least 10 minutes apart (send may be earlier on the clock if it is the next morning).`
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+function validateNotificationScheduleTimes(notification = {}) {
+  if (notification?.enabled !== true) return;
+  const channels = notification.channels || {};
+  if (channels.email?.enabled === true) {
+    validateChannelScheduleGap(channels.email, 'Email notifications');
+  }
+  if (channels.sms?.enabled === true) {
+    validateChannelScheduleGap(channels.sms, 'SMS notifications');
+  }
 }
 
 function normalizeSendWhen(value, fallback = 'same_day') {
@@ -143,6 +200,10 @@ function normalizeChannelSchedule(input = {}, legacy = {}, fallback = DEFAULT_CH
       input.sendAtTime ?? legacy.sendAtTime,
       fallback.sendAtTime
     ),
+    prepareAtTime: normalizeTimeHm(
+      input.prepareAtTime ?? legacy.prepareAtTime,
+      fallback.prepareAtTime || fallback.sendAtTime
+    ),
     sessionDateRange: normalizeSessionDateRange(
       input.sessionDateRange,
       fallback.sessionDateRange
@@ -155,14 +216,23 @@ function normalizeEmailChannel(input = {}, legacy = {}, fallback = DEFAULT_POLIC
   const emailTemplateId = cleanText(input.emailTemplateId, { max: 120 });
   const fromEmail = cleanText(input.fromEmail, { max: 254 });
   const subjectTemplate = cleanText(input.subjectTemplate, { max: 500, allowEmpty: true });
-  const bodyTemplate = cleanText(input.bodyTemplate, { max: 4000, allowEmpty: true });
+  const bodyTemplate = cleanText(input.bodyTemplate, { max: 30000, allowEmpty: true });
+  let wrapperPlaceholderMappings = [];
+  if (Array.isArray(input.wrapperPlaceholderMappings)) {
+    wrapperPlaceholderMappings = validateCustomMappings(input.wrapperPlaceholderMappings);
+  } else if (legacy.wrapperPlaceholderMappings || fallback.wrapperPlaceholderMappings) {
+    wrapperPlaceholderMappings = validateCustomMappings(
+      legacy.wrapperPlaceholderMappings || fallback.wrapperPlaceholderMappings || []
+    );
+  }
   return {
     enabled: boolFlag(input.enabled, fallback.enabled === true),
     ...schedule,
     emailTemplateId,
     fromEmail,
     subjectTemplate: subjectTemplate || fallback.subjectTemplate,
-    bodyTemplate: bodyTemplate || fallback.bodyTemplate
+    bodyTemplate: bodyTemplate || fallback.bodyTemplate,
+    wrapperPlaceholderMappings
   };
 }
 
@@ -170,7 +240,7 @@ function hasLegacyEmailTemplates(channel = {}) {
   return Boolean(
     cleanText(channel?.fromEmail, { max: 254 })
     || cleanText(channel?.subjectTemplate, { max: 500 })
-    || cleanText(channel?.bodyTemplate, { max: 4000 })
+    || cleanText(channel?.bodyTemplate, { max: 30000 })
   );
 }
 
@@ -269,18 +339,16 @@ function validatePolicyInput(input = {}) {
     throw error;
   }
   validateChannelSessionDateRanges(normalized.uncompletedSessionNotification);
+  validateNotificationScheduleTimes(normalized.uncompletedSessionNotification);
   const emailChannel = normalized.uncompletedSessionNotification?.channels?.email || {};
   if (emailChannel.enabled === true && !usesManagedEmailTemplate(emailChannel)) {
     const error = new Error('An email template is required when email notifications are enabled.');
     error.statusCode = 400;
     throw error;
   }
-  const templatesToValidate = [];
+  const templatesToValidate = [emailChannel.bodyTemplate];
   if (!usesManagedEmailTemplate(emailChannel)) {
-    templatesToValidate.push(
-      emailChannel.subjectTemplate,
-      emailChannel.bodyTemplate
-    );
+    templatesToValidate.push(emailChannel.subjectTemplate);
   }
   templatesToValidate.push(normalized.uncompletedSessionNotification.channels.sms.bodyTemplate);
   const invalidTokens = findInvalidTemplateTokens(templatesToValidate);
@@ -315,6 +383,18 @@ function renderTemplate(template = '', context = {}) {
   });
 }
 
+function buildSchoolEmailBodyContent(emailChannel = {}, context = {}) {
+  let template = String(emailChannel?.bodyTemplate || '');
+  const sessionListHtml = cleanText(context?.sessionListHtml);
+  if (sessionListHtml
+    && /<[a-z][\s\S]*>/i.test(template)
+    && /\{\{\s*sessionList\s*\}\}/i.test(template)
+    && !/\{\{\s*sessionListHtml\s*\}\}/i.test(template)) {
+    template = template.replace(/\{\{\s*sessionList\s*\}\}/gi, '{{sessionListHtml}}');
+  }
+  return renderTemplate(template, context);
+}
+
 module.exports = {
   SEND_WHEN_VALUES,
   DAILY_DIGEST_SESSION_ID,
@@ -327,7 +407,14 @@ module.exports = {
   resolvePolicy,
   validatePolicyInput,
   renderTemplate,
+  buildSchoolEmailBodyContent,
   findInvalidTemplateTokens,
   hasLegacyEmailTemplates,
-  usesManagedEmailTemplate
+  usesManagedEmailTemplate,
+  timeHmToMinutes,
+  computePrepareSendGapMinutes,
+  isChannelScheduleGapValid,
+  validateChannelScheduleGap,
+  validateNotificationScheduleTimes,
+  MIN_PREPARE_SEND_GAP_MINUTES
 };

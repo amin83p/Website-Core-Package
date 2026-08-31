@@ -2,7 +2,10 @@
 
 const { requireCoreModule } = require('./schoolCoreModuleResolver');
 const resendEmailService = requireCoreModule('MVC/services/resendEmailService');
+const emailDispatchService = requireCoreModule('MVC/services/emailDispatchService');
 const emailManagementService = requireCoreModule('MVC/services/emailManagementService');
+const emailOrgCapabilityService = requireCoreModule('MVC/services/emailOrgCapabilityService');
+const emailProviderProfileService = requireCoreModule('MVC/services/emailProviderProfileService');
 const sessionAccessPolicyService = require('./sessionAccessPolicyService');
 const sessionNotificationLedgerModel = require('../../models/school/sessionNotificationLedgerModel');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
@@ -13,6 +16,23 @@ const { renderTemplate, DAILY_DIGEST_SESSION_ID, usesManagedEmailTemplate } = se
 
 function cleanText(value) {
   return String(value || '').trim();
+}
+
+function escapeHtml(value = '') {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildPreviewHtmlFromPayload(payload = {}, text = '') {
+  const html = cleanText(payload?.html);
+  if (html) return html;
+  const body = cleanText(text || payload?.text);
+  if (!body) return '';
+  if (/<[a-z][\s\S]*>/i.test(body)) return body;
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;white-space:pre-wrap;">${escapeHtml(body)}</div>`;
 }
 
 function readPersonPhone(person = {}) {
@@ -57,6 +77,9 @@ function buildTemplateContext({
     teacherName: schoolPersonAccessService.formatPersonName
       ? schoolPersonAccessService.formatPersonName(teacher)
       : cleanText(teacher?.displayName || teacher?.name),
+    teacherEmail: schoolPersonAccessService.readPersonEmail
+      ? schoolPersonAccessService.readPersonEmail(teacher)
+      : cleanText(teacher?.contact?.email || teacher?.email),
     orgName: cleanText(orgName),
     sessionManagerUrl: classId && sessionId
       ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
@@ -66,10 +89,15 @@ function buildTemplateContext({
     [{ classData, session }],
     { baseUrl }
   );
+  const sessionListHtml = sessionUncompletedNotificationService.buildSessionListHtml(
+    [{ classData, session }],
+    { baseUrl }
+  );
   return {
     ...baseContext,
     sessionCount: '1',
-    sessionList
+    sessionList,
+    sessionListHtml
   };
 }
 
@@ -98,7 +126,19 @@ async function resolveEmailDeliveryPayload({
   if (!to) {
     return { status: 'skipped_no_contact', channel: 'email' };
   }
-  if (!resendEmailService.isConfigured()) {
+
+  const capabilityOptions = usesManagedEmailTemplate(emailChannel)
+    ? {
+      eventKey: 'SCHOOL_UNCOMPLETED_SESSION_EMAIL',
+      providerProfileId: emailChannel.providerProfileId || '',
+      templateId: emailChannel.emailTemplateId || '',
+      injectedValues: mapNotificationContextToEmailPlaceholders(context, { emailChannel, teacher })
+    }
+    : {
+      providerProfileId: emailChannel.providerProfileId || ''
+    };
+  const canSend = await emailOrgCapabilityService.canOrgSendEmail(orgId, capabilityOptions);
+  if (!canSend) {
     return { status: 'skipped_email_not_configured', channel: 'email' };
   }
 
@@ -107,7 +147,7 @@ async function resolveEmailDeliveryPayload({
       templateId: emailChannel.emailTemplateId,
       orgId,
       to,
-      injectedValues: mapNotificationContextToEmailPlaceholders(context)
+      injectedValues: mapNotificationContextToEmailPlaceholders(context, { emailChannel, teacher })
     });
     const prefix = cleanText(subjectPrefix);
     return {
@@ -163,17 +203,93 @@ async function sendEmailNotification({
   if (resolved.status !== 'ready') {
     return resolved;
   }
-  await resendEmailService.sendEmail({
-    ...resolved.payload,
-    meta: {
+  if (usesManagedEmailTemplate(emailChannel)) {
+    await emailDispatchService.sendByEvent({
       orgId,
-      purpose: 'uncompleted_session_notification',
-      sessionId: context.sessionId,
-      classId: context.classId,
-      emailTemplateId: emailChannel.emailTemplateId || ''
+      eventKey: 'SCHOOL_UNCOMPLETED_SESSION_EMAIL',
+      to: resolved.payload.to,
+      injectedValues: mapNotificationContextToEmailPlaceholders(context, { emailChannel, teacher }),
+      templateId: emailChannel.emailTemplateId || '',
+      providerProfileId: emailChannel.providerProfileId || '',
+      meta: {
+        purpose: 'uncompleted_session_notification',
+        sessionId: context.sessionId,
+        classId: context.classId,
+        emailTemplateId: emailChannel.emailTemplateId || ''
+      }
+    });
+  } else {
+    const credentials = await emailProviderProfileService.resolveProviderCredentials(
+      orgId,
+      emailChannel.providerProfileId || ''
+    );
+    const sender = cleanText(resolved.payload.from) || cleanText(credentials.fromEmail) || undefined;
+    if (sender) {
+      emailProviderProfileService.validateSenderDomain(sender, credentials.verifiedDomains);
     }
-  });
+    await resendEmailService.sendEmail({
+      ...resolved.payload,
+      from: sender,
+      credentials: {
+        apiKey: credentials.apiKey,
+        from: credentials.fromEmail || sender
+      },
+      meta: {
+        orgId,
+        eventKey: 'SCHOOL_UNCOMPLETED_SESSION_EMAIL',
+        sectionId: 'SCHOOL_SESSION_ACCESS',
+        operationId: 'NOTIFY',
+        purpose: 'uncompleted_session_notification',
+        sessionId: context.sessionId,
+        classId: context.classId,
+        emailTemplateId: emailChannel.emailTemplateId || '',
+        providerProfileId: credentials.providerProfileId || ''
+      }
+    });
+  }
   return { status: 'sent', channel: 'email', recipient: resolved.recipient };
+}
+
+async function resolveSmsDeliveryPayload({
+  smsChannel = {},
+  teacher = {},
+  context = {}
+} = {}) {
+  const smsProviderService = requireCoreModule('MVC/services/sms/smsProviderService');
+  if (!smsChannel.enabled) {
+    return { status: 'skipped_channel_disabled' };
+  }
+  const phone = readPersonPhone(teacher);
+  if (!phone) {
+    return { status: 'skipped_no_contact', channel: 'sms' };
+  }
+  const message = renderTemplate(smsChannel.bodyTemplate, context);
+  if (message.length > 320) {
+    return {
+      status: 'skipped_message_too_long',
+      channel: 'sms',
+      recipient: phone,
+      message
+    };
+  }
+  if (!smsProviderService.isMessagingConfigured()) {
+    return {
+      status: 'skipped_no_sms_provider',
+      channel: 'sms',
+      recipient: phone,
+      message
+    };
+  }
+  return {
+    status: 'ready',
+    channel: 'sms',
+    recipient: phone,
+    message,
+    payload: {
+      to: phone,
+      body: message
+    }
+  };
 }
 
 async function sendSmsNotification({
@@ -218,13 +334,27 @@ async function sendDigestEmailNotification({
   if (resolved.status !== 'ready') {
     return resolved;
   }
+  const credentials = await emailProviderProfileService.resolveProviderCredentials(
+    orgId,
+    emailChannel.providerProfileId || ''
+  );
+  const sender = cleanText(resolved.payload.from) || cleanText(credentials.fromEmail) || undefined;
+  if (sender) {
+    emailProviderProfileService.validateSenderDomain(sender, credentials.verifiedDomains);
+  }
   await resendEmailService.sendEmail({
     ...resolved.payload,
+    from: sender,
+    credentials: {
+      apiKey: credentials.apiKey,
+      from: credentials.fromEmail || sender
+    },
     meta: {
       orgId,
       purpose: 'uncompleted_session_digest_notification',
       sessionCount: context.sessionCount,
-      emailTemplateId: emailChannel.emailTemplateId || ''
+      emailTemplateId: emailChannel.emailTemplateId || '',
+      providerProfileId: credentials.providerProfileId || ''
     }
   });
   return {
@@ -236,33 +366,64 @@ async function sendDigestEmailNotification({
   };
 }
 
+async function previewDigestEmailNotification({
+  policy,
+  teacher,
+  context,
+  orgId = '',
+  subjectPrefix = ''
+} = {}) {
+  const emailChannel = policy?.uncompletedSessionNotification?.channels?.email || {};
+  if (!emailChannel.enabled) {
+    return { status: 'skipped_channel_disabled' };
+  }
+  const resolved = await resolveEmailDeliveryPayload({
+    emailChannel,
+    teacher,
+    context,
+    orgId,
+    subjectPrefix
+  });
+  if (resolved.status !== 'ready') {
+    return resolved;
+  }
+  const text = cleanText(resolved.text);
+  return {
+    status: 'preview',
+    channel: 'email',
+    recipient: resolved.recipient,
+    subject: resolved.subject,
+    text,
+    html: buildPreviewHtmlFromPayload(resolved.payload, text),
+    from: cleanText(resolved.payload?.from) || undefined
+  };
+}
+
 async function sendDigestSmsNotification({
   policy,
   teacher,
   context
 } = {}) {
   const smsChannel = policy?.uncompletedSessionNotification?.channels?.sms || {};
-  if (!smsChannel.enabled) {
-    return { status: 'skipped_channel_disabled' };
+  const resolved = await resolveSmsDeliveryPayload({ smsChannel, teacher, context });
+  if (resolved.status !== 'ready') {
+    return resolved;
   }
-  const phone = readPersonPhone(teacher);
-  if (!phone) {
-    return { status: 'skipped_no_contact', channel: 'sms' };
-  }
-  const message = renderTemplate(smsChannel.bodyTemplate, context);
-  if (message.length > 320) {
-    return {
-      status: 'skipped_message_too_long',
-      channel: 'sms',
-      recipient: phone,
-      message
-    };
-  }
+  const smsProviderService = requireCoreModule('MVC/services/sms/smsProviderService');
+  await smsProviderService.sendMessage({
+    phoneE164: resolved.recipient,
+    body: resolved.message,
+    eventKey: 'SCHOOL_UNCOMPLETED_SESSION_SMS',
+    purpose: 'uncompleted_session_digest_notification',
+    meta: {
+      sessionCount: context.sessionCount
+    }
+  });
   return {
-    status: 'skipped_no_sms_provider',
+    status: 'sent',
     channel: 'sms',
-    recipient: phone,
-    message
+    recipient: resolved.recipient,
+    message: resolved.message
   };
 }
 
@@ -377,8 +538,11 @@ module.exports = {
   buildSessionName,
   buildTemplateContext,
   listSessionEditorIds,
+  resolveEmailDeliveryPayload,
+  resolveSmsDeliveryPayload,
   notifyTeacherForSession,
   notifyTeacherDigest,
   sendDigestEmailNotification,
+  previewDigestEmailNotification,
   readPersonPhone
 };

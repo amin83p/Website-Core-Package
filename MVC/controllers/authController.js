@@ -1,7 +1,7 @@
 // MVC/controllers/authController.js
 const crypto = require('crypto');
 const authService = require('../services/authService');
-const { idsEqual } = require('../utils/idAdapter');
+const { idsEqual, toPublicId } = require('../utils/idAdapter');
 const bcrypt = require('bcryptjs');
 
 const dataService = require('../services/dataService');
@@ -11,7 +11,8 @@ const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const startupLogger = require('../utils/startupLogger');
 const passwordResetService = require('../services/passwordResetService');
 const emailManagementService = require('../services/emailManagementService');
-const resendEmailService = require('../services/resendEmailService');
+const emailDispatchService = require('../services/emailDispatchService');
+const passwordResetOrgService = require('../services/passwordResetOrgService');
 const smsProviderService = require('../services/sms/smsProviderService');
 const settingService = require('../services/settingService');
 const appBrandingService = require('../services/appBrandingService');
@@ -289,16 +290,6 @@ async function sendResetCodeEmail({ user = null, orgId = '', code = '', ttlMinut
     });
     return;
   }
-  if (!resendEmailService.isConfigured({ requireFrom: false })) {
-    const cfg = resendEmailService.getConfig();
-    startupLogger.warn('AUTH', 'PASSWORD_RESET_EMAIL', 'Resend API key is missing. Skipping reset email delivery.', {
-      hasApiKey: Boolean(cfg?.apiKey),
-      apiKeyPreview: maskSecretForLog(cfg?.apiKey || ''),
-      fromEmail: cfg?.from || '',
-      hasDefaultSender: Boolean(cfg?.from)
-    });
-    return;
-  }
 
   startupLogger.info('AUTH', 'PASSWORD_RESET_EMAIL', 'Preparing reset email payload.', {
     email: maskEmailForLog(email),
@@ -306,12 +297,10 @@ async function sendResetCodeEmail({ user = null, orgId = '', code = '', ttlMinut
     ttlMinutes: Number(ttlMinutes || 0)
   });
 
-  const templateKey = emailManagementService.getResetTemplateKey();
   const orgName = await resolveOrganizationName(orgId);
-  const rendered = await emailManagementService.resolveTemplateForRuntime({
+  const sendResult = await emailDispatchService.sendByEvent({
     orgId,
-    sectionId: templateKey.sectionId,
-    operationId: templateKey.operationId,
+    eventKey: 'AUTH_PASSWORD_RESET_CODE',
     context: {
       userEmail: email,
       email,
@@ -319,43 +308,99 @@ async function sendResetCodeEmail({ user = null, orgId = '', code = '', ttlMinut
       resetTtlMinutes: ttlMinutes,
       orgName,
       appName: appBrandingService.getBrand().appName || process.env.APP_NAME || 'Application'
-    }
-  });
-
-  startupLogger.info('AUTH', 'PASSWORD_RESET_EMAIL', 'Template rendered; dispatching email via Resend.', {
-    templateSection: String(templateKey?.sectionId || ''),
-    templateOperation: String(templateKey?.operationId || ''),
-    recipientCount: Array.isArray(rendered?.to) ? rendered.to.length : 0,
-    sender: String(rendered?.from || resendEmailService.getConfig()?.from || ''),
-    usedFallbackTemplate: Boolean(rendered?.usedFallback)
-  });
-
-  const sendResult = await resendEmailService.sendEmail({
-    from: rendered.from || undefined,
-    to: rendered.to,
-    subject: rendered.subject,
-    text: rendered.text,
-    html: rendered.html,
-    meta: {
-      orgId: cleanString(orgId, { max: 120, allowEmpty: true }) || '',
-      sectionId: String(templateKey?.sectionId || SECTIONS.USERS),
-      operationId: String(templateKey?.operationId || OPERATIONS.UPDATE),
-      eventKey: cleanString(rendered?.eventKey, { max: 120, allowEmpty: true }) || 'AUTH_PASSWORD_RESET_CODE',
-      actor: {
-        userId: cleanString(user?.id, { max: 120, allowEmpty: true }) || '',
-        username: cleanString(user?.username, { max: 120, allowEmpty: true }) || '',
-        displayName: cleanString(user?.name, { max: 180, allowEmpty: true }) || '',
-        email: cleanString(user?.email, { max: 220, allowEmpty: true }) || ''
-      },
-      templateId: cleanString(rendered?.templateId, { max: 120, allowEmpty: true }) || '',
-      usedFallbackTemplate: Boolean(rendered?.usedFallback)
+    },
+    actor: {
+      userId: cleanString(user?.id, { max: 120, allowEmpty: true }) || '',
+      username: cleanString(user?.username, { max: 120, allowEmpty: true }) || '',
+      displayName: cleanString(user?.name, { max: 180, allowEmpty: true }) || '',
+      email: cleanString(user?.email, { max: 220, allowEmpty: true }) || ''
     }
   });
 
   startupLogger.success('AUTH', 'PASSWORD_RESET_EMAIL', 'Reset email sent successfully.', {
     email: maskEmailForLog(email),
+    orgId: String(orgId || ''),
     resendMessageId: String(sendResult?.id || sendResult?.message_id || '')
   });
+}
+
+async function issueAndDeliverPasswordResetEmail({ user = null, orgId = '' } = {}) {
+  const activeOrgId = toPublicId(orgId) || '';
+  if (!user || !activeOrgId) {
+    throw new Error('User and organization are required to issue a password reset code.');
+  }
+
+  const issued = await passwordResetService.issueResetCode({
+    user,
+    orgId: activeOrgId,
+    ttlMinutes: getResetTtlMinutes(),
+    maxAttempts: getResetMaxAttempts()
+  });
+
+  startupLogger.info('AUTH', 'PASSWORD_RESET_EMAIL', 'Reset code issued.', {
+    email: maskEmailForLog(user?.email || ''),
+    userId: String(user?.id || ''),
+    orgId: activeOrgId,
+    codePreview: String(issued?.code || '').slice(0, 2) + '****',
+    expiresAt: String(issued?.expiresAt || ''),
+    recordId: String(issued?.record?.id || '')
+  });
+
+  try {
+    await sendResetCodeEmail({
+      user,
+      orgId: activeOrgId,
+      code: issued.code,
+      ttlMinutes: issued.ttlMinutes
+    });
+  } catch (mailError) {
+    startupLogger.error('AUTH', 'PASSWORD_RESET_EMAIL', 'Reset code issued but email delivery failed.', {
+      email: maskEmailForLog(user?.email || ''),
+      orgId: activeOrgId,
+      error: mailError?.message || String(mailError)
+    });
+  }
+
+  await passwordResetService.markDeliveryContext({
+    recordId: issued?.record?.id || '',
+    deliveryMethod: 'email',
+    deliveryProvider: 'resend',
+    deliveryPhoneE164: '',
+    deliveryReference: '',
+    deliveryFallbackUsed: false
+  });
+
+  return issued;
+}
+
+function buildPasswordResetEmailSuccessResponse({
+  message = '',
+  requiresOrgSelection = false,
+  orgOptions = []
+} = {}) {
+  const payload = {
+    status: 'success',
+    message,
+    deliveryMethod: 'email',
+    resolvedDeliveryMethod: 'email'
+  };
+  if (requiresOrgSelection) {
+    payload.requiresOrgSelection = true;
+    payload.orgOptions = Array.isArray(orgOptions) ? orgOptions : [];
+  }
+  return payload;
+}
+
+function buildPasswordResetEmailStartResponse({ message = '', orgId = '' } = {}) {
+  const payload = {
+    status: 'success',
+    message,
+    deliveryMethod: 'email',
+    resolvedDeliveryMethod: 'email'
+  };
+  const activeOrgId = toPublicId(orgId) || '';
+  if (activeOrgId) payload.orgId = activeOrgId;
+  return payload;
 }
 
 function buildDeviceInfo(req, provider = 'password') {
@@ -982,67 +1027,41 @@ async function requestPasswordReset(req, res) {
         return res.status(200).json({ status: 'success', message: genericEmailMessage, deliveryMethod: 'email', resolvedDeliveryMethod: 'email' });
       }
 
-      const orgId = cleanString(user.primaryOrgId || user.activeOrgId || '', { max: 120, allowEmpty: true });
-      if (!orgId) {
-        startupLogger.warn('AUTH', 'PASSWORD_RESET_REQUEST', 'User found but no organization context available.', {
+      const eligibleOrgs = await passwordResetOrgService.listEligibleResetOrgsForUser(user);
+      if (!eligibleOrgs.length) {
+        startupLogger.warn('AUTH', 'PASSWORD_RESET_REQUEST', 'Active user has no eligible organizations for email reset.', {
           email: maskEmailForLog(email),
           userId: String(user?.id || ''),
           requestId: String(req.requestId || '')
         });
-        return res.status(200).json({ status: 'success', message: genericEmailMessage, deliveryMethod: 'email', resolvedDeliveryMethod: 'email' });
+        return res.status(200).json(buildPasswordResetEmailSuccessResponse({ message: genericEmailMessage }));
       }
 
-      const issued = await passwordResetService.issueResetCode({
-        user,
-        orgId,
-        ttlMinutes: getResetTtlMinutes(),
-        maxAttempts: getResetMaxAttempts()
-      });
-      startupLogger.info('AUTH', 'PASSWORD_RESET_REQUEST', 'Reset code issued.', {
-        email: maskEmailForLog(email),
-        userId: String(user?.id || ''),
-        orgId: String(orgId || ''),
-        codePreview: String(issued?.code || '').slice(0, 2) + '****',
-        expiresAt: String(issued?.expiresAt || ''),
-        recordId: String(issued?.record?.id || '')
-      });
-
-      try {
-        await sendResetCodeEmail({
-          user,
-          orgId,
-          code: issued.code,
-          ttlMinutes: issued.ttlMinutes
-        });
-      } catch (mailError) {
-        startupLogger.error('AUTH', 'PASSWORD_RESET_REQUEST', 'Reset code issued but email delivery failed.', {
+      if (eligibleOrgs.length > 1) {
+        startupLogger.info('AUTH', 'PASSWORD_RESET_REQUEST', 'Password reset requires organization selection.', {
           email: maskEmailForLog(email),
-          orgId: String(orgId || ''),
-          error: mailError?.message || String(mailError)
+          userId: String(user?.id || ''),
+          optionCount: eligibleOrgs.length,
+          requestId: String(req.requestId || '')
         });
+        return res.status(200).json(buildPasswordResetEmailSuccessResponse({
+          message: genericEmailMessage,
+          requiresOrgSelection: true,
+          orgOptions: eligibleOrgs
+        }));
       }
 
-      await passwordResetService.markDeliveryContext({
-        recordId: issued?.record?.id || '',
-        deliveryMethod: 'email',
-        deliveryProvider: 'resend',
-        deliveryPhoneE164: '',
-        deliveryReference: '',
-        deliveryFallbackUsed: false
-      });
+      const orgId = eligibleOrgs[0].orgId;
+      await issueAndDeliverPasswordResetEmail({ user, orgId });
 
       startupLogger.success('AUTH', 'PASSWORD_RESET_REQUEST', 'Password reset request handled.', {
         email: maskEmailForLog(email),
         requestedDeliveryMethod,
         resolvedDeliveryMethod: 'email',
+        orgId: String(orgId || ''),
         requestId: String(req.requestId || '')
       });
-      return res.status(200).json({
-        status: 'success',
-        message: genericEmailMessage,
-        deliveryMethod: 'email',
-        resolvedDeliveryMethod: 'email'
-      });
+      return res.status(200).json(buildPasswordResetEmailSuccessResponse({ message: genericEmailMessage }));
     }
 
     // SMS path: no delivery here; user chooses/validates target first in /password-reset/sms/start.
@@ -1136,6 +1155,66 @@ async function requestPasswordReset(req, res) {
       stackTop: String(error?.stack || '').split('\n').slice(0, 2).join(' | ')
     });
     return res.status(200).json({ status: 'success', message: genericMessage });
+  }
+}
+
+async function startPasswordResetEmail(req, res) {
+  const email = normalizeEmail(req.body?.email || '');
+  const orgId = toPublicId(req.body?.orgId || '') || '';
+  const genericEmailMessage = 'If the account exists, a reset code has been sent to the registered email.';
+
+  startupLogger.info('AUTH', 'PASSWORD_RESET_EMAIL_START', 'Incoming email reset delivery request.', {
+    email: maskEmailForLog(email),
+    orgId: String(orgId || ''),
+    requestId: String(req.requestId || '')
+  });
+
+  if (!email || !orgId) {
+    return res.status(400).json({ status: 'error', message: 'A valid email and organization are required.' });
+  }
+
+  try {
+    const user = await resolveUserByEmail(email);
+    const userIsActive = Boolean(user && user.active !== false && String(user.status || '').toLowerCase() === 'active');
+    if (!userIsActive) {
+      startupLogger.warn('AUTH', 'PASSWORD_RESET_EMAIL_START', 'No active user found for email (generic success returned).', {
+        email: maskEmailForLog(email),
+        requestId: String(req.requestId || '')
+      });
+      return res.status(200).json(buildPasswordResetEmailStartResponse({ message: genericEmailMessage }));
+    }
+
+    const eligibleOrgs = await passwordResetOrgService.listEligibleResetOrgsForUser(user);
+    const matchedOrg = eligibleOrgs.find((row) => toPublicId(row?.orgId) === orgId);
+    if (!matchedOrg) {
+      startupLogger.warn('AUTH', 'PASSWORD_RESET_EMAIL_START', 'Requested org is not eligible for email reset (generic success returned).', {
+        email: maskEmailForLog(email),
+        orgId: String(orgId || ''),
+        userId: String(user?.id || ''),
+        requestId: String(req.requestId || '')
+      });
+      return res.status(200).json(buildPasswordResetEmailStartResponse({ message: genericEmailMessage }));
+    }
+
+    await issueAndDeliverPasswordResetEmail({ user, orgId: matchedOrg.orgId });
+
+    startupLogger.success('AUTH', 'PASSWORD_RESET_EMAIL_START', 'Password reset email dispatched for selected organization.', {
+      email: maskEmailForLog(email),
+      orgId: String(matchedOrg.orgId || ''),
+      requestId: String(req.requestId || '')
+    });
+    return res.status(200).json(buildPasswordResetEmailStartResponse({
+      message: genericEmailMessage,
+      orgId: matchedOrg.orgId
+    }));
+  } catch (error) {
+    startupLogger.error('AUTH', 'PASSWORD_RESET_EMAIL_START', 'Unhandled error in email reset delivery.', {
+      email: maskEmailForLog(email),
+      orgId: String(orgId || ''),
+      requestId: String(req.requestId || ''),
+      error: error?.message || String(error)
+    });
+    return res.status(200).json(buildPasswordResetEmailStartResponse({ message: genericEmailMessage }));
   }
 }
 
@@ -1459,6 +1538,7 @@ module.exports = {
   resolvePendingMicrosoftUser,
   forceLogin,
   requestPasswordReset,
+  startPasswordResetEmail,
   startPasswordResetSms,
   verifyPasswordReset,
   completePasswordReset

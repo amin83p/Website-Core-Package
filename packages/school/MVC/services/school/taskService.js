@@ -534,7 +534,7 @@ async function getTaskById(id, reqUser, options = {}) {
   return enrichTaskForDisplay(row);
 }
 
-async function deleteSourceTask(input = {}, reqUser = null) {
+async function deleteSourceTask(input = {}, reqUser = null, options = {}) {
   const orgId = toPublicId(input.orgId || getActiveOrgId(reqUser));
   const sourceType = cleanString(input.sourceType, 80).toLowerCase();
   const sourceId = toPublicId(input.sourceId || '');
@@ -543,7 +543,10 @@ async function deleteSourceTask(input = {}, reqUser = null) {
     error.statusCode = 403;
     throw error;
   }
-  assertAdminViewer(reqUser, 'remove source task');
+  const skipAdminCheck = options.skipAdminCheck === true;
+  if (!skipAdminCheck) {
+    assertAdminViewer(reqUser, 'remove source task');
+  }
   if (!orgId || !sourceType || !sourceId) return false;
   const existing = await findBySource({ orgId, sourceType, sourceId });
   if (!existing) return false;

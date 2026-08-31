@@ -5,6 +5,21 @@
   const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
   const autosaveSectionsJson = JSON.stringify(typeof autosaveSections !== 'undefined' ? autosaveSections : []).replace(/</g, '\\u003c');
   const sessionAccessPolicyJson = JSON.stringify(typeof sessionAccessPolicy !== 'undefined' ? sessionAccessPolicy : {}).replace(/</g, '\\u003c');
+  const sessionNotificationEmailDefaultBodyJson = JSON.stringify(
+    typeof sessionNotificationEmailDefaultBody !== 'undefined' ? sessionNotificationEmailDefaultBody : ''
+  ).replace(/</g, '\\u003c');
+  const sessionNotificationEmailTokensJson = JSON.stringify(
+    typeof sessionNotificationEmailTokens !== 'undefined' ? sessionNotificationEmailTokens : []
+  ).replace(/</g, '\\u003c');
+  const sessionNotificationEmailWrapperTokensJson = JSON.stringify(
+    typeof sessionNotificationEmailWrapperTokens !== 'undefined' ? sessionNotificationEmailWrapperTokens : []
+  ).replace(/</g, '\\u003c');
+  const sessionNotificationEmailWrapperBuiltinMappingsJson = JSON.stringify(
+    typeof sessionNotificationEmailWrapperBuiltinMappings !== 'undefined' ? sessionNotificationEmailWrapperBuiltinMappings : []
+  ).replace(/</g, '\\u003c');
+  const sessionNotificationEmailContextSourcesJson = JSON.stringify(
+    typeof sessionNotificationEmailContextSources !== 'undefined' ? sessionNotificationEmailContextSources : []
+  ).replace(/</g, '\\u003c');
   const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '', overallReportTemplateIds: [], templateExportFormats: { report: {}, overall: {} } }).replace(/</g, '\\u003c');
   const studentAttendanceReportTemplateCapabilitiesJson = JSON.stringify(typeof studentAttendanceReportTemplateCapabilities !== 'undefined' ? studentAttendanceReportTemplateCapabilities : { hasDocx: false, hasPdf: false }).replace(/</g, '\\u003c');
   const studentAttendanceReportOverallLabelsJson = JSON.stringify(typeof studentAttendanceReportOverallLabels !== 'undefined' ? studentAttendanceReportOverallLabels : []).replace(/</g, '\\u003c');
@@ -196,20 +211,54 @@
   .session-notification-section-toggle[aria-expanded="false"] .bi-chevron-down {
     transform: rotate(-90deg);
   }
-  .session-notification-digest-row {
+  .session-notification-digest-check {
     display: flex;
     align-items: center;
+    flex-wrap: nowrap;
     gap: 0.5rem;
-    flex-wrap: wrap;
+    width: 100%;
+    min-width: 0;
   }
-  .session-notification-digest-row .form-select,
-  .session-notification-digest-row .form-control {
+  .session-notification-digest-check .form-check {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+    flex: 0 0 auto;
+    min-width: 0;
+    padding-left: 0;
+    gap: 0.5em;
+  }
+  .session-notification-digest-check .form-check-input {
+    float: none;
+    margin-left: 0;
+    margin-top: 0;
+    flex-shrink: 0;
+  }
+  .session-notification-digest-check .form-check-label {
+    white-space: nowrap;
+    padding-left: 0;
+  }
+  .session-notification-digest-controls {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .session-notification-digest-controls .form-select,
+  .session-notification-digest-controls .form-control {
     width: auto;
-    min-width: 7rem;
+    flex: 0 0 auto;
   }
-  .session-notification-digest-row .form-control.session-notification-days-input {
+  .session-notification-digest-controls .form-select {
+    min-width: 9rem;
+    max-width: 11rem;
+  }
+  .session-notification-digest-controls .form-control.session-notification-days-input {
     width: 5.5rem;
     min-width: 5.5rem;
+    max-width: 5.5rem;
   }
   @media (max-width: 767.98px) {
     .school-settings-workspace,
@@ -676,8 +725,23 @@
                   </div>
                   <div class="collapse show p-3" id="sessionNotificationEmailCollapse">
                     <div class="row g-3">
-                      <div class="col-lg-6">
-                        <label class="form-label fw-semibold">Send when</label>
+                      <div class="col-lg-3">
+                        <label class="form-label fw-semibold" for="sessionNotificationEmailPrepareAtTime">Prepare emails at</label>
+                        <input class="form-control" type="time" id="sessionNotificationEmailPrepareAtTime" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <p class="small text-muted mb-0 mt-1">Runs daily at this time to build messages and queue them in the outbox.</p>
+                      </div>
+                      <div class="col-lg-3">
+                        <label class="form-label fw-semibold" for="sessionNotificationEmailSendAtTime">Send at time</label>
+                        <input class="form-control" type="time" id="sessionNotificationEmailSendAtTime" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <p class="small text-muted mb-0 mt-1">Runs daily at this time to deliver queued messages. If this time is earlier on the clock than prepare, it is treated as the next morning.</p>
+                      </div>
+                      <div class="col-12 d-none" id="sessionNotificationEmailScheduleWarning">
+                        <div class="alert alert-warning py-2 px-3 small mb-0" role="alert">
+                          Prepare and Send must be at least 10 minutes apart (send may be earlier on the clock if it is the next morning).
+                        </div>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label fw-semibold">Session(s) Range:</label>
                         <div class="form-check">
                           <input class="form-check-input" type="radio" name="sessionNotificationEmailSendWhen" id="sessionNotificationEmailSameDay" value="same_day" <%= canUpdateFlag ? '' : 'disabled' %>>
                           <label class="form-check-label" for="sessionNotificationEmailSameDay">Same day as session</label>
@@ -686,14 +750,12 @@
                           <input class="form-check-input" type="radio" name="sessionNotificationEmailSendWhen" id="sessionNotificationEmailNextDay" value="next_day" <%= canUpdateFlag ? '' : 'disabled' %>>
                           <label class="form-check-label" for="sessionNotificationEmailNextDay">Day after session</label>
                         </div>
-                      </div>
-                      <div class="col-lg-6">
-                        <label class="form-label fw-semibold" for="sessionNotificationEmailSendAtTime">Send at time</label>
-                        <input class="form-control" type="time" id="sessionNotificationEmailSendAtTime" <%= canUpdateFlag ? '' : 'disabled' %>>
-                        <div class="session-notification-digest-row mt-2" id="sessionNotificationEmailDigestRow">
-                          <input class="form-check-input mt-0" type="radio" name="sessionNotificationEmailSendWhen" id="sessionNotificationEmailDailyAll" value="daily_all" <%= canUpdateFlag ? '' : 'disabled' %>>
-                          <span class="d-flex align-items-center gap-2 flex-wrap" id="sessionNotificationEmailRangeGroup">
-                            <input class="form-control form-control-sm session-notification-days-input d-none" type="number" min="1" max="365" step="1" id="sessionNotificationEmailDaysBefore" placeholder="Days" aria-label="Days before today" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <div class="session-notification-digest-check" id="sessionNotificationEmailDigestRow">
+                          <div class="form-check mb-0">
+                            <input class="form-check-input" type="radio" name="sessionNotificationEmailSendWhen" id="sessionNotificationEmailDailyAll" value="daily_all" <%= canUpdateFlag ? '' : 'disabled' %>>
+                            <label class="form-check-label" for="sessionNotificationEmailDailyAll">Daily digest of uncompleted sessions</label>
+                          </div>
+                          <span class="session-notification-digest-controls" id="sessionNotificationEmailRangeGroup">
                             <select class="form-select form-select-sm" id="sessionNotificationEmailRangeType" aria-label="Sessions to include" <%= canUpdateFlag ? '' : 'disabled' %>>
                               <option value="this_week">This week</option>
                               <option value="two_weeks">These two weeks</option>
@@ -701,8 +763,8 @@
                               <option value="timesheet_period">Current timesheet period</option>
                               <option value="days_before_today">Days before today</option>
                             </select>
+                            <input class="form-control form-control-sm session-notification-days-input d-none" type="number" min="1" max="365" step="1" id="sessionNotificationEmailDaysBefore" placeholder="Days" aria-label="Days before today" <%= canUpdateFlag ? '' : 'disabled' %>>
                           </span>
-                          <label class="form-check-label mb-0" for="sessionNotificationEmailDailyAll">Daily digest of uncompleted sessions</label>
                         </div>
                       </div>
                       <div class="col-12">
@@ -716,9 +778,22 @@
                           <button class="btn btn-outline-secondary" type="button" id="sessionNotificationEmailTemplateClearBtn" <%= canUpdateFlag ? '' : 'disabled' %>>Clear</button>
                         </div>
                         <p class="small text-muted mt-1 mb-0">
-                          Subject, sender, and body come from the selected template. Runtime placeholders such as <code>{{SESSION_LIST}}</code> are filled when notifications are sent.
-                          <a href="/email-management/templates?packageName__eq=SCHOOL" target="_blank" rel="noopener">Manage templates in Email Management</a>.
+                          Subject and sender come from the selected general template in Email Management. School resolves wrapper placeholders (for example <code>{{TEACHER_NAME}}</code>, <code>{{SESSION_LIST}}</code>) and injects the composed notification body at <code>{{BODY_CONTENT}}</code>.
+                          <a href="/email-management/templates?templateKind__eq=general" target="_blank" rel="noopener">Manage general templates</a>.
+                          Open <strong>Edit notification body</strong> for placeholder reference and custom wrapper mappings.
                         </p>
+                        <div class="alert alert-warning py-2 px-3 small mt-2 mb-0 d-none" id="sessionNotificationEmailTemplateBodyContentWarning" role="alert"></div>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label fw-semibold" for="sessionNotificationEmailBodyEditBtn">Notification message body</label>
+                        <textarea class="d-none" id="sessionNotificationEmailBody" <%= canUpdateFlag ? '' : 'disabled' %> aria-hidden="true"></textarea>
+                        <input type="hidden" id="sessionNotificationEmailWrapperMappings" value="[]" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <p class="small text-muted mb-2" id="sessionNotificationEmailBodySummary">Using default message</p>
+                        <% if (canUpdateFlag) { %>
+                          <button class="btn btn-outline-primary btn-sm" type="button" id="sessionNotificationEmailBodyEditBtn">
+                            <i class="bi bi-pencil-square me-1"></i> Edit notification body
+                          </button>
+                        <% } %>
                       </div>
                     </div>
                     <div class="border rounded mt-3">
@@ -767,8 +842,23 @@
                   </div>
                   <div class="collapse show p-3" id="sessionNotificationSmsCollapse">
                     <div class="row g-3">
-                      <div class="col-lg-6">
-                        <label class="form-label fw-semibold">Send when</label>
+                      <div class="col-lg-3">
+                        <label class="form-label fw-semibold" for="sessionNotificationSmsPrepareAtTime">Prepare SMS at</label>
+                        <input class="form-control" type="time" id="sessionNotificationSmsPrepareAtTime" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <p class="small text-muted mb-0 mt-1">Runs daily at this time to build messages and queue them in the outbox.</p>
+                      </div>
+                      <div class="col-lg-3">
+                        <label class="form-label fw-semibold" for="sessionNotificationSmsSendAtTime">Send at time</label>
+                        <input class="form-control" type="time" id="sessionNotificationSmsSendAtTime" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <p class="small text-muted mb-0 mt-1">Runs daily at this time to deliver queued messages. If this time is earlier on the clock than prepare, it is treated as the next morning.</p>
+                      </div>
+                      <div class="col-12 d-none" id="sessionNotificationSmsScheduleWarning">
+                        <div class="alert alert-warning py-2 px-3 small mb-0" role="alert">
+                          Prepare and Send must be at least 10 minutes apart (send may be earlier on the clock if it is the next morning).
+                        </div>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label fw-semibold">Session(s) Range:</label>
                         <div class="form-check">
                           <input class="form-check-input" type="radio" name="sessionNotificationSmsSendWhen" id="sessionNotificationSmsSameDay" value="same_day" <%= canUpdateFlag ? '' : 'disabled' %>>
                           <label class="form-check-label" for="sessionNotificationSmsSameDay">Same day as session</label>
@@ -777,14 +867,12 @@
                           <input class="form-check-input" type="radio" name="sessionNotificationSmsSendWhen" id="sessionNotificationSmsNextDay" value="next_day" <%= canUpdateFlag ? '' : 'disabled' %>>
                           <label class="form-check-label" for="sessionNotificationSmsNextDay">Day after session</label>
                         </div>
-                      </div>
-                      <div class="col-lg-6">
-                        <label class="form-label fw-semibold" for="sessionNotificationSmsSendAtTime">Send at time</label>
-                        <input class="form-control" type="time" id="sessionNotificationSmsSendAtTime" <%= canUpdateFlag ? '' : 'disabled' %>>
-                        <div class="session-notification-digest-row mt-2" id="sessionNotificationSmsDigestRow">
-                          <input class="form-check-input mt-0" type="radio" name="sessionNotificationSmsSendWhen" id="sessionNotificationSmsDailyAll" value="daily_all" <%= canUpdateFlag ? '' : 'disabled' %>>
-                          <span class="d-flex align-items-center gap-2 flex-wrap" id="sessionNotificationSmsRangeGroup">
-                            <input class="form-control form-control-sm session-notification-days-input d-none" type="number" min="1" max="365" step="1" id="sessionNotificationSmsDaysBefore" placeholder="Days" aria-label="Days before today" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <div class="session-notification-digest-check" id="sessionNotificationSmsDigestRow">
+                          <div class="form-check mb-0">
+                            <input class="form-check-input" type="radio" name="sessionNotificationSmsSendWhen" id="sessionNotificationSmsDailyAll" value="daily_all" <%= canUpdateFlag ? '' : 'disabled' %>>
+                            <label class="form-check-label" for="sessionNotificationSmsDailyAll">Daily digest of uncompleted sessions</label>
+                          </div>
+                          <span class="session-notification-digest-controls" id="sessionNotificationSmsRangeGroup">
                             <select class="form-select form-select-sm" id="sessionNotificationSmsRangeType" aria-label="Sessions to include" <%= canUpdateFlag ? '' : 'disabled' %>>
                               <option value="this_week">This week</option>
                               <option value="two_weeks">These two weeks</option>
@@ -792,8 +880,8 @@
                               <option value="timesheet_period">Current timesheet period</option>
                               <option value="days_before_today">Days before today</option>
                             </select>
+                            <input class="form-control form-control-sm session-notification-days-input d-none" type="number" min="1" max="365" step="1" id="sessionNotificationSmsDaysBefore" placeholder="Days" aria-label="Days before today" <%= canUpdateFlag ? '' : 'disabled' %>>
                           </span>
-                          <label class="form-check-label mb-0" for="sessionNotificationSmsDailyAll">Daily digest summary</label>
                         </div>
                       </div>
                       <div class="col-12">
@@ -805,7 +893,7 @@
                   </div>
                 </div>
 
-                <p class="small text-muted mt-3 mb-0">Placeholders: {{className}}, {{classId}}, {{sessionName}}, {{sessionId}}, {{sessionDate}}, {{sessionTime}}, {{teacherName}}, {{orgName}}, {{sessionManagerUrl}}, {{sessionCount}}, {{sessionList}}</p>
+                <p class="small text-muted mt-3 mb-0">Placeholders: {{className}}, {{classId}}, {{sessionName}}, {{sessionId}}, {{sessionDate}}, {{sessionTime}}, {{teacherName}}, {{orgName}}, {{sessionManagerUrl}}, {{sessionCount}}, {{sessionList}}, {{sessionListHtml}}</p>
               </div>
             </div>
 
@@ -951,6 +1039,15 @@
 <% if (typeof includeGenericPicker !== 'undefined' && includeGenericPicker) { %>
   <%- include('partials/modal_GenericPicker', { user }) %>
 <% } %>
+<%- include('school/settings/partials/sessionNotificationEmailBodyModal', {
+  canUpdate: canUpdateFlag,
+  sessionNotificationEmailTokens,
+  sessionNotificationEmailWrapperBuiltinMappings: typeof sessionNotificationEmailWrapperBuiltinMappings !== 'undefined' ? sessionNotificationEmailWrapperBuiltinMappings : [],
+  sessionNotificationEmailContextSources: typeof sessionNotificationEmailContextSources !== 'undefined' ? sessionNotificationEmailContextSources : []
+}) %>
+<%- include('school/settings/partials/sessionNotificationTestEmailModal') %>
+<script src="/scripts/htmlTemplateEditor.js"></script>
+<script src="/scripts/sessionNotificationEmailBodyModal.js"></script>
 
 <script>
 (() => {
@@ -960,6 +1057,10 @@
   let autosavePolicy = <%- autosavePolicyJson %>;
   const autosaveSections = <%- autosaveSectionsJson %>;
   let sessionAccessPolicy = <%- sessionAccessPolicyJson %>;
+  const sessionNotificationEmailTokens = <%- sessionNotificationEmailTokensJson %>;
+  const sessionNotificationEmailDefaultBody = <%- sessionNotificationEmailDefaultBodyJson %>;
+  const sessionNotificationEmailWrapperBuiltinMappings = <%- sessionNotificationEmailWrapperBuiltinMappingsJson %>;
+  const sessionNotificationEmailContextSources = <%- sessionNotificationEmailContextSourcesJson %>;
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
   let sarReportTemplateCapabilities = <%- studentAttendanceReportTemplateCapabilitiesJson %>;
@@ -1951,6 +2052,26 @@
     };
   }
 
+  function readSessionNotificationEmailWrapperMappings() {
+    const field = document.getElementById('sessionNotificationEmailWrapperMappings');
+    const raw = String(field?.value || '[]').trim();
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function writeSessionNotificationEmailWrapperMappings(mappings = []) {
+    const field = document.getElementById('sessionNotificationEmailWrapperMappings');
+    if (!field) return;
+    const list = Array.isArray(mappings) ? mappings : [];
+    field.value = JSON.stringify(list);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
   function collectSessionAccessPolicy() {
     return {
       uncompletedSessionNotification: {
@@ -1959,13 +2080,17 @@
           email: {
             enabled: document.getElementById('sessionNotificationEmailEnabled')?.checked === true,
             sendWhen: resolveChannelSendWhen('Email'),
+            prepareAtTime: String(document.getElementById('sessionNotificationEmailPrepareAtTime')?.value || '17:00').slice(0, 5),
             sendAtTime: String(document.getElementById('sessionNotificationEmailSendAtTime')?.value || '18:00').slice(0, 5),
             sessionDateRange: collectChannelSessionDateRange('Email'),
             emailTemplateId: document.getElementById('sessionNotificationEmailTemplateId')?.value || '',
+            bodyTemplate: document.getElementById('sessionNotificationEmailBody')?.value || '',
+            wrapperPlaceholderMappings: readSessionNotificationEmailWrapperMappings()
           },
           sms: {
             enabled: document.getElementById('sessionNotificationSmsEnabled')?.checked === true,
             sendWhen: resolveChannelSendWhen('Sms'),
+            prepareAtTime: String(document.getElementById('sessionNotificationSmsPrepareAtTime')?.value || '17:00').slice(0, 5),
             sendAtTime: String(document.getElementById('sessionNotificationSmsSendAtTime')?.value || '18:00').slice(0, 5),
             sessionDateRange: collectChannelSessionDateRange('Sms'),
             bodyTemplate: document.getElementById('sessionNotificationSmsBody')?.value || ''
@@ -1978,6 +2103,47 @@
         daysAfterSession: document.getElementById('sessionAttendanceEditDaysAfter')?.value || ''
       }
     };
+  }
+
+  function timeHmToMinutes(value = '') {
+    const token = String(value || '').slice(0, 5);
+    const match = /^(\d{2}):(\d{2})$/.exec(token);
+    if (!match) return 0;
+    return (Number(match[1]) * 60) + Number(match[2]);
+  }
+
+  const MIN_PREPARE_SEND_GAP_MINUTES = 10;
+
+  function computePrepareSendGapMinutes(prepareAtTime = '', sendAtTime = '') {
+    const prep = timeHmToMinutes(prepareAtTime || '17:00');
+    const send = timeHmToMinutes(sendAtTime || '18:00');
+    return send > prep ? (send - prep) : ((24 * 60) - prep) + send;
+  }
+
+  function isChannelScheduleGapValid(channelPrefix) {
+    const enabled = document.getElementById(`sessionNotification${channelPrefix}Enabled`)?.checked === true;
+    const notificationOn = document.getElementById('sessionNotificationEnabled')?.checked === true;
+    if (!notificationOn || !enabled) return true;
+    const prepare = document.getElementById(`sessionNotification${channelPrefix}PrepareAtTime`)?.value || '17:00';
+    const send = document.getElementById(`sessionNotification${channelPrefix}SendAtTime`)?.value || '18:00';
+    return computePrepareSendGapMinutes(prepare, send) >= MIN_PREPARE_SEND_GAP_MINUTES;
+  }
+
+  function refreshChannelScheduleWarning(channelPrefix) {
+    const warning = document.getElementById(`sessionNotification${channelPrefix}ScheduleWarning`);
+    const saveButton = document.getElementById('btnSaveSessionAccessSettings');
+    const valid = isChannelScheduleGapValid(channelPrefix);
+    if (warning) warning.classList.toggle('d-none', valid);
+    return valid;
+  }
+
+  function isSessionAccessScheduleValid() {
+    const emailValid = refreshChannelScheduleWarning('Email');
+    const smsValid = refreshChannelScheduleWarning('Sms');
+    const saveButton = document.getElementById('btnSaveSessionAccessSettings');
+    const allValid = emailValid && smsValid;
+    if (saveButton && canUpdate) saveButton.disabled = !allValid;
+    return allValid;
   }
 
   function refreshChannelNotificationPanels(channelPrefix) {
@@ -2003,6 +2169,7 @@
     document.getElementById('cardSessionNotification')?.classList.toggle('is-disabled', !notificationOn);
     refreshChannelNotificationPanels('Email');
     refreshChannelNotificationPanels('Sms');
+    isSessionAccessScheduleValid();
 
     const editEnabled = document.getElementById('sessionAttendanceEditEnabled')?.checked === true;
     document.getElementById('cardSessionAttendanceEdit')?.classList.toggle('is-disabled', !editEnabled);
@@ -2066,15 +2233,24 @@
 
     document.getElementById('sessionNotificationEmailEnabled').checked = email.enabled !== false;
     setChannelSendWhen('Email', email.sendWhen || legacySendWhen || 'daily_all');
+    document.getElementById('sessionNotificationEmailPrepareAtTime').value = String(
+      email.prepareAtTime || email.sendAtTime || legacySendAtTime || '17:00'
+    ).slice(0, 5);
     document.getElementById('sessionNotificationEmailSendAtTime').value = String(email.sendAtTime || legacySendAtTime || '18:00').slice(0, 5);
     renderChannelSessionDateRange('Email', email.sessionDateRange);
     const templateId = String(email.emailTemplateId || '').trim();
     const templateName = String(email.emailTemplateLabel || email.emailTemplateName || '').trim();
     document.getElementById('sessionNotificationEmailTemplateId').value = templateId;
     document.getElementById('sessionNotificationEmailTemplateName').value = templateName || templateId;
+    document.getElementById('sessionNotificationEmailBody').value = email.bodyTemplate || '';
+    writeSessionNotificationEmailWrapperMappings(email.wrapperPlaceholderMappings || []);
+    refreshSessionNotificationEmailBodySummary();
 
     document.getElementById('sessionNotificationSmsEnabled').checked = sms.enabled === true;
     setChannelSendWhen('Sms', sms.sendWhen || legacySendWhen || 'same_day');
+    document.getElementById('sessionNotificationSmsPrepareAtTime').value = String(
+      sms.prepareAtTime || sms.sendAtTime || legacySendAtTime || '17:00'
+    ).slice(0, 5);
     document.getElementById('sessionNotificationSmsSendAtTime').value = String(sms.sendAtTime || legacySendAtTime || '18:00').slice(0, 5);
     renderChannelSessionDateRange('Sms', sms.sessionDateRange);
     document.getElementById('sessionNotificationSmsBody').value = sms.bodyTemplate || '';
@@ -2082,13 +2258,96 @@
     document.getElementById('sessionAttendanceEditEnabled').checked = edit.enabled !== false;
     document.getElementById('sessionAttendanceEditWindowType').value = edit.windowType || 'timesheet_period';
     document.getElementById('sessionAttendanceEditDaysAfter').value = edit.daysAfterSession || '';
+    refreshSessionNotificationEmailTemplateWarning(
+      email.emailTemplateBodyContentWarning
+      || (email.emailTemplateMissingBodyContentSlot
+        ? 'The selected email template does not include {{BODY_CONTENT}}. Add that placeholder to the template body in Email Management so school message content can appear inside the template wrapper.'
+        : '')
+    );
     refreshSessionAccessPanels();
+  }
+
+  function refreshSessionNotificationEmailTemplateWarning(message = '') {
+    const warningNode = document.getElementById('sessionNotificationEmailTemplateBodyContentWarning');
+    if (!warningNode) return;
+    const text = String(message || '').trim();
+    warningNode.textContent = text;
+    warningNode.classList.toggle('d-none', !text);
+  }
+
+  async function checkSessionNotificationEmailTemplateSlot(templateId = '') {
+    const normalizedTemplateId = String(templateId || '').trim();
+    if (!normalizedTemplateId) {
+      refreshSessionNotificationEmailTemplateWarning('');
+      return;
+    }
+    try {
+      const response = await fetch(`/school/settings/session-access/email-template-check?templateId=${encodeURIComponent(normalizedTemplateId)}`, {
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') return;
+      refreshSessionNotificationEmailTemplateWarning(result.warning || '');
+    } catch (_) {
+      // Non-blocking guidance only.
+    }
+  }
+
+  function normalizeSessionNotificationEmailBody(value = '') {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function refreshSessionNotificationEmailBodySummary() {
+    const bodyField = document.getElementById('sessionNotificationEmailBody');
+    const summaryNode = document.getElementById('sessionNotificationEmailBodySummary');
+    if (!summaryNode) return;
+    const value = String(bodyField?.value || '');
+    const normalized = normalizeSessionNotificationEmailBody(value);
+    const defaultNormalized = normalizeSessionNotificationEmailBody(sessionNotificationEmailDefaultBody);
+    let text = 'Empty message';
+    if (normalized) {
+      text = normalized === defaultNormalized
+        ? 'Using default message'
+        : `Custom message (${value.length} chars)`;
+    }
+    summaryNode.textContent = text;
+  }
+
+  function openSessionNotificationEmailBodyRichEditor() {
+    const bodyField = document.getElementById('sessionNotificationEmailBody');
+    if (!bodyField || bodyField.disabled) return;
+    if (!window.SessionNotificationEmailBodyModal || typeof window.SessionNotificationEmailBodyModal.open !== 'function') {
+      showSettingsMessage({
+        title: 'Rich Editor Unavailable',
+        message: 'The notification body editor is not available on this page. Refresh and try again.',
+        icon: 'warning',
+        buttonClass: 'btn-warning'
+      });
+      return;
+    }
+    window.SessionNotificationEmailBodyModal.init({
+      canUpdate,
+      contextSources: sessionNotificationEmailContextSources
+    });
+    window.SessionNotificationEmailBodyModal.open({
+      bodyValue: bodyField.value || '',
+      customMappings: readSessionNotificationEmailWrapperMappings(),
+      onSave: ({ bodyTemplate, wrapperPlaceholderMappings }) => {
+        bodyField.value = String(bodyTemplate || '');
+        writeSessionNotificationEmailWrapperMappings(wrapperPlaceholderMappings || []);
+        refreshSessionNotificationEmailBodySummary();
+      }
+    });
   }
 
   [
     'sessionNotificationEnabled',
     'sessionNotificationEmailEnabled',
     'sessionNotificationSmsEnabled',
+    'sessionNotificationEmailPrepareAtTime',
+    'sessionNotificationEmailSendAtTime',
+    'sessionNotificationSmsPrepareAtTime',
+    'sessionNotificationSmsSendAtTime',
     'sessionNotificationEmailRangeType',
     'sessionNotificationSmsRangeType',
     'sessionNotificationEmailDaysBefore',
@@ -2108,6 +2367,15 @@
     event.preventDefault();
     const button = document.getElementById('btnSaveSessionAccessSettings');
     if (!button) return;
+    if (!isSessionAccessScheduleValid()) {
+      await showSettingsMessage({
+        title: 'Invalid notification schedule',
+        message: 'Prepare and Send must be at least 10 minutes apart for each enabled channel (send may be earlier on the clock if it is the next morning).',
+        icon: 'warning',
+        buttonClass: 'btn-warning'
+      });
+      return;
+    }
     const policyPayload = collectSessionAccessPolicy();
     const result = await postSettings('/school/settings/session-access', {
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
@@ -2115,6 +2383,7 @@
     }, button, 'sessionAccessSettingsError', { disableButton: false });
     if (!result) return;
     sessionAccessPolicy = result.policy && typeof result.policy === 'object' ? result.policy : sessionAccessPolicy;
+    renderSessionAccessSettings();
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
@@ -2123,6 +2392,7 @@
     const templateName = document.getElementById('sessionNotificationEmailTemplateName');
     if (templateId) templateId.value = '';
     if (templateName) templateName.value = '';
+    refreshSessionNotificationEmailTemplateWarning('');
   }
 
   function openSessionNotificationEmailTemplatePicker() {
@@ -2138,7 +2408,7 @@
     GenericPicker.open(GenericPickerPresets.normalizeConfig({
       ...GenericPickerPresets.emailTemplate({
         title: 'Select Email Template',
-        apiEndpoint: '/email-management/api/templates?isActive__eq=true&packageName__eq=SCHOOL'
+        apiEndpoint: '/email-management/api/templates?isActive__eq=true&templateKind__eq=general'
       }),
       multiselect: false,
       onSelect: (selected) => {
@@ -2150,12 +2420,15 @@
         const templateNameInput = document.getElementById('sessionNotificationEmailTemplateName');
         if (templateIdInput) templateIdInput.value = templateId;
         if (templateNameInput) templateNameInput.value = label;
+        checkSessionNotificationEmailTemplateSlot(templateId);
       }
     }));
   }
 
   document.getElementById('sessionNotificationEmailTemplatePickBtn')?.addEventListener('click', openSessionNotificationEmailTemplatePicker);
   document.getElementById('sessionNotificationEmailTemplateClearBtn')?.addEventListener('click', clearSessionNotificationEmailTemplate);
+  document.getElementById('sessionNotificationEmailBodyEditBtn')?.addEventListener('click', openSessionNotificationEmailBodyRichEditor);
+  document.getElementById('sessionNotificationEmailBodyModal')?.addEventListener('hidden.bs.modal', refreshSessionNotificationEmailBodySummary);
 
   function clearSessionNotificationTestTeacher() {
     const teacherId = document.getElementById('sessionNotificationTestTeacherId');
@@ -2212,8 +2485,19 @@
     }
     setPanelError('sessionAccessSettingsError');
     const actionStateId = document.querySelector('#sessionAccessSettingsForm input[name="actionStateId"]')?.value || '';
+    const modalEl = document.getElementById('sessionNotificationTestEmailModal');
+    const modalError = document.getElementById('sessionNotificationTestEmailModalError');
+    const sampleNotice = document.getElementById('sessionNotificationTestEmailSampleNotice');
+    const warningsNode = document.getElementById('sessionNotificationTestEmailWarnings');
+    const previewFrame = document.getElementById('sessionNotificationTestEmailPreviewFrame');
+    const plainPreview = document.getElementById('sessionNotificationTestEmailPlainPreview');
+    const previewMeta = document.getElementById('sessionNotificationTestEmailPreviewMeta');
+    if (modalError) {
+      modalError.textContent = '';
+      modalError.classList.add('d-none');
+    }
     try {
-      const response = await fetch('/school/settings/session-access/test-notification', {
+      const response = await fetch('/school/settings/session-access/test-notification/preview', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -2228,24 +2512,52 @@
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result || result.status !== 'success') {
-        throw new Error(result?.message || 'Unable to send test email.');
+        throw new Error(result?.message || 'Unable to preview test email.');
       }
-      const previewBody = String(result?.preview?.body || '').trim();
-      const previewSubject = String(result?.preview?.subject || '').trim();
-      const details = [
-        result.message,
-        result.recipient ? `Recipient: ${result.recipient}` : '',
-        `Sessions included: ${result.sessionCount || 0}`,
-        previewSubject ? `Subject: ${previewSubject}` : '',
-        previewBody ? `\n${previewBody}` : ''
-      ].filter(Boolean).join('\n\n');
-      await showSettingsMessage({
-        title: 'Test Email Sent',
-        message: details,
-        icon: 'success'
-      });
+
+      sessionNotificationTestEmailState.teacherId = teacherId;
+      sessionNotificationTestEmailState.actionStateId = actionStateId;
+      sessionNotificationTestEmailState.policyJson = JSON.stringify(collectSessionAccessPolicy());
+
+      const toField = document.getElementById('sessionNotificationTestEmailPreviewTo');
+      const subjectField = document.getElementById('sessionNotificationTestEmailPreviewSubject');
+      if (toField) toField.value = String(result.recipient || '');
+      if (subjectField) subjectField.value = String(result.subject || '');
+
+      if (sampleNotice) {
+        const sampleText = result.usedSampleData === true ? String(result.message || '').trim() : '';
+        sampleNotice.textContent = sampleText;
+        sampleNotice.classList.toggle('d-none', !sampleText);
+      }
+
+      const warningLines = Array.isArray(result.warnings)
+        ? result.warnings.map((row) => String(row || '').trim()).filter(Boolean)
+        : [];
+      if (warningsNode) {
+        warningsNode.textContent = warningLines.join(' ');
+        warningsNode.classList.toggle('d-none', !warningLines.length);
+      }
+
+      if (previewMeta) {
+        previewMeta.textContent = `Sessions included: ${result.sessionCount || 0}`;
+      }
+
+      const previewHtml = String(result?.preview?.html || '').trim();
+      const previewText = String(result?.preview?.text || '').trim();
+      if (previewFrame) {
+        previewFrame.srcdoc = previewHtml || '';
+        previewFrame.classList.toggle('d-none', !previewHtml);
+      }
+      if (plainPreview) {
+        plainPreview.textContent = previewHtml ? '' : previewText;
+        plainPreview.classList.toggle('d-none', Boolean(previewHtml));
+      }
+
+      if (modalEl && window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
     } catch (error) {
-      const message = error?.message || 'Unable to send test email.';
+      const message = error?.message || 'Unable to preview test email.';
       setPanelError('sessionAccessSettingsError', message);
       await showSettingsMessage({
         title: 'Test Email Not Sent',
@@ -2256,9 +2568,78 @@
     }
   }
 
+  const sessionNotificationTestEmailState = {
+    teacherId: '',
+    actionStateId: '',
+    policyJson: ''
+  };
+
+  function setSessionNotificationTestEmailSending(isSending) {
+    const button = document.getElementById('btnConfirmSessionNotificationTestEmail');
+    if (!button) return;
+    button.disabled = isSending;
+    button.querySelector('.js-session-notification-test-email-send-label')?.classList.toggle('d-none', isSending);
+    button.querySelector('.js-session-notification-test-email-send-spinner')?.classList.toggle('d-none', !isSending);
+  }
+
+  async function confirmSessionNotificationTestEmailSend() {
+    const teacherId = String(sessionNotificationTestEmailState.teacherId || '').trim();
+    if (!teacherId) return;
+    const modalEl = document.getElementById('sessionNotificationTestEmailModal');
+    const modalError = document.getElementById('sessionNotificationTestEmailModalError');
+    if (modalError) {
+      modalError.textContent = '';
+      modalError.classList.add('d-none');
+    }
+    setSessionNotificationTestEmailSending(true);
+    try {
+      const response = await fetch('/school/settings/session-access/test-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams({
+          actionStateId: sessionNotificationTestEmailState.actionStateId || '',
+          teacherId,
+          policy: sessionNotificationTestEmailState.policyJson || JSON.stringify(collectSessionAccessPolicy())
+        }).toString()
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error(result?.message || 'Unable to send test email.');
+      }
+      if (modalEl && window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+      }
+      await showSettingsMessage({
+        title: 'Test Email Sent',
+        message: String(result.message || 'Test email sent successfully.'),
+        icon: 'success'
+      });
+    } catch (error) {
+      const message = error?.message || 'Unable to send test email.';
+      if (modalError) {
+        modalError.textContent = message;
+        modalError.classList.remove('d-none');
+      } else {
+        await showSettingsMessage({
+          title: 'Test Email Not Sent',
+          message,
+          icon: 'error',
+          buttonClass: 'btn-danger'
+        });
+      }
+    } finally {
+      setSessionNotificationTestEmailSending(false);
+    }
+  }
+
   document.getElementById('btnPickSessionNotificationTestTeacher')?.addEventListener('click', openSessionNotificationTestTeacherPicker);
   document.getElementById('btnClearSessionNotificationTestTeacher')?.addEventListener('click', clearSessionNotificationTestTeacher);
   document.getElementById('btnSendSessionNotificationTestEmail')?.addEventListener('click', sendSessionNotificationTestEmail);
+  document.getElementById('btnConfirmSessionNotificationTestEmail')?.addEventListener('click', confirmSessionNotificationTestEmailSend);
 
   renderConductLevels();
   renderAttendanceMarks();

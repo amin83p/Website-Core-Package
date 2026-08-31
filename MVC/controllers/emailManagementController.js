@@ -1,7 +1,14 @@
 const emailManagementService = require('../services/emailManagementService');
+const emailProviderProfileService = require('../services/emailProviderProfileService');
+const emailEventDefinitionService = require('../services/emailEventDefinitionService');
 const emailLedgerService = require('../services/emailLedgerService');
 const paginate = require('../utils/paginationHelper');
-const { assertCreateOrgContextOrThrow, canCreateOrgScopedItem } = require('../utils/orgContextUtils');
+const {
+  canManageEmailTemplates,
+  isSystemTemplateOrg,
+  resolveEmailTemplateOrgContext,
+  resolveActiveOrgEmailContext
+} = require('../utils/emailTemplateOrgContext');
 const path = require('path');
 const crypto = require('crypto');
 const coreFilesService = require('../services/coreFilesService');
@@ -30,7 +37,10 @@ function normalizeBoolean(value, fallback = false) {
 
 function buildPayloadFromBody(body = {}) {
   return {
+    templateKind: cleanString(body.templateKind, { max: 20, allowEmpty: true }).toLowerCase(),
+    templateName: cleanString(body.templateName, { max: 180, allowEmpty: true }),
     eventKey: cleanString(body.eventKey, { max: 120, allowEmpty: true }).toUpperCase(),
+    providerProfileId: cleanString(body.providerProfileId, { max: 120, allowEmpty: true }),
     packageName: cleanString(body.packageName, { max: 64, allowEmpty: true }).toUpperCase(),
     sectionId: cleanString(body.sectionId, { max: 120, allowEmpty: true }).toUpperCase(),
     operationId: cleanString(body.operationId, { max: 120, allowEmpty: true }).toUpperCase(),
@@ -56,7 +66,8 @@ function buildPlaceholderMap(registryRows = []) {
       operationId: String(row?.operationId || '').trim().toUpperCase(),
       allowed: Array.isArray(row?.allowed) ? row.allowed : [],
       required: Array.isArray(row?.required) ? row.required : [],
-      runtime: Array.isArray(row?.runtime) ? row.runtime : []
+      runtime: Array.isArray(row?.runtime) ? row.runtime : [],
+      placeholders: Array.isArray(row?.placeholders) ? row.placeholders : []
     };
   });
   return map;
@@ -159,10 +170,11 @@ function getEmailTemplateMediaDefaultFolder() {
 
 async function showTemplateList(req, res) {
   try {
-    const [result, eventCatalog, canCreateTemplate] = await Promise.all([
+    const [result, eventCatalog, canCreateTemplate, activeOrgContext] = await Promise.all([
       emailManagementService.listTemplates(req.query || {}, req.user),
-      Promise.resolve(emailManagementService.getSupportedEventCatalog({ includeInactive: true })),
-      canCreateOrgScopedItem(req.user, { scopeLabel: 'email templates' })
+      emailManagementService.getAccessibleEventDefinitions(req.user, { includeInactive: true }),
+      canManageEmailTemplates(req.user, { scopeLabel: 'email templates' }),
+      resolveActiveOrgEmailContext(req.user)
     ]);
     const packageFilterOptions = ['CORE', ...getRegisteredPackageNames().filter((pkg) => pkg !== 'CORE')];
     const baseRows = Array.isArray(result?.rows) ? result.rows : (Array.isArray(result) ? result : []);
@@ -189,7 +201,8 @@ async function showTemplateList(req, res) {
         sectionLabel: sectionId || '',
         operationLabel: operationId || '',
         eventKey,
-        eventLabel: eventLabelByKey.get(eventKey) || eventLabelByComposite.get(opKey) || row?.eventLabel || ''
+        eventLabel: eventLabelByKey.get(eventKey) || eventLabelByComposite.get(opKey) || row?.eventLabel || '',
+        routeRole: isSystemTemplateOrg(row?.orgId) ? 'platform_default' : 'org_override'
       };
     });
     const fallbackPagination = paginate(rows, req.query?.page, req.query?.limit).pagination;
@@ -213,7 +226,8 @@ async function showTemplateList(req, res) {
       includeModal_Table: true,
       print: true,
       user: req.user || null,
-      actionStateId: req?.actionStateId || ''
+      actionStateId: req?.actionStateId || '',
+      activeOrgContext
     });
   } catch (error) {
     if (isAjax(req)) {
@@ -227,13 +241,22 @@ async function showTemplateList(req, res) {
   }
 }
 
+async function loadTemplateFormAssignments(reqUser) {
+  const result = await emailManagementService.getEventAssignmentsForOrg(reqUser);
+  return result?.assignments && typeof result.assignments === 'object' ? result.assignments : {};
+}
+
 async function showAddTemplateForm(req, res) {
   try {
-    await assertCreateOrgContextOrThrow(req.user, { scopeLabel: 'email templates' });
-    const [eventCatalog, registryRows] = await Promise.all([
-      Promise.resolve(emailManagementService.getSupportedEventCatalog({ includeInactive: true })),
-      Promise.resolve(emailManagementService.getPlaceholderRegistrySnapshot())
+    await resolveEmailTemplateOrgContext(req.user, { scopeLabel: 'email templates' });
+    const forceEventKeys = [];
+    const [eventCatalog, registryRows, eventAssignments, providerOptionsResult] = await Promise.all([
+      emailManagementService.getAccessibleEventDefinitions(req.user, { includeInactive: true, forceEventKeys }),
+      emailManagementService.getAccessiblePlaceholderRegistry(req.user, { includeInactive: true, forceEventKeys }),
+      loadTemplateFormAssignments(req.user),
+      emailProviderProfileService.listProviderOptionsForTemplate(req.user)
     ]);
+    const isSystemMode = isSystemTemplateOrg(req.user?.activeOrgId);
 
     return res.render('emailManagement/templateForm', {
       title: 'Create Email Template',
@@ -242,6 +265,12 @@ async function showAddTemplateForm(req, res) {
       eventCatalog,
       placeholderRegistry: registryRows,
       placeholderRegistryMap: buildPlaceholderMap(registryRows),
+      eventAssignments,
+      currentTemplateId: '',
+      providerOptions: providerOptionsResult?.profiles || [],
+      providerOptionsSource: providerOptionsResult?.source || 'org',
+      isSystemMode,
+      queryEventKey: cleanString(req.query?.eventKey, { max: 120, allowEmpty: true }).toUpperCase(),
       includeModal: true,
       print: true,
       user: req.user || null,
@@ -258,7 +287,10 @@ async function showAddTemplateForm(req, res) {
 
 async function showEmailLedgerList(req, res) {
   try {
-    const result = await emailLedgerService.listEntries(req.query || {}, req.user);
+    const [result, activeOrgContext] = await Promise.all([
+      emailLedgerService.listEntries(req.query || {}, req.user),
+      resolveActiveOrgEmailContext(req.user)
+    ]);
     const rows = Array.isArray(result?.rows) ? result.rows : [];
     const pagination = result?.pagination || paginate(rows, req.query?.page, req.query?.limit).pagination;
 
@@ -280,7 +312,8 @@ async function showEmailLedgerList(req, res) {
       includeModal_Table: true,
       print: true,
       user: req.user || null,
-      actionStateId: req?.actionStateId || ''
+      actionStateId: req?.actionStateId || '',
+      activeOrgContext
     });
   } catch (error) {
     if (isAjax(req)) {
@@ -326,8 +359,16 @@ async function pickerEmailEvents(req, res) {
     const limit = Math.max(1, Number.parseInt(String(req.query?.limit || '20'), 10) || 20);
     const rawQuery = cleanString(req.query?.q, { max: 200, allowEmpty: true }).toLowerCase();
     const tokens = rawQuery ? rawQuery.split(/\s+/g).filter(Boolean) : [];
+    const excludeTemplateId = cleanString(req.query?.excludeTemplateId, { max: 120, allowEmpty: true });
 
-    const catalog = emailManagementService.getSupportedEventCatalog({ includeInactive: false });
+    const [catalog, assignmentResult] = await Promise.all([
+      emailManagementService.getAccessibleEventDefinitions(req.user, { includeInactive: false }),
+      emailManagementService.getEventAssignmentsForOrg(req.user).catch(() => ({ assignments: {} }))
+    ]);
+    const assignments = assignmentResult?.assignments && typeof assignmentResult.assignments === 'object'
+      ? assignmentResult.assignments
+      : {};
+
     const filtered = (Array.isArray(catalog) ? catalog : []).filter((event) => {
       if (!tokens.length) return true;
       const searchable = [
@@ -339,21 +380,30 @@ async function pickerEmailEvents(req, res) {
         ...(Array.isArray(event?.requiredPlaceholders) ? event.requiredPlaceholders : [])
       ].join(' ');
       return tokens.every((token) => matchesKeyword(searchable, token));
-    }).map((event) => ({
-      id: String(event?.eventKey || '').toUpperCase(),
+    }).map((event) => {
+      const eventKey = String(event?.eventKey || '').toUpperCase();
+      const assignment = assignments[eventKey] || null;
+      const assigned = Boolean(assignment?.id && assignment.id !== excludeTemplateId);
+      const assignedSuffix = assigned ? ' [Assigned]' : '';
+      const baseLabel = String(event?.label || eventKey || '').trim() || eventKey;
+      return {
+      id: eventKey,
       name: [
         String(event?.packageName || 'CORE').toUpperCase(),
-        String(event?.label || event?.eventKey || '').trim() || String(event?.eventKey || '').toUpperCase()
+        baseLabel + assignedSuffix
       ].filter(Boolean).join(' — '),
-      eventKey: String(event?.eventKey || '').toUpperCase(),
+      eventKey,
       packageName: String(event?.packageName || 'CORE').toUpperCase(),
-      label: String(event?.label || event?.eventKey || '').trim() || String(event?.eventKey || '').toUpperCase(),
+      label: baseLabel,
       sectionId: String(event?.sectionId || '').toUpperCase(),
       operationId: String(event?.operationId || '').toUpperCase(),
       allowedPlaceholders: Array.isArray(event?.allowedPlaceholders) ? event.allowedPlaceholders : [],
       requiredPlaceholders: Array.isArray(event?.requiredPlaceholders) ? event.requiredPlaceholders : [],
-      description: `${String(event?.sectionId || '').toUpperCase()}::${String(event?.operationId || '').toUpperCase()}`
-    }));
+      description: `${String(event?.sectionId || '').toUpperCase()}::${String(event?.operationId || '').toUpperCase()}`,
+      assigned,
+      assignedTemplateId: assigned ? assignment.id : ''
+    };
+    });
 
     const startIndex = (page - 1) * limit;
     const paged = filtered.slice(startIndex, startIndex + limit);
@@ -478,13 +528,106 @@ async function pickerEmailTemplates(req, res) {
   }
 }
 
+async function pickerEmailPlaceholders(req, res) {
+  try {
+    const page = Math.max(1, Number.parseInt(String(req.query?.page || '1'), 10) || 1);
+    const limit = Math.max(1, Number.parseInt(String(req.query?.limit || '20'), 10) || 20);
+    const rawQuery = cleanString(req.query?.q, { max: 200, allowEmpty: true }).toLowerCase();
+    const tokens = rawQuery ? rawQuery.split(/\s+/g).filter(Boolean) : [];
+
+    const registryRows = await emailManagementService.getAccessiblePlaceholderRegistry(req.user, {
+      includeInactive: true
+    });
+    const placeholders = emailEventDefinitionService.buildGlobalPlaceholderPickerRows(registryRows);
+    const filtered = placeholders.filter((row) => {
+      if (!tokens.length) return true;
+      const searchable = [
+        row?.key,
+        row?.name,
+        row?.description,
+        ...(Array.isArray(row?.eventKeys) ? row.eventKeys : []),
+        ...(Array.isArray(row?.eventLabels) ? row.eventLabels : [])
+      ].join(' ');
+      return tokens.every((token) => matchesKeyword(searchable, token));
+    });
+
+    const startIndex = (page - 1) * limit;
+    const paged = filtered.slice(startIndex, startIndex + limit);
+    const pagination = buildPickerPagination(filtered.length, page, limit);
+    return res.json({ status: 'success', results: paged, pagination });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to load placeholders.' });
+  }
+}
+
+async function showEventRoutingList(req, res) {
+  try {
+    const [result, eventCatalog] = await Promise.all([
+      emailManagementService.listEventRoutingCoverage(req.query || {}, req.user),
+      emailManagementService.getAccessibleEventDefinitions(req.user, { includeInactive: false })
+    ]);
+    const rows = Array.isArray(result?.rows) ? result.rows : [];
+    const pagination = result?.pagination || paginate(rows, req.query?.page, req.query?.limit).pagination;
+    const isSystemMode = isSystemTemplateOrg(req.user?.activeOrgId);
+
+    if (isAjax(req)) {
+      return res.json({ status: 'success', data: rows, pagination });
+    }
+
+    return res.render('emailManagement/eventRoutingList', {
+      title: 'Email Event Routing',
+      data: rows,
+      pagination,
+      filters: req.query || {},
+      eventCatalog: Array.isArray(eventCatalog) ? eventCatalog : [],
+      isSystemMode,
+      tableName: 'Email_Event_Routing',
+      searchableFields: [
+        'eventKey',
+        'eventLabel',
+        'packageName',
+        'sectionId',
+        'operationId',
+        'orgTemplateId',
+        'orgTemplateSubject',
+        'systemTemplateId',
+        'systemTemplateSubject',
+        'effectiveRoute'
+      ],
+      includeModal: true,
+      includeModal_Table: true,
+      print: true,
+      user: req.user || null,
+      actionStateId: req?.actionStateId || ''
+    });
+  } catch (error) {
+    if (isAjax(req)) {
+      return res.status(400).json({ status: 'error', message: error.message || 'Unable to load event routing.' });
+    }
+    return res.status(500).render('error', {
+      title: 'Error',
+      message: error.message || 'Unable to load event routing.',
+      user: req.user || null
+    });
+  }
+}
+
+async function listEventAssignments(req, res) {
+  try {
+    const result = await emailManagementService.getEventAssignmentsForOrg(req.user);
+    return res.json({
+      status: 'success',
+      orgId: result?.orgId || '',
+      assignments: result?.assignments || {}
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to load event assignments.' });
+  }
+}
+
 async function showEditTemplateForm(req, res) {
   try {
-    const [templateRow, eventCatalog, registryRows] = await Promise.all([
-      emailManagementService.getTemplateById(req.params.id, req.user),
-      Promise.resolve(emailManagementService.getSupportedEventCatalog({ includeInactive: true })),
-      Promise.resolve(emailManagementService.getPlaceholderRegistrySnapshot())
-    ]);
+    const templateRow = await emailManagementService.getTemplateById(req.params.id, req.user);
     if (!templateRow) {
       return res.status(404).render('error', {
         title: 'Not Found',
@@ -493,6 +636,21 @@ async function showEditTemplateForm(req, res) {
       });
     }
 
+    const forceEventKeys = [String(templateRow?.eventKey || '').trim().toUpperCase()].filter(Boolean);
+    const [eventCatalog, registryRows, eventAssignments, providerOptionsResult] = await Promise.all([
+      emailManagementService.getAccessibleEventDefinitions(req.user, {
+        includeInactive: true,
+        forceEventKeys
+      }),
+      emailManagementService.getAccessiblePlaceholderRegistry(req.user, {
+        includeInactive: true,
+        forceEventKeys
+      }),
+      loadTemplateFormAssignments(req.user),
+      emailProviderProfileService.listProviderOptionsForTemplate(req.user)
+    ]);
+    const isSystemMode = isSystemTemplateOrg(templateRow?.orgId);
+
     return res.render('emailManagement/templateForm', {
       title: 'Edit Email Template',
       template: templateRow,
@@ -500,6 +658,11 @@ async function showEditTemplateForm(req, res) {
       eventCatalog,
       placeholderRegistry: registryRows,
       placeholderRegistryMap: buildPlaceholderMap(registryRows),
+      eventAssignments,
+      currentTemplateId: String(templateRow?.id || '').trim(),
+      providerOptions: providerOptionsResult?.profiles || [],
+      providerOptionsSource: providerOptionsResult?.source || 'org',
+      isSystemMode,
       includeModal: true,
       print: true,
       user: req.user || null,
@@ -516,7 +679,7 @@ async function showEditTemplateForm(req, res) {
 
 async function addTemplate(req, res) {
   try {
-    await assertCreateOrgContextOrThrow(req.user, { scopeLabel: 'email templates' });
+    await resolveEmailTemplateOrgContext(req.user, { scopeLabel: 'email templates' });
     const payload = buildPayloadFromBody(req.body || {});
     await emailManagementService.createTemplate(payload, req.user);
     if (isAjax(req)) {
@@ -576,11 +739,14 @@ async function deleteTemplate(req, res) {
 
 module.exports = {
   showTemplateList,
+  showEventRoutingList,
   showEmailLedgerList,
   showEmailLedgerDetail,
   showAddTemplateForm,
   showEditTemplateForm,
   pickerEmailEvents,
+  pickerEmailPlaceholders,
+  listEventAssignments,
   pickerEmailTemplates,
   listTemplateMediaLibrary,
   addTemplate,

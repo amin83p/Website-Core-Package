@@ -20,7 +20,7 @@ test('school manifest declares session student cases data entity', () => {
   assert.equal(entity.collectionName, 'schoolSessionStudentCases');
 });
 
-test('class routes expose session student case endpoints under SCHOOL_SESSIONS', () => {
+test('class routes expose session student case endpoints under SCHOOL_SESSION_STUDENT_CASES', () => {
   const src = read('packages/school/MVC/routes/classRoutes.js');
   const controller = read('packages/school/MVC/controllers/school/classController.js');
   assert.match(src, /\/:id\/sessions\/:sessionId\/cases/);
@@ -29,10 +29,13 @@ test('class routes expose session student case endpoints under SCHOOL_SESSIONS',
   assert.match(src, /classCtrl\.updateSessionStudentCaseStatus/);
   assert.match(src, /router\.delete\('\/:id\/sessions\/:sessionId\/cases\/:caseId'/);
   assert.match(src, /classCtrl\.deleteSessionStudentCase/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.READ_ALL\)/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.UPDATE\)/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS, OPERATIONS\.DELETE\)/);
-  assert.match(controller, /Only administrators can delete student cases/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.READ_ALL\)/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.CREATE\)/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.UPDATE\)/);
+  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.DELETE\)/);
+  assert.match(src, /requireCaseStatusMutationAccess/);
+  assert.match(controller, /studentCaseCapabilities/);
+  assert.match(controller, /sessionStudentCaseAccessService/);
   assert.match(controller, /sessionStudentCaseService\.deleteCase/);
 });
 

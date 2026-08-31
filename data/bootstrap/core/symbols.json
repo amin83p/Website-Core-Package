@@ -204,6 +204,74 @@
     }
   },
   {
+    "id": "SYM_SCHEDULED_TASK_MANAGEMENT_920220",
+    "name": "SCHEDULED_TASK_MANAGEMENT",
+    "type": "class",
+    "value": "bi bi-calendar2-week-fill",
+    "tags": [
+      "SCHEDULED_TASK_MANAGEMENT",
+      "920220"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-30T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "SYM_AUTO_SCHEDULED_TASKS_920221",
+    "name": "AUTO_SCHEDULED_TASKS",
+    "type": "class",
+    "value": "bi bi-list-task",
+    "tags": [
+      "AUTO_SCHEDULED_TASKS",
+      "920221"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-30T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "SYM_AUTO_SCHEDULED_TASK_RUNS_920222",
+    "name": "AUTO_SCHEDULED_TASK_RUNS",
+    "type": "class",
+    "value": "bi bi-clock-history",
+    "tags": [
+      "AUTO_SCHEDULED_TASK_RUNS",
+      "920222"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-30T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "SYM_EMAIL_OUTBOX_920223",
+    "name": "EMAIL_OUTBOX",
+    "type": "class",
+    "value": "bi bi-envelope-paper",
+    "tags": [
+      "EMAIL_OUTBOX",
+      "920223"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-30T00:00:00.000Z"
+    }
+  },
+  {
     "id": "SYM_SYSTEM_001",
     "audit": {
       "createUser": "SYS_ROOT_001",

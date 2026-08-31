@@ -3,7 +3,8 @@ const fs = require('fs').promises;
 const newsletterRepository = require('../repositories/newsletterRepository');
 const dataService = require('../services/dataService');
 const {isAjax, buildDataServiceQuery, inferSearchableFields} = require('../utils/generalTools');
-const resendEmailService = require('../services/resendEmailService');
+const emailOrgCapabilityService = require('../services/emailOrgCapabilityService');
+const emailDispatchService = require('../services/emailDispatchService');
 
 // ✅ NEW IMPORTS
 const settingService = require('../services/settingService');
@@ -40,16 +41,26 @@ exports.apiSubscribe = async (req, res) => {
     const sub = await newsletterRepository.subscribeEmail(email, meta, defaultGroupId);
 
     const shouldSendWelcome = settingService.getValue('newsletter', 'sendWelcomeEmail') !== false;
-    if (shouldSendWelcome && resendEmailService.isConfigured()) {
+    if (shouldSendWelcome) {
       try {
-        const baseUrl = buildBaseUrl(req);
-        const unsubscribeUrl = baseUrl
-          ? `${baseUrl}/newsletter/unsubscribe/${encodeURIComponent(String(sub?.email || email || '').trim())}`
-          : '';
-        await resendEmailService.sendNewsletterWelcome({
-          toEmail: sub?.email || email,
-          unsubscribeUrl
+        const canSend = await emailOrgCapabilityService.canOrgSendEmail('SYSTEM', {
+          eventKey: 'NEWSLETTER_WELCOME'
         });
+        if (canSend) {
+          const baseUrl = buildBaseUrl(req);
+          const unsubscribeUrl = baseUrl
+            ? `${baseUrl}/newsletter/unsubscribe/${encodeURIComponent(String(sub?.email || email || '').trim())}`
+            : '';
+          await emailDispatchService.sendByEvent({
+            orgId: req.user?.activeOrgId || 'SYSTEM',
+            eventKey: 'NEWSLETTER_WELCOME',
+            to: sub?.email || email,
+            context: {
+              subscriberEmail: sub?.email || email,
+              unsubscribeUrl
+            }
+          });
+        }
       } catch (welcomeError) {
         console.warn('[NEWSLETTER][WELCOME_EMAIL_FAIL]', welcomeError?.message || welcomeError);
       }

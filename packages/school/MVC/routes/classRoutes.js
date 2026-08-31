@@ -13,6 +13,10 @@ const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
 const upload = requireCoreModule('MVC/middleware/upload');
 const { SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
+const {
+  requireCaseSectionOperationAny,
+  requireCaseStatusMutationAccess
+} = require('./sessionStudentCaseRouteGuards');
 
 router.use(requireAuth);
 
@@ -24,6 +28,14 @@ const sessionManagerMutationActionState = {
 };
 
 const sessionReportAssignmentActionState = {
+  requireToken: true,
+  keepActive: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true,
+  allowSectionTokenFallback: true
+};
+
+const sessionStudentCaseMutationActionState = {
   requireToken: true,
   keepActive: true,
   allowOperationTokenFallback: true,
@@ -509,7 +521,7 @@ router.get('/:id/sessions/:sessionId',
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   classCtrl.manageSession);
 router.get('/:id/sessions/:sessionId/cases',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
+  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.READ_ALL),
   classCtrl.listSessionStudentCases);
 router.get('/:id/sessions/:sessionId/report-instances',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
@@ -587,38 +599,20 @@ router.post('/:id/sessions/:sessionId/merge/unmerge',
   }),
   classCtrl.unmergeSession);
 router.post('/:id/sessions/:sessionId/cases',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {
-    requireToken: true,
-    keepActive: true,
-    allowOperationTokenFallback: true,
-    allowInactiveTokenFallback: true
-  }),
+  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.CREATE, sessionStudentCaseMutationActionState),
   classCtrl.saveSessionStudentCase);
 router.post('/:id/sessions/:sessionId/cases/:caseId',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {
-    requireToken: true,
-    keepActive: true,
-    allowOperationTokenFallback: true,
-    allowInactiveTokenFallback: true
-  }),
+  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, sessionStudentCaseMutationActionState),
   classCtrl.saveSessionStudentCase);
 router.post('/:id/sessions/:sessionId/cases/:caseId/status',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {
-    requireToken: true,
-    keepActive: true,
-    allowOperationTokenFallback: true,
-    allowInactiveTokenFallback: true
-  }),
+  requireCaseStatusMutationAccess,
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, sessionStudentCaseMutationActionState),
   classCtrl.updateSessionStudentCaseStatus);
 router.delete('/:id/sessions/:sessionId/cases/:caseId',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
-  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, {
-    requireToken: false,
-    keepActive: true
-  }),
+  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.DELETE, sessionStudentCaseMutationActionState),
   classCtrl.deleteSessionStudentCase);
 router.get('/:id/sessions/:sessionId/delete-preview',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),

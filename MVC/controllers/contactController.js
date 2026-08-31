@@ -2,7 +2,9 @@
 
 const gtools = require('../utils/generalTools');
 const dataService = require('../services/dataService');
-const resendEmailService = require('../services/resendEmailService');
+const emailDispatchService = require('../services/emailDispatchService');
+const emailOrgCapabilityService = require('../services/emailOrgCapabilityService');
+const contactNotificationService = require('../services/contactNotificationService');
 const appBrandingService = require('../services/appBrandingService');
 const uploadMiddleware = require('../middleware/upload');
 const fileAssetStorage = require('../services/fileAssetStorageService');
@@ -128,9 +130,34 @@ async function submitContact(req, res) {
       ...msg,
       id: saved?.id || msg?.id || ''
     };
-    if (resendEmailService.isConfigured()) {
+    const notifyRecipients = contactNotificationService.getContactNotifyRecipients();
+    const notifyOrgId = req.user?.activeOrgId || 'SYSTEM';
+    if (notifyRecipients.length) {
       try {
-        await resendEmailService.sendContactTask(contactRecord);
+        const canSend = await emailOrgCapabilityService.canOrgSendEmail(notifyOrgId, {
+          eventKey: 'CONTACT_NOTIFICATION'
+        });
+        if (canSend) {
+          await emailDispatchService.sendByEvent({
+            orgId: notifyOrgId,
+            eventKey: 'CONTACT_NOTIFICATION',
+            to: notifyRecipients,
+            replyTo: contactRecord.email && contactRecord.email.includes('@') ? contactRecord.email : '',
+            context: {
+              contactRefId: contactRecord.id,
+              contactName: contactRecord.name,
+              contactEmail: contactRecord.email,
+              contactType: contactRecord.type,
+              contactTimeline: contactRecord.timeline,
+              contactSubject: contactRecord.subject,
+              contactMessage: contactRecord.message
+            },
+            actor: {
+              userId: String(contactRecord?.audit?.userId || '').trim(),
+              displayName: contactRecord.name || 'Website Visitor'
+            }
+          });
+        }
       } catch (notifyError) {
         console.warn('[CONTACT][EMAIL_NOTIFY_FAIL]', notifyError?.message || notifyError);
       }

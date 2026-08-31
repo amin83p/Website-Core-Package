@@ -1,5 +1,6 @@
 // MVC/models/systemSettingsModel.js
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = require('./fileQueue'); 
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
@@ -102,6 +103,9 @@ const DEFAULTS = {
     defaultGroupId: '',
     requireDoubleOptIn: false,
     sendWelcomeEmail: true
+  },
+  contact: {
+    notifyRecipients: ''
   },
   organization: {
     allowFreeRegistration: true,
@@ -214,6 +218,7 @@ async function getSettings() {
     // Deep merge defaults to ensure new fields appear if file exists but is old
     return { 
       newsletter: { ...DEFAULTS.newsletter, ...(parsed.newsletter || {}) },
+      contact: { ...DEFAULTS.contact, ...(parsed.contact || {}) },
       organization: { ...DEFAULTS.organization, ...(parsed.organization || {}) },
       access: { ...DEFAULTS.access, ...(parsed.access || {}) },
       app: mergeAppSettings(DEFAULTS.app, parsed.app || {})
@@ -224,6 +229,22 @@ async function getSettings() {
       return DEFAULTS;
     }
     return DEFAULTS;
+  }
+}
+
+function getSettingsSync() {
+  try {
+    const data = fsSync.readFileSync(settingsPath, 'utf8');
+    const parsed = JSON.parse(data);
+    return {
+      newsletter: { ...DEFAULTS.newsletter, ...(parsed.newsletter || {}) },
+      contact: { ...DEFAULTS.contact, ...(parsed.contact || {}) },
+      organization: { ...DEFAULTS.organization, ...(parsed.organization || {}) },
+      access: { ...DEFAULTS.access, ...(parsed.access || {}) },
+      app: mergeAppSettings(DEFAULTS.app, parsed.app || {})
+    };
+  } catch (_) {
+    return { ...DEFAULTS };
   }
 }
 
@@ -257,5 +278,6 @@ module.exports = {
   DEFAULT_PUBLIC_MENU_ITEMS,
   stripRuntimeBackendSettings,
   getSettings,
+  getSettingsSync,
   updateSettings
 };

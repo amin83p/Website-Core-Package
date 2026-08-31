@@ -71,6 +71,7 @@ router.get('/updates', requireAuth, ctrl.showUpdates);
 router.post('/switch-org', requireAuth, validateRequest(authValidators.switchOrgSchema), ctrl.switchOrg);
 router.post('/switch-mode', requireAuth, validateRequest(authValidators.switchModeSchema), ctrl.switchProfileMode);
 router.post('/password-reset/request', passwordResetRequestLimiter, validateRequest(authValidators.requestPasswordResetSchema), ctrl.requestPasswordReset);
+router.post('/password-reset/email/start', passwordResetRequestLimiter, validateRequest(authValidators.startPasswordResetEmailSchema), ctrl.startPasswordResetEmail);
 router.post('/password-reset/sms/start', passwordResetSmsStartLimiter, validateRequest(authValidators.startPasswordResetSmsSchema), ctrl.startPasswordResetSms);
 router.post('/password-reset/verify', passwordResetVerifyLimiter, validateRequest(authValidators.verifyPasswordResetSchema), ctrl.verifyPasswordReset);
 router.post('/password-reset/complete', validateRequest(authValidators.completePasswordResetSchema), ctrl.completePasswordReset);

@@ -1,0 +1,137 @@
+<%
+  const modalId = 'sessionNotificationEmailBodyModal';
+  const editorId = 'sessionNotificationEmailBodyEditor';
+  const builtinMappings = (typeof sessionNotificationEmailWrapperBuiltinMappings !== 'undefined' && Array.isArray(sessionNotificationEmailWrapperBuiltinMappings))
+    ? sessionNotificationEmailWrapperBuiltinMappings
+    : [];
+  const contextSources = (typeof sessionNotificationEmailContextSources !== 'undefined' && Array.isArray(sessionNotificationEmailContextSources))
+    ? sessionNotificationEmailContextSources
+    : [];
+  const bodyTokens = (typeof sessionNotificationEmailTokens !== 'undefined' && Array.isArray(sessionNotificationEmailTokens))
+    ? sessionNotificationEmailTokens
+    : [];
+  const canEditModal = typeof canUpdate !== 'undefined' && canUpdate === true;
+%>
+<style>
+  #<%= modalId %> .modal-dialog {
+    width: min(1600px, 96vw);
+    max-width: min(1600px, 96vw);
+    height: 94vh;
+    margin: 1.25rem auto;
+  }
+  #<%= modalId %> .modal-content {
+    height: 100%;
+  }
+  #<%= modalId %> .modal-body {
+    overflow: auto;
+  }
+  #<%= modalId %> .wrapper-mapping-table th,
+  #<%= modalId %> .wrapper-mapping-table td {
+    vertical-align: middle;
+  }
+  #<%= modalId %> .wrapper-mapping-builtin td {
+    background: var(--bs-light-bg-subtle, #f8f9fa);
+  }
+  #<%= modalId %> .session-notification-body-editor .html-template-editor-body {
+    min-height: 280px;
+  }
+  #<%= modalId %> .session-notification-body-editor .html-template-editor-visual {
+    min-height: 260px;
+    max-height: 38vh;
+  }
+</style>
+
+<div class="modal fade" id="<%= modalId %>" tabindex="-1" aria-labelledby="<%= modalId %>Label" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title d-flex align-items-center gap-2" id="<%= modalId %>Label">
+          <i class="bi bi-envelope-paper text-primary"></i>
+          <span>Edit notification body</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <details class="small mb-3">
+          <summary class="fw-semibold">Placeholder reference</summary>
+          <div class="mt-2">
+            <p class="text-muted mb-2">
+              <strong>Wrapper tokens</strong> (UPPER_SNAKE) are used in the Email Management general template.
+              School supplies them at send time. Map custom keys in the table below.
+              <a href="/email-management/templates?templateKind__eq=general" target="_blank" rel="noopener">Manage general templates</a>.
+            </p>
+            <p class="text-muted mb-2">
+              <strong>Body tokens</strong> (camelCase) are used in the notification message body editor.
+              School renders them into <code>{{BODY_CONTENT}}</code> before sending.
+            </p>
+            <p class="mb-0 font-monospace small"><%= bodyTokens.map((token) => '{{' + token + '}}').join(', ') %></p>
+          </div>
+        </details>
+
+        <div class="mb-3">
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <div class="fw-semibold">Email wrapper placeholder mappings</div>
+            <% if (canEditModal) { %>
+              <button class="btn btn-sm btn-outline-primary" type="button" id="sessionNotificationEmailWrapperMappingAddBtn">
+                <i class="bi bi-plus-lg me-1"></i>Add custom mapping
+              </button>
+            <% } %>
+          </div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm table-bordered mb-0 wrapper-mapping-table">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:18%">Label</th>
+                  <th style="width:18%">Wrapper key</th>
+                  <th style="width:14%">Value type</th>
+                  <th>Value</th>
+                  <% if (canEditModal) { %><th style="width:4%"></th><% } %>
+                </tr>
+              </thead>
+              <tbody id="sessionNotificationEmailWrapperBuiltinRows">
+                <% builtinMappings.forEach((row) => { %>
+                  <tr class="wrapper-mapping-builtin">
+                    <td><%= row.label || row.token %></td>
+                    <td><code>{{<%= row.token %>}}</code></td>
+                    <td><span class="text-muted">Built-in</span></td>
+                    <td class="text-muted small"><%= row.sourceDescription %></td>
+                    <% if (canEditModal) { %><td></td><% } %>
+                  </tr>
+                <% }) %>
+              </tbody>
+              <tbody id="sessionNotificationEmailWrapperCustomRows"></tbody>
+            </table>
+          </div>
+          <p class="small text-muted mt-2 mb-0">
+            Custom wrapper keys must use UPPER_SNAKE_CASE and cannot override built-in keys such as <code>BODY_CONTENT</code> or <code>TEACHER_EMAIL</code>.
+          </p>
+        </div>
+
+        <div class="session-notification-body-editor">
+          <%- include('partials/htmlTemplateEditor', {
+            id: editorId,
+            sourceId: editorId + 'Source',
+            name: '_sessionNotificationEmailBodyBuffer',
+            label: 'Notification message body',
+            value: '',
+            rows: 12,
+            mode: 'design',
+            preview: true,
+            helper: 'Body tokens render into {{BODY_CONTENT}} in the selected email template.',
+            tokenPlaceholderText: 'Type a body token (for example {{teacherName}})'
+          }) %>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <% if (canEditModal) { %>
+          <button type="button" class="btn btn-primary" id="sessionNotificationEmailBodyModalSaveBtn">
+            <i class="bi bi-check2-circle me-1"></i>Save to settings
+          </button>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="sessionNotificationEmailContextSourcesData"><%- JSON.stringify(contextSources).replace(/</g, '\\u003c') %></script>

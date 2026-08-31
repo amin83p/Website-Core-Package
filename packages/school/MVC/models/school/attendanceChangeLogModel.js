@@ -59,6 +59,16 @@ function sanitizeChangedBy(input = {}) {
   };
 }
 
+function cleanNonNegInt(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
+}
+
+function cleanBoolean(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
 function sanitizeLogInput(input = {}) {
   if (!isPlainObject(input)) throw new Error('Invalid attendance change log payload.');
   return {
@@ -72,7 +82,17 @@ function sanitizeLogInput(input = {}) {
     changedAt: cleanDateTime(input.changedAt, { allowEmpty: true }) || new Date().toISOString(),
     changedBy: sanitizeChangedBy(input.changedBy),
     fromStatus: cleanString(input.fromStatus, { max: 40, allowEmpty: true }) || '',
-    toStatus: cleanString(input.toStatus, { max: 40, allowEmpty: true }) || ''
+    toStatus: cleanString(input.toStatus, { max: 40, allowEmpty: true }) || '',
+    fromLateMinutes: cleanNonNegInt(input.fromLateMinutes),
+    toLateMinutes: cleanNonNegInt(input.toLateMinutes),
+    fromEarlyLeaveMinutes: cleanNonNegInt(input.fromEarlyLeaveMinutes),
+    toEarlyLeaveMinutes: cleanNonNegInt(input.toEarlyLeaveMinutes),
+    fromLateExcused: cleanBoolean(input.fromLateExcused),
+    toLateExcused: cleanBoolean(input.toLateExcused),
+    fromEarlyLeaveExcused: cleanBoolean(input.fromEarlyLeaveExcused),
+    toEarlyLeaveExcused: cleanBoolean(input.toEarlyLeaveExcused),
+    fromAbsenceExcused: cleanBoolean(input.fromAbsenceExcused),
+    toAbsenceExcused: cleanBoolean(input.toAbsenceExcused)
   };
 }
 

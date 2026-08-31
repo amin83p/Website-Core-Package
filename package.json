@@ -38,6 +38,7 @@
     "activity-quota:symbols:seed": "node scripts/seed-activity-quota-symbols.js --db app",
     "email-management:seed": "node scripts/seed-email-management-section.js --db app",
     "email-management:symbols:seed": "node scripts/seed-email-management-symbols.js --db app",
+    "scheduled-tasks:seed": "node scripts/seed-auto-scheduled-tasks-section.js --db app",
     "chat:seed": "node scripts/seed-chat-section.js --db app",
     "system:upload-folders:seed": "node scripts/seed-system-upload-folders-section.js --db app",
     "system:package-builder:seed": "node scripts/seed-system-package-builder-section.js --db app",
@@ -73,6 +74,7 @@
     "school:skills-section:seed": "node scripts/seed-school-skills-section.js --db app",
     "school:books-section:seed": "node scripts/seed-school-books-section.js --db app",
     "school:library-section:seed": "node scripts/seed-school-library-section.js --db app",
+    "school:session-student-cases-section:seed": "node scripts/seed-school-session-student-cases-section.js --db app",
     "school:teaching-outline-templates:reconcile": "node scripts/seed-school-teaching-outline-defaults.js --db app --org 900000 --reconcile-sections",
     "school:class-skills:backfill": "node scripts/school/migration/backfillClassSkills.js --org 900000",
     "school:class-skills:backfill:apply": "node scripts/school/migration/backfillClassSkills.js --org 900000 --apply",
@@ -95,7 +97,9 @@
     "school:tasks-section:dedupe": "node scripts/school/migration/repairDuplicateSchoolTasksSection.js",
     "school:tasks-section:dedupe:apply": "node scripts/school/migration/repairDuplicateSchoolTasksSection.js --apply",
     "school:timesheets:three-state:backfill": "node scripts/school/migration/backfillTimesheetThreeStateLifecycle.js",
-    "school:timesheets:three-state:backfill:apply": "node scripts/school/migration/backfillTimesheetThreeStateLifecycle.js --apply"
+    "school:timesheets:three-state:backfill:apply": "node scripts/school/migration/backfillTimesheetThreeStateLifecycle.js --apply",
+    "school:attendance-timing-detail:backfill": "node scripts/school/migration/backfillAttendanceTimingDetail.js",
+    "school:attendance-timing-detail:backfill:apply": "node scripts/school/migration/backfillAttendanceTimingDetail.js --apply"
   },
   "keywords": [],
   "author": "",

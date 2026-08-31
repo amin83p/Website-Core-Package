@@ -1,0 +1,248 @@
+<% const filterActionUrl = '/school/session-student-cases'; %>
+
+<%- include('partials/tablePages-start', {
+  title,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Student Cases</div>
+    <button
+      id="sessionStudentCaseFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#sessionStudentCaseFilterCollapse"
+      aria-expanded="<%= hasFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="sessionStudentCaseFilterCollapse"
+      aria-label="<%= hasFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="sessionStudentCaseFilterToggleIcon" class="bi <%= hasFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasFiltersApplied ? ' show' : '' %>" id="sessionStudentCaseFilterCollapse">
+    <form class="card-body p-3" method="get" action="<%= filterActionUrl %>">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="filterSeverity">Severity</label>
+          <select class="form-select size-md" id="filterSeverity" name="severity">
+            <option value="" <%= !filters?.severity ? 'selected' : '' %>>All severities</option>
+            <% (severityOptions || []).forEach((option) => { %>
+              <option value="<%= option %>" <%= String(filters?.severity || '') === option ? 'selected' : '' %>><%= option %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="filterCategory">Category</label>
+          <select class="form-select size-md" id="filterCategory" name="category">
+            <option value="" <%= !filters?.category ? 'selected' : '' %>>All categories</option>
+            <% (categoryOptions || []).forEach((option) => { %>
+              <option value="<%= option %>" <%= String(filters?.category || '') === option ? 'selected' : '' %>><%= option %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label" for="filterStatusGroup">Status</label>
+          <select class="form-select size-md" id="filterStatusGroup" name="statusGroup">
+            <% (statusGroupOptions || []).forEach((option) => { %>
+              <option value="<%= option.value %>" <%= String(filters?.statusGroup || '') === option.value ? 'selected' : '' %>><%= option.label %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label" for="filterClassId">Class</label>
+          <select class="form-select size-md" id="filterClassId" name="classId">
+            <option value="" <%= !filters?.classId ? 'selected' : '' %>>All classes</option>
+            <% (classOptions || []).forEach((option) => { %>
+              <option value="<%= option.value %>" <%= String(filters?.classId || '') === option.value ? 'selected' : '' %>><%= option.label %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-1 col-md-6">
+          <label class="form-label" for="filterStartDate">From</label>
+          <input type="date" class="form-control size-md" id="filterStartDate" name="startDate" value="<%= filters?.startDate || '' %>">
+        </div>
+        <div class="col-lg-1 col-md-6">
+          <label class="form-label" for="filterEndDate">To</label>
+          <input type="date" class="form-control size-md" id="filterEndDate" name="endDate" value="<%= filters?.endDate || '' %>">
+        </div>
+        <div class="col-12 d-flex justify-content-lg-end gap-2 pt-2">
+          <a href="<%= filterActionUrl %>" class="btn btn-outline-secondary btn-md" id="sessionStudentCaseFilterResetLink">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+      <% if (filters?.q) { %>
+        <input type="hidden" name="q" value="<%= filters.q %>">
+      <% } %>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search student cases by class, student, teacher, summary...'
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="sessionDateTimeLabel">Session <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="classTitle">Class <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="studentName">Student <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="category">Category <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="severity">Severity <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="summary">Summary <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="teacherName">Teacher <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="9" class="text-center py-5 text-muted">No student cases found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <%
+          const rowStatus = String(item.status || '').trim().toLowerCase();
+          const canResolveRow = canResolveCases === true && !['resolved', 'cancelled'].includes(rowStatus);
+          const canReadRow = canReadCases === true;
+          const hasCaseActions = canReadRow || canResolveRow || canDeleteCases === true;
+          const hasCaseContext = Boolean(item.id && item.classId && item.sessionId);
+        %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-semibold text-dark"><%= item.sessionDateTimeLabel %></div>
+            <div class="x-small text-muted"><%= item.id %></div>
+          </td>
+          <td><div class="fw-semibold text-dark"><%= item.classTitle %></div></td>
+          <td><%= item.studentName || '-' %></td>
+          <td><span class="badge bg-light text-dark border"><%= item.category %></span></td>
+          <td><span class="badge <%= item.severityBadgeClass %>"><%= item.severity %></span></td>
+          <td><span class="badge <%= item.statusBadgeClass %>"><%= item.status %></span></td>
+          <td><%= item.summary %></td>
+          <td><%= item.teacherName %></td>
+          <td class="table-actions text-end pe-4">
+            <% if (hasCaseContext && hasCaseActions) { %>
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= item.id %>"
+                  title="Student case actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                  <% if (canReadRow) { %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm js-student-case-open-here"
+                    data-case-id="<%= item.id %>">
+                    <i class="bi bi-window me-2"></i>Open Here
+                  </button>
+                  <% if (item.reviewHref) { %>
+                    <a
+                      href="<%= item.reviewHref %>"
+                      class="btn btn-outline-primary btn-sm mt-1 js-student-case-open-session"
+                      data-review-href="<%= item.reviewHref %>">
+                      <i class="bi bi-box-arrow-in-right me-2"></i>Open in Class Session
+                    </a>
+                  <% } %>
+                  <% } %>
+                  <% if (canResolveRow) { %>
+                    <button
+                      type="button"
+                      class="btn btn-outline-success btn-sm mt-1 js-student-case-resolve"
+                      data-case-id="<%= item.id %>">
+                      <i class="bi bi-check2-circle me-2"></i>Resolve
+                    </button>
+                  <% } %>
+                  <% if (canDeleteCases) { %>
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger btn-sm mt-1 js-student-case-delete"
+                      data-case-id="<%= item.id %>"
+                      data-student-name="<%= item.studentName || '' %>">
+                      <i class="bi bi-trash me-2"></i>Delete
+                    </button>
+                  <% } %>
+                </div>
+              </div>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/pagination', {
+  pagination,
+  filters,
+  baseUrlPath: 'school/session-student-cases'
+}) %>
+
+<%- include('partials/tablePages-end') %>
+
+<link rel="stylesheet" href="/styles/sessionStudentCaseModal.css">
+<%- include('school/sessionStudentCase/partials/sessionStudentCaseModal') %>
+<script src="/scripts/sessionStudentCaseModalClient.js"></script>
+<script>
+  (function () {
+    window.SessionStudentCaseModal.init({
+      apiMode: 'list',
+      actionStateId: <%- JSON.stringify(actionStateId || '') %>,
+      detailPresets: <%- JSON.stringify(studentCaseDetailPresets || { labels: {}, presets: {} }) %>,
+      allowCreate: <%= canCreateCases === true ? 'true' : 'false' %>,
+      capabilities: {
+        canCreate: <%= canCreateCases === true ? 'true' : 'false' %>,
+        canRead: <%= canReadCases === true ? 'true' : 'false' %>,
+        canUpdate: <%= canUpdateCases === true ? 'true' : 'false' %>,
+        canResolve: <%= canResolveCases === true ? 'true' : 'false' %>,
+        canDelete: <%= canDeleteCases === true ? 'true' : 'false' %>
+      },
+      onSaved() {
+        window.location.reload();
+      }
+    });
+
+    document.addEventListener('click', (event) => {
+      const openHereBtn = event.target.closest('.js-student-case-open-here');
+      if (openHereBtn) {
+        event.preventDefault();
+        const caseId = String(openHereBtn.dataset.caseId || '').trim();
+        if (caseId) window.SessionStudentCaseModal.openRemote(caseId);
+        return;
+      }
+
+      const resolveBtn = event.target.closest('.js-student-case-resolve');
+      if (resolveBtn) {
+        event.preventDefault();
+        const caseId = String(resolveBtn.dataset.caseId || '').trim();
+        if (caseId) {
+          window.SessionStudentCaseModal.resolveRemote(caseId).catch(() => {});
+        }
+        return;
+      }
+
+      const deleteBtn = event.target.closest('.js-student-case-delete');
+      if (deleteBtn) {
+        event.preventDefault();
+        const caseId = String(deleteBtn.dataset.caseId || '').trim();
+        if (!caseId) return;
+        window.SessionStudentCaseModal.deleteRemote(caseId, {
+          studentName: String(deleteBtn.dataset.studentName || '').trim()
+        }).catch(() => {});
+      }
+    });
+  }());
+</script>

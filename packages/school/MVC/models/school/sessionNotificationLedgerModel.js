@@ -54,7 +54,62 @@ async function hasSentEntry(dedupeKey) {
   const key = String(dedupeKey || '').trim();
   if (!key) return false;
   const entries = await readAllEntries();
-  return entries.some((row) => String(row?.dedupeKey || '') === key && String(row?.status || '') === 'sent');
+  return entries.some((row) => {
+    if (String(row?.dedupeKey || '') !== key) return false;
+    const status = String(row?.status || '').trim();
+    return status === 'sent' || status === 'queued';
+  });
+}
+
+async function markQueuedEntriesCancelled(dedupeKey) {
+  const key = String(dedupeKey || '').trim();
+  if (!key) return 0;
+
+  const applyUpdate = (entries = []) => {
+    let changed = 0;
+    const next = entries.map((row) => {
+      if (String(row?.dedupeKey || '') !== key) return row;
+      if (String(row?.status || '').trim() !== 'queued') return row;
+      changed += 1;
+      return { ...row, status: 'cancelled', cancelledAt: new Date().toISOString() };
+    });
+    return { entries: next, changed };
+  };
+
+  return runByRepositoryBackend({}, {
+    json: async () => {
+      let changed = 0;
+      await queueWrite(async () => {
+        const existing = await readFileParsed();
+        const result = applyUpdate(existing);
+        changed = result.changed;
+        if (changed > 0) {
+          await fs.mkdir(path.dirname(dataPath), { recursive: true });
+          await fs.writeFile(dataPath, JSON.stringify({ entries: result.entries }, null, 2), 'utf8');
+        }
+      });
+      return changed;
+    },
+    mongo: async () => {
+      const collection = getMongoCollection(MONGO_COLLECTION);
+      const existing = await readMongoEntries();
+      const result = applyUpdate(existing);
+      if (result.changed > 0) {
+        await collection.updateOne(
+          { id: MONGO_DOC_ID },
+          {
+            $set: {
+              id: MONGO_DOC_ID,
+              entries: result.entries,
+              updatedAt: new Date().toISOString()
+            }
+          },
+          { upsert: true }
+        );
+      }
+      return result.changed;
+    }
+  }, 'school.sessionNotificationLedger.markQueuedEntriesCancelled');
 }
 
 async function appendEntry(entry = {}) {
@@ -105,6 +160,7 @@ async function appendEntry(entry = {}) {
 module.exports = {
   buildDedupeKey,
   hasSentEntry,
+  markQueuedEntriesCancelled,
   appendEntry,
   readAllEntries
 };

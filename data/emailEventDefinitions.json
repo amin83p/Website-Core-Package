@@ -1,0 +1,71 @@
+[
+  {
+    "id": "AUTH_PASSWORD_RESET_CODE",
+    "eventKey": "AUTH_PASSWORD_RESET_CODE",
+    "sectionId": "USERS",
+    "operationId": "UPDATE",
+    "packageName": "CORE",
+    "label": "Password Reset Code",
+    "resolverId": "PASSWORD_RESET",
+    "allowedPlaceholders": [
+      "USER_EMAIL",
+      "RESET_CODE",
+      "RESET_TTL_MINUTES",
+      "APP_NAME",
+      "ORG_NAME"
+    ],
+    "requiredPlaceholders": [
+      "USER_EMAIL",
+      "RESET_CODE"
+    ],
+    "runtimePlaceholders": [],
+    "isActive": true,
+    "createdAt": "2026-08-28T23:53:59.763Z",
+    "updatedAt": "2026-08-29T00:02:05.243Z"
+  },
+  {
+    "id": "CONTACT_NOTIFICATION",
+    "eventKey": "CONTACT_NOTIFICATION",
+    "sectionId": "CONTACT_MESSAGES",
+    "operationId": "CREATE",
+    "packageName": "CORE",
+    "label": "Contact Form Notification",
+    "resolverId": "CONTACT_NOTIFICATION",
+    "allowedPlaceholders": [
+      "CONTACT_REF_ID",
+      "CONTACT_NAME",
+      "CONTACT_EMAIL",
+      "CONTACT_TYPE",
+      "CONTACT_TIMELINE",
+      "CONTACT_SUBJECT",
+      "CONTACT_MESSAGE"
+    ],
+    "requiredPlaceholders": [
+      "CONTACT_SUBJECT"
+    ],
+    "runtimePlaceholders": [],
+    "isActive": true,
+    "createdAt": "2026-08-28T23:53:59.766Z",
+    "updatedAt": "2026-08-29T00:02:05.245Z"
+  },
+  {
+    "id": "NEWSLETTER_WELCOME",
+    "eventKey": "NEWSLETTER_WELCOME",
+    "sectionId": "NEWSLETTERS",
+    "operationId": "CREATE",
+    "packageName": "CORE",
+    "label": "Newsletter Welcome",
+    "resolverId": "NEWSLETTER_WELCOME",
+    "allowedPlaceholders": [
+      "SUBSCRIBER_EMAIL",
+      "UNSUBSCRIBE_URL"
+    ],
+    "requiredPlaceholders": [
+      "SUBSCRIBER_EMAIL"
+    ],
+    "runtimePlaceholders": [],
+    "isActive": true,
+    "createdAt": "2026-08-28T23:53:59.768Z",
+    "updatedAt": "2026-08-29T00:02:05.247Z"
+  }
+]

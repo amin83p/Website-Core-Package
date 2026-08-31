@@ -47,8 +47,11 @@ const SECTIONS = {
     DEBUG_HEIC_CONVERTER: 'DEBUG_HEIC_CONVERTER',
     EMAIL_MANAGEMENT: 'EMAIL_MANAGEMENT',
     EMAIL_TEMPLATES: 'EMAIL_TEMPLATES',
-    EMAIL_LEDGER: 'EMAIL_LEDGER'
-    
+    EMAIL_LEDGER: 'EMAIL_LEDGER',
+    EMAIL_PROVIDERS: 'EMAIL_PROVIDERS',
+    AUTO_SCHEDULED_TASKS: 'AUTO_SCHEDULED_TASKS',
+    AUTO_SCHEDULED_TASK_RUNS: 'AUTO_SCHEDULED_TASK_RUNS',
+    EMAIL_OUTBOX: 'EMAIL_OUTBOX'
 };
 
 /* ============================================================
@@ -61,6 +64,7 @@ const OPERATIONS = {
     READ_ALL: 'READ_ALL',      // View list or details
     CREATE: 'CREATE',  // Add new item
     UPDATE: 'UPDATE',  // Edit existing item
+    RESOLVE: 'RESOLVE', // Resolve / close an item (e.g. student case)
     CONFIGURE: 'CONFIGURE', // Configure settings/state
     DELETE: 'DELETE',  // Remove item
     DELETE_ALL: 'DELETE_ALL',  // Remove item

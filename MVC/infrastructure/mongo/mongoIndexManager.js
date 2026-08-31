@@ -120,9 +120,31 @@ const INDEX_DEFINITIONS = Object.freeze({
   ],
   emailManagementTemplates: [
     { key: { id: 1 }, options: { name: 'idx_email_management_templates_id', unique: true } },
-    { key: { orgId: 1, sectionId: 1, operationId: 1 }, options: { name: 'idx_email_management_templates_org_section_operation', unique: true } },
+    {
+      key: { orgId: 1, eventKey: 1 },
+      options: {
+        name: 'idx_email_management_templates_org_event_key',
+        unique: true,
+        partialFilterExpression: {
+          templateKind: 'event',
+          eventKey: { $exists: true, $gt: '' }
+        }
+      }
+    },
+    { key: { orgId: 1, templateKind: 1, isActive: 1, updatedAt: -1 }, options: { name: 'idx_email_management_templates_org_kind_active_updated' } },
     { key: { orgId: 1, isActive: 1, updatedAt: -1 }, options: { name: 'idx_email_management_templates_org_active_updated' } },
     { key: { orgId: 1, updatedAt: -1 }, options: { name: 'idx_email_management_templates_org_updated' } }
+  ],
+  emailProviderProfiles: [
+    { key: { id: 1 }, options: { name: 'idx_email_provider_profiles_id', unique: true } },
+    { key: { orgId: 1, label: 1 }, options: { name: 'idx_email_provider_profiles_org_label', unique: true } },
+    { key: { orgId: 1, isDefault: 1, isActive: 1 }, options: { name: 'idx_email_provider_profiles_org_default_active' } },
+    { key: { orgId: 1, updatedAt: -1 }, options: { name: 'idx_email_provider_profiles_org_updated' } }
+  ],
+  emailEventDefinitions: [
+    { key: { eventKey: 1 }, options: { name: 'idx_email_event_definitions_event_key', unique: true } },
+    { key: { sectionId: 1, operationId: 1 }, options: { name: 'idx_email_event_definitions_section_operation' } },
+    { key: { packageName: 1, isActive: 1 }, options: { name: 'idx_email_event_definitions_package_active' } }
   ],
   emailLedger: [
     { key: { id: 1 }, options: { name: 'idx_email_ledger_id', unique: true } },
@@ -131,6 +153,48 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { orgId: 1, sectionId: 1, operationId: 1, dateTime: -1 }, options: { name: 'idx_email_ledger_org_section_operation_datetime' } },
     { key: { eventKey: 1, dateTime: -1 }, options: { name: 'idx_email_ledger_event_datetime' } },
     { key: { providerMessageId: 1 }, options: { name: 'idx_email_ledger_provider_message' } }
+  ],
+  scheduledTaskDefinitions: [
+    { key: { id: 1 }, options: { name: 'idx_scheduled_task_definitions_id', unique: true } },
+    { key: { orgId: 1, taskKey: 1, source: 1, sourceRef: 1 }, options: { name: 'idx_scheduled_task_definitions_org_task_source' } },
+    { key: { enabled: 1, paused: 1, nextRunAt: 1 }, options: { name: 'idx_scheduled_task_definitions_due' } },
+    { key: { packageName: 1, taskKey: 1 }, options: { name: 'idx_scheduled_task_definitions_package_task' } }
+  ],
+  scheduledTaskRuns: [
+    { key: { id: 1 }, options: { name: 'idx_scheduled_task_runs_id', unique: true } },
+    { key: { definitionId: 1, scheduledFor: -1 }, options: { name: 'idx_scheduled_task_runs_definition_scheduled' } },
+    { key: { orgId: 1, taskKey: 1, scheduledFor: -1 }, options: { name: 'idx_scheduled_task_runs_org_task_scheduled' } },
+    { key: { status: 1, scheduledFor: -1 }, options: { name: 'idx_scheduled_task_runs_status_scheduled' } }
+  ],
+  emailOutbox: [
+    { key: { id: 1 }, options: { name: 'idx_email_outbox_id', unique: true } },
+    { key: { status: 1, sendAt: 1 }, options: { name: 'idx_email_outbox_status_send_at' } },
+    {
+      key: { orgId: 1, dedupeKey: 1 },
+      options: {
+        name: 'idx_email_outbox_org_dedupe',
+        unique: true,
+        partialFilterExpression: {
+          dedupeKey: { $exists: true, $type: 'string', $gt: '' }
+        }
+      }
+    },
+    { key: { orgId: 1, sendAt: -1 }, options: { name: 'idx_email_outbox_org_send_at' } }
+  ],
+  smsOutbox: [
+    { key: { id: 1 }, options: { name: 'idx_sms_outbox_id', unique: true } },
+    { key: { status: 1, sendAt: 1 }, options: { name: 'idx_sms_outbox_status_send_at' } },
+    {
+      key: { orgId: 1, dedupeKey: 1 },
+      options: {
+        name: 'idx_sms_outbox_org_dedupe',
+        unique: true,
+        partialFilterExpression: {
+          dedupeKey: { $exists: true, $type: 'string', $gt: '' }
+        }
+      }
+    },
+    { key: { orgId: 1, sendAt: -1 }, options: { name: 'idx_sms_outbox_org_send_at' } }
   ],
   passwordResetCodes: [
     { key: { id: 1 }, options: { name: 'idx_password_reset_codes_id', unique: true } },
@@ -618,6 +682,7 @@ function indexOptionsMatch(existing, desired) {
 const REPAIRABLE_INDEX_NAMES_BY_COLLECTION = Object.freeze({
   sections: ['idx_sections_id'],
   operations: ['idx_operations_id'],
+  emailManagementTemplates: ['idx_email_management_templates_org_event_key'],
   schoolLibraryLocations: ['idx_school_library_locations_org_code'],
   schoolBooks: ['idx_school_books_org_isbn'],
   schoolBookAssignments: ['idx_school_book_assignments_org_class'],

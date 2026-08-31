@@ -17,6 +17,18 @@ test('normalizeLoggedStatus treats empty as unmarked', () => {
   assert.equal(attendanceChangeLogService.normalizeLoggedStatus('present'), 'present');
 });
 
+test('diffRosterAttendanceChanges detects timing-only changes', () => {
+  const before = [{ personId: '55', attendance: 'late', lateMinutes: 5, earlyLeaveMinutes: 0 }];
+  const after = [{ personId: '55', attendance: 'late', lateMinutes: 12, earlyLeaveMinutes: 0 }];
+  const changes = attendanceChangeLogService.diffRosterAttendanceChanges(before, after);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].personId, '55');
+  assert.equal(changes[0].fromStatus, 'late');
+  assert.equal(changes[0].toStatus, 'late');
+  assert.equal(changes[0].fromLateMinutes, 5);
+  assert.equal(changes[0].toLateMinutes, 12);
+});
+
 test('diffRosterAttendanceStatusChanges detects status changes only', () => {
   const before = [{ personId: '101', attendance: '' }, { personId: '102', attendance: 'present' }];
   const after = [{ personId: '101', attendance: 'present' }, { personId: '102', attendance: 'present' }];
@@ -65,10 +77,48 @@ test('appendChanges writes expected shape through repository', async () => {
     assert.equal(row.source, 'matrix_cell');
     assert.equal(row.fromStatus, '');
     assert.equal(row.toStatus, 'present');
+    assert.equal(row.fromLateMinutes, 0);
+    assert.equal(row.toLateMinutes, 0);
     assert.equal(row.changedBy.userId, '728610');
     assert.equal(row.changedBy.username, 'teacher@school.ca');
     assert.equal(row.changedBy.displayName, 'Jane Teacher');
     assert.ok(row.changedAt);
+  } finally {
+    require('../MVC/repositories/school').attendanceChangeLogs.create = originalCreate;
+  }
+});
+
+test('appendChanges persists timing fields', async () => {
+  const originalCreate = require('../MVC/repositories/school').attendanceChangeLogs.create;
+  const created = [];
+  require('../MVC/repositories/school').attendanceChangeLogs.create = async (payload) => {
+    const rows = Array.isArray(payload) ? payload : [payload];
+    created.push(...rows);
+    return rows;
+  };
+
+  try {
+    await attendanceChangeLogService.appendChanges({
+      orgId: '900000',
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      sessionDate: '2026-08-27',
+      source: 'session_save',
+      changes: [{
+        personId: '146788',
+        fromStatus: 'late',
+        toStatus: 'late',
+        fromLateMinutes: 5,
+        toLateMinutes: 12,
+        fromEarlyLeaveMinutes: 0,
+        toEarlyLeaveMinutes: 10
+      }],
+      reqUser: { id: '728610', username: 'teacher@school.ca' }
+    });
+    assert.equal(created.length, 1);
+    assert.equal(created[0].fromLateMinutes, 5);
+    assert.equal(created[0].toLateMinutes, 12);
+    assert.equal(created[0].toEarlyLeaveMinutes, 10);
   } finally {
     require('../MVC/repositories/school').attendanceChangeLogs.create = originalCreate;
   }
@@ -109,11 +159,30 @@ test('attendance change log model sanitizes append-only payload', () => {
     source: 'matrix_cell',
     changedBy: { userId: '728610', username: 'teacher@school.ca', displayName: 'Jane Teacher' },
     fromStatus: '',
-    toStatus: 'present'
+    toStatus: 'present',
+    toLateMinutes: 12
   });
   assert.equal(sanitized.source, 'matrix_cell');
   assert.equal(sanitized.fromStatus, '');
   assert.equal(sanitized.toStatus, 'present');
+  assert.equal(sanitized.fromLateMinutes, 0);
+  assert.equal(sanitized.toLateMinutes, 12);
+  assert.equal(sanitized.toEarlyLeaveMinutes, 0);
+});
+
+test('formatEntry includes timing fields', () => {
+  const formatted = attendanceChangeLogService.formatEntry({
+    fromStatus: 'late',
+    toStatus: 'late',
+    fromLateMinutes: 5,
+    toLateMinutes: 12,
+    fromEarlyLeaveMinutes: 0,
+    toEarlyLeaveMinutes: 10
+  }, { marks: [] });
+  assert.equal(formatted.fromLateMinutes, 5);
+  assert.equal(formatted.toLateMinutes, 12);
+  assert.equal(formatted.fromEarlyLeaveMinutes, 0);
+  assert.equal(formatted.toEarlyLeaveMinutes, 10);
 });
 
 test('attendance controller wires matrix cell save to change log append', () => {
@@ -127,7 +196,7 @@ test('attendance controller wires matrix cell save to change log append', () => 
 test('class controller wires saveSession roster save to change log append', () => {
   const source = read('packages/school/MVC/controllers/school/classController.js');
   assert.match(source, /pendingAttendanceChangeLog/);
-  assert.match(source, /attendanceChangeLogService\.diffRosterAttendanceStatusChanges/);
+  assert.match(source, /attendanceChangeLogService\.diffRosterAttendanceChanges/);
   assert.match(source, /source:\s*'session_save'/);
 });
 
@@ -139,11 +208,32 @@ test('attendance routes expose change-log read endpoints', () => {
   assert.match(source, /ctrl\.queryAttendanceChangeLogs/);
 });
 
-test('attendance matrix view includes history toggle and modal', () => {
+test('resolveListScope builds org scope from access context', () => {
+  const scope = attendanceChangeLogService.resolveListScope({
+    reqUser: { id: '728610', activeOrgId: '900000' },
+    accessContext: { scopeId: 'SCP_ORG' }
+  });
+  assert.equal(scope.activeOrgId, '900000');
+  assert.equal(scope.scopeMode, 'orgWide');
+  assert.notEqual(scope.denyAll, true);
+});
+
+test('resolveListScope preserves fully resolved scope', () => {
+  const existing = { canViewAll: true, activeOrgId: '900000' };
+  assert.deepEqual(attendanceChangeLogService.resolveListScope({ scope: existing }), existing);
+});
+
+test('attendance matrix view loads history on demand per cell', () => {
   const source = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
   assert.match(source, /btn_attendanceMatrixHistory/);
   assert.match(source, /attendance-history-mode-on/);
   assert.match(source, /attendanceCellHistoryModal/);
   assert.match(source, /openAttendanceCellHistory/);
-  assert.match(source, /\/api\/change-log\/query/);
+  assert.match(source, /data-student-name/);
+  assert.match(source, /buildHistoryAttendanceCellHtml/);
+  assert.match(source, /\/api\/change-log\?/);
+  assert.match(source, /fetchAttendanceChangeLogForCell/);
+  assert.doesNotMatch(source, /prefetchAttendanceChangeLogsForVisibleCells/);
+  assert.doesNotMatch(source, /\/api\/change-log\/query/);
+  assert.doesNotMatch(source, /attendanceChangeLogCache/);
 });

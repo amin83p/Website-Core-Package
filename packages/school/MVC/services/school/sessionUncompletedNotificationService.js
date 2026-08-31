@@ -5,6 +5,8 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const sessionAttendanceEditAccessService = require('./sessionAttendanceEditAccessService');
+const schoolDataService = require('./schoolDataService');
+const teacherIdentityService = require('./teacherIdentityService');
 const { SESSION_DATE_RANGE_TYPES } = require('./sessionAccessPolicyService');
 
 function cleanText(value) {
@@ -146,6 +148,14 @@ function buildSessionManagerPath(classData = {}, session = {}) {
   return `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`;
 }
 
+function escapeHtml(value = '') {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function buildSessionListText(entries = [], { baseUrl = '' } = {}) {
   const origin = cleanText(baseUrl).replace(/\/$/, '');
   return (Array.isArray(entries) ? entries : []).map((entry) => {
@@ -160,17 +170,58 @@ function buildSessionListText(entries = [], { baseUrl = '' } = {}) {
     const lines = [`- ${className} — ${sessionLabel}`];
     if (sessionUrl) lines.push(`  ${sessionUrl}`);
     return lines.join('\n');
-  }).join('\n');
+  }).join('\n\n');
 }
 
-function groupSessionsByTeacher(entries = []) {
+function buildSessionListHtml(entries = [], { baseUrl = '' } = {}) {
+  const origin = cleanText(baseUrl).replace(/\/$/, '');
+  const items = (Array.isArray(entries) ? entries : []).map((entry) => {
+    const classData = entry?.classData || {};
+    const session = entry?.session || {};
+    const className = cleanText(classData?.title || classData?.name || classData?.id);
+    const date = cleanText(session?.date);
+    const start = cleanText(session?.startTime).slice(0, 5);
+    const end = cleanText(session?.endTime).slice(0, 5);
+    const room = cleanText(session?.room);
+    const relativePath = buildSessionManagerPath(classData, session);
+    const sessionUrl = relativePath
+      ? (origin ? `${origin}${relativePath}` : relativePath)
+      : '';
+    const title = escapeHtml(className);
+    const details = [
+      date ? `Date: ${escapeHtml(date)}` : '',
+      (start || end) ? `Time: ${escapeHtml([start, end].filter(Boolean).join(' - '))}` : '',
+      room ? `Room: ${escapeHtml(room)}` : ''
+    ].filter(Boolean).join(' · ');
+    const link = sessionUrl
+      ? `<a href="${escapeHtml(sessionUrl)}" style="color:#0d6efd;text-decoration:none;font-weight:500;">Open session manager</a>`
+      : '';
+    return [
+      '<li style="margin:0 0 12px;padding:14px 16px;border:1px solid #dee2e6;border-radius:8px;background:#f8f9fa;">',
+      `<div style="font-weight:600;margin-bottom:4px;font-size:15px;">${title}</div>`,
+      details ? `<div style="font-size:14px;color:#495057;margin-bottom:8px;">${details}</div>` : '',
+      link ? `<div style="font-size:14px;">${link}</div>` : '',
+      '</li>'
+    ].join('');
+  }).join('');
+  if (!items) {
+    return '<p style="margin:0;color:#6c757d;">No sessions listed.</p>';
+  }
+  return `<ul style="margin:0;padding:0;list-style:none;">${items}</ul>`;
+}
+
+function groupSessionsByTeacher(entries = [], { teacherPersonMap = null } = {}) {
   const grouped = new Map();
   (Array.isArray(entries) ? entries : []).forEach((entry) => {
     const session = entry?.session || {};
-    const teacherIds = listSessionEditorIds(session);
-    teacherIds.forEach((teacherId) => {
-      const key = cleanText(teacherId);
-      if (!key) return;
+    const seenPersonIds = new Set();
+    listSessionEditorIds(session).forEach((rawId) => {
+      const personId = teacherPersonMap instanceof Map
+        ? teacherIdentityService.resolveTeacherPersonId(rawId, teacherPersonMap) || rawId
+        : rawId;
+      const key = cleanText(personId);
+      if (!key || seenPersonIds.has(key)) return;
+      seenPersonIds.add(key);
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push(entry);
     });
@@ -200,23 +251,65 @@ function buildDigestContext({
     teacherName: schoolPersonAccessService.formatPersonName
       ? schoolPersonAccessService.formatPersonName(teacher)
       : cleanText(teacher?.displayName || teacher?.name),
+    teacherEmail: schoolPersonAccessService.readPersonEmail
+      ? schoolPersonAccessService.readPersonEmail(teacher)
+      : cleanText(teacher?.contact?.email || teacher?.email),
     orgName: cleanText(orgName),
     sessionManagerUrl: classId && sessionId
       ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
       : ''
   };
   const sessionList = buildSessionListText(entries, { baseUrl });
+  const sessionListHtml = buildSessionListHtml(entries, { baseUrl });
   return {
     ...baseContext,
     sessionCount: String(entries.length),
-    sessionList
+    sessionList,
+    sessionListHtml
   };
+}
+
+async function loadTeacherPersonMap(orgId = '', reqUser = null) {
+  const orgKey = cleanText(orgId);
+  if (!orgKey) return new Map();
+  const scopedUser = reqUser && typeof reqUser === 'object'
+    ? reqUser
+    : { activeOrgId: orgKey };
+  const teachers = await schoolDataService.fetchAllData('teachers', {}, scopedUser).catch(() => []);
+  return teacherIdentityService.buildTeacherPersonMap(teachers);
+}
+
+async function listOrgClasses(orgId = '', reqUser = null) {
+  const orgKey = cleanText(orgId);
+  if (!orgKey) return [];
+  const scopedUser = reqUser && typeof reqUser === 'object'
+    ? reqUser
+    : { activeOrgId: orgKey };
+  let classes = await schoolDataService.fetchAllData('classes', {}, scopedUser).catch(() => []);
+  if (!Array.isArray(classes) || !classes.length) {
+    const fallback = await classModel.getAllClasses().catch(() => []);
+    classes = (Array.isArray(fallback) ? fallback : [])
+      .filter((row) => cleanText(row?.orgId) === orgKey);
+  }
+  return classes;
+}
+
+async function listClassSessions(classData = {}, reqUser = null) {
+  const embedded = Array.isArray(classData?.sessions) ? classData.sessions : [];
+  if (embedded.length) return embedded;
+  const classId = cleanText(classData?.id);
+  if (!classId) return [];
+  const scopedUser = reqUser && typeof reqUser === 'object'
+    ? reqUser
+    : { activeOrgId: cleanText(classData?.orgId) };
+  return schoolDataService.getClassSessions(classId, scopedUser).catch(() => []);
 }
 
 async function listUncompletedSessionsForOrg(orgId, {
   fromDate = '',
   throughDate = '',
-  statusMap = null
+  statusMap = null,
+  reqUser = null
 } = {}) {
   const orgKey = cleanText(orgId);
   const cutoff = cleanDateKey(throughDate);
@@ -224,19 +317,22 @@ async function listUncompletedSessionsForOrg(orgId, {
   const start = cleanDateKey(fromDate) || cutoff;
 
   const resolvedStatusMap = statusMap || await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
-  const classes = await classModel.getAllClasses();
+  const scopedUser = reqUser && typeof reqUser === 'object'
+    ? reqUser
+    : { activeOrgId: orgKey };
+  const classes = await listOrgClasses(orgKey, scopedUser);
   const results = [];
 
-  (Array.isArray(classes) ? classes : [])
-    .filter((row) => cleanText(row?.orgId) === orgKey)
-    .forEach((classData) => {
-      const sessions = Array.isArray(classData?.sessions) ? classData.sessions : [];
-      sessions.forEach((session) => {
-        if (!isSessionWithinDateRange(session, start, cutoff)) return;
-        if (!isSessionUncompleted({ session, statusMap: resolvedStatusMap })) return;
-        results.push({ classData, session });
-      });
+  for (const classData of classes) {
+    if (cleanText(classData?.orgId) !== orgKey) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const sessions = await listClassSessions(classData, scopedUser);
+    sessions.forEach((session) => {
+      if (!isSessionWithinDateRange(session, start, cutoff)) return;
+      if (!isSessionUncompleted({ session, statusMap: resolvedStatusMap })) return;
+      results.push({ classData, session });
     });
+  }
 
   results.sort((left, right) => {
     const dateCompare = compareDateKeys(left?.session?.date, right?.session?.date);
@@ -250,13 +346,17 @@ async function listUncompletedSessionsForOrg(orgId, {
   return results;
 }
 
-function listUncompletedSessionsForTeacher(allEntries = [], teacherId = '') {
+function listUncompletedSessionsForTeacher(allEntries = [], teacherId = '', { teacherPersonMap = null } = {}) {
   const targetTeacherId = cleanText(teacherId);
   if (!targetTeacherId) return [];
-  return (Array.isArray(allEntries) ? allEntries : []).filter((entry) => {
-    const session = entry?.session || {};
-    return listSessionEditorIds(session).includes(targetTeacherId);
-  });
+  const entries = Array.isArray(allEntries) ? allEntries : [];
+  const matched = entries.filter((entry) => sessionDeliveryTeamService.isPersonSessionEditor(
+    entry?.session || {},
+    targetTeacherId,
+    teacherPersonMap
+  ));
+
+  return matched;
 }
 
 function buildSampleSessionsForTeacher(orgId = '') {
@@ -305,10 +405,21 @@ async function resolveTeacherSessionsForDigest({
   teacherId = '',
   fromDate = '',
   throughDate = '',
-  statusMap = null
+  statusMap = null,
+  reqUser = null
 } = {}) {
-  const allEntries = await listUncompletedSessionsForOrg(orgId, { fromDate, throughDate, statusMap });
-  const teacherSessions = listUncompletedSessionsForTeacher(allEntries, teacherId);
+  const scopedUser = reqUser && typeof reqUser === 'object'
+    ? reqUser
+    : { activeOrgId: cleanText(orgId) };
+  const teacherPersonMap = await loadTeacherPersonMap(orgId, scopedUser);
+  const allEntries = await listUncompletedSessionsForOrg(orgId, {
+    fromDate,
+    throughDate,
+    statusMap,
+    reqUser: scopedUser
+  });
+  const teacherSessions = listUncompletedSessionsForTeacher(allEntries, teacherId, { teacherPersonMap });
+
   if (teacherSessions.length) {
     return { sessions: teacherSessions, usedSampleData: false };
   }
@@ -330,8 +441,12 @@ module.exports = {
   describeSessionDateRange,
   buildSessionManagerPath,
   buildSessionListText,
+  buildSessionListHtml,
   groupSessionsByTeacher,
   buildDigestContext,
+  loadTeacherPersonMap,
+  listOrgClasses,
+  listClassSessions,
   listUncompletedSessionsForOrg,
   listUncompletedSessionsForTeacher,
   buildSampleSessionsForTeacher,

@@ -178,6 +178,9 @@
           "id": "358609"
         },
         {
+          "id": "778771"
+        },
+        {
           "id": "445564"
         },
         {
@@ -2923,7 +2926,77 @@
         }
       ],
       "subsections": [],
-      "related": [],
+      "related": [
+        {
+          "id": "778771"
+        }
+      ],
+      "adoptExisting": true
+    },
+    {
+      "id": "778771",
+      "name": "SCHOOL_SESSION_STUDENT_CASES",
+      "category": "SCHOOL",
+      "description": "Session student cases saved from Manage Session.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/session-student-cases",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 50,
+          "sessionTime": 60,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 50,
+          "sessionTime": 60,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 50,
+          "sessionTime": 60,
+          "active": true
+        },
+        {
+          "id": "OP1006",
+          "sessionAttempts": 50,
+          "sessionTime": 60,
+          "active": true
+        },
+        {
+          "id": "OP1014",
+          "sessionAttempts": 50,
+          "sessionTime": 60,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [
+        {
+          "id": "358609"
+        }
+      ],
       "adoptExisting": true
     },
     {
@@ -4046,6 +4119,18 @@
       "adoptExisting": true
     },
     {
+      "id": "SYM_SYSTEM_134",
+      "name": "SCHOOL_SESSION_STUDENT_CASES",
+      "type": "class",
+      "value": "bi bi-clipboard2-pulse",
+      "tags": [
+        "SCHOOL_SESSION_STUDENT_CASES",
+        "778771"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
       "id": "SYM_SYSTEM_034",
       "name": "SCHOOL_CLASSES",
       "type": "class",
@@ -4907,6 +4992,54 @@
             {
               "operationId": "OP1005",
               "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "778771",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1006",
+              "scopeId": "SCP_ORG",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,
               "maxFetchUploadVolumeKB": null
@@ -7757,6 +7890,54 @@
             {
               "operationId": "OP1005",
               "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "778771",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_DEPT",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_DEPT",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_DEPT",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_DEPT",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_DEPT",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1014",
+              "scopeId": "SCP_DEPT",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,
               "maxFetchUploadVolumeKB": null

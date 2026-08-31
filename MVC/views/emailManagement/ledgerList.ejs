@@ -10,6 +10,16 @@
 }) %>
 
 <%
+  const orgContext = (activeOrgContext && typeof activeOrgContext === 'object') ? activeOrgContext : {};
+  const orgLabel = String(orgContext.activeOrgLabel || 'Current organization').trim();
+%>
+
+<div class="alert alert-light border mb-3 py-2 px-3 small">
+  <i class="bi bi-building me-1"></i>
+  Showing sent emails for <strong><%= orgLabel %></strong>.
+</div>
+
+<%
   const stateFilters = (filters && typeof filters === 'object') ? filters : {};
   const selectedStatusFilter = String(stateFilters?.status__eq || '').toLowerCase();
   const selectedProviderFilter = String(stateFilters?.provider__eq || '').toLowerCase();

@@ -1370,6 +1370,9 @@
       },
       {
         "id": "920200"
+      },
+      {
+        "id": "920220"
       }
     ],
     "trackState": false
@@ -8213,6 +8216,9 @@
       },
       {
         "id": "920212"
+      },
+      {
+        "id": "920214"
       }
     ],
     "related": [],
@@ -8368,6 +8374,169 @@
       "createDateTime": "2026-05-09T06:49:29.133Z",
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-09T06:49:29.133Z"
+    }
+  },
+  {
+    "id": "920214",
+    "name": "EMAIL_PROVIDERS",
+    "category": "SECURITY",
+    "description": "Manage encrypted org-scoped email provider profiles and verified sender domains.",
+    "homeURL": "/email-management/providers",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1013", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1022", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-05-09T06:49:29.133Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-05-09T06:49:29.133Z"
+    }
+  },
+  {
+    "id": "920220",
+    "name": "SCHEDULED_TASK_MANAGEMENT",
+    "category": "SECURITY",
+    "description": "Navigator for scheduled task definitions, run history, and email outbox.",
+    "homeURL": "/dashboard/section-nav/SCHEDULED_TASK_MANAGEMENT",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": false,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": true,
+    "subsections": [
+      { "id": "920221" },
+      { "id": "920222" },
+      { "id": "920223" }
+    ],
+    "related": [],
+    "operations": [],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-30T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "920221",
+    "name": "AUTO_SCHEDULED_TASKS",
+    "category": "SECURITY",
+    "description": "Manage recurring scheduled task definitions across packages.",
+    "homeURL": "/scheduled-tasks",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1013", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1022", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1024", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-30T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "920222",
+    "name": "AUTO_SCHEDULED_TASK_RUNS",
+    "category": "SECURITY",
+    "description": "View scheduled task execution history, logs, and outcomes.",
+    "homeURL": "/scheduled-tasks/runs",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1013", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1022", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1024", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-30T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "920223",
+    "name": "EMAIL_OUTBOX",
+    "category": "SECURITY",
+    "description": "View queued, sent, and failed deferred emails awaiting dispatch.",
+    "homeURL": "/scheduled-tasks/outbox",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1013", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1022", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+      { "id": "OP1024", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-08-30T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-08-30T00:00:00.000Z"
     }
   },
   {

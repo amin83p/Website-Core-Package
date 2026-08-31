@@ -6,25 +6,71 @@
   const selectedSection = String(row.sectionId || '').toUpperCase();
   const selectedOperation = String(row.operationId || '').toUpperCase();
   const selectedPackageName = String(row.packageName || 'CORE').toUpperCase();
+  const selectedTemplateKind = String(row.templateKind || '').toLowerCase() === 'general' ? 'general' : 'event';
+  const selectedProviderProfileId = String(row.providerProfileId || '').trim();
+  const selectedTemplateName = String(row.templateName || '').trim();
   const mediaDefaultFolder = String((typeof locals.mediaDefaultFolder !== 'undefined' && locals.mediaDefaultFolder) ? locals.mediaDefaultFolder : 'email-templates').trim() || 'email-templates';
+  const systemMode = Boolean(typeof isSystemMode !== 'undefined' && isSystemMode);
+  const initialEventKeyFromQuery = String((typeof locals.queryEventKey !== 'undefined' && locals.queryEventKey) ? locals.queryEventKey : '').trim().toUpperCase();
+  const safeEventAssignments = (eventAssignments && typeof eventAssignments === 'object') ? eventAssignments : {};
+  const currentTemplateId = String((typeof locals.currentTemplateId !== 'undefined' && locals.currentTemplateId) ? locals.currentTemplateId : '').trim();
+  const safeProviderOptions = Array.isArray(providerOptions) ? providerOptions : [];
+  const providerOptionsSourceToken = String((typeof locals.providerOptionsSource !== 'undefined' && locals.providerOptionsSource) ? locals.providerOptionsSource : 'org').toLowerCase();
 %>
 
 <div class="sections-page">
-  <div class="d-flex align-items-center justify-content-between mb-4">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
     <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Email Template' : 'Create Email Template' %></h1>
-    <% if (isEdit) { %>
-      <span class="badge bg-primary border font-monospace">ID: <%= row.id %></span>
-    <% } else { %>
-      <span class="badge bg-success border">New Template</span>
-    <% } %>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="/email-management/routing" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-signpost-split me-1"></i> Event Routing
+      </a>
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= row.id %></span>
+      <% } else { %>
+        <span class="badge bg-success border">New Template</span>
+      <% } %>
+    </div>
   </div>
+
+  <% if (systemMode) { %>
+    <div class="alert alert-info border mb-3">
+      <i class="bi bi-globe2 me-2"></i>
+      <strong>Platform default mode.</strong>
+      One active template per event at the SYSTEM level. Organizations without their own override inherit this route at send time.
+      <div class="small mt-2 mb-0">
+        <strong>Resolution order:</strong> org template → SYSTEM template → code fallback.
+        For one-off sends without a second stored route, callers may pass <code>templateId</code> to <code>sendByEvent()</code>.
+      </div>
+    </div>
+  <% } else { %>
+    <div class="alert alert-light border mb-3">
+      <i class="bi bi-building me-2 text-primary"></i>
+      <strong>Organization override.</strong>
+      One template per event in your organization. If none exists, the SYSTEM platform default is used at send time.
+      <div class="small mt-2 mb-0">
+        <strong>Resolution order:</strong> org template → SYSTEM template → code fallback.
+        For one-off sends without a second stored route, callers may pass <code>templateId</code> to <code>sendByEvent()</code>.
+      </div>
+    </div>
+  <% } %>
 
   <div class="form-container" style="width:100%;max-width:1400px;">
     <form id="emailManagementTemplateForm" action="<%= isEdit ? ('/email-management/templates/' + row.id) : '/email-management/templates/new' %>" method="POST">
       <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
 
-      <div class="row g-3">
-        <div class="col-lg-7">
+      <div class="d-flex justify-content-end mb-2">
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          id="emailTemplateShowGuideBtn"
+        >
+          <i class="bi bi-braces me-1"></i> Show Placeholder Guide
+        </button>
+      </div>
+
+      <div class="row g-3" id="emailTemplateFormRow">
+        <div class="col-lg-12" id="emailTemplateMainColumn">
           <div class="card border-0 shadow-sm">
             <div class="card-header bg-light fw-bold text-primary">
               <i class="bi bi-envelope-paper me-2"></i>Template Definition
@@ -32,7 +78,29 @@
             <div class="card-body">
               <div class="row g-3">
                 <div class="col-md-12">
-                  <label class="form-label fw-bold small text-muted text-uppercase">Email Event <span class="text-danger">*</span></label>
+                  <label class="form-label fw-bold small text-muted text-uppercase">Template Type</label>
+                  <div class="d-flex flex-wrap gap-3">
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="templateKind" id="emailTemplateKindEvent" value="event" <%= selectedTemplateKind === 'event' ? 'checked' : '' %> <%= isEdit ? 'disabled' : '' %>>
+                      <label class="form-check-label" for="emailTemplateKindEvent">Event-bound (automatic routing)</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="templateKind" id="emailTemplateKindGeneral" value="general" <%= selectedTemplateKind === 'general' ? 'checked' : '' %> <%= isEdit ? 'disabled' : '' %>>
+                      <label class="form-check-label" for="emailTemplateKindGeneral">General (manual selection)</label>
+                    </div>
+                  </div>
+                  <% if (isEdit) { %>
+                    <input type="hidden" name="templateKind" value="<%= selectedTemplateKind %>">
+                  <% } %>
+                  <div id="emailTemplateGeneralHelp" class="alert alert-light border small py-2 px-3 mt-2 <%= selectedTemplateKind === 'general' ? '' : 'd-none' %>">
+                    General templates are picked manually by other sections (for example School Settings). Use <code>{{BODY_CONTENT}}</code> where the section-composed message should appear. Any other placeholder names are supplied at send time by the section using this template; core does not define package-specific tokens.
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-3 mt-1<%= selectedTemplateKind === 'general' ? ' d-none' : '' %>" id="emailTemplateEventSection">
+                <div class="col-md-12">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Email Event <span class="text-danger email-template-event-required">*</span></label>
                   <div class="input-group">
                     <input
                       type="text"
@@ -46,28 +114,105 @@
                       <i class="bi bi-search me-1"></i> Pick
                     </button>
                   </div>
-                  <input type="hidden" name="eventKey" id="emailTemplateEventKeyHidden" value="<%= selectedEventKey %>" required>
+                  <input type="hidden" name="eventKey" id="emailTemplateEventKeyHidden" value="<%= selectedEventKey %>" <%= selectedTemplateKind === 'event' ? 'required' : '' %>>
                   <input type="hidden" name="packageName" id="emailTemplatePackageNameHidden" value="<%= selectedPackageName %>">
                   <input type="hidden" name="sectionId" id="emailTemplateSectionIdHidden" value="<%= selectedSection %>">
                   <input type="hidden" name="operationId" id="emailTemplateOperationIdHidden" value="<%= selectedOperation %>">
+                  <div id="emailTemplateEventAssignmentWarning" class="alert alert-warning border small py-2 px-3 mt-2 d-none" role="alert"></div>
                 </div>
                 <div class="col-md-12">
-                  <div class="small text-muted mb-1">Mapped Backend Route</div>
+                  <div class="small text-muted mb-1">Mapped Backend Route (read-only metadata)</div>
                   <div id="emailTemplateMappedRoute" class="font-monospace small">-</div>
+                </div>
+              </div>
+
+              <div class="row g-3 mt-1 <%= selectedTemplateKind === 'general' ? '' : 'd-none' %>" id="emailTemplateGeneralSection">
+                <div class="col-md-12">
+                  <label class="form-label fw-bold small text-muted text-uppercase" for="emailTemplateNameInput">Template Name <span class="text-danger">*</span></label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="emailTemplateNameInput"
+                    name="templateName"
+                    value="<%= selectedTemplateName %>"
+                    placeholder="e.g. School session notification wrapper"
+                    maxlength="180"
+                    <%= selectedTemplateKind === 'general' ? 'required' : '' %>
+                  >
+                  <div class="form-text">Shown in template lists and pickers when other sections choose this general template manually.</div>
+                </div>
+              </div>
+
+              <div class="row g-3 mt-1" id="emailTemplateProviderSection">
+                <div class="col-md-12">
+                  <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                    <label class="form-label fw-bold small text-muted text-uppercase mb-0" for="emailTemplateProviderSelect">Provider Profile (optional)</label>
+                    <button
+                      type="button"
+                      class="btn btn-link p-0 text-info lh-1"
+                      id="emailProviderProfileHelpBtn"
+                      data-bs-toggle="modal"
+                      data-bs-target="#emailProviderProfileHelpModal"
+                      aria-label="Provider profile help"
+                      title="Provider profile help"
+                    >
+                      <i class="bi bi-info-circle"></i>
+                    </button>
+                    <% if (providerOptionsSourceToken === 'system') { %>
+                      <span class="badge bg-info-subtle text-info border">Using SYSTEM provider defaults</span>
+                    <% } %>
+                  </div>
+                  <select class="form-select" id="emailTemplateProviderSelect" name="providerProfileId">
+                    <option value="">Platform default (env)</option>
+                    <% safeProviderOptions.forEach((profile) => { %>
+                      <option
+                        value="<%= profile.id %>"
+                        <%= String(profile.id || '') === selectedProviderProfileId ? 'selected' : '' %>
+                      ><%= profile.label || profile.id %><%= profile.isDefault ? ' (default)' : '' %></option>
+                    <% }) %>
+                  </select>
+                  <div class="form-text" id="emailTemplateProviderEmptyHelp">
+                    <% if (!safeProviderOptions.length) { %>
+                      No provider profiles found for your organization or SYSTEM defaults.
+                      <a href="/email-management/providers">Manage provider profiles</a>.
+                    <% } else { %>
+                      Select a provider profile to choose a verified sender domain below. Leave empty to use org/platform fallback.
+                    <% } %>
+                  </div>
+                  <div id="emailTemplateProviderDomainWarning" class="alert alert-warning border small py-2 px-3 mt-2 d-none" role="alert"></div>
                 </div>
               </div>
 
               <div class="mt-3">
                 <label class="form-label fw-bold small text-muted text-uppercase">Sender Template <span class="text-danger">*</span></label>
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-5">
+                    <label class="form-label small text-muted mb-1" for="emailTemplateSenderLocalPart">Local part</label>
+                    <input
+                      type="text"
+                      class="form-control font-monospace"
+                      id="emailTemplateSenderLocalPart"
+                      placeholder="noreply or info@domain.com"
+                      value=""
+                    >
+                  </div>
+                  <div class="col-md-1 text-center pb-2 d-none d-md-block">
+                    <span class="text-muted fw-bold">@</span>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small text-muted mb-1" for="emailTemplateSenderDomainSelect">Verified domain</label>
+                    <select class="form-select font-monospace" id="emailTemplateSenderDomainSelect" disabled>
+                      <option value="">Select provider first</option>
+                    </select>
+                  </div>
+                </div>
                 <input
-                  type="text"
-                  class="form-control font-monospace"
+                  type="hidden"
                   name="senderTemplate"
+                  id="emailTemplateSenderTemplateHidden"
                   value="<%= row.senderTemplate || '' %>"
-                  placeholder="info@domain.com"
-                  required
                 >
-                <div class="form-text">Resend supports custom sender via `from` when the address/domain is verified.</div>
+                <div class="form-text">Pick a provider profile, then choose one of its verified domains. The composed address is saved as the sender template.</div>
               </div>
 
               <div class="mt-3">
@@ -106,15 +251,24 @@
                   required
                   data-html-template-title="Body Template Editor"
                 ><%= row.bodyTemplate || '' %></textarea>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                  <button
-                    type="button"
-                    class="btn btn-outline-primary btn-sm"
-                    id="emailOpenBodyTemplateEditorBtn"
-                  >
-                    <i class="bi bi-code-square me-1"></i>Open Rich Editor
-                  </button>
-                  <span class="small text-muted">Edit in modal and save back to this field.</span>
+                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                  <div class="d-flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-sm"
+                      id="emailInsertPlaceholderBtn"
+                    >
+                      <i class="bi bi-braces me-1"></i>Insert Placeholder
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-primary btn-sm"
+                      id="emailOpenBodyTemplateEditorBtn"
+                    >
+                      <i class="bi bi-code-square me-1"></i>Open Rich Editor
+                    </button>
+                  </div>
+                  <span class="small text-muted">Use placeholders like <code>{{BODY_CONTENT}}</code> for runtime body injection.</span>
                 </div>
               </div>
 
@@ -126,12 +280,20 @@
           </div>
         </div>
 
-        <div class="col-lg-5">
+        <div class="col-lg-5 d-none" id="emailTemplateGuideColumn">
           <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-light fw-bold text-primary">
-              <i class="bi bi-braces me-2"></i>Placeholder Guide
+            <div class="card-header bg-light fw-bold text-primary d-flex align-items-center justify-content-between py-2 px-3">
+              <div><i class="bi bi-braces me-2"></i>Placeholder Guide</div>
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm px-2"
+                id="emailTemplatePlaceholderGuideCloseBtn"
+                aria-label="Hide placeholder guide"
+              >
+                <i class="bi bi-chevron-up"></i>
+              </button>
             </div>
-            <div class="card-body d-flex flex-column gap-3">
+            <div class="card-body d-flex flex-column gap-3" id="emailTemplatePlaceholderGuideBody">
               <div>
                 <div class="small text-muted mb-1">Selected Template Key</div>
                 <div class="font-monospace small" id="emailTemplateSelectedKey">-</div>
@@ -149,7 +311,8 @@
                 <div id="emailTemplateRequiredPlaceholders" class="d-flex flex-wrap gap-2"></div>
               </div>
               <div class="alert alert-light border small mb-0">
-                Placeholders are strict and case-sensitive (`{{PLACEHOLDER_KEY}}`). Unknown placeholders are rejected on save.
+                Placeholders are strict and case-sensitive (<code>{{PLACEHOLDER_KEY}}</code>). Unknown placeholders are rejected on save.
+                Select an event first, then use <strong>Insert Placeholder</strong> or click a chip below.
               </div>
             </div>
           </div>
@@ -163,6 +326,35 @@
         <a href="/email-management/templates" class="btn btn-filled btn-secondary btn-md" id="emailTemplateCancelBtn">Cancel</a>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="modal fade" id="emailProviderProfileHelpModal" tabindex="-1" aria-labelledby="emailProviderProfileHelpModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title" id="emailProviderProfileHelpModalLabel">
+          <i class="bi bi-key me-2 text-primary"></i>Provider Profile (optional)
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Assign a Resend provider profile to this template when you need credentials or sender settings that differ from your organization defaults.</p>
+        <p class="mb-2">After selecting a provider profile by name, choose a verified domain from that profile's allowlist for the sender address.</p>
+        <p class="mb-2"><strong>Fallback order at send time:</strong></p>
+        <ol class="small mb-3">
+          <li>Template <code>providerProfileId</code> (if set on this row)</li>
+          <li>Organization default provider profile</li>
+          <li>Platform environment fallback (<code>RESEND_*</code> settings)</li>
+        </ol>
+        <p class="mb-2">Custom sender addresses must use a domain listed in the selected profile's verified domains allowlist.</p>
+        <p class="mb-0">Leave this field empty to use the org/platform fallback chain automatically.</p>
+      </div>
+      <div class="modal-footer">
+        <a href="/email-management/providers" class="btn btn-outline-primary btn-sm">Manage Provider Profiles</a>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -187,9 +379,20 @@
     const packageNameHidden = document.getElementById('emailTemplatePackageNameHidden');
     const eventDisplayInput = document.getElementById('emailTemplateEventDisplay');
     const pickEventBtn = document.getElementById('emailTemplatePickEventBtn');
+    const providerSelect = document.getElementById('emailTemplateProviderSelect');
+    const senderLocalPartInput = document.getElementById('emailTemplateSenderLocalPart');
+    const senderDomainSelect = document.getElementById('emailTemplateSenderDomainSelect');
+    const senderTemplateHidden = document.getElementById('emailTemplateSenderTemplateHidden');
+    const providerDomainWarningNode = document.getElementById('emailTemplateProviderDomainWarning');
+    const mainColumnNode = document.getElementById('emailTemplateMainColumn');
+    const guideColumnNode = document.getElementById('emailTemplateGuideColumn');
+    const guideCloseBtn = document.getElementById('emailTemplatePlaceholderGuideCloseBtn');
+    const showGuideBtn = document.getElementById('emailTemplateShowGuideBtn');
     const sectionIdHidden = document.getElementById('emailTemplateSectionIdHidden');
     const operationIdHidden = document.getElementById('emailTemplateOperationIdHidden');
     const mappedRouteNode = document.getElementById('emailTemplateMappedRoute');
+    const assignmentWarningNode = document.getElementById('emailTemplateEventAssignmentWarning');
+    const saveBtn = document.getElementById('emailTemplateSaveBtn');
     const selectedKeyNode = document.getElementById('emailTemplateSelectedKey');
     const labelNode = document.getElementById('emailTemplateDefinitionLabel');
     const allowedNode = document.getElementById('emailTemplateAllowedPlaceholders');
@@ -207,11 +410,27 @@
       ? window.MediaManagerModal
       : null;
 
+    const selectedTemplateKind = <%- JSON.stringify(selectedTemplateKind || 'event') %>;
+    const generalTemplatePlaceholders = <%- JSON.stringify(['BODY_CONTENT']) %>;
+    const templateKindEventInput = document.getElementById('emailTemplateKindEvent');
+    const templateKindGeneralInput = document.getElementById('emailTemplateKindGeneral');
+    const templateGeneralHelpNode = document.getElementById('emailTemplateGeneralHelp');
+    const templateEventSectionNode = document.getElementById('emailTemplateEventSection');
+    const templateGeneralSectionNode = document.getElementById('emailTemplateGeneralSection');
+    const templateNameInput = document.getElementById('emailTemplateNameInput');
     const registryMap = <%- JSON.stringify(placeholderRegistryMap || {}) %>;
     const catalog = <%- JSON.stringify(safeEventCatalog || []) %>;
     const selectedEventKey = <%- JSON.stringify(selectedEventKey || '') %>;
+    const initialEventKeyFromQuery = <%- JSON.stringify(initialEventKeyFromQuery || '') %>;
+    const eventAssignments = <%- JSON.stringify(safeEventAssignments) %>;
+    const currentTemplateId = <%- JSON.stringify(currentTemplateId || '') %>;
+    const isEditMode = <%- JSON.stringify(isEdit) %>;
     const selectedSection = <%- JSON.stringify(selectedSection || '') %>;
     const selectedOperation = <%- JSON.stringify(selectedOperation || '') %>;
+    const providerOptions = <%- JSON.stringify(safeProviderOptions) %>;
+    const initialSenderTemplate = <%- JSON.stringify(row.senderTemplate || '') %>;
+    const selectedProviderProfileId = <%- JSON.stringify(selectedProviderProfileId || '') %>;
+    const guideStorageKey = 'emailTemplate.placeholderGuide.open';
     let imageInsertTargetEditorId = 'htmlTemplateEditorModalEditor';
     const savedImageLibraryFolderCache = new Map();
     const savedImageLibraryInflightByFolder = new Map();
@@ -494,7 +713,69 @@
       return catalog.find((row) => normalizeToken(row?.eventKey) === token) || null;
     }
 
-    function setSelectedEvent(eventRow) {
+    function findEventAssignment(eventKey) {
+      const token = normalizeToken(eventKey);
+      if (!token || !eventAssignments || typeof eventAssignments !== 'object') return null;
+      return eventAssignments[token] || null;
+    }
+
+    function hasConflictingEventAssignment(eventKey) {
+      const assignment = findEventAssignment(eventKey);
+      if (!assignment?.id) return false;
+      return String(assignment.id).trim() !== String(currentTemplateId || '').trim();
+    }
+
+    function updateSaveButtonState() {
+      if (!saveBtn) return;
+      if (isEditMode || getActiveTemplateKind() === 'general') {
+        saveBtn.disabled = false;
+        saveBtn.title = '';
+        return;
+      }
+      const conflict = hasConflictingEventAssignment(eventKeyHidden?.value || '');
+      saveBtn.disabled = conflict;
+      saveBtn.title = conflict
+        ? 'This event already has a template in your organization. Edit the existing template instead.'
+        : '';
+    }
+
+    function updateEventAssignmentWarning(eventKey, options = {}) {
+      if (!assignmentWarningNode) return;
+      const assignment = findEventAssignment(eventKey);
+      const conflict = hasConflictingEventAssignment(eventKey);
+      if (!conflict || !assignment?.id) {
+        assignmentWarningNode.classList.add('d-none');
+        assignmentWarningNode.innerHTML = '';
+        updateSaveButtonState();
+        return;
+      }
+
+      const editUrl = '/email-management/templates/' + encodeURIComponent(assignment.id);
+      assignmentWarningNode.classList.remove('d-none');
+      assignmentWarningNode.innerHTML = [
+        '<i class="bi bi-exclamation-triangle-fill me-1"></i>',
+        '<strong>Event already assigned.</strong> ',
+        'This organization already has template ',
+        '<span class="font-monospace">' + escapeAttr(assignment.id) + '</span>',
+        assignment.subjectTemplate ? (' (“' + escapeAttr(assignment.subjectTemplate) + '”)') : '',
+        '. ',
+        '<a href="' + editUrl + '">Edit existing template</a>',
+        ' or choose a different event.'
+      ].join('');
+
+      updateSaveButtonState();
+
+      if (options.showModal === true) {
+        showModalMessage({
+          title: 'Event Already Assigned',
+          icon: 'warning',
+          message: 'This organization already has a template for the selected event (ID: ' + assignment.id + '). Edit the existing template or choose a different event.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+      }
+    }
+
+    function setSelectedEvent(eventRow, options = {}) {
       const key = normalizeToken(eventRow?.eventKey || eventRow?.id || '');
       const fromCatalog = findEventByKey(key);
       const selected = fromCatalog || eventRow || null;
@@ -509,9 +790,70 @@
       if (sectionIdHidden) sectionIdHidden.value = sectionId;
       if (operationIdHidden) operationIdHidden.value = operationId;
       renderPlaceholderHelp();
+      updateEventAssignmentWarning(key, { showModal: options.showModal === true });
+    }
+
+    function getActiveTemplateKind() {
+      if (templateKindGeneralInput?.checked) return 'general';
+      if (templateKindEventInput?.checked) return 'event';
+      return normalizeToken(selectedTemplateKind).toLowerCase() === 'GENERAL' ? 'general' : 'event';
+    }
+
+    function syncTemplateKindUi() {
+      const isGeneral = getActiveTemplateKind() === 'general';
+      if (templateEventSectionNode) {
+        templateEventSectionNode.classList.toggle('d-none', isGeneral);
+      }
+      if (templateGeneralSectionNode) {
+        templateGeneralSectionNode.classList.toggle('d-none', !isGeneral);
+      }
+      if (templateGeneralHelpNode) {
+        templateGeneralHelpNode.classList.toggle('d-none', !isGeneral);
+      }
+      if (templateNameInput) {
+        if (isGeneral) {
+          templateNameInput.setAttribute('required', 'required');
+        } else {
+          templateNameInput.removeAttribute('required');
+          templateNameInput.value = '';
+        }
+      }
+      if (eventKeyHidden) {
+        if (isGeneral) {
+          eventKeyHidden.removeAttribute('required');
+          eventKeyHidden.value = '';
+        } else {
+          eventKeyHidden.setAttribute('required', 'required');
+        }
+      }
+      if (isGeneral) {
+        if (packageNameHidden) packageNameHidden.value = 'CORE';
+        if (sectionIdHidden) sectionIdHidden.value = '';
+        if (operationIdHidden) operationIdHidden.value = '';
+        if (eventDisplayInput) eventDisplayInput.value = '';
+        updateEventAssignmentWarning('');
+      }
+      renderPlaceholderHelp();
+      updateSaveButtonState();
+    }
+
+    function renderGeneralPlaceholderHelp() {
+      selectedKeyNode.textContent = 'GENERAL';
+      const templateName = cleanText(templateNameInput?.value || '');
+      labelNode.textContent = templateName || 'Core general template slot';
+      mappedRouteNode.textContent = 'Manual selection (no event route)';
+      clearChildren(allowedNode);
+      clearChildren(requiredNode);
+      allowedNode.appendChild(createTag('{{BODY_CONTENT}}', 'badge bg-primary-subtle text-primary border', 'BODY_CONTENT'));
+      allowedNode.appendChild(createTag('Caller-supplied tokens', 'badge bg-light text-muted border'));
+      requiredNode.appendChild(createTag('None at save time', 'badge bg-light text-muted border'));
     }
 
     function renderPlaceholderHelp() {
+      if (getActiveTemplateKind() === 'general') {
+        renderGeneralPlaceholderHelp();
+        return;
+      }
       const key = normalizeToken(eventKeyHidden?.value || '');
       const eventRow = findEventByKey(key);
       const sectionId = normalizeToken(eventRow?.sectionId || sectionIdHidden?.value || '');
@@ -545,12 +887,99 @@
     }
 
     function getCurrentPlaceholderTokens() {
+      if (getActiveTemplateKind() === 'general') {
+        return (Array.isArray(generalTemplatePlaceholders) ? generalTemplatePlaceholders : [])
+          .map((token) => String(token || '').trim())
+          .filter(Boolean);
+      }
       const key = normalizeToken(eventKeyHidden?.value || '');
       const def = key ? registryMap[key] : null;
       if (!def || !Array.isArray(def.allowed)) return [];
       return def.allowed
         .map((token) => String(token || '').trim())
         .filter((token) => token && token.toUpperCase() !== 'NONE');
+    }
+
+    function buildGlobalPlaceholderPickerItems() {
+      const byKey = new Map();
+      Object.keys(registryMap || {}).forEach((mapKey) => {
+        const def = registryMap[mapKey];
+        if (!def) return;
+        const eventKey = normalizeToken(def.eventKey || mapKey);
+        const eventLabel = String(def.label || eventKey || '').trim();
+        const allowed = Array.isArray(def.allowed) ? def.allowed : [];
+        allowed.forEach((token) => {
+          const placeholderKey = normalizeToken(token);
+          if (!placeholderKey || placeholderKey === 'NONE') return;
+          let entry = byKey.get(placeholderKey);
+          if (!entry) {
+            entry = {
+              id: placeholderKey,
+              key: placeholderKey,
+              name: '{{' + placeholderKey + '}}',
+              eventKeys: [],
+              eventLabels: []
+            };
+            byKey.set(placeholderKey, entry);
+          }
+          if (eventKey && entry.eventKeys.indexOf(eventKey) === -1) {
+            entry.eventKeys.push(eventKey);
+            entry.eventLabels.push(eventLabel || eventKey);
+          }
+        });
+      });
+      return Array.from(byKey.values())
+        .map((entry) => ({
+          ...entry,
+          description: entry.eventLabels.length
+            ? 'Used in: ' + entry.eventLabels.join(', ')
+            : ''
+        }))
+        .sort((a, b) => a.key.localeCompare(b.key));
+    }
+
+    function openPlaceholderPicker() {
+      const localItems = buildGlobalPlaceholderPickerItems();
+      if (!localItems.length) {
+        showModalMessage({
+          title: 'No Placeholders',
+          icon: 'warning',
+          message: 'No placeholders are available for your account.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+      if (!window.GenericPicker || typeof window.GenericPicker.open !== 'function') return;
+      const pickerBaseConfig = {
+        title: 'Insert Placeholder',
+        icon: 'bi-braces',
+        sourceMode: 'local',
+        localItems,
+        placeholder: 'Search placeholders (2+ chars, or type --- for all)',
+        searchFields: 'id,key,name,description,eventKeys,eventLabels',
+        limit: 100,
+        onSelect: (item) => insertPlaceholderToken(item?.key || item?.id || '')
+      };
+      const normalizedPickerConfig = (window.GenericPickerPresets && typeof window.GenericPickerPresets.normalizeConfig === 'function')
+        ? window.GenericPickerPresets.normalizeConfig(pickerBaseConfig)
+        : pickerBaseConfig;
+      window.GenericPicker.open(normalizedPickerConfig);
+    }
+
+    function ensureRichEditorPlaceholderPicker() {
+      const modalEl = document.getElementById('htmlTemplateEditorModal');
+      if (!modalEl) return;
+      const wrap = modalEl.querySelector('.js-html-template-modal-tokens-wrap');
+      if (!wrap || wrap.querySelector('.js-email-placeholder-picker-btn')) return;
+      const pickerBtn = document.createElement('button');
+      pickerBtn.type = 'button';
+      pickerBtn.className = 'btn btn-sm btn-outline-primary js-email-placeholder-picker-btn mt-2';
+      pickerBtn.innerHTML = '<i class="bi bi-braces me-1"></i>Insert Placeholder';
+      pickerBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        openPlaceholderPicker();
+      });
+      wrap.appendChild(pickerBtn);
     }
 
     function openBodyTemplateModalEditor() {
@@ -561,17 +990,199 @@
         title: 'Body Template Editor',
         tokens: getCurrentPlaceholderTokens()
       });
+      ensureRichEditorPlaceholderPicker();
+    }
+
+    function parseSenderTemplateParts(senderTemplate = '') {
+      const token = cleanText(senderTemplate);
+      if (!token) return { localPart: '', domain: '' };
+      const angleMatch = token.match(/^(.+)<[^@]+@([^>]+)>$/i);
+      if (angleMatch) {
+        return {
+          localPart: cleanText(angleMatch[1]).replace(/^["'\s]+|["'\s]+$/g, ''),
+          domain: cleanText(angleMatch[2]).toLowerCase()
+        };
+      }
+      const atIndex = token.lastIndexOf('@');
+      if (atIndex < 0) return { localPart: token, domain: '' };
+      return {
+        localPart: cleanText(token.slice(0, atIndex)),
+        domain: cleanText(token.slice(atIndex + 1)).toLowerCase()
+      };
+    }
+
+    function composeSenderTemplate(localPart = '', domain = '') {
+      const local = cleanText(localPart);
+      const domainToken = cleanText(domain).toLowerCase().replace(/^@+/, '');
+      if (!local && !domainToken) return '';
+      if (!domainToken) return local;
+      if (!local) return `noreply@${domainToken}`;
+      return `${local}@${domainToken}`;
+    }
+
+    function findProviderOption(profileId = '') {
+      const token = cleanText(profileId);
+      if (!token) return null;
+      return (Array.isArray(providerOptions) ? providerOptions : []).find((row) => cleanText(row?.id) === token) || null;
+    }
+
+    function updateProviderDomainWarning(message = '') {
+      if (!providerDomainWarningNode) return;
+      const text = cleanText(message);
+      if (!text) {
+        providerDomainWarningNode.classList.add('d-none');
+        providerDomainWarningNode.textContent = '';
+        return;
+      }
+      providerDomainWarningNode.classList.remove('d-none');
+      providerDomainWarningNode.textContent = text;
+    }
+
+    function populateSenderDomainOptions(profile = null, selectedDomain = '') {
+      if (!senderDomainSelect) return;
+      const domains = Array.isArray(profile?.verifiedDomains) ? profile.verifiedDomains : [];
+      senderDomainSelect.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = profile ? 'Select verified domain' : 'Select provider first';
+      senderDomainSelect.appendChild(placeholder);
+      domains.forEach((domain) => {
+        const option = document.createElement('option');
+        option.value = domain;
+        option.textContent = domain;
+        if (cleanText(selectedDomain).toLowerCase() === cleanText(domain).toLowerCase()) {
+          option.selected = true;
+        }
+        senderDomainSelect.appendChild(option);
+      });
+      senderDomainSelect.disabled = !profile || !domains.length;
+      if (profile && !domains.length) {
+        updateProviderDomainWarning('Selected provider profile has no verified domains configured.');
+      } else {
+        updateProviderDomainWarning('');
+      }
+    }
+
+    function syncSenderTemplateHidden() {
+      if (!senderTemplateHidden) return;
+      const providerId = cleanText(providerSelect?.value || '');
+      const local = cleanText(senderLocalPartInput?.value || '');
+      const domain = cleanText(senderDomainSelect?.value || '');
+      if (!providerId) {
+        senderTemplateHidden.value = local;
+        return;
+      }
+      senderTemplateHidden.value = composeSenderTemplate(local, domain);
+    }
+
+    function applyProviderSelection(profileId = '', options = {}) {
+      const token = cleanText(profileId);
+      const profile = findProviderOption(token);
+      if (providerSelect && providerSelect.value !== token) {
+        providerSelect.value = token;
+      }
+      const rawSender = options.senderTemplate || initialSenderTemplate || senderTemplateHidden?.value || '';
+      const parsed = parseSenderTemplateParts(rawSender);
+      if (!profile) {
+        populateSenderDomainOptions(null, '');
+        if (senderLocalPartInput) {
+          senderLocalPartInput.value = cleanText(rawSender);
+        }
+        updateProviderDomainWarning('');
+        syncSenderTemplateHidden();
+        return;
+      }
+      populateSenderDomainOptions(profile, options.domain || parsed.domain);
+      if (senderLocalPartInput) {
+        senderLocalPartInput.value = options.localPart !== undefined
+          ? options.localPart
+          : (parsed.localPart || 'noreply');
+      }
+      syncSenderTemplateHidden();
+    }
+
+    function setGuideOpen(isOpen, options = {}) {
+      const open = Boolean(isOpen);
+      if (mainColumnNode) {
+        mainColumnNode.classList.toggle('col-lg-12', !open);
+        mainColumnNode.classList.toggle('col-lg-7', open);
+      }
+      if (guideColumnNode) {
+        guideColumnNode.classList.toggle('d-none', !open);
+      }
+      if (showGuideBtn) {
+        showGuideBtn.classList.toggle('d-none', open);
+      }
+      if (!options.skipStorage) {
+        try {
+          sessionStorage.setItem(guideStorageKey, open ? '1' : '0');
+        } catch (_) {}
+      }
+    }
+
+    function initPlaceholderGuideLayout() {
+      let initialOpen = false;
+      try {
+        initialOpen = sessionStorage.getItem(guideStorageKey) === '1';
+      } catch (_) {}
+      setGuideOpen(initialOpen, { skipStorage: true });
+      if (showGuideBtn) {
+        showGuideBtn.addEventListener('click', () => setGuideOpen(true));
+      }
+      if (guideCloseBtn) {
+        guideCloseBtn.addEventListener('click', () => setGuideOpen(false));
+      }
+    }
+
+    if (providerSelect) {
+      providerSelect.addEventListener('change', () => {
+        applyProviderSelection(providerSelect.value, {
+          localPart: senderLocalPartInput?.value || '',
+          domain: ''
+        });
+      });
+    }
+    if (senderLocalPartInput) {
+      senderLocalPartInput.addEventListener('input', syncSenderTemplateHidden);
+    }
+    if (senderDomainSelect) {
+      senderDomainSelect.addEventListener('change', syncSenderTemplateHidden);
+    }
+
+    applyProviderSelection(selectedProviderProfileId || providerSelect?.value || '');
+    initPlaceholderGuideLayout();
+
+    function validateSenderBeforeSubmit() {
+      const providerId = cleanText(providerSelect?.value || '');
+      const senderValue = cleanText(senderTemplateHidden?.value || '');
+      if (!senderValue) {
+        return 'Sender template is required.';
+      }
+      if (!providerId) return '';
+      const profile = findProviderOption(providerId);
+      if (!profile) return 'Selected provider profile is not available.';
+      const domains = Array.isArray(profile.verifiedDomains) ? profile.verifiedDomains : [];
+      if (!domains.length) return 'Selected provider profile has no verified domains configured.';
+      const domain = parseSenderTemplateParts(senderValue).domain;
+      if (!domain) return 'Select a verified sender domain for the chosen provider profile.';
+      if (!domains.map((item) => cleanText(item).toLowerCase()).includes(domain)) {
+        return `Sender domain '${domain}' is not in the selected provider profile allowlist.`;
+      }
+      return '';
     }
 
     if (pickEventBtn) {
       pickEventBtn.addEventListener('click', () => {
         if (!window.GenericPicker || typeof window.GenericPicker.open !== 'function') return;
+        const excludeQuery = currentTemplateId
+          ? ('&excludeTemplateId=' + encodeURIComponent(currentTemplateId))
+          : '';
         const pickerBaseConfig = {
           title: 'Select Email Event',
           icon: 'bi-envelope-paper',
-          apiEndpoint: '/email-management/templates/picker/events',
+          apiEndpoint: '/email-management/templates/picker/events' + excludeQuery,
           placeholder: 'Search supported email events (type --- to show all)...',
-          searchFields: 'id,name,label,sectionId,operationId,description',
+          searchFields: 'id,name,label,sectionId,operationId,description,assigned',
           limit: 20,
           onSelect: (item) => {
             setSelectedEvent({
@@ -579,7 +1190,7 @@
               label: String(item?.label || item?.name || item?.id || '').trim(),
               sectionId: normalizeToken(item?.sectionId || ''),
               operationId: normalizeToken(item?.operationId || '')
-            });
+            }, { showModal: item?.assigned === true });
           }
         };
         const normalizedPickerConfig = (window.GenericPickerPresets && typeof window.GenericPickerPresets.normalizeConfig === 'function')
@@ -589,7 +1200,18 @@
       });
     }
 
+    templateKindEventInput?.addEventListener('change', syncTemplateKindUi);
+    templateKindGeneralInput?.addEventListener('change', syncTemplateKindUi);
+    templateNameInput?.addEventListener('input', () => {
+      renderPlaceholderHelp();
+      updateSaveButtonState();
+    });
+    templateNameInput?.addEventListener('change', updateSaveButtonState);
+
     let initialEvent = selectedEventKey ? findEventByKey(selectedEventKey) : null;
+    if (!initialEvent && initialEventKeyFromQuery) {
+      initialEvent = findEventByKey(initialEventKeyFromQuery);
+    }
     if (!initialEvent && selectedSection && selectedOperation) {
       const fallback = catalog.find((event) => (
         normalizeToken(event?.sectionId) === normalizeToken(selectedSection)
@@ -597,11 +1219,14 @@
       ));
       if (fallback) initialEvent = fallback;
     }
-    if (initialEvent) {
+    if (initialEvent && getActiveTemplateKind() !== 'general') {
       setSelectedEvent(initialEvent);
+    } else if (getActiveTemplateKind() === 'general') {
+      syncTemplateKindUi();
     } else {
       if (eventDisplayInput) eventDisplayInput.value = '';
       renderPlaceholderHelp();
+      updateEventAssignmentWarning('');
     }
 
     const openBodyEditorBtn = document.getElementById('emailOpenBodyTemplateEditorBtn');
@@ -610,6 +1235,19 @@
         event.preventDefault();
         openBodyTemplateModalEditor();
       });
+    }
+
+    const insertPlaceholderBtn = document.getElementById('emailInsertPlaceholderBtn');
+    if (insertPlaceholderBtn) {
+      insertPlaceholderBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        openPlaceholderPicker();
+      });
+    }
+
+    const richEditorModal = document.getElementById('htmlTemplateEditorModal');
+    if (richEditorModal) {
+      richEditorModal.addEventListener('shown.bs.modal', () => ensureRichEditorPlaceholderPicker());
     }
 
     if (imageInsertFromUrlBtn) {
@@ -654,7 +1292,6 @@
     };
 
     const form = document.getElementById('emailManagementTemplateForm');
-    const saveBtn = document.getElementById('emailTemplateSaveBtn');
     const cancelBtn = document.getElementById('emailTemplateCancelBtn');
     let submitting = false;
 
@@ -674,6 +1311,35 @@
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (submitting) return;
+      if (!isEditMode && getActiveTemplateKind() !== 'general' && hasConflictingEventAssignment(eventKeyHidden?.value || '')) {
+        await showModalMessage({
+          title: 'Event Already Assigned',
+          icon: 'warning',
+          message: 'This organization already has a template for the selected event. Edit the existing template or choose a different event.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+      if (getActiveTemplateKind() === 'general' && !cleanText(templateNameInput?.value || '')) {
+        await showModalMessage({
+          title: 'Template Name Required',
+          icon: 'warning',
+          message: 'Enter a template name for general templates.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+      const senderValidationMessage = validateSenderBeforeSubmit();
+      if (senderValidationMessage) {
+        await showModalMessage({
+          title: 'Sender Configuration Required',
+          icon: 'warning',
+          message: senderValidationMessage,
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+      syncSenderTemplateHidden();
       submitting = true;
 
       try {
