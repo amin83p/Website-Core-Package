@@ -10,6 +10,7 @@ const {
   SECTIONS,
   OPERATIONS
 } = require('./schoolRouteDependencies');
+const { requireBookCoveringOperationAny } = require('./bookCoveringReportRouteGuards');
 
 router.use(requireAuth);
 
@@ -19,23 +20,26 @@ const mutationActionState = {
   allowInactiveTokenFallback: true
 };
 
+const readOperations = [OPERATIONS.READ, OPERATIONS.READ_ALL];
+const viewOperations = [OPERATIONS.READ, OPERATIONS.READ_ALL, OPERATIONS.UPDATE];
+
 router.get('/api/assigned-books/:classId',
-  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL),
+  requireBookCoveringOperationAny(viewOperations),
   trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.apiAssignedBooks);
 
 router.get('/api/book-toc/:bookId',
-  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL),
+  requireBookCoveringOperationAny(viewOperations),
   trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.apiBookToc);
 
 router.get('/api/resolve-period',
-  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL),
+  requireBookCoveringOperationAny(viewOperations),
   trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.apiResolvePeriod);
 
 router.get('/',
-  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL),
+  requireBookCoveringOperationAny(readOperations),
   trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL),
   ctrl.listReports);
 
@@ -50,8 +54,8 @@ router.post('/new',
   ctrl.saveReport);
 
 router.get('/edit/:id',
-  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.UPDATE),
+  requireBookCoveringOperationAny(viewOperations),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL),
   ctrl.showEditForm);
 
 router.post('/edit/:id',

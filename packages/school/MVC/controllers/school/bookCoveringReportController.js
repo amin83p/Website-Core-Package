@@ -3,6 +3,7 @@
 const schoolDataService = require('../../services/school/schoolDataService');
 const bookAssignmentService = require('../../services/school/bookAssignmentService');
 const bookCoveringReportService = require('../../services/school/bookCoveringReportService');
+const bookCoveringAccessService = require('../../services/school/bookCoveringAccessService');
 const bookCoveringPeriodService = require('../../services/school/bookCoveringPeriodService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -23,8 +24,6 @@ const {
   PAGE_COVERAGE_MODES,
   USAGE_FREQUENCIES
 } = require('../../models/school/bookCoveringReportModel');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
-const accessService = requireCoreModule('MVC/services/security/index');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 const PERIOD_TYPE_HELP = {
@@ -120,24 +119,20 @@ function buildSavePayload(reqBody, activeOrgId, userId, existing = null) {
 exports.listReports = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
-    const canCreate = await canCreateOrgScopedItem(req.user, { scopeLabel: 'book covering reports' });
-    const canDelete = Boolean(
-      (await accessService.evaluateAccess({
-        user: req.user,
-        sectionId: SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING,
-        operationId: OPERATIONS.DELETE,
-        ipAddress: req.ip
-      }).catch(() => null))?.allowed
-    );
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+    const capabilities = await bookCoveringAccessService.resolveListCapabilities(req);
+    const canCreate = capabilities.canCreate && await canCreateOrgScopedItem(req.user, { scopeLabel: 'book covering reports' });
+    const canUpdate = capabilities.canUpdate;
+    const canDelete = capabilities.canDelete;
     const query = await buildDataServiceQuery(req.query, { allowedExactKeys: ['classId', 'status', 'periodType'] });
     const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
     if (query.q === searchDefaultKeyword) query.q = '';
 
-    let rows = await bookCoveringReportService.listReportsForOrg(orgId, req.user);
+    let rows = await bookCoveringReportService.listReportsForOrg(orgId, req.user, accessContext);
     if (query.classId) rows = rows.filter((row) => String(row.classId) === String(query.classId));
     if (query.status) rows = rows.filter((row) => String(row.status) === String(query.status));
     if (query.periodType) rows = rows.filter((row) => String(row.periodType) === String(query.periodType));
-    rows = await bookCoveringReportService.enrichReports(rows, req.user);
+    rows = await bookCoveringReportService.enrichReports(rows, req.user, accessContext);
     rows = rows.sort((a, b) => String(b.periodStartDate || '').localeCompare(String(a.periodStartDate || '')));
 
     const searchableFields = ['id', 'classTitle', 'teacherName', 'periodType', 'status'];
@@ -152,6 +147,7 @@ exports.listReports = async (req, res) => {
       newUrl: 'school/library/book-covering',
       newLabel: canCreate ? 'New Report' : null,
       canCreate,
+      canUpdate,
       canDelete,
       searchableFields,
       includeModal: true,
@@ -171,13 +167,14 @@ exports.listReports = async (req, res) => {
 exports.showCreateForm = async (req, res) => {
   try {
     await assertCreateOrgContextOrThrow(req.user, { scopeLabel: 'book covering reports' });
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
     const prefillClassId = String(req.query?.classId || '').trim();
     const anchorDate = String(req.query?.anchorDate || '').trim();
     let classTitle = '';
     let assignedBooks = [];
     if (prefillClassId) {
       const orgId = getActiveOrgIdOrThrow(req.user);
-      const classRow = await schoolDataService.getDataById('classes', prefillClassId, req.user);
+      const classRow = await schoolDataService.getDataById('classes', prefillClassId, req.user, accessContext);
       if (classRow && idsEqual(classRow.orgId, orgId)) {
         classTitle = classRow.title || prefillClassId;
         assignedBooks = await bookAssignmentService.expandAssignedBooksForClass(
@@ -208,10 +205,13 @@ exports.showCreateForm = async (req, res) => {
 exports.showEditForm = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
-    const row = await schoolDataService.getDataById('bookCoveringReports', req.params.id, req.user);
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+    const capabilities = await bookCoveringAccessService.resolveListCapabilities(req);
+    const row = await schoolDataService.getDataById('bookCoveringReports', req.params.id, req.user, accessContext);
     if (!row) throw new Error('Book covering report not found.');
     assertOrgAccess(row, orgId);
-    const classRow = await schoolDataService.getDataById('classes', row.classId, req.user);
+    bookCoveringAccessService.assertCanReadReport(req, row, accessContext, capabilities);
+    const classRow = await schoolDataService.getDataById('classes', row.classId, req.user, accessContext);
     const assignedBooks = await bookAssignmentService.expandAssignedBooksForClass(
       row.classId,
       orgId,
@@ -224,7 +224,8 @@ exports.showEditForm = async (req, res) => {
       return { ...entry, bookTitle: book.bookTitle || entry.bookId, bookTableOfContents: book.bookTableOfContents || [] };
     });
     const sessionSummary = await resolveSessionSummaryForReport(row.classId, row.sessionId, req.user);
-    const reportReadOnly = await bookCoveringReportService.isReportSessionLocked(row, req.user);
+    const sessionLocked = await bookCoveringReportService.isReportSessionLocked(row, req.user);
+    const reportReadOnly = !capabilities.canUpdate || sessionLocked;
     return res.render('school/library/bookCoveringReportForm', buildFormViewLocals({
       title: 'Book Covering Report',
       reportItem: { ...row, entries },
@@ -234,32 +235,48 @@ exports.showEditForm = async (req, res) => {
       sessionSummary,
       anchorDate: row.periodStartDate,
       reportReadOnly,
+      canUpdate: capabilities.canUpdate,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
     }));
   } catch (error) {
-    return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    const statusCode = error?.statusCode || 500;
+    return res.status(statusCode).render('error', { title: 'Error', message: error.message, user: req.user });
   }
 };
 
 exports.saveReport = async (req, res) => {
   try {
     const id = String(req.params?.id || '').trim();
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+    const capabilities = await bookCoveringAccessService.resolveListCapabilities(req);
     const orgId = id
       ? getActiveOrgIdOrThrow(req.user)
       : await assertCreateOrgContextOrThrow(req.user, { scopeLabel: 'book covering reports' });
-    const existing = id ? await schoolDataService.getDataById('bookCoveringReports', id, req.user) : null;
-    if (existing) assertOrgAccess(existing, orgId);
+    const existing = id
+      ? await schoolDataService.getDataById('bookCoveringReports', id, req.user, accessContext)
+      : null;
+    if (existing) {
+      assertOrgAccess(existing, orgId);
+      bookCoveringAccessService.assertCanMutateReport(req, existing, accessContext, capabilities);
+    }
     const payload = buildSavePayload(req.body, orgId, req.user?.id || 'SYSTEM', existing);
+    const scopedTeacherId = bookCoveringAccessService.resolveScopedTeacherIdForCreate(req, accessContext);
+    if (scopedTeacherId) {
+      payload.teacherId = scopedTeacherId;
+    }
+    if (!id) {
+      bookCoveringAccessService.assertCanCreateForTeacher(req, payload.teacherId, accessContext);
+    }
     const submitAction = String(req.body?.submitAction || '').trim() === 'submit';
     if (submitAction) payload.status = REPORT_STATUSES.SUBMITTED;
 
     let report;
     if (id) {
-      report = await bookCoveringReportService.updateReport(id, payload, req.user);
+      report = await bookCoveringReportService.updateReport(id, payload, req.user, accessContext);
     } else {
-      report = await bookCoveringReportService.createReport(payload, req.user);
+      report = await bookCoveringReportService.createReport(payload, req.user, accessContext);
     }
 
     const response = {
@@ -270,13 +287,15 @@ exports.saveReport = async (req, res) => {
     if (isAjax(req)) return res.json({ ...response, report });
     return res.redirect(response.redirectTo);
   } catch (error) {
-    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
-    return res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+    const statusCode = error?.statusCode || 400;
+    if (isAjax(req)) return res.status(statusCode).json({ status: 'error', message: error.message });
+    return res.status(statusCode).render('error', { title: 'Error', message: error.message, user: req.user });
   }
 };
 
 exports.apiAssignedBooks = async (req, res) => {
   try {
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
     const orgId = getActiveOrgIdOrThrow(req.user);
     const classId = String(req.params.classId || '').trim();
     const enriched = await bookAssignmentService.expandAssignedBooksForClass(
@@ -293,9 +312,10 @@ exports.apiAssignedBooks = async (req, res) => {
 
 exports.apiBookToc = async (req, res) => {
   try {
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
     const orgId = getActiveOrgIdOrThrow(req.user);
     const bookId = String(req.params.bookId || '').trim();
-    const book = await schoolDataService.getDataById('books', bookId, req.user);
+    const book = await schoolDataService.getDataById('books', bookId, req.user, accessContext);
     if (!book || !idsEqual(book.orgId, orgId)) throw new Error('Book not found.');
     return res.json({
       status: 'success',
@@ -311,12 +331,13 @@ exports.apiBookToc = async (req, res) => {
 
 exports.apiResolvePeriod = async (req, res) => {
   try {
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
     const periodType = String(req.query?.periodType || '').trim();
     const anchorDate = String(req.query?.anchorDate || '').trim();
     const classId = String(req.query?.classId || '').trim();
     let cycleStartDate = '';
     if (classId) {
-      const classRow = await schoolDataService.getDataById('classes', classId, req.user);
+      const classRow = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
       cycleStartDate = classRow?.cycleStartDate || '';
     }
     const window = bookCoveringPeriodService.resolvePeriodWindow({ periodType, anchorDate, cycleStartDate });
@@ -329,10 +350,13 @@ exports.apiResolvePeriod = async (req, res) => {
 exports.deleteReport = async (req, res) => {
   try {
     const orgId = getActiveOrgIdOrThrow(req.user);
-    const row = await schoolDataService.getDataById('bookCoveringReports', req.params.id, req.user);
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+    const capabilities = await bookCoveringAccessService.resolveListCapabilities(req);
+    const row = await schoolDataService.getDataById('bookCoveringReports', req.params.id, req.user, accessContext);
     if (!row) throw new Error('Book covering report not found.');
     assertOrgAccess(row, orgId);
-    await bookCoveringReportService.deleteReport(req.params.id, req.user);
+    bookCoveringAccessService.assertCanDeleteReport(req, row, accessContext, capabilities);
+    await bookCoveringReportService.deleteReport(req.params.id, req.user, accessContext);
     const response = {
       status: 'success',
       message: 'Book covering report deleted successfully.',

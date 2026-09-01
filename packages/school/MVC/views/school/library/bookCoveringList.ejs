@@ -53,7 +53,7 @@
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
-                <a href="/school/library/book-covering/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i><%= item.status === 'submitted' ? 'View' : 'Edit' %></a>
+                <a href="/school/library/book-covering/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i><%= (item.status === 'submitted' || !canUpdate) ? 'View' : 'Edit' %></a>
                 <% if (canDelete) { %>
                 <a href="/school/library/book-covering/delete/<%= item.id %>" class="btn btn-outline-danger btn-sm" data-confirm-delete="true"><i class="bi bi-trash me-2"></i>Delete</a>
                 <% } %>

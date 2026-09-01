@@ -310,3 +310,142 @@ test('book covering list uses row actions menu with delete', () => {
   assert.match(view, /book-covering\/delete/);
   assert.match(view, /canDelete/);
 });
+
+test('bookCoveringAccessService centralizes scope resolution and assertions', () => {
+  const serviceSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/services/school/bookCoveringAccessService.js'),
+    'utf8'
+  );
+  assert.match(serviceSource, /buildRouteAccessContext/);
+  assert.match(serviceSource, /resolveAccessFromRequest/);
+  assert.match(serviceSource, /resolveListCapabilities/);
+  assert.match(serviceSource, /assertCanReadReport/);
+  assert.match(serviceSource, /assertCanMutateReport/);
+  assert.match(serviceSource, /assertCanCreateForTeacher/);
+  assert.match(serviceSource, /buildSchoolListScope/);
+  assert.match(serviceSource, /SCHOOL_LIBRARY_BOOK_COVERING/);
+});
+
+test('book covering controller and service pass route access context into data reads', () => {
+  const controllerSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/controllers/school/bookCoveringReportController.js'),
+    'utf8'
+  );
+  const serviceSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/services/school/bookCoveringReportService.js'),
+    'utf8'
+  );
+  const classControllerSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/controllers/school/classController.js'),
+    'utf8'
+  );
+
+  assert.match(controllerSource, /bookCoveringAccessService/);
+  assert.match(controllerSource, /listReportsForOrg\(orgId, req\.user, accessContext\)/);
+  assert.match(controllerSource, /assertCanReadReport\(req, row, accessContext, capabilities\)/);
+  assert.match(controllerSource, /assertCanMutateReport\(req, existing, accessContext, capabilities\)/);
+  assert.match(controllerSource, /assertCanDeleteReport\(req, row, accessContext, capabilities\)/);
+  assert.match(controllerSource, /assertCanCreateForTeacher\(req, payload\.teacherId, accessContext\)/);
+  assert.match(serviceSource, /fetchAllData\('bookCoveringReports', \{\}, reqUser, accessContext\)/);
+  assert.match(serviceSource, /getDataById\('bookCoveringReports', id, reqUser, accessContext\)/);
+  assert.match(classControllerSource, /bookCoveringAccessService\.buildRouteAccessContext\(req\)/);
+  assert.match(classControllerSource, /getSessionBookCoveringSummary[\s\S]*accessContext/);
+  assert.match(classControllerSource, /createDraftForSession[\s\S]*accessContext/);
+});
+
+test('bookCoveringAccessService org-wide access can read any report', () => {
+  const { SCOPE_MODES } = require('../MVC/services/school/schoolDataScopeBuilder');
+  const accessService = require('../MVC/services/school/bookCoveringAccessService');
+  const access = { scopeMode: SCOPE_MODES.ORG_WIDE, canViewAll: true };
+  assert.equal(accessService.canAccessReport({ teacherId: 'TEA-OTHER' }, access), true);
+  assert.equal(accessService.isOrgWideAccess(access), true);
+});
+
+test('bookCoveringAccessService assignment scope only matches own teacherId', () => {
+  const { SCOPE_MODES } = require('../MVC/services/school/schoolDataScopeBuilder');
+  const accessService = require('../MVC/services/school/bookCoveringAccessService');
+  const access = { scopeMode: SCOPE_MODES.ASSIGNMENT, personId: 'TEA-1', userId: 'USR-1' };
+  assert.equal(accessService.canAccessReport({ teacherId: 'TEA-1' }, access), true);
+  assert.equal(accessService.canAccessReport({ teacherId: 'TEA-2' }, access), false);
+  assert.equal(accessService.isReportOwnedByViewer({ teacherId: 'TEA-1' }, access), true);
+  assert.equal(accessService.isReportOwnedByViewer({ teacherId: 'TEA-2' }, access), false);
+});
+
+test('bookCoveringAccessService assertCanReadReport denies other teachers', () => {
+  const { SCOPE_MODES } = require('../MVC/services/school/schoolDataScopeBuilder');
+  const accessService = require('../MVC/services/school/bookCoveringAccessService');
+  const scopeBuilderPath = require.resolve('../MVC/services/school/schoolDataScopeBuilder');
+  const originalScopeBuilder = require.cache[scopeBuilderPath];
+
+  require.cache[scopeBuilderPath] = {
+    id: scopeBuilderPath,
+    filename: scopeBuilderPath,
+    loaded: true,
+    exports: {
+      ...require('../MVC/services/school/schoolDataScopeBuilder'),
+      buildSchoolListScope() {
+        return { scopeMode: SCOPE_MODES.ASSIGNMENT, personId: 'TEA-1', userId: 'USR-1' };
+      }
+    }
+  };
+  delete require.cache[require.resolve('../MVC/services/school/bookCoveringAccessService')];
+  const scopedAccessService = require('../MVC/services/school/bookCoveringAccessService');
+
+  try {
+    scopedAccessService.assertCanReadReport(
+      { user: { id: 'USR-1', personId: 'TEA-1' }, accessScope: 'SCP_DIV' },
+      { teacherId: 'TEA-1' }
+    );
+    assert.throws(
+      () => scopedAccessService.assertCanReadReport(
+        { user: { id: 'USR-1', personId: 'TEA-1' }, accessScope: 'SCP_DIV' },
+        { teacherId: 'TEA-2' }
+      ),
+      (error) => error.statusCode === 403
+    );
+  } finally {
+    if (originalScopeBuilder === undefined) delete require.cache[scopeBuilderPath];
+    else require.cache[scopeBuilderPath] = originalScopeBuilder;
+    delete require.cache[require.resolve('../MVC/services/school/bookCoveringAccessService')];
+  }
+});
+
+test('book covering routes allow READ or READ_ALL for list and view operations', () => {
+  const routeSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/routes/bookCoveringReportRoutes.js'),
+    'utf8'
+  );
+  const guardSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/routes/bookCoveringReportRouteGuards.js'),
+    'utf8'
+  );
+  assert.match(guardSource, /requireBookCoveringOperationAny/);
+  assert.match(routeSource, /requireBookCoveringOperationAny\(readOperations\)/);
+  assert.match(routeSource, /requireBookCoveringOperationAny\(viewOperations\)/);
+  assert.match(routeSource, /OPERATIONS\.CREATE/);
+  assert.match(routeSource, /OPERATIONS\.UPDATE/);
+  assert.match(routeSource, /OPERATIONS\.DELETE/);
+});
+
+test('bookCoveringAccessService resolves all CRUD capabilities', () => {
+  const serviceSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/services/school/bookCoveringAccessService.js'),
+    'utf8'
+  );
+  assert.match(serviceSource, /OPERATIONS\.READ/);
+  assert.match(serviceSource, /OPERATIONS\.READ_ALL/);
+  assert.match(serviceSource, /OPERATIONS\.CREATE/);
+  assert.match(serviceSource, /OPERATIONS\.UPDATE/);
+  assert.match(serviceSource, /OPERATIONS\.DELETE/);
+  assert.match(serviceSource, /canView: canRead \|\| canReadAll/);
+  assert.match(serviceSource, /assertCanDeleteReport/);
+});
+
+test('bookCoveringReports repository uses teacherId assignment scope', () => {
+  const repoSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/repositories/school/index.js'),
+    'utf8'
+  );
+  const block = repoSource.split('bookCoveringReports: createSchoolRepository')[1]?.split('teachingOutlineLevels:')[0] || '';
+  assert.match(block, /assignmentScopeKind:\s*'teacherId'/);
+});

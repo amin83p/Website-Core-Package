@@ -57,6 +57,7 @@ const { getPresetConfig } = require('../../services/school/sessionStudentCasePre
 const sessionStudentCaseResultVisibilityService = require('../../services/school/sessionStudentCaseResultVisibilityService');
 const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
 const bookCoveringReportService = require('../../services/school/bookCoveringReportService');
+const bookCoveringAccessService = require('../../services/school/bookCoveringAccessService');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const sessionIdService = require('../../services/school/sessionIdService');
 const sessionConductService = require('../../services/school/sessionConductService');
@@ -4158,6 +4159,7 @@ async function manageSession(req, res) {
             reportAssignmentCreateAccess,
             bookCoveringCreateAccess,
             bookCoveringReadAccess,
+            bookCoveringReadAllAccess,
             bookCoveringDeleteAccess,
             studentCaseCapabilities
         ] = await Promise.all([
@@ -4189,6 +4191,12 @@ async function manageSession(req, res) {
                 user: req.user,
                 sectionId: SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING,
                 operationId: OPERATIONS.CREATE,
+                ipAddress: req.ip
+            }).catch(() => null),
+            accessService.evaluateAccess({
+                user: req.user,
+                sectionId: SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING,
+                operationId: OPERATIONS.READ,
                 ipAddress: req.ip
             }).catch(() => null),
             accessService.evaluateAccess({
@@ -4245,15 +4253,19 @@ async function manageSession(req, res) {
         ]);
         logManageSessionStep(req, 'reports_outline', reportsStart);
         const canViewBookCoveringReport = Boolean(
-            bookCoveringReadAccess?.allowed || bookCoveringCreateAccess?.allowed
+            bookCoveringReadAccess?.allowed
+            || bookCoveringReadAllAccess?.allowed
+            || bookCoveringCreateAccess?.allowed
         );
         let sessionBookCoveringSummary = null;
         if (canViewBookCoveringReport) {
             try {
+                const bookCoveringAccessContext = bookCoveringAccessService.buildRouteAccessContext(req);
                 sessionBookCoveringSummary = await bookCoveringReportService.getSessionBookCoveringSummary(
                     classData,
                     session,
-                    req.user
+                    req.user,
+                    bookCoveringAccessContext
                 );
             } catch (_) {
                 sessionBookCoveringSummary = null;
@@ -4496,7 +4508,8 @@ async function assignReportToSession(req, res) {
 async function getBookCoveringSummaryForSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, accessContext);
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (!session) throw new Error('Session not found.');
@@ -4505,7 +4518,8 @@ async function getBookCoveringSummaryForSession(req, res) {
         const summary = await bookCoveringReportService.getSessionBookCoveringSummary(
             classData,
             session,
-            req.user
+            req.user,
+            accessContext
         );
 
         return res.json({
@@ -4521,13 +4535,14 @@ async function getBookCoveringSummaryForSession(req, res) {
 async function deleteBookCoveringForSession(req, res) {
     try {
         const { id: classId, sessionId, reportId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, accessContext);
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (!session) throw new Error('Session not found.');
         assertSessionScopeForRequest(req, classData, session);
 
-        const report = await schoolDataService.getDataById('bookCoveringReports', reportId, req.user);
+        const report = await schoolDataService.getDataById('bookCoveringReports', reportId, req.user, accessContext);
         if (!report) throw new Error('Book covering report not found.');
         if (!idsEqual(report.classId, classId)) {
             throw new Error('Book covering report does not belong to this class.');
@@ -4535,8 +4550,9 @@ async function deleteBookCoveringForSession(req, res) {
         if (String(report.sessionId || '').trim() && !idsEqual(report.sessionId, sessionId)) {
             throw new Error('Book covering report is not linked to this session.');
         }
+        bookCoveringAccessService.assertCanMutateReport(req, report, accessContext);
 
-        await bookCoveringReportService.deleteReport(reportId, req.user);
+        await bookCoveringReportService.deleteReport(reportId, req.user, accessContext);
 
         return res.json({
             status: 'success',
@@ -4552,7 +4568,8 @@ async function deleteBookCoveringForSession(req, res) {
 async function createBookCoveringForSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, accessContext);
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
         if (!session) throw new Error('Session not found.');
@@ -4562,12 +4579,13 @@ async function createBookCoveringForSession(req, res) {
             classData,
             session,
             input: req.body || {},
-            reqUser: req.user
+            reqUser: req.user,
+            accessContext
         });
 
         let summary = null;
         if (result.report) {
-            summary = await bookCoveringReportService.buildReportSummary(result.report, req.user);
+            summary = await bookCoveringReportService.buildReportSummary(result.report, req.user, accessContext);
         }
 
         return res.json({

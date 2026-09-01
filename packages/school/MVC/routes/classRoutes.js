@@ -17,6 +17,7 @@ const {
   requireCaseSectionOperationAny,
   requireCaseStatusMutationAccess
 } = require('./sessionStudentCaseRouteGuards');
+const { requireBookCoveringOperationAny } = require('./bookCoveringReportRouteGuards');
 
 router.use(requireAuth);
 
@@ -531,7 +532,7 @@ router.post('/:id/sessions/:sessionId/report-assignments',
   trackActionState(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE, sessionReportAssignmentActionState),
   classCtrl.assignReportToSession);
 router.get('/:id/sessions/:sessionId/book-covering-reports/summary',
-  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.READ_ALL),
+  requireBookCoveringOperationAny([OPERATIONS.READ, OPERATIONS.READ_ALL]),
   classCtrl.getBookCoveringSummaryForSession);
 router.post('/:id/sessions/:sessionId/book-covering-reports',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.CREATE),

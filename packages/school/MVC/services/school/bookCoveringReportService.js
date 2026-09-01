@@ -49,6 +49,10 @@ async function assertReportEditable(report, reqUser) {
   }
 }
 
+function buildWriteOptions(accessContext = {}) {
+  return accessContext && Object.keys(accessContext).length ? { accessContext } : {};
+}
+
 async function findDuplicateReport({
   orgId,
   classId,
@@ -58,9 +62,10 @@ async function findDuplicateReport({
   periodEndDate,
   sessionId,
   reqUser,
-  excludeId = null
+  excludeId = null,
+  accessContext = {}
 }) {
-  const rows = await schoolDataService.fetchAllData('bookCoveringReports', {}, reqUser);
+  const rows = await schoolDataService.fetchAllData('bookCoveringReports', {}, reqUser, accessContext);
   const list = (Array.isArray(rows) ? rows : []).filter((row) => idsEqual(row.orgId, orgId));
   return list.find((row) => {
     if (excludeId && String(row.id) === String(excludeId)) return false;
@@ -111,13 +116,13 @@ function entryHasCoverage(entry = {}) {
   return formatEntryCoverageBrief(entry) !== 'No coverage recorded';
 }
 
-async function buildReportSummary(report, reqUser) {
+async function buildReportSummary(report, reqUser, accessContext = {}) {
   const entries = Array.isArray(report?.entries) ? report.entries : [];
   const bookTitleMap = new Map();
   for (const entry of entries) {
     const bookId = clean(entry.bookId);
     if (!bookId || bookTitleMap.has(bookId)) continue;
-    const book = await schoolDataService.getDataById('books', bookId, reqUser);
+    const book = await schoolDataService.getDataById('books', bookId, reqUser, accessContext);
     bookTitleMap.set(bookId, clean(book?.title) || bookId);
   }
 
@@ -195,7 +200,8 @@ function findReportByDailyWindow(list, {
 async function findReportForSession({
   classData,
   session,
-  reqUser
+  reqUser,
+  accessContext = {}
 }) {
   if (!classData?.id || !session?.sessionId) return null;
 
@@ -211,9 +217,8 @@ async function findReportForSession({
     anchorDate: sessionDate
   });
 
-  const rows = await schoolDataService.fetchAllData('bookCoveringReports', {}, reqUser);
+  const rows = await schoolDataService.fetchAllData('bookCoveringReports', {}, reqUser, accessContext);
   const orgRows = (Array.isArray(rows) ? rows : []).filter((row) => idsEqual(row.orgId, orgId));
-  const classRows = orgRows.filter((row) => String(row.classId) === String(classId));
 
   let matched = findReportLinkedToSession(orgRows, { classId, sessionId });
   if (!matched && teacherId) {
@@ -225,7 +230,8 @@ async function findReportForSession({
       periodStartDate: periodWindow.periodStartDate,
       periodEndDate: periodWindow.periodEndDate,
       sessionId,
-      reqUser
+      reqUser,
+      accessContext
     });
   }
   if (!matched) {
@@ -241,15 +247,15 @@ async function findReportForSession({
   return matched || null;
 }
 
-async function getSessionBookCoveringSummary(classData, session, reqUser) {
-  const report = await findReportForSession({ classData, session, reqUser });
+async function getSessionBookCoveringSummary(classData, session, reqUser, accessContext = {}) {
+  const report = await findReportForSession({ classData, session, reqUser, accessContext });
   if (!report) return null;
-  return buildReportSummary(report, reqUser);
+  return buildReportSummary(report, reqUser, accessContext);
 }
 
-async function validateEntriesAgainstBooks(entries, orgId, reqUser) {
+async function validateEntriesAgainstBooks(entries, orgId, reqUser, accessContext = {}) {
   for (const entry of entries) {
-    const book = await schoolDataService.getDataById('books', entry.bookId, reqUser);
+    const book = await schoolDataService.getDataById('books', entry.bookId, reqUser, accessContext);
     if (!book || !idsEqual(book.orgId, orgId)) {
       throw new Error(`Book ${entry.bookId} is invalid for this organization.`);
     }
@@ -257,7 +263,7 @@ async function validateEntriesAgainstBooks(entries, orgId, reqUser) {
   }
 }
 
-async function createReport(payload, reqUser) {
+async function createReport(payload, reqUser, accessContext = {}) {
   const orgId = clean(payload.orgId);
   const classId = clean(payload.classId);
   const classData = await bookAssignmentService.assertClassInOrg(classId, orgId, reqUser);
@@ -282,7 +288,8 @@ async function createReport(payload, reqUser) {
     periodStartDate: periodWindow.periodStartDate,
     periodEndDate: periodWindow.periodEndDate,
     sessionId: payload.sessionId,
-    reqUser
+    reqUser,
+    accessContext
   });
 
   const fullPayload = {
@@ -297,12 +304,12 @@ async function createReport(payload, reqUser) {
     status: payload.status || REPORT_STATUSES.DRAFT
   };
 
-  await validateEntriesAgainstBooks(fullPayload.entries || [], orgId, reqUser);
-  return schoolDataService.addData('bookCoveringReports', fullPayload, reqUser);
+  await validateEntriesAgainstBooks(fullPayload.entries || [], orgId, reqUser, accessContext);
+  return schoolDataService.addData('bookCoveringReports', fullPayload, reqUser, buildWriteOptions(accessContext));
 }
 
-async function updateReport(id, payload, reqUser) {
-  const existing = await schoolDataService.getDataById('bookCoveringReports', id, reqUser);
+async function updateReport(id, payload, reqUser, accessContext = {}) {
+  const existing = await schoolDataService.getDataById('bookCoveringReports', id, reqUser, accessContext);
   if (!existing) throw new Error('Book covering report not found.');
   await assertReportEditable(existing, reqUser);
 
@@ -333,7 +340,8 @@ async function updateReport(id, payload, reqUser) {
     periodEndDate,
     sessionId: payload.sessionId || existing.sessionId,
     reqUser,
-    excludeId: id
+    excludeId: id,
+    accessContext
   });
 
   const fullPayload = {
@@ -345,25 +353,26 @@ async function updateReport(id, payload, reqUser) {
   };
 
   if (fullPayload.entries) {
-    await validateEntriesAgainstBooks(fullPayload.entries, orgId, reqUser);
+    await validateEntriesAgainstBooks(fullPayload.entries, orgId, reqUser, accessContext);
   }
 
-  return schoolDataService.updateData('bookCoveringReports', id, fullPayload, reqUser);
+  return schoolDataService.updateData('bookCoveringReports', id, fullPayload, reqUser, buildWriteOptions(accessContext));
 }
 
-async function submitReport(id, reqUser) {
-  const existing = await schoolDataService.getDataById('bookCoveringReports', id, reqUser);
+async function submitReport(id, reqUser, accessContext = {}) {
+  const existing = await schoolDataService.getDataById('bookCoveringReports', id, reqUser, accessContext);
   if (!existing) throw new Error('Book covering report not found.');
   if (String(existing.status) === REPORT_STATUSES.SUBMITTED) return existing;
   await assertReportEditable(existing, reqUser);
-  return updateReport(id, { status: REPORT_STATUSES.SUBMITTED }, reqUser);
+  return updateReport(id, { status: REPORT_STATUSES.SUBMITTED }, reqUser, accessContext);
 }
 
 async function createDraftForSession({
   classData,
   session,
   input = {},
-  reqUser
+  reqUser,
+  accessContext = {}
 }) {
   if (!classData?.id) throw new Error('Class is required.');
   if (!session?.sessionId) throw new Error('Session is required.');
@@ -401,7 +410,8 @@ async function createDraftForSession({
     periodStartDate: periodWindow.periodStartDate,
     periodEndDate: periodWindow.periodEndDate,
     sessionId,
-    reqUser
+    reqUser,
+    accessContext
   });
   if (existing) {
     const status = clean(existing.status || REPORT_STATUSES.DRAFT).toLowerCase();
@@ -430,7 +440,7 @@ async function createDraftForSession({
       createUser: reqUser?.id || 'SYSTEM',
       lastUpdateUser: reqUser?.id || 'SYSTEM'
     }
-  }, reqUser);
+  }, reqUser, buildWriteOptions(accessContext));
 
   return {
     report,
@@ -439,17 +449,17 @@ async function createDraftForSession({
   };
 }
 
-async function listReportsForOrg(orgId, reqUser) {
-  const rows = await schoolDataService.fetchAllData('bookCoveringReports', {}, reqUser);
+async function listReportsForOrg(orgId, reqUser, accessContext = {}) {
+  const rows = await schoolDataService.fetchAllData('bookCoveringReports', {}, reqUser, accessContext);
   return (Array.isArray(rows) ? rows : []).filter((row) => idsEqual(row.orgId, orgId));
 }
 
-async function enrichReports(rows, reqUser) {
+async function enrichReports(rows, reqUser, accessContext = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const classIds = [...new Set(list.map((row) => clean(row.classId)).filter(Boolean))];
   const classMap = new Map();
   for (const classId of classIds) {
-    const row = await schoolDataService.getDataById('classes', classId, reqUser);
+    const row = await schoolDataService.getDataById('classes', classId, reqUser, accessContext);
     if (row) classMap.set(String(row.id), row);
   }
   return list.map((row) => ({
@@ -458,12 +468,12 @@ async function enrichReports(rows, reqUser) {
   }));
 }
 
-async function deleteReport(id, reqUser) {
+async function deleteReport(id, reqUser, accessContext = {}) {
   const reportId = clean(id);
   if (!reportId) throw new Error('Book covering report id is required.');
-  const existing = await schoolDataService.getDataById('bookCoveringReports', reportId, reqUser);
+  const existing = await schoolDataService.getDataById('bookCoveringReports', reportId, reqUser, accessContext);
   if (!existing) throw new Error('Book covering report not found.');
-  await schoolDataService.deleteData('bookCoveringReports', reportId, reqUser);
+  await schoolDataService.deleteData('bookCoveringReports', reportId, reqUser, buildWriteOptions(accessContext));
   return existing;
 }
 
