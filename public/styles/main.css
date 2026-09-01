@@ -2786,7 +2786,7 @@ a .spinner-border.spinner-border-sm,
   top: 72px;
   right: 16px;
   margin: 0;
-  width: min(420px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 32px));
   max-height: calc(100vh - 96px);
 }
 

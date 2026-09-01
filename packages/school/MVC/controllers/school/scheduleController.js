@@ -2105,6 +2105,22 @@ function isActiveClassForSchedulePicker(classRow = {}) {
     return status === 'active';
 }
 
+function buildScheduleClassPickerItem(classRow = {}) {
+    const programTerm = Array.isArray(classRow?.allowedProgramTerms) ? classRow.allowedProgramTerms[0] : null;
+    const subject = Array.isArray(classRow?.curriculum?.subjects) ? classRow.curriculum.subjects[0] : null;
+    const termLabel = [programTerm?.termCode, programTerm?.termName].filter(Boolean).join(' - ');
+    return {
+        id: normalizeId(classRow?.id),
+        title: String(classRow?.title || classRow?.name || '').trim() || normalizeId(classRow?.id),
+        code: String(classRow?.code || subject?.code || '').trim(),
+        status: String(classRow?.status || '').trim(),
+        programName: String(programTerm?.programName || '').trim(),
+        termLabel: String(termLabel || '').trim(),
+        departmentName: String(classRow?.deliveryDepartmentName || '').trim(),
+        registrationMode: String(classRow?.registrationMode || '').trim()
+    };
+}
+
 async function listInstructorClassesForSchedule(req, res) {
     try {
         const personId = normalizeId(req.query.personId);
@@ -2116,12 +2132,7 @@ async function listInstructorClassesForSchedule(req, res) {
             .filter((row) => isActiveClassForSchedulePicker(row))
             .filter((row) => !activeOrgId || idsEqual(row?.orgId, activeOrgId) || idsEqual(row?.organizationId, activeOrgId))
             .filter((row) => isUserInstructorOnClass(row, personId))
-            .map((row) => ({
-                id: normalizeId(row?.id),
-                title: String(row?.title || row?.name || '').trim() || normalizeId(row?.id),
-                code: String(row?.code || '').trim(),
-                status: String(row?.status || '').trim()
-            }))
+            .map((row) => buildScheduleClassPickerItem(row))
             .filter((row) => Boolean(row.id))
             .sort((a, b) => String(a.title || a.id).localeCompare(String(b.title || b.id), undefined, { sensitivity: 'base' }));
 

@@ -17,15 +17,44 @@
   }
   .gm-matrix-table th.gm-sticky-name { background-color: #f8f9fa; z-index: 4; }
   .gm-matrix-table td.gm-sticky-name { font-weight: 600; }
-  .gm-matrix-table th.gm-sticky-att,
-  .gm-matrix-table td.gm-sticky-att {
-    position: sticky; left: 220px; z-index: 3; width: 88px; min-width: 88px; max-width: 88px;
+  .gm-matrix-table th.gm-sticky-calc,
+  .gm-matrix-table td.gm-sticky-calc {
+    position: sticky; left: 220px; z-index: 3; width: 44px; min-width: 44px; max-width: 44px;
     border-right: 2px solid #dee2e6; background-color: #fff;
     box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
     text-align: center; vertical-align: middle;
   }
-  .gm-matrix-table th.gm-sticky-att { background-color: #f8f9fa; z-index: 4; font-size: 0.75rem; }
-  .gm-matrix-table td.gm-sticky-att { font-variant-numeric: tabular-nums; }
+  .gm-matrix-table th.gm-sticky-calc { background-color: #f8f9fa; z-index: 4; font-size: 0.75rem; }
+  .gm-calc-btn { line-height: 1; vertical-align: middle; }
+  #gmGradeCalcModal .modal-dialog { max-width: min(1180px, 96vw); }
+  #gmGradeCalcModal .modal-content { border: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 1.25rem 3rem rgba(15, 23, 42, 0.18); }
+  #gmGradeCalcModal .modal-header { padding: 1.1rem 1.5rem; }
+  #gmGradeCalcModal .modal-title { font-size: 1.25rem; }
+  #gmGradeCalcModal .modal-body { padding: 1.35rem 1.5rem 1.5rem; font-size: 1rem; line-height: 1.5; background: linear-gradient(180deg, #f8fbff 0%, #ffffff 140px); }
+  #gmGradeCalcModal .modal-footer { padding: 0.9rem 1.5rem; }
+  .gm-calc-summary { background: #fff; border: 1px solid #dbe7f5; border-radius: 14px; padding: 1rem 1.15rem; margin-bottom: 1.25rem; box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.04); }
+  .gm-calc-summary-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin-bottom: 0.2rem; }
+  .gm-calc-summary-value { font-size: 1.2rem; font-weight: 700; color: #0f172a; }
+  .gm-calc-summary-meta { font-size: 0.95rem; color: #64748b; margin-top: 0.35rem; }
+  .gm-calc-step { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1rem 1.1rem 1.1rem; margin-bottom: 1rem; }
+  .gm-calc-step-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.85rem; }
+  .gm-calc-step-num { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 999px; background: #0d6efd; color: #fff; font-size: 0.95rem; font-weight: 700; flex-shrink: 0; }
+  .gm-calc-step-title { font-size: 1.08rem; font-weight: 700; color: #1e293b; margin: 0; }
+  .gm-calc-step-note { font-size: 0.95rem; color: #475569; margin-bottom: 0.85rem; }
+  .gm-calc-table { font-size: 0.95rem; margin-bottom: 0; }
+  .gm-calc-table thead th { background: #f1f5f9; color: #334155; font-weight: 700; font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.03em; border-bottom-width: 1px; padding: 0.7rem 0.85rem; white-space: nowrap; }
+  .gm-calc-table tbody td { padding: 0.72rem 0.85rem; vertical-align: middle; color: #1e293b; }
+  .gm-calc-table tbody tr:nth-child(even) { background: #f8fafc; }
+  .gm-calc-table .gm-calc-num { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .gm-calc-list-title { font-size: 0.92rem; font-weight: 600; color: #64748b; margin: 0.85rem 0 0.45rem; }
+  .gm-calc-list { font-size: 0.95rem; color: #475569; margin-bottom: 0; padding-left: 1.15rem; }
+  .gm-calc-total-box { display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: linear-gradient(135deg, #ecfdf3 0%, #f0fdf4 100%); border: 1px solid #bbf7d0; border-radius: 12px; padding: 0.95rem 1.1rem; }
+  .gm-calc-total-box.is-final { background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); border-color: #bfdbfe; }
+  .gm-calc-total-label { font-size: 1rem; font-weight: 600; color: #334155; }
+  .gm-calc-total { font-size: 1.45rem; font-weight: 800; color: #0f5132; letter-spacing: -0.02em; }
+  .gm-calc-total-box.is-final .gm-calc-total { color: #1d4ed8; }
+  .gm-calc-formula { font-size: 0.92rem; color: #64748b; font-style: italic; }
+  .gm-calc-status-badge { font-size: 0.82rem; font-weight: 600; padding: 0.35em 0.65em; }
   .gm-band-0 { background-color: #eef6ff !important; }
   .gm-band-1 { background-color: #f3edff !important; }
   .gm-band-2 { background-color: #ecfdf3 !important; }
@@ -34,7 +63,34 @@
   .gm-matrix-table .gm-col-head { white-space: nowrap; max-width: 140px; }
   .gm-col-weight { font-size: 0.7rem; color: #64748b; }
   .gm-comment-btn { line-height: 1; vertical-align: middle; }
-  .gm-eval-card { font-size: 0.85rem; }
+  .gm-col-info-btn { line-height: 1; vertical-align: middle; }
+  .gm-date-session-btn { font-weight: 700; color: #334155 !important; text-decoration: underline; text-underline-offset: 2px; }
+  .gm-date-session-btn:hover { color: #0d6efd !important; }
+  #gmActivityModal .modal-dialog { max-width: min(760px, 96vw); }
+  #gmActivityModal .modal-content { border: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 1.25rem 3rem rgba(15, 23, 42, 0.18); }
+  #gmActivityModal .modal-header { padding: 1rem 1.35rem; }
+  #gmActivityModal .modal-body { padding: 1.25rem 1.35rem 1.35rem; background: linear-gradient(180deg, #f8fbff 0%, #ffffff 120px); }
+  #gmActivityModal .modal-footer { padding: 0.9rem 1.35rem; }
+  .gm-activity-summary { background: #fff; border: 1px solid #dbe7f5; border-radius: 14px; padding: 1rem 1.1rem; margin-bottom: 1rem; box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.04); }
+  .gm-activity-summary-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.45rem; }
+  .gm-activity-summary-title { font-size: 1.2rem; font-weight: 700; color: #0f172a; line-height: 1.3; }
+  .gm-activity-summary-meta { font-size: 0.92rem; color: #64748b; }
+  .gm-activity-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 0.95rem 1rem 1rem; margin-bottom: 0.85rem; }
+  .gm-activity-section-title { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; margin: 0 0 0.75rem; }
+  .gm-activity-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; }
+  .gm-activity-tile { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.7rem 0.8rem; min-height: 100%; }
+  .gm-activity-tile-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin-bottom: 0.2rem; }
+  .gm-activity-tile-value { font-size: 0.95rem; font-weight: 600; color: #1e293b; font-variant-numeric: tabular-nums; }
+  .gm-activity-content-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.95rem 1rem; white-space: pre-wrap; word-break: break-word; color: #334155; line-height: 1.55; font-size: 0.95rem; }
+  .gm-activity-attachment-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+  .gm-activity-attachment-list a { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.45rem 0.7rem; border: 1px solid #dbe7f5; border-radius: 999px; background: #fff; color: #0d6efd; text-decoration: none; font-size: 0.9rem; font-weight: 600; width: fit-content; max-width: 100%; }
+  .gm-activity-attachment-list a:hover { background: #eff6ff; }
+  .gm-activity-skill-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .gm-eval-card { font-size: 0.95rem; }
+  .gm-eval-formula { background: #f8fbff; border: 1px solid #dbe7f5; border-radius: 12px; padding: 0.85rem 1rem; margin-bottom: 0.85rem; }
+  .gm-eval-formula code { font-size: 0.92rem; color: #1e3a5f; }
+  .gm-eval-weights-table input[type="number"] { max-width: 88px; }
+  .gm-eval-weights-table .gm-eval-rel-weight { font-variant-numeric: tabular-nums; font-weight: 600; }
   .schedule-shell .filter-panel {
     background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
     border: 1px solid #dce9ff;
@@ -42,6 +98,16 @@
   }
   .schedule-shell .range-chip.active {
     box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+  }
+  .gm-filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-left: auto;
+  }
+  .gm-filter-actions .gm-filter-action-btn {
+    width: 7.25rem;
+    justify-content: center;
   }
 </style>
 
@@ -74,7 +140,7 @@
 }) %>
 
 <div class="schedule-shell">
-  <p class="text-muted small mb-3">Session gradebooks, quizzes, and assignments aligned with class <strong>Evaluation Rules</strong>. Rolling classes use attendance and assignments weights only.</p>
+  <p class="text-muted small mb-3">Period-weighted final scores from included activities in the selected date range. Weights renormalize per student to 100% (N/A excluded; absent/missing = 0%). Adjust weights below to preview results instantly.</p>
 
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
@@ -115,15 +181,9 @@
             <label class="form-label" for="gm_endDate">End Date</label>
             <input type="date" id="gm_endDate" class="form-control size-md">
           </div>
-          <div class="col-lg-3 col-md-6 d-flex align-items-end">
-            <div class="form-check form-switch mb-2">
-              <input class="form-check-input" type="checkbox" role="switch" id="gm_includeAttendance">
-              <label class="form-check-label" for="gm_includeAttendance">Include attendance in final grade</label>
-            </div>
-          </div>
-          <div class="col-12 col-lg-3 d-flex justify-content-lg-end gap-2 pt-lg-2">
-            <button type="button" id="gm_btnReset" class="btn btn-outline-secondary btn-md">Reset</button>
-            <button type="button" id="gm_btnLoad" class="btn btn-filled btn-primary btn-md">
+          <div class="col-12 col-lg-auto gm-filter-actions">
+            <button type="button" id="gm_btnReset" class="btn btn-outline-secondary btn-md gm-filter-action-btn">Reset</button>
+            <button type="button" id="gm_btnLoad" class="btn btn-filled btn-primary btn-md gm-filter-action-btn">
               <i class="bi bi-funnel me-1"></i> Apply
             </button>
           </div>
@@ -143,11 +203,46 @@
   </div>
 
   <div class="card border-0 shadow-sm mb-3 d-none" id="gm_evalCard">
-    <div class="card-body py-2 gm-eval-card">
-      <span class="fw-bold text-primary me-2"><i class="bi bi-sliders me-1"></i>Evaluation rules</span>
-      <span class="text-muted me-2">Passing:</span><span id="gm_passing" class="me-3">—</span>
-      <span class="text-muted">Weights</span>
-      <span id="gm_weights" class="ms-1">—</span>
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-primary"><i class="bi bi-sliders me-1"></i>Evaluation rules</div>
+      <button
+        id="gmEvalToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#gmEvalCollapse"
+        aria-expanded="false"
+        aria-controls="gmEvalCollapse"
+        aria-label="Open evaluation rules">
+        <i id="gmEvalToggleIcon" class="bi bi-chevron-down"></i>
+      </button>
+    </div>
+    <div class="collapse" id="gmEvalCollapse">
+      <div class="card-body py-3 gm-eval-card">
+        <div class="d-flex justify-content-end mb-2">
+          <button type="button" id="gm_btnSaveWeights" class="btn btn-outline-primary btn-sm" disabled title="Save edited weights to session activities">
+            <i class="bi bi-save me-1"></i> Save weights
+          </button>
+        </div>
+        <div id="gm_evalFormula" class="gm-eval-formula small text-muted">Load the matrix to see the weight formula for this period.</div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered gm-eval-weights-table mb-0" id="gm_evalWeightsTable">
+            <thead class="table-light">
+              <tr>
+                <th>Activity</th>
+                <th>Date</th>
+                <th>Kind</th>
+                <th>Weight</th>
+                <th>Relative %</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="gm_evalWeightsBody">
+              <tr><td colspan="6" class="text-muted">No activities in range.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -155,9 +250,9 @@
     <div class="card-header bg-white border-bottom py-3">
       <h5 class="m-0 fw-bold text-primary" id="gm_classTitle">Class</h5>
       <div class="small text-muted mt-1" id="gm_matrixBlurb">
-        <span class="me-3" id="gm_matrixBlurbMain"><strong>Final</strong> blends weights using attendance % and the average of <em>included</em> assignment-category items (gradebooks, quizzes, assignments).</span>
-        <span class="me-2"><span class="badge bg-light text-success border">Included</span> counts toward category average</span>
-        <span><span class="badge bg-secondary">excl.</span> scored but excluded from average</span>
+        <span class="me-3" id="gm_matrixBlurbMain"><strong>Final</strong> = period-weighted average of included activities (per-student renormalization; absent/missing = 0%; N/A excluded).</span>
+        <span class="me-2"><span class="badge bg-light text-success border">Included</span> counts toward period average</span>
+        <span><span class="badge bg-secondary">excl.</span> excluded from period average</span>
       </div>
     </div>
     <div class="card-body p-0">
@@ -199,6 +294,41 @@
   </div>
 </div>
 
+<div class="modal fade" id="gmGradeCalcModal" tabindex="-1" aria-labelledby="gmGradeCalcModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title fw-bold" id="gmGradeCalcModalTitle"><i class="bi bi-calculator me-2"></i>Grade calculation</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="gmGradeCalcModalBody">
+        <p class="text-muted mb-0 fs-5">Select a student to view the calculation breakdown.</p>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="gmActivityModal" tabindex="-1" aria-labelledby="gmActivityModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title fw-bold" id="gmActivityModalTitle"><i class="bi bi-journal-text me-2"></i>Activity</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="gmActivityModalBody">
+        <p class="text-muted mb-0">Select an activity to view details.</p>
+      </div>
+      <div class="modal-footer bg-light d-flex justify-content-between align-items-center">
+        <a href="#" id="gmActivityModalSessionLink" class="btn btn-outline-primary d-none" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open session</a>
+        <button type="button" class="btn btn-secondary ms-auto" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal_GenericPicker') %>
 <%- include('partials/tablePages-end') %>
 
@@ -223,6 +353,11 @@ document.addEventListener('DOMContentLoaded', () => {
     buttonId: 'gmFilterToggleBtn',
     iconId: 'gmFilterToggleIcon'
   });
+  bindCollapseToggle({
+    collapseId: 'gmEvalCollapse',
+    buttonId: 'gmEvalToggleBtn',
+    iconId: 'gmEvalToggleIcon'
+  });
 
   const INITIAL = <%- JSON.stringify({
     classId: typeof initialClassId !== 'undefined' ? initialClassId : '',
@@ -233,23 +368,175 @@ document.addEventListener('DOMContentLoaded', () => {
   }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
 
   window.currentGradesMatrixData = null;
+  let gmOpenCalcPersonId = '';
+  let gmRollupRecalcTimer = null;
 
-  function getGmIncludeAttendance() {
-    return Boolean(document.getElementById('gm_includeAttendance')?.checked);
+  function gmIncludedColumns(columns) {
+    return (Array.isArray(columns) ? columns : []).filter((col) => col && col.includeInGradeCalculation !== false);
   }
 
-  function updateGmMatrixBlurb(isRollingClass, includeAttendance) {
-    const blurbMain = document.getElementById('gm_matrixBlurbMain');
-    if (!blurbMain) return;
-    if (includeAttendance) {
-      blurbMain.innerHTML = isRollingClass
-        ? '<strong>Final</strong> uses <strong>attendance</strong> and <strong>assignments</strong> weights (rolling classes). Assignments = points-weighted average of <em>included</em> session items (gradebooks, quizzes, assignments). Midterm and final exam weights do not apply.'
-        : '<strong>Final</strong> blends weights using attendance % and a points-weighted average of <em>included</em> assignment-category items (gradebooks, quizzes, assignments). Session items map to the assignments bucket; midterm/final exam weights on the class apply when those components are wired into this view.';
+  function gmWeightSum(columns) {
+    return gmIncludedColumns(columns).reduce((sum, col) => {
+      const w = Number(col?.weight);
+      return sum + (Number.isFinite(w) && w > 0 ? w : 0);
+    }, 0);
+  }
+
+  function gmRelativeWeightPercent(col, columns) {
+    const w = Number(col?.weight);
+    const sum = gmWeightSum(columns);
+    if (!Number.isFinite(w) || w <= 0 || !sum) return null;
+    return Math.round((w / sum) * 10000) / 100;
+  }
+
+  function setGmWeightDirty(dirty) {
+    const data = window.currentGradesMatrixData;
+    if (data) data.weightDirty = Boolean(dirty);
+    const btn = document.getElementById('gm_btnSaveWeights');
+    if (btn) btn.disabled = !dirty;
+  }
+
+  function updateGmEvalFormula(columns) {
+    const el = document.getElementById('gm_evalFormula');
+    if (!el) return;
+    const sum = gmWeightSum(columns);
+    const sumLabel = sum ? String(sum) : '0';
+    el.innerHTML = [
+      '<div class="mb-1"><strong>Reference formula</strong> (when all included activities apply to the student):</div>',
+      `<div><code>W = ${gmEscapeAttr(sumLabel)}</code> (sum of activity weights in this period)</div>`,
+      '<div><code>w&#8242;<sub>i</sub> = (w<sub>i</sub> / W) × 100%</code> (renormalized weight)</div>',
+      '<div><code>Final = Σ (w&#8242;<sub>i</sub> × p<sub>i</sub>)</code> where <code>p<sub>i</sub></code> is activity %; absent/missing → 0%; N/A excluded per student.</div>'
+    ].join('');
+  }
+
+  function buildGmEvalWeightRowHtml(col, columns) {
+    const rel = gmRelativeWeightPercent(col, columns);
+    const relText = rel == null ? '—' : formatGmPercent(rel);
+    const excl = col.includeInGradeCalculation === false
+      ? '<span class="badge bg-secondary">excl.</span>'
+      : '';
+    const disabled = col.includeInGradeCalculation === false ? 'disabled' : '';
+    const weightVal = Number(col.weight) > 0 ? Number(col.weight) : '';
+    return `<tr data-col-key="${gmEscapeAttr(col.colKey || '')}">
+      <td class="fw-semibold">
+        <span class="d-inline-flex align-items-center gap-1">
+          <span>${gmEscapeAttr(col.label || 'Activity')}</span>
+          ${col.colKey ? `<button type="button" class="btn btn-link btn-sm p-0 gm-col-info-btn" title="Activity details" data-col-key="${gmEscapeAttr(col.colKey)}"><i class="bi bi-info-circle text-primary"></i></button>` : ''}
+        </span>
+      </td>
+      <td>${gmEscapeAttr(col.date || '—')}</td>
+      <td>${gmEscapeAttr(col.kindLabel || col.kind || '—')}</td>
+      <td><input type="number" class="form-control form-control-sm gm-eval-weight-input" min="0.01" step="0.01" value="${weightVal}" data-col-key="${gmEscapeAttr(col.colKey || '')}" ${disabled}></td>
+      <td class="gm-eval-rel-weight">${relText}</td>
+      <td>${excl}</td>
+    </tr>`;
+  }
+
+  function renderGmEvalWeightsTable(columns, options = {}) {
+    const tbody = document.getElementById('gm_evalWeightsBody');
+    if (!tbody) return;
+    const list = Array.isArray(columns) ? columns : [];
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No activities in range.</td></tr>';
+      updateGmEvalFormula([]);
       return;
     }
-    blurbMain.innerHTML = isRollingClass
-      ? '<strong>Final</strong> uses <strong>assignments only</strong> (activity averages). Attendance is shown in the Attend. column but not included in Final unless enabled above.'
-      : '<strong>Final</strong> uses <strong>assignments only</strong> (points-weighted average of <em>included</em> session items). Attendance is shown in the Attend. column but not included in Final unless enabled above.';
+    if (options.append) {
+      const existing = new Set(Array.from(tbody.querySelectorAll('tr[data-col-key]')).map((tr) => tr.getAttribute('data-col-key')));
+      const rows = list.filter((col) => col?.colKey && !existing.has(col.colKey))
+        .map((col) => buildGmEvalWeightRowHtml(col, list))
+        .join('');
+      if (rows) tbody.insertAdjacentHTML('beforeend', rows);
+    } else {
+      tbody.innerHTML = list.map((col) => buildGmEvalWeightRowHtml(col, list)).join('');
+    }
+    updateGmEvalFormula(list);
+    setGmWeightDirty(list.some((col) => Number(col.weight) !== Number(col._savedWeight)));
+  }
+
+  function updateGmEvalWeightsRelativeCells(columns) {
+    document.querySelectorAll('#gm_evalWeightsTable tbody tr[data-col-key]').forEach((tr) => {
+      const key = tr.getAttribute('data-col-key');
+      const col = (columns || []).find((c) => c.colKey === key);
+      const relTd = tr.querySelector('.gm-eval-rel-weight');
+      if (relTd && col) relTd.textContent = formatGmPercent(gmRelativeWeightPercent(col, columns));
+    });
+  }
+
+  function updateGmColumnHeadWeights(columns) {
+    const thead = document.getElementById('gm_thead');
+    if (!thead || !thead.rows[1]) return;
+    const heads = thead.rows[1].querySelectorAll('th.gm-col-head');
+    (columns || []).forEach((col, idx) => {
+      if (heads[idx]) heads[idx].innerHTML = renderGmColumnHeadHtml(col);
+    });
+  }
+
+  function onGmWeightInputChange(colKey, value) {
+    const data = window.currentGradesMatrixData;
+    if (!data) return;
+    const col = (data.columns || []).find((c) => String(c.colKey || '') === String(colKey || ''));
+    if (!col || col.includeInGradeCalculation === false) return;
+    const weight = Number(value);
+    if (!Number.isFinite(weight) || weight <= 0) return;
+    col.weight = weight;
+    setGmWeightDirty((data.columns || []).some((c) => Number(c.weight) !== Number(c._savedWeight)));
+    updateGmEvalFormula(data.columns);
+    updateGmEvalWeightsRelativeCells(data.columns);
+    updateGmColumnHeadWeights(data.columns);
+    scheduleGmLiveRollupRecalc();
+  }
+
+  function scheduleGmLiveRollupRecalc() {
+    clearTimeout(gmRollupRecalcTimer);
+    gmRollupRecalcTimer = setTimeout(() => refreshGradesDisplayRollups(), 50);
+  }
+
+  async function saveGmActivityWeights() {
+    const data = window.currentGradesMatrixData;
+    if (!data?.classId || !data.weightDirty) return;
+    const updates = (data.columns || [])
+      .filter((col) => col && Number(col.weight) !== Number(col._savedWeight))
+      .map((col) => ({
+        sessionId: col.sessionId,
+        kind: col.kind,
+        itemId: col.itemId,
+        weight: Number(col.weight)
+      }));
+    if (!updates.length) return;
+    const btn = document.getElementById('gm_btnSaveWeights');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    }
+    try {
+      const res = await fetch('/school/grades-matrix/api/save-activity-weights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify({ classId: data.classId, updates })
+      });
+      const result = await res.json();
+      if (result.status !== 'success') throw new Error(result.message || 'Save failed');
+      (data.columns || []).forEach((col) => {
+        col._savedWeight = Number(col.weight);
+      });
+      setGmWeightDirty(false);
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({ title: 'Saved', icon: 'success', message: `Saved ${result.saved || updates.length} activity weight(s).`, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      }
+    } catch (e) {
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({ title: 'Error', icon: 'error', message: e.message, buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+      } else {
+        alert(e.message);
+      }
+    } finally {
+      if (btn) {
+        btn.innerHTML = orig;
+        btn.disabled = !window.currentGradesMatrixData?.weightDirty;
+      }
+    }
   }
 
   function setGradesPrintEnabled(enabled) {
@@ -327,8 +614,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('gm_className').value = '';
     document.getElementById('gm_startDate').value = '';
     document.getElementById('gm_endDate').value = '';
-    const includeAttEl = document.getElementById('gm_includeAttendance');
-    if (includeAttEl) includeAttEl.checked = false;
     document.getElementById('gm_results').classList.add('d-none');
     document.getElementById('gm_evalCard').classList.add('d-none');
     window.currentGradesMatrixData = null;
@@ -380,14 +665,147 @@ document.addEventListener('DOMContentLoaded', () => {
     return { text: `${pts} pts`, title: 'Points used in category average weighting' };
   }
 
+  function gmBuildSessionManageUrl(classId, sessionId) {
+    const cid = String(classId || '').trim();
+    const sid = String(sessionId || '').trim();
+    if (!cid || !sid) return '';
+    return `/school/classes/${encodeURIComponent(cid)}/sessions/${encodeURIComponent(sid)}`;
+  }
+
+  function gmFormatSessionTimeLabel(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(raw);
+    if (!match) return raw;
+    const hours = Number(match[1]);
+    const minutes = match[2];
+    if (!Number.isFinite(hours)) return raw;
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = ((hours + 11) % 12) + 1;
+    return `${hour12}:${minutes} ${suffix}`;
+  }
+
+  function gmFormatWeightValue(col, weightValue) {
+    const kind = String(col?.kind || '').trim().toLowerCase();
+    const explicit = kind === 'gradebook' ? Number(col?._explicitWeight) : NaN;
+    const weight = Number(weightValue);
+    if (!Number.isFinite(weight) || weight <= 0) return '—';
+    if (kind === 'gradebook' && Number.isFinite(explicit) && explicit > 0) {
+      return `${weight}% of grade`;
+    }
+    return `${weight} pts`;
+  }
+
+  function renderGmColumnInfoButton(col) {
+    const key = String(col?.colKey || '').trim();
+    if (!key) return '';
+    return `<button type="button" class="btn btn-link btn-sm p-0 gm-col-info-btn flex-shrink-0" title="Activity details" data-col-key="${gmEscapeAttr(key)}"><i class="bi bi-info-circle text-primary"></i></button>`;
+  }
+
   function renderGmColumnHeadHtml(col) {
-    const kindLine = `<div class="small text-muted">${gmEscapeAttr(col.kindLabel || '')}</div>`;
-    const labelLine = `<div class="text-dark text-truncate" title="${gmEscapeAttr(col.label)}">${gmEscapeAttr(col.label)}</div>`;
-    const weightInfo = formatGmColumnWeightLabel(col);
-    const weightLine = weightInfo
-      ? `<div class="gm-col-weight" title="${gmEscapeAttr(weightInfo.title)}">${gmEscapeAttr(weightInfo.text)}</div>`
-      : '';
-    return `${kindLine}${labelLine}${weightLine}`;
+    const labelLine = `<div class="text-dark text-truncate fw-semibold" title="${gmEscapeAttr(col.label)}">${gmEscapeAttr(col.label)}</div>`;
+    return `<div class="d-inline-flex align-items-center justify-content-center gap-1 w-100">${labelLine}${renderGmColumnInfoButton(col)}</div>`;
+  }
+
+  function gmActivityDetailTile(label, valueHtml) {
+    return `<div class="gm-activity-tile"><div class="gm-activity-tile-label">${gmEscapeAttr(label)}</div><div class="gm-activity-tile-value">${valueHtml}</div></div>`;
+  }
+
+  function renderGmActivityModalBody(col, matrixData = {}) {
+    if (!col) return '<p class="text-muted mb-0">Activity details are not available.</p>';
+    const savedWeight = col._savedWeight != null ? Number(col._savedWeight) : Number(col.weight);
+    const currentWeight = Number(col.weight);
+    const weightChanged = Number.isFinite(savedWeight) && Number.isFinite(currentWeight) && savedWeight !== currentWeight;
+    const relPct = gmRelativeWeightPercent(col, matrixData.columns || []);
+    const sessionTime = gmFormatSessionTimeLabel(col.sessionStartTime);
+    const kindLabel = String(col.kindLabel || col.kind || 'Activity');
+    const parts = [];
+
+    const metaBits = [
+      gmFormatDisplayDate(col.date),
+      sessionTime || null,
+      col.totalScore != null && Number(col.totalScore) > 0 ? `${col.totalScore} pts` : null
+    ].filter(Boolean);
+    parts.push('<div class="gm-activity-summary">');
+    parts.push('<div class="gm-activity-summary-top">');
+    parts.push(`<div class="gm-activity-summary-title">${gmEscapeAttr(col.label || 'Activity')}</div>`);
+    parts.push(`<span class="badge rounded-pill text-bg-primary">${gmEscapeAttr(kindLabel)}</span>`);
+    parts.push('</div>');
+    parts.push(`<div class="gm-activity-summary-meta">${gmEscapeAttr(metaBits.join(' · ') || '—')}</div>`);
+    parts.push('</div>');
+
+    parts.push('<section class="gm-activity-section"><h6 class="gm-activity-section-title">Weights & scoring</h6><div class="gm-activity-grid">');
+    parts.push(gmActivityDetailTile('Saved weight', gmEscapeAttr(gmFormatWeightValue(col, savedWeight))));
+    parts.push(gmActivityDetailTile('Current weight', `${gmEscapeAttr(gmFormatWeightValue(col, currentWeight))}${weightChanged ? ' <span class="badge bg-warning text-dark ms-1">edited</span>' : ''}`));
+    parts.push(gmActivityDetailTile('Relative %', relPct == null ? '—' : gmEscapeAttr(formatGmPercent(relPct))));
+    parts.push(gmActivityDetailTile('Grade calculation', col.includeInGradeCalculation === false
+      ? '<span class="badge bg-secondary">Excluded</span>'
+      : '<span class="badge bg-success">Included</span>'));
+    if (col.sessionStatus) {
+      parts.push(gmActivityDetailTile('Session status', gmEscapeAttr(col.sessionStatus)));
+    }
+    parts.push('</div></section>');
+
+    if (Array.isArray(col.skills) && col.skills.length) {
+      parts.push('<section class="gm-activity-section"><h6 class="gm-activity-section-title">Skills</h6><div class="gm-activity-skill-list">');
+      col.skills.forEach((skill) => {
+        parts.push(`<span class="badge bg-light text-dark border">${gmEscapeAttr(skill)}</span>`);
+      });
+      parts.push('</div></section>');
+    }
+    if (col.skillFocus) {
+      parts.push(`<section class="gm-activity-section"><h6 class="gm-activity-section-title">Skill focus</h6><div class="gm-activity-tile-value">${gmEscapeAttr(col.skillFocus)}</div></section>`);
+    }
+
+    const content = String(col.activityContent || '').trim();
+    parts.push('<section class="gm-activity-section"><h6 class="gm-activity-section-title">Activity content / instructions</h6>');
+    parts.push(content
+      ? `<div class="gm-activity-content-box">${gmEscapeAttr(content)}</div>`
+      : '<p class="text-muted mb-0 fst-italic">No activity description.</p>');
+    parts.push('</section>');
+
+    const attachments = Array.isArray(col.attachments) ? col.attachments : [];
+    parts.push('<section class="gm-activity-section mb-0"><h6 class="gm-activity-section-title">Attachments</h6>');
+    if (attachments.length) {
+      parts.push('<ul class="gm-activity-attachment-list">');
+      attachments.forEach((file) => {
+        const name = String(file?.name || 'Attachment');
+        const url = String(file?.url || '').trim();
+        if (!url) return;
+        parts.push(`<li><a href="${gmEscapeAttr(url)}" target="_blank" rel="noopener"><i class="bi bi-paperclip"></i><span>${gmEscapeAttr(name)}</span></a></li>`);
+      });
+      parts.push('</ul>');
+    } else {
+      parts.push('<p class="text-muted mb-0 fst-italic">No attachments.</p>');
+    }
+    parts.push('</section>');
+
+    return parts.join('');
+  }
+
+  function openGmActivityModal(colKey) {
+    const data = window.currentGradesMatrixData;
+    const key = String(colKey || '').trim();
+    const col = (Array.isArray(data?.columns) ? data.columns : []).find((item) => String(item?.colKey || '') === key);
+    const bodyEl = document.getElementById('gmActivityModalBody');
+    const titleEl = document.getElementById('gmActivityModalTitle');
+    const sessionLinkEl = document.getElementById('gmActivityModalSessionLink');
+    if (!col || !bodyEl) return;
+    if (titleEl) {
+      titleEl.innerHTML = `<i class="bi bi-journal-text me-2"></i>${gmEscapeAttr(col.label || 'Activity')}`;
+    }
+    bodyEl.innerHTML = renderGmActivityModalBody(col, data);
+    const sessionUrl = gmBuildSessionManageUrl(data?.classId, col.sessionId);
+    if (sessionLinkEl) {
+      if (sessionUrl) {
+        sessionLinkEl.href = sessionUrl;
+        sessionLinkEl.classList.remove('d-none');
+      } else {
+        sessionLinkEl.href = '#';
+        sessionLinkEl.classList.add('d-none');
+      }
+    }
+    if (gmActivityModalInstance) gmActivityModalInstance.show();
   }
 
   function renderGmCommentButton(cell, col, studentName) {
@@ -399,13 +817,18 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderCellHtml(c, col, studentName) {
     const commentBtn = renderGmCommentButton(c, col, studentName);
     if (!c) return commentBtn || '—';
+    if (c.notApplicable || c.attendanceStatus === 'not_applicable') {
+      return '<span class="text-muted small">N/A</span>';
+    }
     if (c.absent) {
-      const label = c.attendanceStatus === 'not_applicable'
-        ? 'N/A'
-        : (c.attendanceStatus === 'acf' ? 'ACF' : 'Absent');
-      return `<span class="text-muted small">${label}</span>`;
+      const label = c.attendanceStatus === 'acf' ? 'ACF' : 'Absent';
+      const wrapCls = c.effective ? 'gm-cell-effective' : 'gm-cell-excluded';
+      return `<span class="text-muted small ${wrapCls}">${label}</span>`;
     }
     if (c.score == null || c.score === '') {
+      if (c.effective) {
+        return `<span class="gm-cell-effective text-muted small" title="Counts as 0% in period average">—</span>${commentBtn}`;
+      }
       return commentBtn || '—';
     }
     const pct = c.percent != null ? `<span class="gm-pct small ms-1">${c.percent}%</span>` : '';
@@ -430,6 +853,139 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${s}%`;
   }
 
+  function gmCalcStatusLabel(status) {
+    const map = {
+      scored: 'Scored',
+      absent: 'Absent (0%)',
+      missing: 'Missing (0%)',
+      not_applicable: 'N/A'
+    };
+    return map[String(status || '').trim()] || String(status || '—');
+  }
+
+  function gmCalcStatusBadge(status) {
+    const key = String(status || '').trim();
+    const cls = {
+      scored: 'text-bg-success',
+      absent: 'text-bg-warning',
+      missing: 'text-bg-secondary',
+      not_applicable: 'text-bg-light text-dark border'
+    }[key] || 'text-bg-secondary';
+    return `<span class="badge gm-calc-status-badge ${cls}">${gmEscapeAttr(gmCalcStatusLabel(key))}</span>`;
+  }
+
+  function gmCalcStepSection(stepNum, title, bodyHtml) {
+    return `<section class="gm-calc-step"><div class="gm-calc-step-head"><span class="gm-calc-step-num">${stepNum}</span><h6 class="gm-calc-step-title">${gmEscapeAttr(title)}</h6></div><div class="gm-calc-step-body">${bodyHtml}</div></section>`;
+  }
+
+  function renderGmGradeCalcButton(personId) {
+    const id = String(personId || '').trim();
+    if (!id) return '';
+    return `<button type="button" class="btn btn-link btn-sm p-0 gm-calc-btn" title="View grade calculation" data-person-id="${gmEscapeAttr(id)}"><i class="bi bi-info-circle text-primary"></i></button>`;
+  }
+
+  function renderGmGradeCalcModalBody(breakdown, meta = {}) {
+    if (!breakdown) {
+      return '<p class="text-muted mb-0 fs-5">No calculation breakdown is available for this student.</p>';
+    }
+    const assignments = breakdown.assignments || {};
+    const applicable = Array.isArray(assignments.applicableActivities) ? assignments.applicableActivities : [];
+    const excluded = Array.isArray(assignments.excludedActivities) ? assignments.excludedActivities : [];
+    const notApplicable = Array.isArray(assignments.notApplicableActivities) ? assignments.notApplicableActivities : [];
+    const parts = [];
+
+    const rangeParts = [meta.startDate, meta.endDate].filter(Boolean);
+    const rangeLabel = rangeParts.length ? rangeParts.join(' to ') : 'Selected date range';
+    parts.push(`<div class="gm-calc-summary"><div class="row g-3"><div class="col-md-6"><div class="gm-calc-summary-label">Student</div><div class="gm-calc-summary-value">${gmEscapeAttr(meta.studentName || '—')}</div></div><div class="col-md-6"><div class="gm-calc-summary-label">Period</div><div class="gm-calc-summary-value" style="font-size:1.05rem;">${gmEscapeAttr(rangeLabel)}</div>${meta.className ? `<div class="gm-calc-summary-meta">${gmEscapeAttr(meta.className)}</div>` : ''}</div></div></div>`);
+
+    if (meta.hasMoreColumns) {
+      parts.push('<div class="alert alert-warning py-3 mb-3">Breakdown covers loaded activities in this view; load all columns for the full period.</div>');
+    }
+
+    let step1Body = '';
+    if (!applicable.length) {
+      step1Body = '<p class="text-muted mb-0">No applicable activities in this period for this student.</p>';
+    } else {
+      step1Body += '<div class="table-responsive"><table class="table table-bordered gm-calc-table mb-0"><thead><tr><th>Activity</th><th>Date</th><th>Kind</th><th>Weight</th><th>Status</th><th>Score</th><th>Activity %</th></tr></thead><tbody>';
+      applicable.forEach((row) => {
+        const scoreText = row.score != null && row.totalScore
+          ? `${row.score}/${row.totalScore}`
+          : '—';
+        step1Body += `<tr><td class="fw-semibold">${gmEscapeAttr(row.label)}</td><td>${gmEscapeAttr(row.date || '—')}</td><td>${gmEscapeAttr(row.kindLabel || row.kind || '—')}</td><td class="gm-calc-num">${row.originalWeight}</td><td>${gmCalcStatusBadge(row.status)}</td><td class="gm-calc-num">${gmEscapeAttr(scoreText)}</td><td class="gm-calc-num">${formatGmPercent(row.activityPercent)}</td></tr>`;
+      });
+      step1Body += '</tbody></table></div>';
+    }
+    if (notApplicable.length) {
+      step1Body += '<div class="gm-calc-list-title">Not applicable for this student (excluded from weight sum)</div><ul class="gm-calc-list">';
+      notApplicable.forEach((row) => {
+        step1Body += `<li>${gmEscapeAttr(row.label)}${row.date ? ` (${gmEscapeAttr(row.date)})` : ''}</li>`;
+      });
+      step1Body += '</ul>';
+    }
+    if (excluded.length) {
+      step1Body += '<div class="gm-calc-list-title">Excluded from grade calculation (activity setting)</div><ul class="gm-calc-list">';
+      excluded.forEach((row) => {
+        step1Body += `<li>${gmEscapeAttr(row.label)}${row.date ? ` (${gmEscapeAttr(row.date)})` : ''}</li>`;
+      });
+      step1Body += '</ul>';
+    }
+    parts.push(gmCalcStepSection(1, 'Applicable activities', step1Body));
+
+    let step2Body = '';
+    if (applicable.length) {
+      const weightSum = Number(assignments.weightSum) || 0;
+      const renormNote = assignments.renormalizedTo100
+        ? `Activity weights sum to <strong>${weightSum}</strong> (not 100). Each weight is renormalized relative to this student's applicable total so contributions add up to 100%.`
+        : `Activity weights sum to <strong>${weightSum}</strong>.`;
+      step2Body += `<p class="gm-calc-step-note mb-3">${renormNote}</p>`;
+      step2Body += '<div class="table-responsive"><table class="table table-bordered gm-calc-table mb-0"><thead><tr><th>Activity</th><th>Original weight</th><th>Normalized %</th></tr></thead><tbody>';
+      applicable.forEach((row) => {
+        step2Body += `<tr><td class="fw-semibold">${gmEscapeAttr(row.label)}</td><td class="gm-calc-num">${row.originalWeight}</td><td class="gm-calc-num">${formatGmPercent(row.normalizedWeightPercent)}</td></tr>`;
+      });
+      step2Body += '</tbody></table></div>';
+    } else {
+      step2Body = '<p class="text-muted mb-0">No weights to normalize.</p>';
+    }
+    parts.push(gmCalcStepSection(2, 'Renormalize weights', step2Body));
+
+    let step3Body = '';
+    if (applicable.length) {
+      step3Body += '<p class="gm-calc-formula mb-3">Contribution = Activity % × Normalized weight</p>';
+      step3Body += '<div class="table-responsive"><table class="table table-bordered gm-calc-table mb-0"><thead><tr><th>Activity</th><th>Activity %</th><th>Normalized weight</th><th>Contribution</th></tr></thead><tbody>';
+      applicable.forEach((row) => {
+        step3Body += `<tr><td class="fw-semibold">${gmEscapeAttr(row.label)}</td><td class="gm-calc-num">${formatGmPercent(row.activityPercent)}</td><td class="gm-calc-num">${formatGmPercent(row.normalizedWeightPercent)}</td><td class="gm-calc-num text-success">${formatGmPercent(row.contributionPercent)}</td></tr>`;
+      });
+      step3Body += '</tbody></table></div>';
+    } else {
+      step3Body = '<p class="text-muted mb-0">No activity contributions.</p>';
+    }
+    parts.push(gmCalcStepSection(3, 'Activity contributions', step3Body));
+
+    parts.push(gmCalcStepSection(4, 'Final score', `<div class="gm-calc-total-box is-final"><span class="gm-calc-total-label">Final score (period-weighted)</span><span class="gm-calc-total">${formatGmPercent(assignments.assignmentsPercent)}</span></div>`));
+
+    return parts.join('');
+  }
+
+  function openGmGradeCalcModal(personId) {
+    gmOpenCalcPersonId = String(personId || '').trim();
+    const data = window.currentGradesMatrixData;
+    const row = (Array.isArray(data?.matrix) ? data.matrix : []).find((item) => String(item?.personId || '') === String(personId || ''));
+    const bodyEl = document.getElementById('gmGradeCalcModalBody');
+    const titleEl = document.getElementById('gmGradeCalcModalTitle');
+    if (!row || !bodyEl) return;
+    if (titleEl) {
+      titleEl.innerHTML = `<i class="bi bi-calculator me-2"></i>Grade calculation — ${gmEscapeAttr(row.name || 'Student')}`;
+    }
+    bodyEl.innerHTML = renderGmGradeCalcModalBody(row.gradeCalculationBreakdown, {
+      studentName: row.name,
+      className: data?.className,
+      startDate: document.getElementById('gm_startDate')?.value || '',
+      endDate: document.getElementById('gm_endDate')?.value || '',
+      hasMoreColumns: Boolean(gmMatrixWindowState.hasMoreColumns)
+    });
+    if (gmGradeCalcModalInstance) gmGradeCalcModalInstance.show();
+  }
+
   let gmLoadSeq = 0;
   let gmLoadAbort = null;
   const GM_STUDENT_WINDOW = 50;
@@ -446,13 +1002,55 @@ document.addEventListener('DOMContentLoaded', () => {
     const groups = [];
     let i = 0;
     while (i < columns.length) {
-      const d = columns[i].date;
+      const col = columns[i];
+      const d = col.date;
+      const sessionId = String(col?.sessionId || '').trim();
       let j = i;
-      while (j < columns.length && columns[j].date === d) j += 1;
-      groups.push({ date: d, start: i, len: j - i });
+      while (
+        j < columns.length
+        && columns[j].date === d
+        && String(columns[j]?.sessionId || '').trim() === sessionId
+      ) j += 1;
+      groups.push({
+        date: d,
+        sessionId,
+        sessionStartTime: col?.sessionStartTime || '',
+        start: i,
+        len: j - i
+      });
       i = j;
     }
     return groups;
+  }
+
+  function gmFormatDisplayDate(ymd) {
+    const raw = String(ymd || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw || '—';
+    const d = new Date(`${raw}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function gmFormatDateGroupLabel(group, columns) {
+    const date = gmFormatDisplayDate(group?.date || columns?.[group?.start]?.date || '—');
+    const timeLabel = gmFormatSessionTimeLabel(group?.sessionStartTime || columns?.[group?.start]?.sessionStartTime || '');
+    return timeLabel ? `${date} · ${timeLabel}` : date;
+  }
+
+  function renderGmDateGroupHeaderHtml(group, columns, classId) {
+    const label = gmFormatDateGroupLabel(group, columns);
+    const sessionId = String(group?.sessionId || columns?.[group?.start]?.sessionId || '').trim();
+    const url = gmBuildSessionManageUrl(classId, sessionId);
+    if (!url) return gmEscapeAttr(label);
+    return `<button type="button" class="btn btn-link btn-sm p-0 gm-date-session-btn" data-session-url="${gmEscapeAttr(url)}" title="Open session">${gmEscapeAttr(label)}</button>`;
+  }
+
+  function appendGmDateGroupHeader(trDate, group, columns, classId) {
+    const th = document.createElement('th');
+    th.colSpan = group.len;
+    th.className = `gm-date-group ${bandClass(columns[group.start].dateBand)}`;
+    th.innerHTML = renderGmDateGroupHeaderHtml(group, columns, classId);
+    trDate.appendChild(th);
   }
 
   function mergeGradesMatrixPayload(existing, chunk, mergeMode) {
@@ -484,19 +1082,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const tr = document.querySelector(`#gm_tbody tr[data-person-id="${CSS.escape(personId)}"]`);
       if (!tr) return;
       const finalTd = tr.querySelector('.gm-sticky-final');
-      const attTd = tr.querySelector('.gm-sticky-att');
       if (finalTd) {
         finalTd.innerHTML = row.finalPercent != null
           ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>`
           : '—';
       }
-      if (attTd) {
-        const attStr = formatGmPercent(row.attendancePct);
-        attTd.innerHTML = attStr === '—'
-          ? '<span class="text-muted">—</span>'
-          : `<span class="fw-semibold text-primary">${attStr}</span>`;
-      }
     });
+    const calcModalEl = document.getElementById('gmGradeCalcModal');
+    if (gmOpenCalcPersonId && calcModalEl?.classList.contains('show')) {
+      openGmGradeCalcModal(gmOpenCalcPersonId);
+    }
   }
 
   async function refreshGradesDisplayRollups() {
@@ -510,7 +1105,6 @@ document.addEventListener('DOMContentLoaded', () => {
           classId: data.classId,
           startDate: document.getElementById('gm_startDate').value,
           endDate: document.getElementById('gm_endDate').value,
-          includeAttendanceInFinal: getGmIncludeAttendance(),
           columns: data.columns || [],
           students: data.matrix.map((row) => ({
             personId: row.personId,
@@ -526,7 +1120,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const rollup = rollups[key];
         if (rollup) Object.assign(row, rollup);
       });
-      data.includeAttendanceInFinal = getGmIncludeAttendance();
       updateGradesRollupDom(data.matrix);
     } catch (_) {}
   }
@@ -536,12 +1129,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!thead || !thead.rows.length || !columns.length) return;
     const trDate = thead.rows[0];
     const trCols = thead.rows[1];
+    const classId = window.currentGradesMatrixData?.classId || document.getElementById('gm_classId')?.value || '';
     buildGmColumnGroups(columns).forEach((group) => {
-      const th = document.createElement('th');
-      th.colSpan = group.len;
-      th.className = `gm-date-group ${bandClass(columns[group.start].dateBand)}`;
-      th.textContent = group.date || '—';
-      trDate.appendChild(th);
+      appendGmDateGroupHeader(trDate, group, columns, classId);
     });
     columns.forEach((col) => {
       const th = document.createElement('th');
@@ -556,11 +1146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tr = document.createElement('tr');
     tr.dataset.personId = String(row.personId || '');
     const fp = row.finalPercent != null ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>` : '—';
-    const attStr = formatGmPercent(row.attendancePct);
-    const attCell = attStr === '—'
-      ? '<span class="text-muted">—</span>'
-      : `<span class="fw-semibold text-primary">${attStr}</span>`;
-    let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-att small">${attCell}</td>`;
+    let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td>`;
     row.cells.forEach((cell, idx) => {
       const col = columns[idx];
       html += `<td class="text-center small ${bandClass(col.dateBand)}">${renderCellHtml(cell, col, row.name)}</td>`;
@@ -604,7 +1190,6 @@ document.addEventListener('DOMContentLoaded', () => {
         classId,
         startDate,
         endDate,
-        includeAttendanceInFinal: getGmIncludeAttendance() ? 'true' : 'false',
         studentOffset: String(mergeMode === 'students' ? gmMatrixWindowState.loadedStudents : 0),
         studentLimit: String(mergeMode === 'columns'
           ? (gmMatrixWindowState.loadedStudents || GM_STUDENT_WINDOW)
@@ -647,23 +1232,14 @@ document.addEventListener('DOMContentLoaded', () => {
       window.currentGradesMatrixData = result;
       setGradesPrintEnabled(true);
 
-      const { evaluation, columns, matrix, className, registrationMode } = result;
-      const isRollingClass = String(registrationMode || '').trim().toLowerCase() === 'rolling';
+      const { columns, matrix, className } = result;
       document.getElementById('gm_classTitle').textContent = className || 'Class';
-      document.getElementById('gm_passing').textContent = (evaluation && evaluation.passingScore != null) ? `${evaluation.passingScore}%` : '—';
-      const w = evaluation && evaluation.weights ? evaluation.weights : {};
-      const weightParts = [
-        w.attendance != null ? `Attendance ${w.attendance}%` : null,
-        w.assignments != null ? `Assignments ${w.assignments}%` : null
-      ];
-      if (!isRollingClass) {
-        weightParts.push(w.midterm != null ? `Midterm ${w.midterm}%` : null);
-        weightParts.push(w.finalExam != null ? `Final exam ${w.finalExam}%` : null);
-      }
-      document.getElementById('gm_weights').innerHTML = weightParts.filter(Boolean).join(' · ') || '—';
-      const includeAttendance = getGmIncludeAttendance();
-      updateGmMatrixBlurb(isRollingClass, includeAttendance);
       document.getElementById('gm_evalCard').classList.remove('d-none');
+      if (mergeMode === 'columns') {
+        renderGmEvalWeightsTable(result.columns || [], { append: true });
+      } else {
+        renderGmEvalWeightsTable(columns || []);
+      }
 
       if (mergeMode === 'columns') {
         appendGmColumns(chunk.columns || []);
@@ -692,13 +1268,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (!columns || !columns.length) {
-        thead.innerHTML = '<tr><th class="gm-sticky-final">Final</th><th class="gm-sticky-name">Student</th><th class="gm-sticky-att" title="Attendance performance % for the selected period">Attend.</th><th>No graded items in this date range</th></tr>';
+        thead.innerHTML = '<tr><th class="gm-sticky-final">Final</th><th class="gm-sticky-name">Student</th><th class="gm-sticky-calc" title="Grade calculation breakdown"><i class="bi bi-info-circle"></i></th><th>No graded items in this date range</th></tr>';
         matrix.forEach((row) => {
           const tr = document.createElement('tr');
           tr.dataset.personId = String(row.personId || '');
           const fp = formatGmPercent(row.finalPercent);
-          const att = formatGmPercent(row.attendancePct);
-          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-att small">${att}</td><td class="text-muted">—</td>`;
+          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td><td class="text-muted">—</td>`;
           tbody.appendChild(tr);
         });
         document.getElementById('gm_results').classList.remove('d-none');
@@ -709,13 +1284,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const trDate = document.createElement('tr');
       trDate.innerHTML = `<th class="gm-sticky-final gm-date-group" rowspan="2">Final</th>
         <th class="gm-sticky-name gm-date-group" rowspan="2">Student</th>
-        <th class="gm-sticky-att gm-date-group" rowspan="2" title="Attendance performance % for sessions in the selected date range (same credit rules as the attendance matrix)">Attend.</th>`;
+        <th class="gm-sticky-calc gm-date-group" rowspan="2" title="Grade calculation breakdown"><i class="bi bi-info-circle"></i></th>`;
       groups.forEach((g) => {
-        const th = document.createElement('th');
-        th.colSpan = g.len;
-        th.className = `gm-date-group ${bandClass(columns[g.start].dateBand)}`;
-        th.textContent = g.date || '—';
-        trDate.appendChild(th);
+        appendGmDateGroupHeader(trDate, g, columns, result.classId || classId);
       });
       const trCols = document.createElement('tr');
       columns.forEach((col) => {
@@ -763,19 +1334,49 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('gm_btnLoad')?.addEventListener('click', () => loadGradesMatrixData());
-
-  document.getElementById('gm_includeAttendance')?.addEventListener('change', () => {
-    if (!window.currentGradesMatrixData?.classId) return;
-    const isRollingClass = String(window.currentGradesMatrixData.registrationMode || '').trim().toLowerCase() === 'rolling';
-    updateGmMatrixBlurb(isRollingClass, getGmIncludeAttendance());
-    refreshGradesDisplayRollups();
+  document.getElementById('gm_btnSaveWeights')?.addEventListener('click', () => saveGmActivityWeights());
+  document.getElementById('gm_evalWeightsTable')?.addEventListener('input', (event) => {
+    const input = event.target.closest('.gm-eval-weight-input');
+    if (!input) return;
+    onGmWeightInputChange(input.getAttribute('data-col-key') || '', input.value);
   });
 
   let gmCommentModalInstance = null;
+  let gmGradeCalcModalInstance = null;
+  let gmActivityModalInstance = null;
   const gmCommentModalEl = document.getElementById('gmCommentModal');
   if (gmCommentModalEl && typeof bootstrap !== 'undefined') {
     gmCommentModalInstance = new bootstrap.Modal(gmCommentModalEl);
   }
+  const gmGradeCalcModalEl = document.getElementById('gmGradeCalcModal');
+  if (gmGradeCalcModalEl && typeof bootstrap !== 'undefined') {
+    gmGradeCalcModalInstance = new bootstrap.Modal(gmGradeCalcModalEl);
+  }
+  const gmActivityModalEl = document.getElementById('gmActivityModal');
+  if (gmActivityModalEl && typeof bootstrap !== 'undefined') {
+    gmActivityModalInstance = new bootstrap.Modal(gmActivityModalEl);
+  }
+
+  document.getElementById('gm_evalWeightsTable')?.addEventListener('click', (event) => {
+    const infoBtn = event.target.closest('.gm-col-info-btn');
+    if (!infoBtn) return;
+    event.preventDefault();
+    openGmActivityModal(infoBtn.getAttribute('data-col-key') || '');
+  });
+
+  document.getElementById('gm_thead')?.addEventListener('click', (event) => {
+    const dateBtn = event.target.closest('.gm-date-session-btn');
+    if (dateBtn) {
+      event.preventDefault();
+      const url = String(dateBtn.getAttribute('data-session-url') || '').trim();
+      if (url) window.open(url, '_blank', 'noopener');
+      return;
+    }
+    const infoBtn = event.target.closest('.gm-col-info-btn');
+    if (!infoBtn) return;
+    event.preventDefault();
+    openGmActivityModal(infoBtn.getAttribute('data-col-key') || '');
+  });
 
   function gmOpenCommentModal({ studentName, activityLabel, comment }) {
     const nameEl = document.getElementById('gmCommentModalStudentName');
@@ -788,6 +1389,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('gm_tbody')?.addEventListener('click', (event) => {
+    const calcBtn = event.target.closest('.gm-calc-btn');
+    if (calcBtn) {
+      event.preventDefault();
+      openGmGradeCalcModal(calcBtn.getAttribute('data-person-id') || '');
+      return;
+    }
     const btn = event.target.closest('.gm-comment-btn');
     if (!btn) return;
     event.preventDefault();
@@ -847,13 +1454,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function gmPrintCellText(cell, col) {
     if (!cell) return { text: '—', cls: 'st-empty' };
-    if (cell.absent) {
-      const label = cell.attendanceStatus === 'not_applicable'
-        ? 'N/A'
-        : (cell.attendanceStatus === 'acf' ? 'ACF' : 'Absent');
-      return { text: label, cls: 'st-absent' };
+    if (cell.notApplicable || cell.attendanceStatus === 'not_applicable') {
+      return { text: 'N/A', cls: 'st-absent' };
     }
-    if (cell.score == null || cell.score === '') return { text: '—', cls: 'st-empty' };
+    if (cell.absent) {
+      const label = cell.attendanceStatus === 'acf' ? 'ACF' : 'Absent';
+      let cls = 'st-absent';
+      if (cell.effective) cls += ' st-eff';
+      return { text: label, cls };
+    }
+    if (cell.score == null || cell.score === '') {
+      if (cell.effective) return { text: '—', cls: 'st-empty st-eff' };
+      return { text: '—', cls: 'st-empty' };
+    }
     const total = Number(col?.totalScore) || 0;
     const score = cell.score;
     const pct = cell.percent != null ? `${cell.percent}%` : '';
@@ -873,24 +1486,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const columns = Array.isArray(matrixData?.columns) ? matrixData.columns : [];
     let finalSum = 0;
     let finalCount = 0;
-    let attSum = 0;
-    let attCount = 0;
     students.forEach((row) => {
       if (row?.finalPercent != null && Number.isFinite(Number(row.finalPercent))) {
         finalSum += Number(row.finalPercent);
         finalCount += 1;
-      }
-      if (row?.attendancePct != null && Number.isFinite(Number(row.attendancePct))) {
-        attSum += Number(row.attendancePct);
-        attCount += 1;
       }
     });
     return {
       studentCount: students.length,
       sessionCount: sessions.length,
       columnCount: columns.length,
-      avgFinal: finalCount ? Math.round((finalSum / finalCount) * 10) / 10 : null,
-      avgAttend: attCount ? Math.round((attSum / attCount) * 10) / 10 : null
+      avgFinal: finalCount ? Math.round((finalSum / finalCount) * 10) / 10 : null
     };
   }
 
@@ -908,23 +1514,8 @@ document.addEventListener('DOMContentLoaded', () => {
       hour: 'numeric', minute: '2-digit'
     });
     const evaluation = data.evaluation || {};
-    const weights = evaluation.weights || {};
-    const isRolling = String(data.registrationMode || '').trim().toLowerCase() === 'rolling';
     const passing = evaluation.passingScore != null ? `${evaluation.passingScore}%` : '—';
-    const weightParts = [
-      weights.attendance != null ? `Attendance ${weights.attendance}%` : null,
-      weights.assignments != null ? `Assignments ${weights.assignments}%` : null
-    ];
-    if (!isRolling) {
-      weightParts.push(weights.midterm != null ? `Midterm ${weights.midterm}%` : null);
-      weightParts.push(weights.finalExam != null ? `Final exam ${weights.finalExam}%` : null);
-    }
-    const weightsLabel = weightParts.filter(Boolean).join(' · ') || '—';
-    const includeAttendanceInFinal = meta.includeAttendanceInFinal === true
-      || matrixData.includeAttendanceInFinal === true;
-    const finalNote = includeAttendanceInFinal
-      ? 'Final % includes attendance per class evaluation weights.'
-      : 'Final % uses assignments only; attendance shown separately and not included in Final.';
+    const finalNote = 'Final % is the period-weighted assignments average (activity weights renormalized per student).';
     const fallbackSettings = {
       includeOrg: true,
       orgName,
@@ -956,19 +1547,11 @@ document.addEventListener('DOMContentLoaded', () => {
       ? window.PrintDocumentBuilder.buildPreviewOrientationScript({ orientation: settings.orientation, sourcePath: location.pathname, mode: 'grades-matrix' })
       : '';
 
-    const groups = [];
-    let gi = 0;
-    while (gi < columns.length) {
-      const d = columns[gi].date;
-      let gj = gi;
-      while (gj < columns.length && columns[gj].date === d) gj += 1;
-      groups.push({ date: d, start: gi, len: gj - gi });
-      gi = gj;
-    }
+    const groups = buildGmColumnGroups(columns);
 
     const dateHeaderCells = groups.map((g) => {
-      const shortDate = gmPrintFormatDateShort(g.date);
-      return `<th class="day-group" colspan="${g.len}">${gmPrintEscapeHtml(shortDate)}</th>`;
+      const label = gmFormatDateGroupLabel(g, columns);
+      return `<th class="day-group" colspan="${g.len}">${gmPrintEscapeHtml(label)}</th>`;
     }).join('');
 
     const activityHeaderCells = columns.map((col) => {
@@ -985,7 +1568,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const bodyRows = students.map((row, index) => {
       const name = String(row.name || 'Student');
       const fp = gmPrintFormatPercent(row.finalPercent);
-      const att = gmPrintFormatPercent(row.attendancePct);
       const cells = (Array.isArray(row.cells) ? row.cells : []).map((cell, idx) => {
         const col = columns[idx] || {};
         const rendered = gmPrintCellText(cell, col);
@@ -998,17 +1580,15 @@ document.addEventListener('DOMContentLoaded', () => {
         <td class="num-col">${index + 1}</td>
         <td class="final-col">${gmPrintEscapeHtml(fp)}</td>
         <td class="name-col">${gmPrintEscapeHtml(name)}</td>
-        <td class="att-col">${gmPrintEscapeHtml(att)}</td>
         ${emptyCols}
       </tr>`;
     }).join('');
 
     const emptyRow = !students.length
-      ? `<tr><td colspan="${Math.max(4, columns.length + 4)}" class="empty-msg">No students found for this range.</td></tr>`
+      ? `<tr><td colspan="${Math.max(3, columns.length + 3)}" class="empty-msg">No students found for this range.</td></tr>`
       : '';
 
     const avgFinalLabel = summary.avgFinal == null ? '—' : gmPrintFormatPercent(summary.avgFinal);
-    const avgAttendLabel = summary.avgAttend == null ? '—' : gmPrintFormatPercent(summary.avgAttend);
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -1098,9 +1678,8 @@ document.addEventListener('DOMContentLoaded', () => {
     table.matrix thead { display: table-header-group; }
     table.matrix tbody tr { page-break-inside: avoid; }
     .num-col { width: 28px; text-align: center; color: #555; }
-    .final-col { text-align: center; min-width: 48px; font-weight: 700; white-space: nowrap; }
+    .final-col { text-align: center; min-width: 52px; white-space: nowrap; color: #198754; font-weight: 700; }
     .name-col { text-align: left; min-width: 110px; max-width: 160px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .att-col { text-align: center; min-width: 48px; white-space: nowrap; color: #0d6efd; font-weight: 600; }
     .day-group { font-size: 9.5px; }
     .act-col { min-width: 56px; max-width: 90px; }
     .act-kind { font-size: 8px; color: #666; font-weight: 500; }
@@ -1176,7 +1755,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span><strong>Printed:</strong> ${gmPrintEscapeHtml(printedAtLabel)}</span>
         ${settings.requestedByLabel ? `<span><strong>Requested by:</strong> ${gmPrintEscapeHtml(settings.requestedByLabel)}</span>` : ''}
       </div>
-      <div class="eval-line"><strong>Passing:</strong> ${gmPrintEscapeHtml(passing)} · <strong>Weights:</strong> ${gmPrintEscapeHtml(weightsLabel)} · ${gmPrintEscapeHtml(finalNote)}</div>
+      <div class="eval-line"><strong>Passing:</strong> ${gmPrintEscapeHtml(passing)} · ${gmPrintEscapeHtml(finalNote)}</div>
         </header>
       </div>
       ${logoHtml}
@@ -1188,7 +1767,6 @@ document.addEventListener('DOMContentLoaded', () => {
       <span class="stat"><b>${summary.sessionCount}</b> sessions</span>
       <span class="stat"><b>${summary.columnCount}</b> activities</span>
       <span class="stat">Avg Final <b>${gmPrintEscapeHtml(avgFinalLabel)}</b></span>
-      <span class="stat">Avg Attend. <b>${gmPrintEscapeHtml(avgAttendLabel)}</b></span>
     </div>
     <div class="legend">Legend: score/total · percent% · excl. = scored but excluded from category average · Absent / ACF / N/A = no score due to attendance · — = no score</div>
 
@@ -1198,7 +1776,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <th class="num-col" rowspan="2">#</th>
           <th class="final-col" rowspan="2">Final %</th>
           <th class="name-col" rowspan="2">Student</th>
-          <th class="att-col" rowspan="2">Attend. %</th>
           ${dateHeaderCells}
         </tr>
         <tr>
@@ -1207,7 +1784,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <th class="num-col">#</th>
           <th class="final-col">Final %</th>
           <th class="name-col">Student</th>
-          <th class="att-col">Attend. %</th>
           <th>No graded items in this date range</th>
         </tr>`}
       </thead>
@@ -1251,7 +1827,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startDate,
         endDate,
         className: window.currentGradesMatrixData.className,
-        includeAttendanceInFinal: getGmIncludeAttendance(),
         printedAt: new Date(),
         printSettings: settings
       });

@@ -237,3 +237,20 @@ test('attendance matrix view loads history on demand per cell', () => {
   assert.doesNotMatch(source, /\/api\/change-log\/query/);
   assert.doesNotMatch(source, /attendanceChangeLogCache/);
 });
+
+test('student attendance report view matches matrix legend and history wiring', () => {
+  const source = read('packages/school/MVC/views/school/attendance/studentAttendanceReportViewer.ejs');
+  assert.match(source, /btn_sarAttendanceHistory/);
+  assert.match(source, /btn_sarAttendanceLegend/);
+  assert.match(source, /sarAttendanceLegendModal/);
+  assert.match(source, /renderSarAttendanceLegend/);
+  assert.match(source, /openSarAttendanceLegendModal/);
+  assert.match(source, /attendance-history-mode-on/);
+  assert.match(source, /attendanceCellHistoryModal/);
+  assert.match(source, /openAttendanceCellHistory/);
+  assert.match(source, /buildHistoryAttendanceCellHtml/);
+  assert.match(source, /\/api\/change-log\?/);
+  assert.match(source, /fetchAttendanceChangeLogForCell/);
+  assert.match(source, /patchSarAttendanceCellsForHistoryMode/);
+  assert.doesNotMatch(source, /studentAttendanceReportLegend/);
+});

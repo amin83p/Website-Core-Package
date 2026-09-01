@@ -6,7 +6,8 @@ const path = require('path');
 const {
   collectColumns,
   buildGradesMatrixCell,
-  formatColumnWeightLabel
+  formatColumnWeightLabel,
+  buildColumnActivityDetails
 } = require('../MVC/controllers/school/gradesMatrixController');
 const attendanceMatrixMetricsService = require('../MVC/services/school/attendanceMatrixMetricsService');
 const matrixWindowService = require('../MVC/services/school/matrixWindowService');
@@ -127,7 +128,35 @@ test('buildGradesMatrixCell clears comment for absent students', () => {
   );
 
   assert.equal(cell.absent, true);
+  assert.equal(cell.notApplicable, false);
+  assert.equal(cell.effective, true);
   assert.equal(cell.comment, undefined);
+});
+
+test('buildGradesMatrixCell marks N/A separately from absent and excludes from period average', () => {
+  const session = makeSession({
+    roster: [{ personId: 'p1', attendance: 'not_applicable' }],
+    gradebooks: [{
+      id: 'gb1',
+      name: 'Quiz',
+      totalScore: 20,
+      scores: { p1: 18 }
+    }]
+  });
+  const { columns } = collectColumns([session]);
+  const ctx = makeCtx([session]);
+  const rosterMaps = matrixWindowService.buildRosterLookupMaps([session]);
+  const cell = buildGradesMatrixCell(
+    { personId: 'p1', name: 'Student One' },
+    columns[0],
+    ctx,
+    rosterMaps
+  );
+
+  assert.equal(cell.notApplicable, true);
+  assert.equal(cell.absent, false);
+  assert.equal(cell.effective, false);
+  assert.equal(cell.score, null);
 });
 
 test('buildGradesMatrixCell omits comment for quiz cells', () => {
@@ -161,11 +190,56 @@ test('computeFinalPercent excludes attendance by default', () => {
   assert.equal(included.finalPercent, 60);
 });
 
-test('gradesMatrix view supports attendance include toggle', () => {
+test('collectColumns includes activity content and session metadata', () => {
+  const session = makeSession({
+    startTime: '09:30',
+    status: 'completed',
+    gradebooks: [{
+      id: 'gb1',
+      name: 'Reading quiz',
+      weight: 10,
+      totalScore: 20,
+      activityContent: 'Read chapter 3 and answer questions.',
+      attachments: [{ id: 'a1', name: 'Worksheet.pdf', url: '/uploads/ws.pdf', role: 'test' }],
+      skills: ['Reading']
+    }]
+  });
+  const { columns } = collectColumns([session]);
+  assert.equal(columns[0].activityContent, 'Read chapter 3 and answer questions.');
+  assert.equal(columns[0].sessionStartTime, '09:30');
+  assert.equal(columns[0].attachments.length, 1);
+  assert.deepEqual(columns[0].skills, ['Reading']);
+});
+
+test('buildColumnActivityDetails reads alternate instruction fields', () => {
+  const details = buildColumnActivityDetails({
+    instructions: 'Complete all items.',
+    description: 'ignored when instructions present'
+  }, 'quiz', { startTime: '14:00', status: 'scheduled' });
+  assert.equal(details.activityContent, 'Complete all items.');
+  assert.equal(details.sessionStartTime, '14:00');
+});
+
+test('gradesMatrix view supports live weight editor and calculation modal', () => {
   assert.match(gradesMatrixSource, /gmCommentModal/);
   assert.match(gradesMatrixSource, /gm-comment-btn/);
   assert.match(gradesMatrixSource, /formatGmColumnWeightLabel/);
   assert.match(gradesMatrixSource, /gmOpenCommentModal/);
-  assert.match(gradesMatrixSource, /gm_includeAttendance/);
-  assert.match(gradesMatrixSource, /updateGmMatrixBlurb/);
+  assert.doesNotMatch(gradesMatrixSource, /gm_includeAttendance/);
+  assert.doesNotMatch(gradesMatrixSource, /gm-sticky-att/);
+  assert.match(gradesMatrixSource, /gm_evalFormula/);
+  assert.match(gradesMatrixSource, /gm_evalWeightsTable/);
+  assert.match(gradesMatrixSource, /gm_btnSaveWeights/);
+  assert.match(gradesMatrixSource, /saveGmActivityWeights/);
+  assert.match(gradesMatrixSource, /scheduleGmLiveRollupRecalc/);
+  assert.match(gradesMatrixSource, /notApplicable/);
+  assert.match(gradesMatrixSource, /period-weighted average/i);
+  assert.match(gradesMatrixSource, /gmGradeCalcModal/);
+  assert.match(gradesMatrixSource, /gm-calc-btn/);
+  assert.match(gradesMatrixSource, /gm-sticky-calc/);
+  assert.match(gradesMatrixSource, /openGmGradeCalcModal/);
+  assert.match(gradesMatrixSource, /gmActivityModal/);
+  assert.match(gradesMatrixSource, /gm-col-info-btn/);
+  assert.match(gradesMatrixSource, /openGmActivityModal/);
+  assert.match(gradesMatrixSource, /gm-date-session-btn/);
 });

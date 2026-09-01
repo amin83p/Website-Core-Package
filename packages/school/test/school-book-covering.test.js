@@ -308,6 +308,9 @@ test('book covering list uses row actions menu with delete', () => {
   assert.match(view, /btn-row-actions-toggle/);
   assert.match(view, /bi-three-dots-vertical/);
   assert.match(view, /book-covering\/delete/);
+  assert.match(view, /data-confirm-delete/);
+  assert.match(view, /confirmBookCoveringDelete/);
+  assert.match(view, /showMessageModal/);
   assert.match(view, /canDelete/);
 });
 

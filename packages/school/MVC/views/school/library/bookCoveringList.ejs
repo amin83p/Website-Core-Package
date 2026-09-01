@@ -66,4 +66,33 @@
   </table>
 </div>
 
+<script>
+(function () {
+  async function confirmBookCoveringDelete() {
+    if (typeof window.showMessageModal === 'function') {
+      const result = await window.showMessageModal({
+        title: 'Delete Book Covering Report',
+        icon: 'warning',
+        message: 'Delete this book covering report permanently? This cannot be undone.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Delete', class: 'btn-danger' }
+        ]
+      });
+      return result === 'Delete';
+    }
+    return window.confirm('Delete this book covering report permanently? This cannot be undone.');
+  }
+
+  document.addEventListener('click', async (event) => {
+    const link = event.target.closest('a[data-confirm-delete="true"]');
+    if (!link || !link.href) return;
+    event.preventDefault();
+    if (await confirmBookCoveringDelete()) {
+      window.location.href = link.href;
+    }
+  });
+})();
+</script>
+
 <%- include('partials/tablePages-end') %>

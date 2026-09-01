@@ -1151,6 +1151,140 @@
     @keyframes pulseCal { 0% { box-shadow: 0 0 0 0 rgba(220,53,69,0.4); } 70% { box-shadow: 0 0 0 4px rgba(220,53,69,0); } 100% { box-shadow: 0 0 0 0 rgba(220,53,69,0); } }
     @keyframes reportPriorityBlink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(1.18); } }
     @media (prefers-reduced-motion: reduce) { .report-priority-marker { animation: none; } }
+
+    .schedule-class-picker-dialog {
+        width: min(560px, calc(100vw - 2rem));
+        max-width: 560px;
+    }
+    .schedule-class-picker-content {
+        border: 1px solid #dce9ff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+    .schedule-class-picker-header {
+        padding: 1.1rem 1.25rem 0.5rem;
+        background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+    }
+    .schedule-class-picker-body {
+        padding: 0 1.25rem 1.15rem;
+        max-height: min(62vh, 520px);
+        overflow-y: auto;
+    }
+    .schedule-class-picker-search-wrap {
+        position: relative;
+    }
+    .schedule-class-picker-search-icon {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+        z-index: 2;
+    }
+    .schedule-class-picker-search {
+        padding-left: 2.35rem;
+        border-radius: 12px;
+        border-color: #dce9ff;
+        background: #fff;
+    }
+    .schedule-class-picker-search:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.12);
+    }
+    .schedule-class-picker-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+    .schedule-class-picker-item {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        width: 100%;
+        text-align: left;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        background: #fff;
+        padding: 0.85rem 0.95rem;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .schedule-class-picker-item:hover,
+    .schedule-class-picker-item:focus {
+        border-color: #93c5fd;
+        box-shadow: 0 8px 22px rgba(37, 99, 235, 0.12);
+        transform: translateY(-1px);
+        outline: none;
+    }
+    .schedule-class-picker-item-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #eff6ff;
+        color: #2563eb;
+        flex-shrink: 0;
+        border: 1px solid #bfdbfe;
+    }
+    .schedule-class-picker-item-main {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .schedule-class-picker-item-title {
+        font-weight: 600;
+        color: #0f172a;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+    .schedule-class-picker-item-meta {
+        margin-top: 0.2rem;
+        font-size: 0.82rem;
+        color: #64748b;
+        overflow-wrap: anywhere;
+    }
+    .schedule-class-picker-item-foot {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.45rem;
+    }
+    .schedule-class-picker-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.12rem 0.5rem;
+        border-radius: 999px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+    .schedule-class-picker-id {
+        font-size: 0.68rem;
+        color: #94a3b8;
+        margin-left: auto;
+    }
+    .schedule-class-picker-item-chevron {
+        color: #cbd5e1;
+        flex-shrink: 0;
+    }
+    .schedule-class-picker-item:hover .schedule-class-picker-item-chevron,
+    .schedule-class-picker-item:focus .schedule-class-picker-item-chevron {
+        color: #2563eb;
+    }
+    .schedule-class-picker-empty,
+    .schedule-class-picker-loading {
+        border: 1px dashed #cbd5e1;
+        border-radius: 14px;
+        background: #f8fafc;
+        padding: 1.5rem 1rem;
+    }
 </style>
 
 <link rel="stylesheet" href="/styles/session-calendar.css">
@@ -1348,16 +1482,28 @@
 <%- include('school/partials/sessionEnrollmentCalendarModal') %>
 <link rel="stylesheet" href="/styles/session-calendar.css">
 <div class="modal fade" id="scheduleClassPickerModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleClassPickerModalTitle">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header py-2">
-        <h5 class="modal-title mb-0" id="scheduleClassPickerModalTitle">Select class</h5>
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable schedule-class-picker-dialog">
+    <div class="modal-content schedule-class-picker-content">
+      <div class="modal-header schedule-class-picker-header border-0 pb-0">
+        <div class="pe-3">
+          <h5 class="modal-title mb-1" id="scheduleClassPickerModalTitle">
+            <i class="bi bi-easel-fill text-primary me-2" aria-hidden="true"></i>Select class
+          </h5>
+          <p class="small text-muted mb-0" id="scheduleClassPickerSubtitle">Choose a class to stage sessions for.</p>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body py-2">
-        <input type="search" class="form-control form-control-sm mb-2" id="scheduleClassPickerSearch" placeholder="Search classes..." autocomplete="off">
-        <div id="scheduleClassPickerEmpty" class="d-none text-muted small py-3 text-center">No active instructor classes found for this teacher.</div>
-        <div id="scheduleClassPickerList" class="list-group list-group-flush"></div>
+      <div class="modal-body schedule-class-picker-body pt-3">
+        <div class="schedule-class-picker-search-wrap mb-3">
+          <i class="bi bi-search schedule-class-picker-search-icon" aria-hidden="true"></i>
+          <input type="search" class="form-control schedule-class-picker-search" id="scheduleClassPickerSearch" placeholder="Search by title, code, program, or ID..." autocomplete="off">
+        </div>
+        <div id="scheduleClassPickerEmpty" class="d-none schedule-class-picker-empty text-center text-muted">
+          <i class="bi bi-inbox fs-2 opacity-25 d-block mb-2" aria-hidden="true"></i>
+          <div class="fw-semibold">No active classes found</div>
+          <div class="small mt-1">This teacher has no active instructor classes in the current organization.</div>
+        </div>
+        <div id="scheduleClassPickerList" class="schedule-class-picker-list" role="listbox" aria-label="Classes"></div>
       </div>
     </div>
   </div>
@@ -2007,6 +2153,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function formatScheduleClassPickerMode(mode) {
+        const raw = String(mode || '').trim().toLowerCase();
+        if (!raw) return '';
+        if (raw === 'rolling') return 'Rolling enrollment';
+        if (raw === 'term') return 'Term registration';
+        return raw.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    function renderScheduleClassPickerItem(item) {
+        const title = escapeHtml(item.title || item.id);
+        const code = String(item.code || '').trim();
+        const program = String(item.programName || '').trim();
+        const term = String(item.termLabel || '').trim();
+        const dept = String(item.departmentName || '').trim();
+        const mode = formatScheduleClassPickerMode(item.registrationMode);
+        const metaBits = [program, term, dept].filter(Boolean);
+        const metaLine = metaBits.join(' · ');
+        const searchBits = [item.title, item.code, item.id, program, term, dept, mode]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean);
+        const chips = [];
+        if (code) chips.push(`<span class="schedule-class-picker-chip">${escapeHtml(code)}</span>`);
+        if (mode) chips.push(`<span class="schedule-class-picker-chip">${escapeHtml(mode)}</span>`);
+        return `<button type="button" class="schedule-class-picker-item" role="option"
+          data-class-id="${escapeHtml(item.id)}"
+          data-class-title="${title}"
+          data-search="${escapeHtml(searchBits.join(' ').toLowerCase())}">
+          <span class="schedule-class-picker-item-icon" aria-hidden="true"><i class="bi bi-easel-fill"></i></span>
+          <span class="schedule-class-picker-item-main">
+            <span class="schedule-class-picker-item-title d-block">${title}</span>
+            ${metaLine ? `<span class="schedule-class-picker-item-meta d-block">${escapeHtml(metaLine)}</span>` : ''}
+            <span class="schedule-class-picker-item-foot">
+              ${chips.join('')}
+              <span class="schedule-class-picker-id">#${escapeHtml(item.id)}</span>
+            </span>
+          </span>
+          <i class="bi bi-chevron-right schedule-class-picker-item-chevron" aria-hidden="true"></i>
+        </button>`;
+    }
+
     async function fetchInstructorClassesForPerson(personId) {
         const url = `/school/schedules/api/instructor-classes?personId=${encodeURIComponent(personId)}`;
         const res = await fetch(url, { headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' } });
@@ -2044,7 +2230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         searchEl?.addEventListener('input', () => {
             const q = String(searchEl.value || '').trim().toLowerCase();
             listEl.querySelectorAll('.schedule-class-picker-item').forEach((item) => {
-                const hay = String(item.textContent || '').trim().toLowerCase();
+                const hay = String(item.getAttribute('data-search') || item.textContent || '').trim().toLowerCase();
                 item.classList.toggle('d-none', Boolean(q) && !hay.includes(q));
             });
         });
@@ -2064,10 +2250,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const listEl = document.getElementById('scheduleClassPickerList');
         const emptyEl = document.getElementById('scheduleClassPickerEmpty');
         const searchEl = document.getElementById('scheduleClassPickerSearch');
+        const subtitleEl = document.getElementById('scheduleClassPickerSubtitle');
         if (!listEl) return;
-        listEl.innerHTML = '<div class="text-center py-3 text-muted small">Loading classes...</div>';
+        listEl.innerHTML = '<div class="schedule-class-picker-loading text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status" aria-hidden="true"></div><div class="small">Loading classes...</div></div>';
         if (emptyEl) emptyEl.classList.add('d-none');
         if (searchEl) searchEl.value = '';
+        if (subtitleEl) {
+            const teacherName = String(person.name || person.id || '').trim();
+            subtitleEl.textContent = teacherName
+                ? `Active classes where ${teacherName} is an instructor.`
+                : 'Choose a class to stage sessions for.';
+        }
         scheduleStageContext = dragContext;
         try {
             const items = await fetchInstructorClassesForPerson(person.id);
@@ -2076,14 +2269,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (emptyEl) emptyEl.classList.remove('d-none');
             } else {
                 if (emptyEl) emptyEl.classList.add('d-none');
-                listEl.innerHTML = items.map((item) => `
-                    <button type="button" class="list-group-item list-group-item-action schedule-class-picker-item"
-                      data-class-id="${escapeHtml(item.id)}"
-                      data-class-title="${escapeHtml(item.title || item.id)}">
-                      <div class="fw-semibold">${escapeHtml(item.title || item.id)}</div>
-                      ${item.code ? `<div class="small text-muted">${escapeHtml(item.code)}</div>` : ''}
-                    </button>
-                `).join('');
+                listEl.innerHTML = items.map((item) => renderScheduleClassPickerItem(item)).join('');
             }
             getScheduleClassPickerModal()?.show();
         } catch (err) {

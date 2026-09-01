@@ -110,3 +110,104 @@ test('computeWeightedAveragePercent matches earned-over-possible when weight equ
   );
   assert.equal(avg, Math.round((23 / 30) * 10000) / 100);
 });
+
+test('computeStudentPeriodAssignmentPercent renormalizes weights that do not sum to 100', () => {
+  const columns = [
+    { includeInGradeCalculation: true, weight: 10, totalScore: 10 },
+    { includeInGradeCalculation: true, weight: 10, totalScore: 10 }
+  ];
+  const cells = [
+    { percent: 100, score: 10, effective: true },
+    { percent: 0, score: 0, absent: true, effective: true }
+  ];
+  const avg = gradebookWeightService.computeStudentPeriodAssignmentPercent(cells, columns);
+  assert.equal(avg, 50);
+});
+
+test('computeStudentPeriodAssignmentPercent treats absent and missing scores as 0%', () => {
+  const columns = [
+    { includeInGradeCalculation: true, weight: 20, totalScore: 10, kind: 'gradebook' },
+    { includeInGradeCalculation: true, weight: 30, totalScore: 20, kind: 'gradebook' }
+  ];
+  const scoredAbsent = [
+    { percent: 80, score: 8, effective: true },
+    { absent: true, effective: true }
+  ];
+  assert.equal(
+    gradebookWeightService.computeStudentPeriodAssignmentPercent(scoredAbsent, columns),
+    32
+  );
+
+  const scoredMissing = [
+    { percent: 80, score: 8, effective: true },
+    { effective: true }
+  ];
+  assert.equal(
+    gradebookWeightService.computeStudentPeriodAssignmentPercent(scoredMissing, columns),
+    32
+  );
+});
+
+test('computeStudentPeriodAssignmentPercent excludes N/A cells from weight sum per student', () => {
+  const columns = [
+    { includeInGradeCalculation: true, weight: 20, totalScore: 10, kind: 'gradebook' },
+    { includeInGradeCalculation: true, weight: 30, totalScore: 20, kind: 'gradebook' },
+    { includeInGradeCalculation: true, weight: 50, totalScore: 30, kind: 'gradebook' }
+  ];
+  const withNa = [
+    { percent: 80, score: 8, effective: true },
+    { absent: true, effective: true },
+    { notApplicable: true, effective: false }
+  ];
+  assert.equal(
+    gradebookWeightService.computeStudentPeriodAssignmentPercent(withNa, columns),
+    32
+  );
+
+  const allApplicable = [
+    { percent: 80, score: 8, effective: true },
+    { percent: 60, score: 12, effective: true },
+    { percent: 100, score: 30, effective: true }
+  ];
+  assert.equal(
+    gradebookWeightService.computeStudentPeriodAssignmentPercent(allApplicable, columns),
+    84
+  );
+});
+
+test('computeStudentPeriodAssignmentPercent matches explicit gradebook weights when all scored', () => {
+  const columns = [
+    { kind: 'gradebook', includeInGradeCalculation: true, totalScore: 10, weight: 20 },
+    { kind: 'gradebook', includeInGradeCalculation: true, totalScore: 20, weight: 30 }
+  ];
+  const cells = [
+    { score: 8, percent: 80, effective: true },
+    { score: 15, percent: 75, effective: true }
+  ];
+  const avg = gradebookWeightService.computeStudentPeriodAssignmentPercent(cells, columns);
+  assert.equal(avg, 77);
+});
+
+test('buildStudentPeriodAssignmentBreakdown lists applicable, excluded, and N/A activities', () => {
+  const columns = [
+    { label: 'A', date: '2026-01-01', kind: 'gradebook', kindLabel: 'Gradebook', includeInGradeCalculation: true, weight: 20, totalScore: 10 },
+    { label: 'B', date: '2026-01-02', kind: 'gradebook', kindLabel: 'Gradebook', includeInGradeCalculation: true, weight: 30, totalScore: 20 },
+    { label: 'C', date: '2026-01-03', kind: 'gradebook', kindLabel: 'Gradebook', includeInGradeCalculation: false, weight: 50, totalScore: 30 },
+    { label: 'D', date: '2026-01-04', kind: 'gradebook', kindLabel: 'Gradebook', includeInGradeCalculation: true, weight: 50, totalScore: 30 }
+  ];
+  const cells = [
+    { percent: 80, score: 8, effective: true },
+    { absent: true, effective: true },
+    { percent: 100, score: 30, effective: true },
+    { notApplicable: true, effective: false }
+  ];
+  const breakdown = gradebookWeightService.buildStudentPeriodAssignmentBreakdown(cells, columns);
+  assert.equal(breakdown.applicableActivities.length, 2);
+  assert.equal(breakdown.excludedActivities.length, 1);
+  assert.equal(breakdown.notApplicableActivities.length, 1);
+  assert.equal(breakdown.weightSum, 50);
+  assert.equal(breakdown.assignmentsPercent, 32);
+  assert.equal(breakdown.applicableActivities[0].normalizedWeightPercent, 40);
+  assert.equal(breakdown.applicableActivities[1].status, 'absent');
+  assert.equal(breakdown.applicableActivities[1].contributionPercent, 0);
+});

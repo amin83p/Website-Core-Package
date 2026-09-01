@@ -1,74 +1,73 @@
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const gradebookWeightService = require('./gradebookWeightService');
 
-function resolveAssignmentCellScore(cell, total) {
-  let score = cell?.score;
-  if (score == null && cell?.percent != null && Number.isFinite(Number(cell.percent))) {
-    score = (Number(cell.percent) / 100) * total;
-  }
-  if (score == null || !Number.isFinite(Number(score))) return null;
-  return Number(score);
+function assignmentsCategoryAveragePercents(cells, columns) {
+  return gradebookWeightService.computeStudentPeriodAssignmentPercent(cells, columns);
 }
 
-function assignmentsCategoryAveragePercents(cells, columns) {
-  const gradebookPairs = [];
-  let otherEarned = 0;
-  let otherPossible = 0;
+const FINAL_COMPONENT_LABELS = {
+  attendance: 'Attendance',
+  assignments: 'Assignments',
+  midterm: 'Midterm',
+  finalExam: 'Final exam'
+};
 
-  for (let i = 0; i < columns.length; i += 1) {
-    const col = columns[i];
-    const cell = cells[i];
-    if (!col || !cell) continue;
-    if (!col.includeInGradeCalculation) continue;
-    if (!cell.effective) continue;
-    const total = Number(col.totalScore);
-    if (!Number.isFinite(total) || total <= 0) continue;
-    const score = resolveAssignmentCellScore(cell, total);
-    if (score == null) continue;
+function computeMatrixFinalPercent(assignmentsPct) {
+  if (assignmentsPct == null || Number.isNaN(Number(assignmentsPct))) return null;
+  return Math.round(Number(assignmentsPct) * 100) / 100;
+}
 
-    if (String(col.kind || '').trim().toLowerCase() === 'gradebook') {
-      gradebookPairs.push({ col, cell, score, total });
-      continue;
-    }
+function buildMatrixGradeCalculationBreakdown({ cells, columns }) {
+  const assignments = gradebookWeightService.buildStudentPeriodAssignmentBreakdown(cells, columns);
+  const finalPercent = computeMatrixFinalPercent(assignments.assignmentsPercent);
+  return {
+    assignments,
+    finalPercent
+  };
+}
 
-    otherEarned += score;
-    otherPossible += total;
-  }
+function buildStudentGradeCalculationBreakdown({
+  cells,
+  columns,
+  evaluation,
+  attendancePct,
+  includeAttendanceInFinal = false
+}) {
+  const assignments = gradebookWeightService.buildStudentPeriodAssignmentBreakdown(cells, columns);
+  const assignmentsPct = assignments.assignmentsPercent;
+  const { finalPercent, parts } = computeFinalPercent(
+    evaluation,
+    attendancePct,
+    assignmentsPct,
+    null,
+    null,
+    { includeAttendanceInFinal }
+  );
+  const finalWeightSum = parts.reduce((sum, part) => sum + part.weight, 0);
+  const finalComponents = parts.map((part) => {
+    const classWeightPercent = Number(part.weight);
+    const categoryPercent = Number(part.pct);
+    const contributionPercent = finalWeightSum
+      ? Math.round((classWeightPercent * categoryPercent / finalWeightSum) * 100) / 100
+      : null;
+    return {
+      key: part.key,
+      label: FINAL_COMPONENT_LABELS[part.key] || part.key,
+      classWeightPercent,
+      categoryPercent,
+      contributionPercent
+    };
+  });
 
-  const gradebookAvg = gradebookPairs.length
-    ? gradebookWeightService.computeWeightedAveragePercent(
-      gradebookPairs.map(({ col }, index) => ({
-        id: String(col.colKey || col.itemId || `gb_${index}`).trim(),
-        weight: gradebookWeightService.resolveActivityWeight(col),
-        totalScore: Number(col.totalScore) || 0,
-        includeInGradeCalculation: col.includeInGradeCalculation !== false
-      })),
-      (_, index) => {
-        const pair = gradebookPairs[index];
-        return {
-          score: pair.score,
-          totalScore: pair.total
-        };
-      }
-    )
-    : null;
-
-  const otherAvg = otherPossible
-    ? Math.round((otherEarned / otherPossible) * 10000) / 100
-    : null;
-
-  if (gradebookAvg != null && otherAvg != null) {
-    const gbWeightSum = gradebookPairs.reduce(
-      (sum, { col }) => sum + gradebookWeightService.resolveActivityWeight(col),
-      0
-    );
-    const blendWeight = gbWeightSum + otherPossible;
-    if (!blendWeight) return null;
-    return Math.round((((gradebookAvg * gbWeightSum) + (otherAvg * otherPossible)) / blendWeight) * 100) / 100;
-  }
-  if (gradebookAvg != null) return gradebookAvg;
-  if (otherAvg != null) return otherAvg;
-  return null;
+  return {
+    assignments,
+    attendancePercent: attendancePct == null ? null : Number(attendancePct),
+    includeAttendanceInFinal: Boolean(includeAttendanceInFinal),
+    evaluationWeights: evaluation?.weights || {},
+    finalComponents,
+    finalWeightSum,
+    finalPercent
+  };
 }
 
 function computeFinalPercent(evaluation, attendancePct, assignmentsPct, midtermPct, finalExamPct, options = {}) {
@@ -135,7 +134,7 @@ function summarizeAttendanceRollupsForStudents(students = [], context = {}) {
 }
 
 function recomputeGradesMatrixRollups(payload = {}, context = {}) {
-  const { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal = false } = context;
+  const { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal = false, assignmentsOnlyFinal = false } = context;
   const columns = Array.isArray(payload?.columns) ? payload.columns : [];
   const sessionIdSet = new Set(
     columns.map((col) => String(col?.sessionId || '').trim()).filter(Boolean)
@@ -144,7 +143,8 @@ function recomputeGradesMatrixRollups(payload = {}, context = {}) {
   const finalOptions = { includeAttendanceInFinal };
   return {
     ...payload,
-    includeAttendanceInFinal,
+    includeAttendanceInFinal: assignmentsOnlyFinal ? false : includeAttendanceInFinal,
+    assignmentsOnlyFinal: Boolean(assignmentsOnlyFinal),
     matrix: matrix.map((row) => {
       const attendanceRecords = Array.isArray(row?._attendanceRecords)
         ? row._attendanceRecords.filter((rec) => sessionIdSet.has(String(rec?.sessionId || '').trim()))
@@ -156,14 +156,35 @@ function recomputeGradesMatrixRollups(payload = {}, context = {}) {
       );
       const attendancePct = attSummary.performancePercent;
       const assignmentsPct = assignmentsCategoryAveragePercents(row.cells, columns);
-      const { finalPercent, parts } = computeFinalPercent(
-        evaluation,
-        attendancePct,
-        assignmentsPct,
-        null,
-        null,
-        finalOptions
-      );
+      let finalPercent;
+      let parts;
+      let gradeCalculationBreakdown;
+      if (assignmentsOnlyFinal) {
+        finalPercent = computeMatrixFinalPercent(assignmentsPct);
+        parts = [];
+        gradeCalculationBreakdown = buildMatrixGradeCalculationBreakdown({
+          cells: row.cells,
+          columns
+        });
+      } else {
+        const computed = computeFinalPercent(
+          evaluation,
+          attendancePct,
+          assignmentsPct,
+          null,
+          null,
+          finalOptions
+        );
+        finalPercent = computed.finalPercent;
+        parts = computed.parts;
+        gradeCalculationBreakdown = buildStudentGradeCalculationBreakdown({
+          cells: row.cells,
+          columns,
+          evaluation,
+          attendancePct,
+          includeAttendanceInFinal
+        });
+      }
       const { _attendanceRecords, ...rest } = row;
       return {
         ...rest,
@@ -172,14 +193,21 @@ function recomputeGradesMatrixRollups(payload = {}, context = {}) {
         attendanceSummary: attSummary,
         assignmentsPct,
         finalPercent,
-        finalParts: parts
+        finalParts: parts,
+        gradeCalculationBreakdown
       };
     })
   };
 }
 
 function summarizeGradesRollupsForRows(rows = [], columns = [], context = {}) {
-  const { classData, orgPolicyCatalog, evaluation, includeAttendanceInFinal = false } = context;
+  const {
+    classData,
+    orgPolicyCatalog,
+    evaluation,
+    includeAttendanceInFinal = false,
+    assignmentsOnlyFinal = false
+  } = context;
   const rollups = {};
   const sessionIdSet = new Set(
     (Array.isArray(columns) ? columns : []).map((col) => String(col?.sessionId || '').trim()).filter(Boolean)
@@ -199,20 +227,39 @@ function summarizeGradesRollupsForRows(rows = [], columns = [], context = {}) {
     const attendancePct = attSummary.performancePercent;
     const cells = Array.isArray(row?.cells) ? row.cells : [];
     const assignmentsPct = assignmentsCategoryAveragePercents(cells, columns);
-    const { finalPercent, parts } = computeFinalPercent(
-      evaluation,
-      attendancePct,
-      assignmentsPct,
-      null,
-      null,
-      finalOptions
-    );
+    let finalPercent;
+    let parts;
+    let gradeCalculationBreakdown;
+    if (assignmentsOnlyFinal) {
+      finalPercent = computeMatrixFinalPercent(assignmentsPct);
+      parts = [];
+      gradeCalculationBreakdown = buildMatrixGradeCalculationBreakdown({ cells, columns });
+    } else {
+      const computed = computeFinalPercent(
+        evaluation,
+        attendancePct,
+        assignmentsPct,
+        null,
+        null,
+        finalOptions
+      );
+      finalPercent = computed.finalPercent;
+      parts = computed.parts;
+      gradeCalculationBreakdown = buildStudentGradeCalculationBreakdown({
+        cells,
+        columns,
+        evaluation,
+        attendancePct,
+        includeAttendanceInFinal
+      });
+    }
     rollups[personId] = {
       attendancePct,
       attendanceSummary: attSummary,
       assignmentsPct,
       finalPercent,
-      finalParts: parts
+      finalParts: parts,
+      gradeCalculationBreakdown
     };
   });
   return rollups;
@@ -221,6 +268,9 @@ function summarizeGradesRollupsForRows(rows = [], columns = [], context = {}) {
 module.exports = {
   assignmentsCategoryAveragePercents,
   computeFinalPercent,
+  computeMatrixFinalPercent,
+  buildStudentGradeCalculationBreakdown,
+  buildMatrixGradeCalculationBreakdown,
   rollupRecordsForStudentRow,
   recomputeAttendanceMatrixRollups,
   summarizeAttendanceRollupsForStudents,

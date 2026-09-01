@@ -32,4 +32,11 @@ router.post(
   ctrl.postGradesRollups
 );
 
+router.post(
+  '/api/save-activity-weights',
+  requireAccess(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.postSaveActivityWeights
+);
+
 module.exports = router;

@@ -20,6 +20,7 @@ const {
 const matrixWindowService = require('../../services/school/matrixWindowService');
 const matrixRollupService = require('../../services/school/matrixRollupService');
 const gradebookWeightService = require('../../services/school/gradebookWeightService');
+const gradesMatrixWeightSaveService = require('../../services/school/gradesMatrixWeightSaveService');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -100,6 +101,39 @@ function formatColumnWeightLabel(col) {
   return { text: `${pts} pts`, title: 'Points used in category average weighting' };
 }
 
+function sanitizeActivityAttachments(attachments = []) {
+  return (Array.isArray(attachments) ? attachments : [])
+    .map((row) => ({
+      id: String(row?.id || '').trim(),
+      name: String(row?.name || 'Attachment').trim().slice(0, 200),
+      url: String(row?.url || '').trim(),
+      role: String(row?.role || '').trim()
+    }))
+    .filter((row) => row.url)
+    .slice(0, 20);
+}
+
+function buildColumnActivityDetails(item, kind, session) {
+  const activityContent = String(
+    item?.activityContent || item?.instructions || item?.description || item?.content || ''
+  ).trim().slice(0, 12000);
+  const details = {
+    sessionStartTime: String(session?.startTime || '').trim(),
+    sessionStatus: String(session?.status || '').trim(),
+    activityContent
+  };
+  if (kind === 'gradebook') {
+    details.attachments = sanitizeActivityAttachments(item?.attachments);
+    details.skills = Array.isArray(item?.skills)
+      ? item.skills.map((skill) => String(skill || '').trim()).filter(Boolean).slice(0, 50)
+      : [];
+    if (item?.skillFocus) {
+      details.skillFocus = String(item.skillFocus).trim().slice(0, 200);
+    }
+  }
+  return details;
+}
+
 function findGradebookItem(session, itemId) {
   const arr = Array.isArray(session.gradebooks) ? session.gradebooks : [];
   const byId = arr.find((g) => String(g?.id || '') === String(itemId));
@@ -159,7 +193,8 @@ function collectColumns(filteredSessions) {
         includeInGradeCalculation: gb?.includeInGradeCalculation !== false,
         weight: gradebookWeightService.resolveActivityWeight(gb),
         _explicitWeight: Number(gb?.weight),
-        totalScore: total > 0 ? total : 0
+        totalScore: total > 0 ? total : 0,
+        ...buildColumnActivityDetails(gb, 'gradebook', ses)
       });
     });
 
@@ -177,7 +212,8 @@ function collectColumns(filteredSessions) {
         label: String(q?.name || `Quiz ${idx + 1}`).slice(0, 120),
         includeInGradeCalculation: q?.includeInGradeCalculation !== false,
         weight: gradebookWeightService.resolveActivityWeight(q),
-        totalScore: total > 0 ? total : 0
+        totalScore: total > 0 ? total : 0,
+        ...buildColumnActivityDetails(q, 'quiz', ses)
       });
     });
 
@@ -195,7 +231,8 @@ function collectColumns(filteredSessions) {
         label: String(a?.name || `Assignment ${idx + 1}`).slice(0, 120),
         includeInGradeCalculation: a?.includeInGradeCalculation !== false,
         weight: gradebookWeightService.resolveActivityWeight(a),
-        totalScore: total > 0 ? total : 0
+        totalScore: total > 0 ? total : 0,
+        ...buildColumnActivityDetails(a, 'assignment', ses)
       });
     });
   });
@@ -293,7 +330,15 @@ function buildGradesMatrixCell(stu, col, ctx, rosterMaps) {
   } = ctx;
   const ses = sessionById.get(col.sessionId);
   if (!ses) {
-    return { score: null, percent: null, absent: true, attendanceStatus: attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT, effective: false, includeInGradeCalculation: false };
+    return {
+      score: null,
+      percent: null,
+      absent: true,
+      notApplicable: false,
+      attendanceStatus: attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT,
+      effective: false,
+      includeInGradeCalculation: false
+    };
   }
   const rosterRecord = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
   const applicabilityState = getApplicabilityForSession(stu, ses);
@@ -323,32 +368,41 @@ function buildGradesMatrixCell(stu, col, ctx, rosterMaps) {
     lateMinutes: rosterRecord?.lateMinutes || 0,
     earlyLeaveMinutes: rosterRecord?.earlyLeaveMinutes || 0
   }, cellPolicy, enabledAttendanceStatuses);
-  const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
-    || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+  const notApplicable = att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+  const absent = !notApplicable && attendanceMatrixMetricsService.isAbsentLikeStatus(att);
 
   const payload = pickPayload(ses, col);
   if (!payload) {
-    return { score: null, percent: null, absent, attendanceStatus: att, effective: false, includeInGradeCalculation: !!col.includeInGradeCalculation };
+    return {
+      score: null,
+      percent: null,
+      absent,
+      notApplicable,
+      attendanceStatus: att,
+      effective: col.includeInGradeCalculation === true && !notApplicable,
+      includeInGradeCalculation: !!col.includeInGradeCalculation
+    };
   }
 
   const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : Number(payload.totalScore) || 0;
-  const raw = absent ? null : getScoreFromMap(payload.scores, stu.personId);
+  const raw = (absent || notApplicable) ? null : getScoreFromMap(payload.scores, stu.personId);
   let percent = null;
-  if (!absent && raw != null && total > 0) {
+  if (!absent && !notApplicable && raw != null && total > 0) {
     percent = Math.round((raw / total) * 1000) / 10;
   }
-  const effective = col.includeInGradeCalculation === true && !absent && raw != null && total > 0;
+  const effective = col.includeInGradeCalculation === true && !notApplicable;
 
   const cell = {
-    score: absent ? null : raw,
+    score: (absent || notApplicable) ? null : raw,
     percent,
     absent,
+    notApplicable,
     attendanceStatus: att,
     effective,
     includeInGradeCalculation: col.includeInGradeCalculation
   };
 
-  if (!absent && col.kind === 'gradebook') {
+  if (!absent && !notApplicable && col.kind === 'gradebook') {
     const comment = getCommentFromMap(payload.scoreComments, stu.personId);
     if (comment) cell.comment = comment;
   }
@@ -540,9 +594,24 @@ async function showGradesMatrixPage(req, res) {
  * @param {import('express').Request} req
  * @param {{ classId: string, startDate?: string, endDate?: string }} query
  */
+function annotateMatrixColumnsForClient(columns = []) {
+  return columns.map((col) => {
+    const weight = gradebookWeightService.resolveActivityWeight(col);
+    const saved = col?._savedWeight != null ? Number(col._savedWeight) : weight;
+    return {
+      ...col,
+      weight,
+      _savedWeight: Number.isFinite(saved) && saved > 0 ? saved : weight
+    };
+  });
+}
+
 async function buildGradesMatrixPayload(req, query, options = {}) {
   const ctx = await loadGradesMatrixSharedContext(req, query);
-  const includeAttendanceInFinal = resolveIncludeAttendanceInFinal(query, options);
+  const assignmentsOnlyFinal = options.assignmentsOnlyFinal === true;
+  const includeAttendanceInFinal = assignmentsOnlyFinal
+    ? false
+    : resolveIncludeAttendanceInFinal(query, options);
   const {
     classData,
     filteredSessions,
@@ -630,7 +699,8 @@ async function buildGradesMatrixPayload(req, query, options = {}) {
     classData,
     orgPolicyCatalog,
     evaluation,
-    includeAttendanceInFinal
+    includeAttendanceInFinal,
+    assignmentsOnlyFinal
   });
 }
 
@@ -641,16 +711,17 @@ async function getGradesMatrixData(req, res) {
       classId,
       startDate,
       endDate,
-      includeAttendanceInFinal: req.query.includeAttendanceInFinal,
       studentOffset: req.query.studentOffset,
       studentLimit: req.query.studentLimit,
       columnOffset: req.query.columnOffset,
       columnLimit: req.query.columnLimit,
       fullMatrix: req.query.fullMatrix || req.query.full
-    });
+    }, { assignmentsOnlyFinal: true });
     const clientPayload = {
       ...payload,
-      matrix: (payload.matrix || []).map(({ _attendanceRecords, ...row }) => row)
+      columns: annotateMatrixColumnsForClient(payload.columns),
+      matrix: (payload.matrix || []).map(({ _attendanceRecords, ...row }) => row),
+      weightDirty: false
     };
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.set('Pragma', 'no-cache');
@@ -695,10 +766,21 @@ async function postGradesRollups(req, res) {
         classData,
         orgPolicyCatalog,
         evaluation,
-        includeAttendanceInFinal: parseIncludeAttendanceInFinal(req.body?.includeAttendanceInFinal, false)
+        assignmentsOnlyFinal: true
       }
     );
     return res.json({ status: 'success', rollups });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function postSaveActivityWeights(req, res) {
+  try {
+    const classId = String(req.body?.classId || '').trim();
+    const updates = Array.isArray(req.body?.updates) ? req.body.updates : [];
+    const result = await gradesMatrixWeightSaveService.saveActivityWeights({ classId, updates }, req.user);
+    return res.json({ status: 'success', saved: result.saved, touchedSessions: result.touchedSessions });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
   }
@@ -708,10 +790,13 @@ module.exports = {
   showGradesMatrixPage,
   getGradesMatrixData,
   postGradesRollups,
+  postSaveActivityWeights,
   buildGradesMatrixPayload,
+  annotateMatrixColumnsForClient,
   collectColumns,
   buildGradesMatrixCell,
   formatColumnWeightLabel,
+  buildColumnActivityDetails,
   getCommentFromMap,
   computeFinalPercent,
   parseIncludeAttendanceInFinal,

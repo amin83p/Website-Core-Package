@@ -155,6 +155,76 @@
     .sar-export-template-label { font-size: 0.78rem; color: #6c757d; }
     #sarExportModal .modal-header { border-bottom: 1px solid #e9ecef; }
     #sarExportModal .modal-footer { border-top: 1px solid #e9ecef; background: #f8f9fa; }
+    .attendance-legend-icon-btn {
+        width: 2.25rem;
+        height: 2.25rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+    .attendance-legend-icon-btn .bi {
+        font-size: 1.05rem;
+        line-height: 1;
+    }
+    .attendance-history-toggle-btn.active {
+        color: #0d6efd;
+        border-color: #0d6efd;
+        background-color: rgba(13, 110, 253, 0.08);
+    }
+    .attendance-cell-history-btn {
+        z-index: 2;
+        color: #6c757d;
+        line-height: 1;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+    #resultsContainer.attendance-history-mode-on .attendance-cell-history-btn {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .attendance-cell-history-btn:hover,
+    .attendance-cell-history-btn:focus {
+        color: #0d6efd;
+    }
+    .attendance-history-status-cell {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        min-width: 8rem;
+    }
+    .attendance-history-status-icon {
+        flex: 0 0 auto;
+        line-height: 1;
+        margin-top: 0.1rem;
+    }
+    .attendance-history-status-text {
+        min-width: 0;
+    }
+    .attendance-history-status-label {
+        font-weight: 600;
+        line-height: 1.2;
+    }
+    .attendance-history-status-timing {
+        font-size: 0.8rem;
+        color: #6c757d;
+        line-height: 1.2;
+        margin-top: 0.15rem;
+    }
+    .attendance-legend-modal-body .attendance-legend-items {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.65rem;
+    }
+    .attendance-legend-modal-body .attendance-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-right: 0 !important;
+    }
 </style>
 
 <%
@@ -271,13 +341,74 @@
 
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div class="small text-muted" id="studentAttendanceReportLegend"></div>
-            <div class="d-flex gap-2">
+            <div class="fw-semibold text-muted small">Student Attendance Report</div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button"
+                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn attendance-history-toggle-btn"
+                    id="btn_sarAttendanceHistory"
+                    aria-label="Toggle change history"
+                    title="Toggle change history"
+                    aria-pressed="false">
+                    <i class="bi bi-clock-history" aria-hidden="true"></i>
+                </button>
+                <button type="button"
+                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                    id="btn_sarAttendanceLegend"
+                    aria-label="Legend"
+                    title="Legend">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                </button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_expandAllStudents">Expand All</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_collapseAllStudents">Collapse All</button>
             </div>
         </div>
         <div class="card-body" id="studentReportSections"></div>
+    </div>
+</div>
+
+<div class="modal fade" id="sarAttendanceLegendModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2 px-3">
+                <h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-info-circle me-1"></i>Attendance Legend</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="sarAttendanceLegendModalBody" class="attendance-legend-modal-body"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="attendanceCellHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2 px-3">
+                <h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-clock-history me-1"></i>Attendance Change History</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="attendanceCellHistoryMeta" class="small text-muted mb-2"></div>
+                <div id="attendanceCellHistoryLoading" class="text-center py-3 d-none">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span class="ms-2">Loading history...</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0" id="attendanceCellHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>When</th>
+                                <th>Who</th>
+                                <th>From</th>
+                                <th>To</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceCellHistoryBody"></tbody>
+                    </table>
+                </div>
+                <div id="attendanceCellHistoryEmpty" class="text-muted small py-2 d-none">No status changes recorded for this cell.</div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -474,6 +605,267 @@
     let sarExportModalInstance = null;
     let sarReportLoadToken = null;
     let sarReportLoadWaitingPoll = null;
+    window.sarAttendanceHistoryModeOn = false;
+
+    function renderSarAttendanceLegend() {
+        const modalBody = document.getElementById('sarAttendanceLegendModalBody');
+        if (!modalBody || !window.AttendanceMarkAppearance?.buildLegendEntries) return;
+        const escapeLegend = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        const items = window.AttendanceMarkAppearance.buildLegendEntries().map((entry) => {
+            if (window.AttendanceMarkAppearance.buildLegendItemHtml) {
+                return window.AttendanceMarkAppearance.buildLegendItemHtml(entry);
+            }
+            return `<span class="attendance-legend-item">${escapeLegend(entry.label || entry.key || '')}</span>`;
+        });
+        items.push('<span class="attendance-legend-item"><i class="bi bi-percent text-secondary"></i> Rollup % = time-based credit</span>');
+        const notesMark = window.AttendanceMarkAppearance.getMark?.('notes');
+        const notesIcon = window.AttendanceMarkAppearance.buildMarkIconHtml
+            ? window.AttendanceMarkAppearance.buildMarkIconHtml('notes')
+            : '<i class="bi bi-chat-dots-fill status-notes"></i>';
+        items.push(`<span class="attendance-legend-item">${notesIcon} ${escapeLegend(notesMark?.label || 'Notes exist')}</span>`);
+        items.push('<span class="attendance-legend-item text-muted small">minutes as late\'/early\' (e.g. L 12\', L /5\', or L 12\'/5\')</span>');
+        modalBody.innerHTML = `<div class="attendance-legend-items">${items.join('')}</div>`;
+    }
+
+    function openSarAttendanceLegendModal() {
+        const modalEl = document.getElementById('sarAttendanceLegendModal');
+        if (!modalEl || !window.bootstrap?.Modal) return;
+        renderSarAttendanceLegend();
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    function buildSarCellHistoryButton(detail = {}) {
+        const classId = String(detail.classId || '').trim();
+        const sessionId = String(detail.sessionId || '').trim();
+        const personId = String(detail.personId || '').trim();
+        if (!classId || !sessionId || !personId) return '';
+        return `<button type="button" class="btn btn-link btn-sm p-0 position-absolute top-0 start-0 ps-1 pt-1 attendance-cell-history-btn" title="View change history" aria-label="View change history" data-class-id="${escapeHtml(classId)}" data-session-id="${escapeHtml(sessionId)}" data-session-date="${escapeHtml(detail.date || '')}" data-person-id="${escapeHtml(personId)}" data-student-name="${escapeHtml(detail.studentName || '')}" onclick="event.stopPropagation(); openAttendanceCellHistory(this);"><i class="bi bi-info-circle" style="font-size:0.65rem;"></i></button>`;
+    }
+
+    function buildSarAttendanceCellHtml(dayCell, personId, classId, studentName) {
+        if (!dayCell?.hasSession) {
+            return '<td class="attendance-no-session-cell" title="No session scheduled"><i class="bi bi-x-lg sar-no-session-icon" aria-hidden="true"></i><span class="visually-hidden">No session scheduled</span></td>';
+        }
+        const noteBadge = dayCell.notesExist
+            ? '<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>'
+            : '';
+        const cellKey = buildCellKey(personId, classId, dayCell.date);
+        const cellTitle = buildStatusTooltip(dayCell);
+        const detail = {
+            classId,
+            sessionId: dayCell.sessionId,
+            personId,
+            date: dayCell.date,
+            studentName
+        };
+        const historyBtn = window.sarAttendanceHistoryModeOn ? buildSarCellHistoryButton(detail) : '';
+        return `<td class="att-cell position-relative" data-sar-cell-key="${escapeHtml(cellKey)}" title="${escapeHtml(cellTitle)}">${historyBtn}${buildStatusIcon(dayCell)}${noteBadge}</td>`;
+    }
+
+    function formatAttendanceHistorySessionDate(ymd) {
+        const raw = String(ymd || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw || '';
+        const d = new Date(`${raw}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return raw;
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function resolveAttendanceHistoryStudentName(personId, buttonEl) {
+        const fromDataset = String(buttonEl?.dataset?.studentName || '').trim();
+        if (fromDataset) return fromDataset;
+        const keyPrefix = `${String(personId || '').trim()}|`;
+        for (const [key, detail] of cellDetailByKey.entries()) {
+            if (key.startsWith(keyPrefix)) {
+                return String(detail?.studentName || personId || '').trim() || 'Student';
+            }
+        }
+        return String(personId || '').trim() || 'Student';
+    }
+
+    function buildHistoryAttendanceSnapshot(entry, side) {
+        const prefix = side === 'to' ? 'to' : 'from';
+        return {
+            status: String(entry?.[`${prefix}Status`] || '').trim(),
+            lateMinutes: Number(entry?.[`${prefix}LateMinutes`]) || 0,
+            earlyLeaveMinutes: Number(entry?.[`${prefix}EarlyLeaveMinutes`]) || 0,
+            lateExcused: attendanceFlagIsTrue(entry?.[`${prefix}LateExcused`]),
+            earlyLeaveExcused: attendanceFlagIsTrue(entry?.[`${prefix}EarlyLeaveExcused`]),
+            absenceExcused: attendanceFlagIsTrue(entry?.[`${prefix}AbsenceExcused`])
+        };
+    }
+
+    function buildHistoryAttendanceIcon(snapshot) {
+        const markAppearance = window.AttendanceMarkAppearance;
+        const buildIcon = (key, ringClass) => {
+            if (markAppearance?.buildMarkIconHtml) {
+                return ringClass
+                    ? markAppearance.buildMarkIconHtml(key, { ringClass })
+                    : markAppearance.buildMarkIconHtml(key);
+            }
+            return '';
+        };
+        const rec = snapshot || {};
+        if (!rec.status) return buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
+        if (rec.status === 'present') return buildIcon('present');
+        if (rec.status === 'late') return buildLateTimingIcon(rec);
+        if (rec.status === 'excused' || (rec.status === 'absent' && sarAbsenceIsExcused(rec))) {
+            return buildIcon('excused_absence', 'attendance-timing-excuse-full');
+        }
+        if (rec.status === 'absent') return buildIcon('absent');
+        if (rec.status === 'acf' && sarAbsenceIsExcused(rec)) {
+            return buildIcon('excused_absence', 'attendance-timing-excuse-full');
+        }
+        if (rec.status === 'acf') return buildIcon('acf');
+        if (rec.status === 'not_applicable') return buildIcon('not_applicable');
+        return buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
+    }
+
+    function buildHistoryAttendanceTimingText(snapshot) {
+        const rec = snapshot || {};
+        const parts = [];
+        const late = Number(rec.lateMinutes) || 0;
+        const early = Number(rec.earlyLeaveMinutes) || 0;
+        if (late > 0) {
+            parts.push(`Late ${late} min${late === 1 ? '' : 's'}${attendanceFlagIsTrue(rec.lateExcused) ? ' (excused)' : ''}`);
+        }
+        if (early > 0) {
+            parts.push(`Left early ${early} min${early === 1 ? '' : 's'}${attendanceFlagIsTrue(rec.earlyLeaveExcused) ? ' (excused)' : ''}`);
+        }
+        return parts.join(' · ');
+    }
+
+    function buildHistoryAttendanceCellHtml(entry, side) {
+        const snapshot = buildHistoryAttendanceSnapshot(entry, side);
+        const label = side === 'to'
+            ? (entry?.toLabel || entry?.toStatus || 'Unmarked')
+            : (entry?.fromLabel || entry?.fromStatus || 'Unmarked');
+        const timingText = buildHistoryAttendanceTimingText(snapshot);
+        const timingHtml = timingText
+            ? `<div class="attendance-history-status-timing">${escapeHtml(timingText)}</div>`
+            : '';
+        return `
+            <div class="attendance-history-status-cell">
+                <div class="attendance-history-status-icon">${buildHistoryAttendanceIcon(snapshot)}</div>
+                <div class="attendance-history-status-text">
+                    <div class="attendance-history-status-label">${escapeHtml(label)}</div>
+                    ${timingHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    function formatAttendanceHistoryWhen(isoValue) {
+        const raw = String(isoValue || '').trim();
+        if (!raw) return '—';
+        const date = new Date(raw);
+        if (Number.isNaN(date.getTime())) return raw;
+        return date.toLocaleString();
+    }
+
+    function renderAttendanceCellHistoryTable(entries) {
+        const tbody = document.getElementById('attendanceCellHistoryBody');
+        const emptyEl = document.getElementById('attendanceCellHistoryEmpty');
+        const tableEl = document.getElementById('attendanceCellHistoryTable');
+        if (!tbody || !emptyEl || !tableEl) return;
+        const rows = Array.isArray(entries) ? entries : [];
+        if (!rows.length) {
+            tbody.innerHTML = '';
+            tableEl.classList.add('d-none');
+            emptyEl.classList.remove('d-none');
+            return;
+        }
+        tableEl.classList.remove('d-none');
+        emptyEl.classList.add('d-none');
+        tbody.innerHTML = rows.map((entry) => `
+            <tr>
+                <td>${escapeHtml(formatAttendanceHistoryWhen(entry.changedAt))}</td>
+                <td>${escapeHtml(entry?.changedBy?.displayName || entry?.changedBy?.username || entry?.changedBy?.userId || '—')}</td>
+                <td>${buildHistoryAttendanceCellHtml(entry, 'from')}</td>
+                <td>${buildHistoryAttendanceCellHtml(entry, 'to')}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function fetchAttendanceChangeLogForCell({ classId, sessionId, personId }) {
+        const params = new URLSearchParams({
+            classId: String(classId || '').trim(),
+            sessionId: String(sessionId || '').trim(),
+            studentPersonId: String(personId || '').trim()
+        });
+        const res = await fetch(`/school/attendances/api/change-log?${params.toString()}`, {
+            headers: { 'X-AJAX-Request': 'true' }
+        });
+        const result = await res.json();
+        if (result.status !== 'success') throw new Error(result.message || 'Unable to load change history.');
+        return Array.isArray(result.entries) ? result.entries : [];
+    }
+
+    async function openAttendanceCellHistory(buttonEl) {
+        const classId = String(buttonEl?.dataset?.classId || '').trim();
+        const sessionId = String(buttonEl?.dataset?.sessionId || '').trim();
+        const personId = String(buttonEl?.dataset?.personId || '').trim();
+        if (!classId || !sessionId || !personId) return;
+
+        const metaEl = document.getElementById('attendanceCellHistoryMeta');
+        const loadingEl = document.getElementById('attendanceCellHistoryLoading');
+        const modalEl = document.getElementById('attendanceCellHistoryModal');
+        if (!modalEl) return;
+
+        if (metaEl) {
+            const studentName = resolveAttendanceHistoryStudentName(personId, buttonEl);
+            const sessionDate = formatAttendanceHistorySessionDate(buttonEl?.dataset?.sessionDate || '');
+            metaEl.textContent = sessionDate ? `${studentName} · ${sessionDate}` : studentName;
+        }
+        renderAttendanceCellHistoryTable([]);
+        if (loadingEl) loadingEl.classList.remove('d-none');
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+        try {
+            const entries = await fetchAttendanceChangeLogForCell({ classId, sessionId, personId });
+            renderAttendanceCellHistoryTable(entries);
+        } catch (error) {
+            renderAttendanceCellHistoryTable([]);
+            if (metaEl) metaEl.textContent = error.message || 'Unable to load change history.';
+        } finally {
+            if (loadingEl) loadingEl.classList.add('d-none');
+        }
+    }
+    window.openAttendanceCellHistory = openAttendanceCellHistory;
+
+    function patchSarAttendanceCellsForHistoryMode() {
+        document.querySelectorAll('[data-sar-cell-key]').forEach((cell) => {
+            const key = String(cell.getAttribute('data-sar-cell-key') || '').trim();
+            const detail = cellDetailByKey.get(key);
+            if (!detail) return;
+            const existingBtn = cell.querySelector('.attendance-cell-history-btn');
+            if (window.sarAttendanceHistoryModeOn) {
+                if (!existingBtn && detail.sessionId) {
+                    cell.insertAdjacentHTML('afterbegin', buildSarCellHistoryButton(detail));
+                }
+            } else if (existingBtn) {
+                existingBtn.remove();
+            }
+        });
+    }
+
+    function setSarAttendanceHistoryMode(enabled) {
+        window.sarAttendanceHistoryModeOn = Boolean(enabled);
+        const resultsContainer = document.getElementById('resultsContainer');
+        const toggleBtn = document.getElementById('btn_sarAttendanceHistory');
+        if (resultsContainer) {
+            resultsContainer.classList.toggle('attendance-history-mode-on', window.sarAttendanceHistoryModeOn);
+        }
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('active', window.sarAttendanceHistoryModeOn);
+            toggleBtn.setAttribute('aria-pressed', window.sarAttendanceHistoryModeOn ? 'true' : 'false');
+        }
+        patchSarAttendanceCellsForHistoryMode();
+    }
 
     function showSarReportWaiting() {
         if (sarReportLoadToken) return sarReportLoadToken;
@@ -1063,15 +1455,6 @@
         return value === true || value === 1 || ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
     }
 
-    function renderStudentAttendanceReportLegend() {
-        if (window.AttendanceMarkAppearance?.renderAttendanceLegend) {
-            window.AttendanceMarkAppearance.renderAttendanceLegend('studentAttendanceReportLegend', {
-                includeRollup: true,
-                includeNotes: true
-            });
-        }
-    }
-
     function buildTimingExcuseIcon(innerIcon, ringClass) {
         if (window.AttendanceMarkAppearance?.buildTimingExcuseIcon) {
             return window.AttendanceMarkAppearance.buildTimingExcuseIcon(innerIcon, ringClass);
@@ -1183,6 +1566,7 @@
         const studentNameHtml = typeof schoolRenderStudentNameHtml === 'function'
             ? schoolRenderStudentNameHtml(student.name, student.studentRecordId, { className: 'text-decoration-none fw-bold' })
             : escapeHtml(student.name || personId);
+        const studentName = String(student?.name || personId).trim();
 
         let classRows = '';
         (student.classes || []).forEach((classRow) => {
@@ -1190,16 +1574,7 @@
             const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
             let cells = '';
             (classRow.days || []).forEach((dayCell) => {
-                if (!dayCell.hasSession) {
-                    cells += '<td class="attendance-no-session-cell" title="No session scheduled"><i class="bi bi-x-lg sar-no-session-icon" aria-hidden="true"></i><span class="visually-hidden">No session scheduled</span></td>';
-                    return;
-                }
-                const noteBadge = dayCell.notesExist
-                    ? '<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>'
-                    : '';
-                const cellKey = buildCellKey(personId, classId, dayCell.date);
-                const cellTitle = buildStatusTooltip(dayCell);
-                cells += `<td class="att-cell position-relative" data-sar-cell-key="${escapeHtml(cellKey)}" title="${escapeHtml(cellTitle)}">${buildStatusIcon(dayCell)}${noteBadge}</td>`;
+                cells += buildSarAttendanceCellHtml(dayCell, personId, classId, studentName);
             });
             classRows += `
                 <tr>
@@ -1312,7 +1687,7 @@
             mergeSelectedStudentsFromReportPayload(students);
             syncSarUrlFromFilters();
             document.getElementById('resultsContainer').classList.remove('d-none');
-            renderStudentAttendanceReportLegend();
+            patchSarAttendanceCellsForHistoryMode();
         } finally {
             hideSarReportWaiting();
             if (loadBtn) {
@@ -1934,6 +2309,7 @@
     }
 
     document.getElementById('studentReportSections').addEventListener('click', (event) => {
+        if (event.target.closest('.attendance-cell-history-btn')) return;
         const cellTrigger = event.target.closest('[data-sar-cell-key]');
         if (cellTrigger) {
             event.preventDefault();
@@ -1968,6 +2344,12 @@
     });
     document.getElementById('btn_expandAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(true));
     document.getElementById('btn_collapseAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(false));
+    document.getElementById('btn_sarAttendanceHistory')?.addEventListener('click', () => {
+        setSarAttendanceHistoryMode(!window.sarAttendanceHistoryModeOn);
+    });
+    document.getElementById('btn_sarAttendanceLegend')?.addEventListener('click', () => {
+        openSarAttendanceLegendModal();
+    });
     document.getElementById('btn_loadData').addEventListener('click', () => {
         loadStudentAttendanceReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
     });
@@ -2131,7 +2513,6 @@
     }
 
     syncSarUrlFromFilters();
-    renderStudentAttendanceReportLegend();
 
     if ((initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate) {
         showSarReportWaiting();

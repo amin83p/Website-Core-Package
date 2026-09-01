@@ -253,12 +253,9 @@ async function getSessionBookCoveringSummary(classData, session, reqUser, access
   return buildReportSummary(report, reqUser, accessContext);
 }
 
-async function validateEntriesAgainstBooks(entries, orgId, reqUser, accessContext = {}) {
+async function validateEntriesAgainstBooks(entries, orgId, reqUser) {
   for (const entry of entries) {
-    const book = await schoolDataService.getDataById('books', entry.bookId, reqUser, accessContext);
-    if (!book || !idsEqual(book.orgId, orgId)) {
-      throw new Error(`Book ${entry.bookId} is invalid for this organization.`);
-    }
+    const book = await bookAssignmentService.assertBookInOrg(entry.bookId, orgId, reqUser);
     validateTocEntryIdsAgainstBook([entry], book.tableOfContents || []);
   }
 }
