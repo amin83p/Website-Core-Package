@@ -91,6 +91,10 @@ test('School Settings routes use standard access and action-state protection', (
   );
   assert.match(
     routes,
+    /router\.post\('\/timesheet-parameters'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
+  );
+  assert.match(
+    routes,
     /router\.get\('\/session-access\/email-template-check'[\s\S]*?checkSessionNotificationEmailTemplate/
   );
   assert.doesNotMatch(routes, /AdminMiddleware|adminAuthority|schoolAdminAccessService/);
@@ -129,7 +133,7 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   const catalog = require('../packages/school/MVC/config/schoolSettingsCatalog');
   assert.deepEqual(
     catalog.listSchoolSettingsGroups().map((row) => row.key),
-    ['conduct-rating-scale', 'attendance-matrix', 'attendance-marks', 'attendance-rollup', 'autosave', 'session-access', 'student-attendance-report']
+    ['conduct-rating-scale', 'attendance-matrix', 'attendance-marks', 'attendance-rollup', 'autosave', 'session-access', 'student-attendance-report', 'timesheet-parameters']
   );
   const rollupGroup = catalog.listSchoolSettingsGroups().find((row) => row.key === 'attendance-rollup');
   assert.equal(rollupGroup?.href, undefined);
@@ -139,6 +143,11 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.match(view, /id="conduct-rating-scale"/);
   assert.match(view, /id="attendance-matrix"/);
   assert.match(view, /id="student-attendance-report"/);
+  assert.match(view, /id="timesheet-parameters"/);
+  assert.match(view, /Sessions with no student enrollment/);
+  assert.match(view, /\/school\/settings\/timesheet-parameters/);
+  assert.match(view, /emptyEnrollmentSessions/);
+  assert.match(view, /statutoryHolidayPayEnabled/);
   assert.match(view, /id="sarReportTemplateId"/);
   assert.match(view, /includeGenericPicker/);
   assert.match(view, /modal_GenericPicker/);
@@ -185,6 +194,7 @@ test('settings page uses a collapsible left sidebar and displays one selected ed
   assert.match(view, /id="attendance-matrix"[^>]*hidden/);
   assert.match(view, /id="attendance-rollup"[^>]*hidden/);
   assert.match(view, /id="student-attendance-report"[^>]*hidden/);
+  assert.match(view, /id="timesheet-parameters"[^>]*hidden/);
   assert.match(view, /function setActiveSettingsPanel/);
   assert.match(view, /function setSettingsSidebarCollapsed/);
   assert.match(view, /schoolSettingsSidebarCollapsed/);
@@ -264,6 +274,9 @@ test('settings page renders in editable and read-only modes with valid client Ja
     sessionNotificationEmailWrapperTokens: require('../packages/school/MVC/services/school/sessionNotificationEmailWrapperPlaceholders').WRAPPER_PLACEHOLDER_DEFINITIONS,
     sessionNotificationEmailDefaultBody: require('../packages/school/MVC/services/school/sessionAccessPolicyService').DEFAULT_POLICY
       .uncompletedSessionNotification.channels.email.bodyTemplate,
+    timesheetParametersPolicy: {
+      emptyEnrollmentSessions: 'hide'
+    },
     actionStateId: 'state-1',
     schoolSectionDashboardHref: '/dashboard/section-nav/SCHOOL'
   };
@@ -278,7 +291,9 @@ test('settings page renders in editable and read-only modes with valid client Ja
   assert.match(editableHtml, /id="schoolSettingsSidebar"/);
   assert.match(editableHtml, /data-settings-target="conduct-rating-scale"/);
   assert.match(editableHtml, /id="attendance-matrix"[^>]*hidden/);
-  assert.match(editableHtml, /id="sarOverallTemplatesTable"/);
+  assert.match(editableHtml, /Save Timesheet Parameters/);
+  assert.match(editableHtml, /id="timesheet-parameters"[^>]*hidden/);
+  assert.match(editableHtml, /Do not show in the timesheet/);
   assert.match(editableHtml, /id="sarOverallTemplateIds"/);
   assert.match(editableHtml, /Add Overall Template/);
   assert.match(editableHtml, /js-sar-overall-up/);
@@ -325,9 +340,10 @@ test('settings policy persistence remains organization-keyed for JSON and Mongo'
   const conductModel = read('packages/school/MVC/models/school/conductRatingScalePolicyModel.js');
   const attendanceModel = read('packages/school/MVC/models/school/attendanceMatrixPolicyModel.js');
   const studentAttendanceReportModel = read('packages/school/MVC/models/school/studentAttendanceReportPolicyModel.js');
+  const timesheetParametersModel = read('packages/school/MVC/models/school/timesheetParametersPolicyModel.js');
   assert.match(controller, /String\(user\?\.activeOrgId \|\| ''\)\.trim\(\)/);
   assert.doesNotMatch(controller, /primaryOrgId/);
-  [conductModel, attendanceModel].forEach((source) => {
+  [conductModel, attendanceModel, timesheetParametersModel].forEach((source) => {
     assert.match(source, /runByRepositoryBackend/);
     assert.match(source, /byOrgId\[(?:orgKey\(activeOrgId\)|key)\]/);
     assert.match(source, /json:/);

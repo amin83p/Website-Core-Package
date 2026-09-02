@@ -293,8 +293,14 @@ function isActivityEntry(entry = {}) {
   return entry.isSchoolActivity === true || Boolean(cleanText(entry.activityId)) || sessionId.startsWith('act-');
 }
 
+function isStatutoryHolidayEntry(entry = {}) {
+  const sessionId = cleanText(entry.sessionId).toLowerCase();
+  return entry.isStatutoryHoliday === true || sessionId.startsWith('stathol-');
+}
+
 function resolveStatusLabel(entry = {}) {
   if (entry.isPriorPeriodAdjustment === true) return 'Prior Period Adjustment';
+  if (isStatutoryHolidayEntry(entry)) return 'Statutory Holiday Pay';
   if (entry.isReportReflection === true) return 'Report Task';
   const approval = cleanText(entry.approvalStatus).toLowerCase();
   if (approval === 'pending_approval') return 'Pending Approval';
@@ -329,10 +335,13 @@ function shapePrintEntry(entry = {}, lookups = {}) {
   const optionalHoursLabel = optionalHours > 0 ? optionalHours.toFixed(2) : '—';
 
   const isActivity = isActivityEntry(entry);
+  const isStatHoliday = isStatutoryHolidayEntry(entry);
   const fallback = cleanText(entry.description || entry.className || entry.activityName || entry.classId || 'Activity');
-  const name = cleanText(isActivity
-    ? (entry.activityName || entry.className || entry.description)
-    : (entry.className || entry.description));
+  const name = cleanText(isStatHoliday
+    ? (entry.className || entry.description || 'Statutory holiday pay')
+    : (isActivity
+      ? (entry.activityName || entry.className || entry.description)
+      : (entry.className || entry.description)));
   const primaryLabel = department.code || fallback;
   let timeLabel = '';
   if (entry.isPriorPeriodAdjustment === true) {

@@ -768,6 +768,20 @@
         </div>
     </div>
 
+    <div id="statHolidayWarningsPanel" class="card border-danger shadow-sm mb-4 d-none">
+        <button type="button" class="card-header bg-danger-subtle border-danger d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#statHolidayWarningsCollapse" aria-expanded="false" aria-controls="statHolidayWarningsCollapse" id="statHolidayWarningsToggle">
+            <div class="fw-bold text-danger-emphasis">
+                <i class="bi bi-calendar-x-fill me-2"></i>
+                Statutory Holiday Pay Not Qualified
+                <span class="badge bg-danger ms-2" id="statHolidayWarningsCount">0</span>
+            </div>
+            <i class="bi bi-chevron-down incomplete-sessions-chevron" aria-hidden="true"></i>
+        </button>
+        <div id="statHolidayWarningsCollapse" class="collapse">
+            <div class="card-body border-top border-danger" id="statHolidayWarningsBody"></div>
+        </div>
+    </div>
+
     <div id="incompleteSessionsPanel" class="card border-warning shadow-sm mb-4 d-none">
         <button type="button" class="card-header bg-warning-subtle border-warning d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#incompleteSessionsCollapse" aria-expanded="false" aria-controls="incompleteSessionsCollapse" id="incompleteSessionsToggle">
             <div class="fw-bold text-warning-emphasis">
@@ -1221,6 +1235,8 @@
     const USE_FROZEN_SNAPSHOT = <%= (typeof useFrozenSnapshot !== 'undefined' && useFrozenSnapshot) ? 'true' : 'false' %>;
     const MANUAL_ACTIVITIES = <%- JSON.stringify(manualActivities || []) %>;
     const INCOMPLETE_SESSIONS = <%- JSON.stringify(incompleteSessions || []) %>;
+    const STAT_HOLIDAY_WARNINGS = <%- JSON.stringify(typeof statHolidayWarnings !== 'undefined' ? statHolidayWarnings : []) %>;
+    const CAN_MANAGE_STAT_HOLIDAY_OVERRIDES = <%= (typeof canManageStatHolidayOverrides !== 'undefined' && canManageStatHolidayOverrides) ? 'true' : 'false' %>;
     const SESSION_STATUS_META = <%- JSON.stringify(sessionStatusMeta || []) %>;
     const IS_READONLY = <%= isEditorLocked %>;
     const IS_ADMIN = <%= isAdmin %>;
@@ -1709,6 +1725,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!entry || entry.isManual) return true;
         if (entry.isPriorPeriodAdjustment === true) return true;
         if (entry.isReportReflection === true) return true;
+        if (entry.isStatutoryHoliday === true || String(entry?.sessionId || '').startsWith('stathol-')) return true;
         if (entry.isSchoolActivity === true || String(entry?.sessionId || '').startsWith('act-')) return true;
         if (entry.isFinalStatus === true) return true;
         if (entry.isFinalStatus === false) return false;
@@ -1793,6 +1810,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 colorBg: '#e2e3e5',
                 colorText: '#41464b',
                 colorBorder: '#adb5bd'
+            });
+        }
+        if (isStatutoryHolidayEntry(entry)) {
+            const hours = Number(resolveEntryHours(entry) || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2);
+            const reasons = Array.isArray(entry?.statHolidayMeta?.disqualifyReasons)
+                ? entry.statHolidayMeta.disqualifyReasons.join(' ')
+                : '';
+            const tip = reasons
+                ? `Statutory holiday pay (${hours} hrs). ${reasons}`
+                : `Statutory holiday pay (${hours} hrs).`;
+            return buildStatusChipHtml({
+                icon: 'bi-balloon-fill',
+                label: tip,
+                colorBg: '#f8d7da',
+                colorText: '#842029',
+                colorBorder: '#dc3545'
             });
         }
         const normalized = normalizeStatusCode(entry?.status);
@@ -2640,6 +2673,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function isStatutoryHolidayEntry(entry) {
+        const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
+        return entry?.isStatutoryHoliday === true || sessionId.startsWith('stathol-');
+    }
+
     function isTimesheetActivityEntry(entry) {
         const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
         return entry?.isSchoolActivity === true
@@ -2692,6 +2730,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resolveTimesheetEntryStatusLabel(entry) {
         if (entry?.isPriorPeriodAdjustment === true) return 'Prior Period Adjustment';
+        if (entry?.isStatutoryHoliday === true || String(entry?.sessionId || '').startsWith('stathol-')) return 'Statutory Holiday Pay';
         if (entry?.isReportReflection === true) return 'Report Task';
         if (entry?.isManual === true) {
             if (isPendingApprovalEntry(entry)) return 'Pending Approval';
@@ -3113,6 +3152,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             actBtns = `${saveFirstHint}${reviewBtns}<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit" onclick="openManualModal('${dateStr}', '${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
                                        ${copyBtn}
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" title="Remove" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
+                        } else if (isStatutoryHolidayEntry(ses) && CAN_MANAGE_STAT_HOLIDAY_OVERRIDES) {
+                            actBtns = `<button class="btn btn-sm btn-outline-primary py-0 px-1 me-1" title="Adjust statutory holiday hours" onclick="openStatHolidayOverrideModal('${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
+                                       <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Disqualify statutory holiday pay" onclick="disqualifyStatHolidayEntry('${ses.sessionId}')"><i class="bi bi-x-lg"></i></button>`;
                         } else if (isAutoPulledTimesheetEntry(ses) && !IS_ADMIN) {
                             actBtns = `<span class="text-muted small ts-tooltip-trigger" data-tip="Auto-pulled sessions are locked and cannot be removed from your timesheet." tabindex="0"><i class="bi bi-lock-fill"></i></span>`;
                         } else {
@@ -5260,6 +5302,129 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    function renderStatHolidayWarningsPanel() {
+        const rows = Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [];
+        const panel = document.getElementById('statHolidayWarningsPanel');
+        const body = document.getElementById('statHolidayWarningsBody');
+        const countEl = document.getElementById('statHolidayWarningsCount');
+        if (!panel || !body) return;
+        if (!rows.length) {
+            panel.classList.add('d-none');
+            return;
+        }
+        panel.classList.remove('d-none');
+        if (countEl) countEl.textContent = String(rows.length);
+        body.innerHTML = rows.map((warning) => {
+            const reasons = Array.isArray(warning?.reasons) ? warning.reasons : [];
+            const reasonHtml = reasons.length
+                ? `<ul class="small mb-2 ps-3">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>`
+                : '<p class="small text-muted mb-2">This holiday did not meet statutory pay requirements.</p>';
+            const forcePayBtn = CAN_MANAGE_STAT_HOLIDAY_OVERRIDES
+                ? `<button type="button" class="btn btn-sm btn-outline-success" onclick="forcePayStatHolidayWarning('${escapeHtml(warning.holidayId)}', '${escapeHtml(warning.date)}', '${escapeHtml(warning.title || 'Statutory holiday')}')"><i class="bi bi-plus-circle me-1"></i>Force pay</button>`
+                : '';
+            return `<div class="border rounded p-3 mb-3 bg-white">
+                <div class="fw-bold">${escapeHtml(warning.title || 'Statutory holiday')} <span class="text-muted fw-normal">(${escapeHtml(formatTimesheetDateLabel(warning.date))})</span></div>
+                ${reasonHtml}
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge text-bg-light border">Calculated hours: ${Number(warning?.calculatedHours || 0).toFixed(2)}</span>
+                    ${forcePayBtn}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    window.openStatHolidayOverrideModal = async function(sessionId) {
+        const entry = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
+        if (!entry || !isStatutoryHolidayEntry(entry)) return;
+        const currentHours = Number(resolveEntryHours(entry) || entry?.statHolidayMeta?.calculatedHours || 0);
+        const nextHours = window.prompt('Statutory holiday pay hours', currentHours.toFixed(2));
+        if (nextHours === null) return;
+        const parsed = Number.parseFloat(nextHours);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            await messageBox({ title: 'Invalid Hours', icon: 'warning', message: 'Enter a valid number of hours.' });
+            return;
+        }
+        entry.hours = Number(parsed.toFixed(2));
+        entry.timesheetHours = entry.hours;
+        entry.durationHours = entry.hours;
+        entry.statHolidayOverride = {
+            ...(entry.statHolidayOverride || {}),
+            forcePay: true,
+            hours: entry.hours,
+            reason: String(entry.statHolidayOverride?.reason || 'Manager adjusted statutory holiday hours').trim()
+        };
+        renderTable();
+    };
+
+    window.disqualifyStatHolidayEntry = async function(sessionId) {
+        const entry = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
+        if (!entry || !isStatutoryHolidayEntry(entry)) return;
+        const confirmed = await messageBox({
+            title: 'Disqualify Statutory Holiday Pay',
+            icon: 'warning',
+            message: 'Remove statutory holiday pay for this date? Managers can force pay again later if needed.',
+            buttons: [
+                { text: 'Cancel', class: 'btn-secondary' },
+                { text: 'Disqualify', class: 'btn-danger', value: true }
+            ]
+        });
+        if (!confirmed) return;
+        entry.statHolidayOverride = {
+            ...(entry.statHolidayOverride || {}),
+            forcePay: false,
+            reason: String(entry.statHolidayOverride?.reason || 'Manager disqualified statutory holiday pay').trim()
+        };
+        const idx = activeEntries.findIndex((row) => String(row?.sessionId || '') === String(sessionId || ''));
+        if (idx >= 0) activeEntries.splice(idx, 1);
+        deletedAutoSessionIds.push(sessionId);
+        renderTable();
+    };
+
+    window.forcePayStatHolidayWarning = async function(holidayId, date, title) {
+        const sessionId = `stathol-${holidayId}-${TARGET_TEACHER_ID}`;
+        if (activeEntries.some((row) => String(row?.sessionId || '') === sessionId)) {
+            await messageBox({ title: 'Already Present', icon: 'info', message: 'This statutory holiday row is already on the timesheet.' });
+            return;
+        }
+        const warning = (Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [])
+            .find((row) => String(row?.holidayId || '') === String(holidayId || ''));
+        const hours = Number(warning?.calculatedHours || 0);
+        const nextHours = window.prompt('Statutory holiday pay hours', hours.toFixed(2));
+        if (nextHours === null) return;
+        const parsed = Number.parseFloat(nextHours);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            await messageBox({ title: 'Invalid Hours', icon: 'warning', message: 'Enter a valid number of hours.' });
+            return;
+        }
+        activeEntries.push({
+            sessionId,
+            date,
+            className: title || 'Statutory holiday',
+            description: 'Statutory holiday pay',
+            hours: Number(parsed.toFixed(2)),
+            timesheetHours: Number(parsed.toFixed(2)),
+            durationHours: Number(parsed.toFixed(2)),
+            isStatutoryHoliday: true,
+            isManual: false,
+            isFinalStatus: true,
+            status: 'stat_holiday',
+            statHolidayMeta: {
+                holidayId,
+                qualified: false,
+                calculatedHours: hours,
+                disqualifyReasons: warning?.reasons || [],
+                checks: warning?.checks || {}
+            },
+            statHolidayOverride: {
+                forcePay: true,
+                hours: Number(parsed.toFixed(2)),
+                reason: 'Manager forced statutory holiday pay'
+            }
+        });
+        renderTable();
+        renderStatHolidayWarningsPanel();
+    };
+
     function renderIncompleteSessionsPanel() {
         const rows = Array.isArray(INCOMPLETE_SESSIONS) ? INCOMPLETE_SESSIONS : [];
         const panel = document.getElementById('incompleteSessionsPanel');
@@ -5294,6 +5459,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     bindTimesheetGuidanceControls();
+    renderStatHolidayWarningsPanel();
     renderIncompleteSessionsPanel();
     renderTable();
     void initializeTimesheetLoadWarnings();

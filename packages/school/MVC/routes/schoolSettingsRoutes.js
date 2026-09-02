@@ -81,4 +81,9 @@ router.post('/student-attendance-report',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveStudentAttendanceReportSettings);
 
+router.post('/timesheet-parameters',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
+  ctrl.saveTimesheetParametersPolicy);
+
 module.exports = router;

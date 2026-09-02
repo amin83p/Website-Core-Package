@@ -17,6 +17,10 @@ test('work session explorer view wires filters, table columns, and quick actions
   assert.match(source, /\/school\/work-sessions\/api\/data/);
   assert.match(source, /btn-quick-complete/);
   assert.match(source, /btn-quick-pending/);
+  assert.match(source, /btn-row-actions-toggle/);
+  assert.match(source, /row-actions-menu/);
+  assert.match(source, /bi-three-dots-vertical/);
+  assert.match(source, /showMessageModal/);
   assert.match(source, /Open Manage/);
   assert.match(source, /\/school\/activities/);
   assert.match(source, /workSessionExplorerAccess/);

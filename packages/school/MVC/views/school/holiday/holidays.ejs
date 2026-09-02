@@ -21,7 +21,7 @@
 <%- include('partials/tablePages-search', {
   placeholder: 'Search holidays...',
   fields: [
-      { name: 'type', label: 'Type', type: 'select', options: ['National Holiday','School Break','Staff Development','Weather Emergency','Other'] }
+      { name: 'type', label: 'Type', type: 'select', options: ['National Holiday','Observance Paid','School Break','Staff Development','Weather Emergency','Other'] }
   ]
 }) %>
 
@@ -69,6 +69,7 @@
                         <% 
                            let badgeClass = 'bg-secondary';
                            if(item.type === 'National Holiday') badgeClass = 'bg-primary';
+                           if(item.type === 'Observance Paid') badgeClass = 'bg-success';
                            if(item.type === 'School Break') badgeClass = 'bg-info text-dark';
                            if(item.type === 'Weather Emergency') badgeClass = 'bg-danger';
                         %>
@@ -126,6 +127,7 @@
                         <label class="form-label fw-bold">Type</label>
                         <select id="hol_type" class="form-select">
                             <option value="National Holiday">National Holiday</option>
+                            <option value="Observance Paid">Observance Paid</option>
                             <option value="School Break">School Break</option>
                             <option value="Staff Development">Staff Development (No Students)</option>
                             <option value="Weather Emergency">Weather / Emergency</option>

@@ -312,8 +312,13 @@ async function buildEligibleAssigneePersons(activity = {}, entry = {}, reqUser =
 async function getWorkSessionContext(activityId, entryId, reqUser, accessContext = {}) {
   const activity = await activityService.getActivity(activityId, reqUser, accessContext);
   if (!activity) throw new Error('School activity not found.');
-  const entry = findEntry(activity, entryId);
+  let entry = findEntry(activity, entryId);
   if (!entry) throw new Error('Work session not found.');
+  entry = await schoolDependencyService.repairActivityEntryTimesheetLocksIfNeeded({
+    activity,
+    entry,
+    reqUser
+  });
   const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
   assertCanManageWorkSession(activity, entry, reqUser, accessContext);
   const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);

@@ -220,6 +220,59 @@ function sanitizeProvisionalMeta(input) {
     };
 }
 
+function sanitizeStatHolidayOverride(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const row = {};
+    if (input.forcePay === true) row.forcePay = true;
+    if (input.forcePay === false) row.forcePay = false;
+    const hours = Number(input.hours);
+    if (Number.isFinite(hours)) row.hours = cleanHours(hours, { min: 0, max: 24 });
+    const reason = cleanString(input.reason, { max: 2000, allowEmpty: true });
+    if (reason) row.reason = reason;
+    const by = cleanString(input.by, { max: 120, allowEmpty: true });
+    const byName = cleanString(input.byName, { max: 200, allowEmpty: true });
+    const at = cleanString(input.at, { max: 40, allowEmpty: true });
+    if (by) row.by = by;
+    if (byName) row.byName = byName;
+    if (at) row.at = at;
+    return Object.keys(row).length ? row : null;
+}
+
+function sanitizeStatHolidayMeta(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const holidayId = cleanString(input.holidayId, { max: 80, allowEmpty: true });
+    const calculatedHours = Number(input.calculatedHours);
+    const row = {
+        qualified: input.qualified === true,
+        calculatedHours: Number.isFinite(calculatedHours) ? cleanHours(calculatedHours, { min: 0, max: 24 }) : 0,
+        disqualifyReasons: (Array.isArray(input.disqualifyReasons) ? input.disqualifyReasons : [])
+            .map((reason) => cleanString(reason, { max: 500, allowEmpty: true }))
+            .filter(Boolean)
+            .slice(0, 20)
+    };
+    if (holidayId) row.holidayId = holidayId;
+    if (input.checks && typeof input.checks === 'object' && !Array.isArray(input.checks)) {
+        row.checks = input.checks;
+    }
+    return row;
+}
+
+function applyStatutoryHolidayFields(row, entry) {
+    if (entry?.isStatutoryHoliday === true || String(entry?.sessionId || '').startsWith('stathol-')) {
+        row.isStatutoryHoliday = true;
+        row.isManual = false;
+        row.isFinalStatus = true;
+        if (!row.status) row.status = 'stat_holiday';
+        const description = cleanString(entry?.description, { max: 220, allowEmpty: true });
+        if (description) row.description = description;
+        const meta = sanitizeStatHolidayMeta(entry?.statHolidayMeta);
+        if (meta) row.statHolidayMeta = meta;
+        const override = sanitizeStatHolidayOverride(entry?.statHolidayOverride);
+        if (override) row.statHolidayOverride = override;
+    }
+    return row;
+}
+
 function applyReconciliationEntryFields(row, entry) {
     if (entry?.isFinalStatus === true) row.isFinalStatus = true;
     if (entry?.isFinalStatus === false) row.isFinalStatus = false;
@@ -309,7 +362,7 @@ function sanitizeSnapshotEntry(entry) {
         if (materializedFromTimesheetId) row.materializedFromTimesheetId = materializedFromTimesheetId;
         if (materializedFromTimesheetEntryId) row.materializedFromTimesheetEntryId = materializedFromTimesheetEntryId;
     }
-    return applyPayrollFields(applyClassSessionDisplayFields(applyReconciliationEntryFields(row, entry), entry), entry);
+    return applyPayrollFields(applyClassSessionDisplayFields(applyStatutoryHolidayFields(applyReconciliationEntryFields(row, entry), entry), entry), entry);
 }
 
 function sanitizeReviewHistoryEntry(input) {
@@ -656,7 +709,7 @@ function sanitizeEntry(entry) {
             }
             : {};
     }
-    return applyPayrollFields(applyClassSessionDisplayFields(applyReconciliationEntryFields(row, entry), entry), entry);
+    return applyPayrollFields(applyClassSessionDisplayFields(applyStatutoryHolidayFields(applyReconciliationEntryFields(row, entry), entry), entry), entry);
 }
 
 function sanitizeTimesheetPayload(input) {

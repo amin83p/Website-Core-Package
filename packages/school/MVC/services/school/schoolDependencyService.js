@@ -111,19 +111,48 @@ function dedupeRefs(refs = []) {
   return out;
 }
 
-function collectTimesheetSourceRefs(timesheet = {}) {
+function getTimesheetBillableEntries(timesheet = {}) {
   const entries = [];
+  const keepEntry = (entry) => (
+    entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
+  );
   if (Array.isArray(timesheet?.submissionSnapshot?.entries)) {
-    entries.push(...timesheet.submissionSnapshot.entries.filter((entry) => (
-      entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
-    )));
+    entries.push(...timesheet.submissionSnapshot.entries.filter(keepEntry));
   }
   if (Array.isArray(timesheet?.entries)) {
-    entries.push(...timesheet.entries.filter((entry) => (
-      entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
-    )));
+    entries.push(...timesheet.entries.filter(keepEntry));
   }
-  return dedupeRefs(entries.flatMap(collectRefsFromEntry));
+  return entries;
+}
+
+function resolveActivityRefPersonId(ref = {}, timesheet = {}) {
+  return normalizeId(ref.personId) || normalizeId(timesheet?.teacherId);
+}
+
+function timesheetEntryReferencesActivityPerson(entry = {}, sourceRef = {}, timesheet = {}) {
+  const activityId = normalizeId(sourceRef.activityId);
+  const activityEntryId = normalizeId(sourceRef.activityEntryId);
+  const targetPersonId = normalizeId(sourceRef.personId);
+  if (!activityId || !targetPersonId) return false;
+  return collectRefsFromEntry(entry).some((ref) => {
+    if (ref.type !== 'activity') return false;
+    if (!idsEqual(ref.activityId, activityId)) return false;
+    if (activityEntryId && !idsEqual(ref.activityEntryId, activityEntryId)) return false;
+    return idsEqual(resolveActivityRefPersonId(ref, timesheet), targetPersonId);
+  });
+}
+
+function collectTimesheetSourceRefs(timesheet = {}) {
+  const teacherId = normalizeId(timesheet?.teacherId);
+  const entries = getTimesheetBillableEntries(timesheet);
+  const refs = dedupeRefs(entries.flatMap(collectRefsFromEntry));
+  if (!teacherId) return refs;
+  return refs.map((ref) => {
+    if (ref.type !== 'activity') return ref;
+    if (normalizeId(ref.personId)) return ref;
+    if (!normalizeId(ref.activityEntryId)) return ref;
+    return { ...ref, personId: teacherId };
+  });
 }
 
 function entryReferencesSource(entry = {}, sourceType, sourceRef = {}) {
@@ -151,19 +180,12 @@ function entryReferencesSource(entry = {}, sourceType, sourceRef = {}) {
 function timesheetReferencesSource(timesheet = {}, sourceType, sourceRef = {}, minStatus = GUARD_MIN_STATUS) {
   const status = String(timesheet?.status || 'draft').trim().toLowerCase();
   if (!meetsMinTimesheetStatus(status, minStatus)) return false;
-  const entries = [];
-  if (Array.isArray(timesheet?.submissionSnapshot?.entries)) {
-    entries.push(...timesheet.submissionSnapshot.entries.filter((entry) => (
-      entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
-    )));
-  }
-  if (Array.isArray(timesheet?.entries)) {
-    entries.push(...timesheet.entries.filter((entry) => (
-      entry?.reconciliationRequired !== true && entry?.isPriorPeriodAdjustment !== true
-    )));
-  }
+  const entries = getTimesheetBillableEntries(timesheet);
   if (sourceType === 'timesheetPeriod' && idsEqual(timesheet?.periodId, sourceRef.periodId)) {
     return meetsMinTimesheetStatus(status);
+  }
+  if (sourceType === 'activity' && normalizeId(sourceRef.personId)) {
+    return entries.some((entry) => timesheetEntryReferencesActivityPerson(entry, sourceRef, timesheet));
   }
   return entries.some((entry) => entryReferencesSource(entry, sourceType, sourceRef));
 }
@@ -445,6 +467,114 @@ async function lockReportAssignment({ assignmentId, timesheetId, reqUser }) {
     lockedTimesheetId: normalizeId(timesheetId)
   }, reqUser);
   return { locked: true };
+}
+
+async function getActivityEntrySubmittedTimesheetLockMap({
+  orgId,
+  activityId,
+  entryId,
+  minStatus = 'submitted',
+  reqUser
+} = {}) {
+  const normalizedActivityId = normalizeId(activityId);
+  const normalizedEntryId = normalizeId(entryId);
+  const lockMap = new Map();
+  if (!normalizedActivityId || !normalizedEntryId) return lockMap;
+  const matches = await findTimesheetsReferencingSource({
+    orgId,
+    sourceType: 'activity',
+    sourceRef: { activityId: normalizedActivityId, activityEntryId: normalizedEntryId },
+    minStatus,
+    reqUser
+  });
+  matches.forEach((timesheet) => {
+    const timesheetId = normalizeId(timesheet?.id);
+    getTimesheetBillableEntries(timesheet).forEach((entry) => {
+      collectRefsFromEntry(entry).forEach((ref) => {
+        if (ref.type !== 'activity') return;
+        if (!idsEqual(ref.activityId, normalizedActivityId)) return;
+        if (!idsEqual(ref.activityEntryId, normalizedEntryId)) return;
+        const personId = resolveActivityRefPersonId(ref, timesheet);
+        if (personId) lockMap.set(personId, timesheetId);
+      });
+    });
+  });
+  return lockMap;
+}
+
+async function repairActivityEntryTimesheetLocksIfNeeded({ activity, entry, reqUser } = {}) {
+  const entryId = normalizeId(entry?.entryId || entry?.id);
+  const activityId = normalizeId(activity?.id);
+  if (!activityId || !entryId) return entry;
+  const assignees = (Array.isArray(entry.assignees) ? entry.assignees : [])
+    .filter((assignee) => assignee && typeof assignee === 'object');
+  if (assignees.length <= 1) return entry;
+
+  const lockMap = await getActivityEntrySubmittedTimesheetLockMap({
+    orgId: activity.orgId,
+    activityId,
+    entryId,
+    minStatus: 'submitted',
+    reqUser
+  });
+
+  let changed = false;
+  const nextAssignees = assignees.map((assignee) => {
+    const personId = normalizeId(assignee.personId);
+    const shouldLock = lockMap.has(personId);
+    const isLocked = isAssigneeTimesheetLocked(assignee);
+    if (shouldLock === isLocked) return assignee;
+    changed = true;
+    if (!shouldLock) {
+      const next = { ...assignee };
+      next.locked = false;
+      delete next.lockReason;
+      delete next.lockedTimesheetId;
+      delete next.lockedAt;
+      delete next.lockedBy;
+      return next;
+    }
+    return {
+      ...assignee,
+      locked: true,
+      lockedAt: assignee.lockedAt || new Date().toISOString(),
+      lockedBy: assignee.lockedBy || null,
+      lockReason: 'timesheet_approved',
+      lockedTimesheetId: lockMap.get(personId)
+    };
+  });
+
+  const allAssigneesLocked = nextAssignees.length > 0 && nextAssignees.every(isAssigneeTimesheetLocked);
+  const entryWasLocked = isActivityEntryTimesheetLocked(entry);
+  let nextEntry = { ...entry, assignees: nextAssignees };
+  if (allAssigneesLocked && !entryWasLocked) {
+    changed = true;
+    nextEntry.locked = true;
+    nextEntry.lockReason = 'timesheet_approved';
+    nextEntry.lockedTimesheetId = normalizeId(nextEntry.lockedTimesheetId)
+      || normalizeId([...lockMap.values()][0]);
+  } else if (!allAssigneesLocked && entryWasLocked) {
+    changed = true;
+    nextEntry.locked = false;
+    delete nextEntry.lockReason;
+    delete nextEntry.lockedTimesheetId;
+    delete nextEntry.lockedAt;
+    delete nextEntry.lockedBy;
+  }
+
+  if (!changed) return entry;
+
+  const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((row) => (
+    idsEqual(row?.entryId || row?.id, entryId) ? nextEntry : row
+  ));
+  const stillActivityLocked = entries.some(isActivityEntryTimesheetLocked)
+    || entries.some((row) => (Array.isArray(row?.assignees) ? row.assignees : []).some(isAssigneeTimesheetLocked));
+  await schoolDataService.updateData('activities', activityId, {
+    ...activity,
+    entries,
+    locked: stillActivityLocked
+  }, reqUser);
+  return nextEntry;
 }
 
 async function lockSourcesForApprovedTimesheet(timesheet = {}, reqUser) {
@@ -1064,6 +1194,9 @@ module.exports = {
   parseReportReflectionSessionId,
   collectRefsFromEntry,
   collectTimesheetSourceRefs,
+  getActivityEntrySubmittedTimesheetLockMap,
+  repairActivityEntryTimesheetLocksIfNeeded,
+  resolveActivityRefPersonId,
   findTimesheetsReferencingSource,
   buildTimesheetBlockers,
   assertSourceNotReferenced,

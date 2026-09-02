@@ -9,6 +9,7 @@ const attendanceMarkAppearancePolicyModel = require('../../models/school/attenda
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
+const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { getActiveDataBackendMode } = requireCoreModule('MVC/infrastructure/runtime/dataBackendRuntime');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -61,6 +62,7 @@ function resolvePolicyModel(catalogEntry) {
   if (catalogEntry?.policyModel === 'autosave') return autosavePolicyModel;
   if (catalogEntry?.policyModel === 'sessionAccess') return sessionAccessPolicyModel;
   if (catalogEntry?.policyModel === 'studentAttendanceReport') return studentAttendanceReportPolicyModel;
+  if (catalogEntry?.policyModel === 'timesheetParameters') return timesheetParametersPolicyModel;
   return null;
 }
 

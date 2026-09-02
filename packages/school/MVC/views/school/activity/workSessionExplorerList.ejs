@@ -215,19 +215,35 @@ document.addEventListener('DOMContentLoaded', () => {
             : '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle">No</span>'
     );
 
-    const buildActionButtons = (row) => {
-        const buttons = [
-            `<a href="${escapeHtml(row.manageUrl)}" class="btn btn-outline-primary btn-sm">Open Manage</a>`
+    const buildActionMenu = (row) => {
+        const rowId = escapeHtml(row.id || '');
+        const menuItems = [
+            `<a href="${escapeHtml(row.manageUrl)}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-box-arrow-up-right me-2"></i>Open Manage
+            </a>`
         ];
         if (row.canQuickComplete) {
             const isCompleted = String(row.statusCode || '').toLowerCase() === 'completed';
             if (isCompleted) {
-                buttons.push(`<button type="button" class="btn btn-outline-secondary btn-sm btn-quick-pending" data-url="${escapeHtml(row.pendingUrl)}" data-person-id="${escapeHtml(row.personId)}">Mark Pending</button>`);
+                menuItems.push(`<button type="button" class="btn btn-outline-secondary btn-sm btn-quick-pending" data-url="${escapeHtml(row.pendingUrl)}" data-person-id="${escapeHtml(row.personId)}">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Mark Pending
+                </button>`);
             } else {
-                buttons.push(`<button type="button" class="btn btn-outline-success btn-sm btn-quick-complete" data-url="${escapeHtml(row.completeUrl)}" data-person-id="${escapeHtml(row.personId)}">Quick Complete</button>`);
+                menuItems.push(`<button type="button" class="btn btn-outline-success btn-sm btn-quick-complete" data-url="${escapeHtml(row.completeUrl)}" data-person-id="${escapeHtml(row.personId)}">
+                    <i class="bi bi-check-circle me-2"></i>Quick Complete
+                </button>`);
             }
         }
-        return `<div class="d-flex flex-wrap justify-content-end gap-1">${buttons.join('')}</div>`;
+        return `
+            <div class="row-actions-wrap">
+                <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="${rowId}" title="Row actions">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="${rowId}">
+                    ${menuItems.join('')}
+                </div>
+            </div>
+        `;
     };
 
     const buildRowHtml = (row) => {
@@ -254,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${escapeHtml(row.evaluationTypeLabel || '')}</td>
                 <td>${buildStatusBadge(row)}</td>
                 <td>${buildPayableBadge(row)}</td>
-                <td class="text-end pe-4">${buildActionButtons(row)}</td>
+                <td class="table-actions text-end pe-4">${buildActionMenu(row)}</td>
             </tr>
         `;
     };
@@ -299,6 +315,37 @@ document.addEventListener('DOMContentLoaded', () => {
         renderRows(payload.data || []);
     };
 
+    const resolveMessageModalFn = () => {
+        if (typeof showMessageModal === 'function') return showMessageModal;
+        if (typeof window !== 'undefined' && typeof window.showMessageModal === 'function') return window.showMessageModal;
+        return null;
+    };
+
+    const safeShowMessage = async (options = {}) => {
+        const showMessageModalFn = resolveMessageModalFn();
+        if (showMessageModalFn) {
+            return showMessageModalFn(options);
+        }
+        window.alert(String(options.message || options.title || 'Notice'));
+        return false;
+    };
+
+    const showUiConfirm = async (options = {}) => {
+        const showMessageModalFn = resolveMessageModalFn();
+        if (showMessageModalFn) {
+            return !!(await showMessageModalFn({
+                title: options.title || 'Confirm',
+                icon: options.icon || 'warning',
+                message: options.message || 'Are you sure?',
+                buttons: options.buttons || [
+                    { text: options.cancelText || 'Cancel', class: 'btn-secondary', value: false },
+                    { text: options.okText || 'Continue', class: options.okClass || 'btn-primary', value: true }
+                ]
+            }));
+        }
+        return window.confirm(String(options.message || 'Are you sure?'));
+    };
+
     const postQuickAction = async (url, personId) => {
         const body = new URLSearchParams();
         body.set('personId', personId);
@@ -324,11 +371,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = completeBtn || pendingBtn;
         if (!target) return;
         event.preventDefault();
+        const isComplete = Boolean(completeBtn);
+        const confirmed = await showUiConfirm({
+            title: isComplete ? 'Quick Complete' : 'Mark Pending',
+            icon: 'warning',
+            message: isComplete
+                ? 'Mark this work session as completed?'
+                : 'Mark this work session as pending again?',
+            okText: isComplete ? 'Complete' : 'Mark Pending',
+            okClass: isComplete ? 'btn-success' : 'btn-warning'
+        });
+        if (!confirmed) return;
         try {
             target.disabled = true;
             await postQuickAction(target.getAttribute('data-url'), target.getAttribute('data-person-id'));
+            await safeShowMessage({
+                title: 'Updated',
+                icon: 'success',
+                message: isComplete ? 'Work session marked as completed.' : 'Work session marked as pending.'
+            });
         } catch (error) {
-            window.alert(error.message || 'Unable to update work session.');
+            await safeShowMessage({
+                title: 'Error',
+                icon: 'error',
+                message: error.message || 'Unable to update work session.'
+            });
         } finally {
             target.disabled = false;
         }
@@ -338,7 +405,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await loadData();
         } catch (error) {
-            window.alert(error.message || 'Unable to load work sessions.');
+            await safeShowMessage({
+                title: 'Error',
+                icon: 'error',
+                message: error.message || 'Unable to load work sessions.'
+            });
         }
     });
 

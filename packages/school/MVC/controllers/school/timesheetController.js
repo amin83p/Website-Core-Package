@@ -24,6 +24,9 @@ const timesheetPayRateService = require('../../services/school/timesheetPayRateS
 const taskService = require('../../services/school/taskService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const timesheetSessionStudentLabelService = require('../../services/school/timesheetSessionStudentLabelService');
+const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
+const statutoryHolidayEligibilityService = require('../../services/school/statutoryHolidayEligibilityService');
 const timesheetEffectiveEntryService = require('../../services/school/timesheetEffectiveEntryService');
 const timesheetPrintService = require('../../services/school/timesheetPrintService');
 const deadlineReconciliationService = require('../../services/school/timesheetDeadlineReconciliationService');
@@ -1757,9 +1760,10 @@ exports.viewTimesheet = async (req, res) => {
         }
         timesheet = normalizeTimesheetLifecycle(timesheet);
 
-        const [classes, departments] = await Promise.all([
+        const [classes, departments, timesheetParametersPolicy] = await Promise.all([
             dataService.fetchAllData('classes', {}, req.user),
-            dataService.fetchAllData('departments', {}, req.user)
+            dataService.fetchAllData('departments', {}, req.user),
+            timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId)
         ]);
         const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
         const liveSessionBuilders = [];
@@ -1881,6 +1885,10 @@ exports.viewTimesheet = async (req, res) => {
             activeOrgId,
             reqUser: req.user
         });
+        const filteredLiveSessions = timesheetParametersPolicyService.applyEmptyEnrollmentSessionsPolicy(
+            liveSessions,
+            timesheetParametersPolicy
+        );
 
         for (const c of scopedClasses) {
             const sessions = sessionsByClassId.get(String(c.id || '').trim()) || [];
@@ -1926,7 +1934,15 @@ exports.viewTimesheet = async (req, res) => {
             reqUser: req.user
         });
         incompleteSessions.push(...(Array.isArray(incompleteActivitySessions) ? incompleteActivitySessions : []));
-        const sortedIncompleteSessions = sortIncompleteSessions(incompleteSessions);
+        const stampedIncompleteSessions = await timesheetSessionStudentLabelService.stampEnrolledStudentCountsOnRows(
+            incompleteSessions,
+            { activeOrgId, reqUser: req.user }
+        );
+        const filteredIncompleteSessions = timesheetParametersPolicyService.applyEmptyEnrollmentSessionsPolicy(
+            stampedIncompleteSessions,
+            timesheetParametersPolicy
+        );
+        const sortedIncompleteSessions = sortIncompleteSessions(filteredIncompleteSessions);
 
         const reportReflectionSessions = await buildReportReflectionLiveSessions({
             teacherPersonId: teacherContext.targetTeacherId,
@@ -1942,26 +1958,12 @@ exports.viewTimesheet = async (req, res) => {
             periodEndDate: period.endDate,
             reqUser: req.user
         });
-        const mergedLiveSessions = [...liveSessions, ...reportReflectionSessions, ...(Array.isArray(activityLiveSessions) ? activityLiveSessions : [])];
-
-        const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
-            orgId: activeOrgId,
-            personId: teacherContext.targetTeacherId,
-            reqUser: req.user
-        });
-        const payrollEditor = shapePayrollContextForEditor(payrollContext);
-        const stampedLiveSessions = mergedLiveSessions.map((row) => withPayrollStamp(row, payrollContext, period));
+        const mergedLiveSessions = [...filteredLiveSessions, ...reportReflectionSessions, ...(Array.isArray(activityLiveSessions) ? activityLiveSessions : [])];
 
         const [allHolidays] = await Promise.all([
             dataService.fetchAllData('holidays', {}, req.user)
         ]);
         const holidays = allHolidays.filter((h) => h.date >= period.startDate && h.date <= period.endDate);
-        const eligibleManualActivities = await activityService.listManualEntryActivitiesForPerson({
-            orgId: activeOrgId,
-            personId: teacherContext.targetTeacherId,
-            reqUser: req.user
-        });
-        const manualActivities = shapeManualActivityRows(eligibleManualActivities);
 
         const useFrozenSnapshot = ['submitted', 'processed'].includes(String(timesheet.status || '').toLowerCase())
             && Array.isArray(timesheet?.submissionSnapshot?.entries)
@@ -1979,6 +1981,39 @@ exports.viewTimesheet = async (req, res) => {
             }),
             isTimesheetSectionAdmin(req.user, OPERATIONS.UPDATE)
         ]);
+
+        let statHolidayWarnings = [];
+        let liveSessionsWithStatHolidays = mergedLiveSessions;
+        if (!useFrozenSnapshot) {
+            const statHolidayContext = await statutoryHolidayEligibilityService.buildStatutoryHolidayTimesheetContext({
+                orgId: activeOrgId,
+                personId: teacherContext.targetTeacherId,
+                periodStartDate: period.startDate,
+                periodEndDate: period.endDate,
+                policy: timesheetParametersPolicy,
+                holidays: allHolidays,
+                supplementalEntries: mergedLiveSessions,
+                existingEntries: timesheet.entries,
+                reqUser: req.user,
+                allowManagerOverride: canManagerUpdate
+            });
+            statHolidayWarnings = statHolidayContext.warnings;
+            liveSessionsWithStatHolidays = [...mergedLiveSessions, ...statHolidayContext.rows];
+        }
+
+        const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            reqUser: req.user
+        });
+        const payrollEditor = shapePayrollContextForEditor(payrollContext);
+        const stampedLiveSessions = liveSessionsWithStatHolidays.map((row) => withPayrollStamp(row, payrollContext, period));
+        const eligibleManualActivities = await activityService.listManualEntryActivitiesForPerson({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            reqUser: req.user
+        });
+        const manualActivities = shapeManualActivityRows(eligibleManualActivities);
         const status = String(timesheet.status || 'draft').toLowerCase();
         const managerApproved = isManagerApproved(timesheet);
         const canReviewerEdit = canManagerUpdate && status === 'submitted' && period.status !== 'processed';
@@ -2088,7 +2123,9 @@ exports.viewTimesheet = async (req, res) => {
             timesheetPrintMode,
             canResetTimesheet: !isReadOnly && status === 'draft' && timesheet.id && (
                 !viewingOtherPerson || canManagerUpdate || canTimesheetsAdminUpdate
-            )
+            ),
+            statHolidayWarnings,
+            canManageStatHolidayOverrides: canManagerUpdate
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -2264,6 +2301,8 @@ exports.saveTimesheet = async (req, res) => {
                 && entry?.isManual !== true
                 && entry?.isPriorPeriodAdjustment !== true
                 && entry?.isReportReflection !== true
+                && entry?.isStatutoryHoliday !== true
+                && !String(entry?.sessionId || '').startsWith('stathol-')
             ));
             if (blockedAutoDeletes.length) {
                 throw new Error('Auto-pulled sessions cannot be removed from your timesheet.');
@@ -2278,9 +2317,10 @@ exports.saveTimesheet = async (req, res) => {
 
         const sessionStatusMeta = await sessionStatusPolicyService.getClientStatusMeta(period.orgId || activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(sessionStatusMeta);
-        const [classes, departments] = await Promise.all([
+        const [classes, departments, timesheetParametersPolicy] = await Promise.all([
             dataService.fetchAllData('classes', {}, req.user),
-            dataService.fetchAllData('departments', {}, req.user)
+            dataService.fetchAllData('departments', {}, req.user),
+            timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId)
         ]);
         const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
         const liveSessionBuilders = [];
@@ -2347,19 +2387,25 @@ exports.saveTimesheet = async (req, res) => {
                 query: { limit: 5000 }
             })
         ]);
-        const trustedLiveSessions = await timesheetSessionStudentLabelService.enrichClassLiveSessions({
-            classRows: scopedClasses,
-            sessionsByClassId,
-            liveSessionBuilders,
-            students,
-            persons: personPayload?.allRows || personPayload?.rows || [],
-            departments,
-            statusMap,
-            periodStartDate: period.startDate,
-            periodEndDate: period.endDate,
-            activeOrgId,
-            reqUser: req.user
-        });
+        const trustedLiveSessions = timesheetParametersPolicyService.applyEmptyEnrollmentSessionsPolicy(
+            await timesheetSessionStudentLabelService.enrichClassLiveSessions({
+                classRows: scopedClasses,
+                sessionsByClassId,
+                liveSessionBuilders,
+                students,
+                persons: personPayload?.allRows || personPayload?.rows || [],
+                departments,
+                statusMap,
+                periodStartDate: period.startDate,
+                periodEndDate: period.endDate,
+                activeOrgId,
+                reqUser: req.user
+            }),
+            timesheetParametersPolicy
+        );
+        hasBlockingIncompleteClassSource = timesheetParametersPolicyService.hasBlockingIncompleteClassSource(
+            trustedLiveSessions
+        );
         const liveSessionById = new Map(
             trustedLiveSessions
                 .map((row) => [String(row?.sessionId || '').trim(), row])
@@ -2379,6 +2425,30 @@ exports.saveTimesheet = async (req, res) => {
             if (key) activityLiveById.set(key, row);
         });
 
+        const supplementalLiveSessions = [
+            ...trustedLiveSessions,
+            ...(Array.isArray(activityLiveSessions) ? activityLiveSessions : [])
+        ];
+        const allHolidays = await dataService.fetchAllData('holidays', {}, req.user);
+        const allowStatHolidayOverride = Boolean(canReviewerEdit);
+        const statHolidayContext = await statutoryHolidayEligibilityService.buildStatutoryHolidayTimesheetContext({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            periodStartDate: period.startDate,
+            periodEndDate: period.endDate,
+            policy: timesheetParametersPolicy,
+            holidays: allHolidays,
+            supplementalEntries: supplementalLiveSessions,
+            existingEntries: existingEntriesList,
+            reqUser: req.user,
+            allowManagerOverride: allowStatHolidayOverride
+        });
+        const statHolidayById = new Map(
+            (Array.isArray(statHolidayContext.rows) ? statHolidayContext.rows : [])
+                .map((row) => [String(row?.sessionId || '').trim(), row])
+                .filter(([sessionId]) => Boolean(sessionId))
+        );
+
         const hasManualRows = entryRows.some((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
         let activityById = new Map();
         if (hasManualRows) {
@@ -2392,12 +2462,14 @@ exports.saveTimesheet = async (req, res) => {
         const buildTrustedClassEntry = (entry, sessionRef) => {
             const sessionId = String(sessionRef?.sessionId || '').trim();
             const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(sessionRef?.status, sessionRef?.notes);
-            const hours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
+            const suppressEmptyEnrollmentHours = sessionRef?.emptyEnrollmentHoursSuppressed === true;
+            const formulaHours = sessionStatusPolicyService.calculateTimesheetHoursByMap(statusMap, {
                 status: sessionRef?.status,
                 notes: sessionRef?.notes,
                 durationHours: sessionRef?.durationHours,
                 session: sessionRef
             });
+            const hours = suppressEmptyEnrollmentHours ? 0 : formulaHours;
             const isFinalStatus = sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
                 status: sessionRef?.status,
                 notes: sessionRef?.notes
@@ -2409,6 +2481,8 @@ exports.saveTimesheet = async (req, res) => {
                 status: normalizedStatus,
                 hours,
                 timesheetHours: hours,
+                emptyEnrollmentHoursSuppressed: suppressEmptyEnrollmentHours,
+                enrolledStudentCount: sessionRef?.enrolledStudentCount,
                 isFinalStatus,
                 isManual: false
             }, { period, isFinalStatus });
@@ -2600,6 +2674,20 @@ exports.saveTimesheet = async (req, res) => {
                     isFinalStatus: true,
                     isReportReflection: true
                 };
+            }
+
+            if (entry.isStatutoryHoliday === true || sessionId.startsWith('stathol-')) {
+                const trustedRow = statHolidayById.get(sessionId);
+                return statutoryHolidayEligibilityService.buildTrustedStatHolidayEntry({
+                    entry,
+                    trustedRow,
+                    existingEntry: existingEntriesBySessionId.get(sessionId) || null,
+                    allowManagerOverride: allowStatHolidayOverride,
+                    actor: {
+                        id: req.user?.id || req.user?.personId || '',
+                        name: req.user?.displayName || req.user?.name || ''
+                    }
+                });
             }
 
             if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) {

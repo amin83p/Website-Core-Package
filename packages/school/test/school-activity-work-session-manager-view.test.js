@@ -14,6 +14,10 @@ test('activity work session manager view uses session manager roster table and r
   assert.match(source, /class="roster-row work-session-assignee-form/);
   assert.match(source, /ws-role-radio/);
   assert.match(source, /ws-completion-radio/);
+  assert.match(source, /ws-assignee-lock-icon/);
+  assert.match(source, /Locked because timesheet was submitted/);
+  assert.match(source, /Work Session Locked/);
+  assert.match(source, /allVisibleAssigneesLocked/);
   assert.match(source, /btnWsAllAttended/);
   assert.match(source, /buildAdminAssigneeRow/);
   assert.match(source, /buildRoleRadios/);
@@ -21,6 +25,8 @@ test('activity work session manager view uses session manager roster table and r
 
   assert.doesNotMatch(source, /ws-role-input/);
   assert.doesNotMatch(source, /ws-completion-status-input/);
+  assert.doesNotMatch(source, /Evaluation type is locked/);
+  assert.doesNotMatch(source, /btn-ws-pending/);
   assert.doesNotMatch(source, /buildAdminAssigneeCard/);
   assert.doesNotMatch(source, /id="workSessionAssigneeForms"/);
 });

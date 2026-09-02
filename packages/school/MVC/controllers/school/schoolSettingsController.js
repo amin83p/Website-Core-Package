@@ -27,8 +27,10 @@ const {
   resolveOrganizationTimezoneFromRow
 } = requireCoreModule('MVC/utils/timezoneUtils');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
+const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
+const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
 const overallReportService = require('../../services/school/overallReportService');
@@ -356,6 +358,7 @@ async function loadSettingsPageData(req) {
     autosavePolicy,
     sessionAccessPolicy,
     studentAttendanceReportPolicy,
+    timesheetParametersPolicy,
     canUpdate
   ] = await Promise.all([
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
@@ -365,6 +368,7 @@ async function loadSettingsPageData(req) {
     autosavePolicyModel.getPolicyForOrg(activeOrgId),
     sessionAccessPolicyModel.getPolicyForOrg(activeOrgId),
     studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId),
+    timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
   const studentAttendanceReportLabels = await resolveStudentAttendanceReportLabels(
@@ -395,6 +399,7 @@ async function loadSettingsPageData(req) {
       .uncompletedSessionNotification.channels.email.bodyTemplate,
     autosaveSections: listAutosaveSections(),
     studentAttendanceReportPolicy,
+    timesheetParametersPolicy,
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
     studentAttendanceReportTemplateCapabilities: studentAttendanceReportLabels.reportTemplateCapabilities,
     studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel,
@@ -822,6 +827,28 @@ async function checkSessionNotificationEmailTemplate(req, res) {
   }
 }
 
+async function saveTimesheetParametersPolicy(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const normalized = timesheetParametersPolicyService.validatePolicyInput(req.body || {});
+    const policy = await timesheetParametersPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      normalized,
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Timesheet Parameters settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save Timesheet Parameters settings.'
+    });
+  }
+}
+
 async function saveAutosavePolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -864,6 +891,7 @@ module.exports = {
   saveAttendanceMatrix,
   saveAttendanceRollupFormula,
   saveStudentAttendanceReportSettings,
+  saveTimesheetParametersPolicy,
   saveAutosavePolicy,
   saveSessionAccessPolicy,
   previewSessionAccessTestNotification,

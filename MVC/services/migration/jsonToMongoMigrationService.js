@@ -383,6 +383,20 @@ function buildCatalog() {
         return next;
       }
     },
+    {
+      key: 'school.timesheetParametersPolicy',
+      domain: 'School',
+      section: 'Timesheet Parameters Policy',
+      source: 'school/timesheetParametersPolicy.json',
+      collection: 'schoolTimesheetParametersPolicy',
+      sourceFormat: 'single_object',
+      transformRecord: (record) => ({ ...(record || {}), id: 'timesheet-parameters-policy' }),
+      inverseTransformRecord: (record) => {
+        const next = { ...(record || {}) };
+        if (next.id === 'timesheet-parameters-policy') delete next.id;
+        return next;
+      }
+    },
 
     // IELTS
     { key: 'ielts.task2Samples', domain: 'IELTS', section: 'Task 2 Samples', source: 'ielts/task2samples.json', collection: 'ieltsTask2Samples' },

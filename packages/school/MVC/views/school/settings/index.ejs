@@ -23,6 +23,29 @@
   const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '', overallReportTemplateIds: [], templateExportFormats: { report: {}, overall: {} } }).replace(/</g, '\\u003c');
   const studentAttendanceReportTemplateCapabilitiesJson = JSON.stringify(typeof studentAttendanceReportTemplateCapabilities !== 'undefined' ? studentAttendanceReportTemplateCapabilities : { hasDocx: false, hasPdf: false }).replace(/</g, '\\u003c');
   const studentAttendanceReportOverallLabelsJson = JSON.stringify(typeof studentAttendanceReportOverallLabels !== 'undefined' ? studentAttendanceReportOverallLabels : []).replace(/</g, '\\u003c');
+  const timesheetParametersPolicyJson = JSON.stringify(typeof timesheetParametersPolicy !== 'undefined' ? timesheetParametersPolicy : { emptyEnrollmentSessions: 'hide' }).replace(/</g, '\\u003c');
+  const emptyEnrollmentSessionsValue = String(
+    (typeof timesheetParametersPolicy !== 'undefined' && timesheetParametersPolicy?.emptyEnrollmentSessions)
+      ? timesheetParametersPolicy.emptyEnrollmentSessions
+      : 'hide'
+  ).trim() || 'hide';
+  const statutoryHolidayPayPolicy = (typeof timesheetParametersPolicy !== 'undefined' && timesheetParametersPolicy?.statutoryHolidayPay)
+    ? timesheetParametersPolicy.statutoryHolidayPay
+    : {
+      enabled: true,
+      minWorkdays: 30,
+      weekdayOccurrencesRequired: 5,
+      weekdayOccurrencesLookback: 9,
+      earningsLookbackWeeks: 4,
+      beforeAfterSearchDays: 14,
+      disqualifyOnLeaveDuringHolidayWeek: true,
+      disqualifyOnLeaveBeforeAfter: true,
+      payableHolidayTypes: ['National Holiday', 'Observance Paid']
+    };
+  const statutoryHolidayPayEnabled = statutoryHolidayPayPolicy.enabled !== false;
+  const payableHolidayTypesSelected = Array.isArray(statutoryHolidayPayPolicy.payableHolidayTypes)
+    ? statutoryHolidayPayPolicy.payableHolidayTypes
+    : ['National Holiday', 'Observance Paid'];
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
     : attendanceThresholdsEnabled !== false;
@@ -1032,6 +1055,105 @@
           </form>
         </div>
       </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="timesheet-parameters" role="tabpanel" aria-labelledby="settings-tab-timesheet-parameters" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-calendar2-week" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Timesheet Parameters</h2>
+              <p class="small text-muted mb-0">Control how class sessions with no student enrollment appear on instructor timesheets and how statutory holiday pay is calculated.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <div class="alert alert-danger d-none js-settings-error" id="timesheetParametersSettingsError" role="alert"></div>
+          <form id="timesheetParametersSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="rollup-feature-card">
+              <div class="fw-semibold mb-1">Sessions with no student enrollment</div>
+              <p class="small text-muted mb-3">Applies to class sessions that have no active enrolled students on the session date. School activity work sessions are not affected.</p>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="emptyEnrollmentSessions" id="emptyEnrollmentShowWithHours" value="show_with_hours" <%= emptyEnrollmentSessionsValue === 'show_with_hours' ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                <label class="form-check-label" for="emptyEnrollmentShowWithHours">Show in the timesheet with its hour</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="emptyEnrollmentSessions" id="emptyEnrollmentShowWithoutHours" value="show_without_hours" <%= emptyEnrollmentSessionsValue === 'show_without_hours' ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                <label class="form-check-label" for="emptyEnrollmentShowWithoutHours">Show in the timesheet without its hour</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="emptyEnrollmentSessions" id="emptyEnrollmentHide" value="hide" <%= emptyEnrollmentSessionsValue === 'hide' ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                <label class="form-check-label" for="emptyEnrollmentHide">Do not show in the timesheet</label>
+              </div>
+            </div>
+            <div class="rollup-feature-card mt-4">
+              <div class="d-flex align-items-center justify-content-between gap-3 mb-1">
+                <div class="fw-semibold">Statutory holiday pay</div>
+                <div class="form-check form-switch mb-0">
+                  <input class="form-check-input" type="checkbox" role="switch" id="statutoryHolidayPayEnabled" name="statutoryHolidayPayEnabled" value="true" <%= statutoryHolidayPayEnabled ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <label class="form-check-label" for="statutoryHolidayPayEnabled">Enabled</label>
+                </div>
+              </div>
+              <p class="small text-muted mb-3">When eligible, auto-add a statutory holiday pay row to timesheets using payable workday history, approved leave checks, and a rolling average-hours formula.</p>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label small fw-semibold" for="statutoryHolidayMinWorkdays">Minimum workdays</label>
+                  <input class="form-control" type="number" min="1" max="365" id="statutoryHolidayMinWorkdays" name="statutoryHolidayMinWorkdays" value="<%= statutoryHolidayPayPolicy.minWorkdays || 30 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <div class="form-text">Distinct payable workdays required before the holiday.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-semibold" for="statutoryHolidayWeekdayOccurrencesRequired">Weekday occurrences required</label>
+                  <input class="form-control" type="number" min="1" max="9" id="statutoryHolidayWeekdayOccurrencesRequired" name="statutoryHolidayWeekdayOccurrencesRequired" value="<%= statutoryHolidayPayPolicy.weekdayOccurrencesRequired || 5 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <div class="form-text">Payable hours on at least this many of the previous same weekdays.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-semibold" for="statutoryHolidayWeekdayOccurrencesLookback">Weekday lookback count</label>
+                  <input class="form-control" type="number" min="1" max="52" id="statutoryHolidayWeekdayOccurrencesLookback" name="statutoryHolidayWeekdayOccurrencesLookback" value="<%= statutoryHolidayPayPolicy.weekdayOccurrencesLookback || 9 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <div class="form-text">How many prior same-weekday occurrences to review.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-semibold" for="statutoryHolidayEarningsLookbackWeeks">Earnings lookback (weeks)</label>
+                  <input class="form-control" type="number" min="1" max="12" id="statutoryHolidayEarningsLookbackWeeks" name="statutoryHolidayEarningsLookbackWeeks" value="<%= statutoryHolidayPayPolicy.earningsLookbackWeeks || 4 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <div class="form-text">Average payable hours are calculated over this window.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-semibold" for="statutoryHolidayBeforeAfterSearchDays">Before/after search days</label>
+                  <input class="form-control" type="number" min="1" max="60" id="statutoryHolidayBeforeAfterSearchDays" name="statutoryHolidayBeforeAfterSearchDays" value="<%= statutoryHolidayPayPolicy.beforeAfterSearchDays || 14 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <div class="form-text">How far to search for adjacent payable workdays.</div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <div class="fw-semibold small mb-2">Paid holiday types</div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="payableHolidayType_National_Holiday" name="payableHolidayType_National_Holiday" value="National Holiday" <%= payableHolidayTypesSelected.includes('National Holiday') ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <label class="form-check-label" for="payableHolidayType_National_Holiday">National Holiday</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="payableHolidayType_Observance_Paid" name="payableHolidayType_Observance_Paid" value="Observance Paid" <%= payableHolidayTypesSelected.includes('Observance Paid') ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <label class="form-check-label" for="payableHolidayType_Observance_Paid">Observance Paid</label>
+                </div>
+              </div>
+              <div class="mt-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek" name="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek" value="true" <%= statutoryHolidayPayPolicy.disqualifyOnLeaveDuringHolidayWeek !== false ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <label class="form-check-label" for="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek">Disqualify when approved leave overlaps the holiday week (Mon–Sun)</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="statutoryHolidayDisqualifyOnLeaveBeforeAfter" name="statutoryHolidayDisqualifyOnLeaveBeforeAfter" value="true" <%= statutoryHolidayPayPolicy.disqualifyOnLeaveBeforeAfter !== false ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <label class="form-check-label" for="statutoryHolidayDisqualifyOnLeaveBeforeAfter">Disqualify when approved leave falls on the last or first adjacent payable workday</label>
+                </div>
+              </div>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end mt-4">
+                <button class="btn btn-primary" type="submit" id="btnSaveTimesheetParametersSettings">
+                  <i class="bi bi-save me-1"></i>Save Timesheet Parameters
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -1062,6 +1184,7 @@
   const sessionNotificationEmailWrapperBuiltinMappings = <%- sessionNotificationEmailWrapperBuiltinMappingsJson %>;
   const sessionNotificationEmailContextSources = <%- sessionNotificationEmailContextSourcesJson %>;
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
+  let timesheetParametersPolicy = <%- timesheetParametersPolicyJson %>;
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
   let sarReportTemplateCapabilities = <%- studentAttendanceReportTemplateCapabilitiesJson %>;
   let sarOverallTemplates = [];
@@ -2033,6 +2156,30 @@
     if (!result) return;
     autosavePolicy = result.policy && typeof result.policy === 'object' ? result.policy : autosavePolicy;
     renderAutosaveSections();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
+  document.getElementById('timesheetParametersSettingsForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveTimesheetParametersSettings');
+    if (!button) return;
+    const selected = document.querySelector('input[name="emptyEnrollmentSessions"]:checked');
+    const result = await postSettings('/school/settings/timesheet-parameters', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      emptyEnrollmentSessions: selected?.value || 'hide',
+      statutoryHolidayPayEnabled: document.getElementById('statutoryHolidayPayEnabled')?.checked ? 'true' : 'false',
+      statutoryHolidayMinWorkdays: document.getElementById('statutoryHolidayMinWorkdays')?.value || '30',
+      statutoryHolidayWeekdayOccurrencesRequired: document.getElementById('statutoryHolidayWeekdayOccurrencesRequired')?.value || '5',
+      statutoryHolidayWeekdayOccurrencesLookback: document.getElementById('statutoryHolidayWeekdayOccurrencesLookback')?.value || '9',
+      statutoryHolidayEarningsLookbackWeeks: document.getElementById('statutoryHolidayEarningsLookbackWeeks')?.value || '4',
+      statutoryHolidayBeforeAfterSearchDays: document.getElementById('statutoryHolidayBeforeAfterSearchDays')?.value || '14',
+      statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek: document.getElementById('statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek')?.checked ? 'true' : 'false',
+      statutoryHolidayDisqualifyOnLeaveBeforeAfter: document.getElementById('statutoryHolidayDisqualifyOnLeaveBeforeAfter')?.checked ? 'true' : 'false',
+      payableHolidayType_National_Holiday: document.getElementById('payableHolidayType_National_Holiday')?.checked ? 'true' : 'false',
+      payableHolidayType_Observance_Paid: document.getElementById('payableHolidayType_Observance_Paid')?.checked ? 'true' : 'false'
+    }, button, 'timesheetParametersSettingsError');
+    if (!result) return;
+    timesheetParametersPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetParametersPolicy;
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 

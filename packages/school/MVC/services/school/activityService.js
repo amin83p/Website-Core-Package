@@ -28,6 +28,9 @@ function isAssigneeTimesheetLocked(assignee = {}) {
 
 function isWorkSessionAssigneeLocked(entry = {}, assignee = {}) {
   if (isAssigneeTimesheetLocked(assignee)) return true;
+  const assignees = (Array.isArray(entry?.assignees) ? entry.assignees : [])
+    .filter((row) => row && typeof row === 'object');
+  if (assignees.length > 1) return false;
   if (schoolDependencyService.isActivityEntryTimesheetLocked(entry)) {
     const reason = String(entry?.lockReason || '').trim();
     if (reason === 'timesheet_approved' || normalizeId(entry?.lockedTimesheetId)) return true;

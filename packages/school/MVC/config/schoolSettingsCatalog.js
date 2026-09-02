@@ -49,6 +49,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     description: 'Choose report templates used for generated student attendance reports.',
     icon: 'bi-file-earmark-person',
     order: 40
+  }),
+  Object.freeze({
+    key: 'timesheet-parameters',
+    title: 'Timesheet Parameters',
+    description: 'Configure how class sessions with no student enrollment appear on timesheets.',
+    icon: 'bi-calendar2-week',
+    order: 45
   })
 ]);
 

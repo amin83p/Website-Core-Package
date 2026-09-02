@@ -1,5 +1,6 @@
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const classSessionCapacityService = require('./classSessionCapacityService');
+const classEnrollmentReadService = require('./classEnrollmentReadService');
 const schoolDataService = require('./schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -113,6 +114,65 @@ async function buildPeriodClassStudentContextById(classRows = [], {
   return out;
 }
 
+function enrollmentCountCacheKey(classId, date) {
+  return `${toPublicId(classId)}::${String(date || '').trim()}`;
+}
+
+async function resolveEnrolledStudentCountCache(items = [], {
+  activeOrgId = '',
+  reqUser
+} = {}) {
+  const cache = new Map();
+  const unique = [];
+  const seen = new Set();
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const classId = toPublicId(item?.classId);
+    const date = String(item?.date || '').trim();
+    if (!classId || !date) return;
+    const key = enrollmentCountCacheKey(classId, date);
+    if (seen.has(key)) return;
+    seen.add(key);
+    unique.push({ classId, date, key });
+  });
+  await Promise.all(unique.map(async ({ classId, date, key }) => {
+    const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
+      classId,
+      reqUser,
+      activeOrgId,
+      sessionDates: [date],
+      startDate: date,
+      endDate: date,
+      canonicalStatuses: ['active']
+    });
+    const studentIds = snapshot?.studentIds instanceof Set ? snapshot.studentIds : new Set();
+    cache.set(key, studentIds.size);
+  }));
+  return cache;
+}
+
+function enrolledStudentCountFromCache(cache, classId, date) {
+  if (!(cache instanceof Map)) return null;
+  const key = enrollmentCountCacheKey(classId, date);
+  if (!cache.has(key)) return null;
+  return Number(cache.get(key) || 0);
+}
+
+async function stampEnrolledStudentCountsOnRows(rows = [], {
+  activeOrgId = '',
+  reqUser
+} = {}) {
+  const source = Array.isArray(rows) ? rows : [];
+  const cache = await resolveEnrolledStudentCountCache(
+    source.map((row) => ({ classId: row?.classId, date: row?.date })),
+    { activeOrgId, reqUser }
+  );
+  return source.map((row) => {
+    const count = enrolledStudentCountFromCache(cache, row?.classId, row?.date);
+    if (count == null) return row;
+    return { ...row, enrolledStudentCount: count };
+  });
+}
+
 async function enrichClassSessionPayloadWithSingleStudentName(sessionPayload, {
   classData,
   sessionRow,
@@ -176,6 +236,13 @@ async function enrichClassLiveSessions({
   const classMap = new Map(relevantClassRows.map((row) => [String(row?.id || '').trim(), row]));
   const termEnrollmentCache = new Map();
   const enrollmentPeriodsByClassId = new Map();
+  const enrollmentCountCache = await resolveEnrolledStudentCountCache(
+    (Array.isArray(liveSessionBuilders) ? liveSessionBuilders : []).map((item) => ({
+      classId: item?.classId,
+      date: item?.sessionRow?.date || item?.payload?.date
+    })),
+    { activeOrgId, reqUser }
+  );
 
   await Promise.all(relevantClassRows.map(async (classRow) => {
     if (classSessionCapacityService.getClassRegistrationModeKey(classRow) !== 'rolling') return;
@@ -242,6 +309,12 @@ async function enrichClassLiveSessions({
         attendance: singleStudentAttendance,
         makeUpRequired
       });
+      const enrolledStudentCount = enrolledStudentCountFromCache(
+        enrollmentCountCache,
+        classId,
+        sessionRow?.date || payload.date
+      );
+      if (enrolledStudentCount != null) payload.enrolledStudentCount = enrolledStudentCount;
     }
     enriched.push(payload);
   }
@@ -263,5 +336,7 @@ module.exports = {
   shouldShowOptionalBadge,
   resolveSingleStudentNameFromPersonIds,
   resolveExpectedStudentPersonIdsForSession: classSessionCapacityService.resolveSessionEnrollmentPersonIds,
+  resolveEnrolledStudentCountCache,
+  stampEnrolledStudentCountsOnRows,
   enrichClassLiveSessions
 };
