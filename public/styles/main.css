@@ -2581,6 +2581,22 @@ footer {
 #chatInterfaceModal {
     z-index: 1070 !important; /* Extremely high to sit above everything */
 }
+#chatInterfaceModal #chatModalContent {
+    will-change: transform, width, height;
+}
+#chatInterfaceModal .chat-modal-drag-handle {
+    touch-action: none;
+}
+
+/* Keep broadcast composer above the chat shell modal */
+#chatBroadcastModal {
+    z-index: 1080 !important;
+}
+
+/* Keep broadcast backdrop above chat shell but below broadcast modal */
+body:has(#chatBroadcastModal.show) .modal-backdrop:last-of-type {
+    z-index: 1075 !important;
+}
    /* App modal stacking (lowest → highest):
       bootstrap default 1055, blocked report delete 1105, loading 11150, message 12000 */
 #globalLoadingModal {

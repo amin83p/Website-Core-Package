@@ -43,6 +43,55 @@ async function emitUnreadState(userId, convId) {
     return payload;
 }
 
+function resolveRecipientIds({ conversation, senderId, recipientIds } = {}) {
+    if (Array.isArray(recipientIds) && recipientIds.length) {
+        return [...new Set(recipientIds
+            .map((userId) => String(userId || '').trim())
+            .filter((userId) => userId && userId !== String(senderId || '').trim()))];
+    }
+    return [...new Set((Array.isArray(conversation?.participants)
+        ? conversation.participants
+        : [])
+        .map((participant) => String(participant?.userId || '').trim())
+        .filter((userId) => userId && userId !== String(senderId || '').trim()))];
+}
+
+async function emitNewMessageToRecipients({
+    conversation = null,
+    convId = '',
+    message = null,
+    senderId = '',
+    recipientIds = null
+} = {}) {
+    if (!io || !message) return { recipientIds: [] };
+    const effectiveConvId = String(convId || conversation?.id || '').trim();
+    if (!effectiveConvId) return { recipientIds: [] };
+
+    const recipients = resolveRecipientIds({
+        conversation,
+        senderId,
+        recipientIds
+    });
+    if (!recipients.length) return { recipientIds: [] };
+
+    await Promise.all(recipients.map(async (recipientId) => {
+        let unread = null;
+        try {
+            unread = await getUnreadPayload(recipientId, effectiveConvId);
+        } catch (summaryError) {
+            console.error('Socket Unread Summary Error:', summaryError);
+        }
+        io.to(getUserRoom(recipientId)).emit('new_message', {
+            convId: effectiveConvId,
+            message,
+            unreadCount: unread?.unreadCount,
+            totalUnread: unread?.totalUnread
+        });
+    }));
+
+    return { recipientIds: recipients };
+}
+
 function parseCookies(cookieHeader = '') {
     const out = {};
     String(cookieHeader || '').split(';').forEach((part) => {
@@ -176,27 +225,12 @@ function init(server) {
                     tempId: data.tempId,
                     realMsg: savedMsg
                 });
-
-                const recipients = (Array.isArray(access.conversation?.participants)
-                    ? access.conversation.participants
-                    : [])
-                    .map((participant) => String(participant?.userId || '').trim())
-                    .filter((userId) => userId && userId !== String(socket.userId));
-
-                await Promise.all([...new Set(recipients)].map(async (recipientId) => {
-                    let unread = null;
-                    try {
-                        unread = await getUnreadPayload(recipientId, data.convId);
-                    } catch (summaryError) {
-                        console.error('Socket Unread Summary Error:', summaryError);
-                    }
-                    io.to(getUserRoom(recipientId)).emit('new_message', {
-                        convId: String(data.convId),
-                        message: savedMsg,
-                        unreadCount: unread?.unreadCount,
-                        totalUnread: unread?.totalUnread
-                    });
-                }));
+                await emitNewMessageToRecipients({
+                    conversation: access.conversation,
+                    convId: data.convId,
+                    message: savedMsg,
+                    senderId: socket.userId
+                });
             } catch (err) {
                 console.error('Socket Message Error:', err);
                 emitChatError(socket, 'Failed to send message.');
@@ -294,4 +328,4 @@ function getIo() {
     return io;
 }
 
-module.exports = { init, getIo };
+module.exports = { init, getIo, emitNewMessageToRecipients };

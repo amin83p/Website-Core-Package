@@ -121,6 +121,8 @@ test('direct-id chat creation cannot bypass the dedicated contact scope', async 
         throw error;
       }
     }, originals);
+    stubModule('../MVC/services/chatBroadcastService', {}, originals);
+    stubModule('../MVC/services/socketService', {}, originals);
     stubModule('../MVC/services/coreFilesService', {}, originals);
     stubModule('../MVC/middleware/upload', {}, originals);
     stubModule('../MVC/services/fileAssetStorageService', {}, originals);
@@ -167,6 +169,8 @@ test('contact search delegates to the role-scoped service and preserves its enve
         packages: ['SCHOOL']
       }]
     }, originals);
+    stubModule('../MVC/services/chatBroadcastService', {}, originals);
+    stubModule('../MVC/services/socketService', {}, originals);
     stubModule('../MVC/services/coreFilesService', {}, originals);
     stubModule('../MVC/middleware/upload', {}, originals);
     stubModule('../MVC/services/fileAssetStorageService', {}, originals);
@@ -215,4 +219,116 @@ test('Chat source keeps historical reads while applying role scope to writes and
   assert.equal(modalSource.includes('ensureChatSocket'), true);
   assert.equal(modalSource.includes('loadOlderMessages'), true);
   assert.equal(modalSource.includes('<script src="/socket.io/socket.io.js"></script>'), false);
+});
+
+test('broadcast contact search delegates to the admin broadcast service', async () => {
+  const originals = new Map();
+  try {
+    stubModule('../MVC/repositories/chatRepository', {}, originals);
+    stubModule('../MVC/services/dataService', {}, originals);
+    stubModule('../MVC/services/chatAccessService', {}, originals);
+    stubModule('../MVC/services/chatContactScopeService', {}, originals);
+    stubModule('../MVC/services/chatBroadcastService', {
+      searchBroadcastRecipients: async () => [{
+        id: 'USER-8',
+        name: 'Admin Target',
+        email: 'target@example.com',
+        org: 'General',
+        roleLabels: [],
+        packages: []
+      }]
+    }, originals);
+    stubModule('../MVC/services/socketService', {}, originals);
+    stubModule('../MVC/services/coreFilesService', {}, originals);
+    stubModule('../MVC/middleware/upload', {}, originals);
+    stubModule('../MVC/services/fileAssetStorageService', {}, originals);
+    stubModule('../MVC/services/uploadFolderSettingsService', {}, originals);
+
+    delete require.cache[CONTROLLER_PATH];
+    const controller = require(CONTROLLER_PATH);
+    const req = {
+      user: { id: 'ADMIN-1' },
+      ip: '127.0.0.1',
+      query: { q: 'admin target', limit: '10' }
+    };
+    const res = createResponse();
+
+    await controller.searchBroadcastUsers(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.status, 'success');
+    assert.equal(Array.isArray(res.payload.data), true);
+    assert.equal(res.payload.data[0].id, 'USER-8');
+  } finally {
+    restoreModules(originals);
+  }
+});
+
+test('broadcast send returns a summary and emits realtime updates', async () => {
+  const originals = new Map();
+  const emitted = [];
+  try {
+    stubModule('../MVC/repositories/chatRepository', {}, originals);
+    stubModule('../MVC/services/dataService', {}, originals);
+    stubModule('../MVC/services/chatAccessService', {}, originals);
+    stubModule('../MVC/services/chatContactScopeService', {}, originals);
+    stubModule('../MVC/services/chatBroadcastService', {
+      broadcastDirectMessage: async () => ({
+        attemptedCount: 2,
+        sentCount: 2,
+        skippedCount: 0,
+        failedCount: 0,
+        deliveries: [
+          {
+            recipientId: 'USER-2',
+            conversationId: 'CONV-2',
+            messages: [{ id: 'MSG-2', senderId: 'ADMIN-1', content: 'Hello', type: 'text' }]
+          },
+          {
+            recipientId: 'USER-3',
+            conversationId: 'CONV-3',
+            messages: [{ id: 'MSG-3', senderId: 'ADMIN-1', content: 'Hello', type: 'text' }]
+          }
+        ],
+        skipped: [],
+        failed: []
+      })
+    }, originals);
+    stubModule('../MVC/services/socketService', {
+      emitNewMessageToRecipients: async (payload) => {
+        emitted.push(payload);
+      }
+    }, originals);
+    stubModule('../MVC/services/coreFilesService', {}, originals);
+    stubModule('../MVC/middleware/upload', {
+      getStoredFileUrl: () => '/uploads/chat/BROADCAST_TEST/file.txt',
+      getStoredFilePath: () => '/uploads/chat/BROADCAST_TEST/file.txt',
+      deleteUploadedFiles: async () => {}
+    }, originals);
+    stubModule('../MVC/services/fileAssetStorageService', {}, originals);
+    stubModule('../MVC/services/uploadFolderSettingsService', {}, originals);
+
+    delete require.cache[CONTROLLER_PATH];
+    const controller = require(CONTROLLER_PATH);
+    const req = {
+      user: { id: 'ADMIN-1' },
+      ip: '127.0.0.1',
+      body: {
+        recipientIds: JSON.stringify(['USER-2', 'USER-3']),
+        content: 'Hello'
+      },
+      files: []
+    };
+    const res = createResponse();
+
+    await controller.broadcastMessage(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.status, 'success');
+    assert.equal(res.payload.data.sentCount, 2);
+    assert.equal(emitted.length, 2);
+    assert.deepEqual(emitted.map((row) => row.recipientIds[0]), ['USER-2', 'USER-3']);
+  } finally {
+    restoreModules(originals);
+  }
 });

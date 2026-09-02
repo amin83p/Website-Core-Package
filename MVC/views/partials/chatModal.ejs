@@ -3,18 +3,23 @@
   const canChatCreate = !!modalChatAccess.canCreate;
   const canChatUpdate = !!modalChatAccess.canUpdate;
   const canChatDelete = !!(modalChatAccess.canDelete || modalChatAccess.canDeleteAll);
+  const canChatBroadcast = !!modalChatAccess.canDeleteAll;
 %>
 <div class="modal fade" id="chatInterfaceModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered" style="max-width: 90vw; width: 900px;"> 
-    <div class="modal-content overflow-hidden shadow-lg" id="chatModalContent" style="height: 600px; min-height: 400px; min-width: 350px; position: relative; resize: both; overflow: hidden;">
+  <div class="modal-dialog modal-dialog-centered chat-shell-dialog" id="chatModalDialog" style="max-width: calc(100vw - 8px); width: min(900px, calc(100vw - 8px)); margin: 4px auto;"> 
+    <div class="modal-content overflow-hidden shadow-lg" id="chatModalContent" style="height: 600px; min-height: 400px; min-width: 350px; position: relative; resize: none; overflow: hidden;">
+      <button type="button" class="btn-close chat-shell-global-close" data-bs-dismiss="modal" aria-label="Close"></button>
       
       <div class="modal-body p-0 d-flex h-100 position-relative">
           
           <div class="chat-sidebar bg-light border-end d-flex flex-column" id="chatSidebar" style="width: 280px; min-width: 0px; max-width: 65%;">
               
-              <div class="p-2 bg-white border-bottom d-flex justify-content-between align-items-center">
+              <div class="p-2 bg-white border-bottom d-flex justify-content-between align-items-center chat-shell-header" id="chatModalHeaderRow">
                   <div class="d-flex align-items-center gap-2">
                       <h6 class="fw-bold m-0 text-secondary ps-2" id="sidebarTitle">Messages</h6>
+                      <button type="button" class="btn btn-sm btn-light text-secondary rounded-circle chat-modal-drag-handle" id="chatModalDragHandle" title="Move Chat Window" aria-label="Move Chat Window">
+                          <i class="bi bi-arrows-move"></i>
+                      </button>
                   </div>
                   <div class="d-flex align-items-center gap-1">
                       <button type="button" class="btn btn-sm btn-light text-secondary rounded-circle" id="chatSoundToggle" title="Mute chat sounds" aria-label="Mute chat sounds" aria-pressed="false">
@@ -25,11 +30,15 @@
                               <i class="bi bi-pencil-square"></i>
                           </button>
                       <% } %>
-                      <button type="button" class="btn-close small ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                      <% if (canChatBroadcast) { %>
+                          <button class="btn btn-sm btn-light text-primary rounded-circle" title="Broadcast" onclick="startBroadcastWizard()">
+                              <i class="bi bi-broadcast"></i>
+                          </button>
+                      <% } %>
                   </div>
               </div>
 
-              <div class="p-2 border-bottom">
+              <div class="p-2 border-bottom chat-shell-search-row">
                   <input type="text" class="form-control form-control-sm bg-white" placeholder="Search..." id="chatSearchInput" onkeyup="handleSearch(this.value)">
               </div>
 
@@ -72,7 +81,6 @@
                                <div class="fw-bold text-dark small text-truncate" id="chatHeaderName">User</div>
                            </div>
                       </div>
-                      <button type="button" class="btn-close small ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
                   </div>
 
                   <div class="flex-grow-1 overflow-auto p-3 bg-light custom-scrollbar" id="chatMessageContainer" 
@@ -81,7 +89,7 @@
 
                   <div id="attachmentPreviewArea" class="d-none"></div>
 
-                  <div class="p-2 border-top bg-white">
+                  <div class="p-2 border-top bg-white chat-compose-wrap">
                       <div id="chatReadOnlyNotice" class="small text-muted px-2 py-1 <%= canChatUpdate ? 'd-none' : '' %>">
                           You can read this conversation, but your access profile does not allow sending messages.
                       </div>
@@ -105,7 +113,7 @@
           </div>
       </div>
        
-      <div id="modalResizer" style="position: absolute; bottom: 0; right: 0; width: 15px; height: 15px; cursor: nwse-resize; z-index: 20;">
+      <div id="modalResizer" style="position: absolute; bottom: 0; right: 0; width: 22px; height: 22px; cursor: nwse-resize; z-index: 20;">
           <svg viewBox="0 0 10 10" width="100%" height="100%" fill="#adb5bd">
             <path d="M10 10 L10 2 L2 10 Z" />
           </svg>
@@ -115,13 +123,91 @@
   </div>
 </div>
 
+<div class="modal fade" id="chatBroadcastModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Broadcast Message</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="chatBroadcastForm">
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold mb-1" for="chatBroadcastSearchInput">Recipients</label>
+                        <input type="text" id="chatBroadcastSearchInput" class="form-control form-control-sm" placeholder="Search users...">
+                        <div class="form-text">Select one or more recipients.</div>
+                    </div>
+                    <div id="chatBroadcastSelectedRecipients" class="d-flex flex-wrap gap-1 mb-2"></div>
+                    <div id="chatBroadcastRecipientList" class="border rounded p-2 bg-light custom-scrollbar" style="max-height: 220px; overflow-y: auto;">
+                        <div class="text-muted small">Loading recipients...</div>
+                    </div>
+
+                    <hr class="my-3">
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold mb-1" for="chatBroadcastMessageInput">Message</label>
+                        <textarea id="chatBroadcastMessageInput" class="form-control" rows="4" placeholder="Type your message..."></textarea>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="small text-muted" id="chatBroadcastRecipientCount">0 recipients selected</div>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-light" id="chatBroadcastAttachButton">
+                                <i class="bi bi-paperclip me-1"></i>Attach files
+                            </button>
+                            <input type="file" id="chatBroadcastFileInput" class="d-none" multiple>
+                        </div>
+                    </div>
+                    <div id="chatBroadcastAttachmentPreview" class="d-none mt-2"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="chatBroadcastSendButton">Send Broadcast</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <style>
     /* Compact Styling */
+    .chat-shell-header {
+        padding: 0.55rem 0.6rem !important;
+    }
+    .chat-shell-search-row {
+        background: #f8fafc;
+    }
+    .chat-shell-search-row #chatSearchInput {
+        border-radius: 10px;
+        border: 1px solid #dbe3ef;
+        padding-left: 0.75rem;
+        box-shadow: none;
+    }
+    .chat-shell-search-row #chatSearchInput:focus {
+        border-color: #99bffb;
+        box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15);
+    }
+    .chat-shell-global-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 30;
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        background-color: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+    }
+    .chat-modal-drag-handle {
+        cursor: move;
+    }
+    .chat-modal-drag-handle:active {
+        cursor: grabbing;
+    }
     .chat-item { cursor: pointer; border-bottom: 1px solid #f8f9fa; padding: 10px; }
     .chat-item:hover, .chat-item.active { background-color: #f1f5f9; }
     .msg-bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9rem; margin-bottom: 2px; }
     .msg-sent { background-color: #d1e7dd; align-self: flex-end; border-bottom-right-radius: 2px; }
     .msg-received { background-color: #fff; border: 1px solid #eee; align-self: flex-start; border-bottom-left-radius: 2px; }
+    .msg-text-content { white-space: pre-wrap; word-break: break-word; }
     .msg-time { font-size: 0.65rem; color: #adb5bd; margin-bottom: 8px; text-align: right; margin-right: 4px; }
     
     /* Scrollbar */
@@ -143,25 +229,32 @@
 
     /* Attachment Preview */
     #attachmentPreviewArea { display: flex; gap: 10px; padding: 10px; background: #f8f9fa; border-top: 1px solid #dee2e6; overflow-x: auto; }
+    #chatBroadcastAttachmentPreview { display: flex; gap: 10px; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; overflow-x: auto; }
     .att-preview-card { position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; flex-shrink: 0; background: #fff; display: flex; align-items: center; justify-content: center; }
     .att-preview-card img { width: 100%; height: 100%; object-fit: cover; }
     .att-preview-remove { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
     .att-preview-file { font-size: 2rem; color: #6c757d; }   
+    .broadcast-recipient-chip { display: inline-flex; align-items: center; gap: 4px; background: #e7f1ff; color: #0d6efd; border-radius: 999px; padding: 2px 8px; font-size: 0.75rem; }
+    .broadcast-recipient-row.active { background: #e7f1ff; border-color: #0d6efd !important; }
 
     /* Sidebar Item Styling */
     .chat-item {
         cursor: pointer;
-        padding: 12px 15px;
-        border-bottom: 1px solid #f1f1f1;
+        padding: 10px 12px;
+        margin: 0 6px 4px;
+        border: 1px solid #eef3fb;
+        border-radius: 10px;
         transition: all 0.2s ease;
         position: relative;
     }
     .chat-item:hover {
         background-color: #f8f9fa;
+        border-color: #dbe7fb;
     }
     .chat-item.active {
         background-color: #e7f1ff; /* Light blue active state */
-        border-left: 4px solid #0d6efd;
+        border-color: #0d6efd;
+        box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.2);
     }
     
     /* Unread Styling */
@@ -200,6 +293,35 @@
         display: inline-block;
     }
 
+    .chat-compose-wrap {
+        background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+    }
+
+    #chatForm {
+        border: 1px solid #dbe7fb;
+        border-radius: 999px;
+        padding: 4px 6px;
+        background: #f8fbff;
+    }
+    #chatForm #chatInput {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding-left: 4px;
+        padding-right: 6px;
+    }
+    #chatForm #chatAttachmentButton {
+        border: 1px solid #dbe7fb;
+    }
+    #chatForm #chatSendButton {
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25);
+    }
+
+    .broadcast-recipient-row {
+        margin: 0 0 6px 0;
+        border-radius: 8px;
+    }
+
     #sidebarResizer,
     #modalResizer {
         touch-action: none;
@@ -218,7 +340,9 @@ const chatAccess = <%- JSON.stringify({
     canRead: !!(modalChatAccess.canRead || modalChatAccess.canReadAll),
     canCreate: canChatCreate,
     canUpdate: canChatUpdate,
-    canDelete: canChatDelete
+    canDelete: canChatDelete,
+    canDeleteAll: !!modalChatAccess.canDeleteAll,
+    canBroadcast: canChatBroadcast
 }) %>;
 let isSidebarVisible = true;
 let previousSidebarWidth = 280;
@@ -235,6 +359,14 @@ let chatInitialUnreadSoundPlayed = false;
 let hasMoreOlderMessages = false;
 let oldestLoadedMessageId = null;
 let loadingOlderMessages = false;
+let broadcastRecipients = [];
+const selectedBroadcastRecipients = new Map();
+let broadcastPendingAttachments = [];
+let broadcastSending = false;
+let chatModalOffsetX = 0;
+let chatModalOffsetY = 0;
+let chatModalIsMaximized = false;
+let chatModalRestoreState = null;
 
 function normalizeClientUnreadCount(value) {
     const parsed = Number(value);
@@ -708,6 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initChatSystem();
     initResizers();
     initChatSoundControls();
+    initBroadcastComposer();
     window.addEventListener('focus', markActiveConversationRead);
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') markActiveConversationRead();
@@ -717,6 +850,12 @@ document.addEventListener('DOMContentLoaded', () => {
     modalEl.addEventListener('show.bs.modal', async () => {
         await ensureChatSocket();
         showInbox();
+        const modalContent = document.getElementById('chatModalContent');
+        if (modalContent) {
+            applyChatModalTransform(modalContent);
+            keepChatModalInViewport(modalContent);
+            setChatModalDragHandleState();
+        }
 
         const sidebar = document.getElementById('chatSidebar');
         if (sidebar && sidebar.classList.contains('d-none')) {
@@ -736,7 +875,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 100);
         }
     });
-
     modalEl.addEventListener('hidden.bs.modal', () => {
         if (socket && socket.connected) socket.disconnect();
         socketReadyPromise = null;
@@ -867,6 +1005,12 @@ function messageExistsInContainer(messageId) {
     return Boolean(document.getElementById(`msg-row-${messageId}`));
 }
 
+function normalizeMessageTextForDisplay(value) {
+    return String(value == null ? '' : value)
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+}
+
 function buildMessageHtml(msg, isTemp = false) {
     const isMine = String(msg.senderId) === String(currentUser.id);
     const typeClass = isMine ? 'msg-sent' : 'msg-received';
@@ -885,7 +1029,7 @@ function buildMessageHtml(msg, isTemp = false) {
         }
     }
 
-    let contentHtml = msg.content;
+    let contentHtml = `<div class="msg-text-content">${safeText(normalizeMessageTextForDisplay(msg.content))}</div>`;
     if (msg.type === 'image') {
         const safeUrl = encodeURI(msg.fileUrl).replace(/%25/g, '%');
         contentHtml = `<a href="${safeUrl}" target="_blank"><img src="${safeUrl}" class="img-fluid rounded mb-1" style="max-width: 200px; min-height: 50px; background: #f0f0f0;"></a>`;
@@ -1025,6 +1169,357 @@ function removeAttachment(index) {
     renderPreviews();
 }
 
+function applyChatModalTransform(modalContent) {
+    if (!modalContent) return;
+    modalContent.style.transform = `translate(${chatModalOffsetX}px, ${chatModalOffsetY}px)`;
+}
+
+function setChatModalDragHandleState() {
+    const handle = document.getElementById('chatModalDragHandle');
+    if (!handle) return;
+    handle.title = chatModalIsMaximized ? 'Restore Chat Window' : 'Move Chat Window';
+    handle.setAttribute('aria-label', handle.title);
+    handle.innerHTML = chatModalIsMaximized
+        ? '<i class="bi bi-fullscreen-exit"></i>'
+        : '<i class="bi bi-arrows-move"></i>';
+}
+
+function getChatModalMaxSize() {
+    return {
+        width: Math.max(350, window.innerWidth - 8),
+        height: Math.max(400, window.innerHeight - 8)
+    };
+}
+
+function setChatModalSize(modalContent, width, height) {
+    if (!modalContent) return;
+    const modalDialog = document.getElementById('chatModalDialog');
+    const normalizedWidth = Math.max(350, Math.floor(width));
+    if (modalDialog) {
+        modalDialog.style.width = `${normalizedWidth}px`;
+    }
+    modalContent.style.width = modalDialog ? '100%' : `${normalizedWidth}px`;
+    modalContent.style.height = `${Math.max(400, Math.floor(height))}px`;
+}
+
+function toggleChatModalMaximize(modalContent, reason = 'manual') {
+    if (!modalContent) return;
+    if (!chatModalIsMaximized) {
+        chatModalRestoreState = {
+            width: modalContent.offsetWidth,
+            height: modalContent.offsetHeight,
+            offsetX: chatModalOffsetX,
+            offsetY: chatModalOffsetY
+        };
+        const fullSize = getChatModalMaxSize();
+        chatModalOffsetX = 0;
+        chatModalOffsetY = 0;
+        setChatModalSize(modalContent, fullSize.width, fullSize.height);
+        applyChatModalTransform(modalContent);
+        chatModalIsMaximized = true;
+    } else {
+        const restore = chatModalRestoreState || {};
+        chatModalOffsetX = Number.isFinite(restore.offsetX) ? restore.offsetX : 0;
+        chatModalOffsetY = Number.isFinite(restore.offsetY) ? restore.offsetY : 0;
+        setChatModalSize(
+            modalContent,
+            Number.isFinite(restore.width) ? restore.width : 900,
+            Number.isFinite(restore.height) ? restore.height : 600
+        );
+        applyChatModalTransform(modalContent);
+        chatModalIsMaximized = false;
+    }
+    setChatModalDragHandleState();
+    keepChatModalInViewport(modalContent);
+}
+
+function clampChatModalPosition(rect) {
+    const minVisibleX = Math.max(72, Math.min(160, Math.floor(rect.width * 0.25)));
+    const minVisibleY = Math.max(56, Math.min(120, Math.floor(rect.height * 0.2)));
+    const minLeft = -(rect.width - minVisibleX);
+    const maxLeft = Math.max(minLeft, window.innerWidth - minVisibleX);
+    const minTop = -(rect.height - minVisibleY);
+    const maxTop = Math.max(minTop, window.innerHeight - minVisibleY);
+    return { minLeft, maxLeft, minTop, maxTop };
+}
+
+function keepChatModalInViewport(modalContent) {
+    if (!modalContent) return;
+    const rect = modalContent.getBoundingClientRect();
+    const bounds = clampChatModalPosition(rect);
+    let adjustX = 0;
+    let adjustY = 0;
+    if (rect.left < bounds.minLeft) adjustX = bounds.minLeft - rect.left;
+    else if (rect.left > bounds.maxLeft) adjustX = bounds.maxLeft - rect.left;
+    if (rect.top < bounds.minTop) adjustY = bounds.minTop - rect.top;
+    else if (rect.top > bounds.maxTop) adjustY = bounds.maxTop - rect.top;
+    if (adjustX !== 0 || adjustY !== 0) {
+        chatModalOffsetX += adjustX;
+        chatModalOffsetY += adjustY;
+        applyChatModalTransform(modalContent);
+    }
+}
+
+function resetBroadcastComposer() {
+    broadcastRecipients = [];
+    selectedBroadcastRecipients.clear();
+    broadcastPendingAttachments = [];
+    const searchInput = document.getElementById('chatBroadcastSearchInput');
+    const messageInput = document.getElementById('chatBroadcastMessageInput');
+    const fileInput = document.getElementById('chatBroadcastFileInput');
+    const listEl = document.getElementById('chatBroadcastRecipientList');
+    if (searchInput) searchInput.value = '';
+    if (messageInput) messageInput.value = '';
+    if (fileInput) fileInput.value = '';
+    if (listEl) {
+        listEl.innerHTML = '<div class="text-muted small">Use search to find recipients.</div>';
+    }
+    renderBroadcastSelectedRecipients();
+    renderBroadcastAttachmentPreviews();
+}
+
+function renderBroadcastSelectedRecipients() {
+    const selectedEl = document.getElementById('chatBroadcastSelectedRecipients');
+    const counterEl = document.getElementById('chatBroadcastRecipientCount');
+    const selectedRows = [...selectedBroadcastRecipients.values()];
+    if (counterEl) {
+        const count = selectedRows.length;
+        counterEl.textContent = `${count} recipient${count === 1 ? '' : 's'} selected`;
+    }
+    if (!selectedEl) return;
+    if (!selectedRows.length) {
+        selectedEl.innerHTML = '<span class="small text-muted">No recipients selected yet.</span>';
+        return;
+    }
+    selectedEl.innerHTML = selectedRows.map((row) => (
+        `<span class="broadcast-recipient-chip">${safeText(row.name || row.id)}</span>`
+    )).join('');
+}
+
+function renderBroadcastRecipients() {
+    const listEl = document.getElementById('chatBroadcastRecipientList');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    if (!broadcastRecipients.length) {
+        listEl.innerHTML = '<div class="text-muted small">No users found.</div>';
+        return;
+    }
+
+    broadcastRecipients.forEach((recipient) => {
+        const recipientId = String(recipient.id || '').trim();
+        if (!recipientId) return;
+        const isSelected = selectedBroadcastRecipients.has(recipientId);
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = `broadcast-recipient-row chat-item d-flex align-items-center w-100 text-start border rounded mb-1 ${isSelected ? 'active' : ''}`;
+        row.innerHTML = `
+            <div class="me-2 flex-shrink-0">
+                ${buildAvatarHtml(recipient.name || recipient.id, recipient.avatar || '', 32, 'bg-primary-subtle', 'text-primary')}
+            </div>
+            <div class="flex-grow-1 overflow-hidden">
+                <div class="small fw-semibold text-truncate">${safeText(recipient.name || recipient.id)}</div>
+                <div class="x-small text-muted text-truncate">${safeText(recipient.email || recipient.org || 'User')}</div>
+            </div>
+            <div class="ms-2">
+                <input type="checkbox" class="form-check-input" ${isSelected ? 'checked' : ''} aria-label="Select recipient">
+            </div>
+        `;
+        row.addEventListener('click', () => {
+            if (selectedBroadcastRecipients.has(recipientId)) selectedBroadcastRecipients.delete(recipientId);
+            else selectedBroadcastRecipients.set(recipientId, recipient);
+            renderBroadcastSelectedRecipients();
+            renderBroadcastRecipients();
+        });
+        listEl.appendChild(row);
+    });
+}
+
+async function fetchBroadcastUsers(query = '') {
+    if (!chatAccess.canBroadcast) return;
+    const listEl = document.getElementById('chatBroadcastRecipientList');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="text-center mt-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
+    try {
+        const resp = await fetch(`/chat/broadcast/users/search?q=${encodeURIComponent(query || '')}&limit=100`);
+        const payload = await resp.json();
+        if (!resp.ok || payload.status !== 'success') {
+            listEl.innerHTML = `<div class="text-danger small">${safeText(payload.message || 'Unable to load recipients.')}</div>`;
+            return;
+        }
+        broadcastRecipients = Array.isArray(payload.data) ? payload.data : [];
+        renderBroadcastRecipients();
+    } catch (error) {
+        console.error(error);
+        listEl.innerHTML = '<div class="text-danger small">Unable to load recipients right now.</div>';
+    }
+}
+
+function handleBroadcastFileSelection(input) {
+    if (!input?.files || !input.files.length) return;
+    const MAX_SIZE = 5 * 1024 * 1024;
+    Array.from(input.files).forEach((file) => {
+        if (broadcastPendingAttachments.length >= 3) {
+            safeShowAlert('Maximum 3 files allowed.', 'warning');
+            return;
+        }
+        if (file.size > MAX_SIZE) {
+            safeShowAlert('File too large (Max 5MB).', 'error');
+            return;
+        }
+        broadcastPendingAttachments.push(file);
+    });
+    renderBroadcastAttachmentPreviews();
+    input.value = '';
+}
+
+function renderBroadcastAttachmentPreviews() {
+    const area = document.getElementById('chatBroadcastAttachmentPreview');
+    if (!area) return;
+    area.innerHTML = '';
+    if (!broadcastPendingAttachments.length) {
+        area.classList.add('d-none');
+        return;
+    }
+    area.classList.remove('d-none');
+    broadcastPendingAttachments.forEach((file, index) => {
+        const isImage = String(file.type || '').startsWith('image/');
+        const innerHTML = isImage
+            ? `<img src="${URL.createObjectURL(file)}">`
+            : '<i class="bi bi-file-earmark-text att-preview-file"></i>';
+        const card = document.createElement('div');
+        card.className = 'att-preview-card';
+        card.innerHTML = `${innerHTML}<div class="att-preview-remove" data-remove-index="${index}">&times;</div>`;
+        const removeBtn = card.querySelector('.att-preview-remove');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => {
+                broadcastPendingAttachments.splice(index, 1);
+                renderBroadcastAttachmentPreviews();
+            });
+        }
+        area.appendChild(card);
+    });
+}
+
+async function submitBroadcastForm(event) {
+    event.preventDefault();
+    if (broadcastSending) return;
+    if (!chatAccess.canBroadcast) {
+        safeShowAlert('Your access profile does not allow broadcast messaging.', 'warning');
+        return;
+    }
+
+    const recipientIds = [...selectedBroadcastRecipients.keys()];
+    const messageInput = document.getElementById('chatBroadcastMessageInput');
+    const sendButton = document.getElementById('chatBroadcastSendButton');
+    const content = String(messageInput?.value || '').trim();
+    if (!recipientIds.length) {
+        safeShowAlert('Select at least one recipient.', 'warning');
+        return;
+    }
+    if (!content && broadcastPendingAttachments.length === 0) {
+        safeShowAlert('Enter a message or attach at least one file.', 'warning');
+        return;
+    }
+
+    broadcastSending = true;
+    if (sendButton) {
+        sendButton.disabled = true;
+        sendButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+    }
+
+    const campaignId = `BROADCAST_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const formData = new FormData();
+    formData.append('recipientIds', JSON.stringify(recipientIds));
+    formData.append('content', content);
+    broadcastPendingAttachments.forEach((file) => formData.append('files', file));
+
+    try {
+        const response = await fetch(`/chat/broadcast/${encodeURIComponent(campaignId)}`, {
+            method: 'POST',
+            body: formData
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.status !== 'success') {
+            safeShowAlert(payload.message || 'Broadcast send failed.', 'error');
+            return;
+        }
+
+        const sentCount = Number(payload?.data?.sentCount) || 0;
+        const skippedCount = Number(payload?.data?.skippedCount) || 0;
+        const failedCount = Number(payload?.data?.failedCount) || 0;
+        let summary = `Broadcast sent to ${sentCount} recipient(s).`;
+        if (skippedCount > 0) summary += ` Skipped: ${skippedCount}.`;
+        if (failedCount > 0) summary += ` Failed: ${failedCount}.`;
+        safeShowAlert(summary, failedCount > 0 ? 'warning' : 'success');
+
+        const modalEl = document.getElementById('chatBroadcastModal');
+        if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.hide();
+        }
+        refreshInbox();
+    } catch (error) {
+        console.error(error);
+        safeShowAlert('Unable to send broadcast right now.', 'error');
+    } finally {
+        broadcastSending = false;
+        if (sendButton) {
+            sendButton.disabled = false;
+            sendButton.innerHTML = 'Send Broadcast';
+        }
+    }
+}
+
+function startBroadcastWizard() {
+    if (!chatAccess.canBroadcast) {
+        safeShowAlert('Your access profile does not allow broadcast messaging.', 'warning');
+        return;
+    }
+    const modalEl = document.getElementById('chatBroadcastModal');
+    if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+        safeShowAlert('Broadcast UI is currently unavailable.', 'error');
+        return;
+    }
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+    fetchBroadcastUsers('');
+    setTimeout(() => {
+        const input = document.getElementById('chatBroadcastSearchInput');
+        if (input) input.focus();
+    }, 120);
+}
+
+function initBroadcastComposer() {
+    const form = document.getElementById('chatBroadcastForm');
+    if (!form || form.dataset.bound === '1') return;
+    form.dataset.bound = '1';
+
+    const searchInput = document.getElementById('chatBroadcastSearchInput');
+    const attachButton = document.getElementById('chatBroadcastAttachButton');
+    const fileInput = document.getElementById('chatBroadcastFileInput');
+    const modalEl = document.getElementById('chatBroadcastModal');
+    let searchTimer = null;
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                fetchBroadcastUsers(searchInput.value || '');
+            }, 180);
+        });
+    }
+    if (attachButton && fileInput) {
+        attachButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => handleBroadcastFileSelection(fileInput));
+    }
+    form.addEventListener('submit', submitBroadcastForm);
+    if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            resetBroadcastComposer();
+        });
+    }
+}
+
 function initResizers() {
     const tx = document.getElementById('chatInput');
     if (tx) {
@@ -1039,7 +1534,9 @@ function initResizers() {
     const sidebarResizer = document.getElementById('sidebarResizer');
     const modalBody = document.querySelector('#chatInterfaceModal .modal-body');
     const modalContent = document.getElementById('chatModalContent');
+    const modalDialog = document.getElementById('chatModalDialog');
     const modalResizer = document.getElementById('modalResizer');
+    const modalDragHandle = document.getElementById('chatModalDragHandle');
 
     if (sidebar && sidebarResizer && modalBody) {
         let draggingSidebar = false;
@@ -1094,6 +1591,12 @@ function initResizers() {
         let startY = 0;
         let startW = 0;
         let startH = 0;
+        let draggingWindow = false;
+        let windowStartX = 0;
+        let windowStartY = 0;
+        let windowStartOffsetX = 0;
+        let windowStartOffsetY = 0;
+        let windowStartRect = null;
 
         const onModalMove = (clientX, clientY) => {
             if (!draggingModal) return;
@@ -1101,11 +1604,12 @@ function initResizers() {
             const deltaY = clientY - startY;
             const minW = 350;
             const minH = 400;
-            const maxW = Math.max(minW, window.innerWidth - 24);
-            const maxH = Math.max(minH, window.innerHeight - 24);
+            const maxW = Math.max(minW, window.innerWidth - 8);
+            const maxH = Math.max(minH, window.innerHeight - 8);
             const newW = Math.max(minW, Math.min(maxW, startW + deltaX));
             const newH = Math.max(minH, Math.min(maxH, startH + deltaY));
-            modalContent.style.width = `${newW}px`;
+            if (modalDialog) modalDialog.style.width = `${newW}px`;
+            modalContent.style.width = modalDialog ? '100%' : `${newW}px`;
             modalContent.style.height = `${newH}px`;
         };
 
@@ -1117,6 +1621,7 @@ function initResizers() {
             window.removeEventListener('mouseup', stopModalDrag);
             window.removeEventListener('touchmove', touchModalMove);
             window.removeEventListener('touchend', stopModalDrag);
+            keepChatModalInViewport(modalContent);
         };
 
         const mouseModalMove = (e) => onModalMove(e.clientX, e.clientY);
@@ -1125,12 +1630,50 @@ function initResizers() {
             onModalMove(e.touches[0].clientX, e.touches[0].clientY);
         };
 
+        const onWindowMove = (clientX, clientY) => {
+            if (!draggingWindow || !windowStartRect) return;
+            const deltaX = clientX - windowStartX;
+            const deltaY = clientY - windowStartY;
+            const candidateOffsetX = windowStartOffsetX + deltaX;
+            const candidateOffsetY = windowStartOffsetY + deltaY;
+            const nextLeft = windowStartRect.left + (candidateOffsetX - windowStartOffsetX);
+            const nextTop = windowStartRect.top + (candidateOffsetY - windowStartOffsetY);
+            const bounds = clampChatModalPosition(windowStartRect);
+            const clampedLeft = Math.max(bounds.minLeft, Math.min(bounds.maxLeft, nextLeft));
+            const clampedTop = Math.max(bounds.minTop, Math.min(bounds.maxTop, nextTop));
+            chatModalOffsetX = windowStartOffsetX + (clampedLeft - windowStartRect.left);
+            chatModalOffsetY = windowStartOffsetY + (clampedTop - windowStartRect.top);
+            applyChatModalTransform(modalContent);
+        };
+
+        const stopWindowDrag = () => {
+            draggingWindow = false;
+            windowStartRect = null;
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+            window.removeEventListener('mousemove', mouseWindowMove);
+            window.removeEventListener('mouseup', stopWindowDrag);
+            window.removeEventListener('touchmove', touchWindowMove);
+            window.removeEventListener('touchend', stopWindowDrag);
+            keepChatModalInViewport(modalContent);
+        };
+
+        const mouseWindowMove = (e) => onWindowMove(e.clientX, e.clientY);
+        const touchWindowMove = (e) => {
+            if (!e.touches || !e.touches.length) return;
+            onWindowMove(e.touches[0].clientX, e.touches[0].clientY);
+        };
+
         modalResizer.addEventListener('mousedown', (e) => {
             e.preventDefault();
             draggingModal = true;
+            if (chatModalIsMaximized) {
+                chatModalIsMaximized = false;
+                setChatModalDragHandleState();
+            }
             startX = e.clientX;
             startY = e.clientY;
-            startW = modalContent.offsetWidth;
+            startW = modalDialog ? modalDialog.offsetWidth : modalContent.offsetWidth;
             startH = modalContent.offsetHeight;
             document.body.style.userSelect = 'none';
             document.body.style.cursor = 'nwse-resize';
@@ -1141,19 +1684,68 @@ function initResizers() {
         modalResizer.addEventListener('touchstart', (e) => {
             if (!e.touches || !e.touches.length) return;
             draggingModal = true;
+            if (chatModalIsMaximized) {
+                chatModalIsMaximized = false;
+                setChatModalDragHandleState();
+            }
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            startW = modalContent.offsetWidth;
+            startW = modalDialog ? modalDialog.offsetWidth : modalContent.offsetWidth;
             startH = modalContent.offsetHeight;
             document.body.style.userSelect = 'none';
             document.body.style.cursor = 'nwse-resize';
             window.addEventListener('touchmove', touchModalMove, { passive: true });
             window.addEventListener('touchend', stopModalDrag);
         }, { passive: true });
+
+        if (modalDragHandle) {
+            modalDragHandle.addEventListener('dblclick', () => {
+                toggleChatModalMaximize(modalContent, 'double-click');
+            });
+            modalDragHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                draggingWindow = true;
+                windowStartX = e.clientX;
+                windowStartY = e.clientY;
+                windowStartOffsetX = chatModalOffsetX;
+                windowStartOffsetY = chatModalOffsetY;
+                windowStartRect = modalContent.getBoundingClientRect();
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'move';
+                window.addEventListener('mousemove', mouseWindowMove);
+                window.addEventListener('mouseup', stopWindowDrag);
+            });
+            modalDragHandle.addEventListener('touchstart', (e) => {
+                if (!e.touches || !e.touches.length) return;
+                draggingWindow = true;
+                windowStartX = e.touches[0].clientX;
+                windowStartY = e.touches[0].clientY;
+                windowStartOffsetX = chatModalOffsetX;
+                windowStartOffsetY = chatModalOffsetY;
+                windowStartRect = modalContent.getBoundingClientRect();
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'move';
+                window.addEventListener('touchmove', touchWindowMove, { passive: true });
+                window.addEventListener('touchend', stopWindowDrag);
+            }, { passive: true });
+        }
+
+        window.addEventListener('resize', () => {
+            if (chatModalIsMaximized) {
+                const fullSize = getChatModalMaxSize();
+                setChatModalSize(modalContent, fullSize.width, fullSize.height);
+                applyChatModalTransform(modalContent);
+            }
+            keepChatModalInViewport(modalContent);
+        });
     }
 }
 
-function showInbox() { const t=document.getElementById('sidebarTitle'); if(t)t.innerText='Messages'; refreshInbox(); }
+function showInbox() {
+    const t = document.getElementById('sidebarTitle');
+    if (t) t.innerText = 'Messages';
+    refreshInbox();
+}
 
 async function refreshInbox() {
     const listEl = document.getElementById('conversationList');

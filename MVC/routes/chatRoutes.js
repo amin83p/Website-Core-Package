@@ -15,6 +15,7 @@ router.get('/messages/:convId', requireChatAccessAny([OPERATIONS.READ, OPERATION
 router.post('/start', requireChatAccessAny(OPERATIONS.CREATE), chatController.startChat);
 router.delete('/delete/:convId', requireChatAccessAny([OPERATIONS.DELETE, OPERATIONS.DELETE_ALL], OPERATIONS.DELETE), chatController.deleteChat);
 router.get('/users/search', requireChatAccessAny(OPERATIONS.CREATE), chatController.searchUsers);
+router.get('/broadcast/users/search', requireChatAccessAny(OPERATIONS.DELETE_ALL), chatController.searchBroadcastUsers);
 
 // ✅ UPDATED: upload('chat', true, true)
 // Arg 1: 'chat' -> Folder Name
@@ -24,6 +25,10 @@ router.post('/upload',
             requireChatAccessAny(OPERATIONS.UPDATE),
             upload('chat', true, true).array('files', 5), 
             chatController.uploadAttachment);
+router.post('/broadcast/:convId',
+            requireChatAccessAny(OPERATIONS.DELETE_ALL),
+            upload('chat', true, true).array('files', 5),
+            chatController.broadcastMessage);
 
 router.get('/list', requireAccess(SECTIONS.CHATS, OPERATIONS.READ_ALL), chatController.listAllChats);
 

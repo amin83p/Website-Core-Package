@@ -275,6 +275,58 @@ test('socket delivery uses recipient user rooms without requiring a conversation
   }
 });
 
+test('broadcast helper emits direct message events to unique recipient user rooms', async () => {
+  const originals = new Map();
+  const ioEvents = [];
+
+  try {
+    const fakeIo = {
+      use() {},
+      on() {},
+      to(room) {
+        return {
+          emit(event, payload) {
+            ioEvents.push({ room, event, payload });
+          }
+        };
+      }
+    };
+
+    stubModule('socket.io', () => fakeIo, originals);
+    stubModule('../MVC/repositories/chatRepository', {
+      getUnreadSummaryForUser: async (userId) => ({
+        totalUnread: userId === 'USER-2' ? 5 : 1,
+        byConversation: { 'CONV-BROADCAST': userId === 'USER-2' ? 3 : 1 }
+      })
+    }, originals);
+    stubModule('../MVC/services/authService', {}, originals);
+    stubModule('../MVC/services/chatAccessService', {
+      canAccessConversation: async () => ({ allowed: true }),
+      conversationHasParticipant: () => true
+    }, originals);
+
+    delete require.cache[SOCKET_SERVICE_PATH];
+    const socketService = require(SOCKET_SERVICE_PATH);
+    socketService.init({});
+
+    await socketService.emitNewMessageToRecipients({
+      convId: 'CONV-BROADCAST',
+      message: { id: 'MSG-B1', senderId: 'ADMIN-1', content: 'Broadcast', type: 'text' },
+      senderId: 'ADMIN-1',
+      recipientIds: ['USER-2', 'USER-3', 'USER-2']
+    });
+
+    const rooms = ioEvents
+      .filter((event) => event.event === 'new_message')
+      .map((event) => event.room)
+      .sort();
+    assert.deepEqual(rooms, ['chat:user:USER-2', 'chat:user:USER-3']);
+    assert.equal(ioEvents.every((event) => event.payload.convId === 'CONV-BROADCAST'), true);
+  } finally {
+    restoreModules(originals);
+  }
+});
+
 test('rendered chat client script is valid and includes badge, sound, and read-state contracts', async () => {
   const templatePath = path.join(ROOT_DIR, 'MVC/views/partials/chatModal.ejs');
   const template = fs.readFileSync(templatePath, 'utf8');
@@ -310,6 +362,11 @@ test('rendered chat client script is valid and includes badge, sound, and read-s
   assert.match(clientSource, /ensureChatSocket/);
   assert.match(clientSource, /loadOlderMessages/);
   assert.match(clientSource, /CHAT_MESSAGE_PAGE_SIZE/);
+  assert.match(clientSource, /normalizeMessageTextForDisplay/);
+  assert.match(clientSource, /msg-text-content/);
+  assert.match(clientSource, /chatModalDragHandle/);
+  assert.match(clientSource, /applyChatModalTransform/);
+  assert.match(clientSource, /keepChatModalInViewport/);
   assert.doesNotMatch(rendered, /src="\/socket\.io\/socket\.io\.js"/);
 });
 

@@ -1049,7 +1049,10 @@
 
     let currentView = localStorage.getItem(VIEW_KEY) || 'compact';
     let iconSizePercent = Number(localStorage.getItem(ICON_SIZE_KEY) || 110);
-    let searchQuery = localStorage.getItem(SEARCH_KEY) || '';
+    if (localStorage.getItem(SEARCH_KEY)) {
+      localStorage.removeItem(SEARCH_KEY);
+    }
+    let searchQuery = '';
     let searchOverlayCloseTimer = null;
     if (!Number.isFinite(iconSizePercent) || iconSizePercent < 80 || iconSizePercent > 170) iconSizePercent = 110;
 
@@ -1062,7 +1065,7 @@
       const headerEl = document.getElementById('main-header');
       const fallbackTop = 8;
       if (!(headerEl instanceof HTMLElement)) return fallbackTop;
-      if (headerEl.classList.contains('header-minimized')) return fallbackTop;
+      const headerMinimized = headerEl.classList.contains('header-minimized');
       const headerRect = headerEl.getBoundingClientRect();
       const headerBottom = Math.max(0, Number(headerRect.bottom || 0));
       const viewportHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);

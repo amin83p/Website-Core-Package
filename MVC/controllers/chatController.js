@@ -5,6 +5,8 @@ const { idsEqual } = require('../utils/idAdapter');
 const dataService = require('../services/dataService'); 
 const chatAccessService = require('../services/chatAccessService');
 const chatContactScopeService = require('../services/chatContactScopeService');
+const chatBroadcastService = require('../services/chatBroadcastService');
+const socketService = require('../services/socketService');
 const coreFilesService = require('../services/coreFilesService');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
@@ -59,6 +61,47 @@ function createHttpError(message, statusCode = 400) {
     const error = new Error(message);
     error.statusCode = statusCode;
     return error;
+}
+
+function parseRecipientIds(rawValue) {
+    if (Array.isArray(rawValue)) {
+        return rawValue
+            .map((entry) => String(entry || '').trim())
+            .filter(Boolean);
+    }
+    if (typeof rawValue === 'string') {
+        const trimmed = rawValue.trim();
+        if (!trimmed) return [];
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                return parsed
+                    .map((entry) => String(entry || '').trim())
+                    .filter(Boolean);
+            }
+        } catch (_) {
+            // Fallback to comma-separated parsing.
+        }
+        return trimmed.split(',').map((entry) => entry.trim()).filter(Boolean);
+    }
+    return [];
+}
+
+function normalizeBroadcastAttachmentRows(files = []) {
+    return (Array.isArray(files) ? files : [])
+        .map((file) => {
+            const fileUrl = uploadMiddleware.getStoredFileUrl(file) || uploadMiddleware.getStoredFilePath(file);
+            if (!fileUrl) return null;
+            const type = String(file?.mimetype || '').startsWith('image/') ? 'image' : 'file';
+            return {
+                type,
+                fileUrl,
+                content: type === 'image'
+                    ? 'Image'
+                    : (String(file?.originalname || '').trim() || 'File')
+            };
+        })
+        .filter(Boolean);
 }
 
 async function loadConversationOrThrow(convId) {
@@ -403,6 +446,59 @@ exports.searchUsers = async (req, res) => {
         );
         res.json({ status: 'success', data: results, results });
     } catch (err) {
+        res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
+    }
+};
+
+exports.searchBroadcastUsers = async (req, res) => {
+    try {
+        const results = await chatBroadcastService.searchBroadcastRecipients({
+            requestingUser: req.user,
+            ipAddress: req.ip,
+            query: req.query.q || '',
+            limit: req.query.limit || 50
+        });
+        res.json({ status: 'success', data: results, results });
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
+    }
+};
+
+exports.broadcastMessage = async (req, res) => {
+    try {
+        const recipientIds = parseRecipientIds(req.body?.recipientIds);
+        const content = String(req.body?.content || '').trim();
+        const attachments = normalizeBroadcastAttachmentRows(req.files || []);
+
+        const result = await chatBroadcastService.broadcastDirectMessage({
+            senderUser: req.user,
+            ipAddress: req.ip,
+            recipientIds,
+            content,
+            attachments
+        });
+
+        await Promise.all(result.deliveries.map(async (delivery) => {
+            const recipientId = delivery.recipientId;
+            await Promise.all((Array.isArray(delivery.messages) ? delivery.messages : []).map((message) => (
+                socketService.emitNewMessageToRecipients({
+                    convId: delivery.conversationId,
+                    message,
+                    senderId: req.user?.id,
+                    recipientIds: [recipientId]
+                })
+            )));
+        }));
+
+        res.json({
+            status: 'success',
+            message: `Broadcast sent to ${result.sentCount} recipient(s).`,
+            data: result
+        });
+    } catch (err) {
+        if (req.files) {
+            await uploadMiddleware.deleteUploadedFiles(req).catch(() => {});
+        }
         res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
     }
 };
