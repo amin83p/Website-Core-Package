@@ -69,6 +69,14 @@ function sendGuardedResponse(req, res, guardResult, duplicateMessage, duplicateS
     return false;
 }
 
+function resolvePeriodStartYearToken(period, fallbackYear) {
+    const startDateToken = String(period?.startDate || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(startDateToken)) return startDateToken.slice(0, 4);
+    const parsedMs = Date.parse(startDateToken);
+    if (Number.isFinite(parsedMs)) return String(new Date(parsedMs).getUTCFullYear());
+    return String(fallbackYear || '');
+}
+
 exports.listTimesheetPeriods = async (req, res) => {
     try {
         let query = await buildDataServiceQuery(req.query);
@@ -83,7 +91,7 @@ exports.listTimesheetPeriods = async (req, res) => {
         const fallbackYear = Number(resolveOrgYearFromRequest(req));
         const availableYears = [...new Set(allPeriods.map((period) => {
             if (!period?.startDate) return fallbackYear;
-            return new Date(period.startDate).getFullYear();
+            return Number(resolvePeriodStartYearToken(period, fallbackYear));
         }))].sort((a, b) => b - a);
         if (!availableYears.some((year) => String(year) === String(selectedYear))) {
             availableYears.unshift(Number(selectedYear));
@@ -91,7 +99,7 @@ exports.listTimesheetPeriods = async (req, res) => {
         }
 
         const yearPeriods = allPeriods
-            .filter((period) => new Date(period.startDate || new Date()).getFullYear().toString() === selectedYear.toString())
+            .filter((period) => resolvePeriodStartYearToken(period, fallbackYear) === selectedYear.toString())
             .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
 
         const searchableFields = await inferSearchableFields(yearPeriods, { exclude: ['audit'] });

@@ -389,6 +389,26 @@ test('timesheet editor uses compact centered status and action columns', () => {
   assert.doesNotMatch(editor, /<th class="text-center" style="width: 120px;">Act<\/th>/);
 });
 
+test('timesheet statutory holiday status chip opens calculation modal with step details', () => {
+  const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
+
+  assert.match(editor, /id="statHolidayCalcModal"/);
+  assert.match(editor, /id="statHolidayCalcSummary"/);
+  assert.match(editor, /id="statHolidayCalcSteps"/);
+  assert.match(editor, /id="statHolidayCalcFallback"/);
+  assert.match(editor, /id="statHolidayCalcOverride"/);
+  assert.match(editor, /ts-status-chip--interactive ts-stat-holiday-status-trigger/);
+  assert.match(editor, /aria-controls="statHolidayCalcModal"/);
+  assert.match(editor, /function buildStatHolidayCalculationStepsHtml\(entry\)/);
+  assert.match(editor, /Step 1: Minimum workdays check/);
+  assert.match(editor, /Step 7: Average-hours formula/);
+  assert.match(editor, /Calculation details are not available for this statutory holiday entry\./);
+  assert.match(editor, /window\.openStatHolidayCalculationModal = function\(sessionId\)/);
+  assert.match(editor, /event\.target\.closest\('\.ts-stat-holiday-status-trigger'\)/);
+  assert.match(editor, /interactive = false, sessionId = ''/);
+  assert.match(editor, /if \(isStatutoryHolidayEntry\(entry\)\) \{[\s\S]*?interactive: true,[\s\S]*?sessionId: String\(entry\?\.sessionId \|\| ''\)/);
+});
+
 test('timesheet identity is grouped under the title and Date cells avoid repeated weekdays', () => {
   const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
 

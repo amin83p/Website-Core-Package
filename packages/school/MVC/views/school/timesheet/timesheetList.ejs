@@ -73,7 +73,7 @@
   ]
 }) %>
 
-<div class="table-scroll-wrapper">
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
   <table class="table-responsive size-md" id="first-table">
     <thead>
       <tr>
@@ -91,48 +91,75 @@
       <% } %>
       
       <% data.forEach(p => { %>
+        <%
+          const deadlineLabel = formatDeadline(p);
+          const editorHref = `/school/timesheets/editor/${p.id}?teacherId=${isAdmin ? targetTeacherId : ''}`;
+          let badge = 'bg-secondary';
+          if (p.tsStatus === 'draft') badge = 'bg-info text-dark';
+          if (p.tsStatus === 'submitted') badge = 'bg-primary';
+          if (p.tsStatus === 'processed') badge = 'bg-success';
+          let availabilityBadge = '';
+          let availabilityClass = 'bg-secondary';
+          if (p.eligibilityPhase === 'upcoming') {
+            availabilityBadge = 'Upcoming';
+            availabilityClass = 'bg-secondary';
+          } else if (p.eligibilityPhase === 'deadline_passed') {
+            availabilityBadge = 'Deadline Passed';
+            availabilityClass = 'bg-danger';
+          }
+          const canOpenFromMenu = p.canOpen !== false;
+          const showThreeDotActionsMenu = p.tsStatus === 'submitted' || p.eligibilityPhase === 'deadline_passed';
+        %>
         <tr>
           <td class="ps-4 fw-bold text-dark"><i class="bi bi-calendar-range me-2 text-muted"></i><%= p.name %></td>
           <td class="small text-muted"><%= p.startDate %> <i class="bi bi-arrow-right mx-1"></i> <%= p.endDate %></td>
-          <td class="small fw-bold text-danger"><%= formatDeadline(p) %></td>
+          <td class="small fw-bold text-danger">
+            <div><%= deadlineLabel %></div>
+            <% if (availabilityBadge) { %><div class="mt-1"><span class="badge <%= availabilityClass %>"><%= availabilityBadge %></span></div><% } %>
+          </td>
           <td class="text-center">
-             <% 
-               let badge = 'bg-secondary';
-               if (p.tsStatus === 'draft') badge = 'bg-info text-dark';
-               if (p.tsStatus === 'submitted') badge = 'bg-primary';
-               if (p.tsStatus === 'processed') badge = 'bg-success';
-               let availabilityBadge = '';
-               let availabilityClass = 'bg-secondary';
-               if (p.eligibilityPhase === 'upcoming') {
-                 availabilityBadge = 'Upcoming';
-                 availabilityClass = 'bg-secondary';
-               } else if (p.eligibilityPhase === 'deadline_passed') {
-                 availabilityBadge = 'Deadline Passed';
-                 availabilityClass = 'bg-danger';
-               } else if (p.eligibilityPhase === 'active') {
-                 availabilityBadge = 'Open';
-                 availabilityClass = 'bg-success';
-               }
-             %>
              <span class="badge <%= badge %> px-2 py-1"><%= p.tsStatus.replace('_', ' ').toUpperCase() %></span>
-             <% if (availabilityBadge) { %><span class="badge <%= availabilityClass %> ms-1"><%= availabilityBadge %></span><% } %>
              <% if (p.tsStatus === 'submitted' && p.managerApproved) { %><span class="badge bg-success ms-1">MANAGER APPROVED</span><% } %>
           </td>
           <td class="fw-bold text-success"><%= p.totalHours || '0.00' %> Hrs</td>
-          <td class="table-actions text-end pe-4">
+          <td class="table-actions text-center align-middle">
              <% if (isAdmin && !targetTeacherId) { %>
                 <button type="button" class="btn btn-sm btn-filled btn-edit" disabled title="Select a teacher first">
                   Select Teacher
                 </button>
              <% } else { %>
-                <% if (p.canOpen === false && p.tsStatus !== 'processed') { %>
+                <% if (showThreeDotActionsMenu) { %>
+                  <div class="row-actions-wrap">
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                      data-row-actions-id="timesheet-actions-<%= p.id %>"
+                      title="Timesheet Actions">
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <div class="row-actions-menu d-none" data-row-actions-id="timesheet-actions-<%= p.id %>">
+                      <% if (canOpenFromMenu) { %>
+                      <a href="<%= editorHref %>" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-box-arrow-up-right me-2"></i>Open Timesheet
+                      </a>
+                      <% } else { %>
+                      <button type="button" class="btn btn-outline-primary btn-sm" disabled title="<%= p.eligibilityReason || 'This timesheet is not open for submission.' %>">
+                        <i class="bi bi-box-arrow-up-right me-2"></i>Open Timesheet
+                      </button>
+                      <% } %>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="See Paystub is not available yet.">
+                        <i class="bi bi-receipt me-2"></i>See Paystub
+                      </button>
+                    </div>
+                  </div>
+                <% } else if (p.canOpen === false && p.tsStatus !== 'processed') { %>
                 <button type="button" class="btn btn-sm btn-filled btn-edit" disabled title="<%= p.eligibilityReason || 'This timesheet period is not available yet.' %>">
                    <%= p.eligibilityPhase === 'upcoming' ? 'Not Available Yet' : 'Unavailable' %>
                 </button>
                 <% } else { %>
-                <a href="/school/timesheets/editor/<%= p.id %>?teacherId=<%= isAdmin ? targetTeacherId : '' %>" class="btn btn-sm btn-filled btn-edit">
-                   <%= p.tsStatus === 'processed' ? 'View Paystub' : 'Open Timesheet' %>
-                </a>
+                  <a href="<%= editorHref %>" class="btn btn-sm btn-filled btn-edit">
+                     <%= p.tsStatus === 'processed' ? 'View Paystub' : 'Open Timesheet' %>
+                  </a>
                 <% } %>
              <% } %>
           </td>

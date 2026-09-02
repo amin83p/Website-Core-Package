@@ -348,6 +348,9 @@
     vertical-align: top;
     height: 1px;
   }
+  #tsTable td.ts-day-date-cell .ts-date-label {
+    white-space: nowrap;
+  }
   .ts-date-cell-stack {
     display: flex;
     flex-direction: column;
@@ -503,9 +506,58 @@
     cursor: default;
     vertical-align: middle;
   }
+  .ts-status-chip.ts-status-chip--interactive {
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .ts-status-chip.ts-status-chip--interactive:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+  }
+  .ts-status-chip.ts-status-chip--interactive:active {
+    transform: translateY(0);
+  }
   .ts-status-chip:focus-visible {
     outline: 2px solid #0d6efd;
     outline-offset: 2px;
+  }
+  .ts-stat-calc-steps .list-group-item {
+    border: 1px solid rgba(13, 110, 253, 0.2);
+    border-radius: 0.6rem;
+    margin-bottom: 0.65rem;
+  }
+  .ts-stat-calc-step-title {
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .ts-stat-calc-step-detail {
+    font-size: 0.9rem;
+    color: #475569;
+    margin-top: 0.35rem;
+  }
+  .ts-stat-calc-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.65rem;
+  }
+  .ts-stat-calc-summary-item {
+    border: 1px solid #dbeafe;
+    border-radius: 0.5rem;
+    background: #f8fbff;
+    padding: 0.55rem 0.7rem;
+  }
+  .ts-stat-calc-summary-item .label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.2rem;
+  }
+  .ts-stat-calc-summary-item .value {
+    color: #0f172a;
+    font-weight: 600;
   }
   .ts-entry-tip {
     position: fixed;
@@ -820,7 +872,7 @@
                 <table class="table table-bordered align-middle mb-0" id="tsTable">
                     <thead class="table-light border-bottom">
                         <tr>
-                            <th style="width: 140px;" rowspan="2">Date</th>
+                            <th style="width: 170px;" rowspan="2">Date</th>
                             <th rowspan="2">Class / Description</th>
                             <th style="width: 160px;" rowspan="2">Student Name</th>
                             <th class="ts-col-hours-group" colspan="2">Hours/Time (Hrs)</th>
@@ -1144,6 +1196,27 @@
         <div class="small text-muted mb-2" id="timesheetCommentContext"></div>
         <textarea id="timesheetCommentInput" class="form-control" rows="5" maxlength="2000" placeholder="Add notes for this session row..."></textarea>
         <div class="form-text mb-0">Your comment is saved automatically when you close this window.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="statHolidayCalcModal" tabindex="-1" aria-hidden="true" aria-labelledby="statHolidayCalcModalTitle">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger-subtle border-0">
+        <h5 class="modal-title fw-bold" id="statHolidayCalcModalTitle"><i class="bi bi-balloon-fill me-2 text-danger"></i>Statutory Holiday Calculation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="ts-stat-calc-summary-grid mb-3" id="statHolidayCalcSummary"></div>
+        <div id="statHolidayCalcResult" class="mb-3"></div>
+        <div class="alert alert-info d-none mb-3" id="statHolidayCalcFallback">Calculation details are not available for this statutory holiday entry.</div>
+        <ol class="list-group list-group-numbered ts-stat-calc-steps" id="statHolidayCalcSteps"></ol>
+        <div class="alert alert-warning d-none mt-2 mb-0" id="statHolidayCalcOverride"></div>
+      </div>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -1744,9 +1817,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (warn) return 'bi-exclamation-triangle-fill';
         return STATUS_ICON_BY_CODE[normalizeStatusCode(statusCode)] || 'bi-circle-fill';
     };
-    const buildStatusChipHtml = ({ icon, label, colorBg, colorText, colorBorder }) => {
+    const buildStatusChipHtml = ({ icon, label, colorBg, colorText, colorBorder, interactive = false, sessionId = '' }) => {
         const tip = escapeHtml(label);
-        return `<span class="ts-status-chip ts-tooltip-trigger" style="background:${escapeHtml(colorBg)};color:${escapeHtml(colorText)};border-color:${escapeHtml(colorBorder)};" data-tip="${tip}" data-tip-bg="${escapeHtml(colorBg)}" data-tip-fg="${escapeHtml(colorText)}" data-tip-border="${escapeHtml(colorBorder)}" aria-label="${tip}" tabindex="0"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span>`;
+        const interactiveClass = interactive ? ' ts-status-chip--interactive ts-stat-holiday-status-trigger' : '';
+        const interactiveAttrs = interactive
+            ? ` role="button" aria-haspopup="dialog" aria-controls="statHolidayCalcModal" data-sesid="${escapeHtml(sessionId)}"`
+            : '';
+        return `<span class="ts-status-chip ts-tooltip-trigger${interactiveClass}" style="background:${escapeHtml(colorBg)};color:${escapeHtml(colorText)};border-color:${escapeHtml(colorBorder)};" data-tip="${tip}" data-tip-bg="${escapeHtml(colorBg)}" data-tip-fg="${escapeHtml(colorText)}" data-tip-border="${escapeHtml(colorBorder)}" aria-label="${tip}" tabindex="0"${interactiveAttrs}><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span>`;
     };
     const buildStatusBadgeHtml = (entry) => {
         if (entry?.isPriorPeriodAdjustment === true) {
@@ -1825,7 +1902,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 label: tip,
                 colorBg: '#f8d7da',
                 colorText: '#842029',
-                colorBorder: '#dc3545'
+                colorBorder: '#dc3545',
+                interactive: true,
+                sessionId: String(entry?.sessionId || '')
             });
         }
         const normalized = normalizeStatusCode(entry?.status);
@@ -2534,6 +2613,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let timesheetCommentModal = null;
+    let statHolidayCalcModal = null;
     let activeCommentSessionId = '';
 
     function updateCommentTriggerCell(sessionId, commentValue) {
@@ -2605,6 +2685,164 @@ document.addEventListener('DOMContentLoaded', () => {
         showForEntry();
     };
 
+    function formatStatHolidayYesNo(passValue) {
+        if (passValue === true) return 'Pass';
+        if (passValue === false) return 'Not Met';
+        return 'Not Available';
+    }
+
+    function statHolidayStepBadgeHtml(passValue) {
+        const badgeClass = passValue === true
+            ? 'text-bg-success'
+            : (passValue === false ? 'text-bg-danger' : 'text-bg-secondary');
+        return `<span class="badge ${badgeClass}">${formatStatHolidayYesNo(passValue)}</span>`;
+    }
+
+    function statHolidayStepItemHtml(title, passValue, details = []) {
+        const detailRows = (Array.isArray(details) ? details : [])
+            .map((line) => String(line || '').trim())
+            .filter(Boolean);
+        const detailHtml = detailRows.length
+            ? `<div class="ts-stat-calc-step-detail">${detailRows.map((line) => `<div>${escapeHtml(line)}</div>`).join('')}</div>`
+            : '<div class="ts-stat-calc-step-detail text-muted">No details provided.</div>';
+        return `<li class="list-group-item">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+                <span class="ts-stat-calc-step-title">${escapeHtml(title)}</span>
+                ${statHolidayStepBadgeHtml(passValue)}
+            </div>
+            ${detailHtml}
+        </li>`;
+    }
+
+    function buildStatHolidayCalculationStepsHtml(entry) {
+        const checks = (entry?.statHolidayMeta && typeof entry.statHolidayMeta === 'object' && entry.statHolidayMeta.checks && typeof entry.statHolidayMeta.checks === 'object')
+            ? entry.statHolidayMeta.checks
+            : null;
+        if (!checks || Object.keys(checks).length === 0) return '';
+
+        const minWorkdays = checks.minWorkdays || {};
+        const weekdayRule = checks.weekdayRule || {};
+        const workdayMatch = checks.workdayMatch || {};
+        const holidayAttendance = checks.holidayAttendance || {};
+        const leaveDuringWeek = checks.leaveDuringHolidayWeek || {};
+        const leaveBeforeAfter = checks.leaveBeforeAfter || {};
+        const calculated = checks.calculatedHours || {};
+
+        const leaveWeekDates = Array.isArray(leaveDuringWeek.leaveDates) ? leaveDuringWeek.leaveDates.filter(Boolean) : [];
+        const leaveBeforeAfterDates = Array.isArray(leaveBeforeAfter.leaveDates) ? leaveBeforeAfter.leaveDates.filter(Boolean) : [];
+        const weekdayName = String(weekdayRule.weekdayName || '').trim() || 'Target weekday';
+        const beforeDateLabel = leaveBeforeAfter.beforeDate ? formatTimesheetDateLabel(leaveBeforeAfter.beforeDate) : 'Not found';
+        const afterDateLabel = leaveBeforeAfter.afterDate ? formatTimesheetDateLabel(leaveBeforeAfter.afterDate) : 'Not found';
+
+        return [
+            statHolidayStepItemHtml('Step 1: Minimum workdays check', minWorkdays.pass, [
+                `Required workdays: ${Number(minWorkdays.required || 0)}`,
+                `Counted workdays: ${Number(minWorkdays.actual || 0)}`
+            ]),
+            statHolidayStepItemHtml('Step 2: Weekday pattern check', weekdayRule.pass, [
+                `Weekday: ${weekdayName}`,
+                `Required matches: ${Number(weekdayRule.required || 0)} in last ${Number(weekdayRule.lookback || 0)} occurrences`,
+                `Your matches: ${Number(weekdayRule.actual || 0)}`
+            ]),
+            statHolidayStepItemHtml('Step 3: Worked-on-holiday or regular-workday gate', workdayMatch.pass, [
+                `Regular workday match: ${workdayMatch.regularWorkday ? 'Yes' : 'No'}`,
+                `Worked on holiday: ${workdayMatch.workedOnHoliday ? 'Yes' : 'No'}`
+            ]),
+            statHolidayStepItemHtml('Step 4: Holiday attendance check', holidayAttendance.pass, [
+                String(holidayAttendance.reason || 'No additional attendance notes.')
+            ]),
+            statHolidayStepItemHtml('Step 5: Leave during holiday week check', leaveDuringWeek.pass, [
+                leaveWeekDates.length
+                    ? `Approved leave dates in holiday week: ${leaveWeekDates.map((date) => formatTimesheetDateLabel(date)).join(', ')}`
+                    : 'No approved leave during holiday week.'
+            ]),
+            statHolidayStepItemHtml('Step 6: Leave before/after check', leaveBeforeAfter.pass, [
+                `Nearest workday before holiday: ${beforeDateLabel}`,
+                `Nearest workday after holiday: ${afterDateLabel}`,
+                leaveBeforeAfterDates.length
+                    ? `Approved leave on these boundary days: ${leaveBeforeAfterDates.map((date) => formatTimesheetDateLabel(date)).join(', ')}`
+                    : 'No boundary leave conflicts.'
+            ]),
+            statHolidayStepItemHtml('Step 7: Average-hours formula', calculated.pass, [
+                `Earnings window: ${calculated.earningsStart ? formatTimesheetDateLabel(calculated.earningsStart) : '-'} to ${calculated.earningsEnd ? formatTimesheetDateLabel(calculated.earningsEnd) : '-'}`,
+                `Total hours in window: ${Number(calculated.totalHours || 0).toFixed(2)}`,
+                `Payable workdays in window: ${Number(calculated.workdayCount || 0)}`,
+                `Average payable hours: ${Number(calculated.averageHours || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2)}`
+            ])
+        ].join('');
+    }
+
+    function renderStatHolidayCalculationModal(entry) {
+        const summaryEl = document.getElementById('statHolidayCalcSummary');
+        const resultEl = document.getElementById('statHolidayCalcResult');
+        const fallbackEl = document.getElementById('statHolidayCalcFallback');
+        const stepsEl = document.getElementById('statHolidayCalcSteps');
+        const overrideEl = document.getElementById('statHolidayCalcOverride');
+        const titleEl = document.getElementById('statHolidayCalcModalTitle');
+        if (!summaryEl || !resultEl || !fallbackEl || !stepsEl || !overrideEl || !titleEl) return;
+
+        const holidayLabel = String(entry?.className || entry?.description || 'Statutory holiday').trim();
+        const dateLabel = entry?.date ? formatTimesheetDateLabel(entry.date) : '-';
+        const payableHours = Number(resolveEntryHours(entry) || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2);
+        const calculatedHours = Number(entry?.statHolidayMeta?.calculatedHours || payableHours || 0).toFixed(2);
+        const qualified = entry?.statHolidayMeta?.qualified === true;
+        const disqualifyReasons = Array.isArray(entry?.statHolidayMeta?.disqualifyReasons)
+            ? entry.statHolidayMeta.disqualifyReasons.filter(Boolean)
+            : [];
+
+        titleEl.innerHTML = `<i class="bi bi-balloon-fill me-2 text-danger"></i>Statutory Holiday Calculation`;
+        summaryEl.innerHTML = `
+            <div class="ts-stat-calc-summary-item"><span class="label">Holiday</span><span class="value">${escapeHtml(holidayLabel)}</span></div>
+            <div class="ts-stat-calc-summary-item"><span class="label">Date</span><span class="value">${escapeHtml(dateLabel)}</span></div>
+            <div class="ts-stat-calc-summary-item"><span class="label">Calculated Hours</span><span class="value">${escapeHtml(calculatedHours)} hrs</span></div>
+            <div class="ts-stat-calc-summary-item"><span class="label">Payable Hours</span><span class="value">${escapeHtml(payableHours)} hrs</span></div>
+        `;
+
+        const resultBadgeClass = qualified ? 'text-bg-success' : 'text-bg-warning';
+        const resultLabel = qualified ? 'Qualified for statutory pay' : 'Not qualified automatically';
+        const reasonsHtml = disqualifyReasons.length
+            ? `<ul class="mb-0 mt-2 ps-3">${disqualifyReasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>`
+            : '';
+        resultEl.innerHTML = `<div class="alert alert-light border mb-0">
+            <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                <strong>${escapeHtml(resultLabel)}</strong>
+                <span class="badge ${resultBadgeClass}">${qualified ? 'Qualified' : 'Not Qualified'}</span>
+            </div>
+            ${reasonsHtml}
+        </div>`;
+
+        const stepsHtml = buildStatHolidayCalculationStepsHtml(entry);
+        const hasSteps = Boolean(stepsHtml.trim());
+        stepsEl.innerHTML = stepsHtml;
+        fallbackEl.classList.toggle('d-none', hasSteps);
+        stepsEl.classList.toggle('d-none', !hasSteps);
+
+        const override = (entry?.statHolidayOverride && typeof entry.statHolidayOverride === 'object')
+            ? entry.statHolidayOverride
+            : null;
+        if (!override) {
+            overrideEl.classList.add('d-none');
+            overrideEl.textContent = '';
+        } else {
+            const overrideHours = Number(override.hours || payableHours || 0).toFixed(2);
+            const overrideAction = override.forcePay === false ? 'disqualified this statutory pay row' : 'forced/adjusted statutory pay';
+            overrideEl.classList.remove('d-none');
+            overrideEl.innerHTML = `<strong>Manager override applied:</strong> A manager ${escapeHtml(overrideAction)} (${escapeHtml(overrideHours)} hrs). ${escapeHtml(String(override.reason || '').trim() || 'No reason recorded.')}`;
+        }
+    }
+
+    window.openStatHolidayCalculationModal = function(sessionId) {
+        const entry = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
+        if (!entry || !isStatutoryHolidayEntry(entry)) return;
+        const modalEl = document.getElementById('statHolidayCalcModal');
+        if (!modalEl || !window.bootstrap) return;
+        renderStatHolidayCalculationModal(entry);
+        if (!statHolidayCalcModal) {
+            statHolidayCalcModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: true });
+        }
+        statHolidayCalcModal.show();
+    };
+
     function buildMakeupOriginalSessionLabel(entry) {
         const dateStr = String(entry?.makeupOriginalDate || '').trim();
         const startTime = String(entry?.makeupOriginalStartTime || '').trim();
@@ -2636,9 +2874,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildDateCellHtml(dateStr, dayName, isHoliday, hol) {
-        const holidayLine = isHoliday
-            ? `<div class="ts-holiday-label small text-danger fw-semibold mt-1"><i class="bi bi-balloon-fill me-1"></i>${holidayName(hol)}</div>`
-            : '';
         const dayClass = isHoliday ? 'text-danger' : '';
         const addBtn = IS_READONLY
             ? ''
@@ -2649,7 +2884,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="ts-date-cell-main">
                     <div class="ts-day-name ${dayClass}">${dayName}</div>
                     <div class="ts-date-label">${formatTimesheetDatePart(dateStr, { month: 'long', day: 'numeric' })}</div>
-                    ${holidayLine}
                 </div>
                 ${actionsHtml}
             </div>`;
@@ -3235,16 +3469,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     tbody.addEventListener('click', (event) => {
+        const statTrigger = event.target.closest('.ts-stat-holiday-status-trigger');
+        if (statTrigger && tbody.contains(statTrigger)) {
+            const sessionId = String(statTrigger.dataset.sesid || '').trim();
+            if (sessionId) openStatHolidayCalculationModal(sessionId);
+            return;
+        }
         const trigger = event.target.closest('.ts-comment-trigger');
         if (!trigger) return;
         const sessionId = String(trigger.dataset.sesid || '').trim();
         if (sessionId) openTimesheetCommentModal(sessionId);
+    });
+    tbody.addEventListener('keydown', (event) => {
+        const statTrigger = event.target.closest('.ts-stat-holiday-status-trigger');
+        if (!statTrigger || !tbody.contains(statTrigger)) return;
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        const sessionId = String(statTrigger.dataset.sesid || '').trim();
+        if (sessionId) openStatHolidayCalculationModal(sessionId);
     });
 
     const timesheetCommentModalEl = document.getElementById('timesheetCommentModal');
     if (timesheetCommentModalEl) {
         timesheetCommentModalEl.addEventListener('hidden.bs.modal', () => {
             persistTimesheetCommentModal();
+            releaseStrayModalShell();
+        });
+    }
+    const statHolidayCalcModalEl = document.getElementById('statHolidayCalcModal');
+    if (statHolidayCalcModalEl) {
+        statHolidayCalcModalEl.addEventListener('hidden.bs.modal', () => {
             releaseStrayModalShell();
         });
     }
