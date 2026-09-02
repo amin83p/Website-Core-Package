@@ -398,6 +398,15 @@ async function showAttendancePage(req, res) {
 
         const attendanceMarkAppearanceResolved = await resolveAttendanceMarkAppearanceForRequest(req);
         const canMarkAttendanceExcused = await userCanMarkAttendanceExcused(req.user);
+        const parsePositiveLimit = (value) => {
+            const n = Number(value);
+            return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+        };
+        const attendanceActionLimits = {
+            maxAttempts: parsePositiveLimit(req.accessLimits?.maxAttempts),
+            maxTimeMinutes: parsePositiveLimit(req.accessLimits?.maxTimeMinutes),
+            maxVolumeKB: parsePositiveLimit(req.accessLimits?.maxVolumeKB)
+        };
 
         res.render('school/attendance/attendanceViewer', {
             title: 'Attendance Matrix',
@@ -417,7 +426,8 @@ async function showAttendancePage(req, res) {
             initialEndDate,
             initialStudentId,
             initialSessionId,
-            initialRange
+            initialRange,
+            attendanceActionLimits
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

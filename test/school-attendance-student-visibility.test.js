@@ -49,6 +49,17 @@ test('attendance matrix print indexes session and attendance notes separately', 
   assert.doesNotMatch(view, /day-session-note/);
 });
 
+test('attendance matrix save flow uses local cell patching and request-budget guards', () => {
+  const view = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
+  assert.match(view, /patchAttendanceMatrixCellAfterSave/);
+  assert.match(view, /queueAttendanceScopedRollupRefresh/);
+  assert.match(view, /refreshAttendanceDisplayRollups\(\{ personIds: queuedIds \}\)/);
+  assert.match(view, /handleAttendanceActionStateFailure/);
+  assert.match(view, /hydrateAttendanceBudgetFromApi/);
+  assert.match(view, /window\.ATTENDANCE_ACTION_LIMITS/);
+  assert.match(view, /resolveAttendanceActionStateId/);
+});
+
 test('master hub attendance includes student visibility dropdown for single and batch', () => {
   const hub = read('packages/school/MVC/views/school/masterAcademiaHub.ejs');
   assert.match(hub, /buildHubStudentFilterDropdownHtml/);

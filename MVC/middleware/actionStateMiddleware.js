@@ -160,12 +160,37 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
             const isMutatingRequest = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
             const operationNameToken = String(operation?.name || operationIdOrName || '').trim().toUpperCase();
             const isCreateOperation = operationNameToken === 'CREATE';
+            const limits = req.accessLimits || {};
+            let state = null;
             let requiresToken = false;
             if (options.requireToken !== undefined) {
                 requiresToken = options.requireToken;
             } else {
                 requiresToken = (operation.keepActive === true) || (isMutatingRequest && isCreateOperation);
             }
+
+            const setActionStateBudgetHeaders = (contextExtra = {}) => {
+                if (res.headersSent) return;
+                const parseNumber = (value) => {
+                    const n = Number(value);
+                    return Number.isFinite(n) ? n : null;
+                };
+                const setHeaderIfPresent = (name, value) => {
+                    if (value == null || value === '') return;
+                    res.setHeader(name, String(value));
+                };
+                const attemptFromContext = parseNumber(contextExtra?.attemptCount);
+                const attemptFromState = parseNumber(state?.attemptCount);
+                const maxAttempts = parseNumber(contextExtra?.maxAttempts ?? limits?.maxAttempts);
+                const maxTimeMinutes = parseNumber(limits?.maxTimeMinutes);
+                const maxVolumeKB = parseNumber(limits?.maxVolumeKB);
+                if (attemptFromContext != null) setHeaderIfPresent('X-Action-State-Attempt-Count', Math.floor(Math.max(0, attemptFromContext)));
+                else if (attemptFromState != null) setHeaderIfPresent('X-Action-State-Attempt-Count', Math.floor(Math.max(0, attemptFromState)));
+                if (maxAttempts != null && maxAttempts > 0) setHeaderIfPresent('X-Action-State-Max-Attempts', Math.floor(maxAttempts));
+                if (maxTimeMinutes != null && maxTimeMinutes > 0) setHeaderIfPresent('X-Action-State-Max-Time-Minutes', Math.floor(maxTimeMinutes));
+                if (maxVolumeKB != null && maxVolumeKB > 0) setHeaderIfPresent('X-Action-State-Max-Volume-KB', Math.floor(maxVolumeKB));
+                if (state?.id) setHeaderIfPresent('X-Action-State-Id', String(state.id).trim());
+            };
 
             const sendError = (statusCode, message, contextExtra = {}) => {
                  if(res.originalEnd) res.end = res.originalEnd; 
@@ -181,6 +206,7 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                      method: String(req.method || '').trim(),
                      ...contextExtra
                  };
+                 setActionStateBudgetHeaders(actionStateContext);
 
                  if (req.xhr || req.headers['x-ajax-request']) {
                      return res.status(statusCode).json({
@@ -212,7 +238,6 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
             // 3. CAPTURE CONTEXT & LOG ATTEMPT
             // -------------------------------------------------------------------------
             const user = req.user;
-            const limits = req.accessLimits || {}; 
             const routeParamKeys = Object.keys(req.params || {});
             const routeParamKey = routeParamKeys.length > 0 ? routeParamKeys[0] : null;
             const routeId = routeParamKey ? req.params[routeParamKey] : null;
@@ -287,7 +312,6 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                 }
             });
 
-            let state;
             try {
                 // ✅ Pass requestContext to Service
                 state = await dataService.logActionStateAttempt(
@@ -433,6 +457,7 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
             }
 
             req.actionStateId = state.id;
+            setActionStateBudgetHeaders({ attemptCount: state.attemptCount });
             req.logSectionId = String(section.id || '').trim() || req.logSectionId;
             req.logOperationId = String(operation.id || '').trim() || req.logOperationId;
             setRequestContextValue('actionStateId', state.id);

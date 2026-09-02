@@ -525,6 +525,17 @@ let detailsModalAllowClose = false;
 let detailsModalSnapshot = null;
 let attendanceMatrixBusyToken = null;
 let attendanceMatrixBusyDepth = 0;
+let attendanceScopedRollupTimer = null;
+const attendanceScopedRollupQueue = new Set();
+const attendanceScopedRollupWaiters = [];
+const ATTENDANCE_ACTION_STATE_HANDLED_ERROR = '__attendance_action_state_handled__';
+const attendanceRequestBudgetState = {
+    maxAttempts: null,
+    maxTimeMinutes: null,
+    maxVolumeKB: null,
+    attemptCount: 0,
+    warnLevel: 0
+};
 
 function attEscapeHtml(value) {
     return String(value == null ? '' : value)
@@ -829,7 +840,10 @@ async function uploadAttendanceFile(input, category, classId, sessionId, student
         body
     });
     const result = await res.json().catch(() => null);
+    hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
     if (!res.ok || !result || result.status !== 'success') {
+        const handled = await handleAttendanceActionStateFailure(result || {});
+        if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
         throw new Error(result?.message || 'File upload failed.');
     }
     return result.file || null;
@@ -854,6 +868,169 @@ function showAttendanceMatrixMessage({ title = 'Attendance Matrix', icon = 'info
     }
     alert(safeMessage.replace(/<[^>]*>/g, ''));
     return Promise.resolve();
+}
+
+function parseAttendancePositiveInteger(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+}
+
+function parseAttendanceNonNegativeInteger(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+
+function resolveAttendanceActionStateId() {
+    return String(window.ATTENDANCE_ACTION_STATE_ID || '').trim();
+}
+
+function setAttendanceActionStateId(nextId) {
+    const value = String(nextId || '').trim();
+    if (!value) return;
+    window.ATTENDANCE_ACTION_STATE_ID = value;
+}
+
+function setAttendanceBudgetState(nextState = {}) {
+    const maxAttempts = parseAttendancePositiveInteger(nextState.maxAttempts);
+    const maxTimeMinutes = parseAttendancePositiveInteger(nextState.maxTimeMinutes);
+    const maxVolumeKB = parseAttendancePositiveInteger(nextState.maxVolumeKB);
+    const attemptCount = parseAttendanceNonNegativeInteger(nextState.attemptCount);
+    if (maxAttempts != null) attendanceRequestBudgetState.maxAttempts = maxAttempts;
+    if (maxTimeMinutes != null) attendanceRequestBudgetState.maxTimeMinutes = maxTimeMinutes;
+    if (maxVolumeKB != null) attendanceRequestBudgetState.maxVolumeKB = maxVolumeKB;
+    if (attemptCount != null) attendanceRequestBudgetState.attemptCount = attemptCount;
+}
+
+function attendanceSanitizeMessageText(message) {
+    return String(message || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function renderAttendanceBudgetNotice(level, messageHtml) {
+    const resultsHeader = document.querySelector('#resultsContainer .card-header');
+    if (!resultsHeader) return;
+    let notice = document.getElementById('attendanceBudgetNotice');
+    if (!level) {
+        if (notice) notice.remove();
+        return;
+    }
+    if (!notice) {
+        notice = document.createElement('div');
+        notice.id = 'attendanceBudgetNotice';
+        notice.className = 'w-100 mt-2';
+        resultsHeader.appendChild(notice);
+    }
+    const levelClass = level >= 2 ? 'alert alert-warning' : 'alert alert-secondary';
+    notice.innerHTML = `<div class="${levelClass} py-2 px-3 mb-0 small">${messageHtml}</div>`;
+}
+
+function maybeWarnAttendanceBudgetUsage() {
+    const maxAttempts = attendanceRequestBudgetState.maxAttempts;
+    const attemptCount = attendanceRequestBudgetState.attemptCount;
+    if (!(maxAttempts > 0) || !(attemptCount >= 0)) {
+        renderAttendanceBudgetNotice(0, '');
+        return;
+    }
+    const ratio = attemptCount / maxAttempts;
+    let level = 0;
+    if (ratio >= 0.9) level = 2;
+    else if (ratio >= 0.7) level = 1;
+    if (!level) {
+        renderAttendanceBudgetNotice(0, '');
+        return;
+    }
+    attendanceRequestBudgetState.warnLevel = Math.max(attendanceRequestBudgetState.warnLevel, level);
+    const remaining = Math.max(0, maxAttempts - attemptCount);
+    const label = level === 2
+        ? 'Attendance request usage is near the session limit.'
+        : 'Attendance request usage is elevated for this page session.';
+    renderAttendanceBudgetNotice(
+        level,
+        `${label} Attempts: <strong>${attemptCount}</strong> / <strong>${maxAttempts}</strong> (remaining: ${remaining}).`
+    );
+}
+
+function hydrateAttendanceBudgetFromApi(response, result, options = {}) {
+    const estimateAttempt = options.estimateAttempt !== false;
+    const headers = response?.headers;
+    if (headers && typeof headers.get === 'function') {
+        setAttendanceActionStateId(headers.get('x-action-state-id'));
+        setAttendanceBudgetState({
+            attemptCount: headers.get('x-action-state-attempt-count'),
+            maxAttempts: headers.get('x-action-state-max-attempts'),
+            maxTimeMinutes: headers.get('x-action-state-max-time-minutes'),
+            maxVolumeKB: headers.get('x-action-state-max-volume-kb')
+        });
+    }
+    const context = result?.actionStateContext;
+    if (context && typeof context === 'object') {
+        setAttendanceBudgetState({
+            attemptCount: context.attemptCount,
+            maxAttempts: context.maxAttempts
+        });
+    } else if (estimateAttempt) {
+        attendanceRequestBudgetState.attemptCount += 1;
+    }
+    maybeWarnAttendanceBudgetUsage();
+}
+
+function isHandledAttendanceActionStateError(error) {
+    return String(error?.message || '').trim() === ATTENDANCE_ACTION_STATE_HANDLED_ERROR;
+}
+
+function isAttendanceActionStateFailureMessage(message) {
+    const text = attendanceSanitizeMessageText(message).toLowerCase();
+    if (!text) return false;
+    return text.includes('security violation')
+        || text.includes('session validation failed')
+        || text.includes('missing action state token')
+        || text.includes('action state token')
+        || text.includes('action session has expired')
+        || text.includes('too many attempts');
+}
+
+function isAttendanceActionStateReloadRecommended(message) {
+    const text = attendanceSanitizeMessageText(message).toLowerCase();
+    if (!text) return false;
+    return text.includes('too many attempts')
+        || text.includes('session validation failed')
+        || text.includes('missing action state token')
+        || text.includes('action session has expired')
+        || text.includes('invalid action state')
+        || text.includes('action state not found');
+}
+
+async function handleAttendanceActionStateFailure(result) {
+    const message = String(result?.message || '').trim();
+    const context = result?.actionStateContext;
+    const hasContext = context && typeof context === 'object';
+    if (!hasContext && !isAttendanceActionStateFailureMessage(message)) return false;
+
+    if (hasContext) {
+        setAttendanceBudgetState({
+            attemptCount: context.attemptCount,
+            maxAttempts: context.maxAttempts
+        });
+        maybeWarnAttendanceBudgetUsage();
+    }
+
+    if (!isAttendanceActionStateReloadRecommended(message)) return false;
+
+    const attemptUsage = hasContext && (context.attemptCount || context.maxAttempts)
+        ? `<p class="small text-muted mt-2 mb-0">Attempts: ${context.attemptCount || '?'} / ${context.maxAttempts || '?'}</p>`
+        : '';
+    const reloadChoice = await showAttendanceMatrixMessage({
+        title: 'Attendance session refresh needed',
+        icon: 'warning',
+        message: `${message || '<p class="mb-0">The attendance action session is no longer valid.</p>'}<p class="mt-2 mb-0">Reload this page to continue safely.</p>${attemptUsage}`,
+        buttons: [
+            { text: 'Close', class: 'btn-secondary', value: false },
+            { text: 'Reload page', class: 'btn-primary', value: true }
+        ]
+    });
+    if (reloadChoice === true || reloadChoice?.value === true || reloadChoice === 'Reload page') {
+        window.location.reload();
+    }
+    return true;
 }
 
 function showAttendanceMatrixBusy({
@@ -892,6 +1069,7 @@ window.ATTENDANCE_PAGE_INITIAL = <%- JSON.stringify({
     sessionId: typeof initialSessionId !== 'undefined' ? initialSessionId : '',
     range: typeof initialRange !== 'undefined' ? initialRange : ''
 }) %>;
+window.ATTENDANCE_ACTION_LIMITS = <%- JSON.stringify(typeof attendanceActionLimits !== 'undefined' ? attendanceActionLimits : {}) %>;
 
 function attendanceFlagIsTrue(value) {
     return value === true || value === 1 || ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
@@ -1079,7 +1257,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
-    window.ATTENDANCE_ACTION_STATE_ID = actionStateId;
+    setAttendanceActionStateId(actionStateId);
+    setAttendanceBudgetState(window.ATTENDANCE_ACTION_LIMITS || {});
+    maybeWarnAttendanceBudgetUsage();
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
     window.CAN_MARK_ATTENDANCE_EXCUSED = <%= (typeof canMarkAttendanceExcused !== 'undefined' && canMarkAttendanceExcused) ? 'true' : 'false' %>;
     window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
@@ -1534,7 +1714,12 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: { 'X-AJAX-Request': 'true' }
         });
         const result = await res.json();
-        if (result.status !== 'success') throw new Error(result.message || 'Unable to load change history.');
+        hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
+        if (result.status !== 'success') {
+            const handled = await handleAttendanceActionStateFailure(result);
+            if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
+            throw new Error(result.message || 'Unable to load change history.');
+        }
         return Array.isArray(result.entries) ? result.entries : [];
     }
 
@@ -1562,6 +1747,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const entries = await fetchAttendanceChangeLogForCell({ classId, sessionId, personId });
             renderAttendanceCellHistoryTable(entries);
         } catch (error) {
+            if (isHandledAttendanceActionStateError(error)) return;
             renderAttendanceCellHistoryTable([]);
             if (metaEl) metaEl.textContent = error.message || 'Unable to load change history.';
         } finally {
@@ -1657,30 +1843,154 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function refreshAttendanceDisplayRollups() {
+    function findAttendanceMatrixCellContext(studentPersonId, sessionId) {
         const data = window.currentMatrixData;
-        if (!data?.classId || !Array.isArray(data.matrix)) return;
+        if (!data || !Array.isArray(data.matrix) || !Array.isArray(data.sessions)) return null;
+        const studentKey = String(studentPersonId || '').trim();
+        const sessionKey = String(sessionId || '').trim();
+        if (!studentKey || !sessionKey) return null;
+        const studentIndex = data.matrix.findIndex((stu) => String(stu?.personId || '').trim() === studentKey);
+        if (studentIndex < 0) return null;
+        const student = data.matrix[studentIndex];
+        const recordIndex = (student.records || []).findIndex((rec) => String(rec?.sessionId || '').trim() === sessionKey);
+        if (recordIndex < 0) return null;
+        const sessionIndex = data.sessions.findIndex((sessionRow) => String(sessionRow?.id || '').trim() === sessionKey);
+        if (sessionIndex < 0) return null;
+        const rowEl = document.querySelector(`#matrixBody tr.matrix-student-row[data-person-id="${CSS.escape(studentKey)}"]`);
+        const cellEl = rowEl?.children?.[sessionIndex + 2] || null;
+        return {
+            student,
+            recordIndex,
+            sessionIndex,
+            rowEl,
+            cellEl
+        };
+    }
+
+    function buildPatchedAttendanceRecord(existingRecord, payload, serverRecord) {
+        const oldRecord = (existingRecord && typeof existingRecord === 'object') ? existingRecord : {};
+        const resultRecord = (serverRecord && typeof serverRecord === 'object') ? serverRecord : {};
+        const parseNonNegInt = (value, fallback = 0) => {
+            const parsed = parseAttendanceNonNegativeInteger(value);
+            if (parsed == null) return parseAttendanceNonNegativeInteger(fallback) ?? 0;
+            return parsed;
+        };
+        const hasKey = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
+        const nextStatus = String(resultRecord.attendance || payload?.attendance || oldRecord.status || '').trim().toLowerCase();
+        const nextLateMinutes = parseNonNegInt(
+            hasKey(resultRecord, 'lateMinutes') ? resultRecord.lateMinutes : payload?.lateMinutes,
+            oldRecord.lateMinutes
+        );
+        const nextEarlyLeaveMinutes = parseNonNegInt(
+            hasKey(resultRecord, 'earlyLeaveMinutes') ? resultRecord.earlyLeaveMinutes : payload?.earlyLeaveMinutes,
+            oldRecord.earlyLeaveMinutes
+        );
+        const nextNotesRaw = hasKey(resultRecord, 'notes')
+            ? resultRecord.notes
+            : (payload?.notes !== undefined ? payload.notes : (oldRecord.rosterStudentNotes ?? oldRecord.notes));
+        const nextExcuseRefRaw = hasKey(resultRecord, 'excuseRef')
+            ? resultRecord.excuseRef
+            : (payload?.excuseRef !== undefined ? payload.excuseRef : oldRecord.excuseRef);
+        const nextExcuseAttachment = hasKey(resultRecord, 'excuseAttachment')
+            ? resultRecord.excuseAttachment
+            : (payload?.excuseAttachment !== undefined ? payload.excuseAttachment : oldRecord.excuseAttachment);
+        return {
+            ...oldRecord,
+            status: nextStatus || oldRecord.status || 'absent',
+            lateMinutes: nextLateMinutes,
+            earlyLeaveMinutes: nextEarlyLeaveMinutes,
+            lateExcused: hasKey(resultRecord, 'lateExcused')
+                ? attendanceFlagIsTrue(resultRecord.lateExcused)
+                : attendanceFlagIsTrue(payload?.lateExcused ?? oldRecord.lateExcused),
+            earlyLeaveExcused: hasKey(resultRecord, 'earlyLeaveExcused')
+                ? attendanceFlagIsTrue(resultRecord.earlyLeaveExcused)
+                : attendanceFlagIsTrue(payload?.earlyLeaveExcused ?? oldRecord.earlyLeaveExcused),
+            absenceExcused: hasKey(resultRecord, 'absenceExcused')
+                ? attendanceFlagIsTrue(resultRecord.absenceExcused)
+                : attendanceFlagIsTrue(payload?.absenceExcused ?? oldRecord.absenceExcused),
+            excuseRef: String(nextExcuseRefRaw || '').trim(),
+            excuseAttachment: (nextExcuseAttachment && typeof nextExcuseAttachment === 'object') ? nextExcuseAttachment : null,
+            rosterStudentNotes: String(nextNotesRaw || '').trim(),
+            notes: String(nextNotesRaw || '').trim()
+        };
+    }
+
+    function patchAttendanceMatrixCellAfterSave({ studentPersonId, sessionId, payload, serverRecord }) {
+        const cellContext = findAttendanceMatrixCellContext(studentPersonId, sessionId);
+        if (!cellContext || !cellContext.student) return false;
+        const previous = cellContext.student.records?.[cellContext.recordIndex];
+        if (!previous) return false;
+        const patchedRecord = buildPatchedAttendanceRecord(previous, payload, serverRecord);
+        cellContext.student.records[cellContext.recordIndex] = patchedRecord;
+        if (cellContext.cellEl) {
+            const replacement = document.createElement('template');
+            replacement.innerHTML = buildAttendanceRecordCell(cellContext.student, patchedRecord).trim();
+            const nextCellEl = replacement.content.firstElementChild;
+            if (nextCellEl) cellContext.cellEl.replaceWith(nextCellEl);
+        }
+        return true;
+    }
+
+    async function refreshAttendanceDisplayRollups(options = {}) {
+        const data = window.currentMatrixData;
+        if (!data?.classId || !Array.isArray(data.matrix)) return false;
         const startDate = String(document.getElementById('filter_startDate')?.value || data.startDate || '').trim();
         const endDate = String(document.getElementById('filter_endDate')?.value || data.endDate || '').trim();
+        const personIds = Array.isArray(options.personIds)
+            ? options.personIds.map((id) => String(id || '').trim()).filter(Boolean)
+            : [];
         try {
+            const requestBody = {
+                classId: data.classId,
+                startDate,
+                endDate
+            };
+            if (personIds.length) requestBody.personIds = personIds;
             const res = await fetch('/school/attendances/api/rollups', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
-                body: JSON.stringify({
-                    classId: data.classId,
-                    startDate,
-                    endDate
-                })
+                body: JSON.stringify(requestBody)
             });
-            const result = await res.json();
-            if (result.status !== 'success') return;
+            const result = await res.json().catch(() => null);
+            hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
+            if (!result || result.status !== 'success') {
+                const handled = await handleAttendanceActionStateFailure(result || {});
+                if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
+                return false;
+            }
             const rollups = result.rollups || {};
             data.matrix.forEach((row) => {
                 const key = String(row.personId || '');
                 if (rollups[key]) row.summary = rollups[key];
             });
             updateAttendanceRollupDom(data.matrix);
-        } catch (_) {}
+            return true;
+        } catch (error) {
+            if (isHandledAttendanceActionStateError(error)) return false;
+            return false;
+        }
+    }
+
+    function queueAttendanceScopedRollupRefresh(studentPersonId, waitMs = 180) {
+        const personId = String(studentPersonId || '').trim();
+        if (personId) attendanceScopedRollupQueue.add(personId);
+        return new Promise((resolve) => {
+            attendanceScopedRollupWaiters.push(resolve);
+            if (attendanceScopedRollupTimer) clearTimeout(attendanceScopedRollupTimer);
+            const delay = Number.isFinite(Number(waitMs)) && Number(waitMs) >= 0 ? Number(waitMs) : 180;
+            attendanceScopedRollupTimer = setTimeout(async () => {
+                attendanceScopedRollupTimer = null;
+                const queuedIds = Array.from(attendanceScopedRollupQueue);
+                attendanceScopedRollupQueue.clear();
+                const ok = queuedIds.length
+                    ? await refreshAttendanceDisplayRollups({ personIds: queuedIds })
+                    : true;
+                const waiters = attendanceScopedRollupWaiters.splice(0, attendanceScopedRollupWaiters.length);
+                waiters.forEach((fn) => {
+                    try { fn(ok); } catch (_) {}
+                });
+            }, delay);
+        });
     }
 
     function mergeAttendanceMatrixPayload(existing, chunk, mergeMode) {
@@ -1762,12 +2072,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const url = `/school/attendances/api/data?${params.toString()}`;
             const res = await fetch(url, { cache: 'no-store', headers: { 'X-AJAX-Request': 'true' } });
             const chunk = await res.json();
+            hydrateAttendanceBudgetFromApi(res, chunk, { estimateAttempt: true });
             const guarded = typeof window.applyGuardedApiResult === 'function'
                 ? await window.applyGuardedApiResult(chunk, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
                 : { stop: false };
             if (guarded.stop) return;
 
-            if (chunk.status !== 'success') throw new Error(chunk.message);
+            if (chunk.status !== 'success') {
+                const handled = await handleAttendanceActionStateFailure(chunk);
+                if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
+                throw new Error(chunk.message);
+            }
 
             const result = mergeMode && window.currentMatrixData
                 ? mergeAttendanceMatrixPayload(window.currentMatrixData, chunk, mergeMode)
@@ -1801,7 +2116,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
-                await refreshAttendanceDisplayRollups();
                 return;
             }
 
@@ -1811,7 +2125,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
-                await refreshAttendanceDisplayRollups();
                 return;
             }
 
@@ -1872,6 +2185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (error) {
+            if (isHandledAttendanceActionStateError(error)) return;
             console.error(error);
             if (!mergeMode) {
                 window.currentMatrixData = null;
@@ -2560,7 +2874,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 text: text,
                 mentions: currentMentions,
                 attachment: await uploadAttendanceFile(document.getElementById('inp_newCommentFile'), 'comment', classId, sessionId, personId),
-                actionStateId
+                actionStateId: resolveAttendanceActionStateId()
             };
 
             const res = await fetch('/school/attendances/api/comment', {
@@ -2569,12 +2883,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             });
             const result = await res.json();
+            hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
             const guarded = typeof window.applyGuardedApiResult === 'function'
                 ? await window.applyGuardedApiResult(result, { busyTitle: 'Send Note In Progress', replayTitle: 'Note Already Sent' })
                 : { stop: false };
             if (guarded.stop) return;
 
-            if (result.status !== 'success') throw new Error(result.message);
+            if (result.status !== 'success') {
+                const handled = await handleAttendanceActionStateFailure(result);
+                if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
+                throw new Error(result.message);
+            }
             
             document.getElementById('inp_newComment').value = '';
             const savedCommentFileInput = document.getElementById('inp_newCommentFile');
@@ -2604,6 +2923,7 @@ document.addEventListener('DOMContentLoaded', () => {
             thread.scrollTop = thread.scrollHeight;
 
         } catch (err) {
+            if (isHandledAttendanceActionStateError(err)) return;
             hideAttendanceMatrixBusy(true);
             showAttendanceMatrixMessage({
                 title: 'Error',
@@ -2666,7 +2986,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (detailsModalInstance) detailsModalInstance.hide();
             showAttendanceMatrixBusy({
                 title: 'Saving Attendance',
-                note: 'Please wait while attendance changes are applied and the matrix refreshes.',
+                note: 'Please wait while attendance changes are applied.',
                 operation: 'Attendance Matrix'
             });
 
@@ -2679,7 +2999,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     lateMinutes: document.getElementById('inp_cellLateMins').value,
                     earlyLeaveMinutes: document.getElementById('inp_cellLeaveMins').value,
                     notes: document.getElementById('inp_rosterStudentNote').value,
-                    actionStateId
+                    actionStateId: resolveAttendanceActionStateId()
                 };
                 if (attendanceCanMarkExcused()) {
                     payload.lateExcused = parseAttendanceMinutesInputValue('inp_cellLateMins') > 0 && document.getElementById('inp_cellLateExcused')?.checked === true;
@@ -2694,18 +3014,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(payload)
                 });
                 const result = await res.json();
+                hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
                 const guarded = typeof window.applyGuardedApiResult === 'function'
                     ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Completed' })
                     : { stop: false };
                 if (guarded.stop) return;
-                if (result.status !== 'success') throw new Error(result.message);
+                if (result.status !== 'success') {
+                    const handled = await handleAttendanceActionStateFailure(result);
+                    if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
+                    throw new Error(result.message);
+                }
 
-                await loadAttendanceMatrixData({
-                    skipButtonBusy: true,
-                    loadingTitle: 'Refreshing Attendance Matrix',
-                    loadingNote: 'Refreshing the attendance matrix after saving attendance...'
+                const patched = patchAttendanceMatrixCellAfterSave({
+                    studentPersonId: personId,
+                    sessionId,
+                    payload,
+                    serverRecord: result.record
                 });
+                if (!patched) {
+                    await loadAttendanceMatrixData({
+                        skipButtonBusy: true,
+                        loadingTitle: 'Refreshing Attendance Matrix',
+                        loadingNote: 'Refreshing the attendance matrix after saving attendance...'
+                    });
+                    return;
+                }
+
+                detailsModalSnapshot = captureAttendanceDetailsModalSnapshot();
+                await queueAttendanceScopedRollupRefresh(personId);
             } catch (err) {
+                if (isHandledAttendanceActionStateError(err)) return;
                 hideAttendanceMatrixBusy(true);
                 showAttendanceMatrixMessage({
                     title: 'Error',
