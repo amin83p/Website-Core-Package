@@ -26,20 +26,44 @@
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return null;
       return {
-        enabled: parsed.enabled === true,
-        minutes: parsed.minutes == null ? null : clampMinutes(parsed.minutes, 5)
+        enabled: Object.prototype.hasOwnProperty.call(parsed, 'enabled')
+          ? parsed.enabled === true
+          : null,
+        minutes: Object.prototype.hasOwnProperty.call(parsed, 'minutes') && parsed.minutes != null
+          ? clampMinutes(parsed.minutes, 5)
+          : null
       };
     } catch (_) {
       return null;
     }
   }
 
-  function writeLocalOverride(orgId, sectionKey, value) {
+  function clearLocalOverride(orgId, sectionKey) {
     try {
-      global.localStorage.setItem(storageKey(orgId, sectionKey), JSON.stringify({
-        enabled: value?.enabled === true,
-        minutes: value?.minutes == null ? null : clampMinutes(value.minutes, 5)
-      }));
+      global.localStorage.removeItem(storageKey(orgId, sectionKey));
+    } catch (_) {
+      // Storage can be unavailable in privacy-restricted browsers.
+    }
+  }
+
+  function writeLocalOverride(orgId, sectionKey, value, policy) {
+    const sectionPolicy = resolveSectionPolicy(policy, sectionKey);
+    const minutes = clampMinutes(value?.minutes, sectionPolicy.defaultMinutes);
+    const enabled = value?.enabled === true;
+    const enabledDiffers = enabled !== (sectionPolicy.enabledByDefault === true);
+    const minutesDiffers = minutes !== sectionPolicy.defaultMinutes;
+
+    if (!enabledDiffers && !minutesDiffers) {
+      clearLocalOverride(orgId, sectionKey);
+      return;
+    }
+
+    const payload = {};
+    if (enabledDiffers) payload.enabled = enabled;
+    if (minutesDiffers) payload.minutes = minutes;
+
+    try {
+      global.localStorage.setItem(storageKey(orgId, sectionKey), JSON.stringify(payload));
     } catch (_) {
       // Storage can be unavailable in privacy-restricted browsers.
     }
@@ -61,16 +85,20 @@
   function resolveEffectiveConfig(orgId, sectionKey, policy) {
     const sectionPolicy = resolveSectionPolicy(policy, sectionKey);
     const local = readLocalOverride(orgId, sectionKey);
-    if (local) {
-      return {
-        enabled: local.enabled === true,
-        minutes: local.minutes == null ? sectionPolicy.defaultMinutes : clampMinutes(local.minutes, sectionPolicy.defaultMinutes)
+    const resolved = local
+      ? {
+        enabled: local.enabled == null
+          ? sectionPolicy.enabledByDefault === true
+          : local.enabled === true,
+        minutes: local.minutes == null
+          ? sectionPolicy.defaultMinutes
+          : clampMinutes(local.minutes, sectionPolicy.defaultMinutes)
+      }
+      : {
+        enabled: sectionPolicy.enabledByDefault === true,
+        minutes: sectionPolicy.defaultMinutes
       };
-    }
-    return {
-      enabled: sectionPolicy.enabledByDefault === true,
-      minutes: sectionPolicy.defaultMinutes
-    };
+    return resolved;
   }
 
   function formatTime(value) {
@@ -177,6 +205,7 @@
 
   async function openManagementModal(controller) {
     const sectionTitle = controller.sectionTitle || controller.sectionKey;
+    const orgPolicy = resolveSectionPolicy(controller.policy, controller.sectionKey);
     const statusText = controller.readOnly
       ? 'Read-only page — autosave is disabled.'
       : (controller.config.enabled
@@ -204,7 +233,8 @@
         <label class="form-label fw-semibold small" for="schoolAutosaveModalMinutes">Interval (minutes)</label>
         <input class="form-control" type="number" min="${MIN_MINUTES}" max="${MAX_MINUTES}" step="1" id="schoolAutosaveModalMinutes" value="${escapeHtml(String(controller.config.minutes))}" ${controller.readOnly ? 'disabled' : ''}>
       </div>
-      <p class="small text-muted mb-0">Changes apply only on this device. Organization defaults come from School Settings.</p>
+      <p class="small text-muted mb-2">Organization default: ${orgPolicy.enabledByDefault ? 'On' : 'Off'}, every ${escapeHtml(String(orgPolicy.defaultMinutes))} minute(s).</p>
+      <p class="small text-muted mb-0">Device overrides apply only on this browser. Matching organization defaults clears your local override.</p>
       ${errorText}
     `;
     applyBtn.disabled = controller.readOnly;
@@ -222,9 +252,30 @@
       instance?.hide();
     };
 
+    const handleReset = () => {
+      clearLocalOverride(controller.orgId, controller.sectionKey);
+      const orgConfig = resolveEffectiveConfig(controller.orgId, controller.sectionKey, controller.policy);
+      controller.setConfig(orgConfig, { persist: false });
+      instance?.hide();
+    };
+
     applyBtn.replaceWith(applyBtn.cloneNode(true));
     const freshApplyBtn = document.getElementById('schoolAutosaveModalApply');
     freshApplyBtn?.addEventListener('click', handleApply, { once: true });
+
+    let resetBtn = document.getElementById('schoolAutosaveModalReset');
+    if (!resetBtn) {
+      const footer = document.getElementById('schoolAutosaveSettingsModalFooter');
+      resetBtn = document.createElement('button');
+      resetBtn.type = 'button';
+      resetBtn.className = 'btn btn-outline-secondary me-auto';
+      resetBtn.id = 'schoolAutosaveModalReset';
+      resetBtn.textContent = 'Use organization defaults';
+      footer?.insertBefore(resetBtn, footer.firstChild);
+    }
+    resetBtn.disabled = controller.readOnly;
+    resetBtn.replaceWith(resetBtn.cloneNode(true));
+    document.getElementById('schoolAutosaveModalReset')?.addEventListener('click', handleReset, { once: true });
   }
 
   function escapeHtml(value) {
@@ -258,6 +309,10 @@
     const button = ensureSideControl();
 
     function notifyStatus() {
+      controller.config = config;
+      controller.status = status;
+      controller.lastSavedAt = lastSavedAt;
+      controller.lastError = lastError;
       updateSideControlUi(controller);
       if (onStatusChange) onStatusChange({ status, config, lastSavedAt, lastError });
     }
@@ -271,7 +326,9 @@
 
     function scheduleTimer() {
       clearTimer();
-      if (!config.enabled || readOnly) return;
+      if (!config.enabled || readOnly) {
+        return;
+      }
       const intervalMs = Math.max(MIN_MINUTES, config.minutes) * 60 * 1000;
       if (typeof global.createVisibilityInterval === 'function') {
         visibilityPoller = global.createVisibilityInterval(() => {
@@ -337,21 +394,16 @@
       lastError,
       button,
       setConfig(next, { persist = false } = {}) {
-        config = {
+        Object.assign(config, {
           enabled: next?.enabled === true,
           minutes: clampMinutes(next?.minutes, config.minutes)
-        };
+        });
         if (readOnly) config.enabled = false;
         if (persist) {
-          writeLocalOverride(orgId, sectionKey, config);
+          writeLocalOverride(orgId, sectionKey, config, policy);
         }
         status = 'idle';
-        const intervalMs = Math.max(MIN_MINUTES, config.minutes) * 60 * 1000;
-        if (visibilityPoller && typeof visibilityPoller.setIntervalMs === 'function') {
-          visibilityPoller.setIntervalMs(intervalMs);
-        } else {
-          scheduleTimer();
-        }
+        scheduleTimer();
         notifyStatus();
       },
       async tick() {
@@ -390,7 +442,9 @@
   global.SchoolAutosave = {
     STORAGE_PREFIX,
     storageKey,
+    resolveSectionPolicy,
     resolveEffectiveConfig,
+    clearLocalOverride,
     init,
     destroy
   };
