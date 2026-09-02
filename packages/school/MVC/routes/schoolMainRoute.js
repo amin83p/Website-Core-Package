@@ -55,6 +55,7 @@ router.use('/sample-data', require('./sampleDataRoutes'));
 router.use('/data-maintenance', require('./schoolDataMaintenanceRoutes'));
 router.use('/departments', require('./departmentRoutes'));
 router.use('/activities', require('./activityRoutes'));
+router.use('/work-sessions', require('./workSessionRoutes'));
 router.use('/subjects', require('./subjectRoutes'));
 router.use('/terms', require('./termRoutes'));
 router.use('/payRates', require('./payRateRoutes'));

@@ -176,6 +176,182 @@ test('materializeActivityManualEntry links existing public work session instead 
   }
 });
 
+test('materializeActivityManualEntry stamps teacher role from manual row personRole', async () => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalUpdate = schoolDataService.updateData;
+  let savedActivity = null;
+
+  schoolDataService.getDataById = async () => ({
+    id: 'ACT-IND-TEACHER',
+    orgId: '900000',
+    title: 'Individual Teacher',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    visibilityScope: 'individual',
+    allowedPersonIds: ['P10'],
+    entries: []
+  });
+  schoolDataService.updateData = async (_entity, _id, payload) => {
+    savedActivity = payload;
+    return payload;
+  };
+
+  try {
+    const result = await materializationService.materializeActivityManualEntry({
+      entry: {
+        sessionId: 'MAN_IND_TEACHER',
+        activityId: 'ACT-IND-TEACHER',
+        activityPaid: true,
+        approvalStatus: 'approved',
+        personRole: 'teacher',
+        description: 'Teacher block',
+        date: '2026-07-16',
+        startTime: '09:00',
+        endTime: '11:00',
+        durationHours: 2
+      },
+      timesheet: { id: 'TS-TEACHER', orgId: '900000' },
+      teacherId: 'P10',
+      reqUser: { id: 'U1' }
+    });
+
+    const created = savedActivity.entries.find((row) => String(row?.entryId || '') === String(result.activityEntryId || ''));
+    const assignee = created.assignees[0];
+    assert.equal(assignee.role, 'teacher');
+    assert.deepEqual(assignee.roles, ['teacher']);
+  } finally {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.updateData = originalUpdate;
+  }
+});
+
+test('materializeActivityManualEntry stamps staff role from manual row personRole', async () => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalUpdate = schoolDataService.updateData;
+  let savedActivity = null;
+
+  schoolDataService.getDataById = async () => ({
+    id: 'ACT-IND-STAFF',
+    orgId: '900000',
+    title: 'Individual Staff',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    visibilityScope: 'individual',
+    allowedPersonIds: ['P11'],
+    entries: []
+  });
+  schoolDataService.updateData = async (_entity, _id, payload) => {
+    savedActivity = payload;
+    return payload;
+  };
+
+  try {
+    const result = await materializationService.materializeActivityManualEntry({
+      entry: {
+        sessionId: 'MAN_IND_STAFF',
+        activityId: 'ACT-IND-STAFF',
+        activityPaid: true,
+        approvalStatus: 'approved',
+        personRole: 'staff',
+        description: 'Staff block',
+        date: '2026-07-17',
+        startTime: '13:00',
+        endTime: '15:00',
+        durationHours: 2
+      },
+      timesheet: { id: 'TS-STAFF', orgId: '900000' },
+      teacherId: 'P11',
+      reqUser: { id: 'U1' }
+    });
+
+    const created = savedActivity.entries.find((row) => String(row?.entryId || '') === String(result.activityEntryId || ''));
+    const assignee = created.assignees[0];
+    assert.equal(assignee.role, 'staff');
+    assert.deepEqual(assignee.roles, ['staff']);
+  } finally {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.updateData = originalUpdate;
+  }
+});
+
+test('materializeActivityManualEntry stamps staff role when linking public work session', async () => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalUpdate = schoolDataService.updateData;
+  let savedActivity = null;
+
+  schoolDataService.getDataById = async () => ({
+    id: 'ACT-PUB-STAFF',
+    orgId: '900000',
+    title: 'Public Staff Activity',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    visibilityScope: 'school',
+    allowedPersonIds: ['P12'],
+    entries: [{
+      entryId: 'ENTRY-STAFF',
+      title: 'Existing session',
+      date: '2026-07-18',
+      startTime: '10:00',
+      endTime: '12:00',
+      durationHours: 2,
+      status: 'posted',
+      assignees: []
+    }]
+  });
+  schoolDataService.updateData = async (_entity, _id, payload) => {
+    savedActivity = payload;
+    return payload;
+  };
+
+  try {
+    await materializationService.materializeActivityManualEntry({
+      entry: {
+        sessionId: 'MAN_PUBLIC_STAFF',
+        activityId: 'ACT-PUB-STAFF',
+        activityEntryId: 'ENTRY-STAFF',
+        activityPaid: true,
+        approvalStatus: 'approved',
+        personRole: 'staff',
+        date: '2026-07-18',
+        startTime: '10:00',
+        endTime: '12:00',
+        durationHours: 2
+      },
+      timesheet: { id: 'TS-PUB-STAFF', orgId: '900000' },
+      teacherId: 'P12',
+      reqUser: { id: 'U1' }
+    });
+
+    const assignee = savedActivity.entries[0].assignees[0];
+    assert.equal(assignee.role, 'staff');
+    assert.deepEqual(assignee.roles, ['staff']);
+  } finally {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.updateData = originalUpdate;
+  }
+});
+
+test('filterScheduleEventsForRole keeps teacher activity events with teacher assignee role', () => {
+  const { filterScheduleEventsForRole } = require('../packages/school/MVC/controllers/school/scheduleController');
+  const teacherEvent = {
+    eventType: 'school_activity',
+    date: '2026-08-21',
+    roles: ['teacher']
+  };
+  const participantEvent = {
+    eventType: 'school_activity',
+    date: '2026-08-21',
+    roles: ['participant']
+  };
+
+  assert.equal(filterScheduleEventsForRole([teacherEvent], 'teacher').length, 1);
+  assert.equal(filterScheduleEventsForRole([participantEvent], 'teacher').length, 0);
+  assert.equal(filterScheduleEventsForRole([teacherEvent], 'staff').length, 0);
+});
+
 test('materializeActivityManualEntry creates new entry for individual suggest rows', async () => {
   const originalGetById = schoolDataService.getDataById;
   const originalUpdate = schoolDataService.updateData;
@@ -224,6 +400,8 @@ test('materializeActivityManualEntry creates new entry for individual suggest ro
     assert.equal(created.date, '2026-07-15');
     assert.equal(created.startTime, '14:00');
     assert.equal(created.endTime, '16:00');
+    assert.equal(created.assignees[0].role, 'teacher');
+    assert.deepEqual(created.assignees[0].roles, ['teacher']);
   } finally {
     schoolDataService.getDataById = originalGetById;
     schoolDataService.updateData = originalUpdate;
@@ -537,6 +715,100 @@ test('materializeApprovedTimesheetManualEntries skips already-materialized activ
     assert.equal(result.summary.activities.length, 0);
     assert.equal(activityUpdates, 0);
     assert.equal(result.timesheet.entries[0].sessionId, 'MAN_SKIP_1');
+  } finally {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.updateData = originalUpdate;
+    schoolDataService.fetchData = originalFetch;
+  }
+});
+
+test('sanitizeSnapshotEntry preserves activity materialization markers on manual rows', () => {
+  const snapshotEntry = timesheetModel.sanitizeSnapshotEntry({
+    sessionId: 'MAN-458369-0001',
+    isManual: true,
+    activityId: '458369',
+    activityEntryId: 'ENTRY-1',
+    activityPaid: true,
+    approvalStatus: 'approved',
+    materializedAt: '2026-08-21T12:00:00.000Z',
+    materializedSessionId: 'act-458369-ENTRY-1-949701',
+    materializedFromTimesheetId: '417761',
+    materializedFromTimesheetEntryId: 'MAN-458369-0001',
+    date: '2026-08-21',
+    startTime: '09:00',
+    endTime: '11:00',
+    requestedHours: 2,
+    hours: 2
+  });
+
+  assert.equal(snapshotEntry.materializedAt, '2026-08-21T12:00:00.000Z');
+  assert.equal(snapshotEntry.materializedSessionId, 'act-458369-ENTRY-1-949701');
+  assert.equal(snapshotEntry.materializedFromTimesheetId, '417761');
+  assert.equal(snapshotEntry.materializedFromTimesheetEntryId, 'MAN-458369-0001');
+});
+
+test('materializeApprovedTimesheetManualEntries merges live materialization markers into stale snapshots', async () => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalUpdate = schoolDataService.updateData;
+  const originalFetch = schoolDataService.fetchData;
+  let activityUpdates = 0;
+
+  schoolDataService.getDataById = async () => {
+    throw new Error('should not load activity when live entries are already materialized');
+  };
+  schoolDataService.updateData = async () => {
+    activityUpdates += 1;
+    return {};
+  };
+  schoolDataService.fetchData = async () => [];
+
+  try {
+    const result = await materializationService.materializeApprovedTimesheetManualEntries({
+      timesheet: {
+        id: '417761',
+        orgId: '900000',
+        teacherId: '949701',
+        entries: [{
+          sessionId: 'MAN-458369-0001',
+          isManual: true,
+          activityId: '458369',
+          activityEntryId: 'ENTRY-1',
+          visibilityScope: 'individual',
+          activityPaid: true,
+          approvalStatus: 'approved',
+          materializedAt: '2026-08-21T12:00:00.000Z',
+          materializedSessionId: 'act-458369-ENTRY-1-949701',
+          date: '2026-08-21',
+          startTime: '09:00',
+          endTime: '11:00',
+          durationHours: 2,
+          hours: 2
+        }],
+        submissionSnapshot: {
+          submittedAt: '2026-08-20T00:00:00.000Z',
+          entries: [{
+            sessionId: 'MAN-458369-0001',
+            isManual: true,
+            activityId: '458369',
+            activityEntryId: 'ENTRY-1',
+            visibilityScope: 'individual',
+            activityPaid: true,
+            approvalStatus: 'approved',
+            date: '2026-08-21',
+            startTime: '09:00',
+            endTime: '11:00',
+            requestedHours: 2,
+            hours: 2
+          }]
+        }
+      },
+      period: { id: '108323', orgId: '900000', startDate: '2026-08-01', endDate: '2026-08-31' },
+      reqUser: { id: 'U1' }
+    });
+
+    assert.equal(result.summary.activities.length, 0);
+    assert.equal(activityUpdates, 0);
+    assert.equal(result.timesheet.entries[0].sessionId, 'MAN-458369-0001');
   } finally {
     schoolDataService.getDataById = originalGetById;
     schoolDataService.updateData = originalUpdate;

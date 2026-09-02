@@ -27,6 +27,9 @@ const timesheetSessionStudentLabelService = require('../../services/school/times
 const timesheetEffectiveEntryService = require('../../services/school/timesheetEffectiveEntryService');
 const timesheetPrintService = require('../../services/school/timesheetPrintService');
 const deadlineReconciliationService = require('../../services/school/timesheetDeadlineReconciliationService');
+const timesheetPeriodEligibilityService = require('../../services/school/timesheetPeriodEligibilityService');
+const { compileTimesheetExcelFiles } = require('../../services/school/timesheetExcel/timesheetExcelCompilerService');
+const { filterPeriodsForYear } = require('../../services/school/timesheetExcel/timesheetPeriodMatchService');
 const schoolRepositories = require('../../repositories/school');
 const {
     resolveOrgTodayFromRequest,
@@ -820,21 +823,45 @@ function formatPeriodDeadlineLabel(period) {
     return `${deadline} ${time}`;
 }
 
-function resolvePeriodSubmissionDeadlineAt(period, orgTimeZone = '') {
-    const deadline = String(period?.submissionDeadline || '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return '';
-    const time = String(period?.submissionDeadlineTime || '23:59').trim() || '23:59';
-    return zonedWallClockToIso(deadline, time, orgTimeZone) || '';
+function isPeriodSubmissionDeadlinePassed(period, orgTimeZone = '', now = new Date()) {
+    return timesheetPeriodEligibilityService.isPeriodSubmissionDeadlinePassed(period, orgTimeZone, now);
 }
 
-function isPeriodSubmissionDeadlinePassed(period, orgTimeZone = '', now = new Date()) {
-    const deadlineAt = resolvePeriodSubmissionDeadlineAt(period, orgTimeZone);
-    if (!deadlineAt) return false;
-    const deadlineMs = Date.parse(deadlineAt);
-    if (!Number.isFinite(deadlineMs)) return false;
-    const nowMs = now instanceof Date ? now.getTime() : Date.parse(String(now || ''));
-    if (!Number.isFinite(nowMs)) return false;
-    return nowMs > deadlineMs;
+function resolvePeriodSubmissionDeadlineAt(period, orgTimeZone = '') {
+    return timesheetPeriodEligibilityService.resolvePeriodSubmissionDeadlineAt(period, orgTimeZone);
+}
+
+async function buildPeriodEligibilityOptions(req, teacherContext = {}, extra = {}) {
+    const isManagementViewer = await hasTimesheetManagementAuthority(req.user, OPERATIONS.READ_ALL);
+    const viewingOtherTeacher = Boolean(
+        teacherContext.isAdmin &&
+        teacherContext.targetTeacherId &&
+        teacherContext.currentTeacherId &&
+        !idsEqual(teacherContext.targetTeacherId, teacherContext.currentTeacherId)
+    );
+    return {
+        orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+        today: resolveOrgTodayFromRequest(req),
+        now: new Date(),
+        isManagementViewer,
+        viewingOtherTeacher,
+        allowLateSubmission: false,
+        ...extra
+    };
+}
+
+function assertPeriodEligibility(eligibility, action = 'open') {
+    if (!eligibility) return;
+    if (action === 'open' && eligibility.canOpen === false) {
+        const error = new Error(eligibility.reason || 'This timesheet period is not available yet.');
+        error.statusCode = 403;
+        throw error;
+    }
+    if (action === 'submit' && eligibility.canSubmit === false) {
+        const error = new Error(eligibility.reason || 'This timesheet period cannot be submitted right now.');
+        error.statusCode = 403;
+        throw error;
+    }
 }
 
 function formatHourlyRateLabel(value) {
@@ -882,7 +909,7 @@ function shapePayrollContextForEditor(payrollContext) {
     };
 }
 
-function shapeTimesheetPeriodPickerRow(period) {
+function shapeTimesheetPeriodPickerRow(period, eligibility = null) {
     const id = String(period?.id || '').trim();
     const name = String(period?.name || id || 'Timesheet Period').trim();
     const startDate = String(period?.startDate || '').trim();
@@ -902,7 +929,11 @@ function shapeTimesheetPeriodPickerRow(period) {
         subtitle,
         periodWindowLabel,
         deadlineLabel,
-        submissionDeadlineTime: String(period?.submissionDeadlineTime || '23:59')
+        submissionDeadlineTime: String(period?.submissionDeadlineTime || '23:59'),
+        eligibilityPhase: eligibility?.phase || period?.eligibilityPhase || '',
+        canOpen: eligibility?.canOpen ?? period?.canOpen,
+        canSubmit: eligibility?.canSubmit ?? period?.canSubmit,
+        eligibilityReason: eligibility?.reason || period?.eligibilityReason || ''
     };
 }
 
@@ -1170,8 +1201,61 @@ exports.listTimesheetManagementPeriods = async (req, res) => {
         delete query.orgId;
         delete query.orgId__eq;
         const periods = await loadTimesheetManagementPeriods(req, query);
+        const eligibilityOptions = await buildPeriodEligibilityOptions(req, { isAdmin: true });
         const { data, pagination } = paginate(periods, query);
-        return res.json({ status: 'success', results: data.map(shapeTimesheetPeriodPickerRow), pagination });
+        return res.json({
+            status: 'success',
+            results: data.map((period) => shapeTimesheetPeriodPickerRow(
+                period,
+                timesheetPeriodEligibilityService.resolvePeriodEligibility(period, eligibilityOptions)
+            )),
+            pagination
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.compileTimesheetExcelImports = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const personId = String(req.body?.personId || '').trim();
+        const year = String(req.body?.year || '').trim();
+        const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+
+        if (!personId) throw new Error('A teacher/staff person is required.');
+        if (!/^\d{4}$/.test(year)) throw new Error('A valid four-digit year is required.');
+        if (!uploadedFiles.length) throw new Error('At least one Excel file (.xlsx) is required.');
+
+        const eligiblePeople = await loadTimesheetEligiblePeople(activeOrgId, req.user);
+        const personRow = eligiblePeople.find((row) => idsEqual(row.personId, personId));
+        if (!personRow) {
+            throw new Error('The selected person is not eligible for timesheet management in the active organization.');
+        }
+
+        const allPeriods = await loadTimesheetManagementPeriods(req, {});
+        const periods = filterPeriodsForYear(allPeriods, year);
+        const files = uploadedFiles.map((file) => ({
+            originalname: file.originalname,
+            buffer: file.buffer
+        }));
+
+        const compiled = await compileTimesheetExcelFiles({
+            files,
+            personId,
+            personName: personRow.name || buildPersonName(personRow.person),
+            year,
+            orgId: activeOrgId,
+            periods
+        });
+
+        return res.json({
+            status: 'success',
+            personId,
+            personName: personRow.name || buildPersonName(personRow.person),
+            year,
+            results: compiled.results || []
+        });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }
@@ -1553,6 +1637,7 @@ exports.listMyTimesheets = async (req, res) => {
         }))].sort((a, b) => b - a);
 
         const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: false, operationId: OPERATIONS.READ_ALL });
+        const eligibilityOptions = await buildPeriodEligibilityOptions(req, teacherContext);
 
         const timesheetQuery = teacherContext.targetTeacherId
             ? { teacherId__eq: teacherContext.targetTeacherId }
@@ -1573,7 +1658,7 @@ exports.listMyTimesheets = async (req, res) => {
             .map((p) => {
                 const ts = targetTimesheets.find((t) => idsEqual(t.periodId, p.id));
                 const orgId = String(p.orgId || '').trim();
-                return {
+                return timesheetPeriodEligibilityService.attachEligibilityToPeriodRow({
                     ...p,
                     orgId,
                     orgName: orgId || '-',
@@ -1581,7 +1666,7 @@ exports.listMyTimesheets = async (req, res) => {
                     tsStatus: ts ? ts.status : 'not_started',
                     managerApproved: Boolean(ts && isManagerApproved(ts)),
                     totalHours: ts ? ts.totalHours : 0
-                };
+                }, eligibilityOptions);
             });
 
         if (requestedTsStatus) {
@@ -1647,6 +1732,11 @@ exports.viewTimesheet = async (req, res) => {
             operationId: OPERATIONS.READ_ALL,
             managementOperationId: OPERATIONS.READ_ALL
         });
+        const periodEligibility = timesheetPeriodEligibilityService.resolvePeriodEligibility(
+            period,
+            await buildPeriodEligibilityOptions(req, teacherContext)
+        );
+        assertPeriodEligibility(periodEligibility, 'open');
 
         const maxDailyHours = 12.0;
         const maxSessionHours = 8.0;
@@ -1992,6 +2082,7 @@ exports.viewTimesheet = async (req, res) => {
             isSubmissionDeadlinePassed,
             allowLateSubmission,
             canAllowLateSubmission,
+            periodEligibility,
             reviewHistory: getReviewHistory(timesheet),
             canPrintTimesheet,
             timesheetPrintMode,
@@ -2130,6 +2221,14 @@ exports.saveTimesheet = async (req, res) => {
 
         const existingRaw = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
         const existing = normalizeTimesheetLifecycle(existingRaw);
+        const periodEligibility = timesheetPeriodEligibilityService.resolvePeriodEligibility(
+            period,
+            await buildPeriodEligibilityOptions(req, teacherContext, {
+                allowLateSubmission: existing?.allowLateSubmission === true
+            })
+        );
+        assertPeriodEligibility(periodEligibility, 'open');
+
         const existingEntriesList = Array.isArray(existing?.entries) ? existing.entries : [];
         const existingEntriesBySessionId = new Map(
             existingEntriesList
@@ -2632,6 +2731,7 @@ exports.saveTimesheet = async (req, res) => {
         }
 
         if (nextStatus === 'submitted' && !reviewerEdit) {
+            assertPeriodEligibility(periodEligibility, 'submit');
             const orgTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || '';
             if (
                 isPeriodSubmissionDeadlinePassed(period, orgTimeZone)
@@ -2665,7 +2765,6 @@ exports.saveTimesheet = async (req, res) => {
                 timesheetId: existing.id,
                 reqUser: req.user
             });
-            await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
             entriesForSave = restoreRevertedManualEntryIds(entriesForSave, revertSummary);
         }
         if (reviewerEdit) {
@@ -2909,7 +3008,7 @@ exports.saveTimesheet = async (req, res) => {
             managerReview: nextStatus === 'submitted'
                 ? resetManagerReview(nextReviewVersion)
                 : (existing?.managerReview || resetManagerReview(nextReviewVersion)),
-            lockedSourceRefs: reviewerEdit ? [] : (existing?.lockedSourceRefs || []),
+            lockedSourceRefs: existing?.lockedSourceRefs || [],
             materializationSummary: reviewerEdit ? null : existing?.materializationSummary,
             approvedAt: reviewerEdit ? '' : String(existing?.approvedAt || ''),
             approvedBy: reviewerEdit ? '' : String(existing?.approvedBy || '')
@@ -2963,16 +3062,23 @@ exports.saveTimesheet = async (req, res) => {
             saved = await dataService.addData('timesheets', payload, req.user);
         }
 
-        if (nextStatus === 'submitted' && reconciliationLockRefs.length > 0) {
+        if (nextStatus === 'submitted') {
             const savedRow = saved && typeof saved === 'object' ? saved : { ...payload, id: existing?.id || saved };
-            const lockSummary = await schoolDependencyService.lockReconciliationSourceRefs({
-                refs: reconciliationLockRefs,
-                timesheetId: savedRow.id,
-                reqUser: req.user
-            });
+            const lockSummary = await schoolDependencyService.lockSourcesForApprovedTimesheet(savedRow, req.user);
+            let reconciliationRefs = [];
+            if (reconciliationLockRefs.length > 0) {
+                const reconciliationSummary = await schoolDependencyService.lockReconciliationSourceRefs({
+                    refs: reconciliationLockRefs,
+                    timesheetId: savedRow.id,
+                    reqUser: req.user
+                });
+                reconciliationRefs = Array.isArray(reconciliationSummary?.lockedSourceRefs)
+                    ? reconciliationSummary.lockedSourceRefs
+                    : [];
+            }
             const lockedSourceRefs = schoolDependencyService.dedupeSourceRefs([
-                ...(Array.isArray(savedRow.lockedSourceRefs) ? savedRow.lockedSourceRefs : []),
-                ...(Array.isArray(lockSummary?.lockedSourceRefs) ? lockSummary.lockedSourceRefs : [])
+                ...(Array.isArray(lockSummary?.lockedSourceRefs) ? lockSummary.lockedSourceRefs : []),
+                ...reconciliationRefs
             ]);
             saved = await dataService.updateData('timesheets', savedRow.id, {
                 ...savedRow,
@@ -3908,7 +4014,6 @@ exports.unprocessTimesheet = async (req, res) => {
             timesheetId: existing.id,
             reqUser: req.user
         });
-        await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
         const restoredEntries = restoreRevertedManualEntryIds(existing.entries, revertSummary);
         const now = new Date().toISOString();
         const totalHours = calculateTimesheetTotal(restoredEntries);

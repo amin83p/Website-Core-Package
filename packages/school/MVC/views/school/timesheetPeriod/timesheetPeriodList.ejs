@@ -1,4 +1,15 @@
 <%
+  const yearOptions = (availableYears || []).map((y) => String(y));
+  if (!yearOptions.includes(String(selectedYear))) yearOptions.unshift(String(selectedYear));
+  const cadenceOptions = [
+    { value: periodCadences.MONTHLY, label: cadenceLabels[periodCadences.MONTHLY] },
+    { value: periodCadences.SEMI_MONTHLY, label: cadenceLabels[periodCadences.SEMI_MONTHLY] },
+    { value: periodCadences.BI_WEEKLY, label: cadenceLabels[periodCadences.BI_WEEKLY] },
+    { value: periodCadences.WEEKLY, label: cadenceLabels[periodCadences.WEEKLY] }
+  ];
+%>
+
+<%
   function formatDeadline(period) {
     const date = period && period.submissionDeadline ? String(period.submissionDeadline) : '-';
     const time = period && period.submissionDeadlineTime ? String(period.submissionDeadlineTime) : '23:59';
@@ -18,9 +29,21 @@
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACCOUNTING" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-calculator me-1"></i> Accounting Dashboard</a>'
   ],
-  manageBtns: [
-  ]
+  manageBtns: canGeneratePeriods ? [
+    '<button type="button" class="btn btn-filled btn-primary btn-md mb-2" id="openGenerateYearModalBtn"><i class="bi bi-calendar-plus me-1"></i> Generate Year</button>'
+  ] : []
 }) %>
+
+<div class="d-flex align-items-end flex-wrap gap-3 mb-4 p-3 bg-light border rounded shadow-sm">
+  <div>
+    <label for="topYearFilter" class="form-label fw-bold small mb-1"><i class="bi bi-calendar me-1"></i> Period Year</label>
+    <select id="topYearFilter" class="form-select border-secondary shadow-sm" style="min-width: 120px;" onchange="filterTimesheetPeriods()">
+      <% yearOptions.forEach((y) => { %>
+        <option value="<%= y %>" <%= y === String(selectedYear) ? 'selected' : '' %>><%= y %></option>
+      <% }); %>
+    </select>
+  </div>
+</div>
 
 <%- include('partials/tablePages-search', {
   placeholder: 'Search periods...',
@@ -29,7 +52,7 @@
   ]
 }) %>
 
-<div class="table-scroll-wrapper" data-floating-row-actions="true">
+<div class="table-scroll-wrapper" data-floating-row-actions="true" data-action-state-id="<%= actionStateId || '' %>">
   <table class="table-responsive size-md" id="first-table">
     <thead>
       <tr>
@@ -43,7 +66,7 @@
     </thead>
     <tbody>
       <% if(data.length === 0) { %>
-         <tr><td colspan="6" class="text-center py-4 text-muted">No timesheet periods configured.</td></tr>
+         <tr><td colspan="6" class="text-center py-4 text-muted">No timesheet periods configured for <%= selectedYear %>.</td></tr>
       <% } %>
       
       <% data.forEach(item => { %>
@@ -93,4 +116,153 @@
     baseUrlPath: newUrl 
 }) %>
 
+<% if (canGeneratePeriods) { %>
+<div class="modal fade" id="generateYearModal" tabindex="-1" aria-labelledby="generateYearModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="generateYearModalLabel"><i class="bi bi-calendar-plus me-2"></i>Generate Year Periods</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">Create all missing periods for the selected year. Existing date ranges are skipped and can still be edited individually afterward.</p>
+        <div class="mb-3">
+          <label for="generateYearInput" class="form-label fw-bold">Year</label>
+          <input type="number" class="form-control" id="generateYearInput" min="2000" max="2999" value="<%= selectedYear %>">
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-bold">Cadence</label>
+          <% cadenceOptions.forEach((option, index) => { %>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="generateCadence" id="cadence_<%= option.value %>" value="<%= option.value %>" <%= index === 1 ? 'checked' : '' %>>
+              <label class="form-check-label" for="cadence_<%= option.value %>"><%= option.label %></label>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="generateYearSubmitBtn">
+          <i class="bi bi-lightning-charge me-1"></i>Generate
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
 <%- include('partials/tablePages-end') %>
+
+<script>
+function filterTimesheetPeriods() {
+  const year = document.getElementById('topYearFilter').value;
+  const urlParams = new URLSearchParams(window.location.search);
+  urlParams.set('year', year);
+  urlParams.delete('page');
+  window.location.search = urlParams.toString();
+}
+
+(function () {
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  const modalEl = document.getElementById('generateYearModal');
+  const openBtn = document.getElementById('openGenerateYearModalBtn');
+  const submitBtn = document.getElementById('generateYearSubmitBtn');
+
+  function ensureGenerateModalOnBody() {
+    if (!modalEl) return null;
+    if (modalEl.parentElement !== document.body) {
+      document.body.appendChild(modalEl);
+    }
+    if (!window.bootstrap?.Modal) return null;
+    return window.bootstrap.Modal.getOrCreateInstance(modalEl);
+  }
+
+  if (openBtn && modalEl) {
+    openBtn.addEventListener('click', function () {
+      const modalInstance = ensureGenerateModalOnBody();
+      if (modalInstance) modalInstance.show();
+    });
+  }
+
+  if (!submitBtn) return;
+
+  let generateInProgress = false;
+
+  submitBtn.addEventListener('click', async function () {
+    if (generateInProgress) return;
+
+    const year = String(document.getElementById('generateYearInput')?.value || '').trim();
+    const cadenceInput = document.querySelector('input[name="generateCadence"]:checked');
+    const cadence = cadenceInput ? String(cadenceInput.value || '').trim() : '';
+    const actionStateId = document.querySelector('[data-action-state-id]')?.dataset.actionStateId || '';
+
+    if (!year || !cadence) {
+      await showMsg({
+        title: 'Missing Information',
+        icon: 'warning',
+        message: 'Year and cadence are required.',
+        buttons: [{ text: 'OK', class: 'btn-secondary' }]
+      });
+      return;
+    }
+
+    const originalHtml = submitBtn.innerHTML;
+    try {
+      generateInProgress = true;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
+      if (typeof showLoading === 'function') showLoading();
+
+      const body = new URLSearchParams({ year, cadence });
+      if (actionStateId) body.set('actionStateId', actionStateId);
+
+      const response = await fetch('/school/timesheetPeriods/api/generate-year', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: body.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Generation In Progress', replayTitle: 'Generation Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+
+      if (result.status === 'error') throw new Error(result.message || 'Generation failed.');
+
+      const modalInstance = ensureGenerateModalOnBody();
+      if (modalInstance) modalInstance.hide();
+
+      await showMsg({
+        title: 'Periods Generated',
+        icon: 'success',
+        message: result.message || ('Created ' + Number(result.createdCount || 0) + ' period(s); skipped ' + Number(result.skippedCount || 0) + '.'),
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
+
+      const urlParams = new URLSearchParams(window.location.search);
+      urlParams.set('year', year);
+      window.location.search = urlParams.toString();
+    } catch (error) {
+      await showMsg({
+        title: 'Generation Error',
+        icon: 'error',
+        message: error.message || 'Generation failed.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      generateInProgress = false;
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalHtml;
+      if (typeof hideLoading === 'function') hideLoading();
+    }
+  });
+})();
+</script>

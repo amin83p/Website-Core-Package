@@ -4,10 +4,17 @@ const ctrl = require('../controllers/school/activityController');
 const {
   requireAuth,
   requireAccess,
+  requireAccessAny,
   trackActionState,
   SECTIONS,
   OPERATIONS
 } = require('./schoolRouteDependencies');
+
+const WORK_SESSION_ACCESS_SECTIONS = [
+  SECTIONS.SCHOOL_WORK_SESSIONS,
+  SECTIONS.SCHOOL_ACTIVITIES
+];
+const WORK_SESSION_TRACK_SECTION = SECTIONS.SCHOOL_WORK_SESSIONS;
 
 router.use(requireAuth);
 
@@ -75,24 +82,24 @@ router.delete('/delete/:id',
   ctrl.deleteActivity);
 
 router.get('/:activityId/work-sessions/manage',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ_ALL),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.manageWorkSessionsOverview);
 router.get('/:activityId/work-sessions/api/overview',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ_ALL),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.getWorkSessionsOverviewJson);
 router.get('/:activityId/work-sessions/:entryId/api/context',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ_ALL),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.getWorkSessionContextJson);
 router.get('/:activityId/work-sessions/:entryId/manage',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ_ALL),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.manageWorkSession);
 router.post('/:activityId/work-sessions/:entryId/metadata',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.UPDATE),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, {
     requireToken: true,
     keepActive: true,
     allowOperationTokenFallback: true,
@@ -101,8 +108,8 @@ router.post('/:activityId/work-sessions/:entryId/metadata',
   }),
   ctrl.saveWorkSessionMetadata);
 router.post('/:activityId/work-sessions/:entryId/save',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.UPDATE),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, {
     requireToken: true,
     keepActive: true,
     allowOperationTokenFallback: true,
@@ -111,8 +118,8 @@ router.post('/:activityId/work-sessions/:entryId/save',
   }),
   ctrl.saveWorkSessionAssignee);
 router.post('/:activityId/work-sessions/:entryId/complete',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.UPDATE),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, {
     requireToken: true,
     keepActive: true,
     allowOperationTokenFallback: true,
@@ -121,8 +128,8 @@ router.post('/:activityId/work-sessions/:entryId/complete',
   }),
   ctrl.completeWorkSessionAssignee);
 router.post('/:activityId/work-sessions/:entryId/pending',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.UPDATE),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, {
     requireToken: true,
     keepActive: true,
     allowOperationTokenFallback: true,
@@ -141,8 +148,8 @@ router.post('/:activityId/force-unlock-timesheet',
   }),
   ctrl.forceUnlockActivityTimesheetLocks);
 router.post('/:activityId/work-sessions/:entryId/force-unlock-timesheet',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.UPDATE, {
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.UPDATE),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, {
     requireToken: true,
     keepActive: true,
     allowOperationTokenFallback: true,
@@ -151,8 +158,8 @@ router.post('/:activityId/work-sessions/:entryId/force-unlock-timesheet',
   }),
   ctrl.forceUnlockWorkSessionTimesheet);
 router.delete('/:activityId/work-sessions/:entryId',
-  requireAccess(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.DELETE),
-  trackActionState(SECTIONS.SCHOOL_ACTIVITIES, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.DELETE),
+  trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
   ctrl.deleteWorkSession);
 
 module.exports = router;

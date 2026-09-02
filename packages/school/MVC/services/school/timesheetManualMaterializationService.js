@@ -3,6 +3,7 @@ const activityService = require('./activityService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionIdService = require('./sessionIdService');
 const manualSessionIdService = require('./manualSessionIdService');
+const timesheetPayrollContextService = require('./timesheetPayrollContextService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -22,6 +23,21 @@ function isManualMaterializationCandidate(entry = {}) {
   const sessionId = normalizeId(entry.sessionId);
   if (!manualSessionIdService.isManualSessionId(sessionId)) return false;
   return Boolean(normalizeId(entry.classId) || normalizeId(entry.activityId));
+}
+
+function mergeLiveMaterializationMarkers(snapshotEntry = {}, liveEntry = {}) {
+  if (!snapshotEntry || !liveEntry) return snapshotEntry;
+  if (!liveEntry.materializedAt && !liveEntry.materializedSessionId) return snapshotEntry;
+  return {
+    ...snapshotEntry,
+    materializedAt: liveEntry.materializedAt || snapshotEntry.materializedAt,
+    materializedSessionId: liveEntry.materializedSessionId || snapshotEntry.materializedSessionId,
+    materializedFromTimesheetId: liveEntry.materializedFromTimesheetId || snapshotEntry.materializedFromTimesheetId,
+    materializedFromTimesheetEntryId: liveEntry.materializedFromTimesheetEntryId || snapshotEntry.materializedFromTimesheetEntryId,
+    activityEntryId: liveEntry.activityEntryId || snapshotEntry.activityEntryId,
+    hours: liveEntry.hours ?? snapshotEntry.hours,
+    timesheetHours: liveEntry.timesheetHours ?? snapshotEntry.timesheetHours
+  };
 }
 
 function nextActivityEntryId(entries = []) {
@@ -93,6 +109,46 @@ async function materializeClassManualEntry({
   return { classId, sessionId, session: newSession };
 }
 
+function normalizeWorkSessionAssigneeRole(value) {
+  const payrollRole = timesheetPayrollContextService.normalizePayrollRole(value);
+  if (payrollRole) return payrollRole;
+  const token = String(value || '').trim().toLowerCase();
+  if (token.includes('teacher')) return 'teacher';
+  if (token === 'staff' || token.includes('staff')) return 'staff';
+  return '';
+}
+
+function buildAssigneeRoleFields(role) {
+  const normalized = normalizeWorkSessionAssigneeRole(role) || 'teacher';
+  return { role: normalized, roles: [normalized] };
+}
+
+async function resolveMaterializedAssigneeRole({ entry, timesheet, teacherId, reqUser } = {}) {
+  const fromEntry = timesheetPayrollContextService.normalizePayrollRole(entry?.personRole);
+  if (fromEntry) return buildAssigneeRoleFields(fromEntry);
+
+  const orgId = normalizeId(timesheet?.orgId || entry?.orgId);
+  const personId = normalizeId(teacherId);
+  if (orgId && personId) {
+    try {
+      const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
+        orgId,
+        personId,
+        reqUser
+      });
+      const resolved = timesheetPayrollContextService.resolveRoleForEntry({
+        payrollContext,
+        requestedRole: entry?.personRole,
+        source: 'activity'
+      });
+      if (resolved) return buildAssigneeRoleFields(resolved);
+    } catch (_error) {
+      // Fall back to teacher when payroll context cannot be resolved.
+    }
+  }
+  return buildAssigneeRoleFields('teacher');
+}
+
 async function materializeActivityManualEntry({
   entry,
   timesheet,
@@ -142,6 +198,8 @@ async function materializeActivityManualEntry({
       completionStatus: 'pending'
     };
   }
+  const assigneeRoleFields = await resolveMaterializedAssigneeRole({ entry, timesheet, teacherId, reqUser });
+  assignee = { ...assignee, ...assigneeRoleFields };
 
   // Public activities link an existing work session; individual suggests create a new ENTRY.
   if (existingEntryId) {
@@ -213,9 +271,17 @@ async function materializeActivityManualEntry({
 }
 
 async function materializeApprovedTimesheetManualEntries({ timesheet = {}, period = {}, reqUser } = {}) {
-  const sourceEntries = Array.isArray(timesheet?.submissionSnapshot?.entries)
+  const snapshotEntries = Array.isArray(timesheet?.submissionSnapshot?.entries)
     ? timesheet.submissionSnapshot.entries
-    : (Array.isArray(timesheet?.entries) ? timesheet.entries : []);
+    : [];
+  const liveEntries = Array.isArray(timesheet?.entries) ? timesheet.entries : [];
+  const liveBySessionId = new Map(
+    liveEntries
+      .filter((row) => row && row.isDeleted !== true)
+      .map((row) => [normalizeId(row.sessionId), row])
+  );
+  const sourceEntries = (snapshotEntries.length ? snapshotEntries : liveEntries)
+    .map((entry) => mergeLiveMaterializationMarkers(entry, liveBySessionId.get(normalizeId(entry?.sessionId))));
   const teacherId = normalizeId(timesheet?.teacherId);
   const orgId = normalizeId(timesheet?.orgId || period?.orgId);
   const attendanceDuePeriodId = await resolveNextTimesheetPeriodId({

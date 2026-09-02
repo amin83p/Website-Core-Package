@@ -102,15 +102,16 @@ test('Activity work session routes, controller, service, and view are wired', ()
   assert.doesNotMatch(manager, /Use this assignee when marking session completed/);
   assert.doesNotMatch(manager, /Select this assignee for completion/);
   assert.doesNotMatch(manager, /ws-complete-target/);
-  assert.match(manager, /All Activities/);
-  assert.match(manager, /All work sessions/);
   assert.match(manager, /session-manager-toolbar-row/);
   assert.match(manager, /session-manager-shell/);
   assert.match(manager, /session-manager-sidebar/);
   assert.match(manager, /session-manager-main/);
   assert.match(manager, /Session Detail/);
   assert.match(manager, /session-manager-info-card/);
-  assert.match(manager, /session-manager-class-nav-toggle/);
+  assert.doesNotMatch(manager, /session-manager-class-nav-toggle/);
+  assert.doesNotMatch(manager, /alert alert-info border-info shadow-sm mb-3/);
+  assert.match(manager, /ws-assignee-info-btn/);
+  assert.match(manager, /bi-info-circle text-primary/);
   assert.match(manager, /session-summary-card/);
   assert.match(manager, /work-session-assignee-form/);
   assert.match(manager, /ws-assignee-save-form/);
@@ -314,6 +315,190 @@ test('School dependency service locks only targeted assignee rows', async () => 
   } finally {
     schoolDataService.getDataById = originalGet;
     schoolDataService.updateData = originalUpdate;
+  }
+});
+
+test('lockActivitySources stamps assignee rows when locking an entry', async () => {
+  const schoolDependencyService = require('../packages/school/MVC/services/school/schoolDependencyService');
+  const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+  const originalGet = schoolDataService.getDataById;
+  const originalUpdate = schoolDataService.updateData;
+
+  let saved = null;
+  const activity = {
+    id: 'ACT-ENTRY-LOCK',
+    entries: [{
+      entryId: 'ENTRY-1',
+      assignees: [
+        { personId: 'P1', status: 'attended', completionStatus: 'completed' },
+        { personId: 'P2', status: 'attended', completionStatus: 'completed' }
+      ]
+    }]
+  };
+
+  schoolDataService.getDataById = async () => activity;
+  schoolDataService.updateData = async (_type, _id, payload) => {
+    saved = payload;
+    return payload;
+  };
+
+  try {
+    const result = await schoolDependencyService.lockActivitySources({
+      activityId: activity.id,
+      entryIds: ['ENTRY-1'],
+      timesheetId: 'TS-ENTRY-1',
+      reqUser: { id: 'ADMIN-1' }
+    });
+    assert.equal(result.locked, true);
+    assert.equal(saved.entries[0].locked, true);
+    assert.equal(saved.entries[0].assignees[0].locked, true);
+    assert.equal(saved.entries[0].assignees[1].locked, true);
+  } finally {
+    schoolDataService.getDataById = originalGet;
+    schoolDataService.updateData = originalUpdate;
+  }
+});
+
+test('lockSourcesForApprovedTimesheet locks activity assignee from act session ref', async () => {
+  const schoolDependencyService = require('../packages/school/MVC/services/school/schoolDependencyService');
+  const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+  const originalGet = schoolDataService.getDataById;
+  const originalUpdate = schoolDataService.updateData;
+  const originalFetch = schoolDataService.fetchAllData;
+
+  let saved = null;
+  const activity = {
+    id: 'ACT-9',
+    entries: [{
+      entryId: 'ENTRY-1',
+      assignees: [{ personId: 'P_100', status: 'attended', completionStatus: 'completed' }]
+    }]
+  };
+
+  schoolDataService.getDataById = async (type, id) => (type === 'activities' && id === 'ACT-9' ? activity : null);
+  schoolDataService.updateData = async (_type, _id, payload) => {
+    saved = payload;
+    return payload;
+  };
+  schoolDataService.fetchAllData = async () => [];
+
+  try {
+    await schoolDependencyService.lockSourcesForApprovedTimesheet({
+      id: 'TS-SUBMIT-1',
+      status: 'submitted',
+      submissionSnapshot: {
+        submittedAt: '2026-07-01T12:00:00.000Z',
+        entries: [{
+          sessionId: 'act-ACT-9-ENTRY-1-P_100',
+          hours: 1.5,
+          activityId: 'ACT-9'
+        }]
+      }
+    }, { id: 'ADMIN-1' });
+    assert.equal(saved.entries[0].assignees[0].locked, true);
+    assert.equal(saved.entries[0].assignees[0].lockedTimesheetId, 'TS-SUBMIT-1');
+  } finally {
+    schoolDataService.getDataById = originalGet;
+    schoolDataService.updateData = originalUpdate;
+    schoolDataService.fetchAllData = originalFetch;
+  }
+});
+
+test('resetAssigneeCompletion rejects timesheet-locked assignee rows', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+  const originalGetActivity = activityService.getActivity;
+  const originalGet = schoolDataService.getDataById;
+
+  const activity = {
+    id: 'ACT-LOCKED-COMPLETE',
+    orgId: '900000',
+    title: 'Locked completion',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'completion',
+    entries: [{
+      entryId: 'ENTRY-1',
+      date: '2026-07-01',
+      startTime: '09:00',
+      endTime: '11:00',
+      durationHours: 2,
+      status: 'posted',
+      assignees: [{
+        personId: 'P1',
+        personName: 'Person 1',
+        status: 'attended',
+        paid: true,
+        paidHours: 2,
+        completionStatus: 'completed',
+        locked: true,
+        lockReason: 'timesheet_approved',
+        lockedTimesheetId: 'TS-1'
+      }]
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+  schoolDataService.getDataById = async (type, id) => (type === 'activities' && id === activity.id ? activity : null);
+
+  const reqUser = { id: 'U1', personId: 'P1', activeOrgId: '900000', orgId: '900000' };
+
+  try {
+    await assert.rejects(
+      () => activityWorkSessionService.resetAssigneeCompletion({
+        activityId: activity.id,
+        entryId: 'ENTRY-1',
+        personId: 'P1',
+        reqUser,
+        accessContext: { scopeId: 'SCP_ORG' }
+      }),
+      /cannot update this assignee row/i
+    );
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    schoolDataService.getDataById = originalGet;
+  }
+});
+
+test('entry-level timesheet lock makes assignee row non-editable', async () => {
+  const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const originalGetActivity = activityService.getActivity;
+
+  const activity = {
+    id: 'ACT-ENTRY-ONLY-LOCK',
+    orgId: '900000',
+    status: 'posted',
+    evaluationType: 'completion',
+    entries: [{
+      entryId: 'ENTRY-1',
+      status: 'posted',
+      locked: true,
+      lockReason: 'timesheet_approved',
+      lockedTimesheetId: 'TS-2',
+      assignees: [{
+        personId: 'P1',
+        personName: 'Person 1',
+        completionStatus: 'completed'
+      }]
+    }]
+  };
+
+  activityService.getActivity = async () => activity;
+  const reqUser = { id: 'U1', personId: 'P1', activeOrgId: '900000', orgId: '900000' };
+
+  try {
+    const context = await activityWorkSessionService.getWorkSessionContext(
+      activity.id,
+      'ENTRY-1',
+      reqUser,
+      { scopeId: 'SCP_ORG' }
+    );
+    assert.equal(context.entry.assignees[0].locked, true);
+    assert.equal(context.entry.assignees[0].editable, false);
+  } finally {
+    activityService.getActivity = originalGetActivity;
   }
 });
 
@@ -1175,6 +1360,11 @@ test('Activity work session paid-hour save skips malformed blank assignee rows',
     schoolDataService.getDataById = originalGet;
     schoolDataService.updateData = originalUpdate;
   }
+});
+
+test('work session manager hides pending action for timesheet-locked assignees', () => {
+  const view = readText('packages/school/MVC/views/school/activity/activityWorkSessionManager.ejs');
+  assert.match(view, /isCompletion && rowEditable && !assignee\.locked && isAssigneeCompleted/);
 });
 
 test('School record access service exposes activity work session assert helper', () => {

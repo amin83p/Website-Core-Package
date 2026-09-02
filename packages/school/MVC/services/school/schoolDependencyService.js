@@ -148,9 +148,9 @@ function entryReferencesSource(entry = {}, sourceType, sourceRef = {}) {
   });
 }
 
-function timesheetReferencesSource(timesheet = {}, sourceType, sourceRef = {}) {
+function timesheetReferencesSource(timesheet = {}, sourceType, sourceRef = {}, minStatus = GUARD_MIN_STATUS) {
   const status = String(timesheet?.status || 'draft').trim().toLowerCase();
-  if (!meetsMinTimesheetStatus(status)) return false;
+  if (!meetsMinTimesheetStatus(status, minStatus)) return false;
   const entries = [];
   if (Array.isArray(timesheet?.submissionSnapshot?.entries)) {
     entries.push(...timesheet.submissionSnapshot.entries.filter((entry) => (
@@ -175,11 +175,9 @@ async function listTimesheets(reqUser, orgId) {
 
 async function findTimesheetsReferencingSource({ orgId, sourceType, sourceRef, minStatus = GUARD_MIN_STATUS, reqUser }) {
   const timesheets = await listTimesheets(reqUser, orgId);
-  return timesheets.filter((row) => {
-    const status = String(row?.status || 'draft').trim().toLowerCase();
-    if (!meetsMinTimesheetStatus(status, minStatus)) return false;
-    return timesheetReferencesSource(row, sourceType, sourceRef);
-  });
+  return timesheets.filter((row) => (
+    timesheetReferencesSource(row, sourceType, sourceRef, minStatus)
+  ));
 }
 
 function buildBlockedMessage(label, blockers = []) {
@@ -352,6 +350,28 @@ async function lockActivityAssignees({ activityId, locks = [], timesheetId, reqU
   return summary;
 }
 
+async function assertActivityAssigneeNotReferencedBySubmittedTimesheet({
+  orgId,
+  activityId,
+  entryId,
+  personId,
+  reqUser
+} = {}) {
+  const blockers = await buildTimesheetBlockers({
+    orgId,
+    sourceType: 'activity',
+    sourceRef: {
+      activityId: normalizeId(activityId),
+      activityEntryId: normalizeId(entryId),
+      personId: normalizeId(personId)
+    },
+    minStatus: 'submitted',
+    reqUser
+  });
+  if (!blockers.length) return;
+  throw new Error(buildBlockedMessage('This work session assignee', blockers));
+}
+
 async function lockActivitySources({ activityId, entryIds = [], locks = [], timesheetId, reqUser }) {
   const normalizedLocks = (Array.isArray(locks) ? locks : []).filter((row) => row?.entryId || row?.activityEntryId);
   if (normalizedLocks.length) {
@@ -364,18 +384,40 @@ async function lockActivitySources({ activityId, entryIds = [], locks = [], time
   const entryIdSet = new Set((Array.isArray(entryIds) ? entryIds : []).map(normalizeId).filter(Boolean));
   const lockAllEntries = !entryIdSet.size;
   let changed = false;
+  const lockedAt = new Date().toISOString();
+  const lockedBy = toPublicId(reqUser?.id);
+  const lockedTimesheetId = normalizeId(timesheetId);
+  const stampAssigneeLock = (assignee) => {
+    if (isAssigneeTimesheetLocked(assignee)) return assignee;
+    changed = true;
+    return {
+      ...assignee,
+      locked: true,
+      lockedAt,
+      lockedBy,
+      lockReason: 'timesheet_approved',
+      lockedTimesheetId
+    };
+  };
   const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((entry) => {
     const entryId = normalizeId(entry?.entryId || entry?.id);
     if (!lockAllEntries && !entryIdSet.has(entryId)) return entry;
-    if (isActivityEntryTimesheetLocked(entry) && String(entry?.lockReason || '') === 'timesheet_approved') return entry;
+    const priorAssignees = (Array.isArray(entry?.assignees) ? entry.assignees : [])
+      .filter((assignee) => assignee && typeof assignee === 'object');
+    const assignees = priorAssignees.map(stampAssigneeLock);
+    const entryAlreadyLocked = isActivityEntryTimesheetLocked(entry)
+      && String(entry?.lockReason || '') === 'timesheet_approved';
+    const assigneesChanged = assignees.some((row, index) => row !== priorAssignees[index]);
+    if (entryAlreadyLocked && !assigneesChanged) return entry;
     changed = true;
     return {
       ...entry,
+      assignees,
       locked: true,
-      lockedAt: new Date().toISOString(),
-      lockedBy: toPublicId(reqUser?.id),
+      lockedAt: entryAlreadyLocked ? (entry.lockedAt || lockedAt) : lockedAt,
+      lockedBy: entryAlreadyLocked ? (entry.lockedBy || lockedBy) : lockedBy,
       lockReason: 'timesheet_approved',
-      lockedTimesheetId: normalizeId(timesheetId)
+      lockedTimesheetId: entryAlreadyLocked ? (entry.lockedTimesheetId || lockedTimesheetId) : lockedTimesheetId
     };
   });
   const nextActivity = {
@@ -1044,6 +1086,7 @@ module.exports = {
   dedupeSourceRefs,
   lockReconciliationSourceRefs,
   unlockSourcesForTimesheet,
+  assertActivityAssigneeNotReferencedBySubmittedTimesheet,
   entryHasTimesheetApprovedLock,
   isOrphanTimesheetLock,
   entryHasOrphanTimesheetLock,

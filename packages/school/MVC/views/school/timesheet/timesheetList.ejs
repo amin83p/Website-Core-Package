@@ -101,8 +101,21 @@
                if (p.tsStatus === 'draft') badge = 'bg-info text-dark';
                if (p.tsStatus === 'submitted') badge = 'bg-primary';
                if (p.tsStatus === 'processed') badge = 'bg-success';
+               let availabilityBadge = '';
+               let availabilityClass = 'bg-secondary';
+               if (p.eligibilityPhase === 'upcoming') {
+                 availabilityBadge = 'Upcoming';
+                 availabilityClass = 'bg-secondary';
+               } else if (p.eligibilityPhase === 'deadline_passed') {
+                 availabilityBadge = 'Deadline Passed';
+                 availabilityClass = 'bg-danger';
+               } else if (p.eligibilityPhase === 'active') {
+                 availabilityBadge = 'Open';
+                 availabilityClass = 'bg-success';
+               }
              %>
              <span class="badge <%= badge %> px-2 py-1"><%= p.tsStatus.replace('_', ' ').toUpperCase() %></span>
+             <% if (availabilityBadge) { %><span class="badge <%= availabilityClass %> ms-1"><%= availabilityBadge %></span><% } %>
              <% if (p.tsStatus === 'submitted' && p.managerApproved) { %><span class="badge bg-success ms-1">MANAGER APPROVED</span><% } %>
           </td>
           <td class="fw-bold text-success"><%= p.totalHours || '0.00' %> Hrs</td>
@@ -112,9 +125,15 @@
                   Select Teacher
                 </button>
              <% } else { %>
+                <% if (p.canOpen === false && p.tsStatus !== 'processed') { %>
+                <button type="button" class="btn btn-sm btn-filled btn-edit" disabled title="<%= p.eligibilityReason || 'This timesheet period is not available yet.' %>">
+                   <%= p.eligibilityPhase === 'upcoming' ? 'Not Available Yet' : 'Unavailable' %>
+                </button>
+                <% } else { %>
                 <a href="/school/timesheets/editor/<%= p.id %>?teacherId=<%= isAdmin ? targetTeacherId : '' %>" class="btn btn-sm btn-filled btn-edit">
                    <%= p.tsStatus === 'processed' ? 'View Paystub' : 'Open Timesheet' %>
                 </a>
+                <% } %>
              <% } %>
           </td>
         </tr>

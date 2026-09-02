@@ -40,6 +40,22 @@
     if (normalized === 'student') return 'Student';
     return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Participant';
   };
+  const buildAssigneeInfoTitle = (assignee = {}) => {
+    const parts = [];
+    if (assignee.completionLabel) parts.push(String(assignee.completionLabel));
+    if (assignee.locked) parts.push('Timesheet locked');
+    if (isCompletion && String(assignee.completionStatus || '').toLowerCase() === 'completed' && assignee.completedAt) {
+      parts.push('Completed ' + String(assignee.completedAt).slice(0, 10));
+    }
+    if (!isCompletion) {
+      const status = String(assignee.status || 'attended').toLowerCase();
+      if (status === 'attended') parts.push('Attendance recorded');
+      else if (status) parts.push('Attendance: ' + status);
+      else parts.push('Pending attendance');
+    }
+    if (assignee.readyForTimesheet) parts.push('Ready for timesheet');
+    return parts.filter(Boolean).join(' · ');
+  };
 %>
 
 <style>
@@ -49,7 +65,75 @@
   .activity-work-session-page .btn-check[value="excused"]:checked + .att-label { background-color: #0dcaf0; color: #000; font-weight: bold; }
   .activity-work-session-page .btn-check[value="absent"]:checked + .att-label { background-color: #dc3545; color: #fff; font-weight: bold; }
 
-  .activity-work-session-page { --session-sidebar-w: 260px; --session-sidebar-collapsed-w: 72px; }
+  .activity-work-session-page .ws-completion-label { background-color: transparent; border: 1px solid transparent; color: #adb5bd; transition: all 0.2s ease-in-out; }
+  .activity-work-session-page .ws-completion-label:hover { background-color: #f8f9fa; color: #495057; }
+  .activity-work-session-page .btn-check.ws-completion-radio[value="pending"]:checked + .ws-completion-label { background-color: #ffc107; color: #000; font-weight: bold; }
+  .activity-work-session-page .btn-check.ws-completion-radio[value="completed"]:checked + .ws-completion-label { background-color: #198754; color: #fff; font-weight: bold; }
+
+  .activity-work-session-page .ws-role-label { background-color: transparent; border: 1px solid #dee2e6; color: #6c757d; transition: all 0.2s ease-in-out; font-size: 0.78rem; padding: 0.25rem 0.35rem; }
+  .activity-work-session-page .ws-role-label:hover { background-color: #f8f9fa; color: #495057; }
+  .activity-work-session-page .btn-check.ws-role-radio:checked + .ws-role-label { background-color: #0d6efd; color: #fff; font-weight: bold; border-color: #0d6efd; }
+
+  .activity-work-session-page .ws-role-radio-group.btn-group-vertical,
+  .activity-work-session-page .ws-completion-radio-group.btn-group-vertical {
+    width: 7.25rem;
+  }
+  .activity-work-session-page .ws-role-radio-group .ws-role-label,
+  .activity-work-session-page .ws-completion-radio-group .ws-completion-label {
+    width: 100%;
+    min-width: 7.25rem;
+    text-align: center;
+  }
+  .activity-work-session-page .ws-completion-label {
+    font-size: 0.78rem;
+    padding: 0.25rem 0.35rem;
+  }
+
+  .activity-work-session-page .ws-person-name {
+    font-size: 1.12rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #1f2a37;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .attendance-order-cell {
+    width: 3.1rem;
+    vertical-align: middle;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .attendance-order-cell .attendance-order-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .attendance-order-head {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .attendance-order-num {
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .ws-assignee-info-btn {
+    line-height: 1;
+    vertical-align: middle;
+  }
+  .activity-work-session-page .ws-person-name-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+  }
+  .activity-work-session-page .ws-person-id {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
+  .activity-work-session-page.session-manager-page { --session-sidebar-w: 260px; --session-sidebar-collapsed-w: 72px; }
   .activity-work-session-page .session-summary-card {
     border: 1px solid #e6ecf5;
     border-radius: 12px;
@@ -191,10 +275,18 @@
   .activity-work-session-page .session-manager-toolbar-row {
     display: flex;
     flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .activity-work-session-page .session-manager-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
     gap: 0.5rem;
-    margin-bottom: 1rem;
+    margin-left: auto;
   }
   .activity-work-session-page .session-manager-toolbar-row .btn-save-session,
   .activity-work-session-page .session-manager-toolbar-row .btn-close-session {
@@ -202,106 +294,97 @@
     font-weight: 600;
   }
 
-  .activity-work-session-page .session-manager-quick-nav {
+  .activity-work-session-page .session-manager-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
     margin-bottom: 1rem;
   }
-  .activity-work-session-page .session-manager-class-nav {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: stretch;
-    min-width: min(100%, 320px);
-  }
-  .activity-work-session-page .session-manager-class-nav-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.7rem;
-    width: 100%;
-    padding: 0.62rem 0.95rem;
-    border: 1px solid #a5b4fc;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #ffffff 0%, #eef2ff 55%, #e0e7ff 100%);
-    color: #312e81;
-    font-weight: 700;
-    text-align: left;
-    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.14);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-  }
-  .activity-work-session-page .session-manager-class-nav-toggle:hover:not(:disabled) {
-    border-color: #818cf8;
-    box-shadow: 0 8px 22px rgba(79, 70, 229, 0.2);
-    transform: translateY(-1px);
-    color: #1e1b4b;
-  }
-  .activity-work-session-page .session-manager-class-nav-toggle[aria-expanded="true"] {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    border-bottom-color: #c7d2fe;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
-  }
-  .activity-work-session-page .session-manager-class-nav-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 9px;
-    background: rgba(99, 102, 241, 0.14);
-    color: #4338ca;
-    flex-shrink: 0;
-  }
-  .activity-work-session-page .session-manager-class-nav-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
+  .activity-work-session-page .session-manager-page-header-main {
     min-width: 0;
-    flex: 1;
+    flex: 1 1 16rem;
   }
-  .activity-work-session-page .session-manager-class-nav-title {
-    font-size: 0.92rem;
-    line-height: 1.2;
-  }
-  .activity-work-session-page .session-manager-class-nav-sub {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #6366f1;
-    letter-spacing: 0.02em;
-  }
-  .activity-work-session-page .session-class-nav-chevron {
-    transition: transform 0.2s ease;
-    font-size: 0.9em;
-    color: #6366f1;
-    flex-shrink: 0;
-  }
-  .activity-work-session-page .session-manager-class-nav-toggle[aria-expanded="true"] .session-class-nav-chevron {
-    transform: rotate(180deg);
-  }
-  .activity-work-session-page .session-manager-class-nav-links {
+  .activity-work-session-page .session-manager-page-meta {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.55rem;
-    border: 1px solid #a5b4fc;
-    border-top: 1px solid #c7d2fe;
-    border-radius: 0 0 12px 12px;
-    background: #fff;
-    box-shadow: 0 10px 24px rgba(79, 70, 229, 0.1);
+    gap: 0.25rem;
+    margin-top: 0.45rem;
   }
-  .activity-work-session-page .session-manager-class-nav-link {
+  .activity-work-session-page .session-manager-page-meta-class {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.55rem 0.7rem;
-    border-radius: 9px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: #1e293b;
-    border: 1px solid transparent;
-  }
-  .activity-work-session-page .session-manager-class-nav-link:hover {
-    background: #f8fafc;
-    border-color: #e2e8f0;
+    gap: 0.4rem;
+    min-width: 0;
     color: #1d4ed8;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .activity-work-session-page .session-manager-page-meta-class-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-work-session-page .session-manager-page-meta-when {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.85rem;
+    color: #334155;
+    font-size: 0.98rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .activity-work-session-page .session-manager-page-meta-when-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+  }
+  .activity-work-session-page .session-manager-page-meta-when-item i {
+    color: #64748b;
+    font-size: 0.95em;
+  }
+  .activity-work-session-page .session-manager-page-header-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex: 0 0 auto;
+  }
+
+  .activity-work-session-page #workSessionAssigneeTable .attendance-order-col {
+    width: 2.75rem;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .ws-role-col {
+    min-width: 7.5rem;
+    width: 7.5rem;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .ws-status-col {
+    min-width: 7.75rem;
+    width: 7.75rem;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .ws-notes-col {
+    min-width: 160px;
+    padding-left: 0.35rem !important;
+    padding-right: 0.5rem !important;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .ws-payable-col {
+    width: 3.25rem;
+    text-align: center;
+  }
+  .activity-work-session-page #workSessionAssigneeTable tbody tr.roster-row:nth-child(even) {
+    background-color: #f8fafc;
+  }
+  .activity-work-session-page #workSessionAssigneeTable tbody tr.roster-row.is-locked {
+    background-color: #f1f5f9;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .ws-notes-input {
+    min-height: 2.4rem;
+    resize: vertical;
+    font-size: 0.85rem;
   }
 
   .activity-work-session-page .session-manager-info-card {
@@ -532,21 +615,6 @@
     font-weight: 600;
   }
 
-  .activity-work-session-page .work-session-assignee-form .form-label {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #64748b;
-    font-weight: 700;
-    margin-bottom: 0.35rem;
-  }
-  .activity-work-session-page .work-session-assignee-form.is-locked {
-    background: #f8fafc;
-  }
-  .activity-work-session-page .work-session-assignee-forms {
-    display: grid;
-    gap: 1rem;
-  }
   .activity-work-session-page .work-session-admin-metadata {
     border: 1px solid #dbe3ef;
     border-radius: 10px;
@@ -558,50 +626,37 @@
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
-    margin-bottom: 0.75rem;
   }
   .activity-work-session-page .ws-derived-hours {
     font-weight: 700;
   }
 </style>
 
-<div class="sections-page activity-work-session-page">
-  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-    <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-check me-2 text-primary"></i>Manage Work Session</h1>
-    <a href="<%= dashboardHref %>" class="btn btn-filled btn-secondary btn-md">
-      <i class="bi bi-speedometer2 me-1"></i>Dashboard
-    </a>
-  </div>
-
-  <div class="session-manager-quick-nav">
-    <div class="session-manager-class-nav">
-      <button
-        type="button"
-        class="session-manager-class-nav-toggle"
-        id="btnToggleWorkSessionNav"
-        data-bs-toggle="collapse"
-        data-bs-target="#workSessionNavCollapse"
-        aria-expanded="false"
-        aria-controls="workSessionNavCollapse">
-        <span class="session-manager-class-nav-icon" aria-hidden="true"><i class="bi bi-box-arrow-up-right"></i></span>
-        <span class="session-manager-class-nav-copy">
-          <span class="session-manager-class-nav-title">Activity navigation</span>
-          <span class="session-manager-class-nav-sub">Manage and browse</span>
-        </span>
-        <i class="bi bi-chevron-down session-class-nav-chevron" aria-hidden="true"></i>
-      </button>
-      <div class="collapse" id="workSessionNavCollapse">
-        <div class="session-manager-class-nav-links">
-          <a href="/school/activities" class="session-manager-class-nav-link"><i class="bi bi-list-ul"></i>All Activities</a>
-          <a href="<%= overviewManageUrl %>" class="session-manager-class-nav-link"><i class="bi bi-kanban"></i>All work sessions</a>
-          <a href="/school/activities/edit/<%= encodeURIComponent(activityRow.id) %>" class="session-manager-class-nav-link"><i class="bi bi-pencil-square"></i>Edit Activity</a>
+<div class="sections-page session-manager-page activity-work-session-page">
+  <div class="session-manager-page-header">
+    <div class="session-manager-page-header-main">
+      <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-check me-2 text-primary"></i>Manage Work Session</h1>
+      <div class="session-manager-page-meta">
+        <div class="session-manager-page-meta-class">
+          <span class="session-manager-page-meta-class-title" title="<%= activityRow.title || 'Activity' %>"><%= activityRow.title || 'Activity' %></span>
+        </div>
+        <div class="session-manager-page-meta-when">
+          <span class="session-manager-page-meta-when-item" id="workSessionPageMetaDate"><i class="bi bi-calendar3" aria-hidden="true"></i><%= entryRow.date || '-' %></span>
+          <span class="session-manager-page-meta-when-item" id="workSessionPageMetaTime"><i class="bi bi-clock" aria-hidden="true"></i><%= entryRow.startTime || '-' %>–<%= entryRow.endTime || '-' %></span>
+          <span class="session-manager-page-meta-when-item"><i class="bi bi-ui-checks" aria-hidden="true"></i><%= evaluationTypeLabel %></span>
         </div>
       </div>
+    </div>
+    <div class="session-manager-page-header-actions">
+      <a href="<%= dashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-speedometer2 me-1"></i>Dashboard
+      </a>
     </div>
   </div>
 
   <div class="session-manager-toolbar-row">
-    <div class="btn-group shadow-sm">
+    <div class="session-manager-toolbar-actions">
+      <div class="btn-group shadow-sm">
       <% if (prevSession && prevSession.manageUrl) { %>
         <a href="<%= prevSession.manageUrl %>" class="btn btn-outline-primary bg-grey btn-md" title="Previous work session"><i class="bi bi-chevron-left"></i></a>
       <% } else { %>
@@ -619,6 +674,7 @@
       </button>
     <% } %>
     <button type="button" class="btn btn-warning btn-md btn-filled btn-close-session" id="btnCloseWorkSessionManager"><i class="bi bi-x-lg me-1"></i>Close</button>
+    </div>
   </div>
 
   <div class="card session-manager-info-card shadow-sm mb-3">
@@ -633,12 +689,7 @@
         aria-expanded="false"
         aria-controls="workSessionInfoDetailsCollapse">
         <div class="session-info-summary">
-          <span class="session-info-summary-class text-truncate" title="<%= activityRow.title || 'Activity' %>"><%= activityRow.title || 'Activity' %></span>
-          <span class="session-info-summary-sep" aria-hidden="true">·</span>
-          <span class="session-info-summary-chip" id="workSessionInfoSummaryDate"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i><%= entryRow.date || '-' %></span>
-          <span class="session-info-summary-chip" id="workSessionInfoSummaryTime"><i class="bi bi-clock me-1" aria-hidden="true"></i><%= entryRow.startTime || '-' %>–<%= entryRow.endTime || '-' %></span>
-          <span class="session-info-summary-chip session-info-summary-chip--location<%= workSessionLocationLabel ? '' : ' is-muted' %>" id="workSessionInfoSummaryLocation" title="Location"><% if (workSessionLocationLabel) { %><i class="bi bi-geo-alt me-1" aria-hidden="true"></i><%= workSessionLocationLabel %><% } %></span>
-          <span class="session-info-summary-chip d-none d-lg-inline-flex" title="Evaluation"><i class="bi bi-ui-checks me-1" aria-hidden="true"></i><%= evaluationTypeLabel %></span>
+          <span class="session-info-summary-class text-muted">Session details</span>
         </div>
         <span class="session-info-expand-meta">
           <span class="session-info-expand-label">Details</span>
@@ -704,41 +755,7 @@
             </div>
           </form>
         <% } %>
-        <div class="session-info-grid">
-          <div class="session-info-tile session-info-tile--accent">
-            <div class="session-info-tile-label">Activity</div>
-            <div class="session-info-tile-value text-truncate" title="<%= activityRow.title || '-' %>"><%= activityRow.title || '-' %></div>
-          </div>
-          <div class="session-info-tile">
-            <div class="session-info-tile-label">Session title</div>
-            <div class="session-info-tile-value"><%= entryRow.title || '-' %></div>
-          </div>
-          <div class="session-info-tile">
-            <div class="session-info-tile-label">Date</div>
-            <div class="session-info-tile-value"><%= entryRow.date || '-' %></div>
-          </div>
-          <div class="session-info-tile">
-            <div class="session-info-tile-label">Time</div>
-            <div class="session-info-tile-value text-nowrap"><%= entryRow.startTime || '-' %> – <%= entryRow.endTime || '-' %></div>
-          </div>
-          <div class="session-info-tile">
-            <div class="session-info-tile-label">Duration</div>
-            <div class="session-info-tile-value"><%= Number(entryRow.durationHours || 0).toFixed(2) %> h</div>
-          </div>
-          <div class="session-info-tile">
-            <div class="session-info-tile-label">Category</div>
-            <div class="session-info-tile-value"><%= activityRow.categoryName || '-' %></div>
-          </div>
-          <div class="session-info-tile">
-            <div class="session-info-tile-label">Department</div>
-            <div class="session-info-tile-value"><%= activityRow.departmentName || '-' %></div>
-          </div>
-        </div>
         <div class="session-info-meta-grid">
-          <div class="session-info-tile">
-            <div class="session-info-tile-label">Evaluation</div>
-            <div class="session-info-tile-value session-info-tile-value-sm"><%= evaluationTypeLabel %></div>
-          </div>
           <div class="session-info-tile">
             <div class="session-info-tile-label">Assignees</div>
             <div class="session-info-tile-value session-info-tile-value-sm"><%= assigneeRows.length %> total · <%= readyCount %> ready for timesheet</div>
@@ -819,167 +836,199 @@
           </div>
         <% } %>
 
-        <% if (isCompletion) { %>
-          <div class="alert alert-info border-info shadow-sm mb-3">
-            <div class="fw-semibold"><i class="bi bi-check2-circle me-2"></i>Completion workflow</div>
-            <div class="small mt-1">Use <strong>Pending completion</strong> in the session status area when the work is done. Use <strong>Save session</strong> for hour and note changes.</div>
-          </div>
-        <% } else { %>
-          <div class="alert alert-info border-info shadow-sm mb-3">
-            <div class="fw-semibold"><i class="bi bi-person-check me-2"></i>Attendance workflow</div>
-            <div class="small mt-1">Set attendance per assignee below, then use <strong>Save session</strong> in the toolbar.</div>
-          </div>
-        <% } %>
-
         <% if (canEditWorkSessionMetadata) { %>
-          <div class="work-session-admin-actions">
+          <div class="work-session-admin-actions mb-3">
             <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddWorkSessionAssignee">
               <i class="bi bi-person-plus me-1"></i>Add person
             </button>
           </div>
         <% } %>
 
-        <div class="work-session-assignee-forms" id="workSessionAssigneeForms">
+        <div class="card border-0 shadow-sm mb-3" id="workSessionAssigneeStep">
+          <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <h5 class="m-0 fw-bold text-primary"><i class="bi bi-people-fill me-2"></i>Assignees</h5>
+              <div class="small text-muted mt-1"><%= isCompletion ? 'Set completion status per assignee, then save or use session status to complete.' : 'Set attendance per assignee, then use Save session.' %></div>
+            </div>
+            <% if (!isCompletion && editableAssigneeRows.length) { %>
+              <div class="btn-group btn-group-sm" role="group" aria-label="Bulk attendance">
+                <button type="button" class="btn btn-outline-success" id="btnWsAllAttended">All Attended</button>
+                <button type="button" class="btn btn-outline-info" id="btnWsAllExcused">All Excused</button>
+                <button type="button" class="btn btn-outline-danger" id="btnWsAllAbsent">All Absent</button>
+                <button type="button" class="btn btn-outline-dark" id="btnWsResetAttendance" title="Reset attendance to attended">Reset</button>
+              </div>
+            <% } %>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: min(70vh, 700px); overflow-y: auto;">
+              <table class="table table-hover align-middle mb-0" id="workSessionAssigneeTable">
+                <thead class="table-light position-sticky top-0" style="z-index: 1;">
+                  <tr>
+                    <th class="attendance-order-col ps-3">#</th>
+                    <th class="ps-2">Person</th>
+                    <th class="ws-role-col">Role</th>
+                    <% if (canEditWorkSessionMetadata && activityRow.paid) { %><th class="ws-payable-col">Payable</th><% } %>
+                    <th class="text-end">Hours</th>
+                    <th class="ws-status-col">Status</th>
+                    <th class="ws-notes-col">Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="workSessionAssigneeTableBody">
+                  <% let visibleAssigneeIndex = 0;
+                  assigneeRows.forEach((assignee, idx) => {
+                    const rowVisible = canManageAll || assignee.isSelf;
+                    if (!rowVisible && !canManageAll) return;
+                    visibleAssigneeIndex += 1;
+                    const rowEditable = assignee.editable && (canManageAll || assignee.isSelf);
+                    const isAssigneeCompleted = String(assignee.completionStatus || '').toLowerCase() === 'completed';
+                    const assigneeRole = String(assignee.role || 'participant').toLowerCase();
+                    const assigneeRoles = Array.from(new Set((Array.isArray(assignee.roles) && assignee.roles.length ? assignee.roles : [assigneeRole])
+                      .map((role) => normalizeRoleForView(role))
+                      .filter(Boolean)));
+                    if (!assigneeRoles.includes(assigneeRole)) assigneeRoles.unshift(assigneeRole);
+                    const rowKey = String(assignee.personId || ('row_' + idx)).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + String(idx);
+                    const rowDisabled = !rowEditable || assignee.locked;
+                    const assigneeInfoTitle = buildAssigneeInfoTitle(assignee);
+                  %>
+                    <tr
+                      class="roster-row work-session-assignee-form<%= assignee.locked ? ' is-locked' : '' %>"
+                      data-personid="<%= assignee.personId %>"
+                      data-person-id="<%= assignee.personId %>"
+                      data-person-name="<%= assignee.personName || assignee.personId %>"
+                      data-locked="<%= assignee.locked ? 'true' : 'false' %>"
+                      data-role="<%= assigneeRole %>"
+                      data-roles="<%= assigneeRoles.join(',') %>"
+                      data-status="<%= String(assignee.status || 'attended').toLowerCase() %>"
+                      data-paid="<%= assignee.paid !== false ? 'true' : 'false' %>"
+                      data-notes="<%= assignee.notes || '' %>"
+                      data-completion-status="<%= String(assignee.completionStatus || 'pending').toLowerCase() %>"
+                      data-completed-at="<%= assignee.completedAt || '' %>"
+                      data-ready-for-timesheet="<%= assignee.readyForTimesheet ? 'true' : 'false' %>">
+                      <td class="attendance-order-cell text-muted small ps-3 align-middle">
+                        <div class="attendance-order-stack">
+                          <div class="attendance-order-head">
+                            <span class="attendance-order-num"><%= visibleAssigneeIndex %></span>
+                            <button
+                              type="button"
+                              class="btn btn-link btn-sm p-0 ws-assignee-info-btn"
+                              data-bs-toggle="tooltip"
+                              data-bs-placement="right"
+                              title="<%= assigneeInfoTitle %>"
+                              aria-label="<%= assigneeInfoTitle %>">
+                              <i class="bi bi-info-circle text-primary"></i>
+                            </button>
+                          </div>
+                          <% if (canEditWorkSessionMetadata && !assignee.locked) { %>
+                            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 js-remove-work-assignee" data-person-id="<%= assignee.personId %>" title="Remove person"><i class="bi bi-trash"></i></button>
+                          <% } %>
+                        </div>
+                      </td>
+                      <td class="ps-2 align-middle ws-person-col">
+                        <div class="ws-person-name-line">
+                          <span class="ws-person-name"><%= assignee.personName || assignee.personId %></span>
+                          <span class="ws-person-id"><%= assignee.personId %></span>
+                        </div>
+                        <% if (isCompletion && rowEditable && !assignee.locked && isAssigneeCompleted) { %>
+                          <form method="POST" action="<%= manageUrl %>/pending" class="mt-2 ws-assignee-pending-form" data-person-id="<%= assignee.personId %>">
+                            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+                            <input type="hidden" name="personId" value="<%= assignee.personId %>">
+                            <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                            <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                            <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                            <button type="submit" class="btn btn-outline-warning btn-sm btn-ws-pending py-0" data-person-id="<%= assignee.personId %>" data-person-name="<%= assignee.personName || assignee.personId %>">
+                              <i class="bi bi-arrow-counterclockwise me-1"></i>Pending
+                            </button>
+                          </form>
+                        <% } %>
+                      </td>
+                      <td class="ws-role-col align-middle">
+                        <% if (canEditWorkSessionMetadata && rowEditable && !assignee.locked) { %>
+                          <div class="btn-group-vertical btn-group-sm ws-role-radio-group" role="group" aria-label="Role for <%= assignee.personName || assignee.personId %>" data-roles="<%= assigneeRoles.join(',') %>">
+                            <% assigneeRoles.forEach((role) => { %>
+                              <input type="radio" class="btn-check ws-role-radio" id="role_<%= rowKey %>_<%= role %>" name="role_<%= rowKey %>" value="<%= role %>" data-person-id="<%= assignee.personId %>" <%= role === assigneeRole ? 'checked' : '' %>>
+                              <label class="btn ws-role-label" for="role_<%= rowKey %>_<%= role %>"><%= roleLabelForView(role) %></label>
+                            <% }) %>
+                          </div>
+                        <% } else { %>
+                          <span class="badge bg-light text-dark border"><%= roleLabelForView(assignee.role || 'participant') %></span>
+                        <% } %>
+                      </td>
+                      <% if (canEditWorkSessionMetadata && activityRow.paid) { %>
+                        <td class="align-middle ws-payable-col">
+                          <% if (rowEditable && !assignee.locked) { %>
+                            <div class="form-check form-switch mb-0 d-inline-flex justify-content-center">
+                              <input class="form-check-input ws-paid-input" type="checkbox" id="paid_<%= rowKey %>" data-person-id="<%= assignee.personId %>" aria-label="Payable for <%= assignee.personName || assignee.personId %>" <%= assignee.paid !== false ? 'checked' : '' %>>
+                            </div>
+                          <% } else { %>
+                            <span class="small"><%= assignee.paid !== false ? 'Yes' : 'No' %></span>
+                          <% } %>
+                        </td>
+                      <% } %>
+                      <td class="text-end align-middle">
+                        <span class="fw-semibold ws-derived-hours" data-person-id="<%= assignee.personId %>"><%= Number(entryRow.durationHours || 0).toFixed(2) %> h</span>
+                      </td>
+                      <td class="ws-status-col align-middle pe-2">
+                        <% if (!isCompletion && rowEditable && !assignee.locked) { %>
+                          <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Attendance status for <%= assignee.personName || assignee.personId %>">
+                            <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="attended_<%= rowKey %>" value="attended" <%= String(assignee.status || 'attended') === 'attended' ? 'checked' : '' %>>
+                            <label class="btn att-label" for="attended_<%= rowKey %>" title="Attended"><i class="bi bi-check-lg me-1"></i>Attended</label>
+                            <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="excused_<%= rowKey %>" value="excused" <%= String(assignee.status || '') === 'excused' ? 'checked' : '' %>>
+                            <label class="btn att-label" for="excused_<%= rowKey %>" title="Excused"><i class="bi bi-envelope-paper me-1"></i>Excused</label>
+                            <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="absent_<%= rowKey %>" value="absent" <%= String(assignee.status || '') === 'absent' ? 'checked' : '' %>>
+                            <label class="btn att-label" for="absent_<%= rowKey %>" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
+                          </div>
+                        <% } else if (isCompletion && canEditWorkSessionMetadata && rowEditable && !assignee.locked) { %>
+                          <div class="btn-group-vertical btn-group-sm ws-completion-radio-group" role="group" aria-label="Completion status for <%= assignee.personName || assignee.personId %>">
+                            <input type="radio" class="btn-check ws-completion-radio" data-person-id="<%= assignee.personId %>" name="completion_<%= rowKey %>" id="pending_<%= rowKey %>" value="pending" <%= isAssigneeCompleted ? '' : 'checked' %>>
+                            <label class="btn ws-completion-label" for="pending_<%= rowKey %>">Pending</label>
+                            <input type="radio" class="btn-check ws-completion-radio" data-person-id="<%= assignee.personId %>" name="completion_<%= rowKey %>" id="completed_<%= rowKey %>" value="completed" <%= isAssigneeCompleted ? 'checked' : '' %>>
+                            <label class="btn ws-completion-label" for="completed_<%= rowKey %>">Completed</label>
+                          </div>
+                        <% } else { %>
+                          <span class="badge bg-light text-dark border"><%= isCompletion ? (isAssigneeCompleted ? 'completed' : 'pending') : (assignee.status || 'pending') %></span>
+                          <% if (isCompletion && rowEditable && !isAssigneeCompleted) { %>
+                            <div class="form-text small text-muted mt-1">Use session status to complete.</div>
+                          <% } %>
+                        <% } %>
+                      </td>
+                      <td class="ws-notes-col align-middle">
+                        <% if (rowEditable && !assignee.locked) { %>
+                          <textarea class="form-control form-control-sm ws-notes-input" id="notes_<%= rowKey %>" data-person-id="<%= assignee.personId %>" rows="2" maxlength="500" placeholder="Notes"><%= assignee.notes || '' %></textarea>
+                        <% } else { %>
+                          <span class="small text-muted"><%= assignee.notes || '—' %></span>
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                  <% if (!assigneeRows.length || visibleAssigneeIndex === 0) { %>
+                    <tr><td colspan="<%= (canEditWorkSessionMetadata && activityRow.paid) ? 7 : 6 %>" class="text-center py-4 text-muted">No assignees on this work session.</td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="workSessionAssigneeHiddenForms" class="d-none">
           <% assigneeRows.forEach((assignee, idx) => {
             const rowVisible = canManageAll || assignee.isSelf;
             if (!rowVisible && !canManageAll) return;
             const rowEditable = assignee.editable && (canManageAll || assignee.isSelf);
-            const statusClass = assignee.locked ? 'secondary' : (assignee.readyForTimesheet ? 'success' : 'warning');
-            const isAssigneeCompleted = String(assignee.completionStatus || '').toLowerCase() === 'completed';
-            const assigneeRole = String(assignee.role || 'participant').toLowerCase();
-            const assigneeRoles = Array.from(new Set((Array.isArray(assignee.roles) && assignee.roles.length ? assignee.roles : [assigneeRole])
-              .map((role) => normalizeRoleForView(role))
-              .filter(Boolean)));
-            if (!assigneeRoles.includes(assigneeRole)) assigneeRoles.unshift(assigneeRole);
             const rowKey = String(assignee.personId || ('row_' + idx)).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + String(idx);
           %>
-            <div
-              class="card border-0 shadow-sm work-session-assignee-form<%= assignee.locked ? ' is-locked' : '' %>"
-              data-person-id="<%= assignee.personId %>"
-              data-person-name="<%= assignee.personName || assignee.personId %>"
-              data-locked="<%= assignee.locked ? 'true' : 'false' %>"
-              data-role="<%= assigneeRole %>"
-              data-status="<%= String(assignee.status || 'attended').toLowerCase() %>"
-              data-paid="<%= assignee.paid !== false ? 'true' : 'false' %>"
-              data-notes="<%= assignee.notes || '' %>"
-              data-completion-status="<%= String(assignee.completionStatus || 'pending').toLowerCase() %>">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-                  <div>
-                    <h6 class="fw-bold mb-1"><%= assignee.personName || assignee.personId %></h6>
-                    <div class="small text-muted font-monospace"><%= assignee.personId %></div>
-                    <% if (assignee.locked) { %><span class="badge bg-secondary mt-2">Timesheet locked</span><% } %>
-                  </div>
-                  <div class="text-end">
-                    <span class="badge bg-<%= statusClass %>"><%= assignee.completionLabel %></span>
-                    <% if (isCompletion && isAssigneeCompleted && assignee.completedAt) { %>
-                      <div class="small text-muted mt-1"><%= assignee.completedAt.slice(0, 10) %></div>
-                    <% } %>
-                    <% if (canEditWorkSessionMetadata && !assignee.locked) { %>
-                      <button type="button" class="btn btn-outline-danger btn-sm mt-2 js-remove-work-assignee" data-person-id="<%= assignee.personId %>" title="Remove person">
-                        <i class="bi bi-trash"></i>
-                      </button>
-                    <% } %>
-                  </div>
-                </div>
-
-                <div class="row g-3 align-items-end">
-                  <div class="col-md-3">
-                    <label class="form-label" for="role_<%= rowKey %>">Role</label>
-                    <% if (canEditWorkSessionMetadata && rowEditable) { %>
-                      <select class="form-select ws-role-input" id="role_<%= rowKey %>" data-person-id="<%= assignee.personId %>" data-roles="<%= assigneeRoles.join(',') %>">
-                        <% assigneeRoles.forEach((role) => { %>
-                          <option value="<%= role %>" <%= role === assigneeRole ? 'selected' : '' %>><%= roleLabelForView(role) %></option>
-                        <% }) %>
-                      </select>
-                    <% } else { %>
-                      <div class="form-control-plaintext"><%= roleLabelForView(assignee.role || 'participant') %></div>
-                    <% } %>
-                  </div>
-                  <% if (canEditWorkSessionMetadata) { %>
-                    <div class="col-md-3">
-                      <label class="form-label" for="paid_<%= rowKey %>">Payable</label>
-                      <% if (rowEditable && !assignee.locked) { %>
-                        <div class="form-check form-switch mt-2">
-                          <input class="form-check-input ws-paid-input" type="checkbox" id="paid_<%= rowKey %>" data-person-id="<%= assignee.personId %>" <%= assignee.paid !== false ? 'checked' : '' %>>
-                          <label class="form-check-label" for="paid_<%= rowKey %>">Payable</label>
-                        </div>
-                      <% } else { %>
-                        <div class="form-control-plaintext"><%= assignee.paid !== false ? 'Yes' : 'No' %></div>
-                      <% } %>
-                    </div>
-                  <% } %>
-                  <div class="col-md-3">
-                    <label class="form-label">Hour</label>
-                    <div class="form-control-plaintext fw-semibold ws-derived-hours" data-person-id="<%= assignee.personId %>"><%= Number(entryRow.durationHours || 0).toFixed(2) %> h</div>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label">Status</label>
-                    <% if (!isCompletion && rowEditable) { %>
-                      <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Attendance status for <%= assignee.personName || assignee.personId %>">
-                        <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="attended_<%= rowKey %>" value="attended" <%= String(assignee.status || 'attended') === 'attended' ? 'checked' : '' %>>
-                        <label class="btn att-label" for="attended_<%= rowKey %>" title="Attended"><i class="bi bi-check-lg me-1"></i>Attended</label>
-                        <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="excused_<%= rowKey %>" value="excused" <%= String(assignee.status || '') === 'excused' ? 'checked' : '' %>>
-                        <label class="btn att-label" for="excused_<%= rowKey %>" title="Excused"><i class="bi bi-envelope-paper me-1"></i>Excused</label>
-                        <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="absent_<%= rowKey %>" value="absent" <%= String(assignee.status || '') === 'absent' ? 'checked' : '' %>>
-                        <label class="btn att-label" for="absent_<%= rowKey %>" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
-                      </div>
-                    <% } else if (isCompletion && canEditWorkSessionMetadata && rowEditable && !assignee.locked) { %>
-                      <select class="form-select ws-completion-status-input" id="completion_<%= rowKey %>" data-person-id="<%= assignee.personId %>">
-                        <option value="pending" <%= isAssigneeCompleted ? '' : 'selected' %>>Pending</option>
-                        <option value="completed" <%= isAssigneeCompleted ? 'selected' : '' %>>Completed</option>
-                      </select>
-                    <% } else { %>
-                      <div class="form-control-plaintext"><span class="badge bg-light text-dark border"><%= isCompletion ? (isAssigneeCompleted ? 'completed' : 'pending') : (assignee.status || 'pending') %></span></div>
-                    <% } %>
-                  </div>
-                </div>
-
-                <% if (activityRow.paid) { %>
-                  <input type="hidden" class="ws-paid-hours-input" id="paidHours_<%= rowKey %>" data-person-id="<%= assignee.personId %>" value="<%= Number(entryRow.durationHours || 0).toFixed(2) %>">
-                <% } %>
-
-                <div class="mb-3">
-                  <label class="form-label" for="notes_<%= rowKey %>">Notes</label>
-                  <% if (rowEditable) { %>
-                    <textarea class="form-control ws-notes-input" id="notes_<%= rowKey %>" data-person-id="<%= assignee.personId %>" rows="3" maxlength="500" placeholder="Add notes for this assignee"><%= assignee.notes || '' %></textarea>
-                  <% } else { %>
-                    <div class="form-control-plaintext"><%= assignee.notes || '-' %></div>
-                  <% } %>
-                </div>
-
-                <% if (isCompletion && rowEditable) { %>
-                  <% if (isAssigneeCompleted) { %>
-                    <form method="POST" action="<%= manageUrl %>/pending" class="mt-3 ws-assignee-pending-form" data-person-id="<%= assignee.personId %>">
-                      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
-                      <input type="hidden" name="personId" value="<%= assignee.personId %>">
-                      <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
-                      <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
-                      <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
-                      <button type="submit" class="btn btn-outline-warning btn-sm btn-ws-pending" data-person-id="<%= assignee.personId %>" data-person-name="<%= assignee.personName || assignee.personId %>">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i>Set back to pending
-                      </button>
-                    </form>
-                  <% } else { %>
-                    <div class="form-text small text-muted">Use the session status button to complete this assignee.</div>
-                  <% } %>
-                <% } %>
-
-                <% if (rowEditable) { %>
-                  <form method="POST" action="<%= manageUrl %>/save" class="d-none ws-assignee-save-form" data-person-id="<%= assignee.personId %>">
-                    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
-                    <input type="hidden" name="personId" value="<%= assignee.personId %>">
-                    <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
-                    <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
-                    <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
-                  </form>
-                <% } %>
-              </div>
-            </div>
+            <% if (activityRow.paid) { %>
+              <input type="hidden" class="ws-paid-hours-input" id="paidHours_<%= rowKey %>" data-person-id="<%= assignee.personId %>" value="<%= Number(entryRow.durationHours || 0).toFixed(2) %>">
+            <% } %>
+            <% if (rowEditable) { %>
+              <form method="POST" action="<%= manageUrl %>/save" class="ws-assignee-save-form" data-person-id="<%= assignee.personId %>">
+                <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+                <input type="hidden" name="personId" value="<%= assignee.personId %>">
+                <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+              </form>
+            <% } %>
           <% }) %>
-          <% if (!assigneeRows.length) { %>
-            <div class="text-center text-muted py-4 border rounded bg-light">No assignees on this work session.</div>
-          <% } %>
         </div>
       </div>
     </main>
@@ -1117,13 +1166,109 @@
       return merged;
     }
 
-    function buildRoleOptions(roles, selectedRole) {
+    function buildRoleRadios(rowKey, personId, roles, selectedRole) {
+      const safePersonId = escapeHtml(personId);
       const normalizedRoles = normalizeRoleList(roles);
       const selected = pickDefaultRole(normalizedRoles, selectedRole);
       const options = normalizedRoles.includes(selected) ? normalizedRoles : [selected].concat(normalizedRoles);
       return options.map((role) => {
-        return '<option value="' + escapeHtml(role) + '"' + (role === selected ? ' selected' : '') + '>' + escapeHtml(roleLabel(role)) + '</option>';
+        const safeRole = escapeHtml(role);
+        const inputId = 'role_' + rowKey + '_' + safeRole;
+        return [
+          '<input type="radio" class="btn-check ws-role-radio" id="' + inputId + '" name="role_' + rowKey + '" value="' + safeRole + '" data-person-id="' + safePersonId + '"' + (role === selected ? ' checked' : '') + '>',
+          '<label class="btn ws-role-label" for="' + inputId + '">' + escapeHtml(roleLabel(role)) + '</label>'
+        ].join('');
       }).join('');
+    }
+
+    function buildCompletionRadios(rowKey, personId, selected) {
+      const safePersonId = escapeHtml(personId);
+      const normalized = String(selected || 'pending').toLowerCase() === 'completed' ? 'completed' : 'pending';
+      return [
+        '<input type="radio" class="btn-check ws-completion-radio" data-person-id="' + safePersonId + '" name="completion_' + rowKey + '" id="pending_' + rowKey + '" value="pending"' + (normalized === 'pending' ? ' checked' : '') + '>',
+        '<label class="btn ws-completion-label" for="pending_' + rowKey + '">Pending</label>',
+        '<input type="radio" class="btn-check ws-completion-radio" data-person-id="' + safePersonId + '" name="completion_' + rowKey + '" id="completed_' + rowKey + '" value="completed"' + (normalized === 'completed' ? ' checked' : '') + '>',
+        '<label class="btn ws-completion-label" for="completed_' + rowKey + '">Completed</label>'
+      ].join('');
+    }
+
+    function buildAssigneeInfoTitleFromRow(row) {
+      if (!row) return '';
+      const parts = [];
+      const completion = String(row.getAttribute('data-completion-status') || 'pending').toLowerCase();
+      const status = String(row.getAttribute('data-status') || 'attended').toLowerCase();
+      const locked = row.getAttribute('data-locked') === 'true';
+      const completedAt = String(row.getAttribute('data-completed-at') || '').trim();
+      const readyForTimesheet = row.getAttribute('data-ready-for-timesheet') === 'true';
+      if (isCompletionMode) {
+        parts.push(completion === 'completed' ? 'Completed' : 'Pending');
+        if (completion === 'completed' && completedAt) {
+          parts.push('Completed ' + completedAt.slice(0, 10));
+        }
+      } else if (status === 'attended') {
+        parts.push('Attendance recorded');
+      } else if (status) {
+        parts.push('Attendance: ' + status);
+      } else {
+        parts.push('Pending attendance');
+      }
+      if (locked) parts.push('Timesheet locked');
+      if (readyForTimesheet) parts.push('Ready for timesheet');
+      return parts.filter(Boolean).join(' · ');
+    }
+
+    function initAssigneeInfoTooltips(root) {
+      if (!window.bootstrap || typeof window.bootstrap.Tooltip !== 'function') return;
+      const scope = root || document;
+      scope.querySelectorAll('.ws-assignee-info-btn[data-bs-toggle="tooltip"]').forEach((icon) => {
+        const existing = window.bootstrap.Tooltip.getInstance(icon);
+        if (existing) existing.dispose();
+        new window.bootstrap.Tooltip(icon);
+      });
+    }
+
+    function refreshAssigneeRowInfoIcons() {
+      document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row').forEach((row) => {
+        const icon = row.querySelector('.ws-assignee-info-btn');
+        if (!icon) return;
+        const title = buildAssigneeInfoTitleFromRow(row);
+        icon.setAttribute('title', title);
+        icon.setAttribute('aria-label', title);
+        icon.setAttribute('data-bs-original-title', title);
+      });
+      initAssigneeInfoTooltips(document.getElementById('workSessionAssigneeTableBody'));
+    }
+
+    function refreshAssigneeRowNumbers() {
+      document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row').forEach((row, index) => {
+        const num = row.querySelector('.attendance-order-num');
+        if (num) num.textContent = String(index + 1);
+      });
+      refreshAssigneeRowInfoIcons();
+    }
+
+    function clearAssigneeEmptyState() {
+      const tbody = document.getElementById('workSessionAssigneeTableBody');
+      if (!tbody) return;
+      const emptyRow = tbody.querySelector('tr:not(.roster-row)');
+      if (emptyRow) emptyRow.remove();
+    }
+
+    function ensureAssigneeEmptyState() {
+      const tbody = document.getElementById('workSessionAssigneeTableBody');
+      if (!tbody) return;
+      if (tbody.querySelectorAll('tr.roster-row').length) return;
+      const colSpan = (canManageAllWorkSession && activityPaid) ? 7 : 6;
+      tbody.innerHTML = '<tr><td colspan="' + colSpan + '" class="text-center py-4 text-muted">No assignees on this work session.</td></tr>';
+    }
+
+    function applyBulkWsAttendance(value) {
+      document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row:not(.is-locked) input.ws-att-radio').forEach((radio) => {
+        if (radio.disabled || radio.value !== value) return;
+        radio.checked = true;
+        const personId = radio.getAttribute('data-person-id');
+        if (personId) syncRowFields(personId);
+      });
     }
 
     function currentDerivedHours() {
@@ -1202,13 +1347,14 @@
           if (!personId) return null;
           const safePersonId = escapeSelectorValue(personId);
           const personSelector = '[data-person-id="' + safePersonId + '"]';
-          const roleInput = row.querySelector('.ws-role-input' + personSelector);
+          const roleGroup = row.querySelector('.ws-role-radio-group');
+          const roleRadio = row.querySelector('.ws-role-radio' + personSelector + ':checked');
           const statusInput = row.querySelector('input.ws-att-radio' + personSelector + ':checked');
-          const completionInput = row.querySelector('.ws-completion-status-input' + personSelector);
+          const completionRadio = row.querySelector('.ws-completion-radio' + personSelector + ':checked');
           const paidInput = row.querySelector('.ws-paid-input' + personSelector);
           const notesInput = row.querySelector('.ws-notes-input' + personSelector);
-          const roleList = normalizeRoleList(roleInput?.getAttribute('data-roles') || row.getAttribute('data-roles') || row.getAttribute('data-role') || 'participant');
-          const role = pickDefaultRole(roleList, roleInput?.value || row.getAttribute('data-role') || 'participant');
+          const roleList = normalizeRoleList(roleGroup?.getAttribute('data-roles') || row.getAttribute('data-roles') || row.getAttribute('data-role') || 'participant');
+          const role = pickDefaultRole(roleList, roleRadio?.value || row.getAttribute('data-role') || 'participant');
           const paidFallback = String(row.getAttribute('data-paid') || 'true').toLowerCase() !== 'false';
           return {
             personId,
@@ -1219,7 +1365,7 @@
             paid: paidInput ? paidInput.checked : paidFallback,
             paidHours: Number(hours.toFixed(2)),
             notes: notesInput ? notesInput.value : (row.getAttribute('data-notes') || ''),
-            completionStatus: completionInput ? completionInput.value : row.getAttribute('data-completion-status') || 'pending'
+            completionStatus: completionRadio ? completionRadio.value : (row.getAttribute('data-completion-status') || 'pending')
           };
         })
         .filter(Boolean);
@@ -1234,47 +1380,60 @@
       return { personId, personName, role, roles: roles.length ? roles : [role] };
     }
 
-    function buildAdminAssigneeCard(person) {
+    function buildAdminAssigneeRow(person) {
       const safePersonId = escapeHtml(person.personId);
       const safePersonName = escapeHtml(person.personName || person.personId);
       const safeRole = escapeHtml(person.role || 'participant');
       const roleList = normalizeRoleList(person.roles || person.role || 'participant');
       const safeRoleList = escapeHtml(roleList.join(','));
-      const roleOptions = buildRoleOptions(roleList, person.role);
       const rowKey = 'dynamic_' + (++dynamicAssigneeIndex);
       const hours = currentDerivedHours().toFixed(2);
-      const attendanceControls = isCompletionMode ? [
-        '<select class="form-select ws-completion-status-input" id="completion_' + rowKey + '" data-person-id="' + safePersonId + '">',
-        '<option value="pending" selected>Pending</option>',
-        '<option value="completed">Completed</option>',
-        '</select>'
-      ].join('') : [
-        '<div class="btn-group btn-group-sm flex-wrap" role="group">',
-        '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="attended_' + rowKey + '" value="attended" checked>',
-        '<label class="btn att-label" for="attended_' + rowKey + '"><i class="bi bi-check-lg me-1"></i>Attended</label>',
-        '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="excused_' + rowKey + '" value="excused">',
-        '<label class="btn att-label" for="excused_' + rowKey + '"><i class="bi bi-envelope-paper me-1"></i>Excused</label>',
-        '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="absent_' + rowKey + '" value="absent">',
-        '<label class="btn att-label" for="absent_' + rowKey + '"><i class="bi bi-x-lg me-1"></i>Absent</label>',
-        '</div>'
-      ].join('');
+      const roleRadios = buildRoleRadios(rowKey, person.personId, roleList, person.role);
+      const statusControls = isCompletionMode
+        ? '<div class="btn-group-vertical btn-group-sm ws-completion-radio-group" role="group">' + buildCompletionRadios(rowKey, person.personId, 'pending') + '</div>'
+        : [
+          '<div class="btn-group btn-group-sm flex-wrap" role="group">',
+          '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="attended_' + rowKey + '" value="attended" checked>',
+          '<label class="btn att-label" for="attended_' + rowKey + '"><i class="bi bi-check-lg me-1"></i>Attended</label>',
+          '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="excused_' + rowKey + '" value="excused">',
+          '<label class="btn att-label" for="excused_' + rowKey + '"><i class="bi bi-envelope-paper me-1"></i>Excused</label>',
+          '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="absent_' + rowKey + '" value="absent">',
+          '<label class="btn att-label" for="absent_' + rowKey + '"><i class="bi bi-x-lg me-1"></i>Absent</label>',
+          '</div>'
+        ].join('');
+      const payableCell = (canManageAllWorkSession && activityPaid)
+        ? '<td class="align-middle ws-payable-col"><div class="form-check form-switch mb-0 d-inline-flex justify-content-center"><input class="form-check-input ws-paid-input" type="checkbox" id="paid_' + rowKey + '" data-person-id="' + safePersonId + '" aria-label="Payable for ' + safePersonName + '"' + (activityPaid ? ' checked' : '') + '></div></td>'
+        : '';
+      const paidHoursHidden = activityPaid
+        ? '<input type="hidden" class="ws-paid-hours-input" id="paidHours_' + rowKey + '" data-person-id="' + safePersonId + '" value="' + hours + '">'
+        : '';
+      if (paidHoursHidden) {
+        const hiddenContainer = document.getElementById('workSessionAssigneeHiddenForms');
+        if (hiddenContainer) hiddenContainer.insertAdjacentHTML('beforeend', paidHoursHidden);
+      }
       return [
-        '<div class="card border-0 shadow-sm work-session-assignee-form" data-person-id="' + safePersonId + '" data-person-name="' + safePersonName + '" data-locked="false" data-role="' + safeRole + '" data-roles="' + safeRoleList + '" data-status="attended" data-paid="' + (activityPaid ? 'true' : 'false') + '" data-notes="" data-completion-status="pending">',
-        '<div class="card-body">',
-        '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">',
-        '<div><h6 class="fw-bold mb-1">' + safePersonName + '</h6><div class="small text-muted font-monospace">' + safePersonId + '</div></div>',
-        '<div class="text-end"><span class="badge bg-warning">Pending</span><button type="button" class="btn btn-outline-danger btn-sm mt-2 js-remove-work-assignee" data-person-id="' + safePersonId + '" title="Remove person"><i class="bi bi-trash"></i></button></div>',
+        '<tr class="roster-row work-session-assignee-form" data-personid="' + safePersonId + '" data-person-id="' + safePersonId + '" data-person-name="' + safePersonName + '" data-locked="false" data-role="' + safeRole + '" data-roles="' + safeRoleList + '" data-status="attended" data-paid="' + (activityPaid ? 'true' : 'false') + '" data-notes="" data-completion-status="pending" data-completed-at="" data-ready-for-timesheet="false">',
+        '<td class="attendance-order-cell text-muted small ps-3 align-middle">',
+        '<div class="attendance-order-stack">',
+        '<div class="attendance-order-head">',
+        '<span class="attendance-order-num"></span>',
+        '<button type="button" class="btn btn-link btn-sm p-0 ws-assignee-info-btn" data-bs-toggle="tooltip" data-bs-placement="right" title="' + escapeHtml(isCompletionMode ? 'Pending' : 'Attendance recorded') + '" aria-label="' + escapeHtml(isCompletionMode ? 'Pending' : 'Attendance recorded') + '"><i class="bi bi-info-circle text-primary"></i></button>',
         '</div>',
-        '<div class="row g-3 align-items-end">',
-        '<div class="col-md-3"><label class="form-label" for="role_' + rowKey + '">Role</label><select class="form-select ws-role-input" id="role_' + rowKey + '" data-person-id="' + safePersonId + '" data-roles="' + safeRoleList + '">' + roleOptions + '</select></div>',
-        '<div class="col-md-3"><label class="form-label" for="paid_' + rowKey + '">Payable</label><div class="form-check form-switch mt-2"><input class="form-check-input ws-paid-input" type="checkbox" id="paid_' + rowKey + '" data-person-id="' + safePersonId + '"' + (activityPaid ? ' checked' : '') + '><label class="form-check-label" for="paid_' + rowKey + '">Payable</label></div></div>',
-        '<div class="col-md-3"><label class="form-label">Hour</label><div class="form-control-plaintext fw-semibold ws-derived-hours" data-person-id="' + safePersonId + '">' + hours + ' h</div></div>',
-        '<div class="col-md-3"><label class="form-label">Status</label>' + attendanceControls + '</div>',
+        '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 js-remove-work-assignee" data-person-id="' + safePersonId + '" title="Remove person"><i class="bi bi-trash"></i></button>',
         '</div>',
-        activityPaid ? '<input type="hidden" class="ws-paid-hours-input" data-person-id="' + safePersonId + '" value="' + hours + '">' : '',
-        '<div class="mb-3"><label class="form-label" for="notes_' + rowKey + '">Notes</label><textarea class="form-control ws-notes-input" id="notes_' + rowKey + '" data-person-id="' + safePersonId + '" rows="3" maxlength="500" placeholder="Add notes for this assignee"></textarea></div>',
+        '</td>',
+        '<td class="ps-2 align-middle ws-person-col">',
+        '<div class="ws-person-name-line">',
+        '<span class="ws-person-name">' + safePersonName + '</span>',
+        '<span class="ws-person-id">' + safePersonId + '</span>',
         '</div>',
-        '</div>'
+        '</td>',
+        '<td class="ws-role-col align-middle"><div class="btn-group-vertical btn-group-sm ws-role-radio-group" role="group" data-roles="' + safeRoleList + '">' + roleRadios + '</div></td>',
+        payableCell,
+        '<td class="text-end align-middle"><span class="fw-semibold ws-derived-hours" data-person-id="' + safePersonId + '">' + hours + ' h</span></td>',
+        '<td class="ws-status-col align-middle pe-2">' + statusControls + '</td>',
+        '<td class="ws-notes-col align-middle"><textarea class="form-control form-control-sm ws-notes-input" id="notes_' + rowKey + '" data-person-id="' + safePersonId + '" rows="2" maxlength="500" placeholder="Notes"></textarea></td>',
+        '</tr>'
       ].join('');
     }
 
@@ -1357,12 +1516,44 @@
     });
     refreshDerivedHours();
 
+    document.getElementById('btnWsAllAttended')?.addEventListener('click', () => applyBulkWsAttendance('attended'));
+    document.getElementById('btnWsAllExcused')?.addEventListener('click', () => applyBulkWsAttendance('excused'));
+    document.getElementById('btnWsAllAbsent')?.addEventListener('click', () => applyBulkWsAttendance('absent'));
+    document.getElementById('btnWsResetAttendance')?.addEventListener('click', () => applyBulkWsAttendance('attended'));
+
+    document.getElementById('workSessionAssigneeTableBody')?.addEventListener('change', function (event) {
+      const target = event.target;
+      if (!target || !target.classList) return;
+      const row = target.closest('.work-session-assignee-form');
+      if (!row) return;
+      const personId = target.getAttribute('data-person-id') || row.getAttribute('data-person-id');
+      if (target.classList.contains('ws-att-radio') && target.checked) {
+        row.setAttribute('data-status', target.value);
+        if (personId) syncRowFields(personId);
+      }
+      if (target.classList.contains('ws-completion-radio') && target.checked) {
+        row.setAttribute('data-completion-status', target.value);
+      }
+      if (target.classList.contains('ws-role-radio') && target.checked) {
+        row.setAttribute('data-role', target.value);
+      }
+      if (target.classList.contains('ws-notes-input') && personId) {
+        row.setAttribute('data-notes', target.value || '');
+        syncRowFields(personId);
+      }
+      if (target.classList.contains('ws-paid-input')) {
+        row.setAttribute('data-paid', target.checked ? 'true' : 'false');
+      }
+      refreshAssigneeRowInfoIcons();
+    });
+
     document.addEventListener('click', async function (event) {
       const removeButton = event.target.closest('.js-remove-work-assignee');
       if (!removeButton) return;
       event.preventDefault();
-      const card = removeButton.closest('.work-session-assignee-form');
-      const personName = card?.getAttribute('data-person-name') || 'this person';
+      const row = removeButton.closest('.work-session-assignee-form');
+      const personName = row?.getAttribute('data-person-name') || 'this person';
+      const personId = row?.getAttribute('data-person-id') || '';
       const confirmed = await showUiConfirm({
         title: 'Remove Person',
         icon: 'warning',
@@ -1371,7 +1562,13 @@
         okClass: 'btn-danger',
         message: 'Remove ' + personName + ' from this work session?'
       });
-      if (confirmed) card?.remove();
+      if (!confirmed) return;
+      if (personId) {
+        document.querySelectorAll('.ws-paid-hours-input[data-person-id="' + escapeSelectorValue(personId) + '"]').forEach((node) => node.remove());
+      }
+      row?.remove();
+      refreshAssigneeRowNumbers();
+      ensureAssigneeEmptyState();
     });
 
     const addAssigneeButton = document.getElementById('btnAddWorkSessionAssignee');
@@ -1381,8 +1578,8 @@
           await showUiMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Person picker is not available on this page.' });
           return;
         }
-        const container = document.getElementById('workSessionAssigneeForms');
-        const assignedIds = new Set(Array.from(container?.querySelectorAll('.work-session-assignee-form[data-person-id]') || [])
+        const tbody = document.getElementById('workSessionAssigneeTableBody');
+        const assignedIds = new Set(Array.from(tbody?.querySelectorAll('.work-session-assignee-form[data-person-id]') || [])
           .map((row) => String(row.getAttribute('data-person-id') || '').trim())
           .filter(Boolean));
         const pickerItems = eligibleAssigneePersons.filter(function (person) {
@@ -1411,14 +1608,16 @@
           limit: 5000,
           onSelect: function (items) {
             const selectedRows = Array.isArray(items) ? items : [items];
-            if (!container) return;
+            if (!tbody) return;
             selectedRows.forEach((item) => {
               const person = normalizePickerPerson(item);
               if (!person) return;
-              const exists = container.querySelector('.work-session-assignee-form[data-person-id="' + escapeSelectorValue(person.personId) + '"]');
+              const exists = tbody.querySelector('.work-session-assignee-form[data-person-id="' + escapeSelectorValue(person.personId) + '"]');
               if (exists) return;
-              container.insertAdjacentHTML('beforeend', buildAdminAssigneeCard(person));
+              clearAssigneeEmptyState();
+              tbody.insertAdjacentHTML('beforeend', buildAdminAssigneeRow(person));
             });
+            refreshAssigneeRowNumbers();
             refreshDerivedHours();
           }
         }));
@@ -1558,5 +1757,7 @@
         else window.location.href = fallbackCloseHref;
       });
     }
+
+    initAssigneeInfoTooltips(document.getElementById('workSessionAssigneeTableBody'));
   })();
 </script>

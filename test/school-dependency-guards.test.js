@@ -66,6 +66,103 @@ test('timesheet model reads legacy approved records as submitted manager-approve
   assert.equal(payload.lockedSourceRefs[0].sessionId, 'SES_1');
 });
 
+test('findTimesheetsReferencingSource matches submitted and processed activity refs', async () => {
+  const schoolDependencyService = require('../packages/school/MVC/services/school/schoolDependencyService');
+  const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+  const originalFetch = schoolDataService.fetchAllData;
+
+  schoolDataService.fetchAllData = async (type) => {
+    if (type === 'timesheets') {
+      return [
+        {
+          id: 'TS_SUBMITTED',
+          orgId: '900000',
+          periodId: 'TSP_1',
+          teacherId: 'P_100',
+          status: 'submitted',
+          submissionSnapshot: {
+            entries: [{ sessionId: 'act-ACT_9-ENTRY-1-P_100', hours: 1.5, activityId: 'ACT_9' }]
+          }
+        },
+        {
+          id: 'TS_PROCESSED',
+          orgId: '900000',
+          periodId: 'TSP_2',
+          teacherId: 'P_200',
+          status: 'processed',
+          submissionSnapshot: {
+            entries: [{ sessionId: 'act-ACT_9-ENTRY-2-P_200', hours: 2, activityId: 'ACT_9' }]
+          }
+        },
+        {
+          id: 'TS_DRAFT',
+          orgId: '900000',
+          periodId: 'TSP_3',
+          teacherId: 'P_300',
+          status: 'draft',
+          entries: [{ sessionId: 'act-ACT_9-ENTRY-3-P_300', hours: 1, activityId: 'ACT_9' }]
+        }
+      ];
+    }
+    if (type === 'timesheetPeriods') {
+      return [
+        { id: 'TSP_1', name: 'July 2026' },
+        { id: 'TSP_2', name: 'August 2026' }
+      ];
+    }
+    return [];
+  };
+
+  try {
+    const submittedMatches = await schoolDependencyService.findTimesheetsReferencingSource({
+      orgId: '900000',
+      sourceType: 'activity',
+      sourceRef: { activityId: 'ACT_9', activityEntryId: 'ENTRY-1', personId: 'P_100' },
+      minStatus: 'submitted',
+      reqUser: { id: 'U1' }
+    });
+    assert.equal(submittedMatches.length, 1);
+    assert.equal(submittedMatches[0].id, 'TS_SUBMITTED');
+
+    const processedMatches = await schoolDependencyService.findTimesheetsReferencingSource({
+      orgId: '900000',
+      sourceType: 'activity',
+      sourceRef: { activityId: 'ACT_9', activityEntryId: 'ENTRY-2', personId: 'P_200' },
+      minStatus: 'submitted',
+      reqUser: { id: 'U1' }
+    });
+    assert.equal(processedMatches.length, 1);
+    assert.equal(processedMatches[0].id, 'TS_PROCESSED');
+
+    const draftMatches = await schoolDependencyService.findTimesheetsReferencingSource({
+      orgId: '900000',
+      sourceType: 'activity',
+      sourceRef: { activityId: 'ACT_9', activityEntryId: 'ENTRY-3', personId: 'P_300' },
+      minStatus: 'submitted',
+      reqUser: { id: 'U1' }
+    });
+    assert.equal(draftMatches.length, 0);
+  } finally {
+    schoolDataService.fetchAllData = originalFetch;
+  }
+});
+
+test('saveTimesheet locks all source refs on submission and keeps locks during reviewer edits', () => {
+  const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
+  const saveBlock = controller.slice(
+    controller.indexOf('exports.saveTimesheet'),
+    controller.indexOf('exports.getPriorAdjustments')
+  );
+  const reviewerEditBlock = saveBlock.slice(
+    saveBlock.indexOf('if (reviewerEdit && isManagerApproved(existing))'),
+    saveBlock.indexOf('if (reviewerEdit) {', saveBlock.indexOf('if (reviewerEdit && isManagerApproved(existing))') + 1)
+  );
+
+  assert.match(saveBlock, /nextStatus === 'submitted'/);
+  assert.match(saveBlock, /lockSourcesForApprovedTimesheet/);
+  assert.doesNotMatch(reviewerEditBlock, /unlockSourcesForTimesheet/);
+});
+
 test('timesheet routes expose manager approval, return compatibility, and finance processing endpoints', () => {
   const source = read('packages/school/MVC/routes/timesheetRoutes.js');
   assert.match(source, /approveTimesheet/);

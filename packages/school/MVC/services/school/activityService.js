@@ -26,6 +26,15 @@ function isAssigneeTimesheetLocked(assignee = {}) {
   return false;
 }
 
+function isWorkSessionAssigneeLocked(entry = {}, assignee = {}) {
+  if (isAssigneeTimesheetLocked(assignee)) return true;
+  if (schoolDependencyService.isActivityEntryTimesheetLocked(entry)) {
+    const reason = String(entry?.lockReason || '').trim();
+    if (reason === 'timesheet_approved' || normalizeId(entry?.lockedTimesheetId)) return true;
+  }
+  return false;
+}
+
 function activityHasLockedAssigneeRows(activity = {}) {
   const entries = Array.isArray(activity.entries) ? activity.entries : [];
   for (const entry of entries) {
@@ -245,13 +254,27 @@ function normalizeActivityAssigneeRows(rows = []) {
     .filter(Boolean);
 }
 
+function copyTimesheetLockFields(source = {}, target = {}) {
+  if (source?.locked === true || String(source?.locked) === 'true') {
+    target.locked = true;
+    if (source.lockedAt) target.lockedAt = source.lockedAt;
+    if (source.lockedBy) target.lockedBy = source.lockedBy;
+    if (source.lockReason) target.lockReason = source.lockReason;
+    if (source.lockedTimesheetId) target.lockedTimesheetId = source.lockedTimesheetId;
+    if (source.unlockedAt) target.unlockedAt = source.unlockedAt;
+    if (source.unlockedBy) target.unlockedBy = source.unlockedBy;
+    if (source.forceUnlockReason) target.forceUnlockReason = source.forceUnlockReason;
+  }
+  return target;
+}
+
 function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
   const assignees = normalizeActivityAssigneeRows(parseJsonArray(entry.assignees));
   const fallbackAssignees = normalizeActivityAssigneeRows(parseJsonArray(entry.attendees));
   const startTime = normalizeId(entry.startTime || activity.startTime);
   const endTime = normalizeId(entry.endTime || activity.endTime);
   const durationHours = Number(entry.durationHours || calculateDurationHours(startTime, endTime) || 0);
-  return {
+  return copyTimesheetLockFields(entry, {
     entryId: normalizeId(entry.entryId || entry.id || `ENTRY-${index + 1}`),
     title: normalizeId(entry.title),
     date: normalizeId(entry.date || entry.activityDate || entry.startDate || activity.date || activity.activityDate || activity.startDate),
@@ -265,7 +288,7 @@ function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
     assignees: assignees.length
       ? assignees
       : (fallbackAssignees.length ? fallbackAssignees : normalizeActivityAssigneeRows(parseJsonArray(activity.attendees)))
-  };
+  });
 }
 
 function getActivityEntries(activity = {}) {
@@ -651,6 +674,35 @@ async function saveActivityCategory(payload = {}, reqUser) {
   }
   return schoolDataService.addData('activityCategories', data, reqUser);
 }
+function buildEligiblePersonSearchHaystack({ person = {}, row = {}, role = '', displayName = '' } = {}) {
+  const personId = normalizeId(person.id || person.personId || row.personId);
+  const firstName = normalizeId(person.firstName || person.name?.first);
+  const lastName = normalizeId(person.lastName || person.name?.last);
+  const preferredName = normalizeId(person.preferredName || person.name?.preferred);
+  const personName = normalizeId(row.personName || person.personName || person.displayName);
+  const fullLegalName = [firstName, lastName].filter(Boolean).join(' ');
+  return [
+    personId,
+    displayName,
+    personName,
+    preferredName,
+    firstName,
+    lastName,
+    fullLegalName,
+    role,
+    row.id
+  ].join(' ').toLowerCase();
+}
+
+function matchesEligiblePersonQuery(haystack = '', query = '') {
+  const normalizedHaystack = String(haystack || '').trim().toLowerCase();
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  if (normalizedHaystack.includes(normalizedQuery)) return true;
+  const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  return tokens.length > 0 && tokens.every((token) => normalizedHaystack.includes(token));
+}
+
 async function getEligiblePersons({ orgId, reqUser, q = '' } = {}) {
   const [personPayload, students, teachers, staff] = await Promise.all([
     schoolIdentityLookupService.listSchoolPersons({
@@ -672,8 +724,8 @@ async function getEligiblePersons({ orgId, reqUser, q = '' } = {}) {
     if (!personId) return;
     const person = personMap.get(personId) || {};
     const displayName = formatPersonName(person, row.personName || personId);
-    const haystack = [personId, displayName, role, row.id].join(' ').toLowerCase();
-    if (query && !haystack.includes(query)) return;
+    const haystack = buildEligiblePersonSearchHaystack({ person, row, role, displayName });
+    if (!matchesEligiblePersonQuery(haystack, query)) return;
     const existing = outputByPerson.get(personId);
     const roles = new Set([...(existing?.roles || []), role]);
     outputByPerson.set(personId, {
@@ -736,7 +788,7 @@ async function getScheduleEventsForPerson({ orgId, personId, startDate, endDate,
             evaluationType,
             completionStatus: normalizeCompletionStatus(attendee),
             completionScan,
-            roles: [attendee.role || 'Participant'],
+            roles: [resolveActivityEntryPersonRole(attendee) || attendee.role || 'participant'],
             roleLabel: activity.paid === true && attendee.paid !== false ? 'Paid Activity' : 'Activity',
             detailsUrl: `/school/activities/${encodeURIComponent(activity.id)}/work-sessions/${encodeURIComponent(entry.entryId)}/manage`,
             hasOverlap: false,
@@ -1063,6 +1115,8 @@ module.exports = {
   saveActivity,
   saveActivityCategory,
   getEligiblePersons,
+  buildEligiblePersonSearchHaystack,
+  matchesEligiblePersonQuery,
   getActivityEntries,
   normalizeActivityVisibilityScope,
   getEffectiveActivityAllowedIds,
@@ -1083,6 +1137,7 @@ module.exports = {
   normalizeEvaluationType,
   normalizeCompletionStatus,
   isAssigneeTimesheetLocked,
+  isWorkSessionAssigneeLocked,
   activityHasLockedAssigneeRows,
   isAssigneeEligibleForTimesheet,
   enforceActivityLockRules,

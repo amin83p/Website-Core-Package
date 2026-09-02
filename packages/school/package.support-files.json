@@ -107,6 +107,13 @@
             "category": "maintenance",
             "status": "root-active",
             "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "scripts/mongo-railway/insert-school-work-sessions-section.mongosh.js",
+            "target": "packages/school/scripts/maintenance/insert-school-work-sessions-section.mongosh.js",
+            "category": "maintenance",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
         }
     ],
     "docs": [

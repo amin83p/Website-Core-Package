@@ -1,6 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const schoolRecordAccessService = require('./schoolRecordAccessService');
 const activityService = require('./activityService');
+const schoolDependencyService = require('./schoolDependencyService');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -75,14 +76,26 @@ function normalizeAssigneeRows(rows = []) {
 }
 
 function canManageAllActivityWorkSessions(reqUser, operationId = OPERATIONS.UPDATE) {
-  return schoolAdminAccessService.isActivitiesAdminViewer(reqUser, operationId);
+  return schoolAdminAccessService.isWorkSessionsAdminViewer(reqUser, operationId)
+    || schoolAdminAccessService.isActivitiesAdminViewer(reqUser, operationId);
 }
 
-function isAssigneeRowEditable({ assignee, reqUser, access, targetPersonId }) {
-  if (!assignee || activityService.isAssigneeTimesheetLocked(assignee)) return false;
+function isAssigneeRowEditable({ entry, assignee, reqUser, access, targetPersonId }) {
+  if (!assignee || activityService.isWorkSessionAssigneeLocked(entry || {}, assignee)) return false;
   if (canManageAllActivityWorkSessions(reqUser)) return true;
   const scopedPersonId = normalizeId(access?.personId || reqUser?.personId);
   return scopedPersonId && idsEqual(assignee.personId, targetPersonId || scopedPersonId);
+}
+
+async function assertAssigneeNotLockedBySubmittedTimesheet({ activity, entry, personId, reqUser } = {}) {
+  if (canManageAllActivityWorkSessions(reqUser)) return;
+  await schoolDependencyService.assertActivityAssigneeNotReferencedBySubmittedTimesheet({
+    orgId: normalizeId(activity?.orgId || reqUser?.activeOrgId || reqUser?.orgId),
+    activityId: normalizeId(activity?.id),
+    entryId: normalizeId(entry?.entryId || entry?.id),
+    personId: normalizeId(personId),
+    reqUser
+  });
 }
 
 function findEntry(activity = {}, entryId = '') {
@@ -132,9 +145,10 @@ function buildAssigneeCompletionLabel(activity, assignee) {
   return normalizeStatus(assignee.status) ? 'Attendance recorded' : 'Pending attendance';
 }
 
-function enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId } = {}) {
-  const locked = activityService.isAssigneeTimesheetLocked(assignee);
+function enrichAssigneeRow(activity, assignee, { entry, reqUser, access, scopedPersonId } = {}) {
+  const locked = activityService.isWorkSessionAssigneeLocked(entry || {}, assignee);
   const editable = isAssigneeRowEditable({
+    entry,
     assignee,
     reqUser,
     access,
@@ -176,7 +190,7 @@ function mapEntryToSessionSummary(activity, entry, index, { access, currentEntry
     role: assignee.role || 'participant',
     status: normalizeStatus(assignee.status, 'attended'),
     completionLabel: buildAssigneeCompletionLabel(activity, assignee),
-    locked: activityService.isAssigneeTimesheetLocked(assignee),
+    locked: activityService.isWorkSessionAssigneeLocked(entry, assignee),
     readyForTimesheet: activityService.isAssigneeEligibleForTimesheet(activity, assignee)
   }));
   const readyCount = assignees.filter((row) => row.readyForTimesheet).length;
@@ -314,7 +328,7 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
   );
   const assignees = normalizeAssigneeRows(entry.assignees)
     .map((assignee) => {
-      const enriched = enrichAssigneeRow(activity, assignee, { reqUser, access, scopedPersonId });
+      const enriched = enrichAssigneeRow(activity, assignee, { entry, reqUser, access, scopedPersonId });
       const personId = normalizeId(enriched.personId);
       const mergedRoles = mergeAssigneeRoleLists(
         enriched.roles || enriched.role,
@@ -509,14 +523,22 @@ async function saveAssigneeRow({
   const targetPersonId = normalizeId(personId || input.personId || context.scopedPersonId);
   const assignee = findAssignee(context.entry, targetPersonId);
   if (!assignee) throw new Error('Assignee not found on this work session.');
+  const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
   if (!isAssigneeRowEditable({
+    entry: context.entry,
     assignee,
     reqUser,
-    access: schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext),
+    access,
     targetPersonId
   })) {
     throw new Error('You cannot edit this assignee row.');
   }
+  await assertAssigneeNotLockedBySubmittedTimesheet({
+    activity: context.activity,
+    entry: context.entry,
+    personId: targetPersonId,
+    reqUser
+  });
   const durationHours = Number(context.entry.durationHours || 0);
   const evaluationType = context.evaluationType;
   const paid = input.paid === undefined
@@ -561,14 +583,22 @@ async function completeAssignee({
   const targetPersonId = normalizeId(personId || input.personId || context.scopedPersonId);
   const assignee = findAssignee(context.entry, targetPersonId);
   if (!assignee) throw new Error('Assignee not found on this work session.');
+  const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
   if (!isAssigneeRowEditable({
+    entry: context.entry,
     assignee,
     reqUser,
-    access: schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext),
+    access,
     targetPersonId
   })) {
     throw new Error('You cannot complete this assignee row.');
   }
+  await assertAssigneeNotLockedBySubmittedTimesheet({
+    activity: context.activity,
+    entry: context.entry,
+    personId: targetPersonId,
+    reqUser
+  });
   const durationHours = Number(context.entry.durationHours || 0);
   const paid = assignee.paid !== false || context.activity.paid === true;
   let status = normalizeStatus(input.status || assignee.status, '');
@@ -612,14 +642,22 @@ async function resetAssigneeCompletion({
   const targetPersonId = normalizeId(personId || input.personId || context.scopedPersonId);
   const assignee = findAssignee(context.entry, targetPersonId);
   if (!assignee) throw new Error('Assignee not found on this work session.');
+  const access = schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext);
   if (!isAssigneeRowEditable({
+    entry: context.entry,
     assignee,
     reqUser,
-    access: schoolRecordAccessService.resolveAccessFromUser(reqUser, accessContext),
+    access,
     targetPersonId
   })) {
     throw new Error('You cannot update this assignee row.');
   }
+  await assertAssigneeNotLockedBySubmittedTimesheet({
+    activity: context.activity,
+    entry: context.entry,
+    personId: targetPersonId,
+    reqUser
+  });
   const durationHours = Number(context.entry.durationHours || 0);
   const paidHours = input.paidHours === undefined || input.paidHours === ''
     ? Number(assignee.paidHours || durationHours || 0)
@@ -697,5 +735,9 @@ module.exports = {
   buildMutationPayload,
   countAccessiblePostedSessions,
   resolveWorkSessionManageTarget,
-  resolveWorkSessionManageTargetForRequest
+  resolveWorkSessionManageTargetForRequest,
+  listAccessiblePostedEntries,
+  enrichAssigneeRow,
+  buildEntryDisplayTitle,
+  canManageAllActivityWorkSessions
 };

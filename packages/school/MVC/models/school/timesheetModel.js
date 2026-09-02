@@ -300,6 +300,14 @@ function sanitizeSnapshotEntry(entry) {
         if (decisionBy) row.decisionBy = decisionBy;
         if (decisionByName) row.decisionByName = decisionByName;
         if (decisionNote) row.decisionNote = decisionNote;
+        const materializedAt = cleanString(entry.materializedAt, { max: 40, allowEmpty: true });
+        const materializedSessionId = cleanString(entry.materializedSessionId, { max: 80, allowEmpty: true });
+        const materializedFromTimesheetId = cleanString(entry.materializedFromTimesheetId, { max: 80, allowEmpty: true });
+        const materializedFromTimesheetEntryId = cleanString(entry.materializedFromTimesheetEntryId, { max: 80, allowEmpty: true });
+        if (materializedAt) row.materializedAt = materializedAt;
+        if (materializedSessionId) row.materializedSessionId = materializedSessionId;
+        if (materializedFromTimesheetId) row.materializedFromTimesheetId = materializedFromTimesheetId;
+        if (materializedFromTimesheetEntryId) row.materializedFromTimesheetEntryId = materializedFromTimesheetEntryId;
     }
     return applyPayrollFields(applyClassSessionDisplayFields(applyReconciliationEntryFields(row, entry), entry), entry);
 }

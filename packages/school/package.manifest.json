@@ -233,6 +233,9 @@
         },
         {
           "id": "555012"
+        },
+        {
+          "id": "555013"
         }
       ],
       "related": [],
@@ -1408,6 +1411,56 @@
       "mainDashboardDisplay": false,
       "navigatorSection": false,
       "homeURL": "/school/activities",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "555013",
+      "name": "SCHOOL_WORK_SESSIONS",
+      "category": "SCHOOL",
+      "description": "Browse and manage assigned work sessions across school activities.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/work-sessions",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -4770,6 +4823,18 @@
       "adoptExisting": true
     },
     {
+      "id": "SYM_SYSTEM_135",
+      "name": "SCHOOL_WORK_SESSIONS",
+      "type": "class",
+      "value": "bi bi-journal-check",
+      "tags": [
+        "SCHOOL_WORK_SESSIONS",
+        "555013"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
       "id": "SYM_SYSTEM_063",
       "name": "SCHOOL_CALENDAR",
       "type": "class",
@@ -6260,6 +6325,47 @@
         },
         {
           "sectionId": "555012",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "555013",
           "adminAccess": false,
           "operations": [
             {
@@ -7890,6 +7996,26 @@
             {
               "operationId": "OP1005",
               "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "555013",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_DEPT",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_DEPT",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,
               "maxFetchUploadVolumeKB": null

@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const ctrl = require('../controllers/school/timesheetController');
 const {
@@ -20,6 +21,31 @@ const timesheetEditorMutationActionState = {
   allowInactiveTokenFallback: true
 };
 
+const TIMESHEET_IMPORT_MAX_FILES = 20;
+const TIMESHEET_IMPORT_MAX_MB = 15;
+const timesheetImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: TIMESHEET_IMPORT_MAX_MB * 1024 * 1024,
+    files: TIMESHEET_IMPORT_MAX_FILES
+  },
+  fileFilter: (req, file, cb) => {
+    const name = String(file?.originalname || '').toLowerCase();
+    if (name.endsWith('.xlsx')) return cb(null, true);
+    return cb(new Error('Only .xlsx Excel files are supported for timesheet import.'));
+  }
+});
+
+function handleTimesheetImportUpload(req, res, next) {
+  timesheetImportUpload.array('files', TIMESHEET_IMPORT_MAX_FILES)(req, res, (error) => {
+    if (!error) return next();
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? `One or more files exceed the ${TIMESHEET_IMPORT_MAX_MB} MB upload limit.`
+      : (error.message || 'Timesheet import upload failed.');
+    return res.status(400).json({ status: 'error', message });
+  });
+}
+
 router.get('/manage',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL),
@@ -39,6 +65,12 @@ router.get('/manage/api/department-summary',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL),
   ctrl.getTimesheetDepartmentSummary);
+
+router.post('/manage/api/import/compile',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL, { keepActive: true }),
+  handleTimesheetImportUpload,
+  ctrl.compileTimesheetExcelImports);
 
 router.post('/manage/print',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.EXPORT),

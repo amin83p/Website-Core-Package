@@ -103,6 +103,14 @@ async function isActivitiesAdminViewerAsync(user, operationId = OPERATIONS.READ_
   return isAdminForRequestAsync(user, SECTIONS.SCHOOL_ACTIVITIES, operationId);
 }
 
+function isWorkSessionsAdminViewer(user, operationId = OPERATIONS.READ_ALL) {
+  return isAdminForRequest(user, SECTIONS.SCHOOL_WORK_SESSIONS, operationId);
+}
+
+async function isWorkSessionsAdminViewerAsync(user, operationId = OPERATIONS.READ_ALL) {
+  return isAdminForRequestAsync(user, SECTIONS.SCHOOL_WORK_SESSIONS, operationId);
+}
+
 function isSchedulesAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL);
 }
@@ -146,6 +154,8 @@ module.exports = {
   isTimesheetManagementAdminViewerAsync,
   isActivitiesAdminViewer,
   isActivitiesAdminViewerAsync,
+  isWorkSessionsAdminViewer,
+  isWorkSessionsAdminViewerAsync,
   isSchedulesAdminViewer,
   isCalendarAdminViewer,
   isExamsAdminViewer,

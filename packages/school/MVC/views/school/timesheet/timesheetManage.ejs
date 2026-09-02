@@ -32,6 +32,233 @@
     border-radius: 999px;
     display: inline-block;
   }
+
+  #timesheetImportReviewModal .modal-content {
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  #timesheetImportReviewModal .modal-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1rem 1.25rem;
+  }
+  #timesheetImportSetupModal .modal-content {
+    border-radius: 14px;
+  }
+
+  .ts-import-summary {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .ts-import-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: .75rem;
+  }
+  .ts-import-summary-item {
+    background: #f8fafc;
+    border: 1px solid #e8edf3;
+    border-radius: 10px;
+    padding: .65rem .8rem;
+    min-height: 4.5rem;
+  }
+  .ts-import-summary-item.ts-import-summary-item-wide {
+    grid-column: span 2;
+  }
+  @media (max-width: 640px) {
+    .ts-import-summary-item.ts-import-summary-item-wide {
+      grid-column: span 1;
+    }
+  }
+  .ts-import-summary-label {
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: .2rem;
+  }
+  .ts-import-summary-value {
+    font-size: .92rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .ts-import-summary-sub {
+    font-size: .78rem;
+    color: #64748b;
+    margin-top: .15rem;
+  }
+  .ts-import-file-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    margin-bottom: 1rem;
+    padding: .55rem .75rem;
+    background: #f1f5f9;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+  }
+  .ts-import-file-nav .file-name {
+    font-weight: 600;
+    color: #1e293b;
+    font-size: .9rem;
+  }
+  .ts-import-file-nav .file-counter {
+    font-size: .78rem;
+    color: #64748b;
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+  }
+  .ts-import-match-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .78rem;
+    font-weight: 600;
+    padding: .2rem .55rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .ts-import-match-pill.exact {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+  }
+  .ts-import-match-pill.partial {
+    background: #fef9c3;
+    color: #854d0e;
+    border-color: #fde047;
+  }
+  .ts-import-match-pill.none {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fca5a5;
+  }
+  .ts-import-ledger-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .ts-import-ledger-table {
+    margin: 0;
+    font-size: .86rem;
+  }
+  .ts-import-ledger-table thead th {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    font-weight: 700;
+    border-bottom: 1px solid #dbe3ee;
+    white-space: nowrap;
+    padding: .65rem .75rem;
+  }
+  .ts-import-ledger-table tbody td {
+    vertical-align: middle;
+    border-color: #e8edf3;
+    padding: .55rem .75rem;
+  }
+  .ts-import-ledger-table tbody tr.ts-import-band-even > td {
+    background: #ffffff;
+  }
+  .ts-import-ledger-table tbody tr.ts-import-band-odd > td {
+    background: #f8fafc;
+  }
+  .ts-import-ledger-table tbody tr.ts-import-band-even > td.date-cell,
+  .ts-import-ledger-table tbody tr.ts-import-band-odd > td.date-cell,
+  .ts-import-ledger-table tbody tr.ts-import-band-even > td.day-cell,
+  .ts-import-ledger-table tbody tr.ts-import-band-odd > td.day-cell {
+    background: #eff6ff;
+    border-right: 1px solid #dbeafe;
+  }
+  .ts-import-ledger-table .date-cell {
+    font-weight: 700;
+    color: #1e3a8a;
+    min-width: 9.5rem;
+    line-height: 1.3;
+  }
+  .ts-import-ledger-table .date-cell .date-sub {
+    display: block;
+    font-size: .74rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: .1rem;
+  }
+  .ts-import-ledger-table .day-cell {
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+  }
+  .ts-import-ledger-table .class-cell {
+    font-weight: 600;
+    color: #0f172a;
+  }
+  .ts-import-ledger-table .hours-cell {
+    font-weight: 700;
+    color: #0f766e;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .ts-import-ledger-table .comment-cell {
+    color: #475569;
+    max-width: 240px;
+    white-space: pre-wrap;
+  }
+  .ts-import-ledger-table tr.ts-import-day-total > td {
+    border-top: 1px solid #cbd5e1;
+    font-weight: 700;
+  }
+  .ts-import-ledger-table tr.ts-import-day-total .day-total-label {
+    color: #475569;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .ts-import-ledger-table tr.ts-import-day-total .day-total-hours {
+    color: #0f766e;
+    font-variant-numeric: tabular-nums;
+  }
+  .ts-import-ledger-table tr.ts-import-day-gap > td {
+    padding: 0;
+    height: .35rem;
+    background: #e2e8f0 !important;
+    border: 0;
+  }
+  .ts-import-stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-top: .25rem;
+    padding: .7rem .85rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: .84rem;
+    color: #334155;
+  }
+  .ts-import-stats-bar strong {
+    color: #0f172a;
+  }
+  .ts-import-empty {
+    text-align: center;
+    color: #64748b;
+    padding: 2rem 1rem;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
 </style>
 
 <div class="d-flex align-items-end flex-wrap gap-3 mb-4 p-3 bg-light border rounded shadow-sm">
@@ -75,6 +302,9 @@
     <button type="button" id="btnClearRoster" class="btn btn-outline-secondary btn-md">
       <i class="bi bi-x-circle me-1"></i> Clear
     </button>
+    <button type="button" id="btnOpenTimesheetImport" class="btn btn-outline-primary btn-md">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i> Import Excel
+    </button>
   </div>
   <div id="periodMeta" class="small text-muted w-100">
     Pick a timesheet period, then load the active teacher/staff roster for your active organization.
@@ -115,6 +345,88 @@
         </tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<div class="modal fade" id="timesheetImportSetupModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius:14px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);border-bottom:1px solid #e2e8f0;">
+        <div>
+          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-spreadsheet me-2 text-primary"></i> Import Legacy Timesheets</h5>
+          <div class="small text-muted">Upload one or more Excel files for a selected teacher and year.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold small mb-1">Teacher / Staff</label>
+          <div class="input-group">
+            <input type="hidden" id="importTeacherId" value="">
+            <input type="text" id="importTeacherDisplay" class="form-control" placeholder="Select teacher or staff..." readonly>
+            <button type="button" id="btnPickImportTeacher" class="btn btn-primary"><i class="bi bi-search"></i></button>
+            <button type="button" id="btnClearImportTeacher" class="btn btn-outline-secondary" title="Clear teacher"><i class="bi bi-x-lg"></i></button>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="importYear" class="form-label fw-bold small mb-1">Year</label>
+          <select id="importYear" class="form-select"></select>
+        </div>
+        <div class="mb-2">
+          <label for="importExcelFiles" class="form-label fw-bold small mb-1">Excel Files</label>
+          <input type="file" id="importExcelFiles" class="form-control" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple>
+          <div class="form-text">Supported format: .xlsx (Equilibrium School legacy timesheet template).</div>
+        </div>
+        <ul id="importFileList" class="list-group list-group-flush small"></ul>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="btnCompileTimesheetImport" class="btn btn-primary">
+          <i class="bi bi-gear-wide-connected me-1"></i> Compile
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="timesheetImportReviewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div class="w-100">
+          <h5 class="modal-title fw-bold mb-0"><i class="bi bi-clipboard-data me-2 text-primary"></i> Import Compile Report</h5>
+          <div class="small text-muted mt-1">Review compiled legacy timesheet rows before import.</div>
+        </div>
+        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light-subtle" style="background:#f8fafc;">
+        <div id="importReviewSummary" class="ts-import-summary"></div>
+        <div id="importReviewFileNav" class="ts-import-file-nav d-none">
+          <div>
+            <div class="file-counter" id="importReviewFileIndicator"></div>
+            <div class="file-name" id="importReviewFileName"></div>
+          </div>
+          <div id="importReviewNavDots" class="d-flex gap-1"></div>
+        </div>
+        <div id="importReviewErrorPanel" class="alert alert-danger border-0 shadow-sm d-none">
+          <div class="fw-bold"><i class="bi bi-exclamation-octagon me-1"></i> Error</div>
+          <ul id="importReviewErrorList" class="mb-0 ps-3 mt-2"></ul>
+        </div>
+        <div id="importReviewWarningsPanel" class="alert alert-warning border-0 shadow-sm d-none">
+          <div class="fw-bold"><i class="bi bi-exclamation-triangle me-1"></i> Warnings</div>
+          <ul id="importReviewWarningsList" class="mb-0 ps-3 mt-2"></ul>
+        </div>
+        <div id="importReviewTableWrap"></div>
+        <div id="importReviewStats" class="ts-import-stats-bar d-none"></div>
+      </div>
+      <div class="modal-footer bg-white border-top d-flex justify-content-between">
+        <div class="btn-group">
+          <button type="button" id="importReviewPrevBtn" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i> Back</button>
+          <button type="button" id="importReviewNextBtn" class="btn btn-outline-secondary">Next <i class="bi bi-chevron-right"></i></button>
+        </div>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -310,6 +622,9 @@
               </a>
               <button type="button" class="btn btn-outline-secondary" data-summary-person="${escapeHtml(row.personId)}">
                 <i class="bi bi-diagram-3 me-1"></i> Summary
+              </button>
+              <button type="button" class="btn btn-outline-primary" data-import-person="${escapeHtml(row.personId)}" data-import-person-name="${escapeHtml(row.name || row.personId)}">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Import
               </button>
             </div>
           </td>
@@ -655,6 +970,14 @@
     if (periodSelect.value) loadRoster();
   });
   tbody?.addEventListener('click', (event) => {
+    const importBtn = event.target.closest('[data-import-person]');
+    if (importBtn) {
+      openImportSetupModal({
+        personId: importBtn.getAttribute('data-import-person'),
+        name: importBtn.getAttribute('data-import-person-name') || ''
+      });
+      return;
+    }
     const btn = event.target.closest('[data-summary-person]');
     if (!btn) return;
     loadSummary(btn.getAttribute('data-summary-person'));
@@ -680,6 +1003,444 @@
   });
   btnPrintSelected?.addEventListener('click', () => {
     void openSelectedTimesheetPrintPreview();
+  });
+
+  const importSetupModalEl = document.getElementById('timesheetImportSetupModal');
+  const importReviewModalEl = document.getElementById('timesheetImportReviewModal');
+  const btnOpenTimesheetImport = document.getElementById('btnOpenTimesheetImport');
+  const btnPickImportTeacher = document.getElementById('btnPickImportTeacher');
+  const btnClearImportTeacher = document.getElementById('btnClearImportTeacher');
+  const importTeacherId = document.getElementById('importTeacherId');
+  const importTeacherDisplay = document.getElementById('importTeacherDisplay');
+  const importYear = document.getElementById('importYear');
+  const importExcelFiles = document.getElementById('importExcelFiles');
+  const importFileList = document.getElementById('importFileList');
+  const btnCompileTimesheetImport = document.getElementById('btnCompileTimesheetImport');
+  const importReviewSummary = document.getElementById('importReviewSummary');
+  const importReviewFileNav = document.getElementById('importReviewFileNav');
+  const importReviewFileIndicator = document.getElementById('importReviewFileIndicator');
+  const importReviewFileName = document.getElementById('importReviewFileName');
+  const importReviewNavDots = document.getElementById('importReviewNavDots');
+  const importReviewErrorPanel = document.getElementById('importReviewErrorPanel');
+  const importReviewErrorList = document.getElementById('importReviewErrorList');
+  const importReviewWarningsPanel = document.getElementById('importReviewWarningsPanel');
+  const importReviewWarningsList = document.getElementById('importReviewWarningsList');
+  const importReviewTableWrap = document.getElementById('importReviewTableWrap');
+  const importReviewStats = document.getElementById('importReviewStats');
+  const importReviewPrevBtn = document.getElementById('importReviewPrevBtn');
+  const importReviewNextBtn = document.getElementById('importReviewNextBtn');
+
+  let importCompilePayload = null;
+  let importReviewIndex = 0;
+  let importCompileInProgress = false;
+
+  function ensureModalOnBody(modalEl) {
+    if (!modalEl) return null;
+    if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+    if (!window.bootstrap?.Modal) return null;
+    return window.bootstrap.Modal.getOrCreateInstance(modalEl);
+  }
+
+  function populateImportYearOptions() {
+    if (!importYear) return;
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let y = currentYear - 2; y <= currentYear + 2; y++) years.push(y);
+    importYear.innerHTML = years.map((year) => (
+      '<option value="' + year + '"' + (year === currentYear ? ' selected' : '') + '>' + year + '</option>'
+    )).join('');
+  }
+
+  function setImportTeacher(person) {
+    const id = String(person?.id || person?.personId || '').trim();
+    const name = String(person?.name || person?.displayName || person?.title || id).trim();
+    if (importTeacherId) importTeacherId.value = id;
+    if (importTeacherDisplay) importTeacherDisplay.value = name;
+  }
+
+  function clearImportTeacher() {
+    if (importTeacherId) importTeacherId.value = '';
+    if (importTeacherDisplay) importTeacherDisplay.value = '';
+  }
+
+  function renderImportFileList() {
+    if (!importFileList || !importExcelFiles) return;
+    const files = Array.from(importExcelFiles.files || []);
+    if (!files.length) {
+      importFileList.innerHTML = '<li class="list-group-item text-muted">No files selected.</li>';
+      return;
+    }
+    importFileList.innerHTML = files.map((file) => (
+      '<li class="list-group-item d-flex justify-content-between align-items-center">'
+      + '<span>' + escapeHtml(file.name) + '</span>'
+      + '<span class="badge bg-light text-dark border">' + escapeHtml(formatFileSize(file.size)) + '</span>'
+      + '</li>'
+    )).join('');
+  }
+
+  function formatFileSize(bytes) {
+    const size = Number(bytes || 0);
+    if (!Number.isFinite(size) || size <= 0) return '0 B';
+    if (size < 1024) return size + ' B';
+    if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
+    return (size / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function openImportSetupModal(prefillPerson) {
+    populateImportYearOptions();
+    if (prefillPerson?.personId) {
+      setImportTeacher({ id: prefillPerson.personId, name: prefillPerson.name });
+    }
+    renderImportFileList();
+    const modal = ensureModalOnBody(importSetupModalEl);
+    if (modal) modal.show();
+  }
+
+  function formatImportHours(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '—';
+    return num.toFixed(2);
+  }
+
+  function formatImportDateLong(dateToken) {
+    const token = String(dateToken || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token || 'Unknown date';
+    const parsed = new Date(token + 'T12:00:00');
+    if (Number.isNaN(parsed.getTime())) return token;
+    return parsed.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  function formatImportDateShort(dateToken) {
+    const token = String(dateToken || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token || '';
+    const parsed = new Date(token + 'T12:00:00');
+    if (Number.isNaN(parsed.getTime())) return token;
+    return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function formatImportPeriodRange(startDate, endDate) {
+    if (!startDate || !endDate) return 'Unavailable';
+    return formatImportDateShort(startDate) + ' → ' + formatImportDateShort(endDate);
+  }
+
+  function groupImportRowsByDate(rows) {
+    const groups = [];
+    const map = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const date = String(row?.date || '').trim() || 'Unknown';
+      if (!map.has(date)) {
+        const group = { date, dayOfWeek: row?.dayOfWeek || '', rows: [] };
+        map.set(date, group);
+        groups.push(group);
+      }
+      const group = map.get(date);
+      if (!group.dayOfWeek && row?.dayOfWeek) group.dayOfWeek = row.dayOfWeek;
+      group.rows.push(row);
+    });
+    return groups;
+  }
+
+  function renderImportMatchPill(result) {
+    const matched = result?.matchedPeriod;
+    const status = String(matched?.matchStatus || result?.matchStatus || 'none').toLowerCase();
+    if (!matched?.id) {
+      return '<span class="ts-import-match-pill none"><i class="bi bi-x-circle"></i> No matching period</span>';
+    }
+    const label = escapeHtml(matched.name || matched.id);
+    const id = escapeHtml(matched.id);
+    const icon = status === 'exact' ? 'bi-check-circle' : 'bi-exclamation-circle';
+    return '<span class="ts-import-match-pill ' + escapeHtml(status) + '"><i class="bi ' + icon + '"></i> '
+      + label + ' <span class="fw-normal opacity-75">(' + id + ')</span></span>';
+  }
+
+  function renderImportSummaryCard(result) {
+    const personName = escapeHtml(importCompilePayload?.personName || importCompilePayload?.personId || '—');
+    const personId = escapeHtml(importCompilePayload?.personId || '');
+    const year = escapeHtml(importCompilePayload?.year || '—');
+    const startDate = result?.sourcePeriod?.startDate || '';
+    const endDate = result?.sourcePeriod?.endDate || '';
+    const employeeFromFile = escapeHtml(result?.employeeNameFromFile || '—');
+    const templateId = escapeHtml(result?.templateId || '—');
+    const stats = result?.stats || {};
+    const rowCount = Number(stats.rowCount || (result?.rows || []).length || 0);
+    const totalHours = formatImportHours(stats.totalHours || 0);
+    const dayCount = groupImportRowsByDate(result?.rows || []).length;
+    const matched = result?.matchedPeriod;
+    const appPeriodLabel = matched?.id
+      ? escapeHtml((matched.name || matched.id) + ' · ' + (matched.startDate || '?') + ' to ' + (matched.endDate || '?'))
+      : 'No match found';
+
+    return ''
+      + '<div class="ts-import-summary-grid">'
+      + '<div class="ts-import-summary-item">'
+      + '<div class="ts-import-summary-label">Selected Teacher</div>'
+      + '<div class="ts-import-summary-value">' + personName + '</div>'
+      + '<div class="ts-import-summary-sub font-monospace">' + personId + '</div>'
+      + '</div>'
+      + '<div class="ts-import-summary-item">'
+      + '<div class="ts-import-summary-label">Import Year</div>'
+      + '<div class="ts-import-summary-value">' + year + '</div>'
+      + '<div class="ts-import-summary-sub">Used for period matching</div>'
+      + '</div>'
+      + '<div class="ts-import-summary-item ts-import-summary-item-wide">'
+      + '<div class="ts-import-summary-label">Excel Timesheet Period</div>'
+      + '<div class="ts-import-summary-value">' + escapeHtml(formatImportPeriodRange(startDate, endDate)) + '</div>'
+      + '<div class="ts-import-summary-sub">' + escapeHtml(startDate && endDate ? startDate + ' to ' + endDate : '') + '</div>'
+      + '</div>'
+      + '<div class="ts-import-summary-item ts-import-summary-item-wide">'
+      + '<div class="ts-import-summary-label">Matched App Period</div>'
+      + '<div class="ts-import-summary-value">' + renderImportMatchPill(result) + '</div>'
+      + '<div class="ts-import-summary-sub">' + appPeriodLabel + '</div>'
+      + '</div>'
+      + '<div class="ts-import-summary-item">'
+      + '<div class="ts-import-summary-label">Employee in File</div>'
+      + '<div class="ts-import-summary-value">' + employeeFromFile + '</div>'
+      + '<div class="ts-import-summary-sub">Informational only</div>'
+      + '</div>'
+      + '<div class="ts-import-summary-item">'
+      + '<div class="ts-import-summary-label">Compiled Totals</div>'
+      + '<div class="ts-import-summary-value">' + totalHours + ' hrs</div>'
+      + '<div class="ts-import-summary-sub">' + rowCount + ' row' + (rowCount === 1 ? '' : 's') + ' · ' + dayCount + ' day' + (dayCount === 1 ? '' : 's') + '</div>'
+      + '</div>'
+      + '<div class="ts-import-summary-item">'
+      + '<div class="ts-import-summary-label">Template</div>'
+      + '<div class="ts-import-summary-value">' + templateId + '</div>'
+      + '<div class="ts-import-summary-sub">Legacy workbook format</div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  function renderImportDayGroups(rows) {
+    const groups = groupImportRowsByDate(rows);
+    if (!groups.length) {
+      return '<div class="ts-import-empty"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No billable rows found.</div>';
+    }
+
+    const hasDayColumn = groups.some((group) => String(group.dayOfWeek || '').trim());
+    const colCount = hasDayColumn ? 7 : 6;
+
+    const bodyHtml = groups.map((group, groupIndex) => {
+      const bandClass = groupIndex % 2 === 0 ? 'ts-import-band-even' : 'ts-import-band-odd';
+      const dayHours = group.rows.reduce((sum, row) => sum + (Number(row.hours) || 0), 0);
+      const rowSpan = group.rows.length + 1;
+      const dateMain = escapeHtml(formatImportDateShort(group.date));
+      const dateLong = escapeHtml(formatImportDateLong(group.date));
+      const dayLabel = escapeHtml(group.dayOfWeek || '—');
+
+      const dataRows = group.rows.map((row, rowIndex) => {
+        const dateCells = rowIndex === 0
+          ? '<td class="date-cell" rowspan="' + rowSpan + '">' + dateMain
+            + '<span class="date-sub">' + dateLong + '</span></td>'
+            + (hasDayColumn
+              ? '<td class="day-cell" rowspan="' + rowSpan + '">' + dayLabel + '</td>'
+              : '')
+          : '';
+
+        return ''
+          + '<tr class="' + bandClass + (rowIndex === 0 ? ' ts-import-day-start' : '') + '">'
+          + dateCells
+          + '<td class="class-cell">' + escapeHtml(row.className || '—') + '</td>'
+          + '<td class="text-end hours-cell">' + formatImportHours(row.hours) + '</td>'
+          + '<td>' + (row.studentName ? escapeHtml(row.studentName) : '<span class="text-muted">—</span>') + '</td>'
+          + '<td class="text-end">' + (row.optionalHours == null ? '<span class="text-muted">—</span>' : formatImportHours(row.optionalHours)) + '</td>'
+          + '<td class="comment-cell">' + (row.comment ? escapeHtml(row.comment) : '<span class="text-muted">—</span>') + '</td>'
+          + '</tr>';
+      }).join('');
+
+      const totalRow = ''
+        + '<tr class="ts-import-day-total ' + bandClass + '">'
+        + '<td class="day-total-label">Day total · ' + group.rows.length + ' entr' + (group.rows.length === 1 ? 'y' : 'ies') + '</td>'
+        + '<td class="text-end day-total-hours">' + formatImportHours(dayHours) + ' hrs</td>'
+        + '<td colspan="3"></td>'
+        + '</tr>';
+
+      const gapRow = groupIndex < groups.length - 1
+        ? '<tr class="ts-import-day-gap"><td colspan="' + colCount + '"></td></tr>'
+        : '';
+
+      return dataRows + totalRow + gapRow;
+    }).join('');
+
+    const dayHeader = hasDayColumn ? '<th>Day</th>' : '';
+
+    return ''
+      + '<div class="table-responsive ts-import-ledger-wrap">'
+      + '<table class="table table-sm ts-import-ledger-table mb-0">'
+      + '<thead><tr>'
+      + '<th>Date</th>' + dayHeader
+      + '<th>Class</th><th class="text-end">Hours</th><th>Student</th><th class="text-end">Optional</th><th>Comment</th>'
+      + '</tr></thead><tbody>' + bodyHtml + '</tbody></table>'
+      + '</div>';
+  }
+
+  function renderImportFileNav(results, index) {
+    if (!importReviewFileNav) return;
+    const total = results.length;
+    importReviewFileNav.classList.toggle('d-none', total <= 0);
+    if (importReviewFileIndicator) {
+      importReviewFileIndicator.textContent = total > 1
+        ? ('File ' + (index + 1) + ' of ' + total)
+        : 'Compiled file';
+    }
+    if (importReviewFileName) {
+      importReviewFileName.textContent = String(results[index]?.fileName || 'timesheet.xlsx');
+    }
+    if (importReviewNavDots && total > 1) {
+      importReviewNavDots.innerHTML = results.map((item, dotIndex) => {
+        const isActive = dotIndex === index;
+        const isError = String(item?.status || '').toLowerCase() === 'error';
+        const klass = isActive ? 'bg-primary' : (isError ? 'bg-danger' : 'bg-secondary');
+        return '<span class="rounded-circle ' + klass + '" style="width:.55rem;height:.55rem;opacity:' + (isActive ? '1' : '.45') + ';"></span>';
+      }).join('');
+    } else if (importReviewNavDots) {
+      importReviewNavDots.innerHTML = '';
+    }
+  }
+
+  function renderMatchedPeriodBadge(result) {
+    return renderImportMatchPill(result);
+  }
+
+  function renderImportReviewCurrent() {
+    const results = Array.isArray(importCompilePayload?.results) ? importCompilePayload.results : [];
+    if (!results.length) return;
+    if (importReviewIndex < 0) importReviewIndex = 0;
+    if (importReviewIndex >= results.length) importReviewIndex = results.length - 1;
+    const result = results[importReviewIndex];
+
+    renderImportFileNav(results, importReviewIndex);
+    if (importReviewSummary) {
+      importReviewSummary.innerHTML = renderImportSummaryCard(result);
+      importReviewSummary.classList.toggle('d-none', false);
+    }
+
+    const isError = String(result?.status || '').toLowerCase() === 'error';
+    if (importReviewErrorPanel) importReviewErrorPanel.classList.toggle('d-none', !isError);
+    if (importReviewWarningsPanel) importReviewWarningsPanel.classList.toggle('d-none', isError || !(result?.warnings || []).length);
+    if (importReviewTableWrap) importReviewTableWrap.classList.toggle('d-none', isError);
+    if (importReviewStats) importReviewStats.classList.toggle('d-none', isError);
+
+    if (isError) {
+      const messages = result?.error?.messages || [result?.error?.title || 'The file could not be compiled.'];
+      importReviewErrorList.innerHTML = messages.map((msg) => '<li>' + escapeHtml(msg) + '</li>').join('');
+      importReviewWarningsList.innerHTML = '';
+      importReviewTableWrap.innerHTML = '';
+      importReviewStats.innerHTML = '';
+    } else {
+      importReviewErrorList.innerHTML = '';
+      const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
+      importReviewWarningsList.innerHTML = warnings.map((msg) => '<li>' + escapeHtml(msg) + '</li>').join('');
+      const rows = Array.isArray(result?.rows) ? result.rows : [];
+      importReviewTableWrap.innerHTML = renderImportDayGroups(rows);
+      const stats = result?.stats || {};
+      const groups = groupImportRowsByDate(rows);
+      importReviewStats.innerHTML = ''
+        + '<div><strong>Rows:</strong> ' + Number(stats.rowCount || rows.length || 0) + '</div>'
+        + '<div><strong>Days:</strong> ' + groups.length + '</div>'
+        + '<div><strong>Total hours:</strong> ' + formatImportHours(stats.totalHours || 0) + '</div>'
+        + '<div><strong>Template:</strong> ' + escapeHtml(result?.templateId || '—') + '</div>';
+    }
+
+    if (importReviewPrevBtn) importReviewPrevBtn.disabled = importReviewIndex <= 0;
+    if (importReviewNextBtn) importReviewNextBtn.disabled = importReviewIndex >= results.length - 1;
+  }
+
+  function openImportReviewModal(payload) {
+    importCompilePayload = payload || null;
+    importReviewIndex = 0;
+    renderImportReviewCurrent();
+    const modal = ensureModalOnBody(importReviewModalEl);
+    if (modal) modal.show();
+  }
+
+  async function compileTimesheetImport() {
+    if (importCompileInProgress) return;
+    const personId = String(importTeacherId?.value || '').trim();
+    const year = String(importYear?.value || '').trim();
+    const files = Array.from(importExcelFiles?.files || []);
+    if (!personId) {
+      await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Please select a teacher or staff member.' });
+      return;
+    }
+    if (!/^\d{4}$/.test(year)) {
+      await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Please choose a valid year.' });
+      return;
+    }
+    if (!files.length) {
+      await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Please attach at least one .xlsx file.' });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('personId', personId);
+    formData.append('year', year);
+    files.forEach((file) => formData.append('files', file));
+
+    const originalHtml = btnCompileTimesheetImport?.innerHTML || '';
+    importCompileInProgress = true;
+    if (btnCompileTimesheetImport) {
+      btnCompileTimesheetImport.disabled = true;
+      btnCompileTimesheetImport.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Compiling...';
+    }
+
+    try {
+      const res = await fetch('/school/timesheets/manage/api/import/compile', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-AJAX-Request': 'true' },
+        body: formData
+      });
+      const payload = await res.json();
+      if (!res.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Compile request failed.');
+      }
+      const setupModal = ensureModalOnBody(importSetupModalEl);
+      if (setupModal) setupModal.hide();
+      openImportReviewModal(payload);
+    } catch (error) {
+      await showMessage({ title: 'Import Compile Error', icon: 'error', message: escapeHtml(error.message || String(error)) });
+    } finally {
+      importCompileInProgress = false;
+      if (btnCompileTimesheetImport) {
+        btnCompileTimesheetImport.disabled = false;
+        btnCompileTimesheetImport.innerHTML = originalHtml;
+      }
+    }
+  }
+
+  populateImportYearOptions();
+  btnOpenTimesheetImport?.addEventListener('click', () => openImportSetupModal());
+  btnPickImportTeacher?.addEventListener('click', async () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      await showMessage({ title: 'Teacher Picker', icon: 'warning', message: 'The person picker is not available on this page. Please refresh and try again.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.person({
+      title: 'Select Teacher/Staff for Import',
+      apiEndpoint: '/school/timesheets/api/eligible-persons',
+      placeholder: 'Search teacher or staff...',
+      onSelect: (item) => setImportTeacher(item)
+    }));
+  });
+  btnClearImportTeacher?.addEventListener('click', clearImportTeacher);
+  importExcelFiles?.addEventListener('change', renderImportFileList);
+  btnCompileTimesheetImport?.addEventListener('click', () => { void compileTimesheetImport(); });
+  importReviewPrevBtn?.addEventListener('click', () => {
+    if (importReviewIndex > 0) {
+      importReviewIndex -= 1;
+      renderImportReviewCurrent();
+    }
+  });
+  importReviewNextBtn?.addEventListener('click', () => {
+    const total = Array.isArray(importCompilePayload?.results) ? importCompilePayload.results.length : 0;
+    if (importReviewIndex < total - 1) {
+      importReviewIndex += 1;
+      renderImportReviewCurrent();
+    }
   });
 })();
 </script>

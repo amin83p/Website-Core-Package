@@ -11,6 +11,13 @@ const {
 
 router.use(requireAuth);
 
+const timesheetPeriodInlineMutationActionState = {
+  requireToken: true,
+  keepActive: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+};
+
 router.get('/',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_PERIODS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_PERIODS, OPERATIONS.READ_ALL),
@@ -43,5 +50,10 @@ router.delete('/delete/:id',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_PERIODS, OPERATIONS.DELETE),
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_PERIODS, OPERATIONS.DELETE, { requireToken: true }),
   ctrl.deleteTimesheetPeriod);
+
+router.post('/api/generate-year',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_PERIODS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_PERIODS, OPERATIONS.CREATE, timesheetPeriodInlineMutationActionState),
+  ctrl.generateYearPeriods);
 
 module.exports = router;

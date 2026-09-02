@@ -1,0 +1,419 @@
+<%
+  const explorerAccess = (typeof workSessionExplorerAccess !== 'undefined' && workSessionExplorerAccess)
+    ? workSessionExplorerAccess
+    : { isAdminViewer: true, canFilterByPerson: true, lockedPersonId: '', lockedPersonName: '' };
+  const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
+    ? schoolSectionDashboardHref
+    : '/dashboard/section-nav/SCHOOL';
+  const newUrl = 'school/work-sessions';
+  const actionStateToken = typeof actionStateId !== 'undefined' ? actionStateId : '';
+%>
+
+<style>
+    .work-session-row.work-session-row-locked { box-shadow: inset 4px 0 0 #6c757d; }
+    .work-session-status-badge { font-size: 0.75rem; font-weight: 600; padding: 0.35em 0.65em; border-radius: 4px; }
+</style>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel: null,
+  user,
+  tableName: typeof tableName !== 'undefined' ? tableName : 'Work_Session_Explorer',
+  btn_export: false,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/school/activities" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-calendar-event me-1"></i> School Activities</a>'
+  ]
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Work Sessions</div>
+    <button
+      id="workSessionFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#workSessionFilterCollapse"
+      aria-expanded="true"
+      aria-controls="workSessionFilterCollapse"
+      aria-label="Close filters">
+      <i id="workSessionFilterToggleIcon" class="bi bi-chevron-up"></i>
+    </button>
+  </div>
+  <div class="collapse show" id="workSessionFilterCollapse">
+    <div class="card-body p-3" id="workSessionFilterForm">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label" for="filter_startDate">Start Date</label>
+          <input type="date" id="filter_startDate" class="form-control size-md">
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label" for="filter_endDate">End Date</label>
+          <input type="date" id="filter_endDate" class="form-control size-md">
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label" for="filter_evaluationType">Evaluation Type</label>
+          <select id="filter_evaluationType" class="form-select size-md">
+            <option value="">All types</option>
+            <option value="attendance">Attendance</option>
+            <option value="completion">Completion</option>
+          </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label" for="filter_status">Status</label>
+          <select id="filter_status" class="form-select size-md">
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <% if (explorerAccess.canFilterByPerson) { %>
+        <div class="col-md-6 col-xl-4">
+          <label class="form-label" for="filter_personName">Person</label>
+          <div class="input-group">
+            <input type="hidden" id="filter_personId">
+            <input type="text" id="filter_personName" class="form-control bg-white" placeholder="All people" readonly>
+            <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker" title="Select person">
+              <i class="bi bi-person-badge"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="btn_clearPerson" title="Clear person">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <% } else if (explorerAccess.lockedPersonId) { %>
+        <div class="col-md-6 col-xl-4">
+          <label class="form-label" for="filter_personName">Your Assignments</label>
+          <input type="hidden" id="filter_personId" value="<%= explorerAccess.lockedPersonId %>">
+          <input type="text" id="filter_personName" class="form-control size-md bg-white" value="<%= explorerAccess.lockedPersonName || explorerAccess.lockedPersonId %>" readonly>
+        </div>
+        <% } %>
+        <div class="col-12">
+          <label class="form-label">Quick Ranges</label>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range" data-range="today">Today</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range" data-range="thisWeek">This Week</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range" data-range="thisMonth">This Month</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-range" data-range="allTime">All Time</button>
+          </div>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2">
+          <button type="button" id="btn_resetFilters" class="btn btn-outline-secondary btn-md">Reset</button>
+          <button type="button" id="btn_loadData" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="small text-muted">
+      Matched rows: <span class="fw-bold text-dark" id="lbl_resultCount">0</span>
+    </div>
+    <div class="small text-muted">
+      Showing page: <span class="fw-bold text-dark" id="lbl_resultPage">1 / 1</span>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search by activity, session title, person, or status...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable dragable ps-4" data-column="date" style="width: 140px;">Date <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="time" style="width: 150px;">Time <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="activityTitle">Activity <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="sessionTitle">Work Session <span class="sort-icon"></span></th>
+        <% if (explorerAccess.isAdminViewer) { %>
+        <th class="draggable dragable" data-column="personName">Person <span class="sort-icon"></span></th>
+        <% } %>
+        <th class="draggable dragable" data-column="evaluationTypeLabel">Evaluation <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="statusLabel">My Status <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="payable">Payable <span class="sort-icon"></span></th>
+        <th class="text-end pe-4" data-column="actions">Action</th>
+      </tr>
+    </thead>
+    <tbody id="workSessionsBody">
+      <tr>
+        <td colspan="<%= explorerAccess.isAdminViewer ? 9 : 8 %>" class="text-center py-4 text-muted">Select filters and click Apply to load work sessions.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const workSessionExplorerAccess = <%- JSON.stringify(explorerAccess) %>;
+    const canFilterByPerson = workSessionExplorerAccess.canFilterByPerson === true;
+    const isAdminViewer = workSessionExplorerAccess.isAdminViewer === true;
+    const actionStateId = <%- JSON.stringify(actionStateToken) %>;
+    let serverSearchQuery = '';
+
+    const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[ch]));
+
+    const setDateRange = (start, end) => {
+        document.getElementById('filter_startDate').value = start ? start.toISOString().split('T')[0] : '';
+        document.getElementById('filter_endDate').value = end ? end.toISOString().split('T')[0] : '';
+    };
+
+    const updateResultSummary = (count) => {
+        const total = Number(count || 0);
+        document.getElementById('lbl_resultCount').innerText = total.toLocaleString();
+        document.getElementById('lbl_resultPage').innerText = total > 0 ? '1 / 1' : '0 / 0';
+    };
+
+    const resetFilters = ({ reload = true } = {}) => {
+        setDateRange(null, null);
+        document.getElementById('filter_evaluationType').value = '';
+        document.getElementById('filter_status').value = '';
+        serverSearchQuery = '';
+        if (canFilterByPerson) {
+            const personIdEl = document.getElementById('filter_personId');
+            const personNameEl = document.getElementById('filter_personName');
+            if (personIdEl) personIdEl.value = '';
+            if (personNameEl) personNameEl.value = '';
+        }
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
+        if (reload) {
+            document.querySelector('.btn-range[data-range="today"]')?.click();
+        }
+    };
+
+    const buildStatusBadge = (row) => {
+        const normalized = String(row.statusCode || '').toLowerCase();
+        const label = row.statusLabel || 'Pending';
+        if (normalized === 'completed' || normalized === 'attendance_recorded') {
+            return `<span class="badge work-session-status-badge bg-success bg-opacity-10 text-success border border-success-subtle">${escapeHtml(label)}</span>`;
+        }
+        return `<span class="badge work-session-status-badge bg-warning bg-opacity-10 text-warning-emphasis border border-warning-subtle">${escapeHtml(label)}</span>`;
+    };
+
+    const buildPayableBadge = (row) => (
+        row.payable
+            ? '<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle">Yes</span>'
+            : '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle">No</span>'
+    );
+
+    const buildActionButtons = (row) => {
+        const buttons = [
+            `<a href="${escapeHtml(row.manageUrl)}" class="btn btn-outline-primary btn-sm">Open Manage</a>`
+        ];
+        if (row.canQuickComplete) {
+            const isCompleted = String(row.statusCode || '').toLowerCase() === 'completed';
+            if (isCompleted) {
+                buttons.push(`<button type="button" class="btn btn-outline-secondary btn-sm btn-quick-pending" data-url="${escapeHtml(row.pendingUrl)}" data-person-id="${escapeHtml(row.personId)}">Mark Pending</button>`);
+            } else {
+                buttons.push(`<button type="button" class="btn btn-outline-success btn-sm btn-quick-complete" data-url="${escapeHtml(row.completeUrl)}" data-person-id="${escapeHtml(row.personId)}">Quick Complete</button>`);
+            }
+        }
+        return `<div class="d-flex flex-wrap justify-content-end gap-1">${buttons.join('')}</div>`;
+    };
+
+    const buildRowHtml = (row) => {
+        const dObj = new Date(`${row.date}T00:00:00`);
+        const shortDate = Number.isNaN(dObj.getTime())
+            ? escapeHtml(row.date || '')
+            : dObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        const timeRange = `${escapeHtml(row.startTime || '')}${row.endTime ? ` - ${escapeHtml(row.endTime)}` : ''}`;
+        const lockedClass = row.locked ? ' work-session-row-locked' : '';
+        const lockedBadge = row.locked
+            ? '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle ms-1">Locked</span>'
+            : '';
+        const personCell = isAdminViewer
+            ? `<td>${escapeHtml(row.personName || row.personId || '')}</td>`
+            : '';
+
+        return `
+            <tr class="work-session-row${lockedClass}" data-row-id="${escapeHtml(row.id)}">
+                <td class="ps-4">${shortDate}</td>
+                <td>${timeRange}</td>
+                <td>${escapeHtml(row.activityTitle || '')}</td>
+                <td>${escapeHtml(row.sessionTitle || '')}${lockedBadge}</td>
+                ${personCell}
+                <td>${escapeHtml(row.evaluationTypeLabel || '')}</td>
+                <td>${buildStatusBadge(row)}</td>
+                <td>${buildPayableBadge(row)}</td>
+                <td class="text-end pe-4">${buildActionButtons(row)}</td>
+            </tr>
+        `;
+    };
+
+    const renderRows = (rows) => {
+        const body = document.getElementById('workSessionsBody');
+        if (!body) return;
+        if (!Array.isArray(rows) || !rows.length) {
+            body.innerHTML = `<tr><td colspan="${isAdminViewer ? 9 : 8}" class="text-center py-4 text-muted">No work sessions matched your filters.</td></tr>`;
+            updateResultSummary(0);
+            return;
+        }
+        body.innerHTML = rows.map(buildRowHtml).join('');
+        updateResultSummary(rows.length);
+    };
+
+    const collectFilters = () => {
+        const params = new URLSearchParams();
+        const startDate = document.getElementById('filter_startDate')?.value || '';
+        const endDate = document.getElementById('filter_endDate')?.value || '';
+        const evaluationType = document.getElementById('filter_evaluationType')?.value || '';
+        const status = document.getElementById('filter_status')?.value || '';
+        const personId = document.getElementById('filter_personId')?.value || '';
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+        if (evaluationType) params.set('evaluationType', evaluationType);
+        if (status) params.set('status', status);
+        if (personId) params.set('personId', personId);
+        if (serverSearchQuery) params.set('q', serverSearchQuery);
+        return params.toString();
+    };
+
+    const loadData = async () => {
+        const query = collectFilters();
+        const response = await fetch(`/school/work-sessions/api/data${query ? `?${query}` : ''}`, {
+            headers: { Accept: 'application/json' }
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.status !== 'success') {
+            throw new Error(payload.message || 'Unable to load work sessions.');
+        }
+        renderRows(payload.data || []);
+    };
+
+    const postQuickAction = async (url, personId) => {
+        const body = new URLSearchParams();
+        body.set('personId', personId);
+        if (actionStateId) body.set('actionStateId', actionStateId);
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                Accept: 'application/json'
+            },
+            body: body.toString()
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status === 'error') {
+            throw new Error(payload.message || 'Unable to update work session.');
+        }
+        await loadData();
+    };
+
+    document.getElementById('workSessionsBody')?.addEventListener('click', async (event) => {
+        const completeBtn = event.target.closest('.btn-quick-complete');
+        const pendingBtn = event.target.closest('.btn-quick-pending');
+        const target = completeBtn || pendingBtn;
+        if (!target) return;
+        event.preventDefault();
+        try {
+            target.disabled = true;
+            await postQuickAction(target.getAttribute('data-url'), target.getAttribute('data-person-id'));
+        } catch (error) {
+            window.alert(error.message || 'Unable to update work session.');
+        } finally {
+            target.disabled = false;
+        }
+    });
+
+    document.getElementById('btn_loadData')?.addEventListener('click', async () => {
+        try {
+            await loadData();
+        } catch (error) {
+            window.alert(error.message || 'Unable to load work sessions.');
+        }
+    });
+
+    document.getElementById('btn_resetFilters')?.addEventListener('click', () => resetFilters({ reload: true }));
+
+    document.querySelectorAll('.btn-range').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            const range = e.currentTarget.getAttribute('data-range');
+            const today = new Date();
+            let start = new Date(today);
+            let end = new Date(today);
+
+            if (range === 'today') {
+                // keep today
+            } else if (range === 'thisWeek') {
+                const day = today.getDay() || 7;
+                start.setHours(-24 * (day - 1));
+                end.setTime(start.getTime() + (6 * 24 * 60 * 60 * 1000));
+            } else if (range === 'thisMonth') {
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            } else if (range === 'allTime') {
+                setDateRange(null, null);
+                document.getElementById('btn_loadData').click();
+                return;
+            }
+
+            setDateRange(start, end);
+            document.getElementById('btn_loadData').click();
+        });
+    });
+
+    if (canFilterByPerson) {
+        document.getElementById('btn_openPersonPicker')?.addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.person({
+                title: 'Filter by Person',
+                placeholder: 'Search people...',
+                context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
+                onSelect: (item) => {
+                    const personId = item.personId || item.id || '';
+                    const personName = `${item.firstName || ''} ${item.lastName || ''}`.trim()
+                        || item.displayName
+                        || item.name
+                        || personId;
+                    document.getElementById('filter_personId').value = personId;
+                    document.getElementById('filter_personName').value = personName;
+                    document.getElementById('btn_loadData').click();
+                }
+            }));
+        });
+
+        document.getElementById('btn_clearPerson')?.addEventListener('click', () => {
+            document.getElementById('filter_personId').value = '';
+            document.getElementById('filter_personName').value = '';
+            document.getElementById('btn_loadData').click();
+        });
+    }
+
+    const tableSearchForm = document.getElementById('tableSearchModalForm');
+    if (tableSearchForm) {
+        tableSearchForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            serverSearchQuery = String(document.getElementById('tsmQuery')?.value || '').trim();
+            const quickSearchInput = document.getElementById('searchInput');
+            if (quickSearchInput) quickSearchInput.value = serverSearchQuery;
+            const modalEl = document.getElementById('tableSearchModal');
+            if (modalEl && window.bootstrap?.Modal) {
+                const instance = window.bootstrap.Modal.getInstance(modalEl) || new window.bootstrap.Modal(modalEl);
+                instance.hide();
+            }
+            document.getElementById('btn_loadData').click();
+        }, true);
+    }
+
+    document.querySelector('.btn-range[data-range="today"]')?.click();
+});
+</script>

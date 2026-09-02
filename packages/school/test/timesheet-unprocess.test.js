@@ -130,7 +130,10 @@ test('unprocess route is CONFIGURE-gated and controller/UI are wired', () => {
   assert.match(controller, /canUnprocessProcessed/);
   assert.match(controller, /timesheetUnprocessService/);
   assert.match(controller, /revertMaterializedRecordsForTimesheet/);
-  assert.match(controller, /unlockSourcesForTimesheet/);
+  assert.doesNotMatch(
+    controller.slice(controller.indexOf('exports.unprocessTimesheet'), controller.indexOf('exports.returnTimesheet')),
+    /unlockSourcesForTimesheet/
+  );
   assert.doesNotMatch(
     controller.slice(controller.indexOf('exports.unprocessTimesheet'), controller.indexOf('exports.returnTimesheet')),
     /approvalStatus:\s*'pending_approval'/

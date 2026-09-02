@@ -1,10 +1,16 @@
 // MVC/controllers/school/timesheetPeriodController.js
 const dataService = require('../../services/school/schoolDataService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
+const timesheetPeriodGenerationService = require('../../services/school/timesheetPeriodGenerationService');
+const { PERIOD_CADENCES, CADENCE_LABELS } = require('../../services/school/timesheetPeriodScheduleService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
+const {
+    resolveOrgTodayFromRequest,
+    resolveOrgYearFromRequest
+} = requireCoreModule('MVC/utils/timezoneUtils');
 const {
     getActiveOrgIdOrThrow: getActiveOrgIdOrThrowShared,
     assertCreateOrgContextOrThrow: assertCreateOrgContextOrThrowShared,
@@ -70,11 +76,28 @@ exports.listTimesheetPeriods = async (req, res) => {
         if (query.q === searchDefaultKeyword) query = {};
         const canCreateTimesheetPeriods = await canCreateOrgScopedItem(req.user, { scopeLabel: 'timesheet periods' });
 
-        const allPeriods = await dataService.fetchData('timesheetPeriods', query, req.user);
-        const searchableFields = await inferSearchableFields(allPeriods, { exclude: ['audit'] });
-        const { data, pagination } = paginate(allPeriods, query);
+        const selectedYear = query.year || resolveOrgTodayFromRequest(req).slice(0, 4);
+        delete query.year;
 
-        if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
+        const allPeriods = await dataService.fetchData('timesheetPeriods', query, req.user);
+        const fallbackYear = Number(resolveOrgYearFromRequest(req));
+        const availableYears = [...new Set(allPeriods.map((period) => {
+            if (!period?.startDate) return fallbackYear;
+            return new Date(period.startDate).getFullYear();
+        }))].sort((a, b) => b - a);
+        if (!availableYears.some((year) => String(year) === String(selectedYear))) {
+            availableYears.unshift(Number(selectedYear));
+            availableYears.sort((a, b) => b - a);
+        }
+
+        const yearPeriods = allPeriods
+            .filter((period) => new Date(period.startDate || new Date()).getFullYear().toString() === selectedYear.toString())
+            .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+        const searchableFields = await inferSearchableFields(yearPeriods, { exclude: ['audit'] });
+        const { data, pagination } = paginate(yearPeriods, query);
+
+        if (isAjax(req)) return res.json({ status: 'success', results: data, pagination, selectedYear, availableYears });
 
         res.render('school/timesheetPeriod/timesheetPeriodList', {
             title: 'Timesheet Periods',
@@ -88,6 +111,11 @@ exports.listTimesheetPeriods = async (req, res) => {
             print: true,
             pagination,
             filters: req.query,
+            availableYears,
+            selectedYear,
+            canGeneratePeriods: canCreateTimesheetPeriods,
+            periodCadences: PERIOD_CADENCES,
+            cadenceLabels: CADENCE_LABELS,
             user: req.user,
             actionStateId: req.actionStateId
         });
@@ -196,6 +224,50 @@ exports.saveTimesheetPeriod = async (req, res) => {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
         if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
         res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    }
+};
+
+exports.generateYearPeriods = async (req, res) => {
+    let guardKey = '';
+    try {
+        const activeOrgId = await assertCreateOrgContextOrThrow(req.user);
+        const year = Number(req.body.year);
+        const cadence = String(req.body.cadence || '').trim();
+
+        guardKey = idempotencyGuardService.createGuardKey([
+            'timesheet_period_generate_year',
+            String(activeOrgId || '').trim(),
+            String(year || ''),
+            cadence
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 120000,
+            replayTtlMs: 12000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'Timesheet period generation is already in progress. Please wait.')) return;
+
+        const summary = await timesheetPeriodGenerationService.generateYearPeriods({
+            orgId: activeOrgId,
+            year,
+            cadence,
+            reqUser: req.user
+        });
+
+        const payloadOut = {
+            status: 'success',
+            message: `Generated ${summary.createdCount} period(s); ${summary.skippedCount} skipped.`,
+            createdCount: summary.createdCount,
+            skippedCount: summary.skippedCount,
+            cadence: summary.cadence,
+            year: summary.year,
+            periods: summary.created
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', error, message: error.message });
     }
 };
 
