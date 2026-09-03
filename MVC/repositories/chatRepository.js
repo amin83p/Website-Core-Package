@@ -61,6 +61,17 @@ function normalizeChatDocument(row) {
   return normalized ? normalizeConversation(normalized) : null;
 }
 
+function attachmentReferenceMatches(fileUrl, fileName) {
+  if (!fileUrl || !fileName) return false;
+  const reference = String(fileUrl).split('?')[0].split('#')[0];
+  const referencedName = reference.split('/').pop() || '';
+  try {
+    return decodeURIComponent(referencedName) === String(fileName);
+  } catch (_) {
+    return referencedName === String(fileName);
+  }
+}
+
 function isDirectConversationForUserIds(conversation, userIds = []) {
   if (String(conversation?.type || 'direct') !== 'direct') return false;
   const normalizedUserIds = (Array.isArray(userIds) ? userIds : [])
@@ -231,7 +242,7 @@ const chatRepository = {
 
   async addMessage(convId, senderId, content, type = 'text', fileUrl = null, options = {}) {
     return runByRepositoryBackend(options, {
-      json: async () => chatModel.addMessage(convId, senderId, content, type, fileUrl),
+      json: async () => chatModel.addMessage(convId, senderId, content, type, fileUrl, options),
       mongo: async () => {
         const collection = getMongoCollection('chatConversations');
         const timestamp = new Date().toISOString();
@@ -243,7 +254,8 @@ const chatRepository = {
           type: String(type || 'text'),
           fileUrl: fileUrl || null,
           status: 'sent',
-          timestamp
+          timestamp,
+          replyTo: options?.replyTo || null
         };
         const existingMessages = {
           $cond: [{ $isArray: '$messages' }, '$messages', []]
@@ -333,6 +345,82 @@ const chatRepository = {
         return normalizeMessage(message);
       }
     }, 'core.chat.addMessage');
+  },
+
+  async getMessage(convId, messageId, options = {}) {
+    return runByRepositoryBackend(options, {
+      json: async () => chatModel.getMessage(convId, messageId),
+      mongo: async () => {
+        const row = await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(convId), {
+          projection: { messages: 1 }
+        });
+        return (Array.isArray(row?.messages) ? row.messages : [])
+          .map((message) => normalizeMessage(message))
+          .find((message) => idsEqual(message?.id, messageId)) || null;
+      }
+    }, 'core.chat.getMessage');
+  },
+
+  async hasActiveAttachment(convId, fileName, options = {}) {
+    return runByRepositoryBackend(options, {
+      json: async () => chatModel.hasActiveAttachment(convId, fileName),
+      mongo: async () => {
+        const row = await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(convId), {
+          projection: { messages: 1 }
+        });
+        return (Array.isArray(row?.messages) ? row.messages : []).some((message) => (
+          !message?.deletedAt && attachmentReferenceMatches(message?.fileUrl, fileName)
+        ));
+      }
+    }, 'core.chat.hasActiveAttachment');
+  },
+
+  async softDeleteMessages(convId, messageIds = [], deleteOptions = {}, options = {}) {
+    const ids = [...new Set((Array.isArray(messageIds) ? messageIds : [])
+      .map((id) => toPublicId(id)).filter(Boolean))];
+    if (!ids.length) throw new Error('Select at least one message.');
+    return runByRepositoryBackend(options, {
+      json: async () => chatModel.softDeleteMessages(convId, ids, deleteOptions),
+      mongo: async () => {
+        const collection = getMongoCollection('chatConversations');
+        const row = await collection.findOne(resolveMongoIdFilter(convId));
+        if (!row) throw new Error('Conversation not found.');
+        const messages = Array.isArray(row?.messages) ? row.messages : [];
+        const found = messages.filter((message) => ids.some((id) => idsEqual(message?.id, id)));
+        if (found.length !== ids.length) throw new Error('One or more messages were not found.');
+        const now = new Date().toISOString();
+        const nextMessages = messages.map((message) => (
+          ids.some((id) => idsEqual(message?.id, id)) && !message?.deletedAt
+            ? {
+                ...message,
+                content: 'Message deleted',
+                fileUrl: null,
+                deletedAt: now,
+                deletedByUserId: toPublicId(deleteOptions?.deletedByUserId),
+                deletionScope: String(deleteOptions?.scopeMode || '')
+              }
+            : message
+        ));
+        const active = nextMessages.filter((message) => !message?.deletedAt);
+        const last = active.slice().sort((left, right) => (
+          new Date(right?.timestamp || 0).getTime() - new Date(left?.timestamp || 0).getTime()
+        ))[0] || null;
+        await collection.updateOne(resolveMongoIdFilter(convId), {
+          $set: {
+            messages: nextMessages,
+            totalMessages: active.length,
+            lastMessage: last ? {
+              content: last.type === 'image' ? 'Image' : (last.type === 'file' ? 'File' : String(last.content || '')),
+              senderId: toPublicId(last.senderId), timestamp: last.timestamp,
+              status: last.status || 'sent', type: last.type || 'text'
+            } : null,
+            lastMessageAt: last?.timestamp || null,
+            updatedAt: now
+          }
+        });
+        return { messageIds: ids, deletedAt: now };
+      }
+    }, 'core.chat.softDeleteMessages');
   },
 
   async setLastRead(convId, userId, options = {}) {

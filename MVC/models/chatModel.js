@@ -43,6 +43,96 @@ async function getMessages(convId, options = {}) {
     }
 }
 
+async function getMessage(convId, messageId) {
+    try {
+        const msgPath = path.join(MSG_DIR, `${convId}.json`);
+        const messages = JSON.parse(await fs.readFile(msgPath, 'utf8'));
+        return messages.map((message) => normalizeMessage(message))
+            .find((message) => idsEqual(message?.id, messageId)) || null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function attachmentReferenceMatches(fileUrl, fileName) {
+    if (!fileUrl || !fileName) return false;
+    const reference = String(fileUrl).split('?')[0].split('#')[0];
+    const referencedName = reference.split('/').pop() || '';
+    try {
+        return decodeURIComponent(referencedName) === String(fileName);
+    } catch (_) {
+        return referencedName === String(fileName);
+    }
+}
+
+async function hasActiveAttachment(convId, fileName) {
+    try {
+        const msgPath = path.join(MSG_DIR, `${convId}.json`);
+        const messages = JSON.parse(await fs.readFile(msgPath, 'utf8'));
+        return messages.some((message) => (
+            !message?.deletedAt && attachmentReferenceMatches(message?.fileUrl, fileName)
+        ));
+    } catch (_) {
+        return false;
+    }
+}
+
+function summarizeMessages(messages = []) {
+    const active = (Array.isArray(messages) ? messages : []).filter((message) => message?.deletedAt == null);
+    const last = active.slice().sort((left, right) => (
+        new Date(right?.timestamp || 0).getTime() - new Date(left?.timestamp || 0).getTime()
+    ))[0] || null;
+    return {
+        totalMessages: active.length,
+        lastMessage: last ? {
+            content: last.type === 'image' ? 'Image' : (last.type === 'file' ? 'File' : String(last.content || '')),
+            senderId: toPublicId(last.senderId),
+            timestamp: last.timestamp,
+            status: last.status || 'sent',
+            type: last.type || 'text'
+        } : null,
+        lastMessageAt: last?.timestamp || null
+    };
+}
+
+async function softDeleteMessages(convId, messageIds = [], options = {}) {
+    return await queueWrite(async () => {
+        const targetIds = new Set((Array.isArray(messageIds) ? messageIds : []).map((id) => String(id || '').trim()).filter(Boolean));
+        const msgPath = path.join(MSG_DIR, `${convId}.json`);
+        let messages = [];
+        try { messages = JSON.parse(await fs.readFile(msgPath, 'utf8')); } catch {}
+        const found = messages.filter((message) => targetIds.has(String(message?.id || '')));
+        if (found.length !== targetIds.size) throw new Error('One or more messages were not found.');
+
+        const now = new Date().toISOString();
+        messages = messages.map((message) => {
+            if (!targetIds.has(String(message?.id || '')) || message?.deletedAt) return message;
+            return {
+                ...message,
+                content: 'Message deleted',
+                fileUrl: null,
+                deletedAt: now,
+                deletedByUserId: toPublicId(options?.deletedByUserId),
+                deletionScope: String(options?.scopeMode || '')
+            };
+        });
+        await fs.writeFile(msgPath, JSON.stringify(messages, null, 2));
+
+        const convData = await fs.readFile(CONV_FILE, 'utf8').catch(() => '[]');
+        const conversations = JSON.parse(convData);
+        const convIndex = conversations.findIndex((conversation) => idsEqual(conversation?.id, convId));
+        if (convIndex > -1) {
+            conversations[convIndex] = {
+                ...conversations[convIndex],
+                ...summarizeMessages(messages),
+                updatedAt: now
+            };
+            await fs.writeFile(CONV_FILE, JSON.stringify(conversations, null, 2));
+        }
+        return { messageIds: [...targetIds], deletedAt: now };
+    });
+}
+
 async function createConversation(userIds) {
     return await queueWrite(async () => {
         const data = await fs.readFile(CONV_FILE, 'utf8').catch(() => '[]');
@@ -80,7 +170,7 @@ async function createConversation(userIds) {
     });
 }
 
-async function addMessage(convId, senderId, content, type = 'text', fileUrl = null) {
+async function addMessage(convId, senderId, content, type = 'text', fileUrl = null, options = {}) {
     return await queueWrite(async () => {
         // 1. Update Message File
         const msgPath = path.join(MSG_DIR, `${convId}.json`);
@@ -93,6 +183,7 @@ async function addMessage(convId, senderId, content, type = 'text', fileUrl = nu
             content: String(content || ''),
             type: String(type || 'text'),
             fileUrl: fileUrl || null,
+            replyTo: options?.replyTo || null,
             timestamp: new Date().toISOString(),
             status: 'sent'
         };
@@ -265,13 +356,16 @@ async function getUnreadSummaryForUser(userId) {
     return buildUnreadSummary(conversations, userId);
 }
 
-module.exports = { 
+module.exports = {
     getConversations,
     getMessages,
+    getMessage,
+    hasActiveAttachment,
     createConversation,
     addMessage,
     updateMessageStatus,
     deleteConversation,
+    softDeleteMessages,
     setLastRead,
     getAllConversations,
     getConversationById,

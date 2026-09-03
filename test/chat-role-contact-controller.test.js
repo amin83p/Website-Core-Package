@@ -6,6 +6,7 @@ const path = require('node:path');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CONTROLLER_PATH = path.join(ROOT_DIR, 'MVC/controllers/chatController.js');
 const ACCESS_SERVICE_PATH = path.join(ROOT_DIR, 'MVC/services/chatAccessService.js');
+const ATTACHMENT_SERVICE_PATH = path.join(ROOT_DIR, 'MVC/services/chatAttachmentAccessService.js');
 
 function stubModule(modulePath, exportsValue, originals) {
   const resolved = require.resolve(modulePath);
@@ -21,6 +22,7 @@ function stubModule(modulePath, exportsValue, originals) {
 function restoreModules(originals) {
   delete require.cache[CONTROLLER_PATH];
   delete require.cache[ACCESS_SERVICE_PATH];
+  delete require.cache[ATTACHMENT_SERVICE_PATH];
   originals.forEach((entry, resolved) => {
     if (entry) require.cache[resolved] = entry;
     else delete require.cache[resolved];
@@ -31,8 +33,18 @@ function createResponse() {
   return {
     statusCode: 200,
     payload: null,
+    body: null,
+    headers: {},
     status(code) {
       this.statusCode = code;
+      return this;
+    },
+    setHeader(key, value) {
+      this.headers[key] = value;
+      return this;
+    },
+    send(body) {
+      this.body = body;
       return this;
     },
     json(payload) {
@@ -96,6 +108,46 @@ test('existing participant history stays readable while UPDATE is denied by cont
   }
 });
 
+test('READ_ALL grants global conversation reads even when READ is evaluated first', async () => {
+  const originals = new Map();
+  try {
+    stubModule('../MVC/services/security/index', {
+      evaluateAccess: async ({ operationId }) => ({
+        allowed: operationId === 'READ' || operationId === 'READ_ALL',
+        operationId
+      })
+    }, originals);
+    stubModule('../MVC/services/adminAuthorityService', {
+      isAdminForRequestAsync: async () => false
+    }, originals);
+    stubModule('../MVC/services/chatContactScopeService', {
+      getConversationMessagingEligibility: async () => ({
+        canMessage: false,
+        reason: 'No write access.'
+      })
+    }, originals);
+
+    delete require.cache[ACCESS_SERVICE_PATH];
+    const chatAccessService = require(ACCESS_SERVICE_PATH);
+    const result = await chatAccessService.canAccessConversation({
+      user: { id: 'USER-ADMIN' },
+      conversation: {
+        id: 'CONV-1',
+        participants: [{ userId: 'USER-1' }, { userId: 'USER-2' }]
+      },
+      operationIds: ['READ', 'READ_ALL'],
+      allowGlobalAdmin: true
+    });
+
+    assert.equal(result.allowed, true);
+    assert.equal(result.operationId, 'READ_ALL');
+    assert.equal(result.participant, false);
+    assert.equal(result.globalRead, true);
+  } finally {
+    restoreModules(originals);
+  }
+});
+
 test('direct-id chat creation cannot bypass the dedicated contact scope', async () => {
   const originals = new Map();
   let repositoryCreateCalled = false;
@@ -143,6 +195,59 @@ test('direct-id chat creation cannot bypass the dedicated contact scope', async 
     assert.match(res.payload.message, /outside/i);
     assert.equal(repositoryCreateCalled, false);
     assert.equal(genericUserFetchCalled, false);
+  } finally {
+    restoreModules(originals);
+  }
+});
+
+test('chat attachment download requires chat download access and streams through guarded resolver', async () => {
+  const originals = new Map();
+  try {
+    stubModule('../MVC/repositories/chatRepository', {
+      getById: async () => ({
+        id: 'CONV-1',
+        participants: [{ userId: 'USER-1' }, { userId: 'USER-2' }]
+      })
+    }, originals);
+    stubModule('../MVC/services/dataService', {}, originals);
+    stubModule('../MVC/services/chatAccessService', {
+      canDownloadConversationAttachment: async () => ({
+        allowed: true,
+        operationId: 'DOWNLOAD_FILE',
+        participant: true
+      })
+    }, originals);
+    stubModule('../MVC/services/chatContactScopeService', {}, originals);
+    stubModule('../MVC/services/chatAttachmentAccessService', {
+      loadAttachment: async (convId, fileName) => ({
+        buffer: Buffer.from(`loaded:${convId}:${fileName}`),
+        mimeType: 'text/plain; charset=utf-8',
+        fileName
+      })
+    }, originals);
+    stubModule('../MVC/services/chatBroadcastService', {}, originals);
+    stubModule('../MVC/services/socketService', {}, originals);
+    stubModule('../MVC/services/coreFilesService', {}, originals);
+    stubModule('../MVC/middleware/upload', {}, originals);
+    stubModule('../MVC/services/fileAssetStorageService', {}, originals);
+    stubModule('../MVC/services/uploadFolderSettingsService', {}, originals);
+
+    delete require.cache[CONTROLLER_PATH];
+    const controller = require(CONTROLLER_PATH);
+    const req = {
+      user: { id: 'USER-1' },
+      ip: '127.0.0.1',
+      params: { convId: 'CONV-1', fileName: 'note.txt' },
+      query: { download: '1' }
+    };
+    const res = createResponse();
+
+    await controller.downloadAttachment(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers['Content-Type'], 'text/plain; charset=utf-8');
+    assert.equal(res.headers['Content-Disposition'], 'attachment; filename="note.txt"');
+    assert.equal(res.body.toString(), 'loaded:CONV-1:note.txt');
   } finally {
     restoreModules(originals);
   }
@@ -210,9 +315,14 @@ test('Chat source keeps historical reads while applying role scope to writes and
   );
 
   assert.equal(accessSource.includes('getConversationMessagingEligibility'), true);
+  assert.equal(accessSource.includes('canReadAllConversations'), true);
+  assert.equal(accessSource.includes('canDownloadConversationAttachment'), true);
   assert.equal(accessSource.includes('operationResult.operationId === OPERATIONS.UPDATE'), true);
+  assert.equal(socketSource.includes('loadConversationForSocket'), true);
   assert.equal(socketSource.includes('[OPERATIONS.UPDATE]'), true);
   assert.equal(modalSource.includes('chatReadOnlyNotice'), true);
+  assert.equal(modalSource.includes('/chat/attachments/'), true);
+  assert.equal(modalSource.includes('canDownloadFile'), true);
   assert.equal(modalSource.includes('res.access'), true);
   assert.equal(modalSource.includes('res.pagination'), true);
   assert.equal(modalSource.includes('currentConversationCanMessage'), true);

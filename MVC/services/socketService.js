@@ -92,6 +92,29 @@ async function emitNewMessageToRecipients({
     return { recipientIds: recipients };
 }
 
+async function emitMessagesDeleted({ convId = '', messageIds = [], deletedByUserId = '' } = {}) {
+    if (!io || !convId || !Array.isArray(messageIds) || !messageIds.length) return;
+    io.to(String(convId)).emit('message_deleted', {
+        convId: String(convId),
+        messageIds: messageIds.map((id) => String(id)),
+        deletedByUserId: String(deletedByUserId || '')
+    });
+}
+
+function buildReplySnapshot(message = null) {
+    if (!message) return null;
+    const type = String(message?.type || 'text');
+    const preview = message?.deletedAt
+        ? 'Message deleted'
+        : (type === 'image' ? 'Image' : (type === 'file' ? 'Attachment' : String(message?.content || '').slice(0, 240)));
+    return {
+        messageId: String(message.id || ''),
+        senderId: String(message.senderId || ''),
+        type,
+        preview
+    };
+}
+
 function parseCookies(cookieHeader = '') {
     const out = {};
     String(cookieHeader || '').split(';').forEach((part) => {
@@ -213,12 +236,21 @@ function init(server) {
                     return emitChatError(socket, access.reason || 'You cannot send messages in this conversation.');
                 }
 
+                let replyTo = null;
+                const replyToMessageId = String(data.replyToMessageId || '').trim();
+                if (replyToMessageId) {
+                    const target = await chatRepository.getMessage(data.convId, replyToMessageId);
+                    if (!target) return emitChatError(socket, 'The message you are replying to no longer exists.');
+                    replyTo = buildReplySnapshot(target);
+                }
+
                 const savedMsg = await chatRepository.addMessage(
                     data.convId,
                     socket.userId,
                     data.content,
                     data.type,
-                    data.fileUrl
+                    data.fileUrl,
+                    { replyTo }
                 );
 
                 socket.emit('message_sent_ack', {
@@ -328,4 +360,4 @@ function getIo() {
     return io;
 }
 
-module.exports = { init, getIo, emitNewMessageToRecipients };
+module.exports = { init, getIo, emitNewMessageToRecipients, emitMessagesDeleted };

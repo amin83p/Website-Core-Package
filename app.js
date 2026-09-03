@@ -44,6 +44,7 @@ const requestPerfTracer = require('./MVC/utils/requestPerfTracer');
 requestPerfTracer.installDataHooks();
 
 const socketService = require('./MVC/services/socketService');
+const chatAttachmentAccessService = require('./MVC/services/chatAttachmentAccessService');
 // app.js (or wherever you define middleware)
 const logger = require('./MVC/utils/logger');
 // Import Middleware & Models (Defined at top)
@@ -352,6 +353,10 @@ const uploadsStaticContext = {
   middleware: null
 };
 app.use('/uploads', (req, res, next) => {
+  if (chatAttachmentAccessService.isProtectedChatUploadPath(req.path || req.url || '')) {
+    return res.status(404).send('Not found');
+  }
+
   const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
   if (!uploadsStaticContext.middleware || uploadsStaticContext.root !== uploadRoot) {
     uploadsStaticContext.root = uploadRoot;

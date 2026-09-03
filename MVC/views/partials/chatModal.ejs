@@ -3,6 +3,10 @@
   const canChatCreate = !!modalChatAccess.canCreate;
   const canChatUpdate = !!modalChatAccess.canUpdate;
   const canChatDelete = !!(modalChatAccess.canDelete || modalChatAccess.canDeleteAll);
+  const deleteScopeToken = String(modalChatAccess.deleteScopeId || '').trim().toUpperCase();
+  const canChatDeleteConversation = !!modalChatAccess.canDeleteAll || (
+    !!modalChatAccess.canDelete && !['SCP_OWNER', 'OWNER', 'SCP_USER', 'USER'].includes(deleteScopeToken)
+  );
   const canChatBroadcast = !!modalChatAccess.canDeleteAll;
 %>
 <div class="modal fade" id="chatInterfaceModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
@@ -69,7 +73,7 @@
                                 <i class="bi bi-layout-sidebar"></i>
                            </button>
 
-                           <% if (canChatDelete) { %>
+                           <% if (canChatDeleteConversation) { %>
                                <button class="btn btn-sm btn-light border me-3 text-danger" onclick="deleteCurrentChat()" title="Delete Conversation">
                                     <i class="bi bi-trash"></i>
                                </button>
@@ -87,9 +91,23 @@
                        style="background-image: radial-gradient(#e9ecef 1px, transparent 1px); background-size: 15px 15px;">
                   </div>
 
+                  <div id="chatSelectionToolbar" class="d-none px-3 py-2 border-top bg-white d-flex align-items-center justify-content-between">
+                      <span class="small text-muted" id="chatSelectionCount">0 selected</span>
+                      <div class="d-flex gap-2">
+                          <button type="button" class="btn btn-sm btn-light" onclick="clearMessageSelection()" title="Cancel selection"><i class="bi bi-x-lg"></i></button>
+                          <button type="button" class="btn btn-sm btn-danger" id="chatBulkDeleteButton" onclick="deleteSelectedMessages()" title="Delete selected messages"><i class="bi bi-trash"></i></button>
+                      </div>
+                  </div>
+
                   <div id="attachmentPreviewArea" class="d-none"></div>
 
                   <div class="p-2 border-top bg-white chat-compose-wrap">
+                      <div id="chatReplyPreview" class="d-none px-2 pb-2 small">
+                          <div class="border-start border-primary border-3 bg-light px-2 py-1 d-flex justify-content-between align-items-center">
+                              <span id="chatReplyPreviewText" class="text-truncate"></span>
+                              <button type="button" class="btn btn-sm btn-light" onclick="clearReplyTarget()" title="Cancel reply"><i class="bi bi-x-lg"></i></button>
+                          </div>
+                      </div>
                       <div id="chatReadOnlyNotice" class="small text-muted px-2 py-1 <%= canChatUpdate ? 'd-none' : '' %>">
                           You can read this conversation, but your access profile does not allow sending messages.
                       </div>
@@ -122,6 +140,8 @@
     </div>
   </div>
 </div>
+
+<div id="chatMessageContextMenu" class="dropdown-menu shadow" role="menu" aria-label="Message actions"></div>
 
 <div class="modal fade" id="chatBroadcastModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -326,6 +346,10 @@
     #modalResizer {
         touch-action: none;
     }
+    #chatMessageContextMenu { position: fixed; z-index: 1085; min-width: 150px; }
+    .chat-message-row.is-selected .msg-bubble { outline: 2px solid #0d6efd; outline-offset: 2px; }
+    .chat-message-row.is-deleted .msg-bubble { opacity: 0.72; font-style: italic; }
+    .chat-reply-quote { border-left: 3px solid rgba(13, 110, 253, 0.55); background: rgba(255,255,255,.55); padding: 4px 7px; margin-bottom: 5px; font-size: .73rem; }
 </style>
 
 <script>
@@ -342,6 +366,8 @@ const chatAccess = <%- JSON.stringify({
     canUpdate: canChatUpdate,
     canDelete: canChatDelete,
     canDeleteAll: !!modalChatAccess.canDeleteAll,
+    deleteScopeId: modalChatAccess.deleteScopeId || '',
+    canDownloadFile: !!modalChatAccess.canDownloadFile,
     canBroadcast: canChatBroadcast
 }) %>;
 let isSidebarVisible = true;
@@ -367,6 +393,10 @@ let chatModalOffsetX = 0;
 let chatModalOffsetY = 0;
 let chatModalIsMaximized = false;
 let chatModalRestoreState = null;
+let replyTarget = null;
+const selectedMessageIds = new Set();
+let contextMenuMessage = null;
+let touchContextTimer = null;
 
 function normalizeClientUnreadCount(value) {
     const parsed = Number(value);
@@ -686,6 +716,12 @@ function bindChatSocketHandlers() {
         }
     });
 
+    socket.on('message_deleted', (data) => {
+        if (String(data?.convId || '') === String(currentConvId || '')) {
+            applyDeletedMessages(data?.messageIds || []);
+        }
+    });
+
     socket.on('on_conversation_deleted', (data) => {
         refreshInbox();
         if (currentConvId === data.convId) {
@@ -761,14 +797,16 @@ function initChatFormHandler() {
         const text = input.value.trim();
         if (!text && pendingAttachments.length === 0) return;
 
+        const replyToMessageId = replyTarget?.id || '';
         if (pendingAttachments.length > 0) {
-            await uploadPendingFiles();
+            await uploadPendingFiles(text ? '' : replyToMessageId);
         }
 
         if (text) {
             const tempId = 'temp_' + Date.now();
             appendMessage({
-                id: tempId, content: text, senderId: currentUser.id, type: 'text', status: 'sending'
+                id: tempId, content: text, senderId: currentUser.id, type: 'text', status: 'sending',
+                replyTo: replyTarget ? { senderId: '', preview: replyTarget.preview } : null
             }, true);
             if (!socket || !socket.connected) {
                 await ensureChatSocket();
@@ -778,11 +816,13 @@ function initChatFormHandler() {
                 return;
             }
             socket.emit('send_message', {
-                tempId: tempId, convId: currentConvId, content: text, type: 'text', senderId: currentUser.id
+                tempId: tempId, convId: currentConvId, content: text, type: 'text', senderId: currentUser.id,
+                replyToMessageId
             });
             input.value = '';
             input.style.height = '38px';
         }
+        if (text || pendingAttachments.length === 0) clearReplyTarget();
     });
 }
 
@@ -801,6 +841,13 @@ function initChatSystem() {
     refreshInbox();
     initMessageScrollLoader();
     initChatFormHandler();
+    document.addEventListener('click', hideMessageContextMenu);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            hideMessageContextMenu();
+            clearMessageSelection();
+        }
+    });
 }
 
 function buildAvatarHtml(name, avatarUrl, size = 40, bgClass = 'bg-secondary', textClass = 'text-white') {
@@ -880,7 +927,7 @@ document.addEventListener('DOMContentLoaded', () => {
         socketReadyPromise = null;
     });
 });
-async function uploadPendingFiles() {
+async function uploadPendingFiles(replyToMessageId = '') {
     if (!currentConvId) return;
     if (!chatAccess.canUpdate || !currentConversationCanMessage) {
         safeShowAlert(currentConversationScopeReason || 'This conversation is read-only.', 'warning');
@@ -919,14 +966,15 @@ async function uploadPendingFiles() {
             renderPreviews();
 
             // 2. Process uploaded files
-            res.files.forEach(f => {
+            res.files.forEach((f, index) => {
                 // A. Emit to Server (for Recipient)
                 if (socket && socket.connected) socket.emit('send_message', {
                     convId: currentConvId,
                     content: f.type === 'image' ? 'Image' : 'File',
                     type: f.type,
                     fileUrl: f.url,
-                    senderId: currentUser.id
+                    senderId: currentUser.id,
+                    replyToMessageId: index === 0 ? replyToMessageId : ''
                 });
 
                 // B. RENDER LOCALLY (Fixes "I don't see my image")
@@ -1011,8 +1059,29 @@ function normalizeMessageTextForDisplay(value) {
         .replace(/\r/g, '\n');
 }
 
+function getChatAttachmentFileName(fileUrl) {
+    const token = String(fileUrl || '').split(/[?#]/)[0].replace(/\\/g, '/');
+    const parts = token.split('/').filter(Boolean);
+    if (!parts.length) return '';
+    try {
+        return decodeURIComponent(parts[parts.length - 1]);
+    } catch (_) {
+        return parts[parts.length - 1];
+    }
+}
+
+function buildChatAttachmentUrl(msg, forceDownload = false) {
+    if (!chatAccess.canDownloadFile) return '';
+    const convId = String(msg.convId || msg.conversationId || currentConvId || '').trim();
+    const fileName = getChatAttachmentFileName(msg.fileUrl);
+    if (!convId || !fileName) return '';
+    const baseUrl = `/chat/attachments/${encodeURIComponent(convId)}/${encodeURIComponent(fileName)}`;
+    return forceDownload ? `${baseUrl}?download=1` : baseUrl;
+}
+
 function buildMessageHtml(msg, isTemp = false) {
     const isMine = String(msg.senderId) === String(currentUser.id);
+    const isDeleted = Boolean(msg.deletedAt);
     const typeClass = isMine ? 'msg-sent' : 'msg-received';
     const alignClass = isMine ? 'align-self-end' : 'align-self-start';
 
@@ -1029,17 +1098,25 @@ function buildMessageHtml(msg, isTemp = false) {
         }
     }
 
+    const replyHtml = msg.replyTo ? `<div class="chat-reply-quote"><strong>${String(msg.replyTo.senderId) === String(currentUser.id) ? 'You' : 'Reply'}</strong><br>${safeText(msg.replyTo.preview || 'Message')}</div>` : '';
     let contentHtml = `<div class="msg-text-content">${safeText(normalizeMessageTextForDisplay(msg.content))}</div>`;
-    if (msg.type === 'image') {
-        const safeUrl = encodeURI(msg.fileUrl).replace(/%25/g, '%');
-        contentHtml = `<a href="${safeUrl}" target="_blank"><img src="${safeUrl}" class="img-fluid rounded mb-1" style="max-width: 200px; min-height: 50px; background: #f0f0f0;"></a>`;
-    } else if (msg.type === 'file') {
-        contentHtml = `<a href="${msg.fileUrl}" target="_blank" class="text-decoration-none d-flex align-items-center p-2 border rounded bg-white"><i class="bi bi-file-earmark-arrow-down fs-4 me-2 text-primary"></i><div><div class="small fw-bold text-dark">Attachment</div><div class="x-small text-muted">Download</div></div></a>`;
+    if (!isDeleted && msg.type === 'image') {
+        const safeUrl = buildChatAttachmentUrl(msg, false);
+        const downloadUrl = buildChatAttachmentUrl(msg, true);
+        contentHtml = safeUrl
+            ? `<a href="${downloadUrl}" target="_blank"><img src="${safeUrl}" class="img-fluid rounded mb-1" style="max-width: 200px; min-height: 50px; background: #f0f0f0;"></a>`
+            : '<div class="small text-muted p-2 border rounded bg-white">Image attachment unavailable.</div>';
+    } else if (!isDeleted && msg.type === 'file') {
+        const downloadUrl = buildChatAttachmentUrl(msg, true);
+        contentHtml = downloadUrl
+            ? `<a href="${downloadUrl}" target="_blank" class="text-decoration-none d-flex align-items-center p-2 border rounded bg-white"><i class="bi bi-file-earmark-arrow-down fs-4 me-2 text-primary"></i><div><div class="small fw-bold text-dark">Attachment</div><div class="x-small text-muted">Download</div></div></a>`
+            : '<div class="small text-muted p-2 border rounded bg-white">Attachment unavailable.</div>';
     }
 
     return `
-    <div class="d-flex flex-column ${alignClass}" style="max-width: 85%;" id="msg-row-${msg.id || 'temp'}">
+    <div class="chat-message-row d-flex flex-column ${alignClass} ${isDeleted ? 'is-deleted' : ''}" style="max-width: 85%;" id="msg-row-${msg.id || 'temp'}" data-message-id="${safeAttr(msg.id || '')}" data-sender-id="${safeAttr(msg.senderId || '')}" data-message-type="${safeAttr(msg.type || 'text')}" data-deleted="${isDeleted ? '1' : '0'}" data-file-url="${safeAttr(msg.fileUrl || '')}">
         <div class="msg-bubble ${typeClass}">
+            ${replyHtml}
             ${contentHtml}
             <div class="d-flex align-items-center justify-content-end mt-1">
                 <span class="msg-time small text-muted" style="font-size:0.65rem;">
@@ -1065,6 +1142,7 @@ function insertMessageHtml(html, position) {
 function appendMessage(msg, isTemp = false, scrollAfter = true) {
     if (messageExistsInContainer(msg.id) && !isTemp) return;
     insertMessageHtml(buildMessageHtml(msg, isTemp), 'beforeend');
+    bindMessageActionEvents();
     if (scrollAfter) scrollToBottom();
 }
 
@@ -1077,7 +1155,170 @@ function prependMessages(messages) {
         if (messageExistsInContainer(message.id)) return;
         insertMessageHtml(buildMessageHtml(message, false), 'afterbegin');
     });
+    bindMessageActionEvents();
     container.scrollTop = previousTop + (container.scrollHeight - previousHeight);
+}
+
+function getMessageRow(messageId) {
+    return document.getElementById(`msg-row-${String(messageId || '')}`);
+}
+
+function isOwnMessageRow(row) {
+    return String(row?.dataset?.senderId || '') === String(currentUser.id);
+}
+
+function canAttemptMessageDelete(row) {
+    if (!row || row.dataset.deleted === '1' || !chatAccess.canDelete) return false;
+    if (chatAccess.canDeleteAll) return true;
+    const scope = String(chatAccess.deleteScopeId || '').toUpperCase();
+    if (scope === 'SCP_OWNER' || scope === 'OWNER' || scope === 'SCP_USER' || scope === 'USER' || !scope) {
+        return isOwnMessageRow(row);
+    }
+    return true;
+}
+
+function updateSelectionToolbar() {
+    const toolbar = document.getElementById('chatSelectionToolbar');
+    const count = document.getElementById('chatSelectionCount');
+    const deleteButton = document.getElementById('chatBulkDeleteButton');
+    const rows = [...selectedMessageIds].map(getMessageRow).filter(Boolean);
+    if (toolbar) toolbar.classList.toggle('d-none', rows.length === 0);
+    if (count) count.textContent = `${rows.length} selected`;
+    const allowed = rows.length > 0 && rows.every(canAttemptMessageDelete);
+    if (deleteButton) deleteButton.disabled = !allowed;
+}
+
+function toggleMessageSelection(messageId) {
+    const row = getMessageRow(messageId);
+    if (!row || row.dataset.deleted === '1') return;
+    if (selectedMessageIds.has(String(messageId))) selectedMessageIds.delete(String(messageId));
+    else selectedMessageIds.add(String(messageId));
+    row.classList.toggle('is-selected', selectedMessageIds.has(String(messageId)));
+    updateSelectionToolbar();
+}
+
+function clearMessageSelection() {
+    selectedMessageIds.forEach((messageId) => getMessageRow(messageId)?.classList.remove('is-selected'));
+    selectedMessageIds.clear();
+    updateSelectionToolbar();
+}
+
+function clearReplyTarget() {
+    replyTarget = null;
+    document.getElementById('chatReplyPreview')?.classList.add('d-none');
+}
+
+function replyToMessage(messageId) {
+    const row = getMessageRow(messageId);
+    if (!row || row.dataset.deleted === '1') return;
+    const type = row.dataset.messageType || 'text';
+    const text = type === 'text'
+        ? String(row.querySelector('.msg-text-content')?.textContent || '').trim()
+        : (type === 'image' ? 'Image' : 'Attachment');
+    replyTarget = { id: String(messageId), preview: text };
+    const preview = document.getElementById('chatReplyPreview');
+    const previewText = document.getElementById('chatReplyPreviewText');
+    if (previewText) previewText.textContent = `Replying to: ${text}`;
+    preview?.classList.remove('d-none');
+    document.getElementById('chatInput')?.focus();
+}
+
+async function copyMessageText(messageId) {
+    const text = String(getMessageRow(messageId)?.querySelector('.msg-text-content')?.textContent || '').trim();
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); }
+    catch (_) { safeShowAlert('Copy is not available in this browser.', 'warning'); }
+}
+
+function downloadMessageFile(messageId) {
+    const row = getMessageRow(messageId);
+    const fileUrl = row?.dataset.fileUrl || '';
+    const fileName = getChatAttachmentFileName(fileUrl);
+    if (!currentConvId || !fileName || !chatAccess.canDownloadFile) return;
+    window.open(`/chat/attachments/${encodeURIComponent(currentConvId)}/${encodeURIComponent(fileName)}?download=1`, '_blank', 'noopener');
+}
+
+function hideMessageContextMenu() {
+    const menu = document.getElementById('chatMessageContextMenu');
+    menu?.classList.remove('show');
+    contextMenuMessage = null;
+}
+
+function showMessageContextMenu(event, row) {
+    event.preventDefault();
+    if (!row || row.dataset.deleted === '1') return;
+    contextMenuMessage = row;
+    const messageId = String(row.dataset.messageId || '');
+    const type = row.dataset.messageType || 'text';
+    const actions = [
+        ['Select', 'bi-check2-square', () => toggleMessageSelection(messageId)],
+        ['Reply', 'bi-reply', () => replyToMessage(messageId)]
+    ];
+    if (type === 'text') actions.push(['Copy', 'bi-clipboard', () => copyMessageText(messageId)]);
+    if (canAttemptMessageDelete(row)) actions.push(['Delete', 'bi-trash', () => deleteMessages([messageId])]);
+    if ((type === 'file' || type === 'image') && chatAccess.canDownloadFile) actions.push(['Download', 'bi-download', () => downloadMessageFile(messageId)]);
+    const menu = document.getElementById('chatMessageContextMenu');
+    if (!menu) return;
+    menu.innerHTML = actions.map(([label, icon], index) => `<button type="button" class="dropdown-item d-flex align-items-center gap-2" data-action-index="${index}"><i class="bi ${icon}"></i>${label}</button>`).join('');
+    menu.querySelectorAll('[data-action-index]').forEach((button) => button.addEventListener('click', () => {
+        const action = actions[Number(button.dataset.actionIndex)];
+        hideMessageContextMenu();
+        action?.[2]();
+    }));
+    menu.style.left = `${Math.min(event.clientX, window.innerWidth - 180)}px`;
+    menu.style.top = `${Math.min(event.clientY, window.innerHeight - 220)}px`;
+    menu.classList.add('show');
+}
+
+function bindMessageActionEvents() {
+    document.querySelectorAll('.chat-message-row:not([data-actions-bound="1"])').forEach((row) => {
+        row.dataset.actionsBound = '1';
+        row.addEventListener('contextmenu', (event) => showMessageContextMenu(event, row));
+        row.addEventListener('pointerdown', (event) => {
+            if (event.pointerType === 'mouse') return;
+            touchContextTimer = window.setTimeout(() => showMessageContextMenu(event, row), 550);
+        });
+        ['pointerup', 'pointercancel', 'pointermove'].forEach((eventName) => row.addEventListener(eventName, () => {
+            if (touchContextTimer) window.clearTimeout(touchContextTimer);
+            touchContextTimer = null;
+        }));
+    });
+}
+
+function applyDeletedMessages(messageIds = []) {
+    messageIds.forEach((messageId) => {
+        const row = getMessageRow(messageId);
+        if (!row) return;
+        row.dataset.deleted = '1';
+        row.dataset.fileUrl = '';
+        row.classList.add('is-deleted');
+        row.querySelector('.msg-bubble').innerHTML = '<div class="msg-text-content">Message deleted</div>';
+        selectedMessageIds.delete(String(messageId));
+    });
+    updateSelectionToolbar();
+}
+
+async function deleteMessages(messageIds) {
+    const ids = [...new Set((Array.isArray(messageIds) ? messageIds : []).map(String).filter(Boolean))];
+    if (!ids.length) return;
+    try {
+        const isBulk = ids.length > 1;
+        const endpoint = isBulk ? '/chat/messages/bulk-delete' : `/chat/messages/${encodeURIComponent(currentConvId)}/${encodeURIComponent(ids[0])}`;
+        const response = await fetch(endpoint, isBulk ? {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ convId: currentConvId, messageIds: ids })
+        } : { method: 'DELETE' });
+        const result = await response.json();
+        if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to delete message.');
+        applyDeletedMessages(result.data?.messageIds || ids);
+    } catch (error) {
+        safeShowAlert(error.message || 'Unable to delete message.', 'error');
+    }
+}
+
+function deleteSelectedMessages() {
+    const rows = [...selectedMessageIds].map(getMessageRow).filter(Boolean);
+    if (!rows.length || !rows.every(canAttemptMessageDelete)) return;
+    deleteMessages([...selectedMessageIds]);
 }
 
 function updateLoadOlderIndicator() {

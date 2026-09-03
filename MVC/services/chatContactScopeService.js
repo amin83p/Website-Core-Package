@@ -31,6 +31,18 @@ function isVirtualRoot(user = {}) {
   return user?.isVirtualSuperAdmin === true;
 }
 
+function normalizeChatScopeMode(scopeId = '') {
+  const token = String(scopeId || '').trim().toUpperCase();
+  if (token === 'SCP_DEPT' || token === 'DEPARTMENT' || token === 'DEPT') return 'department';
+  if (token === 'SCP_DIV' || token === 'DIVISION' || token === 'DIV') return 'division';
+  if (token === 'SCP_ORG' || token === 'ORGANIZATION' || token === 'ORG') return 'organization';
+  if (token === 'SCP_OWNER' || token === 'OWNER') return 'owner';
+  if (token === 'SCP_USER' || token === 'USER') return 'user';
+  if (token === 'SCP_ADMIN' || token === 'ADMIN') return 'admin';
+  if (token === 'GLOBAL') return 'global';
+  return '';
+}
+
 function isActiveUser(user = {}) {
   if (!user || user.active === false) return false;
   const status = String(user?.status || user?.state || user?.accountStatus || 'active')
@@ -189,7 +201,7 @@ function buildRequesterContext({ requestingUser, requesterPerson = null, registr
   };
 }
 
-function evaluateTargetContact(context = {}, targetUser = null, targetPerson = null) {
+function evaluateTargetContact(context = {}, targetUser = null, targetPerson = null, options = {}) {
   if (!context?.eligible) {
     return {
       allowed: false,
@@ -247,10 +259,35 @@ function evaluateTargetContact(context = {}, targetUser = null, targetPerson = n
     };
   }
 
+  const scopeMode = normalizeChatScopeMode(options?.scopeId || options?.scopeMode || '');
+  const targetRoleKeys = new Set((targetRoleScope.packageRoles || []).map((role) => role.key));
+  if (scopeMode === 'organization' || scopeMode === 'admin') {
+    const hasRole = activeMemberships(targetPerson).some((membership) => (
+      idsEqual(membership?.orgId || membership?.organizationId, context.activeOrgId)
+      && collectMembershipRoleTokens(membership).length > 0
+    ));
+    return {
+      allowed: hasRole,
+      reason: hasRole ? '' : OUTSIDE_SCOPE_REASON,
+      matchingDomains: [],
+      targetRoleScope
+    };
+  }
+
   const requesterDomains = new Set(context.roleScope?.packageDomains || []);
   const matchingDomains = (targetRoleScope.packageDomains || [])
     .filter((domain) => requesterDomains.has(domain));
   if (matchingDomains.length > 0) {
+    if (scopeMode === 'division') {
+      const hasSharedRole = (context.roleScope?.packageRoles || [])
+        .some((role) => targetRoleKeys.has(role.key));
+      return {
+        allowed: hasSharedRole,
+        reason: hasSharedRole ? '' : OUTSIDE_SCOPE_REASON,
+        matchingDomains: hasSharedRole ? dedupe(matchingDomains) : [],
+        targetRoleScope
+      };
+    }
     return {
       allowed: true,
       reason: '',
@@ -259,7 +296,7 @@ function evaluateTargetContact(context = {}, targetUser = null, targetPerson = n
     };
   }
 
-  if (context.roleScope?.isPlain && targetRoleScope.isPlain) {
+  if (!['department', 'division'].includes(scopeMode) && context.roleScope?.isPlain && targetRoleScope.isPlain) {
     return {
       allowed: true,
       reason: '',
@@ -396,7 +433,7 @@ async function searchContacts(requestingUser, query = '', options = {}) {
       const targetScope = analyzePersonRoleScope(person, context.activeOrgId, context.registry);
       if (!targetScope.eligible) return;
       const targetStub = { id: `PERSON:${personId}`, active: true, status: 'active' };
-      const decision = evaluateTargetContact(context, targetStub, person);
+      const decision = evaluateTargetContact(context, targetStub, person, options);
       if (decision.allowed) eligiblePersonIds.push(personId);
     });
     users = eligiblePersonIds.length
@@ -411,7 +448,7 @@ async function searchContacts(requestingUser, query = '', options = {}) {
   (Array.isArray(users) ? users : []).forEach((user) => {
     if (!isActiveUser(user) || idsEqual(user?.id, requestingUser?.id)) return;
     const person = personById.get(toPublicId(user?.personId)) || null;
-    const decision = evaluateTargetContact(context, user, person);
+    const decision = evaluateTargetContact(context, user, person, options);
     if (!decision.allowed) return;
     const contact = projectContact(user, person, decision.targetRoleScope);
     if (matchesContactQuery(contact, user, person || {}, query)) contacts.push(contact);
@@ -426,7 +463,7 @@ async function searchContacts(requestingUser, query = '', options = {}) {
     .slice(0, normalizeLimit(options?.limit));
 }
 
-async function getContactDecision(requestingUser, targetUserId) {
+async function getContactDecision(requestingUser, targetUserId, options = {}) {
   const context = await buildContactContext(requestingUser);
   if (!context.eligible) {
     return { allowed: false, reason: context.reason, context, targetUser: null, targetPerson: null };
@@ -438,15 +475,15 @@ async function getContactDecision(requestingUser, targetUserId) {
     ? await personRepository.getById(targetPersonId, PERSON_QUERY_OPTIONS)
     : null;
   return {
-    ...evaluateTargetContact(context, targetUser, targetPerson),
+    ...evaluateTargetContact(context, targetUser, targetPerson, options),
     context,
     targetUser,
     targetPerson
   };
 }
 
-async function assertCanContact(requestingUser, targetUserId) {
-  const decision = await getContactDecision(requestingUser, targetUserId);
+async function assertCanContact(requestingUser, targetUserId, options = {}) {
+  const decision = await getContactDecision(requestingUser, targetUserId, options);
   if (!decision.allowed) throw createHttpError(decision.reason || OUTSIDE_SCOPE_REASON, 403);
   return decision;
 }
@@ -457,7 +494,7 @@ function otherParticipantIds(conversation = {}, requestingUserId = '') {
     .filter((userId) => userId && !idsEqual(userId, requestingUserId)));
 }
 
-async function buildConversationContactStates(requestingUser, conversations = []) {
+async function buildConversationContactStates(requestingUser, conversations = [], options = {}) {
   const rows = Array.isArray(conversations) ? conversations : [];
   const targetUserIds = dedupe(rows.flatMap((conversation) => (
     otherParticipantIds(conversation, requestingUser?.id)
@@ -477,7 +514,7 @@ async function buildConversationContactStates(requestingUser, conversations = []
     const participantRows = targetIds.map((userId) => {
       const user = userById.get(userId) || null;
       const person = personById.get(toPublicId(user?.personId)) || null;
-      const decision = evaluateTargetContact(context, user, person);
+      const decision = evaluateTargetContact(context, user, person, options);
       return {
         userId,
         user,
@@ -510,12 +547,22 @@ async function buildConversationContactStates(requestingUser, conversations = []
   return stateByConversationId;
 }
 
-async function getConversationMessagingEligibility(requestingUser, conversation) {
-  const states = await buildConversationContactStates(requestingUser, [conversation]);
+async function getConversationMessagingEligibility(requestingUser, conversation, options = {}) {
+  const states = await buildConversationContactStates(requestingUser, [conversation], options);
   return states.get(toPublicId(conversation?.id)) || {
     canMessage: false,
     reason: READ_ONLY_REASON,
     participants: []
+  };
+}
+
+async function getConversationScopeEligibility(requestingUser, conversation, options = {}) {
+  const states = await buildConversationContactStates(requestingUser, [conversation], options);
+  const state = states.get(toPublicId(conversation?.id));
+  return {
+    allowed: Boolean(state?.canMessage),
+    reason: state?.reason || OUTSIDE_SCOPE_REASON,
+    state: state || null
   };
 }
 
@@ -525,6 +572,7 @@ module.exports = {
   OUTSIDE_SCOPE_REASON,
   READ_ONLY_REASON,
   isVirtualRoot,
+  normalizeChatScopeMode,
   isActiveUser,
   formatPersonName,
   buildRequesterContext,
@@ -535,5 +583,6 @@ module.exports = {
   getContactDecision,
   assertCanContact,
   buildConversationContactStates,
-  getConversationMessagingEligibility
+  getConversationMessagingEligibility,
+  getConversationScopeEligibility
 };

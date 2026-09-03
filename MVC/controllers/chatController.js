@@ -6,6 +6,7 @@ const dataService = require('../services/dataService');
 const chatAccessService = require('../services/chatAccessService');
 const chatContactScopeService = require('../services/chatContactScopeService');
 const chatBroadcastService = require('../services/chatBroadcastService');
+const chatAttachmentAccessService = require('../services/chatAttachmentAccessService');
 const socketService = require('../services/socketService');
 const coreFilesService = require('../services/coreFilesService');
 const fs = require('fs');
@@ -138,10 +139,16 @@ async function assertCanUpdateConversation(req, conversation) {
     return result;
 }
 
+function formatContentDisposition(fileName = 'attachment', forceDownload = false) {
+    const safeName = String(fileName || 'attachment').replace(/"/g, '');
+    return `${forceDownload ? 'attachment' : 'inline'}; filename="${safeName}"`;
+}
+
 async function enrichConversations(conversations, currentUserId, requestingUser, updateAccess = {}) {
     const stateByConversationId = await chatContactScopeService.buildConversationContactStates(
         requestingUser,
-        conversations
+        conversations,
+        { scopeId: updateAccess?.scopeId }
     );
 
     return conversations.map(c => {
@@ -195,11 +202,11 @@ async function enrichConversations(conversations, currentUserId, requestingUser,
 // 1. ADMIN LIST
 exports.listAllChats = async (req, res) => {
     try {
-        const canViewGlobalChatList = await chatAccessService.isGlobalChatAdmin(req.user, req.ip);
-        if (!canViewGlobalChatList) {
+        const canViewGlobalChatList = await chatAccessService.canReadAllConversations(req.user, req.ip);
+        if (!canViewGlobalChatList.allowed) {
             return res.status(403).render('error', {
                 title: 'Access Denied',
-                message: 'Global conversation management requires full chat administration access.',
+                message: canViewGlobalChatList.reason || 'Global conversation list access requires READ_ALL chat access.',
                 user: req.user
             });
         }
@@ -252,6 +259,42 @@ exports.listAllChats = async (req, res) => {
 
     } catch (err) {
         res.status(500).render('error', { title: 'Error', message: err.message });
+    }
+};
+
+exports.downloadAttachment = async (req, res) => {
+    try {
+        const { convId, fileName } = req.params;
+        const conversation = await loadConversationOrThrow(convId);
+        const access = await chatAccessService.canDownloadConversationAttachment(
+            req.user,
+            conversation,
+            req.ip
+        );
+        if (!access.allowed) {
+            return res.status(403).json({
+                status: 'error',
+                message: access.reason || 'You do not have permission to download this chat attachment.'
+            });
+        }
+
+        // A deleted message removes the attachment reference, so an old URL cannot bypass the tombstone.
+        const isActiveAttachment = typeof chatRepository.hasActiveAttachment === 'function'
+            ? await chatRepository.hasActiveAttachment(convId, fileName)
+            : true;
+        if (!isActiveAttachment) {
+            return res.status(404).json({ status: 'error', message: 'Attachment not found.' });
+        }
+
+        const attachment = await chatAttachmentAccessService.loadAttachment(convId, fileName);
+        const forceDownload = ['1', 'true', 'yes'].includes(String(req.query?.download || '').trim().toLowerCase());
+        res.setHeader('Content-Type', attachment.mimeType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', formatContentDisposition(attachment.fileName, forceDownload));
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        return res.send(attachment.buffer);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
     }
 };
 
@@ -349,6 +392,36 @@ exports.deleteChat = async (req, res) => {
     }
 };
 
+exports.deleteMessages = async (req, res) => {
+    try {
+        const convId = req.params.convId || req.body?.convId;
+        const rawIds = req.params.messageId ? [req.params.messageId] : req.body?.messageIds;
+        const messageIds = (Array.isArray(rawIds) ? rawIds : [rawIds])
+            .map((value) => String(value || '').trim())
+            .filter(Boolean);
+        if (!convId || !messageIds.length) throw createHttpError('Select at least one message.', 400);
+
+        const conversation = await loadConversationOrThrow(convId);
+        const messages = await Promise.all(messageIds.map((messageId) => chatRepository.getMessage(convId, messageId)));
+        if (messages.some((message) => !message)) throw createHttpError('One or more messages were not found.', 404);
+        const access = await chatAccessService.canDeleteMessages(req.user, conversation, messages, req.ip);
+        if (!access.allowed) throw createHttpError(access.reason || 'You do not have permission to delete these messages.', 403);
+
+        const result = await chatRepository.softDeleteMessages(convId, messageIds, {
+            deletedByUserId: req.user?.id,
+            scopeMode: access.scopeMode || 'global'
+        });
+        await socketService.emitMessagesDeleted({
+            convId,
+            messageIds: result.messageIds,
+            deletedByUserId: req.user?.id
+        });
+        return res.json({ status: 'success', data: result });
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
+    }
+};
+
 // 4. STANDARD ACTIONS (No changes needed here)
 exports.getInbox = async (req, res) => {
     try {
@@ -422,7 +495,10 @@ exports.startChat = async (req, res) => {
         const { targetUserId } = req.body;
         if (!targetUserId) throw new Error("Target user required");
         if (idsEqual(targetUserId, req.user.id)) throw createHttpError('You cannot start a chat with yourself.', 400);
-        await chatContactScopeService.assertCanContact(req.user, targetUserId);
+        const createAccess = typeof chatAccessService.canUseChatOperation === 'function'
+            ? await chatAccessService.canUseChatOperation(req.user, OPERATIONS.CREATE, req.ip)
+            : { scopeId: null };
+        await chatContactScopeService.assertCanContact(req.user, targetUserId, { scopeId: createAccess.scopeId });
 
         const conv = await chatRepository.create({ userIds: [req.user.id, targetUserId] });
         const updateAccess = await chatAccessService.canUseChatOperation(req.user, OPERATIONS.UPDATE, req.ip);
@@ -439,10 +515,13 @@ exports.startChat = async (req, res) => {
 
 exports.searchUsers = async (req, res) => {
     try {
+        const createAccess = typeof chatAccessService.canUseChatOperation === 'function'
+            ? await chatAccessService.canUseChatOperation(req.user, OPERATIONS.CREATE, req.ip)
+            : { scopeId: null };
         const results = await chatContactScopeService.searchContacts(
             req.user,
             req.query.q || '',
-            { limit: 20 }
+            { limit: 20, scopeId: createAccess.scopeId }
         );
         res.json({ status: 'success', data: results, results });
     } catch (err) {
