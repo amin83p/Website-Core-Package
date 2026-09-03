@@ -529,12 +529,17 @@ let attendanceScopedRollupTimer = null;
 const attendanceScopedRollupQueue = new Set();
 const attendanceScopedRollupWaiters = [];
 const ATTENDANCE_ACTION_STATE_HANDLED_ERROR = '__attendance_action_state_handled__';
+// Set to a positive number only for local UI testing; null uses the server action-state limit.
+const ATTENDANCE_MATRIX_UI_REQUEST_LIMIT_OVERRIDE = null;
+const ATTENDANCE_MATRIX_MUTATION_BUDGET_SOURCES = new Set(['cell-save', 'comment-save']);
 const attendanceRequestBudgetState = {
     maxAttempts: null,
     maxTimeMinutes: null,
     maxVolumeKB: null,
     attemptCount: 0,
-    warnLevel: 0
+    mutationCount: 0,
+    exhausted: false,
+    reloadPromptShown: false
 };
 
 function attEscapeHtml(value) {
@@ -827,6 +832,9 @@ const attendanceAttachmentEscape = (value) => String(value ?? '')
 async function uploadAttendanceFile(input, category, classId, sessionId, studentPersonId = '') {
     const file = input?.files && input.files[0];
     if (!file) return null;
+    if (!(await ensureAttendanceRequestBudgetAvailable())) {
+        throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
+    }
     const body = new FormData();
     body.append('kind', category || 'attendance');
     body.append('classId', classId || '');
@@ -840,7 +848,7 @@ async function uploadAttendanceFile(input, category, classId, sessionId, student
         body
     });
     const result = await res.json().catch(() => null);
-    hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
+    hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true, source: 'file-upload' });
     if (!res.ok || !result || result.status !== 'success') {
         const handled = await handleAttendanceActionStateFailure(result || {});
         if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
@@ -899,63 +907,139 @@ function setAttendanceBudgetState(nextState = {}) {
     if (maxTimeMinutes != null) attendanceRequestBudgetState.maxTimeMinutes = maxTimeMinutes;
     if (maxVolumeKB != null) attendanceRequestBudgetState.maxVolumeKB = maxVolumeKB;
     if (attemptCount != null) attendanceRequestBudgetState.attemptCount = attemptCount;
+    syncAttendanceRequestBudgetExhausted({ prompt: false });
+}
+
+function getActiveAttendanceRangeChip() {
+    const active = document.querySelector('.btn-range.range-chip.active');
+    return active ? String(active.getAttribute('data-range') || '').trim() : '';
+}
+
+function captureAttendanceMatrixFilterState() {
+    const classId = String(document.getElementById('filter_classId')?.value || window.currentMatrixData?.classId || '').trim();
+    const className = String(document.getElementById('filter_className')?.value || window.currentMatrixData?.className || '').trim();
+    const startDate = String(document.getElementById('filter_startDate')?.value || '').trim();
+    const endDate = String(document.getElementById('filter_endDate')?.value || '').trim();
+    const range = getActiveAttendanceRangeChip();
+    return { classId, className, startDate, endDate, range };
+}
+
+function buildAttendanceMatrixReloadUrl(state = {}) {
+    const url = new URL(`${window.location.origin}/school/attendances`);
+    const next = state && typeof state === 'object' ? state : captureAttendanceMatrixFilterState();
+    if (next.classId) url.searchParams.set('classId', next.classId);
+    if (next.className && next.className !== 'Loading Class Data...') {
+        url.searchParams.set('className', next.className);
+    }
+    if (next.startDate) url.searchParams.set('startDate', next.startDate);
+    if (next.endDate) url.searchParams.set('endDate', next.endDate);
+    if (next.range) url.searchParams.set('range', next.range);
+    return url.pathname + url.search;
+}
+
+function navigateAttendanceMatrixReload(state) {
+    window.location.assign(buildAttendanceMatrixReloadUrl(state));
+}
+
+function resolveEffectiveAttendanceRequestMaxAttempts() {
+    const override = Number(ATTENDANCE_MATRIX_UI_REQUEST_LIMIT_OVERRIDE);
+    if (Number.isFinite(override) && override > 0) return Math.floor(override);
+    const serverMax = attendanceRequestBudgetState.maxAttempts;
+    return serverMax > 0 ? serverMax : 0;
+}
+
+function resolveEffectiveAttendanceRequestCount() {
+    const override = Number(ATTENDANCE_MATRIX_UI_REQUEST_LIMIT_OVERRIDE);
+    if (Number.isFinite(override) && override > 0) {
+        return attendanceRequestBudgetState.mutationCount || 0;
+    }
+    return attendanceRequestBudgetState.attemptCount;
+}
+
+function clearAttendanceBudgetNotice() {
+    const notice = document.getElementById('attendanceBudgetNotice');
+    if (notice) notice.remove();
+}
+
+function syncAttendanceRequestBudgetFromUsage() {
+    clearAttendanceBudgetNotice();
+    syncAttendanceRequestBudgetExhausted({ prompt: true });
+}
+
+function syncAttendanceRequestBudgetExhausted({ prompt = true } = {}) {
+    const maxAttempts = resolveEffectiveAttendanceRequestMaxAttempts();
+    const attemptCount = resolveEffectiveAttendanceRequestCount();
+    const isExhausted = maxAttempts > 0 && attemptCount >= maxAttempts;
+    const wasExhausted = attendanceRequestBudgetState.exhausted;
+    attendanceRequestBudgetState.exhausted = isExhausted;
+    if (prompt && isExhausted && !wasExhausted && !attendanceRequestBudgetState.reloadPromptShown) {
+        void promptAttendanceMatrixReload({ reason: 'limit_reached' });
+    }
+}
+
+async function ensureAttendanceRequestBudgetAvailable() {
+    syncAttendanceRequestBudgetExhausted({ prompt: true });
+    if (!attendanceRequestBudgetState.exhausted) return true;
+    if (!attendanceRequestBudgetState.reloadPromptShown) {
+        await promptAttendanceMatrixReload({ reason: 'limit_reached' });
+    }
+    return false;
+}
+
+async function promptAttendanceMatrixReload({ reason = 'limit_reached', serverMessage = '' } = {}) {
+    if (attendanceRequestBudgetState.reloadPromptShown) return false;
+    attendanceRequestBudgetState.reloadPromptShown = true;
+    attendanceRequestBudgetState.exhausted = true;
+
+    const attemptCount = attendanceRequestBudgetState.attemptCount;
+    const effectiveCount = resolveEffectiveAttendanceRequestCount();
+    const maxAttempts = resolveEffectiveAttendanceRequestMaxAttempts();
+    const attemptUsage = maxAttempts > 0
+        ? `<p class="small text-muted mt-2 mb-0">Requests used: <strong>${effectiveCount}</strong> / <strong>${maxAttempts}</strong></p>`
+        : '';
+
+    let body = '';
+    if (reason === 'limit_reached') {
+        body = `<p class="mb-2">This attendance page can only send a limited number of updates at one time. You have reached that limit.</p>
+            <p class="mb-2">Attendance you already saved is stored. If you have an attendance cell open with unsaved changes, save or note them before reloading.</p>
+            <p class="mb-0">Click <strong>Reload page</strong> to continue with the same class and date filters.</p>${attemptUsage}`;
+    } else {
+        const cleaned = String(serverMessage || '').trim();
+        body = `${cleaned || '<p class="mb-0">The attendance page session is no longer valid.</p>'}
+            <p class="mt-2 mb-0">Click <strong>Reload page</strong> to continue with the same class and date filters.</p>${attemptUsage}`;
+    }
+
+    const reloadChoice = await showAttendanceMatrixMessage({
+        title: 'Attendance page needs a refresh',
+        icon: 'warning',
+        message: body,
+        buttons: [
+            { text: 'Close', class: 'btn-secondary', value: false },
+            { text: 'Reload page', class: 'btn-primary', value: true }
+        ]
+    });
+    if (reloadChoice === true || reloadChoice?.value === true || reloadChoice === 'Reload page') {
+        navigateAttendanceMatrixReload(captureAttendanceMatrixFilterState());
+        return true;
+    }
+    return false;
 }
 
 function attendanceSanitizeMessageText(message) {
     return String(message || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function renderAttendanceBudgetNotice(level, messageHtml) {
-    const resultsHeader = document.querySelector('#resultsContainer .card-header');
-    if (!resultsHeader) return;
-    let notice = document.getElementById('attendanceBudgetNotice');
-    if (!level) {
-        if (notice) notice.remove();
-        return;
-    }
-    if (!notice) {
-        notice = document.createElement('div');
-        notice.id = 'attendanceBudgetNotice';
-        notice.className = 'w-100 mt-2';
-        resultsHeader.appendChild(notice);
-    }
-    const levelClass = level >= 2 ? 'alert alert-warning' : 'alert alert-secondary';
-    notice.innerHTML = `<div class="${levelClass} py-2 px-3 mb-0 small">${messageHtml}</div>`;
-}
-
-function maybeWarnAttendanceBudgetUsage() {
-    const maxAttempts = attendanceRequestBudgetState.maxAttempts;
-    const attemptCount = attendanceRequestBudgetState.attemptCount;
-    if (!(maxAttempts > 0) || !(attemptCount >= 0)) {
-        renderAttendanceBudgetNotice(0, '');
-        return;
-    }
-    const ratio = attemptCount / maxAttempts;
-    let level = 0;
-    if (ratio >= 0.9) level = 2;
-    else if (ratio >= 0.7) level = 1;
-    if (!level) {
-        renderAttendanceBudgetNotice(0, '');
-        return;
-    }
-    attendanceRequestBudgetState.warnLevel = Math.max(attendanceRequestBudgetState.warnLevel, level);
-    const remaining = Math.max(0, maxAttempts - attemptCount);
-    const label = level === 2
-        ? 'Attendance request usage is near the session limit.'
-        : 'Attendance request usage is elevated for this page session.';
-    renderAttendanceBudgetNotice(
-        level,
-        `${label} Attempts: <strong>${attemptCount}</strong> / <strong>${maxAttempts}</strong> (remaining: ${remaining}).`
-    );
-}
-
 function hydrateAttendanceBudgetFromApi(response, result, options = {}) {
     const estimateAttempt = options.estimateAttempt !== false;
+    const source = String(options.source || 'unknown').trim();
+    let countedFromServer = false;
     const headers = response?.headers;
     if (headers && typeof headers.get === 'function') {
         setAttendanceActionStateId(headers.get('x-action-state-id'));
+        const headerAttemptRaw = headers.get('x-action-state-attempt-count');
+        if (headerAttemptRaw != null && String(headerAttemptRaw).trim() !== '') countedFromServer = true;
         setAttendanceBudgetState({
-            attemptCount: headers.get('x-action-state-attempt-count'),
+            attemptCount: headerAttemptRaw,
             maxAttempts: headers.get('x-action-state-max-attempts'),
             maxTimeMinutes: headers.get('x-action-state-max-time-minutes'),
             maxVolumeKB: headers.get('x-action-state-max-volume-kb')
@@ -963,14 +1047,23 @@ function hydrateAttendanceBudgetFromApi(response, result, options = {}) {
     }
     const context = result?.actionStateContext;
     if (context && typeof context === 'object') {
+        countedFromServer = true;
         setAttendanceBudgetState({
             attemptCount: context.attemptCount,
             maxAttempts: context.maxAttempts
         });
-    } else if (estimateAttempt) {
+    } else if (estimateAttempt && !countedFromServer) {
         attendanceRequestBudgetState.attemptCount += 1;
     }
-    maybeWarnAttendanceBudgetUsage();
+    if (
+        ATTENDANCE_MATRIX_MUTATION_BUDGET_SOURCES.has(source)
+        && result
+        && typeof result === 'object'
+        && result.status === 'success'
+    ) {
+        attendanceRequestBudgetState.mutationCount += 1;
+    }
+    syncAttendanceRequestBudgetFromUsage();
 }
 
 function isHandledAttendanceActionStateError(error) {
@@ -1010,26 +1103,15 @@ async function handleAttendanceActionStateFailure(result) {
             attemptCount: context.attemptCount,
             maxAttempts: context.maxAttempts
         });
-        maybeWarnAttendanceBudgetUsage();
+        syncAttendanceRequestBudgetFromUsage();
     }
 
     if (!isAttendanceActionStateReloadRecommended(message)) return false;
 
-    const attemptUsage = hasContext && (context.attemptCount || context.maxAttempts)
-        ? `<p class="small text-muted mt-2 mb-0">Attempts: ${context.attemptCount || '?'} / ${context.maxAttempts || '?'}</p>`
-        : '';
-    const reloadChoice = await showAttendanceMatrixMessage({
-        title: 'Attendance session refresh needed',
-        icon: 'warning',
-        message: `${message || '<p class="mb-0">The attendance action session is no longer valid.</p>'}<p class="mt-2 mb-0">Reload this page to continue safely.</p>${attemptUsage}`,
-        buttons: [
-            { text: 'Close', class: 'btn-secondary', value: false },
-            { text: 'Reload page', class: 'btn-primary', value: true }
-        ]
+    await promptAttendanceMatrixReload({
+        reason: 'session_invalid',
+        serverMessage: message || '<p class="mb-0">The attendance page session is no longer valid.</p>'
     });
-    if (reloadChoice === true || reloadChoice?.value === true || reloadChoice === 'Reload page') {
-        window.location.reload();
-    }
     return true;
 }
 
@@ -1259,7 +1341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     setAttendanceActionStateId(actionStateId);
     setAttendanceBudgetState(window.ATTENDANCE_ACTION_LIMITS || {});
-    maybeWarnAttendanceBudgetUsage();
+    syncAttendanceRequestBudgetFromUsage();
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
     window.CAN_MARK_ATTENDANCE_EXCUSED = <%= (typeof canMarkAttendanceExcused !== 'undefined' && canMarkAttendanceExcused) ? 'true' : 'false' %>;
     window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
@@ -1315,52 +1397,77 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function normalizeAttendanceRangeToken(raw) {
+        const token = String(raw || '').trim();
+        if (!token) return '';
+        const lower = token.toLowerCase();
+        if (lower === 'alltime' || lower === 'all_time') return 'allTime';
+        const known = ['today', 'twoWeeks', 'thisWeek', 'prevWeek', 'thisMonth', 'prevMonth'];
+        return known.find((key) => key.toLowerCase() === lower) || '';
+    }
+
+    function computeAttendanceRangeDates(range) {
+        const today = new Date();
+        let start;
+        let end;
+        if (range === 'today') {
+            start = startOfLocalDay(today);
+            end = new Date(start);
+        } else if (range === 'twoWeeks') {
+            const day = today.getDay() || 7;
+            start = startOfLocalDay(today);
+            start.setDate(today.getDate() - (day - 1));
+            end = new Date(start);
+            end.setDate(start.getDate() + 13);
+        } else if (range === 'thisWeek') {
+            const day = today.getDay() || 7;
+            start = startOfLocalDay(today);
+            start.setDate(today.getDate() - (day - 1));
+            end = new Date(start);
+            end.setDate(start.getDate() + 6);
+        } else if (range === 'prevWeek') {
+            const day = today.getDay() || 7;
+            start = startOfLocalDay(today);
+            start.setDate(today.getDate() - (day - 1) - 7);
+            end = new Date(start);
+            end.setDate(start.getDate() + 6);
+        } else if (range === 'thisMonth') {
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        } else if (range === 'prevMonth') {
+            start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            end = new Date(today.getFullYear(), today.getMonth(), 0);
+        } else {
+            return null;
+        }
+        return { start, end };
+    }
+
+    function applyAttendanceRangeSelection(range, { autoLoad = true } = {}) {
+        const token = normalizeAttendanceRangeToken(range);
+        if (!token) return false;
+        if (token === 'allTime') {
+            setDateRange(null, null);
+            setActiveRangeChip('allTime');
+            if (autoLoad && document.getElementById('filter_classId').value) {
+                document.getElementById('btn_loadData').click();
+            }
+            return true;
+        }
+        const dates = computeAttendanceRangeDates(token);
+        if (!dates) return false;
+        setDateRange(dates.start, dates.end);
+        setActiveRangeChip(token);
+        if (autoLoad && document.getElementById('filter_classId').value) {
+            document.getElementById('btn_loadData').click();
+        }
+        return true;
+    }
+
     document.querySelectorAll('.btn-range').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const range = e.currentTarget.getAttribute('data-range');
-            const today = new Date();
-            let start;
-            let end;
-
-            if (range === 'today') {
-                start = startOfLocalDay(today);
-                end = new Date(start);
-            } else if (range === 'twoWeeks') {
-                const day = today.getDay() || 7;
-                start = startOfLocalDay(today);
-                start.setDate(today.getDate() - (day - 1));
-                end = new Date(start);
-                end.setDate(start.getDate() + 13);
-            } else if (range === 'thisWeek') {
-                const day = today.getDay() || 7;
-                start = startOfLocalDay(today);
-                start.setDate(today.getDate() - (day - 1));
-                end = new Date(start);
-                end.setDate(start.getDate() + 6);
-            } else if (range === 'prevWeek') {
-                const day = today.getDay() || 7;
-                start = startOfLocalDay(today);
-                start.setDate(today.getDate() - (day - 1) - 7);
-                end = new Date(start);
-                end.setDate(start.getDate() + 6);
-            } else if (range === 'thisMonth') {
-                start = new Date(today.getFullYear(), today.getMonth(), 1);
-                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            } else if (range === 'prevMonth') {
-                start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                end = new Date(today.getFullYear(), today.getMonth(), 0);
-            } else if (range === 'allTime') {
-                setDateRange(null, null);
-                setActiveRangeChip(range);
-                if (document.getElementById('filter_classId').value) document.getElementById('btn_loadData').click();
-                return;
-            } else {
-                return;
-            }
-
-            setDateRange(start, end);
-            setActiveRangeChip(range);
-            if (document.getElementById('filter_classId').value) document.getElementById('btn_loadData').click();
+            applyAttendanceRangeSelection(range);
         });
     });
 
@@ -1705,6 +1812,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchAttendanceChangeLogForCell({ classId, sessionId, personId }) {
+        if (!(await ensureAttendanceRequestBudgetAvailable())) {
+            throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
+        }
         const params = new URLSearchParams({
             classId: String(classId || '').trim(),
             sessionId: String(sessionId || '').trim(),
@@ -1714,7 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: { 'X-AJAX-Request': 'true' }
         });
         const result = await res.json();
-        hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
+        hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true, source: 'change-log' });
         if (result.status !== 'success') {
             const handled = await handleAttendanceActionStateFailure(result);
             if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
@@ -1934,6 +2044,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function refreshAttendanceDisplayRollups(options = {}) {
         const data = window.currentMatrixData;
         if (!data?.classId || !Array.isArray(data.matrix)) return false;
+        if (!(await ensureAttendanceRequestBudgetAvailable())) return false;
         const startDate = String(document.getElementById('filter_startDate')?.value || data.startDate || '').trim();
         const endDate = String(document.getElementById('filter_endDate')?.value || data.endDate || '').trim();
         const personIds = Array.isArray(options.personIds)
@@ -1952,7 +2063,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(requestBody)
             });
             const result = await res.json().catch(() => null);
-            hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
+            hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true, source: 'rollups' });
             if (!result || result.status !== 'success') {
                 const handled = await handleAttendanceActionStateFailure(result || {});
                 if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
@@ -2038,6 +2149,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!classId) return;
         if (attMatrixWindowState.loading) return;
+        if (!(await ensureAttendanceRequestBudgetAvailable())) return;
 
         const btn = document.getElementById('btn_loadData');
         const originalHtml = btn.innerHTML;
@@ -2069,10 +2181,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? (attMatrixWindowState.loadedSessions || MATRIX_SESSION_WINDOW)
                     : MATRIX_SESSION_WINDOW)
             });
+            const sessionIdsFilter = String(
+                options.sessionIds
+                || new URLSearchParams(window.location.search).get('sessionIds')
+                || ''
+            ).trim();
+            if (sessionIdsFilter) params.set('sessionIds', sessionIdsFilter);
             const url = `/school/attendances/api/data?${params.toString()}`;
             const res = await fetch(url, { cache: 'no-store', headers: { 'X-AJAX-Request': 'true' } });
             const chunk = await res.json();
-            hydrateAttendanceBudgetFromApi(res, chunk, { estimateAttempt: true });
+            hydrateAttendanceBudgetFromApi(res, chunk, { estimateAttempt: true, source: 'matrix-load' });
             const guarded = typeof window.applyGuardedApiResult === 'function'
                 ? await window.applyGuardedApiResult(chunk, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
                 : { stop: false };
@@ -2867,6 +2985,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
+            if (!(await ensureAttendanceRequestBudgetAvailable())) return;
             const payload = {
                 classId: classId,
                 sessionId: sessionId,
@@ -2883,7 +3002,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             });
             const result = await res.json();
-            hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
+            hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true, source: 'comment-save' });
             const guarded = typeof window.applyGuardedApiResult === 'function'
                 ? await window.applyGuardedApiResult(result, { busyTitle: 'Send Note In Progress', replayTitle: 'Note Already Sent' })
                 : { stop: false };
@@ -2991,6 +3110,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             try {
+                if (!(await ensureAttendanceRequestBudgetAvailable())) return;
                 const payload = {
                     classId,
                     sessionId,
@@ -3014,7 +3134,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(payload)
                 });
                 const result = await res.json();
-                hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true });
+                hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true, source: 'cell-save' });
                 const guarded = typeof window.applyGuardedApiResult === 'function'
                     ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Completed' })
                     : { stop: false };
@@ -3070,8 +3190,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let qEnd = (urlParams.get('endDate') || init.endDate || '').trim();
     const qStudentId = (urlParams.get('studentId') || init.studentId || '').trim();
     const qSessionId = (urlParams.get('sessionId') || init.sessionId || '').trim();
-    const qRange = (urlParams.get('range') || init.range || '').trim().toLowerCase();
-    const wantsAllTimeRange = qRange === 'alltime' || qRange === 'all_time';
+    const qSessionIds = (urlParams.get('sessionIds') || init.sessionIds || '').trim();
+    const qRange = (urlParams.get('range') || init.range || '').trim();
+    const normalizedRange = normalizeAttendanceRangeToken(qRange);
 
     if (qStart && !qEnd) qEnd = qStart;
 
@@ -3083,15 +3204,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (qEnd) document.getElementById('filter_endDate').value = qEnd;
 
     if (!qClassId) {
-        document.querySelector('.btn-range[data-range="thisWeek"]').click();
+        applyAttendanceRangeSelection('thisWeek');
     } else if (qStart && qEnd) {
+        if (normalizedRange) setActiveRangeChip(normalizedRange);
         document.getElementById('btn_loadData').click();
-    } else if (wantsAllTimeRange) {
-        document.querySelector('.btn-range[data-range="allTime"]').click();
+    } else if (normalizedRange) {
+        applyAttendanceRangeSelection(normalizedRange);
     } else if (qStudentId && qSessionId && !qStart) {
-        document.querySelector('.btn-range[data-range="allTime"]').click();
+        applyAttendanceRangeSelection('allTime');
+    } else if (qSessionIds && qClassId && !qStart) {
+        applyAttendanceRangeSelection('allTime');
     } else {
-        document.querySelector('.btn-range[data-range="thisWeek"]').click();
+        applyAttendanceRangeSelection('thisWeek');
     }
     renderAttendanceMatrixLegend();
 });

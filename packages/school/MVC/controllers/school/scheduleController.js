@@ -19,6 +19,8 @@ const sessionDeliveryTeamService = require('../../services/school/sessionDeliver
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
+const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
+const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -1793,6 +1795,10 @@ async function showSchedulePage(req, res) {
         const viewerScheduleAccess = scheduleAccessService.toViewerScheduleAccess(scheduleCapabilities);
         const safePersonId = viewerScheduleAccess.canSelectAnyPerson ? (personId || '') : (viewerScheduleAccess.lockedPersonId || '');
         const safePersonName = viewerScheduleAccess.canSelectAnyPerson ? (personName || '') : (viewerScheduleAccess.lockedPersonName || '');
+        const activeOrgId = String(req.user?.activeOrgId || '').trim();
+        const attendanceMarkAppearanceResolved = activeOrgId
+            ? await attendanceMarkAppearancePolicyModel.getPolicyForOrg(activeOrgId)
+            : { marks: [] };
 
         res.render('school/schedule/personSchedule', {
             title: 'Master Schedule Viewer',
@@ -1804,6 +1810,7 @@ async function showSchedulePage(req, res) {
             prefillDate: date || '',
             viewerScheduleAccess,
             scheduleCapabilities,
+            attendanceMarkAppearanceResolved
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -2144,6 +2151,39 @@ async function listInstructorClassesForSchedule(req, res) {
     }
 }
 
+async function getSessionAttendanceList(req, res) {
+    try {
+        const classId = String(req.query?.classId || '').trim();
+        const sessionId = String(req.query?.sessionId || '').trim();
+        const payload = await scheduleSessionContextService.buildSessionAttendanceList({
+            classId,
+            sessionId,
+            reqUser: req.user
+        });
+        res.json({ status: 'success', ...payload });
+    } catch (error) {
+        res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function getSessionEnrollmentList(req, res) {
+    try {
+        const classId = String(req.query?.classId || '').trim();
+        const sessionId = String(req.query?.sessionId || '').trim();
+        const asOfDate = String(req.query?.asOfDate || '').trim();
+        const useCurrentDate = ['1', 'true', 'yes', 'on'].includes(String(req.query?.useCurrentDate || '').trim().toLowerCase());
+        const payload = await scheduleSessionContextService.buildSessionEnrollmentList({
+            classId,
+            sessionId,
+            reqUser: req.user,
+            asOfDate: useCurrentDate ? resolveOrgTodayFromRequest(req) : asOfDate
+        });
+        res.json({ status: 'success', ...payload });
+    } catch (error) {
+        res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 module.exports = {
     showSchedulePage,
     showMySchedulePage,
@@ -2153,6 +2193,8 @@ module.exports = {
     pickerSchoolSchedulePersons,
     listActiveTeacherSchedulePersons,
     listInstructorClassesForSchedule,
+    getSessionAttendanceList,
+    getSessionEnrollmentList,
     showGlobalSchedulePage,
     getGlobalSchedule,
     buildScheduleViewerAccess,

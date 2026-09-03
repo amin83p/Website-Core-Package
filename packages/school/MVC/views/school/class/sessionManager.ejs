@@ -1143,6 +1143,25 @@
         background: #f1f5f9;
         cursor: not-allowed;
     }
+    .session-gradebook-card tr.gb-row-attendance-unmarked {
+        background-color: #fff8e1;
+    }
+    .session-gradebook-card tr.gb-row-attendance-unmarked td {
+        background-color: inherit;
+    }
+    .session-gradebook-card tr.gb-row-attendance-blocked {
+        background-color: #f8fafc;
+    }
+    .session-gradebook-card tr.gb-row-attendance-blocked td {
+        background-color: inherit;
+    }
+    .session-gradebook-card .gb-attendance-footnote {
+        border-left: 3px solid #f59e0b;
+        background: #fffbeb;
+        border-radius: 6px;
+        padding: 0.65rem 0.85rem;
+        color: #92400e;
+    }
     .session-gradebook-card .gb-comment-btn {
         min-width: 2.25rem;
         padding-left: 0.45rem;
@@ -8910,9 +8929,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return row.querySelector('.att-radio:checked')?.value || '';
     }
 
+    function gbIsPersonAttendanceUnmarked(personId) {
+        return !String(gbAttendanceStatus(personId) || '').trim();
+    }
+
     function gbIsPersonAbsent(personId) {
         const status = gbAttendanceStatus(personId);
         return status === 'absent' || status === 'acf' || status === 'not_applicable';
+    }
+
+    function gbIsPersonGradeBlocked(personId) {
+        return gbIsPersonAttendanceUnmarked(personId) || gbIsPersonAbsent(personId);
     }
 
     function gbNormalizeSkillToken(value) {
@@ -9280,7 +9307,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const total = Number(gb.totalScore);
             gradebookRoster.forEach(({ personId }) => {
                 const pid = String(personId);
-                if (gbIsPersonAbsent(pid)) {
+                if (gbIsPersonGradeBlocked(pid)) {
                     gb.scores[pid] = null;
                     if (gb.scoreComments && typeof gb.scoreComments === 'object') delete gb.scoreComments[pid];
                     return;
@@ -9358,12 +9385,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const rows = gradebookRoster.length
                 ? gradebookRoster.map(({ personId, name }) => {
                     const pid = String(personId);
-                    const absent = gbIsPersonAbsent(pid);
-                    const sc = gb.scores[pid];
-                    if (absent) {
+                    const unmarked = gbIsPersonAttendanceUnmarked(pid);
+                    if (gbIsPersonGradeBlocked(pid)) {
                         const attendanceStatus = gbAttendanceStatus(pid);
-                        const blockedLabel = attendanceStatus === 'not_applicable' ? 'N/A' : 'Absent';
-                        return `<tr>
+                        let blockedLabel = 'Absent';
+                        let rowClass = 'gb-row-attendance-blocked';
+                        if (unmarked) {
+                            blockedLabel = 'Not marked';
+                            rowClass = 'gb-row-attendance-unmarked';
+                        } else if (attendanceStatus === 'not_applicable') {
+                            blockedLabel = 'N/A';
+                        }
+                        return `<tr class="${rowClass}">
                         <td class="ps-3">${gbEscapeHtml(name)}</td>
                         <td class="text-muted"><span class="badge bg-light text-muted border">${gbEscapeHtml(blockedLabel)}</span></td>
                         <td class="text-muted">N/A</td>
@@ -9371,6 +9404,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td class="text-muted">—</td>
                     </tr>`;
                     }
+                    const sc = gb.scores[pid];
                     const val = sc !== null && sc !== undefined && !Number.isNaN(Number(sc)) ? String(sc) : '';
                     return `<tr>
                     <td class="ps-3">${gbEscapeHtml(name)}</td>
@@ -9412,7 +9446,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`);
         });
 
-        host.innerHTML = parts.join('');
+        const showAttendanceFootnote = gradebookRoster.some(({ personId }) => gbIsPersonAttendanceUnmarked(String(personId)));
+        host.innerHTML = parts.join('') + (showAttendanceFootnote
+            ? `<div class="gb-attendance-footnote small mt-3" role="note">
+                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                Highlighted rows are students without attendance marked. Mark attendance on the Attendance tab before entering grades; scores entered without attendance are not saved.
+            </div>`
+            : '');
 
         host.querySelectorAll('input.gb-score-input').forEach((inp) => {
             inp.addEventListener('input', () => {
@@ -9709,7 +9749,10 @@ document.addEventListener('DOMContentLoaded', () => {
         gradebooksState.forEach((gb) => {
             gradebookRoster.forEach(({ personId }) => {
                 const pid = String(personId);
-                if (gbIsPersonAbsent(pid)) gb.scores[pid] = null;
+                if (gbIsPersonGradeBlocked(pid)) {
+                    gb.scores[pid] = null;
+                    if (gb.scoreComments && typeof gb.scoreComments === 'object') delete gb.scoreComments[pid];
+                }
             });
         });
         gbRenderList();

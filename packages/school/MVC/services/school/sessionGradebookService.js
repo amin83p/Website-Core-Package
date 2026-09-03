@@ -65,15 +65,16 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
     const scoreComments = {};
 
     for (const pid of personIds) {
-      const att = attendanceByPerson.get(pid) || 'absent';
-      const isAbsent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
+      const att = attendanceByPerson.has(pid) ? attendanceByPerson.get(pid) : '';
+      const isGradeBlocked = attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(att)
+        || attendanceMatrixMetricsService.isAbsentLikeStatus(att)
         || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       let v = rawScores[pid];
       if (v === undefined) v = rawScores[String(pid)];
       if (v === '' || v === undefined) v = null;
       if (v !== null && v !== undefined) v = Number(v);
 
-      if (isAbsent) {
+      if (isGradeBlocked) {
         scores[pid] = null;
       } else if (v === null || Number.isNaN(v)) {
         scores[pid] = null;
@@ -83,7 +84,7 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
         scores[pid] = v;
       }
 
-      if (isAbsent) continue;
+      if (isGradeBlocked) continue;
       let comment = rawScoreComments[pid];
       if (comment === undefined) comment = rawScoreComments[String(pid)];
       comment = String(comment || '').trim().slice(0, MAX_SCORE_COMMENT_LENGTH);

@@ -6084,7 +6084,7 @@ async function normalizeSessionGradebooksForSave(classData, session, rawList, re
                 pid,
                 attendanceMatrixMetricsService.normalizeStatus(
                     r.attendance,
-                    attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+                    ''
                 )
             );
         }

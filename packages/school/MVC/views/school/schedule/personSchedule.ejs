@@ -1287,6 +1287,8 @@
     }
 </style>
 
+<%- include('school/attendance/_attendanceMarkAppearance') %>
+
 <link rel="stylesheet" href="/styles/session-calendar.css">
 
 <%
@@ -1478,6 +1480,66 @@
   </div>
 </div>
 
+<div id="scheduleSessionContextMenu" class="schedule-session-context-menu d-none" role="menu" aria-hidden="true">
+  <div class="schedule-session-context-menu-header" id="scheduleSessionContextMenuHeader"></div>
+  <div class="schedule-session-context-menu-actions">
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleSessionContextAttendance" role="menuitem">
+      <i class="bi bi-clipboard2-check" aria-hidden="true"></i>
+      <span>Attendance List</span>
+    </button>
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleSessionContextEnrollment" role="menuitem">
+      <i class="bi bi-people" aria-hidden="true"></i>
+      <span>Enrollment List</span>
+    </button>
+  </div>
+  <div class="schedule-session-context-menu-divider"></div>
+  <div class="schedule-session-context-menu-section-label">Session status</div>
+  <div id="scheduleSessionContextStatusList" class="schedule-session-context-status-list"></div>
+</div>
+
+<div class="modal fade" id="scheduleSessionAttendanceModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleSessionAttendanceModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="scheduleSessionAttendanceModalTitle">Attendance List</h5>
+          <div class="small text-muted" id="scheduleSessionAttendanceModalSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0" id="scheduleSessionAttendanceModalBody"></div>
+      <div class="modal-footer flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="#" class="btn btn-outline-primary" id="btn_scheduleSessionAttendanceOpenMatrix" target="_blank" rel="noopener">Open Attendance Matrix</a>
+        <a href="#" class="btn btn-primary" id="btn_scheduleSessionAttendanceOpenSession" target="_blank" rel="noopener">Open Session</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleSessionEnrollmentModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleSessionEnrollmentModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="scheduleSessionEnrollmentModalTitle">Enrollment List</h5>
+          <div class="small text-muted" id="scheduleSessionEnrollmentModalSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0" id="scheduleSessionEnrollmentModalBody"></div>
+      <div class="modal-footer flex-wrap gap-2 justify-content-between">
+        <div class="small text-muted" id="scheduleSessionEnrollmentAsOfNote"></div>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary" id="btn_scheduleSessionEnrollmentRefreshCurrent" title="Refresh enrollment usage as of today">Update to today</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          <a href="#" class="btn btn-primary" id="btn_scheduleSessionEnrollmentOpenSession" target="_blank" rel="noopener">Open Session</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <% if (canDragCreateSessions) { %>
 <%- include('school/partials/sessionEnrollmentCalendarModal') %>
 <link rel="stylesheet" href="/styles/session-calendar.css">
@@ -1517,6 +1579,7 @@
 
 <script src="/scripts/scheduleCompletionDisplay.js"></script>
 <script src="/scripts/sessionCalendarCore.js"></script>
+<script src="/scripts/attendanceMarkAppearanceClient.js"></script>
 <% if (canDragCreateSessions) { %>
 <script src="/scripts/sessionEnrollmentCalendarModal.js"></script>
 <% } %>
@@ -2576,6 +2639,449 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = String(event?.date || '').trim();
         if (!classId || !sessionId || !date) return '';
         return `${classId}::${sessionId}::${date}`;
+    }
+
+    function isClassSessionScheduleEvent(event) {
+        if (!event || event.isDraft) return false;
+        const eventType = String(event?.eventType || event?.targetType || '').trim().toLowerCase();
+        if (eventType && eventType !== 'class_session' && eventType !== 'session') return false;
+        if (isLeaveEvent(event) || isReportScheduleEvent(event)) return false;
+        if (String(event?.activityId || '').trim()) return false;
+        return Boolean(String(event?.classId || '').trim() && String(event?.sessionId || '').trim() && String(event?.date || '').trim());
+    }
+
+    function buildScheduleSessionContextDataAttrs(event) {
+        const selectionKey = escapeHtml(scheduleSessionSelectionKey(event));
+        const keyAttr = selectionKey ? `data-schedule-session-key="${selectionKey}"` : '';
+        if (!isClassSessionScheduleEvent(event)) return keyAttr;
+        const classId = escapeHtml(String(event.classId || '').trim());
+        const sessionId = escapeHtml(String(event.sessionId || '').trim());
+        const sessionDate = escapeHtml(String(event.date || '').trim());
+        return `${keyAttr} data-class-id="${classId}" data-session-id="${sessionId}" data-session-date="${sessionDate}" data-event-type="class_session"`;
+    }
+
+    function resolveScheduleContextEventFromTarget(target) {
+        const block = target?.closest?.('[data-event-type="class_session"][data-session-id][data-class-id]');
+        if (!block) return null;
+        const key = String(block.getAttribute('data-schedule-session-key') || '').trim();
+        const person = activeSchedulePerson();
+        if (!person?.id) return null;
+        const events = getScheduleEventsForPerson(person.id);
+        if (key) {
+            const matched = events.find((row) => scheduleSessionSelectionKey(row) === key);
+            if (matched) return matched;
+        }
+        const classId = String(block.getAttribute('data-class-id') || '').trim();
+        const sessionId = String(block.getAttribute('data-session-id') || '').trim();
+        const sessionDate = String(block.getAttribute('data-session-date') || '').trim();
+        return events.find((row) => String(row?.classId || '').trim() === classId
+            && String(row?.sessionId || '').trim() === sessionId
+            && String(row?.date || '').trim() === sessionDate) || null;
+    }
+
+    function normalizeScheduleStatusAccessType(value) {
+        return String(value || 'all').trim().toLowerCase();
+    }
+
+    function scheduleStatusMatchesCapacityMode(meta, capacityMode) {
+        const mode = String(capacityMode || '').trim().toLowerCase();
+        if (!mode || mode === 'both') return true;
+        const capacity = String(meta?.classCapacity || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+        const normalizedCapacity = !capacity || capacity === 'all'
+            ? 'both'
+            : (capacity === 'one_on_one' || capacity === '1_on_1' || capacity === 'oneonone' ? 'one_on_one' : (capacity === 'group' ? 'group' : 'both'));
+        if (normalizedCapacity === 'both') return true;
+        return normalizedCapacity === mode;
+    }
+
+    function buildScheduleSessionStatusMenuItems(event) {
+        const person = activeSchedulePerson();
+        const statusMeta = Array.isArray(scheduleState.statusMetaByPersonId[person?.id || ''])
+            ? scheduleState.statusMetaByPersonId[person.id]
+            : [];
+        const allowAdminStatuses = canSelectAnyPerson === true;
+        const capacityMode = event?.isOneOnOneClass ? 'one_on_one' : 'group';
+        const currentStatus = normalizeSessionStatus(event?.status);
+        return statusMeta
+            .filter((row) => row?.active !== false)
+            .filter((row) => allowAdminStatuses || normalizeScheduleStatusAccessType(row?.accessType) !== 'admins')
+            .filter((row) => scheduleStatusMatchesCapacityMode(row, capacityMode))
+            .sort((a, b) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0))
+            .map((row) => ({
+                code: normalizeSessionStatus(row?.code),
+                label: String(row?.label || row?.code || '').trim(),
+                colorBg: row?.colorBg || '#e2e3e5',
+                colorText: row?.colorText || '#41464b',
+                colorBorder: row?.colorBorder || '#c6c8ca',
+                isCurrent: normalizeSessionStatus(row?.code) === currentStatus
+            }));
+    }
+
+    function scheduleAttendanceFlagIsTrue(value) {
+        return value === true || value === 1 || ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+    }
+
+    function scheduleAttendanceIsAbsentLike(status) {
+        const att = String(status || '').trim().toLowerCase();
+        return att === 'absent' || att === 'acf';
+    }
+
+    function scheduleBuildLateTimingIcon(rec) {
+        const late = Number(rec?.lateMinutes) || 0;
+        const early = Number(rec?.earlyLeaveMinutes) || 0;
+        const markAppearance = window.AttendanceMarkAppearance;
+        const innerIcon = markAppearance?.buildMarkIconHtml
+            ? markAppearance.buildMarkIconHtml('late')
+            : '<i class="bi bi-clock-fill status-late"></i>';
+        const ringClass = (late > 0 && scheduleAttendanceFlagIsTrue(rec?.lateExcused))
+            || (early > 0 && scheduleAttendanceFlagIsTrue(rec?.earlyLeaveExcused))
+            ? 'attendance-timing-excuse-partial'
+            : '';
+        if (markAppearance?.buildTimingExcuseIcon) {
+            return markAppearance.buildTimingExcuseIcon(innerIcon, ringClass);
+        }
+        return innerIcon;
+    }
+
+    function scheduleBuildAttendanceTooltip(rec) {
+        const markAppearance = window.AttendanceMarkAppearance;
+        const status = String(rec?.attendance || rec?.status || '').trim().toLowerCase();
+        let tooltip = 'Not marked yet';
+        if (status === 'present') tooltip = markAppearance?.getMark('present')?.label || 'Present';
+        else if (status === 'late') tooltip = markAppearance?.getMark('late')?.label || 'Late';
+        else if (status === 'excused' || (status === 'absent' && scheduleAttendanceFlagIsTrue(rec?.absenceExcused))) {
+            tooltip = markAppearance?.getMark('excused_absence')?.label || 'Excused absence';
+        } else if (status === 'absent') tooltip = markAppearance?.getMark('absent')?.label || 'Absent';
+        else if (status === 'acf' && scheduleAttendanceFlagIsTrue(rec?.absenceExcused)) {
+            tooltip = markAppearance?.getMark('excused_absence')?.label || 'Excused ACF';
+        } else if (status === 'acf') tooltip = markAppearance?.getMark('acf')?.label || 'Absent Camera Off';
+        else if (status === 'not_applicable') tooltip = markAppearance?.getMark('not_applicable')?.label || 'N/A';
+
+        const late = Number(rec?.lateMinutes) || 0;
+        const early = Number(rec?.earlyLeaveMinutes) || 0;
+        const parts = [tooltip];
+        if (late > 0) parts.push(`Late ${late} min${scheduleAttendanceFlagIsTrue(rec?.lateExcused) ? ' (excused)' : ''}`);
+        if (early > 0) parts.push(`Early leave ${early} min${scheduleAttendanceFlagIsTrue(rec?.earlyLeaveExcused) ? ' (excused)' : ''}`);
+        if (scheduleAttendanceIsAbsentLike(status) && scheduleAttendanceFlagIsTrue(rec?.absenceExcused)) parts.push('Absence excused');
+        if (rec?.notesPreview) parts.push(rec.notesPreview);
+        return parts.join(' · ');
+    }
+
+    function scheduleBuildAttendanceMarkHtml(rec) {
+        const markAppearance = window.AttendanceMarkAppearance;
+        const buildIcon = (key, ringClass) => {
+            if (markAppearance?.buildMarkIconHtml) {
+                return ringClass
+                    ? markAppearance.buildMarkIconHtml(key, { ringClass })
+                    : markAppearance.buildMarkIconHtml(key);
+            }
+            return '';
+        };
+        const status = String(rec?.attendance || rec?.status || '').trim().toLowerCase();
+        let icon = buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
+        if (status === 'present') icon = buildIcon('present');
+        else if (status === 'late') icon = scheduleBuildLateTimingIcon(rec);
+        else if (status === 'excused' || (status === 'absent' && scheduleAttendanceFlagIsTrue(rec?.absenceExcused))) {
+            icon = buildIcon('excused_absence', 'attendance-timing-excuse-full');
+        } else if (status === 'absent') icon = buildIcon('absent');
+        else if (status === 'acf' && scheduleAttendanceFlagIsTrue(rec?.absenceExcused)) {
+            icon = buildIcon('excused_absence', 'attendance-timing-excuse-full');
+        } else if (status === 'acf') icon = buildIcon('acf');
+        else if (status === 'not_applicable') icon = buildIcon('not_applicable');
+
+        const notesIcon = rec?.hasNotes
+            ? (buildIcon('notes') || '<i class="bi bi-chat-dots-fill status-notes"></i>')
+            : '';
+        const tooltip = escapeHtml(scheduleBuildAttendanceTooltip(rec));
+        return `<div class="schedule-session-attendance-mark" title="${tooltip}">
+            <span class="schedule-session-attendance-icon">${icon}</span>
+            ${notesIcon ? `<span class="schedule-session-attendance-notes">${notesIcon}</span>` : ''}
+            <span class="schedule-session-attendance-detail small text-muted">${tooltip}</span>
+        </div>`;
+    }
+
+    function formatScheduleDateLabel(ymd) {
+        const raw = String(ymd || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw || '—';
+        const d = new Date(`${raw}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return raw;
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function formatScheduleEnrollmentDateRange(row) {
+        const start = formatScheduleDateLabel(row?.enrollmentStartDate);
+        const end = formatScheduleDateLabel(row?.enrollmentEndDate);
+        if (start !== '—' && end !== '—') return `${start} – ${end}`;
+        if (start !== '—') return `From ${start}`;
+        if (end !== '—') return `Until ${end}`;
+        return '—';
+    }
+
+    function buildAttendanceMatrixUrlForSession(event) {
+        const classId = String(event?.classId || '').trim();
+        const sessionId = String(event?.sessionId || '').trim();
+        const sessionDate = String(event?.date || '').trim();
+        const url = new URL(`${window.location.origin}/school/attendances`);
+        if (classId) url.searchParams.set('classId', classId);
+        if (sessionDate) {
+            url.searchParams.set('startDate', sessionDate);
+            url.searchParams.set('endDate', sessionDate);
+        }
+        if (sessionId) url.searchParams.set('sessionIds', sessionId);
+        return url.pathname + url.search;
+    }
+
+    function buildSessionManagerUrlForEvent(event) {
+        const detailsUrl = String(getEventDetailsUrl(event) || '').trim();
+        if (detailsUrl) return detailsUrl;
+        const classId = encodeURIComponent(String(event?.classId || '').trim());
+        const sessionId = encodeURIComponent(String(event?.sessionId || '').trim());
+        return `/school/classes/${classId}/sessions/${sessionId}`;
+    }
+
+    function renderScheduleSessionListModalTable(rows, columns) {
+        const list = Array.isArray(rows) ? rows : [];
+        if (!list.length) {
+            return '<div class="p-4 text-center text-muted">No students found for this session.</div>';
+        }
+        const head = columns.map((col) => `<th>${escapeHtml(col.label)}</th>`).join('');
+        const body = list.map((row) => {
+            const cells = columns.map((col) => `<td>${col.render(row)}</td>`).join('');
+            return `<tr>${cells}</tr>`;
+        }).join('');
+        return `<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 schedule-session-context-table"><thead class="table-light"><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function buildScheduleSessionModalSubtitle(session) {
+        const parts = [];
+        if (session?.className) parts.push(session.className);
+        if (session?.date) parts.push(session.date);
+        const time = formatScheduleClockRange(session?.start, session?.end);
+        if (time && time !== '—') parts.push(time);
+        if (session?.status) parts.push(formatStatusLabel(session.status));
+        return parts.join(' · ');
+    }
+
+    let scheduleSessionContextEvent = null;
+    let scheduleSessionContextMenuSuppressDismissUntil = 0;
+    let scheduleSessionAttendanceModalInstance = null;
+    let scheduleSessionEnrollmentModalInstance = null;
+    let scheduleSessionEnrollmentModalEvent = null;
+    let scheduleSessionEnrollmentUseCurrentDate = false;
+
+    function hideScheduleSessionContextMenu() {
+        const menu = document.getElementById('scheduleSessionContextMenu');
+        if (!menu) return;
+        menu.classList.add('d-none');
+        menu.classList.remove('show');
+        menu.setAttribute('aria-hidden', 'true');
+        scheduleSessionContextEvent = null;
+    }
+
+    function renderScheduleSessionContextStatusList(event) {
+        const container = document.getElementById('scheduleSessionContextStatusList');
+        if (!container) return;
+        const items = buildScheduleSessionStatusMenuItems(event);
+        if (!items.length) {
+            container.innerHTML = '<div class="schedule-session-context-status-empty">No statuses available</div>';
+            return;
+        }
+        container.innerHTML = items.map((item) => `
+            <div class="schedule-session-context-status-item${item.isCurrent ? ' is-current' : ''}" role="menuitem">
+                <span class="schedule-session-context-status-chip" style="background:${escapeHtml(item.colorBg)};color:${escapeHtml(item.colorText)};border-color:${escapeHtml(item.colorBorder)};">${escapeHtml(item.label)}</span>
+                ${item.isCurrent ? '<i class="bi bi-check-lg ms-auto text-success" aria-hidden="true"></i>' : ''}
+            </div>
+        `).join('');
+    }
+
+    function renderScheduleSessionContextMenuHeader(event) {
+        const header = document.getElementById('scheduleSessionContextMenuHeader');
+        if (!header || !event) return;
+        const title = escapeHtml(getEventTitle(event));
+        const meta = [
+            escapeHtml(String(event?.date || '').trim()),
+            escapeHtml(formatScheduleClockRange(event?.start, event?.end)),
+            escapeHtml(formatStatusLabel(event?.status))
+        ].filter((part) => part && part !== '—').join(' · ');
+        header.innerHTML = `<div class="schedule-session-context-menu-title">${title}</div>${meta ? `<div class="schedule-session-context-menu-meta">${meta}</div>` : ''}`;
+    }
+
+    function showScheduleSessionContextMenu(event, mouseEvent) {
+        const menu = document.getElementById('scheduleSessionContextMenu');
+        if (!menu || !isClassSessionScheduleEvent(event)) return;
+        scheduleSessionContextEvent = event;
+        renderScheduleSessionContextMenuHeader(event);
+        renderScheduleSessionContextStatusList(event);
+        const menuWidth = 280;
+        const menuHeight = Math.min(window.innerHeight - 16, 420);
+        const left = Math.min(mouseEvent.clientX, window.innerWidth - menuWidth - 8);
+        const top = Math.min(mouseEvent.clientY, window.innerHeight - menuHeight - 8);
+        if (menu.parentElement !== document.body) document.body.appendChild(menu);
+        menu.style.position = 'fixed';
+        menu.style.left = `${Math.max(8, left)}px`;
+        menu.style.top = `${Math.max(8, top)}px`;
+        menu.style.zIndex = '2200';
+        menu.classList.remove('d-none');
+        menu.classList.add('show');
+        menu.setAttribute('aria-hidden', 'false');
+        scheduleSessionContextMenuSuppressDismissUntil = Date.now() + 250;
+    }
+
+    async function loadScheduleSessionAttendanceModal(event) {
+        const bodyEl = document.getElementById('scheduleSessionAttendanceModalBody');
+        const subtitleEl = document.getElementById('scheduleSessionAttendanceModalSubtitle');
+        if (!bodyEl || !event) return;
+        bodyEl.innerHTML = '<div class="p-4 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading attendance list...</div>';
+        if (subtitleEl) subtitleEl.textContent = buildScheduleSessionModalSubtitle({ className: event.className, date: event.date, start: event.start, end: event.end, status: event.status });
+        const params = new URLSearchParams({
+            classId: String(event.classId || '').trim(),
+            sessionId: String(event.sessionId || '').trim()
+        });
+        const res = await fetch(`/school/schedules/api/session-attendance-list?${params.toString()}`, {
+            headers: { 'X-AJAX-Request': 'true' },
+            cache: 'no-store'
+        });
+        const result = await res.json();
+        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load attendance list.');
+        if (subtitleEl) subtitleEl.textContent = buildScheduleSessionModalSubtitle(result.session || {});
+        bodyEl.innerHTML = renderScheduleSessionListModalTable(result.students, [
+            { label: 'Student', render: (row) => `<div class="fw-semibold">${escapeHtml(row.name || row.personId || '')}</div>` },
+            { label: 'Attendance', render: (row) => scheduleBuildAttendanceMarkHtml(row) },
+            { label: 'Applicability', render: (row) => `<span class="small text-muted">${escapeHtml(row.applicability || '')}</span>` }
+        ]);
+    }
+
+    async function openScheduleSessionAttendanceModal(event) {
+        const modalEl = document.getElementById('scheduleSessionAttendanceModal');
+        const openSessionEl = document.getElementById('btn_scheduleSessionAttendanceOpenSession');
+        const openMatrixEl = document.getElementById('btn_scheduleSessionAttendanceOpenMatrix');
+        if (!modalEl || !event) return;
+        if (!scheduleSessionAttendanceModalInstance && window.bootstrap?.Modal) {
+            scheduleSessionAttendanceModalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        }
+        if (openSessionEl) openSessionEl.href = buildSessionManagerUrlForEvent(event);
+        if (openMatrixEl) openMatrixEl.href = buildAttendanceMatrixUrlForSession(event);
+        scheduleSessionAttendanceModalInstance?.show();
+        try {
+            await loadScheduleSessionAttendanceModal(event);
+        } catch (error) {
+            const bodyEl = document.getElementById('scheduleSessionAttendanceModalBody');
+            if (bodyEl) bodyEl.innerHTML = `<div class="p-4 text-danger">${escapeHtml(error.message || 'Unable to load attendance list.')}</div>`;
+        }
+    }
+
+    function renderScheduleEnrollmentAsOfNote(result) {
+        const noteEl = document.getElementById('scheduleSessionEnrollmentAsOfNote');
+        if (!noteEl) return;
+        const sessionDate = String(result?.session?.date || '').trim();
+        const asOfDate = String(result?.asOfDate || '').trim();
+        if (!asOfDate || asOfDate === sessionDate) {
+            noteEl.textContent = `Usage shown as of session date (${formatScheduleDateLabel(sessionDate)}).`;
+            return;
+        }
+        noteEl.textContent = `Usage shown as of today (${formatScheduleDateLabel(asOfDate)}).`;
+    }
+
+    async function loadScheduleSessionEnrollmentModal(event, { useCurrentDate = false } = {}) {
+        const bodyEl = document.getElementById('scheduleSessionEnrollmentModalBody');
+        const subtitleEl = document.getElementById('scheduleSessionEnrollmentModalSubtitle');
+        const refreshBtn = document.getElementById('btn_scheduleSessionEnrollmentRefreshCurrent');
+        if (!bodyEl || !event) return;
+        scheduleSessionEnrollmentUseCurrentDate = useCurrentDate === true;
+        bodyEl.innerHTML = '<div class="p-4 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading enrollment list...</div>';
+        if (subtitleEl) subtitleEl.textContent = buildScheduleSessionModalSubtitle({ className: event.className, date: event.date, start: event.start, end: event.end, status: event.status });
+        const params = new URLSearchParams({
+            classId: String(event.classId || '').trim(),
+            sessionId: String(event.sessionId || '').trim()
+        });
+        if (useCurrentDate) params.set('useCurrentDate', '1');
+        const res = await fetch(`/school/schedules/api/session-enrollment-list?${params.toString()}`, {
+            headers: { 'X-AJAX-Request': 'true' },
+            cache: 'no-store'
+        });
+        const result = await res.json();
+        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load enrollment list.');
+        if (subtitleEl) subtitleEl.textContent = buildScheduleSessionModalSubtitle(result.session || {});
+        renderScheduleEnrollmentAsOfNote(result);
+        if (refreshBtn) {
+            refreshBtn.disabled = result.asOfMode === 'current';
+            refreshBtn.textContent = result.asOfMode === 'current' ? 'Showing today' : 'Update to today';
+        }
+        bodyEl.innerHTML = renderScheduleSessionListModalTable(result.students, [
+            { label: 'Student', render: (row) => `<div class="fw-semibold">${escapeHtml(row.name || row.personId || '')}</div>` },
+            { label: 'Enrollment window', render: (row) => `<span class="small">${escapeHtml(formatScheduleEnrollmentDateRange(row))}</span>` },
+            { label: 'Target', render: (row) => `<span class="small text-muted">${escapeHtml(row.capLabel || '—')}</span>` },
+            { label: 'Consumed', render: (row) => `<span class="small">${escapeHtml(row.consumedLabel || '—')}</span>` },
+            { label: 'Remaining', render: (row) => `<span class="small">${escapeHtml(row.remainingLabel || '—')}</span>` }
+        ]);
+    }
+
+    async function openScheduleSessionEnrollmentModal(event) {
+        const modalEl = document.getElementById('scheduleSessionEnrollmentModal');
+        const openSessionEl = document.getElementById('btn_scheduleSessionEnrollmentOpenSession');
+        if (!modalEl || !event) return;
+        scheduleSessionEnrollmentModalEvent = event;
+        if (!scheduleSessionEnrollmentModalInstance && window.bootstrap?.Modal) {
+            scheduleSessionEnrollmentModalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        }
+        if (openSessionEl) openSessionEl.href = buildSessionManagerUrlForEvent(event);
+        scheduleSessionEnrollmentModalInstance?.show();
+        try {
+            await loadScheduleSessionEnrollmentModal(event, { useCurrentDate: false });
+        } catch (error) {
+            const bodyEl = document.getElementById('scheduleSessionEnrollmentModalBody');
+            if (bodyEl) bodyEl.innerHTML = `<div class="p-4 text-danger">${escapeHtml(error.message || 'Unable to load enrollment list.')}</div>`;
+        }
+    }
+
+    function bindScheduleSessionContextMenu() {
+        const menu = document.getElementById('scheduleSessionContextMenu');
+        const visualArea = document.getElementById('visualDisplayArea');
+        if (!menu || !visualArea) return;
+
+        visualArea.addEventListener('contextmenu', (mouseEvent) => {
+            if (mouseEvent.target.closest('[data-schedule-session-select], .schedule-session-select')) return;
+            const event = resolveScheduleContextEventFromTarget(mouseEvent.target);
+            if (!event) return;
+            mouseEvent.preventDefault();
+            mouseEvent.stopPropagation();
+            showScheduleSessionContextMenu(event, mouseEvent);
+        });
+
+        document.getElementById('btn_scheduleSessionContextAttendance')?.addEventListener('click', async (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            if (event) await openScheduleSessionAttendanceModal(event);
+        });
+        document.getElementById('btn_scheduleSessionContextEnrollment')?.addEventListener('click', async (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            if (event) await openScheduleSessionEnrollmentModal(event);
+        });
+        document.getElementById('btn_scheduleSessionEnrollmentRefreshCurrent')?.addEventListener('click', async (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionEnrollmentModalEvent;
+            if (!event) return;
+            try {
+                await loadScheduleSessionEnrollmentModal(event, { useCurrentDate: true });
+            } catch (error) {
+                const bodyEl = document.getElementById('scheduleSessionEnrollmentModalBody');
+                if (bodyEl) bodyEl.innerHTML = `<div class="p-4 text-danger">${escapeHtml(error.message || 'Unable to load enrollment list.')}</div>`;
+            }
+        });
+
+        document.addEventListener('click', (clickEvent) => {
+            if (Date.now() < scheduleSessionContextMenuSuppressDismissUntil) return;
+            if (!menu || menu.classList.contains('d-none')) return;
+            if (clickEvent.target.closest('#scheduleSessionContextMenu')) return;
+            hideScheduleSessionContextMenu();
+        });
+        document.addEventListener('scroll', hideScheduleSessionContextMenu, true);
+        document.addEventListener('keydown', (keyEvent) => {
+            if (keyEvent.key === 'Escape') hideScheduleSessionContextMenu();
+        });
     }
 
     function scheduleSessionClassIdFromKey(key) {
@@ -4286,7 +4792,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
                     : `<span class="text-muted small">No details</span>`;
                 html += `
-                    <div class="${rowClasses}${selectedClass}${unselectableClass}" data-schedule-session-key="${escapeHtml(selectionKey)}"${scan?.rowStyle ? ` style="${scan.rowStyle}"` : ''}>
+                    <div class="${rowClasses}${selectedClass}${unselectableClass}" ${buildScheduleSessionContextDataAttrs(ev)}${scan?.rowStyle ? ` style="${scan.rowStyle}"` : ''}>
                         <div class="schedule-scan-cell">${selectionControl}${scanIcon}</div>
                         <div class="event-time">${escapeHtml(formatScheduleClockRange(ev?.start, ev?.end))}</div>
                         <div>
@@ -4381,7 +4887,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `
                         <div class="${blockClasses}${selectedClass}${unselectableClass}" 
                  style="${mergeScheduleBlockLayoutStyle('position:absolute;inset:2px;', scan)}"
-                             data-schedule-session-key="${escapeHtml(selectionKey)}"
+                             ${buildScheduleSessionContextDataAttrs(ev)}
                              data-tip="${escapeHtml(tipLabel)}"
                              data-tip-bg="${escapeHtml(tipStyle.bg)}"
                              data-tip-fg="${escapeHtml(tipStyle.fg)}"
@@ -4427,7 +4933,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `
                     <div class="${blockClasses}${selectedClass}${unselectableClass}"
                  style="${mergeScheduleBlockLayoutStyle('position:absolute;inset:2px 2px 2px 2px;', scan)}"
-                         data-schedule-session-key="${escapeHtml(selectionKey)}"
+                         ${buildScheduleSessionContextDataAttrs(ev)}
                          data-tip="${escapeHtml(tipLabel)}"
                          data-tip-bg="${escapeHtml(tipStyle.bg)}"
                          data-tip-fg="${escapeHtml(tipStyle.fg)}"
@@ -4509,7 +5015,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ? '<span class="cal-session-makeup">M</span>'
             : '';
         const tooltip = buildScheduleEventTooltip(event, statusMap, scan);
-        return `<div class="cal-session-chip ${stateClass}" title="${escapeHtml(tooltip)}"><span class="cal-session-time">${escapeHtml(timeLabel)}${makeupMark}</span></div>`;
+        const contextAttrs = buildScheduleSessionContextDataAttrs(event);
+        return `<div class="cal-session-chip ${stateClass}" ${contextAttrs} title="${escapeHtml(tooltip)}"><span class="cal-session-time">${escapeHtml(timeLabel)}${makeupMark}</span></div>`;
     }
 
     function buildCalendarDaySessionsHtml(dayEvents, scd, statusMap, maxVisible = 4) {
@@ -4698,6 +5205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (next && target.contains(next)) return;
         hideScheduleTip();
     });
+    bindScheduleSessionContextMenu();
     window.addEventListener('scroll', hideScheduleTip, true);
     window.addEventListener('resize', hideScheduleTip);
     bindScheduleGridResizeObserver();

@@ -830,7 +830,9 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
 
 async function getAttendanceData(req, res) {
     try {
-        const payload = await buildAttendanceMatrixPayload(req);
+        const payload = await buildAttendanceMatrixPayload(req, {
+            filterSessionIds: req.query?.sessionIds
+        });
         res.json({
             status: 'success',
             ...payload

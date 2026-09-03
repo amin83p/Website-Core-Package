@@ -58,6 +58,18 @@ test('attendance matrix save flow uses local cell patching and request-budget gu
   assert.match(view, /hydrateAttendanceBudgetFromApi/);
   assert.match(view, /window\.ATTENDANCE_ACTION_LIMITS/);
   assert.match(view, /resolveAttendanceActionStateId/);
+  assert.match(view, /captureAttendanceMatrixFilterState/);
+  assert.match(view, /buildAttendanceMatrixReloadUrl/);
+  assert.match(view, /promptAttendanceMatrixReload/);
+  assert.match(view, /ensureAttendanceRequestBudgetAvailable/);
+  assert.match(view, /navigateAttendanceMatrixReload/);
+  assert.match(view, /normalizeAttendanceRangeToken/);
+  assert.match(view, /applyAttendanceRangeSelection\(normalizedRange\)/);
+  assert.match(view, /ATTENDANCE_MATRIX_UI_REQUEST_LIMIT_OVERRIDE/);
+  assert.match(view, /resolveEffectiveAttendanceRequestCount/);
+  assert.match(view, /ATTENDANCE_MATRIX_MUTATION_BUDGET_SOURCES/);
+  assert.match(view, /syncAttendanceRequestBudgetFromUsage/);
+  assert.doesNotMatch(view, /near the session limit/);
 });
 
 test('master hub attendance includes student visibility dropdown for single and batch', () => {
