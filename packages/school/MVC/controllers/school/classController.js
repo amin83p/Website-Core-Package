@@ -3319,6 +3319,23 @@ async function editClass(req, res) {
       reqUser: req.user,
       label: 'This class session ledger'
     });
+    for (const lockedSession of (Array.isArray(existingSessions) ? existingSessions : [])) {
+        if (!schoolDependencyService.isSessionTimesheetApprovedLock(lockedSession)) continue;
+        const lockedSessionId = toPublicId(lockedSession?.sessionId || lockedSession?.id);
+        if (!lockedSessionId) continue;
+        const incomingLockedSession = (Array.isArray(sessions) ? sessions : [])
+            .find((row) => idsEqual(row?.sessionId || row?.id, lockedSessionId));
+        if (!incomingLockedSession) continue;
+        const restrictedScopes = schoolDependencyService.collectSessionTimesheetRestrictedMutationScopes({
+            previousSession: lockedSession,
+            nextSession: incomingLockedSession
+        });
+        schoolDependencyService.assertSessionTimesheetLockAllowsMutationScopes(
+            lockedSession,
+            restrictedScopes,
+            `Session ${lockedSessionId}`
+        );
+    }
     if (updates.billingMode === 'chargeable') {
         validateChargeablePostingTemplatesOrThrow(updates.postingTemplates);
         updates.postingTemplates = await resolvePostingPoliciesOrThrow(updates.postingTemplates, existing?.orgId || activeOrgId, req.user);
@@ -4088,20 +4105,82 @@ async function manageSession(req, res) {
             };
         })();
         const isSessionLocked = session.locked === true || String(session.locked) === 'true';
+        const isTimesheetSessionLock = schoolDependencyService.isSessionTimesheetApprovedLock(session);
+        const isAdministrativeSessionLock = isSessionLocked && !isTimesheetSessionLock;
         const orgIdForPolicies = classData?.orgId || getActiveOrgIdOrThrow(req.user);
-        const attendanceEditAccess = await sessionAttendanceEditAccessService.resolveAttendanceEditAccess({
+        const completedSessionStatusMap = await sessionStatusPolicyService.getStatusMap(orgIdForPolicies, { includeInactive: true });
+        const attendanceEditAccess = await sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
             orgId: orgIdForPolicies,
             session,
-            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+            target: 'attendance',
+            statusMap: completedSessionStatusMap
         });
+        const completedSessionEditPolicy = attendanceEditAccess?.policy || null;
+        const completedSessionTimesheetPeriod = attendanceEditAccess?.timesheetPeriod;
+        const [notesEditAccess, gradebookEditAccess, conductEditAccess, curriculumEditAccess, studentCasesEditAccess] = await Promise.all([
+            sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+                orgId: orgIdForPolicies,
+                session,
+                policy: completedSessionEditPolicy,
+                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+                timesheetPeriod: completedSessionTimesheetPeriod,
+                target: 'notes',
+                statusMap: completedSessionStatusMap
+            }),
+            sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+                orgId: orgIdForPolicies,
+                session,
+                policy: completedSessionEditPolicy,
+                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+                timesheetPeriod: completedSessionTimesheetPeriod,
+                target: 'gradebook',
+                statusMap: completedSessionStatusMap
+            }),
+            sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+                orgId: orgIdForPolicies,
+                session,
+                policy: completedSessionEditPolicy,
+                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+                timesheetPeriod: completedSessionTimesheetPeriod,
+                target: 'conduct',
+                statusMap: completedSessionStatusMap
+            }),
+            sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+                orgId: orgIdForPolicies,
+                session,
+                policy: completedSessionEditPolicy,
+                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+                timesheetPeriod: completedSessionTimesheetPeriod,
+                target: 'curriculum',
+                statusMap: completedSessionStatusMap
+            }),
+            sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+                orgId: orgIdForPolicies,
+                session,
+                policy: completedSessionEditPolicy,
+                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+                timesheetPeriod: completedSessionTimesheetPeriod,
+                target: 'studentcases',
+                statusMap: completedSessionStatusMap
+            })
+        ]);
         const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_ATTENDANCES,
             OPERATIONS.UPDATE,
             { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
         );
+        const canOverrideCompletedSections = Boolean(canOverride);
         const attendanceEditLocked = !attendanceEditAccess.editable && !canOverrideAttendanceEdit;
-        const isReadOnly = !canEditSession || (isSessionLocked && !canOverride) || attendanceEditLocked;
+        const notesEditLocked = !notesEditAccess.editable && !canOverrideCompletedSections;
+        const gradebookEditLocked = !gradebookEditAccess.editable && !canOverrideCompletedSections;
+        const conductEditLocked = !conductEditAccess.editable && !canOverrideCompletedSections;
+        const curriculumEditLocked = !curriculumEditAccess.editable && !canOverrideCompletedSections;
+        const studentCasesEditLocked = !studentCasesEditAccess.editable && !canOverrideCompletedSections;
+        const timesheetMetadataLockActive = isTimesheetSessionLock;
+        const timesheetDeletionLockActive = isTimesheetSessionLock;
+        const isReadOnly = !canEditSession || (isAdministrativeSessionLock && !canOverride);
 
         // 2. Prefetch identity, subjects, and enrollment periods once; reuse across roster, reports, outline, and locks.
         const prefetchStart = Date.now();
@@ -4418,6 +4497,18 @@ async function manageSession(req, res) {
             isReadOnly,
             attendanceEditAccess,
             attendanceEditLocked,
+            notesEditAccess,
+            notesEditLocked,
+            gradebookEditAccess,
+            gradebookEditLocked,
+            conductEditAccess,
+            conductEditLocked,
+            curriculumEditAccess,
+            curriculumEditLocked,
+            studentCasesEditAccess,
+            studentCasesEditLocked,
+            timesheetMetadataLockActive,
+            timesheetDeletionLockActive,
             canEditSessionMetadata: canOverride,
             canManageClassConduct: Boolean(canOverride) || Boolean(canEditSession),
             canOverrideMakeupDuration,
@@ -4673,12 +4764,28 @@ async function listSessionStudentCases(req, res) {
 async function saveSessionStudentCase(req, res) {
     try {
         const { id: classId, sessionId, caseId = '' } = req.params;
-        await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
-        const { classData, session } = await sessionStudentCaseReviewService.loadClassSessionContext(req, classId, sessionId);
+        const { classData, session, statusMap } = await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         const body = req.body || {};
         const shouldResolve = String(body.status || '').trim().toLowerCase() === 'resolved';
+        const isCreateRequest = !caseId;
+        if (isCreateRequest) {
+            const canOverrideCompletedSections = await adminAuthorityService.isAdminForRequestAsync(
+                req.user,
+                SECTIONS.SCHOOL_CLASSES,
+                OPERATIONS.UPDATE,
+                { section: { id: SECTIONS.SCHOOL_CLASSES } }
+            );
+            await sessionAttendanceEditAccessService.assertSessionSectionEditable({
+                orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+                session,
+                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+                canOverride: canOverrideCompletedSections,
+                target: 'studentcases',
+                statusMap
+            });
+        }
         await sessionStudentCaseAccessService.assertCanSave(req, classData, session, {
-            isCreate: !caseId,
+            isCreate: isCreateRequest,
             resolve: shouldResolve
         });
         const capabilities = await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session });
@@ -4868,6 +4975,11 @@ async function deleteClassSession(req, res) {
     const sessions = await schoolDataService.getClassSessions(classId, req.user);
     const target = (Array.isArray(sessions) ? sessions : []).find((row) => idsEqual(row?.sessionId || row?.id, sessionId));
     if (!target) throw new Error('Session not found.');
+    schoolDependencyService.assertSessionTimesheetLockAllowsMutationScopes(
+      target,
+      [schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.DELETE],
+      'This session'
+    );
 
     const preview = await schoolDeletionGuardService.previewDelete({
       entityKey: 'session', id: sessionId, orgId: classData.orgId, reqUser: req.user, context: { classId }
@@ -4932,6 +5044,11 @@ async function deleteLinkedMakeupSession(req, res) {
 
             const makeupSession = sessions.find((row) => idsEqual(row?.sessionId || row?.id, makeupSessionId));
             if (!makeupSession) throw new Error('Make-up session not found.');
+            schoolDependencyService.assertSessionTimesheetLockAllowsMutationScopes(
+                makeupSession,
+                [schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.DELETE],
+                'This make-up session'
+            );
 
             const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
             const survivingSessions = sessions.filter((row) => !idsEqual(row?.sessionId || row?.id, makeupSessionId));
@@ -5406,7 +5523,8 @@ async function saveSession(req, res) {
 
         // --- Backend Save Protection ---
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
-        schoolDependencyService.assertSessionNotTimesheetLocked(sessions[sessionIndex], 'This session');
+        const isTimesheetApprovedLock = schoolDependencyService.isSessionTimesheetApprovedLock(sessions[sessionIndex]);
+        const isAdministrativeSessionLock = isSessionLocked && !isTimesheetApprovedLock;
         let canOverride = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,
@@ -5414,7 +5532,7 @@ async function saveSession(req, res) {
             { section: { id: SECTIONS.SCHOOL_CLASSES } }
         );
 
-        if (isSessionLocked && !canOverride) {
+        if (isAdministrativeSessionLock && !canOverride) {
             throw new Error('This session is locked and cannot be edited. Please contact an administrator.');
         }
 
@@ -5577,8 +5695,85 @@ async function saveSession(req, res) {
         const shouldSkipInstructionalPayload = currentMakeupInactive || nextMakeupInactive;
         let pendingAttendanceChangeLog = null;
 
+        const orgIdForPolicies = classData?.orgId || getActiveOrgIdOrThrow(req.user);
+        const orgTimeZoneForPolicies = req.orgTimeZone || req.user?.activeOrgTimeZone || '';
+        const normalizedMetadataBody = await normalizeSessionMetadataTeacherInput(req.body || {}, {
+            activeOrgId: orgIdForPolicies,
+            reqUser: req.user
+        });
+        const viewerPersonId = String(req.user?.personId || '').trim();
+        const canManageCoTeachers = Boolean(canOverride);
+        const canToggleCoTeacherEdit = Boolean(
+            canOverride
+            || sessionDeliveryTeamService.isPersonSessionMainTeacher(originalSession, viewerPersonId)
+        );
+        const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_ATTENDANCES,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
+        );
+        let completedSessionEditPolicy = null;
+        let completedSessionTimesheetPeriod = undefined;
+        if (wasCompletion) {
+            const attendanceEditAccess = await sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+                orgId: orgIdForPolicies,
+                session: originalSession,
+                orgTimeZone: orgTimeZoneForPolicies,
+                target: 'attendance',
+                statusMap
+            });
+            completedSessionEditPolicy = attendanceEditAccess?.policy || null;
+            completedSessionTimesheetPeriod = attendanceEditAccess?.timesheetPeriod;
+        }
+        const assertCompletedSessionSectionEditable = async (target, canOverrideSection) => {
+            if (!wasCompletion) return;
+            await sessionAttendanceEditAccessService.assertSessionSectionEditable({
+                orgId: orgIdForPolicies,
+                session: originalSession,
+                policy: completedSessionEditPolicy,
+                orgTimeZone: orgTimeZoneForPolicies,
+                canOverride: canOverrideSection,
+                timesheetPeriod: completedSessionTimesheetPeriod,
+                target,
+                statusMap
+            });
+        };
         const normalizedNotes = notes !== undefined ? String(notes || '').trim() : originalSession.notes;
         const normalizedRoom = room !== undefined ? String(room || '').trim() : originalSession.room;
+        const probeSessionForTimesheetLock = JSON.parse(JSON.stringify(originalSession || {}));
+        probeSessionForTimesheetLock.status = normalizedStatus;
+        probeSessionForTimesheetLock.room = normalizedRoom;
+        applyAdminSessionMetadataUpdate(
+            probeSessionForTimesheetLock,
+            normalizedMetadataBody,
+            { canOverride, canManageCoTeachers, canToggleCoTeacherEdit }
+        );
+        const restrictedTimesheetMutationScopes = schoolDependencyService.collectSessionTimesheetRestrictedMutationScopes({
+            previousSession: originalSession,
+            nextSession: probeSessionForTimesheetLock
+        });
+        if (isTimesheetApprovedLock) {
+            schoolDependencyService.assertSessionTimesheetLockAllowsMutationScopes(
+                originalSession,
+                restrictedTimesheetMutationScopes,
+                'This session'
+            );
+        }
+        const existingNotes = String(originalSession.notes || '').trim();
+        const notesChanged = notes !== undefined && normalizedNotes !== existingNotes;
+        if (notesChanged) {
+            await assertCompletedSessionSectionEditable('notes', canOverride);
+        }
+        if (!shouldSkipInstructionalPayload && skillsCovered !== undefined) {
+            await assertCompletedSessionSectionEditable('curriculum', canOverride);
+        }
+        if (!shouldSkipInstructionalPayload && req.body?.gradebooks !== undefined) {
+            await assertCompletedSessionSectionEditable('gradebook', canOverride);
+        }
+        if (!shouldSkipInstructionalPayload && roster !== undefined) {
+            await assertCompletedSessionSectionEditable('attendance', canOverrideAttendanceEdit);
+        }
 
         originalSession.status = normalizedStatus;
         originalSession.notes = normalizedNotes;
@@ -5638,21 +5833,6 @@ async function saveSession(req, res) {
             originalSession.completedAt = new Date().toISOString();
         } else if (wasCompletion && !willBeCompletion) {
             originalSession.completedAt = '';
-        }
-        const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_ATTENDANCES,
-            OPERATIONS.UPDATE,
-            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
-        );
-
-        if (!shouldSkipInstructionalPayload && roster !== undefined && wasCompletion) {
-            await sessionAttendanceEditAccessService.assertSessionAttendanceEditable({
-                orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
-                session: originalSession,
-                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
-                canOverride: canOverrideAttendanceEdit
-            });
         }
 
         if (!shouldSkipInstructionalPayload && roster !== undefined) {
@@ -5787,17 +5967,6 @@ async function saveSession(req, res) {
                 req.user
             );
         }
-
-        const normalizedMetadataBody = await normalizeSessionMetadataTeacherInput(req.body || {}, {
-            activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
-            reqUser: req.user
-        });
-        const viewerPersonId = String(req.user?.personId || '').trim();
-        const canManageCoTeachers = Boolean(canOverride);
-        const canToggleCoTeacherEdit = Boolean(
-            canOverride
-            || sessionDeliveryTeamService.isPersonSessionMainTeacher(originalSession, viewerPersonId)
-        );
         const { changed: metadataChanged } = applyAdminSessionMetadataUpdate(
             originalSession,
             normalizedMetadataBody,
@@ -5948,7 +6117,8 @@ async function saveSessionGradebooks(req, res) {
         }
 
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
-        schoolDependencyService.assertSessionNotTimesheetLocked(sessions[sessionIndex], 'This session');
+        const isTimesheetApprovedLock = schoolDependencyService.isSessionTimesheetApprovedLock(sessions[sessionIndex]);
+        const isAdministrativeSessionLock = isSessionLocked && !isTimesheetApprovedLock;
         let canOverride = await adminAuthorityService.isAdminForRequestAsync(
             req.user,
             SECTIONS.SCHOOL_CLASSES,
@@ -5956,9 +6126,17 @@ async function saveSessionGradebooks(req, res) {
             { section: { id: SECTIONS.SCHOOL_CLASSES } }
         );
 
-        if (isSessionLocked && !canOverride) {
+        if (isAdministrativeSessionLock && !canOverride) {
             throw new Error('This session is locked and cannot be edited.');
         }
+        await sessionAttendanceEditAccessService.assertSessionSectionEditable({
+            orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+            session: sessions[sessionIndex],
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+            canOverride,
+            target: 'gradebook',
+            statusMap
+        });
 
         let rawList = req.body?.gradebooks;
         if (typeof rawList === 'string') {
@@ -6089,9 +6267,18 @@ async function saveSessionConduct(req, res) {
         if (!canOverride && !canEditSessionForConduct) {
             return res.status(403).json({ status: 'error', message: 'You do not have permission to manage class conduct for this session.' });
         }
-        if (isLocked && !canOverride) {
+        const isTimesheetApprovedLock = schoolDependencyService.isSessionTimesheetApprovedLock(session);
+        const isAdministrativeSessionLock = isLocked && !isTimesheetApprovedLock;
+        if (isAdministrativeSessionLock && !canOverride) {
             return res.status(403).json({ status: 'error', message: 'This session is locked. Class conduct cannot be changed.' });
         }
+        await sessionAttendanceEditAccessService.assertSessionSectionEditable({
+            orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+            session,
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+            canOverride,
+            target: 'conduct'
+        });
 
         let incomingRoster = req.body?.roster;
         if (typeof incomingRoster === 'string') {

@@ -16,6 +16,14 @@ const WINDOW_TYPE_VALUES = Object.freeze([
   'timesheet_period',
   'days_after_session'
 ]);
+const COMPLETED_SESSION_EDIT_POLICY_KEYS = Object.freeze([
+  'completedSessionAttendanceEdit',
+  'completedSessionNotesEdit',
+  'completedSessionGradebookEdit',
+  'completedSessionConductEdit',
+  'completedSessionCurriculumEdit',
+  'completedSessionStudentCasesEdit'
+]);
 
 const TEMPLATE_TOKENS = Object.freeze([
   'className',
@@ -79,6 +87,31 @@ const DEFAULT_POLICY = Object.freeze({
     })
   }),
   completedSessionAttendanceEdit: Object.freeze({
+    enabled: true,
+    windowType: 'timesheet_period',
+    daysAfterSession: null
+  }),
+  completedSessionNotesEdit: Object.freeze({
+    enabled: true,
+    windowType: 'timesheet_period',
+    daysAfterSession: null
+  }),
+  completedSessionGradebookEdit: Object.freeze({
+    enabled: true,
+    windowType: 'timesheet_period',
+    daysAfterSession: null
+  }),
+  completedSessionConductEdit: Object.freeze({
+    enabled: true,
+    windowType: 'timesheet_period',
+    daysAfterSession: null
+  }),
+  completedSessionCurriculumEdit: Object.freeze({
+    enabled: true,
+    windowType: 'timesheet_period',
+    daysAfterSession: null
+  }),
+  completedSessionStudentCasesEdit: Object.freeze({
     enabled: true,
     windowType: 'timesheet_period',
     daysAfterSession: null
@@ -276,8 +309,10 @@ function normalizeNotificationSettings(input = {}) {
   };
 }
 
-function normalizeAttendanceEditSettings(input = {}) {
-  const fallback = DEFAULT_POLICY.completedSessionAttendanceEdit;
+function normalizeCompletedSessionEditSettings(
+  input = {},
+  fallback = DEFAULT_POLICY.completedSessionAttendanceEdit
+) {
   const windowType = normalizeWindowType(input.windowType, fallback.windowType);
   const daysAfterSession = windowType === 'days_after_session'
     ? normalizeDaysAfterSession(input.daysAfterSession)
@@ -289,10 +324,37 @@ function normalizeAttendanceEditSettings(input = {}) {
   };
 }
 
+function normalizeAttendanceEditSettings(input = {}) {
+  return normalizeCompletedSessionEditSettings(input, DEFAULT_POLICY.completedSessionAttendanceEdit);
+}
+
 function normalizePolicyFromStored(input = {}) {
   return {
     uncompletedSessionNotification: normalizeNotificationSettings(input.uncompletedSessionNotification),
-    completedSessionAttendanceEdit: normalizeAttendanceEditSettings(input.completedSessionAttendanceEdit)
+    completedSessionAttendanceEdit: normalizeCompletedSessionEditSettings(
+      input.completedSessionAttendanceEdit,
+      DEFAULT_POLICY.completedSessionAttendanceEdit
+    ),
+    completedSessionNotesEdit: normalizeCompletedSessionEditSettings(
+      input.completedSessionNotesEdit,
+      DEFAULT_POLICY.completedSessionNotesEdit
+    ),
+    completedSessionGradebookEdit: normalizeCompletedSessionEditSettings(
+      input.completedSessionGradebookEdit,
+      DEFAULT_POLICY.completedSessionGradebookEdit
+    ),
+    completedSessionConductEdit: normalizeCompletedSessionEditSettings(
+      input.completedSessionConductEdit,
+      DEFAULT_POLICY.completedSessionConductEdit
+    ),
+    completedSessionCurriculumEdit: normalizeCompletedSessionEditSettings(
+      input.completedSessionCurriculumEdit,
+      DEFAULT_POLICY.completedSessionCurriculumEdit
+    ),
+    completedSessionStudentCasesEdit: normalizeCompletedSessionEditSettings(
+      input.completedSessionStudentCasesEdit,
+      DEFAULT_POLICY.completedSessionStudentCasesEdit
+    )
   };
 }
 
@@ -330,14 +392,14 @@ function validateChannelSessionDateRanges(notification = {}) {
 
 function validatePolicyInput(input = {}) {
   const normalized = normalizePolicyFromForm(input);
-  if (
-    normalized.completedSessionAttendanceEdit.windowType === 'days_after_session'
-    && !normalized.completedSessionAttendanceEdit.daysAfterSession
-  ) {
-    const error = new Error('Days after session is required when that edit window is selected.');
-    error.statusCode = 400;
-    throw error;
-  }
+  COMPLETED_SESSION_EDIT_POLICY_KEYS.forEach((key) => {
+    const sectionPolicy = normalized?.[key] || {};
+    if (sectionPolicy.windowType === 'days_after_session' && !sectionPolicy.daysAfterSession) {
+      const error = new Error('Days after session is required when that edit window is selected.');
+      error.statusCode = 400;
+      throw error;
+    }
+  });
   validateChannelSessionDateRanges(normalized.uncompletedSessionNotification);
   validateNotificationScheduleTimes(normalized.uncompletedSessionNotification);
   const emailChannel = normalized.uncompletedSessionNotification?.channels?.email || {};
@@ -400,6 +462,7 @@ module.exports = {
   DAILY_DIGEST_SESSION_ID,
   SESSION_DATE_RANGE_TYPES,
   WINDOW_TYPE_VALUES,
+  COMPLETED_SESSION_EDIT_POLICY_KEYS,
   TEMPLATE_TOKENS,
   DEFAULT_POLICY,
   normalizePolicyFromStored,

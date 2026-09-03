@@ -1454,8 +1454,10 @@ async function buildEventsForPersonAndRange({
             isActive = studentClassIds.has(normalizedClassId);
         }
 
-        if (!isActive) {
-            isActive = studentClassIds.has(normalizedClassId);
+        const canUseStudentIndexFallback = !linkedStudentIds.length || !hasCanonicalPeriods;
+        const indexFallbackHit = !isActive && canUseStudentIndexFallback && studentClassIds.has(normalizedClassId);
+        if (indexFallbackHit) {
+            isActive = true;
         }
 
         studentActiveCache.set(cacheKey, isActive);

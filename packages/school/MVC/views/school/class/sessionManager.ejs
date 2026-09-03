@@ -1328,6 +1328,14 @@
 
 <div class="sections-page session-manager-page">
     <% const disabledAttr = isReadOnly ? 'disabled' : ''; %>
+    <% const attendanceReadOnly = isReadOnly || (typeof attendanceEditLocked !== 'undefined' && attendanceEditLocked); %>
+    <% const sessionNotesReadOnly = isReadOnly || (typeof notesEditLocked !== 'undefined' && notesEditLocked); %>
+    <% const gradebookSectionReadOnly = isReadOnly || (typeof gradebookEditLocked !== 'undefined' && gradebookEditLocked); %>
+    <% const conductSectionReadOnly = isReadOnly || (typeof conductEditLocked !== 'undefined' && conductEditLocked); %>
+    <% const curriculumSectionReadOnly = isReadOnly || (typeof curriculumEditLocked !== 'undefined' && curriculumEditLocked); %>
+    <% const studentCasesSectionReadOnly = isReadOnly || (typeof studentCasesEditLocked !== 'undefined' && studentCasesEditLocked); %>
+    <% const attendanceDisabledAttr = attendanceReadOnly ? 'disabled' : ''; %>
+    <% const sessionNotesDisabledAttr = sessionNotesReadOnly ? 'disabled' : ''; %>
     <% const canEditSessionMetadataPageFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true; %>
     <% const enrollmentLockedPersonIdSet = new Set((Array.isArray(enrollmentLockedAttendancePersonIds) ? enrollmentLockedAttendancePersonIds : []).map((id) => String(id || '').trim()).filter(Boolean)); %>
     <% function jsonForScript(value) {
@@ -1399,7 +1407,13 @@
         const isMergedSessionRow = session.merged && session.merged.isMergedSession === true;
         const isMergedSessionInactive = currentSessionStatusMeta && currentSessionStatusMeta.mergedSessionRequired === true && !isMergedSessionRow;
         const canUndoSessionMergeFlag = typeof canUndoSessionMerge !== 'undefined' && canUndoSessionMerge === true;
-        const statusControlDisabled = isReadOnly || isMergedSessionRow;
+        const timesheetMetadataLockActiveFlag = typeof timesheetMetadataLockActive !== 'undefined'
+            ? timesheetMetadataLockActive === true
+            : false;
+        const timesheetDeletionLockActiveFlag = typeof timesheetDeletionLockActive !== 'undefined'
+            ? timesheetDeletionLockActive === true
+            : false;
+        const statusControlDisabled = isReadOnly || isMergedSessionRow || timesheetMetadataLockActiveFlag;
         const statusControlDisabledAttr = statusControlDisabled ? 'disabled' : '';
         const isInstructionalInactive = isMakeupRequiredInactive || isMergedSessionInactive;
         const mergedPartnerReference = (typeof mergedPartnerSessionReference !== 'undefined' && mergedPartnerSessionReference && typeof mergedPartnerSessionReference === 'object')
@@ -1447,6 +1461,8 @@
         const canViewClassConductPanelFlag = canEditSessionMetadataFlag;
         const canViewSchoolSettingsFlag = typeof canViewSchoolSettings !== 'undefined' && canViewSchoolSettings === true;
         const isTimesheetSessionLock = typeof isSessionLocked !== 'undefined' && isSessionLocked && String(session.lockReason || '') === 'timesheet_approved';
+        const metadataDisabledAttr = (isReadOnly || timesheetMetadataLockActiveFlag) ? 'disabled' : '';
+        const coTeacherControlLocked = isReadOnly || timesheetMetadataLockActiveFlag;
         const canToggleSessionLock = canEditSessionMetadataFlag && !isTimesheetSessionLock;
         const conductScaleDefaultLevels = [
             { code: 'S', label: 'Superior', displayCode: 'S', minPercent: 85, maxPercent: 100, defaultPercent: 92.5 },
@@ -1543,7 +1559,7 @@
                 </button>
             <% } %>
             <% if (typeof canDeleteSession !== 'undefined' && canDeleteSession) { %>
-                <button type="button" class="btn btn-outline-danger btn-md fw-semibold shadow-sm" id="btnDeleteSession">
+                <button type="button" class="btn btn-outline-danger btn-md fw-semibold shadow-sm" id="btnDeleteSession" <%= timesheetDeletionLockActiveFlag ? 'disabled' : '' %> title="<%= timesheetDeletionLockActiveFlag ? 'This session is locked by an approved timesheet. Reopen the timesheet to delete it.' : 'Delete session' %>">
                     <i class="bi bi-trash me-1"></i>Delete session
                 </button>
             <% } %>
@@ -1650,7 +1666,7 @@
                     <div class="session-info-tile">
                         <div class="session-info-tile-label">Date</div>
                         <% if (canEditSessionMetadataFlag) { %>
-                            <input type="date" id="sessionDate" class="form-control form-control-sm" value="<%= session.date || '' %>" <%- disabledAttr %>>
+                            <input type="date" id="sessionDate" class="form-control form-control-sm" value="<%= session.date || '' %>" <%- metadataDisabledAttr %>>
                         <% } else { %>
                             <div class="session-info-tile-value"><%= session.date %></div>
                         <% } %>
@@ -1659,8 +1675,8 @@
                         <div class="session-info-tile-label">Time</div>
                         <% if (canEditSessionMetadataFlag) { %>
                             <div class="d-flex gap-2 flex-wrap">
-                                <input type="time" id="sessionStartTime" class="form-control form-control-sm" value="<%= session.startTime || '' %>" aria-label="Start time" <%- disabledAttr %>>
-                                <input type="time" id="sessionEndTime" class="form-control form-control-sm" value="<%= session.endTime || '' %>" aria-label="End time" <%- disabledAttr %>>
+                                <input type="time" id="sessionStartTime" class="form-control form-control-sm" value="<%= session.startTime || '' %>" aria-label="Start time" <%- metadataDisabledAttr %>>
+                                <input type="time" id="sessionEndTime" class="form-control form-control-sm" value="<%= session.endTime || '' %>" aria-label="End time" <%- metadataDisabledAttr %>>
                             </div>
                         <% } else { %>
                             <div class="session-info-tile-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
@@ -1671,8 +1687,8 @@
                         <div class="session-info-tile-label">Teacher</div>
                         <input type="hidden" id="sessionTeacherId" value="<%= session.delivery?.deliveredBy || '' %>">
                         <div class="input-group input-group-sm">
-                            <input type="text" class="form-control bg-white" id="sessionTeacherName" value="<%= session.delivery?.deliveredByName || session.delivery?.deliveredBy || '' %>" readonly placeholder="Select teacher" <%- disabledAttr %>>
-                            <button type="button" class="btn btn-outline-primary" id="sessionPickTeacher" <%= disabledAttr ? 'disabled' : '' %> aria-label="Pick teacher"><i class="bi bi-person-check"></i></button>
+                            <input type="text" class="form-control bg-white" id="sessionTeacherName" value="<%= session.delivery?.deliveredByName || session.delivery?.deliveredBy || '' %>" readonly placeholder="Select teacher" <%- metadataDisabledAttr %>>
+                            <button type="button" class="btn btn-outline-primary" id="sessionPickTeacher" <%= metadataDisabledAttr ? 'disabled' : '' %> aria-label="Pick teacher"><i class="bi bi-person-check"></i></button>
                         </div>
                     </div>
                     <% } else if (smTeacherLabel) { %>
@@ -1691,7 +1707,7 @@
                     <div class="session-info-tile" style="grid-column: 1 / -1;">
                         <div class="session-info-tile-label d-flex align-items-center justify-content-between gap-2 flex-wrap">
                             <span><i class="bi bi-people-fill me-1"></i>Co-Teachers</span>
-                            <% if (canManageCoTeachersFlag && !isReadOnly) { %>
+                            <% if (canManageCoTeachersFlag && !coTeacherControlLocked) { %>
                                 <button type="button" class="btn btn-sm btn-outline-primary" id="sessionAddCoTeacherBtn"><i class="bi bi-person-plus me-1"></i>Add</button>
                             <% } %>
                         </div>
@@ -1706,7 +1722,7 @@
                                             <span class="text-muted"> · <%= row.roleLabel || 'Co-Teacher' %></span>
                                         </div>
                                         <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                            <% if (canToggleCoTeacherEditFlag && !isReadOnly) { %>
+                                            <% if (canToggleCoTeacherEditFlag && !coTeacherControlLocked) { %>
                                                 <div class="form-check form-switch m-0">
                                                     <input class="form-check-input session-co-can-edit" type="checkbox" role="switch" <%= row.canEdit === true ? 'checked' : '' %> title="Allow Session Manager edits">
                                                     <label class="form-check-label small">Can edit</label>
@@ -1716,7 +1732,7 @@
                                             <% } else { %>
                                                 <span class="badge bg-light text-muted border">View only</span>
                                             <% } %>
-                                            <% if (canManageCoTeachersFlag && !isReadOnly) { %>
+                                            <% if (canManageCoTeachersFlag && !coTeacherControlLocked) { %>
                                                 <button type="button" class="btn btn-sm btn-outline-danger session-co-remove" title="Remove"><i class="bi bi-x"></i></button>
                                             <% } %>
                                         </div>
@@ -1728,7 +1744,7 @@
                     </div>
                     <div class="session-info-tile session-info-tile--location">
                         <label class="session-info-tile-label mb-0" for="sessionRoom">Location</label>
-                        <input type="text" id="sessionRoom" class="form-control form-control-sm" value="<%= session.room || '' %>" placeholder="Room, lab, field…" <%- disabledAttr %> autocomplete="off">
+                        <input type="text" id="sessionRoom" class="form-control form-control-sm" value="<%= session.room || '' %>" placeholder="Room, lab, field…" <%- metadataDisabledAttr %> autocomplete="off">
                     </div>
                 </div>
                 <div class="session-info-meta-grid">
@@ -1783,6 +1799,66 @@
                 <h6 class="fw-bold mb-1">Attendance Edit Window Closed</h6>
                 <div class="small">
                     Attendance edits are no longer allowed for this completed session<% if (attendanceEditAccess?.deadlineDateKey) { %> (deadline: <%= attendanceEditAccess.deadlineDateKey %>)<% } %>.
+                    Contact an administrator if you need an override.
+                </div>
+            </div>
+        </div>
+    <% } %>
+    <% if (typeof notesEditLocked !== 'undefined' && notesEditLocked) { %>
+        <div class="alert alert-warning border-warning shadow-sm d-flex align-items-center mb-3">
+            <i class="bi bi-journal-x fs-3 me-3 text-warning"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Session Notes Edit Window Closed</h6>
+                <div class="small">
+                    Session Notes edits are no longer allowed for this completed session<% if (notesEditAccess?.deadlineDateKey) { %> (deadline: <%= notesEditAccess.deadlineDateKey %>)<% } %>.
+                    Contact an administrator if you need an override.
+                </div>
+            </div>
+        </div>
+    <% } %>
+    <% if (typeof gradebookEditLocked !== 'undefined' && gradebookEditLocked) { %>
+        <div class="alert alert-warning border-warning shadow-sm d-flex align-items-center mb-3">
+            <i class="bi bi-journal-bookmark fs-3 me-3 text-warning"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Grade book Edit Window Closed</h6>
+                <div class="small">
+                    Grade book/Activities edits are no longer allowed for this completed session<% if (gradebookEditAccess?.deadlineDateKey) { %> (deadline: <%= gradebookEditAccess.deadlineDateKey %>)<% } %>.
+                    Contact an administrator if you need an override.
+                </div>
+            </div>
+        </div>
+    <% } %>
+    <% if (typeof conductEditLocked !== 'undefined' && conductEditLocked) { %>
+        <div class="alert alert-warning border-warning shadow-sm d-flex align-items-center mb-3">
+            <i class="bi bi-emoji-neutral fs-3 me-3 text-warning"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Class Conduct Edit Window Closed</h6>
+                <div class="small">
+                    Class Conduct Before Reports edits are no longer allowed for this completed session<% if (conductEditAccess?.deadlineDateKey) { %> (deadline: <%= conductEditAccess.deadlineDateKey %>)<% } %>.
+                    Contact an administrator if you need an override.
+                </div>
+            </div>
+        </div>
+    <% } %>
+    <% if (typeof curriculumEditLocked !== 'undefined' && curriculumEditLocked) { %>
+        <div class="alert alert-warning border-warning shadow-sm d-flex align-items-center mb-3">
+            <i class="bi bi-bullseye fs-3 me-3 text-warning"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Curriculum Edit Window Closed</h6>
+                <div class="small">
+                    Curriculum edits are no longer allowed for this completed session<% if (curriculumEditAccess?.deadlineDateKey) { %> (deadline: <%= curriculumEditAccess.deadlineDateKey %>)<% } %>.
+                    Contact an administrator if you need an override.
+                </div>
+            </div>
+        </div>
+    <% } %>
+    <% if (typeof studentCasesEditLocked !== 'undefined' && studentCasesEditLocked) { %>
+        <div class="alert alert-warning border-warning shadow-sm d-flex align-items-center mb-3">
+            <i class="bi bi-folder-check fs-3 me-3 text-warning"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Student Cases Edit Window Closed</h6>
+                <div class="small">
+                    Student Cases are no longer allowed for this completed session<% if (studentCasesEditAccess?.deadlineDateKey) { %> (deadline: <%= studentCasesEditAccess.deadlineDateKey %>)<% } %>.
                     Contact an administrator if you need an override.
                 </div>
             </div>
@@ -2048,7 +2124,7 @@
                                 <i class="bi bi-grid-3x3" aria-hidden="true"></i>Attendance matrix
                             </a>
                             <% } %>
-                            <% if (!isReadOnly && session.roster.length > 0) { %>
+                            <% if (!attendanceReadOnly && session.roster.length > 0) { %>
                                 <div class="btn-group btn-group-sm" role="group" aria-label="Bulk attendance">
                                     <button type="button" class="btn btn-outline-success" id="btnAllPresent">All Present</button>
                                     <% if (enabledAttendanceSet.has('late')) { %>
@@ -2076,7 +2152,7 @@
                                         <tr><td colspan="3" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
                                     <% } else { %>
                                         <% session.roster.forEach((student, i) => { %>
-                                            <% const rowDisabledAttr = (isReadOnly || enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) ? 'disabled' : ''; %>
+                                            <% const rowDisabledAttr = (attendanceReadOnly || enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) ? 'disabled' : ''; %>
                                             <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
                                                 <td class="attendance-order-cell text-muted small ps-3"><%= i + 1 %></td>
                                                 <td class="ps-2 fw-bold align-middle">
@@ -2167,7 +2243,7 @@
                             <div class="row g-2 align-items-end mb-3">
                                 <div class="col-md-8">
                                     <label class="form-label fw-semibold mb-1" for="optionalConductStudentSelect">Student</label>
-                                    <select id="optionalConductStudentSelect" class="form-select" <%- disabledAttr %>>
+                                    <select id="optionalConductStudentSelect" class="form-select" <%= conductSectionReadOnly ? 'disabled' : '' %>>
                                         <option value="">Select a student…</option>
                                         <% session.roster.forEach((student) => { %>
                                             <option value="<%= student.personId %>" data-student-name="<%= student.name %>"><%= student.name %></option>
@@ -2175,7 +2251,7 @@
                                     </select>
                                 </div>
                                 <div class="col-md-4">
-                                    <% if (!isReadOnly) { %>
+                                    <% if (!conductSectionReadOnly) { %>
                                         <button type="button" class="btn btn-outline-primary w-100" id="btnAddOptionalConductStudents"><i class="bi bi-plus-lg me-1"></i>Add to table</button>
                                     <% } %>
                                 </div>
@@ -2188,17 +2264,17 @@
                                             <% conductDimensions.forEach((dim) => { %>
                                                 <th class="text-center <%= dim.peClass %>"><div><%= dim.label %></div></th>
                                             <% }) %>
-                                            <% if (!isReadOnly) { %>
+                                            <% if (!conductSectionReadOnly) { %>
                                                 <th class="text-end pe-3" style="width: 4.5rem;"></th>
                                             <% } %>
                                         </tr>
                                     </thead>
                                     <tbody id="optionalConductTableBody">
-                                        <tr id="optionalConductEmptyRow"><td colspan="<%= isReadOnly ? 5 : 6 %>" class="text-center py-4 text-muted">Add one or more students to rate class conduct.</td></tr>
+                                        <tr id="optionalConductEmptyRow"><td colspan="<%= conductSectionReadOnly ? 5 : 6 %>" class="text-center py-4 text-muted">Add one or more students to rate class conduct.</td></tr>
                                     </tbody>
                                 </table>
                             </div>
-                            <% if (!isReadOnly) { %>
+                            <% if (!conductSectionReadOnly) { %>
                                 <div class="d-flex justify-content-end mt-3">
                                     <button type="button" class="btn btn-outline-primary" id="btnOpenOptionalConductBulkModal" disabled><i class="bi bi-lightning-charge me-1"></i>Quick rate</button>
                                 </div>
@@ -2218,10 +2294,10 @@
                     <div class="card-body">
                         <div class="mb-0">
                             <label class="form-label fw-bold">Teacher notes / homework</label>
-                            <textarea id="sessionNotes" class="form-control" rows="8" placeholder="Log what was covered today..." <%- disabledAttr %>><%= session.notes %></textarea>
+                            <textarea id="sessionNotes" class="form-control" rows="8" placeholder="Log what was covered today..." <%- sessionNotesDisabledAttr %>><%= session.notes %></textarea>
                         </div>
-                        <% if (isReadOnly) { %>
-                            <p class="small text-muted mb-0 mt-3"><i class="bi bi-lock-fill me-1"></i>This session is read-only.</p>
+                        <% if (sessionNotesReadOnly) { %>
+                            <p class="small text-muted mb-0 mt-3"><i class="bi bi-lock-fill me-1"></i>Session Notes are locked for this session.</p>
                         <% } %>
                     </div>
                 </div>
@@ -2247,7 +2323,7 @@
                         <div class="small text-muted mt-1">Select gradebook skills and note what you covered in this session.<% if (teachingOutlineContext && (teachingOutlineContext.suggestionsBySkill || teachingOutlineContext.levels)) { %> Use <strong>Session suggestions</strong> for roster-based teaching outline ideas.<% } %></div>
                     </div>
                     <div class="card-body">
-                        <% if (!isReadOnly && isInstructionalInactive !== true) { %>
+                        <% if (!curriculumSectionReadOnly && isInstructionalInactive !== true) { %>
                         <div class="mb-3" id="skillsCoveredAddForm">
                             <div class="row g-2 align-items-start">
                                 <div class="col-12 col-md-3 col-lg-2">
@@ -2301,7 +2377,7 @@
                     </div>
                 </div>
                 <% } %>
-                <% if (!isReadOnly && isInstructionalInactive !== true) { %>
+                <% if (!curriculumSectionReadOnly && isInstructionalInactive !== true) { %>
                 <div class="modal fade" id="outlinePickerModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-xl modal-dialog-scrollable">
                         <div class="modal-content">
@@ -2433,7 +2509,7 @@
                     </div>
 
                     <% if (hasSessionReportsAssignedFlag) { %>
-                        <% if (sessionHasConductRequiredReportsResolved && canManageReportClassConductFlag && !isReadOnly) { %>
+                        <% if (sessionHasConductRequiredReportsResolved && canManageReportClassConductFlag && !conductSectionReadOnly) { %>
                         <div class="session-panel-cta-zone session-panel-cta-zone--primary" id="sessionReportConductCtaZone">
                             <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenConductBulkModal">
                                 <i class="bi bi-lightning-charge me-2"></i>Quick rate class conduct
@@ -2525,7 +2601,7 @@
                                                             <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"><%= level.displayCode || level.code %></button>
                                                         <% }) %>
                                                     </div>
-                                                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%- disabledAttr %>>
+                                                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%= conductSectionReadOnly ? 'disabled' : '' %>>
                                                 </div>
                                             </td>
                                         <% }) %>
@@ -2615,7 +2691,7 @@
                         <h5 class="m-0 fw-bold text-primary"><i class="bi bi-folder-check me-2"></i>Student Cases</h5>
                         <div class="small text-muted mt-1">Open a case when one or more students need extra reflection, support, or office follow-up.</div>
                     </div>
-                    <% if (!isReadOnly && typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canCreate) { %>
+                    <% if (!studentCasesSectionReadOnly && typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canCreate) { %>
                     <div class="student-case-cta-zone">
                         <button type="button" class="btn btn-outline-secondary student-case-open-btn w-100" id="btnOpenStudentCaseWizard">
                             <i class="bi bi-folder-plus me-2"></i>Open Student Case
@@ -2656,7 +2732,7 @@
                             <i class="bi bi-table" aria-hidden="true"></i>Grades matrix
                         </a>
                     </div>
-                    <% if (!isReadOnly) { %>
+                    <% if (!gradebookSectionReadOnly) { %>
                     <div class="session-panel-cta-zone session-panel-cta-zone--primary">
                         <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenGradebookModal">
                             <i class="bi bi-journal-plus me-2"></i>Add activity
@@ -2748,10 +2824,10 @@
                                 <tr>
                                     <th scope="row">Late arrival</th>
                                     <td>
-                                        <input type="time" class="form-control form-control-sm attendance-timing-input-time" id="modalArrivalTime" step="60" <%- disabledAttr %>>
+                                        <input type="time" class="form-control form-control-sm attendance-timing-input-time" id="modalArrivalTime" step="60" <%- attendanceDisabledAttr %>>
                                     </td>
                                     <td>
-                                        <input type="number" class="form-control form-control-sm attendance-timing-input-mins" id="modalBreakLateMins" placeholder="0" min="0" step="1" <%- disabledAttr %>>
+                                        <input type="number" class="form-control form-control-sm attendance-timing-input-mins" id="modalBreakLateMins" placeholder="0" min="0" step="1" <%- attendanceDisabledAttr %>>
                                     </td>
                                     <td class="attendance-timing-total"><span id="modalAttendanceTotalLate">0</span> min</td>
                                 </tr>
@@ -2767,10 +2843,10 @@
                                 <tr>
                                     <th scope="row">Leaving early</th>
                                     <td>
-                                        <input type="time" class="form-control form-control-sm attendance-timing-input-time" id="modalLeaveTime" step="60" <%- disabledAttr %>>
+                                        <input type="time" class="form-control form-control-sm attendance-timing-input-time" id="modalLeaveTime" step="60" <%- attendanceDisabledAttr %>>
                                     </td>
                                     <td>
-                                        <input type="number" class="form-control form-control-sm attendance-timing-input-mins" id="modalBreakEarlyMins" placeholder="0" min="0" step="1" <%- disabledAttr %>>
+                                        <input type="number" class="form-control form-control-sm attendance-timing-input-mins" id="modalBreakEarlyMins" placeholder="0" min="0" step="1" <%- attendanceDisabledAttr %>>
                                     </td>
                                     <td class="attendance-timing-total"><span id="modalAttendanceTotalEarly">0</span> min</td>
                                 </tr>
@@ -2782,21 +2858,21 @@
                     <div class="row g-2 mt-2">
                         <div class="col-md-6">
                             <div class="d-none" id="wrap_modalLateExcused">
-                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalLateExcused" aria-pressed="false" <%- disabledAttr %>>
+                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalLateExcused" aria-pressed="false" <%- attendanceDisabledAttr %>>
                                     <i class="bi bi-shield-plus"></i><span>Mark late excused</span>
                                 </button>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="d-none" id="wrap_modalEarlyLeaveExcused">
-                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalEarlyLeaveExcused" aria-pressed="false" <%- disabledAttr %>>
+                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalEarlyLeaveExcused" aria-pressed="false" <%- attendanceDisabledAttr %>>
                                     <i class="bi bi-shield-plus"></i><span>Mark early leave excused</span>
                                 </button>
                             </div>
                         </div>
                         <div class="col-12">
                             <div class="d-none" id="wrap_modalAbsenceExcused">
-                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalAbsenceExcused" aria-pressed="false" <%- disabledAttr %>>
+                                <button type="button" class="btn btn-outline-success btn-sm attendance-timing-toggle" id="btn_modalAbsenceExcused" aria-pressed="false" <%- attendanceDisabledAttr %>>
                                     <i class="bi bi-shield-plus"></i><span>Mark absence excused</span>
                                 </button>
                             </div>
@@ -2808,9 +2884,9 @@
                 <div class="row g-3 mb-2">
                     <div class="col-12">
                         <label class="form-label fw-bold small" for="modalExcuseRef">Excuse / reference notes</label>
-                        <textarea class="form-control" id="modalExcuseRef" rows="3" placeholder="Add details..." <%- disabledAttr %>></textarea>
+                        <textarea class="form-control" id="modalExcuseRef" rows="3" placeholder="Add details..." <%- attendanceDisabledAttr %>></textarea>
                         <label class="form-label fw-bold small mt-2" for="modalExcuseFile">Attach supporting file</label>
-                        <input type="file" class="form-control form-control-sm" id="modalExcuseFile" <%- disabledAttr %>>
+                        <input type="file" class="form-control form-control-sm" id="modalExcuseFile" <%- attendanceDisabledAttr %>>
                         <div class="small text-muted mt-1">Browse, or paste a screenshot / file (Ctrl+V / Cmd+V).</div>
                         <div class="small mt-2" id="modalExcuseAttachmentPreview"></div>
                     </div>
@@ -2823,10 +2899,10 @@
 
                     <div class="border rounded p-2 bg-white shadow-sm">
                         <div class="d-flex flex-wrap gap-1 mb-2" id="pendingMentionsArea"></div>
-                        <textarea class="form-control border-0 bg-transparent p-0 mb-2" id="inp_newComment" rows="2" placeholder="Write a note or tag someone..."></textarea>
+                        <textarea class="form-control border-0 bg-transparent p-0 mb-2" id="inp_newComment" rows="2" placeholder="Write a note or tag someone..." <%= attendanceReadOnly ? 'disabled' : '' %>></textarea>
                         <div class="d-flex justify-content-between align-items-center border-top pt-2">
-                            <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser"><i class="bi bi-at"></i> Tag User</button>
-                            <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Send Note</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser" <%= attendanceReadOnly ? 'disabled' : '' %>><i class="bi bi-at"></i> Tag User</button>
+                            <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment" <%= attendanceReadOnly ? 'disabled' : '' %>>Send Note</button>
                         </div>
                     </div>
                 </div>
@@ -2834,7 +2910,7 @@
             </div>
             <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <% if (!isReadOnly) { %>
+                <% if (!attendanceReadOnly) { %>
                     <button type="button" class="btn btn-primary fw-bold" id="btnSaveDetails">Apply Time/Excuse</button>
                 <% } %>
             </div>
@@ -3571,18 +3647,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionBookCoveringSummaryInitial = <%- jsonForScript(typeof sessionBookCoveringSummary !== 'undefined' && sessionBookCoveringSummary ? sessionBookCoveringSummary : null) %>;
     const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
-    const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag)) %>;
-    const sessionReadOnly = <%- jsonForScript(!!isReadOnly) %>;
+    const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag && !timesheetMetadataLockActiveFlag)) %>;
+    const sessionAttendanceReadOnly = <%- jsonForScript(Boolean(attendanceReadOnly)) %>;
+    const sessionNotesSectionReadOnly = <%- jsonForScript(Boolean(sessionNotesReadOnly)) %>;
+    const sessionConductSectionReadOnly = <%- jsonForScript(Boolean(conductSectionReadOnly)) %>;
+    const sessionCurriculumSectionReadOnly = <%- jsonForScript(Boolean(curriculumSectionReadOnly)) %>;
+    const sessionGradebookSectionReadOnly = <%- jsonForScript(Boolean(gradebookSectionReadOnly)) %>;
     const sessionCanManageClassConduct = <%- jsonForScript(Boolean(canManageReportClassConductFlag)) %>;
-    const sessionCanManageCoTeachers = <%- jsonForScript(Boolean(typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true)) %>;
-    const sessionCanToggleCoTeacherEdit = <%- jsonForScript(Boolean(typeof canToggleCoTeacherEdit !== 'undefined' && canToggleCoTeacherEdit === true)) %>;
+    const sessionCanManageCoTeachers = <%- jsonForScript(Boolean((typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true) && !timesheetMetadataLockActiveFlag)) %>;
+    const sessionCanToggleCoTeacherEdit = <%- jsonForScript(Boolean((typeof canToggleCoTeacherEdit !== 'undefined' && canToggleCoTeacherEdit === true) && !timesheetMetadataLockActiveFlag)) %>;
     let sessionCoTeachersState = <%- jsonForScript(
         Array.isArray(typeof sessionCoTeachers !== 'undefined' ? sessionCoTeachers : null)
             ? sessionCoTeachers
             : (Array.isArray(session?.delivery?.coTeachers) ? session.delivery.coTeachers : [])
     ) %>;
     const sessionCanToggleLock = <%- jsonForScript(Boolean(canToggleSessionLock)) %>;
-    const sessionCanDeleteSession = <%- jsonForScript(typeof canDeleteSession !== 'undefined' && canDeleteSession === true) %>;
+    const sessionCanDeleteSession = <%- jsonForScript(Boolean((typeof canDeleteSession !== 'undefined' && canDeleteSession === true) && !timesheetDeletionLockActiveFlag)) %>;
     const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const sessionStatusMap = new Map((sessionStatusMeta || []).map((row) => [normalizeStatusCode(row.code), row]));
     const resolveStatusMeta = (statusCode) => sessionStatusMap.get(normalizeStatusCode(statusCode)) || null;
@@ -3686,7 +3766,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderExcuseAttachmentPreview(attachment, emptyText = '<span class="text-muted">No file attached.</span>') {
         const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
         if (!excusePreview) return;
-        const removable = !sessionReadOnly;
+        const removable = !sessionAttendanceReadOnly;
         if (!attachment) {
             excusePreview.innerHTML = emptyText;
             return;
@@ -4685,7 +4765,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : 'null' %>;
     window.__attendanceThresholdsEnabled = <%= typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved?.thresholdsEnabled === false ? 'false' : 'true' %>;
     window.__conductRatingScale = <%- JSON.stringify(typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved ? conductRatingScaleResolved : { levels: conductScaleDefaultLevels }) %>;
-    const sessionConductReadOnly = <%= JSON.stringify(!!isReadOnly || !canViewClassConductPanelFlag) %>;
+    const sessionConductReadOnly = sessionConductSectionReadOnly || <%= JSON.stringify(!canViewClassConductPanelFlag) %>;
     const conductDimensionMeta = <%- jsonForScript(conductDimensions) %>;
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
@@ -5309,8 +5389,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
     const studentCaseCapabilities = <%- jsonForScript(typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities ? studentCaseCapabilities : {}) %>;
+    const sessionStudentCasesSectionReadOnly = <%- jsonForScript(Boolean(studentCasesSectionReadOnly)) %>;
     const canDeleteStudentCases = Boolean(studentCaseCapabilities.canDelete);
-    const canCreateStudentCases = Boolean(studentCaseCapabilities.canCreate);
+    const canCreateStudentCases = Boolean(studentCaseCapabilities.canCreate) && !sessionStudentCasesSectionReadOnly;
     const canUpdateStudentCases = Boolean(studentCaseCapabilities.canUpdate);
     const canResolveStudentCases = Boolean(studentCaseCapabilities.canResolve);
     const canReadStudentCases = Boolean(studentCaseCapabilities.canRead || studentCaseCapabilities.canReadAll);
@@ -7953,7 +8034,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSessionContentList();
 
     /* --- Curriculum: skills covered this session --- */
-    const skillsCoveredReadOnly = <%= JSON.stringify(!!isReadOnly || !!isInstructionalInactive) %>;
+    const skillsCoveredReadOnly = sessionCurriculumSectionReadOnly || <%= JSON.stringify(!!isInstructionalInactive) %>;
     const skillsCoveredCatalog = <%- jsonForScript(gradebookSkills || []) %>;
     const skillsCoveredLabelById = new Map(skillsCoveredCatalog.map((skill) => [skill.id, skill.label]));
     const CLB_SKILL_IDS = new Set(
@@ -8804,7 +8885,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderOutlineSuggestions();
 
     /* --- Session gradebook (multiple activities per session) --- */
-    const gbReadOnly = <%= JSON.stringify(!!isReadOnly || !!isInstructionalInactive) %>;
+    const gbReadOnly = sessionGradebookSectionReadOnly || <%= JSON.stringify(!!isInstructionalInactive) %>;
     const gbClassId = sessionManagerClassId;
     const gbSessionId = sessionManagerSessionId;
     const gradebookRoster = <%- jsonForScript((session.roster || []).map((r) => ({ personId: String(r.personId), name: r.name || 'Student' }))) %>;
@@ -9824,11 +9905,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const shouldSendInstructionalPayload = !sessionInstructionalInactive && !selectedStatusRequiresMakeup;
         const payload = {
             status,
-            notes,
             room,
             actionStateId,
             trigger: 'autosave'
         };
+        if (!sessionNotesSectionReadOnly) {
+            payload.notes = notes;
+        }
         if (sessionAutosaveDirty.metadataDirty && sessionCanEditMetadata) {
             payload.date = document.getElementById('sessionDate')?.value || '';
             payload.startTime = document.getElementById('sessionStartTime')?.value || '';
@@ -9839,15 +9922,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sessionAutosaveDirty.metadataDirty && (sessionCanManageCoTeachers || sessionCanToggleCoTeacherEdit || sessionCanEditMetadata)) {
             payload.coTeachers = JSON.stringify(Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : []);
         }
-        if (shouldSendInstructionalPayload && sessionAutosaveDirty.rosterDirty) {
+        if (shouldSendInstructionalPayload && !sessionAttendanceReadOnly && sessionAutosaveDirty.rosterDirty) {
             payload.roster = JSON.stringify(buildSessionSaveRosterRows());
         }
         if (shouldSendInstructionalPayload && sessionAutosaveDirty.instructionalDirty) {
             payload.contentItems = JSON.stringify(Array.isArray(manualSessionContentState) ? manualSessionContentState : []);
             payload.contentOrder = JSON.stringify(Array.isArray(sessionContentOrderState) ? sessionContentOrderState : []);
-            payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
+            if (!sessionCurriculumSectionReadOnly) {
+                payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
+            }
         }
-        if (shouldSendInstructionalPayload && sessionAutosaveDirty.gradebookDirty) {
+        if (shouldSendInstructionalPayload && !sessionGradebookSectionReadOnly && sessionAutosaveDirty.gradebookDirty) {
             gbSyncScoresFromInputs();
             payload.gradebooks = JSON.stringify(gradebooksState);
         }
@@ -9942,10 +10027,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const shouldSendInstructionalPayload = !sessionInstructionalInactive && !selectedStatusRequiresMakeup;
         const payload = {
             status,
-            notes,
             room,
             actionStateId
         };
+        if (!sessionNotesSectionReadOnly) {
+            payload.notes = notes;
+        }
         if (sessionCanEditMetadata) {
             payload.date = document.getElementById('sessionDate')?.value || '';
             payload.startTime = document.getElementById('sessionStartTime')?.value || '';
@@ -9957,12 +10044,18 @@ document.addEventListener('DOMContentLoaded', () => {
             payload.coTeachers = JSON.stringify(Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : []);
         }
         if (shouldSendInstructionalPayload) {
-            payload.roster = JSON.stringify(buildSessionSaveRosterRows());
+            if (!sessionAttendanceReadOnly) {
+                payload.roster = JSON.stringify(buildSessionSaveRosterRows());
+            }
             payload.contentItems = JSON.stringify(Array.isArray(manualSessionContentState) ? manualSessionContentState : []);
             payload.contentOrder = JSON.stringify(Array.isArray(sessionContentOrderState) ? sessionContentOrderState : []);
-            payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
-            gbSyncScoresFromInputs();
-            payload.gradebooks = JSON.stringify(gradebooksState);
+            if (!sessionCurriculumSectionReadOnly) {
+                payload.skillsCovered = JSON.stringify(Array.isArray(skillsCoveredState) ? skillsCoveredState : []);
+            }
+            if (!sessionGradebookSectionReadOnly) {
+                gbSyncScoresFromInputs();
+                payload.gradebooks = JSON.stringify(gradebooksState);
+            }
         }
         return payload;
     }

@@ -38,6 +38,11 @@ test('session access policy service normalizes defaults and validates templates'
   assert.equal(policy.uncompletedSessionNotification.channels.sms.sendWhen, 'same_day');
   assert.equal(policy.completedSessionAttendanceEdit.enabled, true);
   assert.equal(policy.completedSessionAttendanceEdit.windowType, 'timesheet_period');
+  assert.equal(policy.completedSessionNotesEdit.enabled, true);
+  assert.equal(policy.completedSessionGradebookEdit.enabled, true);
+  assert.equal(policy.completedSessionConductEdit.enabled, true);
+  assert.equal(policy.completedSessionCurriculumEdit.enabled, true);
+  assert.equal(policy.completedSessionStudentCasesEdit.enabled, true);
 
   const normalized = sessionAccessPolicyService.validatePolicyInput({
     uncompletedSessionNotification: {
@@ -65,6 +70,11 @@ test('session access policy service normalizes defaults and validates templates'
       enabled: true,
       windowType: 'days_after_session',
       daysAfterSession: 4
+    },
+    completedSessionNotesEdit: {
+      enabled: true,
+      windowType: 'end_of_week',
+      daysAfterSession: null
     }
   });
   assert.equal(normalized.uncompletedSessionNotification.channels.email.sendWhen, 'next_day');
@@ -73,7 +83,17 @@ test('session access policy service normalizes defaults and validates templates'
 
   assert.throws(
     () => sessionAccessPolicyService.validatePolicyInput({
-      completedSessionAttendanceEdit: {
+      completedSessionCurriculumEdit: {
+        enabled: true,
+        windowType: 'days_after_session',
+        daysAfterSession: null
+      }
+    }),
+    /Days after session is required/
+  );
+  assert.throws(
+    () => sessionAccessPolicyService.validatePolicyInput({
+      completedSessionStudentCasesEdit: {
         enabled: true,
         windowType: 'days_after_session',
         daysAfterSession: null
@@ -314,6 +334,67 @@ test('attendance edit enforcement blocks expired windows and allows admin overri
         canOverride: false
       }),
       (error) => error.code === 'SESSION_ATTENDANCE_EDIT_WINDOW_EXPIRED'
+    );
+  } finally {
+    sessionStatusPolicyService.getStatusMap = originalGetStatusMap;
+    sessionStatusPolicyService.isSessionCompletionStatusByMap = originalIsCompletion;
+  }
+});
+
+test('section edit enforcement supports section-specific targets', async () => {
+  const policy = sessionAccessPolicyService.resolvePolicy({
+    completedSessionNotesEdit: { enabled: false, windowType: 'timesheet_period', daysAfterSession: null },
+    completedSessionGradebookEdit: { enabled: true, windowType: 'days_after_session', daysAfterSession: 2 },
+    completedSessionStudentCasesEdit: { enabled: false, windowType: 'timesheet_period', daysAfterSession: null }
+  });
+  const session = {
+    status: 'completed',
+    date: '2020-01-10',
+    completedAt: '2020-01-10T18:00:00.000Z'
+  };
+
+  const originalGetStatusMap = sessionStatusPolicyService.getStatusMap;
+  const originalIsCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap;
+  sessionStatusPolicyService.getStatusMap = async () => ({ completed: { isFinal: true } });
+  sessionStatusPolicyService.isSessionCompletionStatusByMap = () => true;
+
+  try {
+    await assert.rejects(
+      () => sessionAttendanceEditAccessService.assertSessionSectionEditable({
+        orgId: 'ORG-1',
+        session,
+        policy,
+        orgTimeZone: 'UTC',
+        now: new Date('2020-01-12T00:00:00.000Z'),
+        canOverride: false,
+        target: 'notes'
+      }),
+      (error) => error.code === 'SESSION_NOTES_EDIT_WINDOW_EXPIRED'
+    );
+
+    const allowed = await sessionAttendanceEditAccessService.assertSessionSectionEditable({
+      orgId: 'ORG-1',
+      session,
+      policy,
+      orgTimeZone: 'UTC',
+      now: new Date('2020-01-11T00:00:00.000Z'),
+      canOverride: false,
+      target: 'gradebook'
+    });
+    assert.equal(allowed.target, 'gradebook');
+    assert.equal(allowed.reason, 'within_edit_window');
+
+    await assert.rejects(
+      () => sessionAttendanceEditAccessService.assertSessionSectionEditable({
+        orgId: 'ORG-1',
+        session,
+        policy,
+        orgTimeZone: 'UTC',
+        now: new Date('2020-01-12T00:00:00.000Z'),
+        canOverride: false,
+        target: 'studentcases'
+      }),
+      (error) => error.code === 'SESSION_STUDENT_CASES_EDIT_WINDOW_EXPIRED'
     );
   } finally {
     sessionStatusPolicyService.getStatusMap = originalGetStatusMap;
@@ -564,10 +645,25 @@ test('session access settings routes, controller, and session manager enforcemen
   assert.match(classController, /sessionAttendanceEditAccessService/);
   assert.match(classController, /originalSession\.completedAt/);
   assert.match(classController, /attendanceEditLocked/);
+  assert.match(classController, /notesEditLocked/);
+  assert.match(classController, /gradebookEditLocked/);
+  assert.match(classController, /conductEditLocked/);
+  assert.match(classController, /curriculumEditLocked/);
+  assert.match(classController, /studentCasesEditLocked/);
   assert.match(attendanceController, /assertSessionAttendanceEditable/);
   assert.match(sessionView, /Attendance Edit Window Closed/);
+  assert.match(sessionView, /Session Notes Edit Window Closed/);
+  assert.match(sessionView, /Grade book Edit Window Closed/);
+  assert.match(sessionView, /Class Conduct Edit Window Closed/);
+  assert.match(sessionView, /Curriculum Edit Window Closed/);
+  assert.match(sessionView, /Student Cases Edit Window Closed/);
   assert.match(settingsView, /id="session-access"/);
   assert.match(settingsView, /\/school\/settings\/session-access/);
+  assert.match(settingsView, /sessionNotesEditEnabled/);
+  assert.match(settingsView, /sessionGradebookEditEnabled/);
+  assert.match(settingsView, /sessionConductEditEnabled/);
+  assert.match(settingsView, /sessionCurriculumEditEnabled/);
+  assert.match(settingsView, /sessionStudentCasesEditEnabled/);
   assert.match(settingsView, /sessionNotificationEmailDailyAll/);
   assert.match(settingsView, /sessionNotificationSmsDailyAll/);
   assert.match(settingsView, /sessionNotificationEmailRangeType/);

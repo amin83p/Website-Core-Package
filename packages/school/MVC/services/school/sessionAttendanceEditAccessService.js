@@ -10,6 +10,49 @@ const {
 } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const FIXED_GRACE_DAYS_WHEN_DISABLED = 1;
+const SECTION_EDIT_TARGETS = Object.freeze({
+  attendance: Object.freeze({
+    key: 'attendance',
+    policyKey: 'completedSessionAttendanceEdit',
+    label: 'Attendance',
+    errorCode: 'SESSION_ATTENDANCE_EDIT_WINDOW_EXPIRED'
+  }),
+  notes: Object.freeze({
+    key: 'notes',
+    policyKey: 'completedSessionNotesEdit',
+    label: 'Session Notes',
+    errorCode: 'SESSION_NOTES_EDIT_WINDOW_EXPIRED'
+  }),
+  gradebook: Object.freeze({
+    key: 'gradebook',
+    policyKey: 'completedSessionGradebookEdit',
+    label: 'Grade book/Activities',
+    errorCode: 'SESSION_GRADEBOOK_EDIT_WINDOW_EXPIRED'
+  }),
+  conduct: Object.freeze({
+    key: 'conduct',
+    policyKey: 'completedSessionConductEdit',
+    label: 'Class Conduct Before Reports',
+    errorCode: 'SESSION_CONDUCT_EDIT_WINDOW_EXPIRED'
+  }),
+  curriculum: Object.freeze({
+    key: 'curriculum',
+    policyKey: 'completedSessionCurriculumEdit',
+    label: 'Curriculum',
+    errorCode: 'SESSION_CURRICULUM_EDIT_WINDOW_EXPIRED'
+  }),
+  studentcases: Object.freeze({
+    key: 'studentcases',
+    policyKey: 'completedSessionStudentCasesEdit',
+    label: 'Student Cases',
+    errorCode: 'SESSION_STUDENT_CASES_EDIT_WINDOW_EXPIRED'
+  })
+});
+
+function resolveSectionEditTarget(target = 'attendance') {
+  const key = String(target || 'attendance').trim().toLowerCase();
+  return SECTION_EDIT_TARGETS[key] || SECTION_EDIT_TARGETS.attendance;
+}
 
 function cleanDateKey(value) {
   const token = String(value || '').trim();
@@ -73,8 +116,14 @@ async function findTimesheetPeriodForSessionDate(orgId, sessionDate) {
   return orgPeriods[0] || null;
 }
 
-function resolveDeadlineDateKey({ policy, session, orgId, timesheetPeriod = null }) {
-  const editPolicy = policy?.completedSessionAttendanceEdit || {};
+function resolveDeadlineDateKey({
+  policy,
+  session,
+  orgId,
+  timesheetPeriod = null,
+  policyKey = SECTION_EDIT_TARGETS.attendance.policyKey
+}) {
+  const editPolicy = policy?.[policyKey] || {};
   const sessionDate = resolveSessionDateKey(session);
   const completionInstant = resolveCompletionInstant(session);
   const completionDate = completionInstant
@@ -117,24 +166,30 @@ function resolveDeadlineInstant({
   return Number.isFinite(ms) ? new Date(ms) : null;
 }
 
-async function resolveAttendanceEditAccess({
+async function resolveSessionSectionEditAccess({
   orgId = '',
   session = {},
   policy = null,
   orgTimeZone = 'UTC',
   now = new Date(),
-  timesheetPeriod = undefined
+  timesheetPeriod = undefined,
+  target = 'attendance',
+  statusMap = null
 } = {}) {
+  const resolvedTarget = resolveSectionEditTarget(target);
   const resolvedPolicy = policy || await sessionAccessPolicyModel.getPolicyForOrg(orgId);
-  const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
-  const isCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(statusMap, session);
+  const effectiveStatusMap = statusMap || await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
+  const isCompletion = sessionStatusPolicyService.isSessionCompletionStatusByMap(effectiveStatusMap, session);
   if (!isCompletion) {
     return {
       editable: true,
       reason: 'session_not_completed',
       deadlineAt: null,
       deadlineDateKey: '',
-      policy: resolvedPolicy
+      policy: resolvedPolicy,
+      target: resolvedTarget.key,
+      policyKey: resolvedTarget.policyKey,
+      targetLabel: resolvedTarget.label
     };
   }
 
@@ -145,7 +200,8 @@ async function resolveAttendanceEditAccess({
     policy: resolvedPolicy,
     session,
     orgId,
-    timesheetPeriod: period
+    timesheetPeriod: period,
+    policyKey: resolvedTarget.policyKey
   });
   const deadlineAt = resolveDeadlineInstant({
     deadlineDateKey,
@@ -159,51 +215,85 @@ async function resolveAttendanceEditAccess({
     deadlineAt: deadlineAt ? deadlineAt.toISOString() : null,
     deadlineDateKey,
     policy: resolvedPolicy,
-    timesheetPeriod: period
+    timesheetPeriod: period,
+    target: resolvedTarget.key,
+    policyKey: resolvedTarget.policyKey,
+    targetLabel: resolvedTarget.label
   };
 }
 
-function formatDeadlineMessage(access = {}) {
-  if (access.editable) return '';
-  if (access.deadlineDateKey) {
-    return `Attendance edits are locked after ${access.deadlineDateKey} for completed sessions. Contact an administrator if you need an override.`;
-  }
-  return 'Attendance edits are locked for this completed session. Contact an administrator if you need an override.';
+function resolveLockedSectionLabel(access = {}, fallbackTarget = 'attendance') {
+  const fallback = resolveSectionEditTarget(fallbackTarget);
+  return String(access?.targetLabel || fallback.label || 'This section').trim();
 }
 
-async function assertSessionAttendanceEditable({
+function formatDeadlineMessage(access = {}, fallbackTarget = 'attendance') {
+  const sectionLabel = resolveLockedSectionLabel(access, fallbackTarget);
+  if (access.editable) return '';
+  if (access.deadlineDateKey) {
+    return `${sectionLabel} edits are locked after ${access.deadlineDateKey} for completed sessions. Contact an administrator if you need an override.`;
+  }
+  return `${sectionLabel} edits are locked for this completed session. Contact an administrator if you need an override.`;
+}
+
+async function assertSessionSectionEditable({
   orgId = '',
   session = {},
   policy = null,
   orgTimeZone = 'UTC',
   now = new Date(),
   canOverride = false,
-  timesheetPeriod = undefined
+  timesheetPeriod = undefined,
+  target = 'attendance',
+  statusMap = null
 } = {}) {
-  if (canOverride) return { editable: true, reason: 'admin_override' };
-  const access = await resolveAttendanceEditAccess({
+  const resolvedTarget = resolveSectionEditTarget(target);
+  if (canOverride) {
+    return {
+      editable: true,
+      reason: 'admin_override',
+      target: resolvedTarget.key,
+      policyKey: resolvedTarget.policyKey,
+      targetLabel: resolvedTarget.label
+    };
+  }
+  const access = await resolveSessionSectionEditAccess({
     orgId,
     session,
     policy,
     orgTimeZone,
     now,
-    timesheetPeriod
+    timesheetPeriod,
+    target: resolvedTarget.key,
+    statusMap
   });
   if (!access.editable) {
-    const error = new Error(formatDeadlineMessage(access));
+    const error = new Error(formatDeadlineMessage(access, resolvedTarget.key));
     error.statusCode = 403;
-    error.code = 'SESSION_ATTENDANCE_EDIT_WINDOW_EXPIRED';
+    error.code = resolvedTarget.errorCode;
     error.data = {
       deadlineAt: access.deadlineAt,
-      deadlineDateKey: access.deadlineDateKey
+      deadlineDateKey: access.deadlineDateKey,
+      target: resolvedTarget.key,
+      targetLabel: resolvedTarget.label
     };
     throw error;
   }
   return access;
 }
 
+async function resolveAttendanceEditAccess(options = {}) {
+  return resolveSessionSectionEditAccess({ ...options, target: 'attendance' });
+}
+
+async function assertSessionAttendanceEditable(options = {}) {
+  return assertSessionSectionEditable({ ...options, target: 'attendance' });
+}
+
 module.exports = {
   FIXED_GRACE_DAYS_WHEN_DISABLED,
+  SECTION_EDIT_TARGETS,
+  resolveSectionEditTarget,
   addDaysToDateKey,
   endOfWeekDateKey,
   endOfMonthDateKey,
@@ -211,6 +301,8 @@ module.exports = {
   findTimesheetPeriodForSessionDate,
   resolveDeadlineDateKey,
   resolveDeadlineInstant,
+  resolveSessionSectionEditAccess,
+  assertSessionSectionEditable,
   resolveAttendanceEditAccess,
   formatDeadlineMessage,
   assertSessionAttendanceEditable

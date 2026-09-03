@@ -20,7 +20,9 @@ test('session manager sends status-only payload when current or selected status 
   assert.match(source, /function isSessionStatusMakeupRequired\(statusCode\)/);
   assert.match(source, /const selectedStatusRequiresMakeup = isSessionStatusMakeupRequired\(status\);/);
   assert.match(source, /const shouldSendInstructionalPayload = !sessionInstructionalInactive && !selectedStatusRequiresMakeup;/);
-  assert.match(source, /if \(shouldSendInstructionalPayload\) {\s*payload\.roster = JSON\.stringify\(roster\);[\s\S]*payload\.contentItems = JSON\.stringify\(/);
+  assert.match(source, /if \(shouldSendInstructionalPayload\) \{/);
+  assert.match(source, /if \(!sessionAttendanceReadOnly\) {\s*payload\.roster = JSON\.stringify\(buildSessionSaveRosterRows\(\)\);/);
+  assert.match(source, /payload\.contentItems = JSON\.stringify\(/);
 });
 
 test('saveSession controller skips instructional payload updates for make-up-required sessions', () => {
@@ -29,6 +31,8 @@ test('saveSession controller skips instructional payload updates for make-up-req
   assert.match(source, /if \(!shouldSkipInstructionalPayload && contentItems !== undefined\)/);
   assert.match(source, /if \(!shouldSkipInstructionalPayload && contentOrder !== undefined\)/);
   assert.match(source, /if \(!shouldSkipInstructionalPayload && roster !== undefined\)/);
+  assert.match(source, /if \(!shouldSkipInstructionalPayload && skillsCovered !== undefined\) {\s*await assertCompletedSessionSectionEditable\('curriculum'/);
+  assert.match(source, /if \(!shouldSkipInstructionalPayload && req\.body\?\.gradebooks !== undefined\) {\s*await assertCompletedSessionSectionEditable\('gradebook'/);
   assert.doesNotMatch(source, /Change the status from Master Hub first, or create\/open the make-up session\./);
 });
 
@@ -127,12 +131,52 @@ test('session manager handles metadata conflict warning with force resubmit', ()
   assert.match(source, /Save Anyway/);
   assert.match(source, /submitSessionSave\(\{ \.\.\.payload,\s*force:\s*true \}\)/);
 });
+
+test('session manager uses section-specific completed-session read-only flags', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(source, /const attendanceReadOnly = isReadOnly \|\| \(typeof attendanceEditLocked !== 'undefined' && attendanceEditLocked\);/);
+  assert.match(source, /const sessionNotesReadOnly = isReadOnly \|\| \(typeof notesEditLocked !== 'undefined' && notesEditLocked\);/);
+  assert.match(source, /const gradebookSectionReadOnly = isReadOnly \|\| \(typeof gradebookEditLocked !== 'undefined' && gradebookEditLocked\);/);
+  assert.match(source, /const conductSectionReadOnly = isReadOnly \|\| \(typeof conductEditLocked !== 'undefined' && conductEditLocked\);/);
+  assert.match(source, /const curriculumSectionReadOnly = isReadOnly \|\| \(typeof curriculumEditLocked !== 'undefined' && curriculumEditLocked\);/);
+  assert.match(source, /const studentCasesSectionReadOnly = isReadOnly \|\| \(typeof studentCasesEditLocked !== 'undefined' && studentCasesEditLocked\);/);
+  assert.match(source, /if \(!sessionNotesSectionReadOnly\) {\s*payload\.notes = notes;/);
+  assert.match(source, /if \(!sessionCurriculumSectionReadOnly\) {\s*payload\.skillsCovered = JSON\.stringify/);
+  assert.match(source, /if \(!sessionGradebookSectionReadOnly\) {\s*gbSyncScoresFromInputs\(\);/);
+});
 test('session manager keeps make-up-required attendance visible as derived N/A', () => {
   const viewSource = read('packages/school/MVC/views/school/class/sessionManager.ejs');
   const controllerSource = read('packages/school/MVC/controllers/school/classController.js');
   assert.match(viewSource, /Attendance remains visible as N\/A for tracking/);
   assert.doesNotMatch(viewSource, /data-session-panel="attendance" role="tab" aria-selected="true" <%= isMakeupRequiredInactive/);
   assert.match(controllerSource, /const forceSessionNotApplicable = sessionStatusPolicyService\.shouldForceNotApplicableAttendanceByMap/);
-  assert.match(controllerSource, /state\.reason === 'makeup_required'/);
+  assert.match(controllerSource, /state\.reason === classEnrollmentSessionApplicabilityService\.APPLICABILITY_REASON\.MAKEUP_REQUIRED/);
   assert.match(controllerSource, /attendanceMatrixMetricsService\.ATTENDANCE_STATUS\.NOT_APPLICABLE/);
+});
+
+test('session manager scopes approved-timesheet lock to metadata and delete controls', () => {
+  const viewSource = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  const controllerSource = read('packages/school/MVC/controllers/school/classController.js');
+
+  assert.match(controllerSource, /const isAdministrativeSessionLock = isSessionLocked && !isTimesheetSessionLock;/);
+  assert.match(controllerSource, /const timesheetMetadataLockActive = isTimesheetSessionLock;/);
+  assert.match(controllerSource, /const timesheetDeletionLockActive = isTimesheetSessionLock;/);
+  assert.match(controllerSource, /const isReadOnly = !canEditSession \|\| \(isAdministrativeSessionLock && !canOverride\);/);
+
+  assert.match(viewSource, /const metadataDisabledAttr = \(isReadOnly \|\| timesheetMetadataLockActiveFlag\) \? 'disabled' : '';/);
+  assert.match(viewSource, /id="btnDeleteSession" <%= timesheetDeletionLockActiveFlag \? 'disabled' : '' %>/);
+  assert.match(viewSource, /const sessionCanEditMetadata = <%- jsonForScript\(Boolean\(canEditSessionMetadataFlag && !timesheetMetadataLockActiveFlag\)\) %>;/);
+  assert.match(viewSource, /const sessionCanManageCoTeachers = <%- jsonForScript\(Boolean\(\(typeof canManageCoTeachers !== 'undefined' && canManageCoTeachers === true\) && !timesheetMetadataLockActiveFlag\)\) %>;/);
+  assert.match(viewSource, /const sessionCanDeleteSession = <%- jsonForScript\(Boolean\(\(typeof canDeleteSession !== 'undefined' && canDeleteSession === true\) && !timesheetDeletionLockActiveFlag\)\) %>;/);
+});
+
+test('session manager gates student case creation with completed-session lock window', () => {
+  const viewSource = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  const controllerSource = read('packages/school/MVC/controllers/school/classController.js');
+
+  assert.match(controllerSource, /studentCasesEditAccess/);
+  assert.match(controllerSource, /studentCasesEditLocked/);
+  assert.match(viewSource, /Student Cases Edit Window Closed/);
+  assert.match(viewSource, /if \(!studentCasesSectionReadOnly && typeof studentCaseCapabilities !== 'undefined'/);
+  assert.match(viewSource, /const canCreateStudentCases = Boolean\(studentCaseCapabilities\.canCreate\) && !sessionStudentCasesSectionReadOnly;/);
 });

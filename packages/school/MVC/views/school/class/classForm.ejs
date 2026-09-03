@@ -3465,6 +3465,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const isCancelled = statusMeta ? statusMeta.excludeFromTeacherIndex === true : statusCode === 'cancelled';
             const isLocked = !!ses.locked;
             const isTimesheetLock = isTimesheetApprovedLock(ses);
+            const isAdminLocked = isLocked && !isTimesheetLock;
             const rowAppearance = buildSessionRowAppearance(statusCode, { locked: isLocked, conflict: Boolean(ses.conflictMsg) });
             
             let conflictHtml = '';
@@ -3487,11 +3488,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
-            const lockedAttr = isLocked ? 'disabled' : '';
+            const broadLockedAttr = isAdminLocked ? 'disabled' : '';
+            const metadataLockAttr = (isAdminLocked || isTimesheetLock) ? 'disabled' : '';
             const lockCbDisabled = isTimesheetLock ? 'disabled' : '';
             const lockTitle = isTimesheetLock
                 ? 'Locked by an approved timesheet. Reopen the timesheet to unlock.'
                 : 'Lock session';
+            const coTeacherSelectDisabledAttr = isTimesheetLock ? 'disabled' : '';
+            const coTeacherSelectTitle = isTimesheetLock
+                ? 'Locked by an approved timesheet. Co-teacher bulk actions are disabled.'
+                : 'Select for co-teacher apply';
             const tName = ses.delivery?.deliveredByName || ses.delivery?.deliveredBy || '';
             
             const isUnsaved = !ses._isSaved;
@@ -3524,42 +3530,43 @@ document.addEventListener('DOMContentLoaded', () => {
                     return label ? `${label} (${pay})` : pay;
                 }).filter(Boolean).slice(0, 3).join(', ')}${coTeachers.length > 3 ? '…' : ''}</div>`
                 : '';
+            if (isTimesheetLock) ses._bulkSelected = false;
             const selectedAttr = ses._bulkSelected === true ? 'checked' : '';
             tr.innerHTML = `
-                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-select-cb" data-index="${index}" ${selectedAttr} title="Select for co-teacher apply"></td>
+                <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-select-cb" data-index="${index}" ${selectedAttr} ${coTeacherSelectDisabledAttr} title="${coTeacherSelectTitle}"></td>
                 <td class="text-center align-middle"><input type="checkbox" class="form-check-input session-lock-cb" data-index="${index}" ${isLocked ? 'checked' : ''} ${lockCbDisabled} title="${lockTitle}"></td>
                 <td>
                     <div class="d-flex align-items-center gap-1">
                         ${manageBtnHtml}
                         <span class="badge bg-light text-dark border">${dayName}</span>
-                        <input type="date" class="form-control form-control-sm border-0 bg-transparent session-input px-1" data-index="${index}" data-field="date" value="${ses.date || ''}" ${lockedAttr}>
+                        <input type="date" class="form-control form-control-sm border-0 bg-transparent session-input px-1" data-index="${index}" data-field="date" value="${ses.date || ''}" ${metadataLockAttr}>
                     </div>
                 </td>
                 <td>
                     <div class="d-flex align-items-center">                        
-                        <input type="time" class="form-control form-control-sm border-0 bg-transparent session-input px-1" data-index="${index}" data-field="startTime" value="${ses.startTime || ''}" ${lockedAttr}>
+                        <input type="time" class="form-control form-control-sm border-0 bg-transparent session-input px-1" data-index="${index}" data-field="startTime" value="${ses.startTime || ''}" ${metadataLockAttr}>
                         <i class="bi bi-dash text-muted"></i>
-                        <input type="time" class="form-control form-control-sm border-0 bg-transparent session-input px-1" data-index="${index}" data-field="endTime" value="${ses.endTime || ''}" ${lockedAttr}>
+                        <input type="time" class="form-control form-control-sm border-0 bg-transparent session-input px-1" data-index="${index}" data-field="endTime" value="${ses.endTime || ''}" ${metadataLockAttr}>
                     </div>
                 </td>
-                <td><input type="number" step="0.5" class="form-control form-control-sm border-0 bg-transparent session-input" data-index="${index}" data-field="durationHours" value="${ses.durationHours || 0}" ${lockedAttr}></td>
-                <td><input type="text" class="form-control form-control-sm border-0 bg-transparent session-input" data-index="${index}" data-field="room" value="${ses.room || ''}" placeholder="Room..." ${lockedAttr}></td>                
+                <td><input type="number" step="0.5" class="form-control form-control-sm border-0 bg-transparent session-input" data-index="${index}" data-field="durationHours" value="${ses.durationHours || 0}" ${broadLockedAttr}></td>
+                <td><input type="text" class="form-control form-control-sm border-0 bg-transparent session-input" data-index="${index}" data-field="room" value="${ses.room || ''}" placeholder="Room..." ${metadataLockAttr}></td>                
                 <td>
                     <div class="input-group input-group-sm">
-                        <input type="text" class="form-control border-0 bg-transparent session-input fw-bold" data-index="${index}" data-field="deliveredByName" value="${tName}" placeholder="Teacher Name" readonly ${lockedAttr}>
-                        <button class="btn btn-outline-secondary btn-pick-teacher" data-index="${index}" type="button" ${lockedAttr}><i class="bi bi-person"></i></button>
+                        <input type="text" class="form-control border-0 bg-transparent session-input fw-bold" data-index="${index}" data-field="deliveredByName" value="${tName}" placeholder="Teacher Name" readonly ${metadataLockAttr}>
+                        <button class="btn btn-outline-secondary btn-pick-teacher" data-index="${index}" type="button" ${metadataLockAttr}><i class="bi bi-person"></i></button>
                     </div>
                     ${coTeacherHint}
                     ${conflictHtml}
                 </td>
-                <td><input type="text" class="form-control form-control-sm border-0 bg-transparent session-input" data-index="${index}" data-field="notes" value="${ses.notes || ''}" placeholder="Notes..." ${lockedAttr}></td>
+                <td><input type="text" class="form-control form-control-sm border-0 bg-transparent session-input" data-index="${index}" data-field="notes" value="${ses.notes || ''}" placeholder="Notes..." ${broadLockedAttr}></td>
                 <td>
                     <div class="d-flex align-items-center gap-2">
-                        <select class="form-select form-select-sm border-0 bg-transparent session-input ${isCancelled ? 'fw-bold text-danger' : ''}" data-index="${index}" data-field="status" ${lockedAttr}>${buildStatusOptionsHtml(statusCode, ses)}</select>
+                        <select class="form-select form-select-sm border-0 bg-transparent session-input ${isCancelled ? 'fw-bold text-danger' : ''}" data-index="${index}" data-field="status" ${metadataLockAttr}>${buildStatusOptionsHtml(statusCode, ses)}</select>
                         ${isLocked ? '<span class="badge bg-dark-subtle text-dark border"><i class="bi bi-lock-fill"></i></span>' : ''}
                     </div>
                 </td>
-                <td class="text-center"><button type="button" class="btn btn-sm text-danger btn-remove-session" data-index="${index}" ${lockedAttr}><i class="bi bi-trash"></i></button></td>
+                <td class="text-center"><button type="button" class="btn btn-sm text-danger btn-remove-session" data-index="${index}" ${metadataLockAttr}><i class="bi bi-trash"></i></button></td>
             `;
             tbody.appendChild(tr);
         });
@@ -4353,6 +4360,7 @@ function getBulkAffectedSessions() {
         const match = (curId && curId === oldVal) || (curName === oldVal) || (!curId && curName && curName === oldVal);
         if (!match) return false;
         if (!statusMatches(s, target)) return false;
+        if (isTimesheetApprovedLock(s)) return false;
         if (!includeLocked && isLocked(s)) return false;
         return true;
     });
@@ -4718,6 +4726,7 @@ async function applyBulkTeacherChange() {
         const match = (curId && curId === oldVal) || (curName === oldVal) || (!curId && curName && curName === oldVal);
         if (!match) return;
         if (!statusMatches(s, target)) return;
+        if (isTimesheetApprovedLock(s)) return;
         if (!includeLocked && isLocked(s)) return;
 
         if (!s.delivery) s.delivery = {};
@@ -4947,7 +4956,7 @@ function normalizeBulkCoTeacherRow(row = {}, session = null) {
 }
 
 function getSelectedSessionsForCoTeachers() {
-    return (sessionsState || []).filter((s) => s && s._bulkSelected === true);
+    return (sessionsState || []).filter((s) => s && s._bulkSelected === true && !isTimesheetApprovedLock(s));
 }
 
 function syncBulkModalFooterForTab(isMainTab) {
@@ -5005,7 +5014,10 @@ function mergeCoTeachersOntoSession(session, incomingRows = [], { replace = fals
 if (sessionsSelectAllCb) {
     sessionsSelectAllCb.addEventListener('change', () => {
         const checked = !!sessionsSelectAllCb.checked;
-        (sessionsState || []).forEach((s) => { if (s) s._bulkSelected = checked; });
+        (sessionsState || []).forEach((s) => {
+            if (!s) return;
+            s._bulkSelected = checked && !isTimesheetApprovedLock(s);
+        });
         renderSessions();
         computeBulkCoTeacherPreview();
     });

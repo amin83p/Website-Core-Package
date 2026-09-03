@@ -21,7 +21,12 @@ function pickStoredPolicyFields(row) {
   if (!row || typeof row !== 'object') return {};
   return {
     uncompletedSessionNotification: row.uncompletedSessionNotification,
-    completedSessionAttendanceEdit: row.completedSessionAttendanceEdit
+    completedSessionAttendanceEdit: row.completedSessionAttendanceEdit,
+    completedSessionNotesEdit: row.completedSessionNotesEdit,
+    completedSessionGradebookEdit: row.completedSessionGradebookEdit,
+    completedSessionConductEdit: row.completedSessionConductEdit,
+    completedSessionCurriculumEdit: row.completedSessionCurriculumEdit,
+    completedSessionStudentCasesEdit: row.completedSessionStudentCasesEdit
   };
 }
 
@@ -51,9 +56,11 @@ function effectivePolicyFromDoc(doc, activeOrgId) {
   if (!row || typeof row !== 'object') {
     return sessionAccessPolicyService.resolvePolicy(DEFAULT_POLICY);
   }
-  return sessionAccessPolicyService.resolvePolicy(
-    sessionAccessPolicyService.normalizePolicyFromStored(pickStoredPolicyFields(row))
+  const projected = pickStoredPolicyFields(row);
+  const resolved = sessionAccessPolicyService.resolvePolicy(
+    sessionAccessPolicyService.normalizePolicyFromStored(projected)
   );
+  return resolved;
 }
 
 async function getPolicyForOrg(activeOrgId) {

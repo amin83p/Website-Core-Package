@@ -920,31 +920,234 @@
               </div>
             </div>
 
-            <div class="rollup-feature-card" id="cardSessionAttendanceEdit">
-              <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" role="switch" id="sessionAttendanceEditEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
-                <label class="form-check-label fw-semibold" for="sessionAttendanceEditEnabled">Allow attendance edits after session completion</label>
+            <div class="rollup-feature-card mb-4" id="cardSessionCompletedEditWindows">
+              <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
+                <div>
+                  <h3 class="h6 fw-bold mb-1"><i class="bi bi-lock me-1 text-primary"></i>Completed Session Edit Windows</h3>
+                  <p class="small text-muted mb-0">Control post-completion edit windows per section. Each section can be expanded/collapsed below.</p>
+                </div>
               </div>
-              <p class="small text-muted mt-2 mb-0" id="sessionAttendanceEditDisabledHelp">
-                When off, teachers may edit attendance until the end of the next calendar day after completion.
-              </p>
-              <div class="rollup-feature-options mt-3" id="sessionAttendanceEditOptions">
-                <div class="row g-3 align-items-end">
-                  <div class="col-md-5">
-                    <label class="form-label fw-semibold" for="sessionAttendanceEditWindowType">Edit window</label>
-                    <select class="form-select" id="sessionAttendanceEditWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
-                      <option value="end_of_week">End of week</option>
-                      <option value="end_of_month">End of month</option>
-                      <option value="timesheet_period">Timesheet period</option>
-                      <option value="days_after_session">Days after session</option>
-                    </select>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label fw-semibold" for="sessionAttendanceEditDaysAfter">Days after session</label>
-                    <input class="form-control" type="number" min="1" max="365" step="1" id="sessionAttendanceEditDaysAfter" <%= canUpdateFlag ? '' : 'disabled' %>>
+
+              <div class="border rounded rollup-feature-card p-0" id="cardSessionAttendanceEdit">
+                <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sessionAttendanceEditCollapse" aria-expanded="true" aria-controls="sessionAttendanceEditCollapse">
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    <i class="bi bi-people-fill text-primary" aria-hidden="true"></i>
+                    <span>Allow attendance edits after session completion</span>
+                  </button>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sessionAttendanceEditEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label visually-hidden" for="sessionAttendanceEditEnabled">Allow attendance edits after session completion</label>
                   </div>
                 </div>
-                <p class="small text-muted mt-2 mb-0" id="sessionAttendanceEditPreview"></p>
+                <div class="collapse show p-3" id="sessionAttendanceEditCollapse">
+                  <p class="small text-muted mt-0 mb-0" id="sessionAttendanceEditDisabledHelp">
+                    When off, teachers may edit attendance until the end of the next calendar day after completion.
+                  </p>
+                  <div class="rollup-feature-options mt-3" id="sessionAttendanceEditOptions">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-5">
+                        <label class="form-label fw-semibold" for="sessionAttendanceEditWindowType">Edit window</label>
+                        <select class="form-select" id="sessionAttendanceEditWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
+                          <option value="end_of_week">End of week</option>
+                          <option value="end_of_month">End of month</option>
+                          <option value="timesheet_period">Timesheet period</option>
+                          <option value="days_after_session">Days after session</option>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="sessionAttendanceEditDaysAfter">Days after session</label>
+                        <input class="form-control" type="number" min="1" max="365" step="1" id="sessionAttendanceEditDaysAfter" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      </div>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0" id="sessionAttendanceEditPreview"></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border rounded rollup-feature-card p-0 mt-3" id="cardSessionNotesEdit">
+                <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sessionNotesEditCollapse" aria-expanded="true" aria-controls="sessionNotesEditCollapse">
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    <i class="bi bi-journal-text text-primary" aria-hidden="true"></i>
+                    <span>Allow Session Notes edits after session completion</span>
+                  </button>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sessionNotesEditEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label visually-hidden" for="sessionNotesEditEnabled">Allow Session Notes edits after session completion</label>
+                  </div>
+                </div>
+                <div class="collapse show p-3" id="sessionNotesEditCollapse">
+                  <p class="small text-muted mt-0 mb-0" id="sessionNotesEditDisabledHelp">
+                    When off, teachers may edit Session Notes until the end of the next calendar day after completion.
+                  </p>
+                  <div class="rollup-feature-options mt-3" id="sessionNotesEditOptions">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-5">
+                        <label class="form-label fw-semibold" for="sessionNotesEditWindowType">Edit window</label>
+                        <select class="form-select" id="sessionNotesEditWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
+                          <option value="end_of_week">End of week</option>
+                          <option value="end_of_month">End of month</option>
+                          <option value="timesheet_period">Timesheet period</option>
+                          <option value="days_after_session">Days after session</option>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="sessionNotesEditDaysAfter">Days after session</label>
+                        <input class="form-control" type="number" min="1" max="365" step="1" id="sessionNotesEditDaysAfter" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      </div>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0" id="sessionNotesEditPreview"></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border rounded rollup-feature-card p-0 mt-3" id="cardSessionGradebookEdit">
+                <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sessionGradebookEditCollapse" aria-expanded="true" aria-controls="sessionGradebookEditCollapse">
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    <i class="bi bi-journal-bookmark text-primary" aria-hidden="true"></i>
+                    <span>Allow Grade book/Activities edits after session completion</span>
+                  </button>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sessionGradebookEditEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label visually-hidden" for="sessionGradebookEditEnabled">Allow Grade book/Activities edits after session completion</label>
+                  </div>
+                </div>
+                <div class="collapse show p-3" id="sessionGradebookEditCollapse">
+                  <p class="small text-muted mt-0 mb-0" id="sessionGradebookEditDisabledHelp">
+                    When off, teachers may edit Grade book/Activities until the end of the next calendar day after completion.
+                  </p>
+                  <div class="rollup-feature-options mt-3" id="sessionGradebookEditOptions">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-5">
+                        <label class="form-label fw-semibold" for="sessionGradebookEditWindowType">Edit window</label>
+                        <select class="form-select" id="sessionGradebookEditWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
+                          <option value="end_of_week">End of week</option>
+                          <option value="end_of_month">End of month</option>
+                          <option value="timesheet_period">Timesheet period</option>
+                          <option value="days_after_session">Days after session</option>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="sessionGradebookEditDaysAfter">Days after session</label>
+                        <input class="form-control" type="number" min="1" max="365" step="1" id="sessionGradebookEditDaysAfter" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      </div>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0" id="sessionGradebookEditPreview"></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border rounded rollup-feature-card p-0 mt-3" id="cardSessionConductEdit">
+                <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sessionConductEditCollapse" aria-expanded="true" aria-controls="sessionConductEditCollapse">
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    <i class="bi bi-emoji-smile text-primary" aria-hidden="true"></i>
+                    <span>Allow Class Conduct Before Reports edits after session completion</span>
+                  </button>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sessionConductEditEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label visually-hidden" for="sessionConductEditEnabled">Allow Class Conduct Before Reports edits after session completion</label>
+                  </div>
+                </div>
+                <div class="collapse show p-3" id="sessionConductEditCollapse">
+                  <p class="small text-muted mt-0 mb-0" id="sessionConductEditDisabledHelp">
+                    When off, teachers may edit Class Conduct Before Reports until the end of the next calendar day after completion.
+                  </p>
+                  <div class="rollup-feature-options mt-3" id="sessionConductEditOptions">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-5">
+                        <label class="form-label fw-semibold" for="sessionConductEditWindowType">Edit window</label>
+                        <select class="form-select" id="sessionConductEditWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
+                          <option value="end_of_week">End of week</option>
+                          <option value="end_of_month">End of month</option>
+                          <option value="timesheet_period">Timesheet period</option>
+                          <option value="days_after_session">Days after session</option>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="sessionConductEditDaysAfter">Days after session</label>
+                        <input class="form-control" type="number" min="1" max="365" step="1" id="sessionConductEditDaysAfter" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      </div>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0" id="sessionConductEditPreview"></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border rounded rollup-feature-card p-0 mt-3" id="cardSessionCurriculumEdit">
+                <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sessionCurriculumEditCollapse" aria-expanded="true" aria-controls="sessionCurriculumEditCollapse">
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    <i class="bi bi-bullseye text-primary" aria-hidden="true"></i>
+                    <span>Allow Curriculum edits after session completion</span>
+                  </button>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sessionCurriculumEditEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label visually-hidden" for="sessionCurriculumEditEnabled">Allow Curriculum edits after session completion</label>
+                  </div>
+                </div>
+                <div class="collapse show p-3" id="sessionCurriculumEditCollapse">
+                  <p class="small text-muted mt-0 mb-0" id="sessionCurriculumEditDisabledHelp">
+                    When off, teachers may edit Curriculum until the end of the next calendar day after completion.
+                  </p>
+                  <div class="rollup-feature-options mt-3" id="sessionCurriculumEditOptions">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-5">
+                        <label class="form-label fw-semibold" for="sessionCurriculumEditWindowType">Edit window</label>
+                        <select class="form-select" id="sessionCurriculumEditWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
+                          <option value="end_of_week">End of week</option>
+                          <option value="end_of_month">End of month</option>
+                          <option value="timesheet_period">Timesheet period</option>
+                          <option value="days_after_session">Days after session</option>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="sessionCurriculumEditDaysAfter">Days after session</label>
+                        <input class="form-control" type="number" min="1" max="365" step="1" id="sessionCurriculumEditDaysAfter" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      </div>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0" id="sessionCurriculumEditPreview"></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border rounded rollup-feature-card p-0 mt-3" id="cardSessionStudentCasesEdit">
+                <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sessionStudentCasesEditCollapse" aria-expanded="true" aria-controls="sessionStudentCasesEditCollapse">
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    <i class="bi bi-folder-check text-primary" aria-hidden="true"></i>
+                    <span>Allow Student Cases edits after session completion</span>
+                  </button>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sessionStudentCasesEditEnabled" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label visually-hidden" for="sessionStudentCasesEditEnabled">Allow Student Cases edits after session completion</label>
+                  </div>
+                </div>
+                <div class="collapse show p-3" id="sessionStudentCasesEditCollapse">
+                  <p class="small text-muted mt-0 mb-0" id="sessionStudentCasesEditDisabledHelp">
+                    When off, teachers may edit Student Cases until the end of the next calendar day after completion.
+                  </p>
+                  <div class="rollup-feature-options mt-3" id="sessionStudentCasesEditOptions">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-5">
+                        <label class="form-label fw-semibold" for="sessionStudentCasesEditWindowType">Edit window</label>
+                        <select class="form-select" id="sessionStudentCasesEditWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
+                          <option value="end_of_week">End of week</option>
+                          <option value="end_of_month">End of month</option>
+                          <option value="timesheet_period">Timesheet period</option>
+                          <option value="days_after_session">Days after session</option>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="sessionStudentCasesEditDaysAfter">Days after session</label>
+                        <input class="form-control" type="number" min="1" max="365" step="1" id="sessionStudentCasesEditDaysAfter" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      </div>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0" id="sessionStudentCasesEditPreview"></p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2219,7 +2422,28 @@
     field.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  const COMPLETED_SESSION_EDIT_CONFIGS = [
+    { idPrefix: 'sessionAttendanceEdit', policyKey: 'completedSessionAttendanceEdit', label: 'attendance' },
+    { idPrefix: 'sessionNotesEdit', policyKey: 'completedSessionNotesEdit', label: 'Session Notes' },
+    { idPrefix: 'sessionGradebookEdit', policyKey: 'completedSessionGradebookEdit', label: 'Grade book/Activities' },
+    { idPrefix: 'sessionConductEdit', policyKey: 'completedSessionConductEdit', label: 'Class Conduct Before Reports' },
+    { idPrefix: 'sessionCurriculumEdit', policyKey: 'completedSessionCurriculumEdit', label: 'Curriculum' },
+    { idPrefix: 'sessionStudentCasesEdit', policyKey: 'completedSessionStudentCasesEdit', label: 'Student Cases' }
+  ];
+
+  function collectCompletedSessionEditPolicy(idPrefix) {
+    return {
+      enabled: document.getElementById(`${idPrefix}Enabled`)?.checked === true,
+      windowType: document.getElementById(`${idPrefix}WindowType`)?.value || 'timesheet_period',
+      daysAfterSession: document.getElementById(`${idPrefix}DaysAfter`)?.value || ''
+    };
+  }
+
   function collectSessionAccessPolicy() {
+    const completedSessionEditPolicies = COMPLETED_SESSION_EDIT_CONFIGS.reduce((acc, config) => {
+      acc[config.policyKey] = collectCompletedSessionEditPolicy(config.idPrefix);
+      return acc;
+    }, {});
     return {
       uncompletedSessionNotification: {
         enabled: document.getElementById('sessionNotificationEnabled')?.checked === true,
@@ -2244,11 +2468,7 @@
           }
         }
       },
-      completedSessionAttendanceEdit: {
-        enabled: document.getElementById('sessionAttendanceEditEnabled')?.checked === true,
-        windowType: document.getElementById('sessionAttendanceEditWindowType')?.value || 'timesheet_period',
-        daysAfterSession: document.getElementById('sessionAttendanceEditDaysAfter')?.value || ''
-      }
+      ...completedSessionEditPolicies
     };
   }
 
@@ -2318,37 +2538,38 @@
     refreshChannelNotificationPanels('Sms');
     isSessionAccessScheduleValid();
 
-    const editEnabled = document.getElementById('sessionAttendanceEditEnabled')?.checked === true;
-    document.getElementById('cardSessionAttendanceEdit')?.classList.toggle('is-disabled', !editEnabled);
-    document.getElementById('sessionAttendanceEditDisabledHelp')?.classList.toggle('d-none', editEnabled);
-    document.getElementById('sessionAttendanceEditOptions')?.classList.toggle('d-none', !editEnabled);
-    const windowType = document.getElementById('sessionAttendanceEditWindowType')?.value || 'timesheet_period';
-    const daysField = document.getElementById('sessionAttendanceEditDaysAfter');
-    if (daysField) {
-      daysField.disabled = !canUpdate || windowType !== 'days_after_session';
-    }
-    const preview = document.getElementById('sessionAttendanceEditPreview');
-    if (preview) {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const sampleDate = `${yyyy}-${mm}-${dd}`;
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const sampleDate = `${yyyy}-${mm}-${dd}`;
+    COMPLETED_SESSION_EDIT_CONFIGS.forEach((config) => {
+      const editEnabled = document.getElementById(`${config.idPrefix}Enabled`)?.checked === true;
+      document.getElementById(`card${config.idPrefix.charAt(0).toUpperCase()}${config.idPrefix.slice(1)}`)?.classList.toggle('is-disabled', !editEnabled);
+      document.getElementById(`${config.idPrefix}DisabledHelp`)?.classList.toggle('d-none', editEnabled);
+      document.getElementById(`${config.idPrefix}Options`)?.classList.toggle('d-none', !editEnabled);
+      const windowType = document.getElementById(`${config.idPrefix}WindowType`)?.value || 'timesheet_period';
+      const daysField = document.getElementById(`${config.idPrefix}DaysAfter`);
+      if (daysField) {
+        daysField.disabled = !canUpdate || windowType !== 'days_after_session';
+      }
+      const preview = document.getElementById(`${config.idPrefix}Preview`);
+      if (!preview) return;
       let message = '';
       if (!editEnabled) {
-        message = `Example: a session completed on ${sampleDate} would remain editable through the next calendar day.`;
+        message = `Example: a completed session ${config.label} section would remain editable through the next calendar day after completion (${sampleDate}).`;
       } else if (windowType === 'days_after_session') {
-        const days = Number(document.getElementById('sessionAttendanceEditDaysAfter')?.value || 1);
-        message = `Example: a session on ${sampleDate} would remain editable for ${days} day(s) after the session date.`;
+        const days = Number(document.getElementById(`${config.idPrefix}DaysAfter`)?.value || 1);
+        message = `Example: a completed session ${config.label} section would remain editable for ${days} day(s) after the session date.`;
       } else if (windowType === 'end_of_week') {
-        message = `Example: a session completed today would remain editable through the end of this week.`;
+        message = `Example: a completed session ${config.label} section would remain editable through the end of that week.`;
       } else if (windowType === 'end_of_month') {
-        message = `Example: a session completed today would remain editable through the end of this month.`;
+        message = `Example: a completed session ${config.label} section would remain editable through the end of that month.`;
       } else {
-        message = `Example: a session completed today would remain editable through the end of its timesheet period.`;
+        message = `Example: a completed session ${config.label} section would remain editable through the end of its timesheet period.`;
       }
       preview.textContent = message;
-    }
+    });
   }
 
   function setChannelSendWhen(channelPrefix, sendWhen) {
@@ -2371,7 +2592,10 @@
     const channels = notification.channels || {};
     const email = channels.email || {};
     const sms = channels.sms || {};
-    const edit = sessionAccessPolicy?.completedSessionAttendanceEdit || {};
+    const completedSessionEditPolicies = COMPLETED_SESSION_EDIT_CONFIGS.reduce((acc, config) => {
+      acc[config.policyKey] = sessionAccessPolicy?.[config.policyKey] || {};
+      return acc;
+    }, {});
     const legacySendWhen = notification.sendWhen;
     const legacySendAtTime = notification.sendAtTime;
 
@@ -2402,9 +2626,15 @@
     renderChannelSessionDateRange('Sms', sms.sessionDateRange);
     document.getElementById('sessionNotificationSmsBody').value = sms.bodyTemplate || '';
 
-    document.getElementById('sessionAttendanceEditEnabled').checked = edit.enabled !== false;
-    document.getElementById('sessionAttendanceEditWindowType').value = edit.windowType || 'timesheet_period';
-    document.getElementById('sessionAttendanceEditDaysAfter').value = edit.daysAfterSession || '';
+    COMPLETED_SESSION_EDIT_CONFIGS.forEach((config) => {
+      const edit = completedSessionEditPolicies[config.policyKey] || {};
+      const enabledEl = document.getElementById(`${config.idPrefix}Enabled`);
+      const windowTypeEl = document.getElementById(`${config.idPrefix}WindowType`);
+      const daysAfterEl = document.getElementById(`${config.idPrefix}DaysAfter`);
+      if (enabledEl) enabledEl.checked = edit.enabled !== false;
+      if (windowTypeEl) windowTypeEl.value = edit.windowType || 'timesheet_period';
+      if (daysAfterEl) daysAfterEl.value = edit.daysAfterSession || '';
+    });
     refreshSessionNotificationEmailTemplateWarning(
       email.emailTemplateBodyContentWarning
       || (email.emailTemplateMissingBodyContentSlot
@@ -2501,7 +2731,22 @@
     'sessionNotificationSmsDaysBefore',
     'sessionAttendanceEditEnabled',
     'sessionAttendanceEditWindowType',
-    'sessionAttendanceEditDaysAfter'
+    'sessionAttendanceEditDaysAfter',
+    'sessionNotesEditEnabled',
+    'sessionNotesEditWindowType',
+    'sessionNotesEditDaysAfter',
+    'sessionGradebookEditEnabled',
+    'sessionGradebookEditWindowType',
+    'sessionGradebookEditDaysAfter',
+    'sessionConductEditEnabled',
+    'sessionConductEditWindowType',
+    'sessionConductEditDaysAfter',
+    'sessionCurriculumEditEnabled',
+    'sessionCurriculumEditWindowType',
+    'sessionCurriculumEditDaysAfter',
+    'sessionStudentCasesEditEnabled',
+    'sessionStudentCasesEditWindowType',
+    'sessionStudentCasesEditDaysAfter'
   ].forEach((id) => {
     document.getElementById(id)?.addEventListener('change', refreshSessionAccessPanels);
     document.getElementById(id)?.addEventListener('input', refreshSessionAccessPanels);

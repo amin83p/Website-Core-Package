@@ -11,6 +11,11 @@ const classEnrollmentReadService = require('../packages/school/MVC/services/scho
 const activityService = require('../packages/school/MVC/services/school/activityService');
 const schoolPersonAccessService = require('../packages/school/MVC/services/school/schoolPersonAccessService');
 const schoolRepositories = require('../packages/school/MVC/repositories/school');
+const sessionAttendanceEditAccessService = require('../packages/school/MVC/services/school/sessionAttendanceEditAccessService');
+const schoolDeletionGuardService = require('../packages/school/MVC/services/school/schoolDeletionGuardService');
+const sessionStudentCaseAccessService = require('../packages/school/MVC/services/school/sessionStudentCaseAccessService');
+const sessionStudentCaseService = require('../packages/school/MVC/services/school/sessionStudentCaseService');
+const sessionStudentCaseResultVisibilityService = require('../packages/school/MVC/services/school/sessionStudentCaseResultVisibilityService');
 
 const schoolMethodNames = [
   'getDataById',
@@ -61,6 +66,25 @@ const schoolPersonAccessOriginals = {
 const reportAssignmentOriginals = {
   list: schoolRepositories.reportAssignments.list
 };
+const sessionAttendanceEditAccessOriginals = {
+  resolveSessionSectionEditAccess: sessionAttendanceEditAccessService.resolveSessionSectionEditAccess,
+  assertSessionSectionEditable: sessionAttendanceEditAccessService.assertSessionSectionEditable
+};
+const deletionGuardOriginals = {
+  previewDelete: schoolDeletionGuardService.previewDelete,
+  assertCanDelete: schoolDeletionGuardService.assertCanDelete
+};
+const sessionStudentCaseAccessOriginals = {
+  resolveCaseCapabilities: sessionStudentCaseAccessService.resolveCaseCapabilities,
+  assertCanSave: sessionStudentCaseAccessService.assertCanSave
+};
+const sessionStudentCaseServiceOriginals = {
+  saveCase: sessionStudentCaseService.saveCase,
+  saveCasesBulk: sessionStudentCaseService.saveCasesBulk
+};
+const sessionStudentCaseVisibilityOriginals = {
+  redactCaseForViewer: sessionStudentCaseResultVisibilityService.redactCaseForViewer
+};
 
 function restoreStubs() {
   schoolMethodNames.forEach((name) => {
@@ -75,6 +99,15 @@ function restoreStubs() {
   activityService.getScheduleEventsForPerson = activityOriginals.getScheduleEventsForPerson;
   schoolPersonAccessService.buildPersonByIdMap = schoolPersonAccessOriginals.buildPersonByIdMap;
   schoolRepositories.reportAssignments.list = reportAssignmentOriginals.list;
+  sessionAttendanceEditAccessService.resolveSessionSectionEditAccess = sessionAttendanceEditAccessOriginals.resolveSessionSectionEditAccess;
+  sessionAttendanceEditAccessService.assertSessionSectionEditable = sessionAttendanceEditAccessOriginals.assertSessionSectionEditable;
+  schoolDeletionGuardService.previewDelete = deletionGuardOriginals.previewDelete;
+  schoolDeletionGuardService.assertCanDelete = deletionGuardOriginals.assertCanDelete;
+  sessionStudentCaseAccessService.resolveCaseCapabilities = sessionStudentCaseAccessOriginals.resolveCaseCapabilities;
+  sessionStudentCaseAccessService.assertCanSave = sessionStudentCaseAccessOriginals.assertCanSave;
+  sessionStudentCaseService.saveCase = sessionStudentCaseServiceOriginals.saveCase;
+  sessionStudentCaseService.saveCasesBulk = sessionStudentCaseServiceOriginals.saveCasesBulk;
+  sessionStudentCaseResultVisibilityService.redactCaseForViewer = sessionStudentCaseVisibilityOriginals.redactCaseForViewer;
 }
 
 function createReq(overrides = {}) {
@@ -250,6 +283,119 @@ function createAdminSessionSaveReq(body = {}) {
       ...body
     }
   });
+}
+
+function applyTimesheetLockedSessionSaveStubs(sessionOverrides = {}) {
+  let savedSessions = null;
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        cycleStartDate: '2026-07-01',
+        cycleEndDate: '2026-07-31',
+        status: 'active'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    {
+      sessionId: 'SES-1',
+      date: '2026-07-10',
+      startTime: '09:00',
+      endTime: '11:00',
+      status: 'scheduled',
+      room: '101',
+      locked: true,
+      lockReason: 'timesheet_approved',
+      delivery: { deliveredBy: 'T-1', deliveredByName: 'Teacher One', coTeachers: [] },
+      roster: [],
+      notes: 'Original note',
+      ...sessionOverrides
+    }
+  ]);
+  schoolDataService.saveClassSessions = async (_classId, sessions) => {
+    savedSessions = sessions;
+  };
+  schoolIndexService.rebuildIndexesForClass = async () => {};
+  classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = async () => {};
+  sessionAttendanceEditAccessService.resolveSessionSectionEditAccess = async ({ target }) => ({
+    editable: true,
+    target: target || 'attendance',
+    targetLabel: 'Attendance',
+    policy: {},
+    timesheetPeriod: null
+  });
+  sessionAttendanceEditAccessService.assertSessionSectionEditable = async () => ({ editable: true });
+  return {
+    getSavedSessions: () => savedSessions
+  };
+}
+
+function applySessionStudentCaseCreateStubs({ lockError = null } = {}) {
+  let saveCaseCalls = 0;
+  let assertCanSaveCalls = 0;
+  let guardTarget = '';
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        status: 'active'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    {
+      sessionId: 'SES-1',
+      date: '2026-07-10',
+      startTime: '09:00',
+      endTime: '11:00',
+      status: 'completed',
+      completedAt: '2026-07-10T18:00:00.000Z',
+      roster: [{ personId: 'STU-1', name: 'Student One' }]
+    }
+  ]);
+  sessionAttendanceEditAccessService.assertSessionSectionEditable = async ({ target }) => {
+    guardTarget = String(target || '').trim().toLowerCase();
+    if (lockError) throw lockError;
+    return { editable: true, target: guardTarget };
+  };
+  sessionStudentCaseAccessService.assertCanSave = async () => {
+    assertCanSaveCalls += 1;
+    return { allowed: true };
+  };
+  sessionStudentCaseAccessService.resolveCaseCapabilities = async () => ({
+    canCreate: true,
+    canRead: true,
+    canReadAll: true,
+    canUpdate: true,
+    canResolve: true,
+    canDelete: true
+  });
+  sessionStudentCaseService.saveCase = async ({ input }) => {
+    saveCaseCalls += 1;
+    return {
+      id: 'CASE-1',
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      studentPersonId: input?.studentPersonId || 'STU-1',
+      status: 'open',
+      issue: input?.issue || 'Needs support'
+    };
+  };
+  sessionStudentCaseResultVisibilityService.redactCaseForViewer = (saved) => saved;
+  return {
+    getSaveCaseCalls: () => saveCaseCalls,
+    getAssertCanSaveCalls: () => assertCanSaveCalls,
+    getGuardTarget: () => guardTarget
+  };
 }
 
 test.afterEach(() => {
@@ -1026,4 +1172,451 @@ test('saveSessionGradebooks rejects an existing rolling session outside the cycl
   assert.equal(res.payload.status, 'error');
   assert.match(String(res.payload.message || ''), /within cycle dates/i);
   assert.match(String(res.payload.message || ''), /2026-06-30/);
+});
+
+test('saveSession rejects completed-session notes edits when notes window is closed', async () => {
+  applyDefaultGuardStubs();
+  let saveCalled = false;
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        cycleStartDate: '2026-07-01',
+        cycleEndDate: '2026-07-31',
+        status: 'active'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    {
+      sessionId: 'SES-1',
+      date: '2026-07-10',
+      startTime: '09:00',
+      endTime: '11:00',
+      status: 'completed',
+      completedAt: '2026-07-10T18:00:00.000Z',
+      notes: 'Old note',
+      room: '101',
+      roster: []
+    }
+  ]);
+  schoolDataService.saveClassSessions = async () => {
+    saveCalled = true;
+  };
+  schoolIndexService.rebuildIndexesForClass = async () => {};
+  classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = async () => {};
+  sessionAttendanceEditAccessService.resolveSessionSectionEditAccess = async ({ target }) => ({
+    editable: true,
+    target: target || 'attendance',
+    targetLabel: 'Attendance',
+    policy: {},
+    timesheetPeriod: null
+  });
+  sessionAttendanceEditAccessService.assertSessionSectionEditable = async ({ target }) => {
+    if (target === 'notes') {
+      const error = new Error('Session Notes edits are locked for this completed session.');
+      error.statusCode = 403;
+      error.code = 'SESSION_NOTES_EDIT_WINDOW_EXPIRED';
+      throw error;
+    }
+    return { editable: true };
+  };
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    body: {
+      status: 'completed',
+      notes: 'Updated note while locked'
+    }
+  });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.payload.status, 'error');
+  assert.equal(res.payload.code, 'SESSION_NOTES_EDIT_WINDOW_EXPIRED');
+  assert.equal(saveCalled, false);
+});
+
+test('saveSessionConduct rejects completed-session conduct edits when conduct window is closed', async () => {
+  applyDefaultGuardStubs();
+  let saveCalled = false;
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        cycleStartDate: '2026-07-01',
+        cycleEndDate: '2026-07-31',
+        status: 'active'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    {
+      sessionId: 'SES-1',
+      date: '2026-07-10',
+      startTime: '09:00',
+      endTime: '11:00',
+      status: 'completed',
+      completedAt: '2026-07-10T18:00:00.000Z',
+      roster: [{ personId: 'STU-1', classEffortPercent: null }]
+    }
+  ]);
+  schoolDataService.saveClassSessions = async () => {
+    saveCalled = true;
+  };
+  sessionAttendanceEditAccessService.assertSessionSectionEditable = async ({ target }) => {
+    if (target === 'conduct') {
+      const error = new Error('Class Conduct Before Reports edits are locked for this completed session.');
+      error.statusCode = 403;
+      error.code = 'SESSION_CONDUCT_EDIT_WINDOW_EXPIRED';
+      throw error;
+    }
+    return { editable: true };
+  };
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    body: {
+      ready: true,
+      roster: JSON.stringify([{ personId: 'STU-1', classEffortPercent: 85 }])
+    }
+  });
+  const res = createRes();
+  await classController.saveSessionConduct(req, res);
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /conduct/i);
+  assert.equal(saveCalled, false);
+});
+
+test('saveSessionGradebooks rejects completed-session gradebook edits when gradebook window is closed', async () => {
+  applyDefaultGuardStubs();
+  let saveCalled = false;
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        cycleStartDate: '2026-07-01',
+        cycleEndDate: '2026-07-31',
+        status: 'active'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    {
+      sessionId: 'SES-1',
+      date: '2026-07-10',
+      startTime: '09:00',
+      endTime: '11:00',
+      status: 'completed',
+      completedAt: '2026-07-10T18:00:00.000Z',
+      roster: [],
+      gradebooks: []
+    }
+  ]);
+  schoolDataService.saveClassSessions = async () => {
+    saveCalled = true;
+  };
+  sessionAttendanceEditAccessService.assertSessionSectionEditable = async ({ target }) => {
+    if (target === 'gradebook') {
+      const error = new Error('Grade book/Activities edits are locked for this completed session.');
+      error.statusCode = 403;
+      error.code = 'SESSION_GRADEBOOK_EDIT_WINDOW_EXPIRED';
+      throw error;
+    }
+    return { editable: true };
+  };
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    body: { gradebooks: [] }
+  });
+  const res = createRes();
+  await classController.saveSessionGradebooks(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /grade book/i);
+  assert.equal(saveCalled, false);
+});
+
+test('saveSessionStudentCase rejects create when student-cases window is closed', async () => {
+  applyDefaultGuardStubs();
+  const guardError = new Error('Student Cases edits are no longer allowed for this completed session (deadline: 2026-08-31).');
+  guardError.statusCode = 403;
+  guardError.code = 'SESSION_STUDENT_CASES_EDIT_WINDOW_EXPIRED';
+  const state = applySessionStudentCaseCreateStubs({ lockError: guardError });
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    user: {
+      id: 'USR-1',
+      activeOrgId: 'ORG-1',
+      activeProfile: { fullAdmin: true, orgId: 'ORG-1' },
+      isSystemAdmin: false,
+      isVirtualSuperAdmin: false
+    },
+    body: {
+      studentPersonIds: ['STU-1'],
+      issue: 'Need support'
+    }
+  });
+  const res = createRes();
+  await classController.saveSessionStudentCase(req, res);
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /student cases/i);
+  assert.equal(state.getGuardTarget(), 'studentcases');
+  assert.equal(state.getAssertCanSaveCalls(), 0);
+  assert.equal(state.getSaveCaseCalls(), 0);
+});
+
+test('saveSessionStudentCase allows create when student-cases window is open', async () => {
+  applyDefaultGuardStubs();
+  const state = applySessionStudentCaseCreateStubs();
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    user: {
+      id: 'USR-1',
+      activeOrgId: 'ORG-1',
+      activeProfile: { fullAdmin: true, orgId: 'ORG-1' },
+      isSystemAdmin: false,
+      isVirtualSuperAdmin: false
+    },
+    body: {
+      studentPersonIds: ['STU-1'],
+      issue: 'Needs extra support during class'
+    }
+  });
+  const res = createRes();
+  await classController.saveSessionStudentCase(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.payload.status, 'success');
+  assert.equal(state.getGuardTarget(), 'studentcases');
+  assert.equal(state.getAssertCanSaveCalls(), 1);
+  assert.equal(state.getSaveCaseCalls(), 1);
+  assert.equal(res.payload.case.studentPersonId, 'STU-1');
+});
+
+test('saveSession rejects targeted timesheet-locked metadata mutations', async () => {
+  applyDefaultGuardStubs();
+  const saveState = applyTimesheetLockedSessionSaveStubs();
+
+  const req = createAdminSessionSaveReq({
+    status: 'scheduled',
+    room: '202',
+    date: '2026-07-11',
+    startTime: '12:00',
+    endTime: '13:00',
+    teacherId: 'T-2',
+    teacherName: 'Teacher Two',
+    coTeachers: JSON.stringify([{ personId: 'T-3', name: 'Co Teacher', roleLabel: 'Co-Teacher', canEdit: false }])
+  });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /approved timesheet/i);
+  assert.match(String(res.payload.message || ''), /date\/time/i);
+  assert.equal(saveState.getSavedSessions(), null);
+});
+
+test('saveSession rejects status changes on timesheet-locked sessions', async () => {
+  applyDefaultGuardStubs();
+  const saveState = applyTimesheetLockedSessionSaveStubs();
+
+  const req = createAdminSessionSaveReq({
+    status: 'cancelled',
+    room: '101'
+  });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /approved timesheet/i);
+  assert.match(String(res.payload.message || ''), /status/i);
+  assert.equal(saveState.getSavedSessions(), null);
+});
+
+test('saveSession still allows notes-only updates on timesheet-locked sessions', async () => {
+  applyDefaultGuardStubs();
+  const saveState = applyTimesheetLockedSessionSaveStubs({
+    status: 'completed',
+    completedAt: '2026-07-10T18:00:00.000Z'
+  });
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    body: {
+      status: 'completed',
+      notes: 'Updated note while timesheet lock is active',
+      room: '101'
+    }
+  });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.payload.status, 'success');
+  assert.ok(Array.isArray(saveState.getSavedSessions()));
+  assert.equal(saveState.getSavedSessions()[0].notes, 'Updated note while timesheet lock is active');
+});
+
+test('deleteClassSession rejects approved-timesheet locked sessions before delete preview', async () => {
+  applyDefaultGuardStubs();
+  let previewCalls = 0;
+  schoolDeletionGuardService.previewDelete = async () => {
+    previewCalls += 1;
+    return { allowed: true };
+  };
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        status: 'active'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    { sessionId: 'SES-1', date: '2026-07-10', status: 'scheduled', locked: true, lockReason: 'timesheet_approved' }
+  ]);
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    user: {
+      id: 'USR-1',
+      activeOrgId: 'ORG-1',
+      activeProfile: { fullAdmin: true, orgId: 'ORG-1' },
+      isSystemAdmin: false,
+      isVirtualSuperAdmin: false
+    }
+  });
+  const res = createRes();
+  await classController.deleteClassSession(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /approved timesheet/i);
+  assert.equal(previewCalls, 0);
+});
+
+test('editClass rejects room changes on approved-timesheet locked sessions', async () => {
+  applyDefaultGuardStubs();
+  let updateCalls = 0;
+  let saveSessionCalls = 0;
+  applyClassLookupStubs({
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes') {
+        return {
+          id: String(id || 'CLS-1'),
+          orgId: 'ORG-1',
+          title: 'Legacy Rolling Class',
+          registrationMode: 'rolling',
+          status: 'active',
+          allowedProgramTerms: [{ programId: 'PGM-1', termId: '', order: 1 }],
+          enrollment: { maxCapacity: 30, students: [] },
+          statusHistory: []
+        };
+      }
+      if (entityType === 'departments') {
+        return { id: 'DPT-1', orgId: 'ORG-1', code: 'PD', name: 'Professional Development' };
+      }
+      return null;
+    },
+    fetchData: async (entityType) => {
+      if (entityType === 'programs') {
+        return [{ id: 'PGM-1', orgId: 'ORG-1', code: 'PGM', name: 'Program One' }];
+      }
+      if (entityType === 'terms') return [];
+      if (entityType === 'classes') return [];
+      return [];
+    },
+    getClassSessions: async () => ([
+      {
+        sessionId: 'SES-CLS-1-0001',
+        date: '2026-07-10',
+        startTime: '09:00',
+        endTime: '10:00',
+        status: 'scheduled',
+        room: '101',
+        locked: true,
+        lockReason: 'timesheet_approved',
+        delivery: { deliveredBy: 'T-1', deliveredByName: 'Teacher One', coTeachers: [] }
+      }
+    ]),
+    updateData: async () => {
+      updateCalls += 1;
+      return { id: 'CLS-1' };
+    },
+    saveClassSessions: async () => {
+      saveSessionCalls += 1;
+    }
+  });
+
+  const req = createReq({
+    params: { id: 'CLS-1' },
+    body: {
+      title: 'Legacy Rolling Class',
+      status: 'active',
+      registrationMode: 'rolling',
+      cycleStartDate: '2026-07-01',
+      cycleEndDate: '2026-07-31',
+      deliveryDepartmentId: 'DPT-1',
+      billingMode: 'no_charge',
+      credits: '1',
+      allowedProgramTerms: JSON.stringify([{ programId: 'PGM-1', termId: '', order: 1 }]),
+      curriculum: JSON.stringify({ subjects: [], totalHours: 0 }),
+      pricing: JSON.stringify({ feeRules: [] }),
+      postingTemplates: JSON.stringify([]),
+      schedule: JSON.stringify({ current: {}, history: [] }),
+      instructors: JSON.stringify([]),
+      enrollment: JSON.stringify({ maxCapacity: 30, students: [] }),
+      evaluation: JSON.stringify({ passingScore: 60, weights: {} }),
+      sessions: JSON.stringify([
+        {
+          sessionId: 'SES-CLS-1-0001',
+          date: '2026-07-10',
+          startTime: '09:00',
+          endTime: '10:00',
+          status: 'scheduled',
+          room: '202',
+          locked: true,
+          lockReason: 'timesheet_approved',
+          delivery: { deliveredBy: 'T-1', deliveredByName: 'Teacher One', coTeachers: [] }
+        }
+      ])
+    }
+  });
+  const res = createRes();
+  await classController.editClass(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /approved timesheet/i);
+  assert.match(String(res.payload.message || ''), /room/i);
+  assert.equal(updateCalls, 0);
+  assert.equal(saveSessionCalls, 0);
 });

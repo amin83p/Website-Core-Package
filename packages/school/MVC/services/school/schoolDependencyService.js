@@ -602,7 +602,6 @@ async function lockSourcesForApprovedTimesheet(timesheet = {}, reqUser) {
       if (ref.activityEntryId) activityEntries.get(ref.activityId).add(ref.activityEntryId);
     }
   });
-
   const summary = {
     classSessions: [],
     activities: [],
@@ -1020,6 +1019,126 @@ function assertSessionNotTimesheetLocked(session = {}, label = 'This session') {
   }
 }
 
+const SESSION_TIMESHEET_LOCK_MUTATION_SCOPE = Object.freeze({
+  STATUS: 'status',
+  ROOM: 'room',
+  DATE_TIME: 'date_time',
+  TEACHER_ASSIGNMENT: 'teacher_assignment',
+  CO_TEACHERS_ASSIGNMENT: 'co_teachers_assignment',
+  DELETE: 'delete'
+});
+
+const SESSION_TIMESHEET_LOCK_MUTATION_LABEL = Object.freeze({
+  [SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.STATUS]: 'status',
+  [SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.ROOM]: 'room',
+  [SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.DATE_TIME]: 'date/time',
+  [SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.TEACHER_ASSIGNMENT]: 'teacher assignment',
+  [SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.CO_TEACHERS_ASSIGNMENT]: 'co-teachers assignment',
+  [SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.DELETE]: 'deletion'
+});
+
+function normalizeSessionStatusToken(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+function normalizeSessionRoomToken(value) {
+  return String(value || '').trim();
+}
+
+function normalizeSessionDateToken(value) {
+  const token = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(token) ? token : '';
+}
+
+function normalizeSessionTimeToken(value) {
+  const token = String(value || '').trim().slice(0, 5);
+  return /^\d{2}:\d{2}$/.test(token) ? token : '';
+}
+
+function resolveSessionMainTeacherId(session = {}) {
+  return normalizeId(
+    session?.delivery?.deliveredBy
+    || session?.teacherId
+    || session?.deliveredBy
+  );
+}
+
+function normalizePaidFlag(value) {
+  const token = String(value ?? '').trim().toLowerCase();
+  if (value === false || token === 'false' || token === '0' || token === 'unpaid') return false;
+  return true;
+}
+
+function normalizeCoTeacherPaidHours(value) {
+  const parsed = Number.parseFloat(String(value ?? '').trim());
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : null;
+}
+
+function normalizeSessionCoTeachersForComparison(session = {}) {
+  const rows = Array.isArray(session?.delivery?.coTeachers)
+    ? session.delivery.coTeachers
+    : (Array.isArray(session?.coTeachers) ? session.coTeachers : []);
+  const normalizeRole = (value) => {
+    const token = String(value || '').trim().toLowerCase();
+    if (!token || token === 'co-teacher' || token === 'coteacher') return '';
+    return token;
+  };
+  return rows
+    .map((row) => {
+      const personId = normalizeId(row?.personId || row?.teacherId || row?.id);
+      if (!personId) return null;
+      return {
+        personId,
+        roleLabel: normalizeRole(row?.roleLabel || row?.role),
+        canEdit: row?.canEdit === true,
+        paid: normalizePaidFlag(row?.paid),
+        paidHours: normalizeCoTeacherPaidHours(row?.paidHours)
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.personId.localeCompare(right.personId));
+}
+
+function collectSessionTimesheetRestrictedMutationScopes({ previousSession = {}, nextSession = {} } = {}) {
+  const scopes = new Set();
+  if (normalizeSessionStatusToken(previousSession?.status) !== normalizeSessionStatusToken(nextSession?.status)) {
+    scopes.add(SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.STATUS);
+  }
+  if (normalizeSessionRoomToken(previousSession?.room) !== normalizeSessionRoomToken(nextSession?.room)) {
+    scopes.add(SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.ROOM);
+  }
+  const dateChanged = normalizeSessionDateToken(previousSession?.date) !== normalizeSessionDateToken(nextSession?.date);
+  const startChanged = normalizeSessionTimeToken(previousSession?.startTime) !== normalizeSessionTimeToken(nextSession?.startTime);
+  const endChanged = normalizeSessionTimeToken(previousSession?.endTime) !== normalizeSessionTimeToken(nextSession?.endTime);
+  if (dateChanged || startChanged || endChanged) {
+    scopes.add(SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.DATE_TIME);
+  }
+  if (!idsEqual(resolveSessionMainTeacherId(previousSession), resolveSessionMainTeacherId(nextSession))) {
+    scopes.add(SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.TEACHER_ASSIGNMENT);
+  }
+  const priorCoTeachers = JSON.stringify(normalizeSessionCoTeachersForComparison(previousSession));
+  const nextCoTeachers = JSON.stringify(normalizeSessionCoTeachersForComparison(nextSession));
+  if (priorCoTeachers !== nextCoTeachers) {
+    scopes.add(SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.CO_TEACHERS_ASSIGNMENT);
+  }
+  return [...scopes];
+}
+
+function assertSessionTimesheetLockAllowsMutationScopes(session = {}, scopes = [], label = 'This session') {
+  if (!isSessionTimesheetApprovedLock(session)) return;
+  const blocked = [...new Set((Array.isArray(scopes) ? scopes : [])
+    .map((scope) => String(scope || '').trim().toLowerCase())
+    .filter((scope) => Object.values(SESSION_TIMESHEET_LOCK_MUTATION_SCOPE).includes(scope)))];
+  if (!blocked.length) return;
+  const labels = blocked
+    .map((scope) => SESSION_TIMESHEET_LOCK_MUTATION_LABEL[scope] || scope)
+    .filter(Boolean);
+  const humanList = labels.length === 1
+    ? labels[0]
+    : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+  throw new Error(`${label} is locked by an approved timesheet. Reopen the timesheet to change ${humanList}.`);
+}
+
 function isSessionTimesheetApprovedLock(session = {}) {
   return isSessionTimesheetLocked(session)
     && String(session?.lockReason || '') === 'timesheet_approved';
@@ -1207,6 +1326,9 @@ module.exports = {
   assertSessionStatusNotReferenced,
   assertActivityNotTimesheetLocked,
   assertSessionNotTimesheetLocked,
+  SESSION_TIMESHEET_LOCK_MUTATION_SCOPE,
+  collectSessionTimesheetRestrictedMutationScopes,
+  assertSessionTimesheetLockAllowsMutationScopes,
   isSessionTimesheetApprovedLock,
   applySessionAdminLock,
   isSessionTimesheetLocked,

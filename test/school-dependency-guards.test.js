@@ -268,11 +268,51 @@ test('assertClassSessionLedgerPreservesTimesheetLocks allows preserving locked s
   });
 });
 
+test('collectSessionTimesheetRestrictedMutationScopes detects targeted metadata changes', () => {
+  const scopes = schoolDependencyService.collectSessionTimesheetRestrictedMutationScopes({
+    previousSession: {
+      status: 'scheduled',
+      date: '2026-07-10',
+      startTime: '09:00',
+      endTime: '10:00',
+      room: '101',
+      delivery: { deliveredBy: 'T-1', coTeachers: [] }
+    },
+    nextSession: {
+      status: 'completed',
+      date: '2026-07-11',
+      startTime: '11:00',
+      endTime: '12:00',
+      room: '202',
+      delivery: { deliveredBy: 'T-2', coTeachers: [{ personId: 'T-3', roleLabel: 'Co-Teacher' }] }
+    }
+  });
+  assert.ok(scopes.includes(schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.STATUS));
+  assert.ok(scopes.includes(schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.DATE_TIME));
+  assert.ok(scopes.includes(schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.ROOM));
+  assert.ok(scopes.includes(schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.TEACHER_ASSIGNMENT));
+  assert.ok(scopes.includes(schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.CO_TEACHERS_ASSIGNMENT));
+});
+
+test('assertSessionTimesheetLockAllowsMutationScopes rejects approved-timesheet locked mutations', () => {
+  assert.throws(() => {
+    schoolDependencyService.assertSessionTimesheetLockAllowsMutationScopes(
+      { locked: true, lockReason: 'timesheet_approved' },
+      [schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.ROOM],
+      'Session SES_1'
+    );
+  }, /reopen the timesheet to change room/i);
+});
+
 test('class edit save and form guard timesheet-locked session ledger changes', () => {
   const controllerSource = read('packages/school/MVC/controllers/school/classController.js');
   const formSource = read('packages/school/MVC/views/school/class/classForm.ejs');
   assert.match(controllerSource, /assertClassSessionLedgerPreservesTimesheetLocks/);
+  assert.match(controllerSource, /collectSessionTimesheetRestrictedMutationScopes/);
+  assert.match(controllerSource, /assertSessionTimesheetLockAllowsMutationScopes/);
   assert.match(formSource, /function isTimesheetApprovedLock/);
+  assert.match(formSource, /const metadataLockAttr = \(isAdminLocked \|\| isTimesheetLock\) \? 'disabled' : '';/);
+  assert.match(formSource, /if \(isTimesheetApprovedLock\(s\)\) return false;/);
   assert.match(formSource, /timesheet-locked session\(s\) will be kept/);
   assert.match(formSource, /Locked by an approved timesheet/);
 });
