@@ -30,19 +30,25 @@
       </div>
       <div class="session-stage-section mb-2">
         <div class="session-stage-label small text-muted mb-1">Number of sessions</div>
-        <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="session-stage-count-row d-flex flex-wrap align-items-center gap-2">
           <div class="btn-group session-stage-stepper" role="group" aria-label="Session count stepper">
             <button type="button" class="btn btn-outline-secondary" id="btn_sessionEnrollmentStageCountDown" aria-label="Decrease session count"><i class="bi bi-dash-lg"></i></button>
-            <span class="btn btn-light session-stage-count-display" id="sessionEnrollmentStageCountDisplay" tabindex="0" aria-live="polite">4</span>
+            <input type="number" class="form-control form-control-sm session-stage-count-input" id="sessionEnrollmentStageCountDisplay" value="4" min="1" max="72" step="1" inputmode="numeric" aria-label="Number of sessions" aria-live="polite">
             <button type="button" class="btn btn-outline-secondary" id="btn_sessionEnrollmentStageCountUp" aria-label="Increase session count"><i class="bi bi-plus-lg"></i></button>
           </div>
-          <div class="session-stage-btn-group d-flex flex-wrap gap-2" id="sessionEnrollmentStageCountChips" role="group" aria-label="Quick session counts">
+          <div class="session-stage-count-chips" id="sessionEnrollmentStageCountChips" role="group" aria-label="Quick session counts">
             <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="1">1</button>
             <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="2">2</button>
             <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip active" data-stage-count="4">4</button>
             <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="6">6</button>
             <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="8">8</button>
             <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="12">12</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="30">30</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="36">36</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="40">40</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="48">48</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="60">60</button>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="72">72</button>
           </div>
         </div>
       </div>

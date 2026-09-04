@@ -9,6 +9,7 @@ const classEnrollmentReadService = require('./classEnrollmentReadService');
 const leaveRequestService = require('./leaveRequestService');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const classCycleEnrollmentPolicyService = require('./classCycleEnrollmentPolicyService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -990,7 +991,8 @@ const registrationIntegrityService = {
       preview.issues.push('Posting Policy is missing. Add a Posting Policy for this student fee category or All Categories.');
     }
     if (classPricing.warnings.length) preview.warnings.push(...classPricing.warnings);
-    if (preview.capacity.max > 0 && preview.capacity.enrolled >= preview.capacity.max) {
+    const skipClassLevelCapacityLimit = classSessionCapacityService.shouldSkipClassLevelCapacityLimit(classItem);
+    if (!skipClassLevelCapacityLimit && preview.capacity.max > 0 && preview.capacity.enrolled >= preview.capacity.max) {
       preview.capacity.isAtCapacity = true;
       preview.warnings.push(
         `Enrollment is at capacity: ${preview.capacity.enrolled} of ${preview.capacity.max} open enrollment slot(s) are already used for this class. Increase Max Student Capacity to enroll more students.`

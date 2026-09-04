@@ -14,6 +14,21 @@ const classData = {
   billingMode: 'no_charge'
 };
 
+test('normalizeEnrollmentEngineRequest coerces one_on_one for rolling capacity-1 class', () => {
+  const capacityOneClass = {
+    registrationMode: 'rolling',
+    enrollment: { maxCapacity: 1 }
+  };
+  const normalized = engineService.normalizeEnrollmentEngineRequest({
+    classId: classData.id,
+    studentId: 'STU_001',
+    startDate: '2026-01-01',
+    sessionCapacityType: 'group'
+  }, capacityOneClass);
+  assert.equal(normalized.sessionCapacityType, 'one_on_one');
+  assert.equal(normalized.students[0].sessionCapacityType, 'one_on_one');
+});
+
 test('normalizeEnrollmentEngineRequest infers session_cap mode from targetSessionCount', () => {
   const normalized = engineService.normalizeEnrollmentEngineRequest({
     classId: classData.id,

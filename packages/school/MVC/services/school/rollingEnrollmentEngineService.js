@@ -8,6 +8,7 @@ const rollingEnrollmentWorkspaceService = require('./rollingEnrollmentWorkspaceS
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const sessionConflictDetectionService = require('./sessionConflictDetectionService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -44,10 +45,10 @@ function inferEnrollmentModeFromFields(input = {}) {
   return ENROLLMENT_MODES.DATE_WINDOW;
 }
 
-function normalizeStudentEntries(input = {}) {
-  const defaultSessionCapacityType = classEnrollmentPeriodModel.sanitizeSessionCapacityType(
-    input.sessionCapacityType,
-    { defaultValue: 'group' }
+function normalizeStudentEntries(input = {}, classData = null) {
+  const defaultSessionCapacityType = classSessionCapacityService.resolveEffectiveSessionCapacityType(
+    classData,
+    classEnrollmentPeriodModel.sanitizeSessionCapacityType(input.sessionCapacityType, { defaultValue: 'group' })
   );
   const defaultUnmarkSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
     input.unmarkSessionIds
@@ -62,9 +63,12 @@ function normalizeStudentEntries(input = {}) {
         termId: toPublicId(row?.termId || ''),
         programRegistrationId: toPublicId(row?.programRegistrationId || ''),
         notes: String(row?.notes || '').trim(),
-        sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(
-          row?.sessionCapacityType || defaultSessionCapacityType,
-          { defaultValue: 'group' }
+        sessionCapacityType: classSessionCapacityService.resolveEffectiveSessionCapacityType(
+          classData,
+          classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+            row?.sessionCapacityType || defaultSessionCapacityType,
+            { defaultValue: 'group' }
+          )
         ),
         unmarkSessionIds: rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
           row?.unmarkSessionIds || defaultUnmarkSessionIds
@@ -88,13 +92,13 @@ function normalizeStudentEntries(input = {}) {
 /**
  * Normalize rolling enrollment engine input into a validated request contract.
  */
-function normalizeEnrollmentEngineRequest(input = {}) {
+function normalizeEnrollmentEngineRequest(input = {}, classData = null) {
   const classId = toPublicId(input.classId || '');
   const startDate = String(input.startDate || '').trim();
   if (!classId) throw new Error('classId is required.');
   if (!startDate) throw new Error('startDate is required.');
 
-  const students = normalizeStudentEntries(input);
+  const students = normalizeStudentEntries(input, classData);
   if (!students.length) throw new Error('At least one student is required.');
 
   const explicitMode = String(input.enrollmentMode || '').trim().toLowerCase();
@@ -152,7 +156,10 @@ function normalizeEnrollmentEngineRequest(input = {}) {
     sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(input.sessionCountPolicy),
     notes: String(input.notes || '').trim(),
     enrollmentSource: String(input.enrollmentSource || 'rolling_enrollment').trim(),
-    sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(input.sessionCapacityType, { defaultValue: 'group' }),
+    sessionCapacityType: classSessionCapacityService.resolveEffectiveSessionCapacityType(
+      classData,
+      classEnrollmentPeriodModel.sanitizeSessionCapacityType(input.sessionCapacityType, { defaultValue: 'group' })
+    ),
     unmarkSessionIds: rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(input.unmarkSessionIds),
     allowOverlap: parseBoolean(input.allowOverlap, false),
     finance: input.finance && typeof input.finance === 'object' ? input.finance : null
@@ -248,9 +255,12 @@ function buildEnrollmentPayloadForStudent(classData, normalized, student, studen
     programId: toPublicId(resolution.programId || studentEntry.programId || ''),
     termId: toPublicId(resolution.termId || studentEntry.termId || ''),
     enrollmentSource: normalized.enrollmentSource,
-    sessionCapacityType: classEnrollmentPeriodModel.sanitizeSessionCapacityType(
-      studentEntry.sessionCapacityType || normalized.sessionCapacityType,
-      { defaultValue: 'group' }
+    sessionCapacityType: classSessionCapacityService.resolveEffectiveSessionCapacityType(
+      classData,
+      classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+        studentEntry.sessionCapacityType || normalized.sessionCapacityType,
+        { defaultValue: 'group' }
+      )
     ),
     feeCategory: String(student?.feeCategory || '').trim(),
     notes: String(studentEntry.notes || normalized.notes || '').trim(),
@@ -265,7 +275,12 @@ async function augmentEnrollmentPayloadForSessionCapacity({
   enrollmentPayload = {},
   reqUser
 } = {}) {
-  if (enrollmentPayload.sessionCapacityType !== 'one_on_one') return enrollmentPayload;
+  const effectiveSessionCapacityType = classSessionCapacityService.resolveEffectiveSessionCapacityType(
+    classData,
+    enrollmentPayload.sessionCapacityType
+  );
+  enrollmentPayload.sessionCapacityType = effectiveSessionCapacityType;
+  if (effectiveSessionCapacityType !== 'one_on_one') return enrollmentPayload;
   const activeSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
     studentEntry?.unmarkSessionIds || normalized?.unmarkSessionIds || []
   );
@@ -398,9 +413,12 @@ async function materializeEnrollmentSessionUnmarks({
   normalized = {},
   reqUser
 } = {}) {
-  const sessionCapacityType = classEnrollmentPeriodModel.sanitizeSessionCapacityType(
-    studentEntry?.sessionCapacityType || normalized?.sessionCapacityType || period?.sessionCapacityType,
-    { defaultValue: 'group' }
+  const sessionCapacityType = classSessionCapacityService.resolveEffectiveSessionCapacityType(
+    classData,
+    classEnrollmentPeriodModel.sanitizeSessionCapacityType(
+      studentEntry?.sessionCapacityType || normalized?.sessionCapacityType || period?.sessionCapacityType,
+      { defaultValue: 'group' }
+    )
   );
   const personId = toPublicId(period?.personId || student?.personId || '');
   if (!personId) return { updatedCount: 0, sessionIds: [] };
@@ -642,7 +660,10 @@ async function execute({
   hooks = {}
 } = {}) {
   if (!classData?.id) throw new Error('classData is required.');
-  const normalized = normalizeEnrollmentEngineRequest({ ...rawRequest, classId: rawRequest.classId || classData.id });
+  const normalized = normalizeEnrollmentEngineRequest(
+    { ...rawRequest, classId: rawRequest.classId || classData.id },
+    classData
+  );
   const billingMode = normalizeClassBillingMode(classData?.billingMode);
 
   const firstStudentId = normalized.students[0]?.studentId || '';

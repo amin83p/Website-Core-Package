@@ -32,7 +32,8 @@
     id: String(c.id || ''),
     orgId: String(c.orgId || ''),
     room: String(c.room || ''),
-    instructors: classInstructors
+    instructors: classInstructors,
+    maxCapacity: Number(c?.enrollment?.maxCapacity || c?.maxCapacity || 0)
   });
   const orgTodayJson = jsonForScript(typeof orgToday !== 'undefined' ? orgToday : '');
   const classIdJson = jsonForScript(String(c.id || ''));
@@ -1974,6 +1975,7 @@
   }
   const classId = <%- classIdJson %>;
   const rollingClassData = <%- rollingClassDataJson %>;
+  const classMaxCapacity = Number(rollingClassData?.maxCapacity || 0);
   const actionStateId = <%- actionStateIdJson %>;
   const cycleWindow = {
     startDate: <%- cycleStartDateJson %>,
@@ -2673,6 +2675,7 @@
   }
 
   function renderClassCapacityWarningPanel(capacity) {
+    if (isRollingCapacityOneClass()) return '';
     const max = Number(capacity?.max || 0);
     const enrolled = Number(capacity?.enrolled || 0);
     if (!(capacity?.isAtCapacity === true && max > 0)) return '';
@@ -3859,18 +3862,36 @@
   function setSessionCapacitySelectValue(selectId, value) {
     const el = qs(selectId);
     if (!el) return;
-    const normalized = normalizeSessionCapacityTypeValue(value);
+    const normalized = isRollingCapacityOneClass()
+      ? 'one_on_one'
+      : normalizeSessionCapacityTypeValue(value);
     el.value = normalized;
     if (el.value !== normalized) {
-      el.value = 'group';
+      el.value = isRollingCapacityOneClass() ? 'one_on_one' : 'group';
     }
   }
 
+  function isRollingCapacityOneClass() {
+    return isRollingClass() && classMaxCapacity === 1;
+  }
+
+  function syncSessionCapacityControlsForClass() {
+    if (!isRollingCapacityOneClass()) return;
+    ['inp_sessionCapacityType', 'grp_sessionCapacityType', 'edit_sessionCapacityType'].forEach((selectId) => {
+      const el = qs(selectId);
+      if (!el) return;
+      setSessionCapacitySelectValue(selectId, 'one_on_one');
+      el.disabled = true;
+    });
+  }
+
   function isGroupSessionCapacityEnrollment(selectId = 'inp_sessionCapacityType') {
+    if (isRollingCapacityOneClass()) return false;
     return readSessionCapacityTypeFromSelect(selectId) === 'group';
   }
 
   function isOneOnOneSessionCapacityEnrollment(selectId = 'inp_sessionCapacityType') {
+    if (isRollingCapacityOneClass()) return true;
     return readSessionCapacityTypeFromSelect(selectId) === 'one_on_one';
   }
 
@@ -5377,6 +5398,7 @@
 
   function applyUnmarkSelectableRules(pickerData) {
     if (!pickerData || typeof pickerData !== 'object') return pickerData;
+    if (!isOneOnOneSessionCapacityEnrollment()) return pickerData;
     const patchEvents = (events) => (Array.isArray(events) ? events : []).map((event) => {
       const rosterCount = resolveSessionRosterCount(event);
       const outOfWindow = String(event?.excludeReason || '').trim() === 'out_of_window';
@@ -7959,7 +7981,8 @@
     qs('inp_startDate').value = '';
     qs('inp_endDate').value = '';
     qs('inp_status').value = 'active';
-    setSessionCapacitySelectValue('inp_sessionCapacityType', 'group');
+    setSessionCapacitySelectValue('inp_sessionCapacityType', isRollingCapacityOneClass() ? 'one_on_one' : 'group');
+    syncSessionCapacityControlsForClass();
     setFunderSelectValue('inp_funder', { funderId: 'self', funderType: 'self' });
     qs('inp_reasonStart').value = '';
     if (qs('inp_targetSessionCount')) {
@@ -9240,6 +9263,7 @@
 
   resetChargeModalState();
   applyTargetSessionCountUi();
+  syncSessionCapacityControlsForClass();
   renderRows();
 })();
 </script>

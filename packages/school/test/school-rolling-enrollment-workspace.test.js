@@ -247,3 +247,94 @@ test('enrichSessionsWithEnrollmentOccupancy writes occupancy onto slim sessions'
   });
   assert.equal(payload.sessions[0].rosterCount, 1);
 });
+
+test('assertRollingSessionRosterWithinCapacity rejects extra students on capacity-1 rolling class', () => {
+  const classData = {
+    id: 'CLS_CAP1',
+    orgId: 'ORG_900000',
+    registrationMode: 'rolling',
+    enrollment: { maxCapacity: 1 }
+  };
+  const session = {
+    sessionId: 'SES_CAP1',
+    date: '2026-02-01',
+    roster: [
+      { personId: 'PERSON_A' },
+      { personId: 'PERSON_B' }
+    ]
+  };
+  const students = [
+    { id: 'STU_A', personId: 'PERSON_A', orgId: 'ORG_900000' },
+    { id: 'STU_B', personId: 'PERSON_B', orgId: 'ORG_900000' }
+  ];
+  const periodRows = [
+    {
+      studentId: 'STU_A',
+      personId: 'PERSON_A',
+      status: 'active',
+      startDate: '2026-02-01',
+      endDate: '2026-03-31',
+      sessionCapacityType: 'group'
+    },
+    {
+      studentId: 'STU_B',
+      personId: 'PERSON_B',
+      status: 'active',
+      startDate: '2026-02-01',
+      endDate: '2026-03-31',
+      sessionCapacityType: 'group'
+    }
+  ];
+  const studentToPersonMap = workspaceService.buildStudentToPersonMap(students, 'ORG_900000');
+  assert.throws(() => {
+    workspaceService.assertRollingSessionRosterWithinCapacity({
+      classData,
+      session,
+      roster: session.roster,
+      periodRows,
+      studentToPersonMap,
+      statusMap: STATUS_MAP,
+      activeOrgId: 'ORG_900000'
+    });
+  }, /allows at most 1 student/i);
+});
+
+test('buildEnrollmentSessionPickerPayloadSync marks occupied sessions unselectable for capacity-1 class', () => {
+  const pickerService = require('../MVC/services/school/sessionEnrollmentPickerService');
+  const students = [
+    { id: 'STU_A', personId: 'PERSON_A', orgId: 'ORG_900000' }
+  ];
+  const periodRows = [{
+    studentId: 'STU_A',
+    personId: 'PERSON_A',
+    status: 'active',
+    startDate: '2026-01-01',
+    endDate: '2026-03-31',
+    sessionCapacityType: 'group'
+  }];
+  const payload = pickerService.buildEnrollmentSessionPickerPayloadSync({
+    classData: {
+      id: 'CLS_CAP1',
+      orgId: 'ORG_900000',
+      registrationMode: 'rolling',
+      enrollment: { maxCapacity: 1 },
+      instructors: [{ personId: 'TCH_001', name: 'Coach A', status: 'active' }]
+    },
+    persistedSessions: [{
+      sessionId: 'SES_OCC',
+      date: '2026-01-05',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [{ personId: 'PERSON_A' }]
+    }],
+    statusMap: STATUS_MAP,
+    startDate: '2026-01-01',
+    endDate: '2026-03-31',
+    periodRows,
+    students,
+    activeOrgId: 'ORG_900000'
+  });
+  const event = payload.allEvents.find((row) => row.sessionId === 'SES_OCC');
+  assert.equal(event?.selectable, false);
+  assert.equal(event?.excludeReason, 'Student already enrolled');
+});

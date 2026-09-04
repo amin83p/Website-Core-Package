@@ -2,6 +2,7 @@ const schoolDataService = require('./schoolDataService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -93,6 +94,63 @@ function resolveSessionOccupiedStudentCount({
   });
 
   return Math.max(rosterOthers, expectedOthers);
+}
+
+function assertRollingSessionRosterWithinCapacity({
+  classData = {},
+  session = {},
+  roster = null,
+  periodRows = [],
+  studentToPersonMap = new Map(),
+  statusMap = new Map(),
+  forceNotApplicableSessionKeys = new Set(),
+  activeOrgId = ''
+} = {}) {
+  if (!classSessionCapacityService.isRollingCapacityOneClass(classData)) return;
+  const sessionMax = classSessionCapacityService.resolveSessionMaxStudents(classData);
+  if (sessionMax <= 0) return;
+  const workingSession = {
+    ...session,
+    roster: Array.isArray(roster) ? roster : (Array.isArray(session?.roster) ? session.roster : [])
+  };
+  const occupied = resolveSessionOccupiedStudentCount({
+    session: workingSession,
+    periodRows,
+    studentToPersonMap,
+    statusMap,
+    forceNotApplicableSessionKeys,
+    activeOrgId
+  });
+  if (occupied > sessionMax) {
+    throw new Error(`This session allows at most ${sessionMax} student(s). Remove extra students before saving.`);
+  }
+}
+
+function assertSessionHasCapacityForStudent({
+  classData = {},
+  session = {},
+  periodRows = [],
+  studentToPersonMap = new Map(),
+  statusMap = new Map(),
+  forceNotApplicableSessionKeys = new Set(),
+  excludeStudentId = '',
+  activeOrgId = ''
+} = {}) {
+  if (!classSessionCapacityService.isRollingCapacityOneClass(classData)) return;
+  const sessionMax = classSessionCapacityService.resolveSessionMaxStudents(classData);
+  if (sessionMax <= 0) return;
+  const occupied = resolveSessionOccupiedStudentCount({
+    session,
+    periodRows,
+    studentToPersonMap,
+    statusMap,
+    forceNotApplicableSessionKeys,
+    excludeStudentId,
+    activeOrgId
+  });
+  if (occupied >= sessionMax) {
+    throw new Error('This session already has a student enrolled and cannot accept another.');
+  }
 }
 
 function enrichSessionsWithEnrollmentOccupancy({
@@ -261,5 +319,7 @@ module.exports = {
   filterSessionsInEnrollmentWindow,
   buildStudentToPersonMap,
   resolveSessionOccupiedStudentCount,
+  assertRollingSessionRosterWithinCapacity,
+  assertSessionHasCapacityForStudent,
   enrichSessionsWithEnrollmentOccupancy
 };

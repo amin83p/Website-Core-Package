@@ -1,0 +1,316 @@
+<div id="scheduleDraftSessionContextMenu" class="schedule-session-context-menu d-none" role="menu" aria-hidden="true">
+
+  <div class="schedule-session-context-menu-header" id="scheduleDraftSessionContextMenuHeader"></div>
+
+  <div class="schedule-session-context-menu-actions d-none" id="scheduleDraftSessionContextMenuBulk">
+
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleDraftContextEditAllSelected" role="menuitem">
+
+      <i class="bi bi-pencil-square" aria-hidden="true"></i>
+
+      <span>Edit All</span>
+
+    </button>
+
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleDraftContextDeleteAllSelected" role="menuitem">
+
+      <i class="bi bi-trash3" aria-hidden="true"></i>
+
+      <span>Delete All</span>
+
+    </button>
+
+  </div>
+
+  <div class="schedule-session-context-menu-divider d-none" id="scheduleDraftSessionContextMenuBulkDivider"></div>
+
+  <div class="schedule-session-context-menu-actions" id="scheduleDraftSessionContextMenuSingle">
+
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleDraftContextDelete" role="menuitem">
+
+      <i class="bi bi-trash" aria-hidden="true"></i>
+
+      <span>Delete</span>
+
+    </button>
+
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleDraftContextAdjustStart" role="menuitem">
+
+      <i class="bi bi-arrows-move" aria-hidden="true"></i>
+
+      <span>Adjust start time</span>
+
+    </button>
+
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleDraftContextMoveSession" role="menuitem">
+
+      <i class="bi bi-calendar-event" aria-hidden="true"></i>
+
+      <span>Move session</span>
+
+    </button>
+
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleDraftContextEdit" role="menuitem">
+
+      <i class="bi bi-pencil" aria-hidden="true"></i>
+
+      <span>Edit</span>
+
+    </button>
+
+  </div>
+
+  <div class="schedule-session-context-menu-divider"></div>
+
+  <div class="schedule-session-context-menu-actions" id="scheduleDraftSessionContextMenuBatch">
+
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleDraftContextDeleteAll" role="menuitem">
+
+      <i class="bi bi-trash3" aria-hidden="true"></i>
+
+      <span>Delete all staged…</span>
+
+    </button>
+
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleDraftContextEditAll" role="menuitem">
+
+      <i class="bi bi-pencil-square" aria-hidden="true"></i>
+
+      <span>Edit all staged…</span>
+
+    </button>
+
+  </div>
+
+</div>
+
+
+
+<div id="scheduleDraftBulkEditOverlay" class="session-enrollment-stage-overlay d-none" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="scheduleDraftBulkEditOverlayTitle">
+
+  <div class="session-enrollment-stage-backdrop" data-draft-bulk-edit-dismiss="1" aria-hidden="true"></div>
+
+  <div class="session-enrollment-stage-panel card shadow">
+
+    <div class="card-header py-2 d-flex align-items-start justify-content-between gap-2">
+
+      <div>
+
+        <h5 class="card-title mb-0" id="scheduleDraftBulkEditOverlayTitle">Edit selected staged sessions</h5>
+
+        <div class="small text-muted" id="scheduleDraftBulkEditOverlayContext"></div>
+
+      </div>
+
+      <button type="button" class="btn-close" data-draft-bulk-edit-dismiss="1" aria-label="Close"></button>
+
+    </div>
+
+    <div class="card-body py-2">
+
+      <div class="session-stage-section mb-3">
+
+        <label class="session-stage-label small text-muted mb-1" for="scheduleDraftBulkEditStartTime">Start time</label>
+
+        <input type="time" class="form-control form-control-sm" id="scheduleDraftBulkEditStartTime" step="900">
+
+      </div>
+
+      <div class="session-stage-section mb-2">
+
+        <label class="session-stage-label small text-muted mb-1" for="scheduleDraftBulkEditEndTime">End time</label>
+
+        <input type="time" class="form-control form-control-sm" id="scheduleDraftBulkEditEndTime" step="900">
+
+      </div>
+
+      <div class="small text-muted mb-2">Times apply to each selected session on its existing date.</div>
+
+      <div class="small text-danger d-none" id="scheduleDraftBulkEditError" role="alert"></div>
+
+    </div>
+
+    <div class="card-footer py-2 d-flex justify-content-end gap-2">
+
+      <button type="button" class="btn btn-secondary btn-sm" data-draft-bulk-edit-dismiss="1">Cancel</button>
+
+      <button type="button" class="btn btn-primary btn-sm" id="btn_scheduleDraftBulkEditApply">Apply</button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<div class="modal fade" id="scheduleDraftAttemptPickerModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleDraftAttemptPickerModalTitle">
+
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+
+    <div class="modal-content border-0 shadow-lg">
+
+      <div class="modal-header">
+
+        <h5 class="modal-title" id="scheduleDraftAttemptPickerModalTitle">Select staging attempt</h5>
+
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+      </div>
+
+      <div class="modal-body">
+
+        <p class="small text-muted mb-3" id="scheduleDraftAttemptPickerSubtitle">Choose which staged session batch to update.</p>
+
+        <div id="scheduleDraftAttemptPickerList" class="list-group"></div>
+
+      </div>
+
+      <div class="modal-footer">
+
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<div id="scheduleDraftEditOverlay" class="session-enrollment-stage-overlay d-none" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="scheduleDraftEditOverlayTitle">
+
+  <div class="session-enrollment-stage-backdrop" data-draft-edit-dismiss="1" aria-hidden="true"></div>
+
+  <div class="session-enrollment-stage-panel card shadow">
+
+    <div class="card-header py-2 d-flex align-items-start justify-content-between gap-2">
+
+      <div>
+
+        <h5 class="card-title mb-0" id="scheduleDraftEditOverlayTitle">Edit staged session</h5>
+
+        <div class="small text-muted" id="scheduleDraftEditOverlayContext"></div>
+
+      </div>
+
+      <button type="button" class="btn-close" data-draft-edit-dismiss="1" aria-label="Close"></button>
+
+    </div>
+
+    <div class="card-body py-2">
+
+      <div class="session-stage-section mb-3">
+
+        <label class="session-stage-label small text-muted mb-1" for="scheduleDraftEditDate">Date</label>
+
+        <input type="date" class="form-control form-control-sm" id="scheduleDraftEditDate">
+
+      </div>
+
+      <div class="session-stage-section mb-3">
+
+        <label class="session-stage-label small text-muted mb-1" for="scheduleDraftEditStartTime">Start time</label>
+
+        <input type="time" class="form-control form-control-sm" id="scheduleDraftEditStartTime" step="900">
+
+      </div>
+
+      <div class="session-stage-section mb-2">
+
+        <div class="session-stage-label small text-muted mb-1">Duration</div>
+
+        <div class="session-stage-btn-group d-flex flex-wrap gap-2" id="scheduleDraftEditDurationGroup" role="group" aria-label="Session duration">
+
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-draft-edit-duration="0.5">30 Mins</button>
+
+          <button type="button" class="btn btn-outline-secondary session-stage-chip active" data-draft-edit-duration="1">1 Hr</button>
+
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-draft-edit-duration="1.5">1:30 Hrs</button>
+
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-draft-edit-duration="2">2 Hrs</button>
+
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-draft-edit-duration="2.5">2:30 Hrs</button>
+
+          <button type="button" class="btn btn-outline-secondary session-stage-chip" data-draft-edit-duration="3">3 Hrs</button>
+
+        </div>
+
+      </div>
+
+      <div class="small text-danger d-none" id="scheduleDraftEditError" role="alert"></div>
+
+    </div>
+
+    <div class="card-footer py-2 d-flex justify-content-end gap-2">
+
+      <button type="button" class="btn btn-secondary btn-sm" data-draft-edit-dismiss="1">Cancel</button>
+
+      <button type="button" class="btn btn-primary btn-sm" id="btn_scheduleDraftEditApply">Apply</button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<div id="scheduleDraftMoveOverlay" class="session-enrollment-stage-overlay d-none" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="scheduleDraftMoveOverlayTitle">
+
+  <div class="session-enrollment-stage-backdrop" data-draft-move-dismiss="1" aria-hidden="true"></div>
+
+  <div class="session-enrollment-stage-panel card shadow">
+
+    <div class="card-header py-2 d-flex align-items-start justify-content-between gap-2">
+
+      <div>
+
+        <h5 class="card-title mb-0" id="scheduleDraftMoveOverlayTitle">Move session</h5>
+
+        <div class="small text-muted" id="scheduleDraftMoveOverlayContext"></div>
+
+      </div>
+
+      <button type="button" class="btn-close" data-draft-move-dismiss="1" aria-label="Close"></button>
+
+    </div>
+
+    <div class="card-body py-2">
+
+      <div class="session-stage-section mb-3">
+
+        <label class="session-stage-label small text-muted mb-1" for="scheduleDraftMoveDate">Date</label>
+
+        <input type="date" class="form-control form-control-sm" id="scheduleDraftMoveDate">
+
+      </div>
+
+      <div class="session-stage-section mb-2">
+
+        <label class="session-stage-label small text-muted mb-1" for="scheduleDraftMoveStartTime">Start time</label>
+
+        <input type="time" class="form-control form-control-sm" id="scheduleDraftMoveStartTime" step="900">
+
+      </div>
+
+      <div class="small text-muted mb-2">Duration stays the same as the current session.</div>
+
+      <div class="small text-danger d-none" id="scheduleDraftMoveError" role="alert"></div>
+
+    </div>
+
+    <div class="card-footer py-2 d-flex justify-content-end gap-2">
+
+      <button type="button" class="btn btn-secondary btn-sm" data-draft-move-dismiss="1">Cancel</button>
+
+      <button type="button" class="btn btn-primary btn-sm" id="btn_scheduleDraftMoveApply">Move</button>
+
+    </div>
+
+  </div>
+
+</div>
+

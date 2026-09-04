@@ -4,6 +4,8 @@ const schoolDataService = require('./schoolDataService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const rollingEnrollmentWorkspaceService = require('./rollingEnrollmentWorkspaceService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -280,7 +282,11 @@ function buildEnrollmentSessionPickerPayloadSync({
   sessions = [],
   sessionsToCreate = [],
   viewPreset = 'week',
-  anchorDate = ''
+  anchorDate = '',
+  periodRows = [],
+  students = [],
+  excludeStudentId = '',
+  activeOrgId = ''
 } = {}) {
   if (!classData?.id) throw new Error('classData is required.');
 
@@ -328,6 +334,15 @@ function buildEnrollmentSessionPickerPayloadSync({
   );
 
   const classId = toPublicId(classData.id);
+  const sessionMaxStudents = classSessionCapacityService.resolveSessionMaxStudents(classData);
+  const enforceSessionOccupancy = classSessionCapacityService.isRollingCapacityOneClass(classData);
+  const studentToPersonMap = enforceSessionOccupancy
+    ? rollingEnrollmentWorkspaceService.buildStudentToPersonMap(students, activeOrgId)
+    : new Map();
+  const forceNotApplicableSessionKeys = enforceSessionOccupancy
+    ? sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(policyStatusMap, mergedSessions)
+    : new Set();
+
   const events = mergedSessions.map((session) => {
     const sessionId = String(session?.sessionId || '').trim();
     const classified = classifiedById.get(sessionId) || rollingEnrollmentSessionAlignmentService.classifySessionForWindow(
@@ -338,10 +353,27 @@ function buildEnrollmentSessionPickerPayloadSync({
     const start = String(classified?.startTime || session?.startTime || '').trim();
     const end = String(classified?.endTime || session?.endTime || '').trim();
     const durationHours = Number(classified?.durationHours || 0);
-    const rosterCount = Array.isArray(session?.roster)
+    let rosterCount = Array.isArray(session?.roster)
       ? session.roster.length
       : Math.max(0, Number(session?.rosterCount || 0) || 0);
-    const selectable = classified?.countable === true;
+    if (enforceSessionOccupancy) {
+      rosterCount = rollingEnrollmentWorkspaceService.resolveSessionOccupiedStudentCount({
+        session,
+        periodRows,
+        studentToPersonMap,
+        statusMap: policyStatusMap,
+        forceNotApplicableSessionKeys,
+        excludeStudentId,
+        activeOrgId
+      });
+    }
+    const occupied = sessionMaxStudents > 0 && rosterCount >= sessionMaxStudents;
+    let selectable = classified?.countable === true;
+    let excludeReason = selectable ? '' : String(classified?.excludeReason || '').trim();
+    if (selectable && occupied) {
+      selectable = false;
+      excludeReason = 'Student already enrolled';
+    }
     return {
       sessionId,
       classId,
@@ -354,7 +386,7 @@ function buildEnrollmentSessionPickerPayloadSync({
       manageable: Boolean(sessionId),
       manageSessionUrl: buildManageSessionUrl(classId, sessionId),
       selectable,
-      excludeReason: selectable ? '' : String(classified?.excludeReason || '').trim(),
+      excludeReason,
       isStaged: session?.isStaged === true,
       selected: selectedSet.has(sessionId)
     };
@@ -412,9 +444,25 @@ async function buildEnrollmentSessionPickerPayload({
   });
 
   let persisted = Array.isArray(persistedSessions) ? persistedSessions : null;
+  let periodRows = [];
+  let students = [];
+  const activeOrgId = toPublicId(classData?.orgId || reqUser?.activeOrgId || '');
   if (!persisted) {
-    persisted = await schoolDataService.getClassSessions(classData.id, reqUser);
+    [persisted, periodRows, students] = await Promise.all([
+      schoolDataService.getClassSessions(classData.id, reqUser),
+      schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, reqUser),
+      schoolDataService.fetchAllData('students', {}, reqUser)
+    ]);
     persisted = Array.isArray(persisted) ? persisted : [];
+    periodRows = Array.isArray(periodRows) ? periodRows : [];
+    students = Array.isArray(students) ? students : [];
+  } else if (classSessionCapacityService.isRollingCapacityOneClass(classData)) {
+    [periodRows, students] = await Promise.all([
+      schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, reqUser),
+      schoolDataService.fetchAllData('students', {}, reqUser)
+    ]);
+    periodRows = Array.isArray(periodRows) ? periodRows : [];
+    students = Array.isArray(students) ? students : [];
   }
 
   let resolvedStatusMap = statusMapOverride;
@@ -423,6 +471,17 @@ async function buildEnrollmentSessionPickerPayload({
       classData?.orgId || reqUser?.activeOrgId || '',
       { includeInactive: true }
     );
+  }
+
+  if (classSessionCapacityService.isRollingCapacityOneClass(classData) && periodRows.length) {
+    persisted = rollingEnrollmentWorkspaceService.enrichSessionsWithEnrollmentOccupancy({
+      sessions: persisted,
+      periodRows,
+      statusMap: resolvedStatusMap,
+      students,
+      excludeStudentId: studentId,
+      activeOrgId
+    });
   }
 
   return buildEnrollmentSessionPickerPayloadSync({
@@ -438,7 +497,11 @@ async function buildEnrollmentSessionPickerPayload({
     sessions,
     sessionsToCreate: stagedSessions,
     viewPreset,
-    anchorDate
+    anchorDate,
+    periodRows,
+    students,
+    excludeStudentId: studentId,
+    activeOrgId
   });
 }
 

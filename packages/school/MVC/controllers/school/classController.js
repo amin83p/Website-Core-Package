@@ -29,6 +29,7 @@ const programRegistrationDraftService = require('../../services/school/programRe
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const sessionAttendanceEditAccessService = require('../../services/school/sessionAttendanceEditAccessService');
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
+const rollingEnrollmentWorkspaceService = require('../../services/school/rollingEnrollmentWorkspaceService');
 const makeupSessionAllocationService = require('../../services/school/makeupSessionAllocationService');
 const sessionMergeService = require('../../services/school/sessionMergeService');
 const skillCatalogService = require('../../services/school/skillCatalogService');
@@ -1545,6 +1546,42 @@ async function loadSessionRosterIdentityData(reqUser) {
     };
 }
 
+async function assertRollingCapacityOneSessionRosterOrThrow({
+    classData,
+    session,
+    roster,
+    reqUser,
+    prefetchedPeriodRows = null,
+    prefetchedStudents = null
+}) {
+    if (!classSessionCapacityService.isRollingCapacityOneClass(classData)) return;
+    const activeOrgId = toPublicId(classData?.orgId || reqUser?.activeOrgId || '');
+    let periodRows = prefetchedPeriodRows;
+    let students = prefetchedStudents;
+    if (!Array.isArray(periodRows) || !Array.isArray(students)) {
+        [periodRows, students] = await Promise.all([
+            schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, reqUser),
+            schoolDataService.fetchAllData('students', {}, reqUser)
+        ]);
+    }
+    const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true });
+    const studentToPersonMap = rollingEnrollmentWorkspaceService.buildStudentToPersonMap(students, activeOrgId);
+    const forceNotApplicableSessionKeys = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(
+        statusMap,
+        [session]
+    );
+    rollingEnrollmentWorkspaceService.assertRollingSessionRosterWithinCapacity({
+        classData,
+        session,
+        roster,
+        periodRows: Array.isArray(periodRows) ? periodRows : [],
+        studentToPersonMap,
+        statusMap,
+        forceNotApplicableSessionKeys,
+        activeOrgId
+    });
+}
+
 async function buildEnrichedSessionRosterForMutation({
     classData,
     session,
@@ -1650,6 +1687,14 @@ async function buildEnrichedSessionRosterForMutation({
     });
 
     enrichedRoster.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    await assertRollingCapacityOneSessionRosterOrThrow({
+        classData,
+        session: workingSession,
+        roster: enrichedRoster,
+        reqUser,
+        prefetchedPeriodRows,
+        prefetchedStudents: students
+    });
     return enrichedRoster;
 }
 
@@ -5853,6 +5898,12 @@ async function saveSession(req, res) {
                 incomingRoster,
                 reqUser: req.user,
                 existingRoster: existingRoster
+            });
+            await assertRollingCapacityOneSessionRosterOrThrow({
+                classData,
+                session: sessionForAttendanceWindow,
+                roster: incomingRoster,
+                reqUser: req.user
             });
             const orgPolicyCatalogSave = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
                 classData?.orgId || getActiveOrgIdOrThrow(req.user)

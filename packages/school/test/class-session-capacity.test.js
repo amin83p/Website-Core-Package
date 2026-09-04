@@ -93,6 +93,73 @@ test('normalizeSessionCapacityType defaults missing values to group', () => {
   assert.equal(classSessionCapacityService.normalizeSessionCapacityType('1 on 1'), 'one_on_one');
 });
 
+test('resolveSessionMaxStudents returns 1 for capacity-1 classes', () => {
+  assert.equal(classSessionCapacityService.resolveSessionMaxStudents({ enrollment: { maxCapacity: 1 } }), 1);
+  assert.equal(classSessionCapacityService.resolveSessionMaxStudents({ enrollment: { maxCapacity: 8 } }), 8);
+  assert.equal(classSessionCapacityService.resolveSessionMaxStudents({ enrollment: { maxCapacity: 0 } }), 0);
+});
+
+test('resolveEffectiveSessionCapacityType forces one_on_one for rolling capacity-1', () => {
+  const rollingCapacityOne = { registrationMode: 'rolling', enrollment: { maxCapacity: 1 } };
+  assert.equal(
+    classSessionCapacityService.resolveEffectiveSessionCapacityType(rollingCapacityOne, 'group'),
+    'one_on_one'
+  );
+  assert.equal(
+    classSessionCapacityService.resolveEffectiveSessionCapacityType(
+      { registrationMode: 'rolling', enrollment: { maxCapacity: 8 } },
+      'group'
+    ),
+    'group'
+  );
+});
+
+test('shouldSkipClassLevelCapacityLimit is true only for rolling capacity-1', () => {
+  assert.equal(
+    classSessionCapacityService.shouldSkipClassLevelCapacityLimit({
+      registrationMode: 'rolling',
+      enrollment: { maxCapacity: 1 }
+    }),
+    true
+  );
+  assert.equal(
+    classSessionCapacityService.shouldSkipClassLevelCapacityLimit({
+      registrationMode: 'rolling',
+      enrollment: { maxCapacity: 8 }
+    }),
+    false
+  );
+  assert.equal(
+    classSessionCapacityService.shouldSkipClassLevelCapacityLimit({
+      registrationMode: 'term_based',
+      enrollment: { maxCapacity: 1 }
+    }),
+    false
+  );
+});
+
+test('resolveRollingSessionCapacityFromEnrollment uses class maxCapacity for rolling capacity-1', () => {
+  const rollingCapacityOne = { registrationMode: 'rolling', enrollment: { maxCapacity: 1 } };
+  const sessionOneStudent = {
+    date: '2026-03-01',
+    roster: [{ personId: 'PER_1' }]
+  };
+  const periodsGroup = [{
+    studentId: 'STU_1',
+    status: 'active',
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    sessionCapacityType: 'group'
+  }];
+
+  assert.equal(classSessionCapacityService.resolveRollingSessionCapacityFromEnrollment({
+    classData: rollingCapacityOne,
+    session: sessionOneStudent,
+    enrollmentPeriods: periodsGroup,
+    studentToPersonMap: new Map([['STU_1', 'PER_1']])
+  }), 'one_on_one');
+});
+
 test('resolveRollingSessionCapacityFromEnrollment uses roster and enrollment period', () => {
   const studentToPersonMap = new Map([['STU_1', 'PER_1']]);
   const sessionOneStudent = {

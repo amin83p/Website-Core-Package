@@ -1545,7 +1545,308 @@
     if (!block) return;
     event.preventDefault();
     event.stopPropagation();
-    showContextMenu(event, block.getAttribute('data-session-id'));
+    const sessionId = String(block.getAttribute('data-session-id') || '').trim();
+    const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+    if (isPartialMode() && eventRow?.isStaged === true && global.ScheduleDraftSessionMenu?.show) {
+      global.ScheduleDraftSessionMenu.show({
+        sessionId,
+        classId: state?.classId || eventRow.classId,
+        className: state?.classLabel || eventRow.title,
+        date: eventRow.date,
+        start: eventRow.start,
+        end: eventRow.end,
+        duration: eventRow.durationHours,
+        scheduledDuration: eventRow.durationHours,
+        stagingAttemptId: eventRow.stagingAttemptId,
+        isDraft: true
+      }, event, 'partialModal');
+      return;
+    }
+    showContextMenu(event, sessionId);
+  }
+
+  function getPartialBlockingScheduleEvents() {
+    if (!state) return [];
+    return (Array.isArray(state.conflictScheduleEvents) ? state.conflictScheduleEvents : []).map((row) => ({
+      sessionId: String(row?.sessionId || row?.id || '').trim(),
+      id: String(row?.id || row?.sessionId || '').trim(),
+      date: core.normalizeDateOnly(row?.date),
+      startTime: String(row?.startTime || row?.start || '').trim(),
+      start: String(row?.startTime || row?.start || '').trim(),
+      endTime: String(row?.endTime || row?.end || '').trim(),
+      end: String(row?.endTime || row?.end || '').trim()
+    })).filter((row) => row.sessionId || row.id);
+  }
+
+  function getPartialConflictSessions(excludeSessionId = '') {
+    if (!state) return [];
+    const excluded = String(excludeSessionId || '').trim();
+    const staged = (Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate : []).map((row) => ({
+      sessionId: row.sessionId,
+      id: row.sessionId,
+      date: row.date,
+      startTime: row.startTime,
+      start: row.startTime,
+      endTime: row.endTime,
+      end: row.endTime
+    }));
+    const seen = new Set();
+    const merged = [];
+    [...getPartialBlockingScheduleEvents(), ...staged].forEach((row) => {
+      const id = String(row?.sessionId || row?.id || '').trim();
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      merged.push({ ...row, sessionId: id, id });
+    });
+    return merged.filter((row) => {
+      const id = String(row?.sessionId || row?.id || '').trim();
+      return !excluded || id !== excluded;
+    });
+  }
+
+  function refreshPartialPickerFromState() {
+    if (!state || !isPartialMode()) return;
+    const pickerData = buildPartialPickerData({
+      classId: state.classId,
+      classLabel: state.classLabel,
+      sessionsToCreate: state.sessionsToCreate,
+      existingEvents: getExistingSessionsForStaging(),
+      startDate: state.startDate,
+      endDate: state.endDate,
+      stagingAttempts: state.stagingAttempts
+    });
+    applyPickerData(pickerData, { preserveViewRange: true });
+  }
+
+  function notifyPartialStagedSessionsChange() {
+    if (!state || typeof state.onStagedSessionsChange !== 'function') return;
+    state.onStagedSessionsChange({
+      sessionsToCreate: Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate.slice() : [],
+      stagingAttempts: Array.isArray(state.stagingAttempts) ? state.stagingAttempts.slice() : [],
+      viewRange: state.viewRange ? { ...state.viewRange } : null
+    });
+  }
+
+  function removePartialStagedAttempt(attemptId) {
+    const id = String(attemptId || '').trim();
+    if (!state || !id) return;
+    const removeIds = new Set(
+      (Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate : [])
+        .filter((row) => String(row?.stagingAttemptId || '') === id)
+        .map((row) => String(row?.sessionId || '').trim())
+        .filter(Boolean)
+    );
+    if (!removeIds.size) {
+      const batch = (state.stagingAttempts || []).find((row) => String(row?.attemptId || '') === id);
+      (batch?.sessionIds || []).forEach((sid) => removeIds.add(String(sid).trim()));
+    }
+    state.sessionsToCreate = (state.sessionsToCreate || []).filter((row) => !removeIds.has(String(row?.sessionId || '').trim()));
+    removeIds.forEach((sid) => state.selectedSet.delete(sid));
+    state.stagingAttempts = (state.stagingAttempts || []).filter((batch) => String(batch?.attemptId || '') !== id);
+    allEvents = allEvents.filter((row) => !removeIds.has(String(row?.sessionId || '').trim()));
+    refreshPartialPickerFromState();
+    notifyPartialStagedSessionsChange();
+  }
+
+  function deleteStagedSession(sessionId) {
+    if (!state || !isPartialMode()) return;
+    const id = String(sessionId || '').trim();
+    if (!id) return;
+    const removed = (state.sessionsToCreate || []).find((row) => String(row?.sessionId || '') === id);
+    state.sessionsToCreate = (state.sessionsToCreate || []).filter((row) => String(row?.sessionId || '') !== id);
+    state.selectedSet.delete(id);
+    state.stagingAttempts = (state.stagingAttempts || []).map((batch) => ({
+      ...batch,
+      sessionIds: (batch.sessionIds || []).filter((sid) => String(sid) !== id)
+    })).filter((batch) => (batch.sessionIds || []).length > 0);
+    if (removed?.stagingAttemptId) {
+      const attemptId = String(removed.stagingAttemptId).trim();
+      const stillHasAttempt = (state.sessionsToCreate || []).some((row) => String(row?.stagingAttemptId || '') === attemptId);
+      if (!stillHasAttempt) {
+        state.stagingAttempts = (state.stagingAttempts || []).filter((batch) => String(batch?.attemptId || '') !== attemptId);
+      }
+    }
+    allEvents = allEvents.filter((row) => String(row?.sessionId || '') !== id);
+    refreshPartialPickerFromState();
+    notifyPartialStagedSessionsChange();
+  }
+
+  function deleteStagedAttempt(attemptId) {
+    if (!isPartialMode()) return;
+    removePartialStagedAttempt(attemptId);
+  }
+
+  function applyPartialStagedSessionMove(update = {}) {
+    if (!state || !isPartialMode() || !update?.sessionId) return false;
+    const id = String(update.sessionId).trim();
+    const hasConflict = core.checkScheduleTimeConflict?.({
+      date: update.date,
+      startTime: update.startTime,
+      endTime: update.endTime,
+      sessions: getPartialConflictSessions(id),
+      excludeSessionId: id
+    });
+    if (hasConflict) return false;
+    state.sessionsToCreate = (state.sessionsToCreate || []).map((row) => {
+      if (String(row?.sessionId || '') !== id) return row;
+      return {
+        ...row,
+        date: update.date,
+        startTime: update.startTime,
+        endTime: update.endTime,
+        durationHours: update.durationHours
+      };
+    });
+    const eventIdx = allEvents.findIndex((row) => String(row?.sessionId || '') === id);
+    if (eventIdx >= 0) {
+      allEvents[eventIdx] = {
+        ...allEvents[eventIdx],
+        date: core.normalizeDateOnly(update.date),
+        start: update.startTime,
+        end: update.endTime,
+        durationHours: update.durationHours
+      };
+    }
+    refreshPartialPickerFromState();
+    notifyPartialStagedSessionsChange();
+    return true;
+  }
+
+  function applyPartialStagedSessionResize(update = {}) {
+    return applyPartialStagedSessionMove(update);
+  }
+
+  function moveStagedSession(sessionId, update = {}) {
+    if (!state || !isPartialMode()) return false;
+    const id = String(sessionId || '').trim();
+    const date = core.normalizeDateOnly(update.date);
+    const startTime = String(update.startTime || '').trim();
+    const endTime = String(update.endTime || update.end || '').trim();
+    const durationHours = Number(update.durationHours || 0);
+    return applyPartialStagedSessionMove({
+      sessionId: id,
+      date,
+      startTime,
+      endTime,
+      durationHours
+    });
+  }
+
+  function editStagedSession(sessionId, values = {}) {
+    if (!state || !isPartialMode()) return false;
+    const id = String(sessionId || '').trim();
+    const date = core.normalizeDateOnly(values.date);
+    const startTime = String(values.startTime || '').trim();
+    const durationHours = Number(values.durationHours || 0);
+    const endTime = core.addDurationToTime(startTime, durationHours);
+    const hasConflict = core.checkScheduleTimeConflict?.({
+      date,
+      startTime,
+      endTime,
+      sessions: getPartialConflictSessions(id),
+      excludeSessionId: id
+    });
+    if (hasConflict) {
+      const errorEl = document.getElementById('scheduleDraftEditError');
+      if (errorEl) {
+        errorEl.textContent = 'That time slot conflicts with another session.';
+        errorEl.classList.remove('d-none');
+      }
+      return false;
+    }
+    state.sessionsToCreate = (state.sessionsToCreate || []).map((row) => {
+      if (String(row?.sessionId || '') !== id) return row;
+      return { ...row, date, startTime, endTime, durationHours };
+    });
+    refreshPartialPickerFromState();
+    notifyPartialStagedSessionsChange();
+    return true;
+  }
+
+  function editStagedAttempt(attemptId) {
+    if (!state || !isPartialMode()) return;
+    const batch = (state.stagingAttempts || []).find((row) => String(row?.attemptId || '') === String(attemptId || '').trim());
+    if (!batch?.stageParams) return;
+    const params = batch.stageParams;
+    state.pendingEditAttemptId = String(batch.attemptId || '').trim();
+    openStageQuickModal({
+      date: String(params.anchorDate || '').trim(),
+      startTime24: String(params.startTime || '').trim(),
+      startTimeLabel: core.formatClockTime(params.startTime),
+      durationHours: Number(params.durationHours || 1)
+    });
+    stageDurationHours = Number(params.durationHours || 1);
+    stageWeekdays = new Set(Array.isArray(params.weekdays) ? params.weekdays : []);
+    syncStageCountDisplay(Number(params.count || 4));
+    stageModalEl = resolveStageOverlayEl();
+    stageModalEl?.querySelectorAll('[data-stage-duration]').forEach((btn) => {
+      const hours = Number(btn.getAttribute('data-stage-duration'));
+      btn.classList.toggle('active', hours === stageDurationHours);
+    });
+    stageModalEl?.querySelectorAll('[data-stage-weekday]').forEach((btn) => {
+      const dow = Number(btn.getAttribute('data-stage-weekday'));
+      btn.classList.toggle('active', stageWeekdays.has(dow));
+    });
+    const skipEl = stageModalEl?.querySelector('#sessionEnrollmentStageSkipHolidays');
+    if (skipEl) skipEl.checked = params.skipHolidays === true;
+  }
+
+  function getStagingAttempts(classId = '') {
+    if (!state || !isPartialMode()) return [];
+    const batches = Array.isArray(state.stagingAttempts) ? state.stagingAttempts : [];
+    const filterClassId = String(classId || state.classId || '').trim();
+    if (!filterClassId) return batches.slice();
+    return batches.filter((batch) => String(batch?.classId || '').trim() === filterClassId);
+  }
+
+  function syncFromParentDrafts(payload = {}) {
+    if (!state || !isPartialMode()) return;
+    state.sessionsToCreate = Array.isArray(payload.sessionsToCreate) ? payload.sessionsToCreate.slice() : [];
+    state.stagingAttempts = Array.isArray(payload.stagingAttempts) ? payload.stagingAttempts.slice() : [];
+    state.selectedSet = new Set(
+      state.sessionsToCreate.map((row) => String(row?.sessionId || '').trim()).filter(Boolean)
+    );
+    refreshPartialPickerFromState();
+  }
+
+  function bindPartialDraftDragMove() {
+    hostEl = qs('sessionEnrollmentCalendarHost');
+    if (!hostEl || hostEl.dataset.partialDraftDragMoveBound === '1' || !core.bindCalendarDragMove) return;
+    hostEl.dataset.partialDraftDragMoveBound = '1';
+    core.bindCalendarDragMove(hostEl, {
+      enabled: true,
+      blockSelector: '.session-enrollment-block.is-staged[data-session-id]',
+      canStartMove: (sessionId, block) => !block?.closest?.('.session-cal-draft-resize-handle'),
+      getConflictSessions: () => getPartialConflictSessions(),
+      onMoveComplete: (update) => { applyPartialStagedSessionMove(update); }
+    });
+    if (core.bindCalendarDragResize) {
+      core.bindCalendarDragResize(hostEl, {
+        enabled: true,
+        blockSelector: '.session-enrollment-block.is-staged[data-session-id]',
+        getConflictSessions: () => getPartialConflictSessions(),
+        onResizeComplete: (update) => { applyPartialStagedSessionResize(update); }
+      });
+    }
+  }
+
+  function isModalOpen() {
+    return Boolean(modalEl && modalEl.classList.contains('show') && state);
+  }
+
+  function createPartialStagingAttemptId() {
+    return `STAGE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function createPartialDraftBatch({ attemptId, classId, classLabel, stageParams, sessionIds } = {}) {
+    return {
+      attemptId: String(attemptId || createPartialStagingAttemptId()).trim(),
+      classId: String(classId || state?.classId || '').trim(),
+      classLabel: String(classLabel || state?.classLabel || classId || 'Class').trim(),
+      createdAt: new Date().toISOString(),
+      stageParams: (stageParams && typeof stageParams === 'object') ? { ...stageParams } : {},
+      sessionIds: Array.isArray(sessionIds) ? sessionIds.map((id) => String(id || '').trim()).filter(Boolean) : []
+    };
   }
 
   function bindBulkNaModalEvents() {
@@ -1613,7 +1914,7 @@
   let contextMenuSessionId = '';
   let manageSummaryMeta = null;
   const STAGE_COUNT_MIN = 1;
-  const STAGE_COUNT_MAX = 52;
+  const STAGE_COUNT_MAX = 72;
 
   function getExistingSessionsForStaging() {
     if (!state) return [];
@@ -1638,10 +1939,10 @@
       teacherName: String(row?.teacherName || '').trim() || 'Teacher',
       manageable: false,
       manageSessionUrl: '',
-      selectable: true,
+      selectable: false,
       excludeReason: '',
       isStaged: true,
-      selected: state.selectedSet.has(sessionId)
+      selected: false
     };
   }
 
@@ -1879,7 +2180,7 @@
       count,
       enrollmentStart,
       enrollmentEnd,
-      existingSessions: getExistingSessionsForStaging(),
+      existingSessions: getPartialBlockingScheduleEvents(),
       alreadyStaged: state.sessionsToCreate || [],
       scheduleDefaults: state.scheduleDefaults || {},
       blockedDates
@@ -1910,7 +2211,35 @@
       }
       const clickedDate = stageContext.date;
       hideStageQuickModalLayer();
-      commitQuickStagedSessions(result.sessions, clickedDate);
+      if (isPartialMode()) {
+        const editAttemptId = String(state.pendingEditAttemptId || '').trim();
+        if (editAttemptId) removePartialStagedAttempt(editAttemptId);
+        const attemptId = editAttemptId || createPartialStagingAttemptId();
+        const sessionsWithAttempt = result.sessions.map((row) => ({ ...row, stagingAttemptId: attemptId }));
+        const stageParams = {
+          durationHours: readStageDurationHours(),
+          weekdays: readStageWeekdays(),
+          count: readStageSessionCount(),
+          skipHolidays: Boolean(qs('sessionEnrollmentStageSkipHolidays')?.checked),
+          anchorDate: stageContext.date,
+          startTime: stageContext.startTime24
+        };
+        state.stagingAttempts = [
+          ...(state.stagingAttempts || []).filter((batch) => String(batch?.attemptId || '') !== attemptId),
+          createPartialDraftBatch({
+            attemptId,
+            classId: state.classId,
+            classLabel: state.classLabel,
+            stageParams,
+            sessionIds: sessionsWithAttempt.map((row) => row.sessionId)
+          })
+        ];
+        state.pendingEditAttemptId = '';
+        commitQuickStagedSessions(sessionsWithAttempt, clickedDate);
+        notifyPartialStagedSessionsChange();
+      } else {
+        commitQuickStagedSessions(result.sessions, clickedDate);
+      }
     } finally {
       if (createBtn) {
         createBtn.disabled = false;
@@ -1978,7 +2307,8 @@
 
   function readStageSessionCount() {
     const display = qs('sessionEnrollmentStageCountDisplay');
-    const value = Number(display?.textContent || stageSessionCount || 1);
+    const raw = display && 'value' in display ? display.value : display?.textContent;
+    const value = Number(raw || stageSessionCount || 1);
     if (!Number.isFinite(value)) return STAGE_COUNT_MIN;
     return Math.max(STAGE_COUNT_MIN, Math.min(STAGE_COUNT_MAX, Math.round(value)));
   }
@@ -1986,7 +2316,10 @@
   function syncStageCountDisplay(count) {
     stageSessionCount = Math.max(STAGE_COUNT_MIN, Math.min(STAGE_COUNT_MAX, Math.round(Number(count) || 1)));
     const display = qs('sessionEnrollmentStageCountDisplay');
-    if (display) display.textContent = String(stageSessionCount);
+    if (display) {
+      if ('value' in display) display.value = String(stageSessionCount);
+      else display.textContent = String(stageSessionCount);
+    }
     stageModalEl?.querySelectorAll('[data-stage-count]').forEach((btn) => {
       const chip = Number(btn.getAttribute('data-stage-count'));
       btn.classList.toggle('active', chip === stageSessionCount);
@@ -2116,6 +2449,21 @@
       btn.addEventListener('click', () => {
         syncStageCountDisplay(Number(btn.getAttribute('data-stage-count') || 1));
         updateStageCapacityWarning().catch(() => {});
+      });
+    });
+
+    qs('sessionEnrollmentStageCountDisplay')?.addEventListener('change', () => {
+      syncStageCountDisplay(readStageSessionCount());
+      updateStageCapacityWarning().catch(() => {});
+    });
+    qs('sessionEnrollmentStageCountDisplay')?.addEventListener('input', () => {
+      const display = qs('sessionEnrollmentStageCountDisplay');
+      if (!display || !('value' in display)) return;
+      const parsed = Number(display.value);
+      if (!Number.isFinite(parsed)) return;
+      stageModalEl?.querySelectorAll('[data-stage-count]').forEach((btn) => {
+        const chip = Number(btn.getAttribute('data-stage-count'));
+        btn.classList.toggle('active', chip === Math.round(parsed));
       });
     });
 
@@ -2410,6 +2758,145 @@
     });
   }
 
+  function buildPartialEnrollmentBlockHtml(ev) {
+    const sessionId = String(ev?.sessionId || '').trim();
+    const isStaged = ev?.isStaged === true;
+    const timeLabel = `${String(ev?.start || '').trim()} – ${String(ev?.end || '').trim()}`;
+    if (isStaged) {
+      const menu = global.ScheduleDraftSessionMenu;
+      const draftEvent = { ...ev, isDraft: true };
+      const draftSelect = menu?.buildDraftSelectHtml ? menu.buildDraftSelectHtml(draftEvent) : '';
+      const draftSelected = menu?.isDraftSelected?.(draftEvent) ? ' is-session-selected is-draft-selected' : '';
+      const classes = [
+        'session-enrollment-block',
+        'is-staged',
+        draftSelected.trim()
+      ].filter(Boolean).join(' ');
+      return `
+        <div class="${classes}"
+             data-session-id="${core.escapeHtml(sessionId)}"
+             data-selectable="0"
+             data-session-kind="staged"
+             role="button"
+             tabindex="0">
+          ${draftSelect}
+          <span class="session-cal-draft-resize-handle session-cal-draft-resize-handle-top" data-resize-edge="top" aria-hidden="true"></span>
+          <span class="session-cal-draft-resize-handle session-cal-draft-resize-handle-bottom" data-resize-edge="bottom" aria-hidden="true"></span>
+          <div class="session-block-status">Staged</div>
+          <div class="session-block-teacher">${core.escapeHtml(ev?.teacherName || 'Teacher')}</div>
+          <div class="session-block-hours">${core.escapeHtml(core.formatHours(ev?.durationHours))}</div>
+          <div class="session-block-time small text-muted">${core.escapeHtml(timeLabel)}</div>
+        </div>
+      `;
+    }
+    const classes = 'session-enrollment-block is-scheduled is-unselectable';
+    return `
+      <div class="${classes}"
+           data-session-id="${core.escapeHtml(sessionId)}"
+           data-selectable="0"
+           data-session-kind="scheduled"
+           tabindex="0">
+        <div class="session-block-status">Scheduled</div>
+        <div class="session-block-teacher">${core.escapeHtml(ev?.teacherName || 'Teacher')}</div>
+        <div class="session-block-hours">${core.escapeHtml(core.formatHours(ev?.durationHours))}</div>
+        <div class="session-block-time small text-muted">${core.escapeHtml(timeLabel)}</div>
+      </div>
+    `;
+  }
+
+  function buildPartialListDayCardHtml(ev) {
+    const sessionId = String(ev?.sessionId || '').trim();
+    const isStaged = ev?.isStaged === true;
+    const timeLabel = `${String(ev?.start || '').trim()} – ${String(ev?.end || '').trim()}`;
+    if (isStaged) {
+      const menu = global.ScheduleDraftSessionMenu;
+      const draftEvent = { ...ev, isDraft: true };
+      const draftSelect = menu?.buildDraftSelectHtml ? menu.buildDraftSelectHtml(draftEvent) : '';
+      const draftSelected = menu?.isDraftSelected?.(draftEvent) ? ' is-session-selected is-draft-selected' : '';
+      const classes = [
+        'session-day-card',
+        'is-staged',
+        draftSelected.trim()
+      ].filter(Boolean).join(' ');
+      return `
+        <div class="${classes}" data-session-id="${core.escapeHtml(sessionId)}" data-selectable="0" data-session-kind="staged" role="button" tabindex="0">
+          <div class="d-flex align-items-start gap-2">
+            ${draftSelect}
+            <div class="flex-grow-1">
+              <div class="fw-semibold">Staged · ${core.escapeHtml(timeLabel)}</div>
+              <div class="small text-muted">${core.escapeHtml(ev?.teacherName || 'Teacher')}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="session-day-card is-scheduled is-unselectable" data-session-id="${core.escapeHtml(sessionId)}" data-selectable="0" data-session-kind="scheduled" tabindex="0">
+        <div class="fw-semibold">Scheduled · ${core.escapeHtml(timeLabel)}</div>
+        <div class="small text-muted">${core.escapeHtml(ev?.teacherName || 'Teacher')}</div>
+      </div>
+    `;
+  }
+
+  function deleteSelectedStagedSessions(sessionIds = []) {
+    if (!state || !isPartialMode()) return;
+    (Array.isArray(sessionIds) ? sessionIds : []).forEach((sessionId) => {
+      deleteStagedSession(sessionId);
+    });
+    renderCalendar();
+  }
+
+  function applyBulkStagedSessionTimes(sessionIds = [], values = {}) {
+    if (!state || !isPartialMode()) return false;
+    const ids = (Array.isArray(sessionIds) ? sessionIds : []).map((id) => String(id || '').trim()).filter(Boolean);
+    if (!ids.length) return false;
+    const startTime = String(values.startTime || '').trim();
+    const endTime = String(values.endTime || '').trim();
+    const durationHours = Number(values.durationHours || 0);
+    if (!startTime || !endTime) return false;
+    const excludeIds = new Set(ids);
+    const conflictSessions = getPartialConflictSessions('').filter((row) => {
+      const rowId = String(row?.sessionId || row?.id || '').trim();
+      return !excludeIds.has(rowId);
+    });
+    const selectedRows = (state.sessionsToCreate || []).filter((row) => excludeIds.has(String(row?.sessionId || '').trim()));
+    for (const row of selectedRows) {
+      const sessionId = String(row?.sessionId || '').trim();
+      const hasConflict = core.checkScheduleTimeConflict?.({
+        date: row.date,
+        startTime,
+        endTime,
+        sessions: conflictSessions,
+        excludeSessionId: sessionId
+      });
+      if (hasConflict) return false;
+    }
+    state.sessionsToCreate = (state.sessionsToCreate || []).map((row) => {
+      const id = String(row?.sessionId || '').trim();
+      if (!excludeIds.has(id)) return row;
+      return {
+        ...row,
+        startTime,
+        endTime,
+        durationHours
+      };
+    });
+    allEvents = allEvents.map((row) => {
+      const id = String(row?.sessionId || '').trim();
+      if (!excludeIds.has(id)) return row;
+      return {
+        ...row,
+        start: startTime,
+        end: endTime,
+        durationHours
+      };
+    });
+    refreshPartialPickerFromState();
+    notifyPartialStagedSessionsChange();
+    renderCalendar();
+    return true;
+  }
+
   function renderCalendar() {
     hostEl = qs('sessionEnrollmentCalendarHost');
     if (!hostEl || !state) return;
@@ -2429,6 +2916,9 @@
     if (isManageMode()) {
       calendarOptions.buildPositionedBlockHtml = (ev) => buildManageEnrollmentBlockHtml(ev);
       calendarOptions.buildListDayCardHtml = (ev) => buildManageListDayCardHtml(ev);
+    } else if (isPartialMode()) {
+      calendarOptions.buildPositionedBlockHtml = (ev) => buildPartialEnrollmentBlockHtml(ev);
+      calendarOptions.buildListDayCardHtml = (ev) => buildPartialListDayCardHtml(ev);
     }
     core.renderEnrollmentCalendar(hostEl, getVisibleEvents(), calendarOptions);
     syncAutoDayWidthMode();
@@ -2496,8 +2986,26 @@
       event.stopPropagation();
       return;
     }
+    if (isPartialMode()) {
+      const draftInput = event.target.closest('[data-schedule-draft-select]');
+      const draftLabel = event.target.closest('.schedule-draft-select');
+      if (draftInput || draftLabel) {
+        event.preventDefault();
+        event.stopPropagation();
+        const checkbox = draftInput || draftLabel?.querySelector('[data-schedule-draft-select]');
+        const sessionId = String(checkbox?.getAttribute('data-draft-session-id') || '').trim();
+        if (sessionId && global.ScheduleDraftSessionMenu?.toggleDraftSelection) {
+          global.ScheduleDraftSessionMenu.toggleDraftSelection(sessionId);
+          renderCalendar();
+        }
+        return;
+      }
+    }
     const block = event.target.closest('[data-session-id]');
     if (block) {
+      if (isPartialMode() && String(block.getAttribute('data-session-kind') || '') === 'staged') {
+        return;
+      }
       if (isManageMode()) {
         const sessionId = String(block.getAttribute('data-session-id') || '').trim();
         const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
@@ -2544,6 +3052,7 @@
     if (hostEl) {
       hostEl.addEventListener('click', handleHostClick);
       hostEl.addEventListener('contextmenu', handleHostContextMenu);
+      bindPartialDraftDragMove();
     }
     bindContextMenuEvents();
 
@@ -2647,12 +3156,13 @@
       if (isPartialMode()) {
         const stagedFromEvents = allEvents
           .filter((ev) => ev?.isStaged === true)
-          .map((ev) => ({
+            .map((ev) => ({
             sessionId: String(ev?.sessionId || '').trim(),
             date: core.normalizeDateOnly(ev?.date),
             startTime: String(ev?.start || ev?.startTime || '').trim(),
             endTime: String(ev?.end || ev?.endTime || '').trim(),
             durationHours: Number(ev?.durationHours || 0),
+            stagingAttemptId: String(ev?.stagingAttemptId || '').trim(),
             isStaged: true
           }))
           .filter((row) => row.sessionId && row.date);
@@ -2661,6 +3171,7 @@
       const payload = {
         selectedSessionIds: Array.from(state.selectedSet),
         sessionsToCreate,
+        stagingAttempts: Array.isArray(state.stagingAttempts) ? state.stagingAttempts.slice() : [],
         summary,
         viewRange: state.viewRange ? { ...state.viewRange } : null
       };
@@ -2746,10 +3257,11 @@
       title: String(classLabel || '').trim(),
       manageable: false,
       manageSessionUrl: '',
-      selectable: true,
+      selectable: false,
       excludeReason: '',
       isStaged: true,
-      selected: selectedSet.has(sessionId)
+      stagingAttemptId: String(row?.stagingAttemptId || '').trim(),
+      selected: false
     };
   }
 
@@ -2854,6 +3366,9 @@
       targetSessionCount: Number(options.targetSessionCount || 0),
       targetHours: Number(options.targetHours || 0),
       sessionsToCreate: Array.isArray(options.sessionsToCreate) ? options.sessionsToCreate : [],
+      stagingAttempts: Array.isArray(options.stagingAttempts) ? options.stagingAttempts.slice() : [],
+      conflictScheduleEvents: Array.isArray(options.conflictScheduleEvents) ? options.conflictScheduleEvents : [],
+      pendingEditAttemptId: '',
       sessions: Array.isArray(options.sessions) ? options.sessions : [],
       persistedSessions: Array.isArray(options.persistedSessions) ? options.persistedSessions : [],
       statusMap: (options.statusMap && typeof options.statusMap === 'object') ? options.statusMap : null,
@@ -2938,8 +3453,18 @@
 
   global.SessionEnrollmentCalendarModal = {
     open,
+    isOpen: isModalOpen,
     buildPartialPickerData,
     collectHolidayDatesForRange,
+    syncFromParentDrafts,
+    getStagingAttempts,
+    deleteStagedSession,
+    deleteSelectedStagedSessions,
+    deleteStagedAttempt,
+    editStagedSession,
+    editStagedAttempt,
+    moveStagedSession,
+    applyBulkStagedSessionTimes,
     PRESET_LABELS
   };
 })(typeof window !== 'undefined' ? window : global);

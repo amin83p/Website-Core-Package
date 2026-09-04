@@ -588,6 +588,7 @@
            role="button"
            aria-selected="${selected ? 'true' : 'false'}"
            tabindex="0">
+        ${isStaged ? '<span class="session-cal-draft-resize-handle session-cal-draft-resize-handle-top" data-resize-edge="top" aria-hidden="true"></span><span class="session-cal-draft-resize-handle session-cal-draft-resize-handle-bottom" data-resize-edge="bottom" aria-hidden="true"></span>' : ''}
         ${manageLink}
         <div class="session-block-status">${escapeHtml(statusLabel)}</div>
         <div class="session-block-teacher">${escapeHtml(ev?.teacherName || 'Teacher')}</div>
@@ -899,26 +900,12 @@
       const state = finishDrag(event.pointerId);
       if (!state || !opts.enabled) return;
 
-      let context = state.lastContext;
       if (!state.dragged) {
-        const clickRange = computeVerticalDragRange(state.anchorSnappedOffset, state.anchorSnappedOffset + 60);
-        if (!isSpanOccupiedOnDay(state.dayCell, clickRange.anchorOffset, clickRange.endOffset)) {
-          const startMin = timelineMinutesFromOffset(clickRange.anchorOffset);
-          context = {
-            mode: 'vertical',
-            date: state.anchorContext.date,
-            snappedOffsetMinutes: clickRange.anchorOffset,
-            endOffsetMinutes: clickRange.endOffset,
-            startTime24: minutesToTime24(startMin),
-            startTimeLabel: formatSnappedTimelineLabel(clickRange.anchorOffset),
-            durationMinutes: 60,
-            durationHours: 1,
-            durationLabel: formatDurationHrsMins(60),
-            occupied: false
-          };
-        }
+        if (typeof opts.onDragCancelled === 'function') opts.onDragCancelled();
+        return;
       }
 
+      const context = state.lastContext;
       if (!context || context.occupied) {
         if (typeof opts.onDragCancelled === 'function') opts.onDragCancelled();
         return;
@@ -960,6 +947,416 @@
       try {
         grid.setPointerCapture(event.pointerId);
       } catch (_) {}
+
+      document.addEventListener('pointermove', onDocumentPointerMove);
+      document.addEventListener('pointerup', onDocumentPointerUp);
+      document.addEventListener('pointercancel', onDocumentPointerUp);
+    });
+  }
+
+  function bindCalendarDragMove(container, options = {}) {
+    if (!container) return;
+    container._calendarDragMoveOptions = options;
+    if (container.dataset.dragMoveBound === '1') return;
+    container.dataset.dragMoveBound = '1';
+
+    let dragState = null;
+
+    function getOptions() {
+      return container._calendarDragMoveOptions || {};
+    }
+
+    function getBlockSelector() {
+      const opts = getOptions();
+      return String(opts.blockSelector || '[data-event-type="schedule_draft"], .is-schedule-draft[data-session-id]').trim();
+    }
+
+    function detachDocumentListeners() {
+      document.removeEventListener('pointermove', onDocumentPointerMove);
+      document.removeEventListener('pointerup', onDocumentPointerUp);
+      document.removeEventListener('pointercancel', onDocumentPointerUp);
+    }
+
+    function finishDrag(pointerId) {
+      if (!dragState) return null;
+      try {
+        dragState.block?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      detachDocumentListeners();
+      const state = dragState;
+      dragState = null;
+      clearVerticalTimeHover(container);
+      clearDragOverlays(container);
+      document.body.classList.remove('is-schedule-draft-moving');
+      const opts = getOptions();
+      if (typeof opts.onMoveEnd === 'function') opts.onMoveEnd();
+      return state;
+    }
+
+    function resolveMoveContext(clientX, clientY, target, durationMinutes, verticalRowHint = null) {
+      const verticalRow = verticalRowHint || target?.closest?.('.session-cal-time-track');
+      if (!verticalRow || !container.contains(verticalRow)) return null;
+      const dayGridFromTarget = target?.closest?.('.session-cal-day-grid');
+      const dayCellFromTarget = target?.closest?.('.session-cal-day-cell');
+      let dayCell = dayGridFromTarget
+        ? dayGridFromTarget.closest('.session-cal-day-cell')
+        : dayCellFromTarget;
+      let y;
+      let trackRect;
+      if (!dayCell) {
+        const rowHit = resolveDayCellFromDaysRowX(verticalRow, clientX, clientY);
+        if (!rowHit) return null;
+        dayCell = rowHit.dayCell;
+        y = rowHit.y;
+        trackRect = rowHit.trackRect;
+      } else {
+        const daysRow = verticalRow.querySelector('.session-cal-days-row');
+        if (!daysRow) return null;
+        trackRect = daysRow.getBoundingClientRect();
+        y = Math.max(0, Math.min(trackRect.height, clientY - trackRect.top));
+      }
+      if (!dayCell || dayCell.classList.contains('is-out-of-range')) return null;
+      const date = normalizeDateOnly(dayCell.getAttribute('data-cal-date'));
+      if (!date) return null;
+      const fixedDuration = Math.max(TIMELINE_SNAP_MINUTES, Math.round(Number(durationMinutes) || TIMELINE_SNAP_MINUTES));
+      let snappedStart = snapTimelineOffsetMinutesForClick(offsetMinutesFromGridY(y, trackRect.height));
+      let endOffset = snappedStart + fixedDuration;
+      if (endOffset > TOTAL_MINUTES) {
+        endOffset = TOTAL_MINUTES;
+        snappedStart = Math.max(0, endOffset - fixedDuration);
+      }
+      const startMin = timelineMinutesFromOffset(snappedStart);
+      const endMin = timelineMinutesFromOffset(endOffset);
+      return {
+        mode: 'vertical',
+        date,
+        dayCell,
+        snappedOffsetMinutes: snappedStart,
+        endOffsetMinutes: endOffset,
+        startTime24: minutesToTime24(startMin),
+        endTime24: minutesToTime24(endMin),
+        startTimeLabel: formatSnappedTimelineLabel(snappedStart),
+        durationMinutes: fixedDuration,
+        durationHours: fixedDuration / 60,
+        durationLabel: formatDurationHrsMins(fixedDuration),
+        occupied: false
+      };
+    }
+
+    function onDocumentPointerMove(event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const opts = getOptions();
+      if (!opts.enabled) return;
+      clearVerticalTimeHover(container);
+      const context = resolveMoveContext(
+        event.clientX,
+        event.clientY,
+        event.target,
+        dragState.durationMinutes,
+        dragState.verticalRow
+      );
+      if (!context) return;
+      dragState.dragged = dragState.dragged
+        || Math.abs(event.clientX - dragState.anchorClientX) > 5
+        || Math.abs(event.clientY - dragState.anchorClientY) > 5;
+      dragState.lastContext = context;
+      const dayGrid = context.dayCell?.querySelector('.session-cal-day-grid')
+        || event.target.closest('.session-cal-day-grid')
+        || dragState.dayGrid;
+      if (dayGrid) updateDragOverlay(dayGrid, context);
+    }
+
+    function onDocumentPointerUp(event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const opts = getOptions();
+      const state = finishDrag(event.pointerId);
+      if (!state || !opts.enabled || !state.dragged) return;
+
+      const context = state.lastContext;
+      if (!context) {
+        if (typeof opts.onMoveCancelled === 'function') opts.onMoveCancelled();
+        return;
+      }
+
+      const conflictSessions = typeof opts.getConflictSessions === 'function' ? opts.getConflictSessions() : [];
+      const hasConflict = checkScheduleTimeConflict({
+        date: context.date,
+        startTime: context.startTime24,
+        endTime: context.endTime24,
+        sessions: conflictSessions,
+        excludeSessionId: state.sessionId
+      });
+
+      if (hasConflict) {
+        if (typeof opts.onMoveConflict === 'function') opts.onMoveConflict(context);
+        else if (typeof opts.onMoveCancelled === 'function') opts.onMoveCancelled();
+        return;
+      }
+
+      if (typeof opts.onMoveComplete === 'function') {
+        opts.onMoveComplete({
+          sessionId: state.sessionId,
+          date: context.date,
+          startTime: context.startTime24,
+          endTime: context.endTime24,
+          durationHours: context.durationHours
+        });
+      }
+    }
+
+    container.addEventListener('pointerdown', (event) => {
+      const opts = getOptions();
+      if (!opts.enabled) return;
+      const block = event.target.closest(getBlockSelector());
+      if (!block || !container.contains(block)) return;
+      if (event.target.closest('.schedule-draft-select, [data-schedule-draft-select]')) return;
+      if (event.button !== 0) return;
+      const sessionId = String(block.getAttribute('data-session-id') || '').trim();
+      if (!sessionId) return;
+      if (typeof opts.canStartMove === 'function' && opts.canStartMove(sessionId, block) === false) return;
+
+      const positioned = block.closest('.session-cal-positioned-session');
+      const dayGrid = block.closest('.session-cal-day-grid');
+      const dayCell = dayGrid?.closest('.session-cal-day-cell');
+      const verticalRow = block.closest('.session-cal-time-track');
+      if (!positioned || !dayGrid || !dayCell || !verticalRow) return;
+
+      const startMin = Number(positioned.dataset.timelineStart);
+      const endMin = Number(positioned.dataset.timelineEnd);
+      if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) return;
+      const durationMinutes = Math.max(TIMELINE_SNAP_MINUTES, endMin - startMin);
+      const anchorSnappedOffset = snapTimelineOffsetMinutes(startMin - (TIMELINE_START_HOUR * 60));
+
+      event.preventDefault();
+      try {
+        block.setPointerCapture(event.pointerId);
+      } catch (_) {}
+
+      dragState = {
+        pointerId: event.pointerId,
+        block,
+        sessionId,
+        dayGrid,
+        dayCell,
+        verticalRow,
+        anchorClientX: event.clientX,
+        anchorClientY: event.clientY,
+        anchorSnappedOffset,
+        durationMinutes,
+        dragged: false,
+        lastContext: null
+      };
+
+      document.body.classList.add('is-schedule-draft-moving');
+      const scheduleTip = document.querySelector('.sch-event-tip');
+      if (scheduleTip) {
+        scheduleTip.hidden = true;
+        scheduleTip.classList.remove('is-visible', 'is-below');
+      }
+      if (typeof opts.onMoveStart === 'function') opts.onMoveStart();
+
+      document.addEventListener('pointermove', onDocumentPointerMove);
+      document.addEventListener('pointerup', onDocumentPointerUp);
+      document.addEventListener('pointercancel', onDocumentPointerUp);
+    });
+  }
+
+  function bindCalendarDragResize(container, options = {}) {
+    if (!container) return;
+    container._calendarDragResizeOptions = options;
+    if (container.dataset.dragResizeBound === '1') return;
+    container.dataset.dragResizeBound = '1';
+
+    let dragState = null;
+
+    function getOptions() {
+      return container._calendarDragResizeOptions || {};
+    }
+
+    function getHandleSelector() {
+      return '.session-cal-draft-resize-handle-top, .session-cal-draft-resize-handle-bottom';
+    }
+
+    function detachDocumentListeners() {
+      document.removeEventListener('pointermove', onDocumentPointerMove);
+      document.removeEventListener('pointerup', onDocumentPointerUp);
+      document.removeEventListener('pointercancel', onDocumentPointerUp);
+    }
+
+    function finishDrag(pointerId) {
+      if (!dragState) return null;
+      try {
+        dragState.handle?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      detachDocumentListeners();
+      const state = dragState;
+      dragState = null;
+      clearVerticalTimeHover(container);
+      clearDragOverlays(container);
+      document.body.classList.remove('is-schedule-draft-resizing');
+      const opts = getOptions();
+      if (typeof opts.onResizeEnd === 'function') opts.onResizeEnd();
+      return state;
+    }
+
+    function resolveResizeContext(clientY, verticalRow, dayCell, edge, anchorStartOffset, anchorEndOffset) {
+      const daysRow = verticalRow.querySelector('.session-cal-days-row');
+      if (!daysRow) return null;
+      const trackRect = daysRow.getBoundingClientRect();
+      const y = Math.max(0, Math.min(trackRect.height, clientY - trackRect.top));
+      const snappedOffset = snapTimelineOffsetMinutesForClick(offsetMinutesFromGridY(y, trackRect.height));
+      let startOffset = anchorStartOffset;
+      let endOffset = anchorEndOffset;
+      if (edge === 'bottom') {
+        endOffset = Math.max(startOffset + TIMELINE_SNAP_MINUTES, snappedOffset);
+        endOffset = Math.min(TOTAL_MINUTES, endOffset);
+      } else {
+        startOffset = Math.min(anchorEndOffset - TIMELINE_SNAP_MINUTES, snappedOffset);
+        startOffset = Math.max(0, startOffset);
+      }
+      let durationMinutes = Math.max(TIMELINE_SNAP_MINUTES, endOffset - startOffset);
+      if (startOffset + durationMinutes > TOTAL_MINUTES) {
+        if (edge === 'bottom') {
+          endOffset = TOTAL_MINUTES;
+          startOffset = Math.max(0, endOffset - durationMinutes);
+        } else {
+          startOffset = Math.max(0, TOTAL_MINUTES - durationMinutes);
+          endOffset = startOffset + durationMinutes;
+        }
+        durationMinutes = endOffset - startOffset;
+      }
+      const date = normalizeDateOnly(dayCell.getAttribute('data-cal-date'));
+      if (!date) return null;
+      const startMin = timelineMinutesFromOffset(startOffset);
+      const endMin = timelineMinutesFromOffset(endOffset);
+      return {
+        mode: 'vertical',
+        date,
+        dayCell,
+        snappedOffsetMinutes: startOffset,
+        endOffsetMinutes: endOffset,
+        startTime24: minutesToTime24(startMin),
+        endTime24: minutesToTime24(endMin),
+        startTimeLabel: formatSnappedTimelineLabel(startOffset),
+        durationMinutes,
+        durationHours: durationMinutes / 60,
+        durationLabel: formatDurationHrsMins(durationMinutes)
+      };
+    }
+
+    function onDocumentPointerMove(event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const opts = getOptions();
+      if (!opts.enabled) return;
+      clearVerticalTimeHover(container);
+      const context = resolveResizeContext(
+        event.clientY,
+        dragState.verticalRow,
+        dragState.dayCell,
+        dragState.edge,
+        dragState.anchorStartOffset,
+        dragState.anchorEndOffset
+      );
+      if (!context) return;
+      dragState.dragged = dragState.dragged || Math.abs(event.clientY - dragState.anchorClientY) > 5;
+      dragState.lastContext = context;
+      const dayGrid = dragState.dayGrid;
+      if (dayGrid) updateDragOverlay(dayGrid, context);
+    }
+
+    function onDocumentPointerUp(event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const opts = getOptions();
+      const state = finishDrag(event.pointerId);
+      if (!state || !opts.enabled || !state.dragged) return;
+
+      const context = state.lastContext;
+      if (!context) {
+        if (typeof opts.onResizeCancelled === 'function') opts.onResizeCancelled();
+        return;
+      }
+
+      const conflictSessions = typeof opts.getConflictSessions === 'function' ? opts.getConflictSessions() : [];
+      const hasConflict = checkScheduleTimeConflict({
+        date: context.date,
+        startTime: context.startTime24,
+        endTime: context.endTime24,
+        sessions: conflictSessions,
+        excludeSessionId: state.sessionId
+      });
+
+      if (hasConflict) {
+        if (typeof opts.onResizeConflict === 'function') opts.onResizeConflict(context);
+        else if (typeof opts.onResizeCancelled === 'function') opts.onResizeCancelled();
+        return;
+      }
+
+      if (typeof opts.onResizeComplete === 'function') {
+        opts.onResizeComplete({
+          sessionId: state.sessionId,
+          date: context.date,
+          startTime: context.startTime24,
+          endTime: context.endTime24,
+          durationHours: context.durationHours
+        });
+      }
+    }
+
+    container.addEventListener('pointerdown', (event) => {
+      const opts = getOptions();
+      if (!opts.enabled) return;
+      const handle = event.target.closest(getHandleSelector());
+      if (!handle || !container.contains(handle)) return;
+      if (event.button !== 0) return;
+      const block = handle.closest('[data-session-id]');
+      if (!block || !container.contains(block)) return;
+      const sessionId = String(block.getAttribute('data-session-id') || '').trim();
+      if (!sessionId) return;
+      if (typeof opts.canStartResize === 'function' && opts.canStartResize(sessionId, block) === false) return;
+
+      const positioned = block.closest('.session-cal-positioned-session');
+      const dayGrid = block.closest('.session-cal-day-grid');
+      const dayCell = dayGrid?.closest('.session-cal-day-cell');
+      const verticalRow = block.closest('.session-cal-time-track');
+      if (!positioned || !dayGrid || !dayCell || !verticalRow) return;
+
+      const startMin = Number(positioned.dataset.timelineStart);
+      const endMin = Number(positioned.dataset.timelineEnd);
+      if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) return;
+      const timelineStartMin = TIMELINE_START_HOUR * 60;
+      const anchorStartOffset = startMin - timelineStartMin;
+      const anchorEndOffset = endMin - timelineStartMin;
+      const edge = String(handle.getAttribute('data-resize-edge') || handle.classList.contains('session-cal-draft-resize-handle-top') ? 'top' : 'bottom').trim();
+
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch (_) {}
+
+      dragState = {
+        pointerId: event.pointerId,
+        handle,
+        block,
+        sessionId,
+        dayGrid,
+        dayCell,
+        verticalRow,
+        edge,
+        anchorClientY: event.clientY,
+        anchorStartOffset,
+        anchorEndOffset,
+        dragged: false,
+        lastContext: null
+      };
+
+      document.body.classList.add('is-schedule-draft-resizing');
+      const scheduleTip = document.querySelector('.sch-event-tip');
+      if (scheduleTip) {
+        scheduleTip.hidden = true;
+        scheduleTip.classList.remove('is-visible', 'is-below');
+      }
+      if (typeof opts.onResizeStart === 'function') opts.onResizeStart();
 
       document.addEventListener('pointermove', onDocumentPointerMove);
       document.addEventListener('pointerup', onDocumentPointerUp);
@@ -1576,6 +1973,31 @@
     return normalizeDateOnly(row?.date || row?.sessionDate || row?.startDate || '');
   }
 
+  function checkScheduleTimeConflict({
+    date,
+    startTime,
+    endTime,
+    sessions = [],
+    excludeSessionId = ''
+  } = {}) {
+    const dateNorm = normalizeDateOnly(date);
+    if (!dateNorm) return true;
+    const startMin = timeToMinutes(startTime);
+    const endMin = timeToMinutes(endTime);
+    if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) return true;
+    const excluded = String(excludeSessionId || '').trim();
+    return (Array.isArray(sessions) ? sessions : []).some((row) => {
+      const rowId = String(row?.sessionId || row?.id || '').trim();
+      if (excluded && rowId === excluded) return false;
+      const rowDate = normalizeDateOnly(getSessionDate(row));
+      if (rowDate !== dateNorm) return false;
+      const existingStart = timeToMinutes(String(row?.startTime || row?.start || '').trim());
+      const existingEnd = timeToMinutes(String(row?.endTime || row?.end || '').trim());
+      if (!Number.isFinite(existingStart) || !Number.isFinite(existingEnd)) return false;
+      return startMin < existingEnd && existingStart < endMin;
+    });
+  }
+
   function minutesToTime24(totalMinutes) {
     const mins = Math.max(0, Math.min((24 * 60) - 1, Math.round(Number(totalMinutes) || 0)));
     const h = Math.floor(mins / 60);
@@ -1698,7 +2120,7 @@
     const startTime = String(options.startTime || '').trim();
     const durationHours = Number(options.durationHours || 0);
     const weekdays = normalizeWeekdays(options.weekdays);
-    const count = Math.max(1, Math.min(52, Number(options.count || 1)));
+    const count = Math.max(1, Math.min(72, Number(options.count || 1)));
     const enrollmentStart = normalizeDateOnly(options.enrollmentStart || '');
     const enrollmentEnd = normalizeDateOnly(options.enrollmentEnd || '');
     const existingSessions = Array.isArray(options.existingSessions) ? options.existingSessions : [];
@@ -1822,7 +2244,7 @@
       return sessions;
     }
 
-    const allSessions = generateUpTo(52);
+    const allSessions = generateUpTo(72);
 
     return {
       sessions: allSessions.slice(0, count),
@@ -1842,6 +2264,25 @@
       }
     }
     return null;
+  }
+
+  function resolveDayCellFromDaysRowX(verticalRow, clientX, clientY) {
+    if (!verticalRow) return null;
+    const daysRow = verticalRow.querySelector('.session-cal-days-row');
+    if (!daysRow) return null;
+    const trackRect = daysRow.getBoundingClientRect();
+    const cells = verticalRow.querySelectorAll('.session-cal-day-cell:not(.is-out-of-range)');
+    let dayCell = null;
+    for (const cell of cells) {
+      const rect = cell.getBoundingClientRect();
+      if (clientX >= rect.left && clientX <= rect.right) {
+        dayCell = cell;
+        break;
+      }
+    }
+    if (!dayCell) return null;
+    const y = Math.max(0, Math.min(trackRect.height, clientY - trackRect.top));
+    return { dayCell, y, trackRect };
   }
 
   function resolveGridClickContext(container, clientX, clientY, target) {
@@ -2178,6 +2619,10 @@
     buildVerticalDragContext,
     resolveVerticalDragContext,
     bindCalendarDragCreate,
+    bindCalendarDragMove,
+    bindCalendarDragResize,
+    checkScheduleTimeConflict,
+    getSessionDate,
     clearDragOverlays,
     resolveEnrollmentNaState,
     resolveEnrollmentNaStateForCap,

@@ -30,6 +30,18 @@ function functionSource(name, nextName) {
   return viewSource.slice(start, end);
 }
 
+test('capacity-1 rolling class forces one-on-one session flow in UI helpers', () => {
+  assert.match(viewSource, /function isRollingCapacityOneClass\(/);
+  assert.match(viewSource, /function syncSessionCapacityControlsForClass\(/);
+  assert.match(viewSource, /maxCapacity: Number\(c\?\.enrollment\?\.maxCapacity/);
+
+  const isOneOnOne = functionSource('isOneOnOneSessionCapacityEnrollment', 'resolveAnticipatedFinishDateClient');
+  assert.match(isOneOnOne, /isRollingCapacityOneClass\(\)/);
+
+  const capacityPanel = functionSource('renderClassCapacityWarningPanel', 'renderProgramRegistrationShortcutPanel');
+  assert.match(capacityPanel, /isRollingCapacityOneClass\(\)/);
+});
+
 test('group enrollment finishes on form step without cap review wizard', () => {
   const addPeriod = functionSource('addPeriod', 'openCloseModal');
   const formBranch = addPeriod.match(/if \(enrollWizardStep === 'form'\) \{[\s\S]*?\n    \}/);

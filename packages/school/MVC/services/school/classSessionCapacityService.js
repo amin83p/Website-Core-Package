@@ -39,6 +39,27 @@ function resolveClassMaxCapacity(classData = {}) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isRollingCapacityOneClass(classData = {}) {
+  return getClassRegistrationModeKey(classData) === 'rolling'
+    && resolveClassMaxCapacity(classData) === 1;
+}
+
+function resolveSessionMaxStudents(classData = {}) {
+  const maxCapacity = resolveClassMaxCapacity(classData);
+  if (maxCapacity === 1) return 1;
+  return maxCapacity > 0 ? maxCapacity : 0;
+}
+
+function resolveEffectiveSessionCapacityType(classData = {}, sessionCapacityType = '') {
+  const normalized = normalizeSessionCapacityType(sessionCapacityType);
+  if (isRollingCapacityOneClass(classData)) return 'one_on_one';
+  return normalized;
+}
+
+function shouldSkipClassLevelCapacityLimit(classData = {}) {
+  return isRollingCapacityOneClass(classData);
+}
+
 function buildEnrollmentStudentContext(studentIds, {
   studentToPersonMap = new Map()
 } = {}) {
@@ -112,10 +133,15 @@ function resolveRosterStudentIds(session = {}, studentToPersonMap = new Map()) {
 }
 
 function resolveRollingSessionCapacityFromEnrollment({
+  classData = null,
   session,
   enrollmentPeriods = [],
   studentToPersonMap = new Map()
 } = {}) {
+  if (classData && isRollingCapacityOneClass(classData)) {
+    return 'one_on_one';
+  }
+
   const rosterCount = Array.isArray(session?.roster) ? session.roster.length : 0;
   if (rosterCount !== 1) return 'group';
 
@@ -273,6 +299,7 @@ async function resolveSessionOneOnOneContext({
       rollingEnrollmentPeriods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser);
     }
     const capacityMode = resolveRollingSessionCapacityFromEnrollment({
+      classData,
       session,
       enrollmentPeriods: rollingEnrollmentPeriods,
       studentToPersonMap
@@ -499,6 +526,10 @@ module.exports = {
   SCHEDULE_SOLO_STUDENT_ENROLLMENT_STATUSES,
   getClassRegistrationModeKey,
   resolveClassMaxCapacity,
+  isRollingCapacityOneClass,
+  resolveSessionMaxStudents,
+  resolveEffectiveSessionCapacityType,
+  shouldSkipClassLevelCapacityLimit,
   buildEnrollmentStudentContext,
   resolveIsOneOnOne,
   resolveCapacityModeFromIsOneOnOne,

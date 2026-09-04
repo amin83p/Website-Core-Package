@@ -20,6 +20,7 @@ const sessionNavigationService = require('../../services/school/sessionNavigatio
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
+const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
@@ -1785,20 +1786,32 @@ async function getMyScheduleData(req, res) {
     }
 }
 
+async function resolveScheduleViewerAccessContext(req) {
+    const scheduleCapabilities = await scheduleAccessService.buildScheduleCapabilities(req.user, {
+        accessScope: req.accessScope || '',
+        ipAddress: req.ip || ''
+    });
+    const viewerScheduleAccess = scheduleAccessService.toViewerScheduleAccess(scheduleCapabilities);
+    return { scheduleCapabilities, viewerScheduleAccess };
+}
+
 async function showSchedulePage(req, res) {
     try {
         const { personId, personName, date } = req.query;
-        const scheduleCapabilities = await scheduleAccessService.buildScheduleCapabilities(req.user, {
-            accessScope: req.accessScope || '',
-            ipAddress: req.ip || ''
-        });
-        const viewerScheduleAccess = scheduleAccessService.toViewerScheduleAccess(scheduleCapabilities);
+        const { scheduleCapabilities, viewerScheduleAccess } = await resolveScheduleViewerAccessContext(req);
         const safePersonId = viewerScheduleAccess.canSelectAnyPerson ? (personId || '') : (viewerScheduleAccess.lockedPersonId || '');
         const safePersonName = viewerScheduleAccess.canSelectAnyPerson ? (personName || '') : (viewerScheduleAccess.lockedPersonName || '');
         const activeOrgId = String(req.user?.activeOrgId || '').trim();
         const attendanceMarkAppearanceResolved = activeOrgId
             ? await attendanceMarkAppearancePolicyModel.getPolicyForOrg(activeOrgId)
             : { marks: [] };
+        const userId = String(req.user?.id || '').trim();
+        const initialScheduleViewerPrefs = userId
+            ? await scheduleViewerPreferencesService.getPreferences(userId, {
+                reqUser: req.user,
+                access: viewerScheduleAccess
+            })
+            : scheduleViewerPreferencesService.emptyPreferences();
 
         res.render('school/schedule/personSchedule', {
             title: 'Master Schedule Viewer',
@@ -1810,10 +1823,61 @@ async function showSchedulePage(req, res) {
             prefillDate: date || '',
             viewerScheduleAccess,
             scheduleCapabilities,
-            attendanceMarkAppearanceResolved
+            attendanceMarkAppearanceResolved,
+            initialScheduleViewerPrefs
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    }
+}
+
+async function getScheduleViewerPreferences(req, res) {
+    try {
+        const userId = String(req.user?.id || '').trim();
+        if (!userId) {
+            return res.status(401).json({ status: 'error', message: 'Authentication required.' });
+        }
+        const { viewerScheduleAccess } = await resolveScheduleViewerAccessContext(req);
+        const preferences = await scheduleViewerPreferencesService.getPreferences(userId, {
+            reqUser: req.user,
+            access: viewerScheduleAccess
+        });
+        return res.json({ status: 'success', preferences });
+    } catch (error) {
+        return res.status(500).json({
+            status: 'error',
+            message: error.message || 'Failed to load schedule viewer preferences.'
+        });
+    }
+}
+
+async function saveScheduleViewerPreferences(req, res) {
+    try {
+        const userId = String(req.user?.id || '').trim();
+        if (!userId) {
+            return res.status(401).json({ status: 'error', message: 'Authentication required.' });
+        }
+        const payload = (req.body && typeof req.body === 'object') ? req.body : {};
+        const { viewerScheduleAccess } = await resolveScheduleViewerAccessContext(req);
+        const preferences = await scheduleViewerPreferencesService.savePreferences(
+            userId,
+            payload,
+            req.user || userId,
+            {
+                reqUser: req.user,
+                access: viewerScheduleAccess
+            }
+        );
+        return res.json({
+            status: 'success',
+            message: 'Workspace saved.',
+            preferences
+        });
+    } catch (error) {
+        return res.status(500).json({
+            status: 'error',
+            message: error.message || 'Failed to save schedule viewer preferences.'
+        });
     }
 }
 
@@ -2186,6 +2250,8 @@ async function getSessionEnrollmentList(req, res) {
 
 module.exports = {
     showSchedulePage,
+    getScheduleViewerPreferences,
+    saveScheduleViewerPreferences,
     showMySchedulePage,
     getMyScheduleData,
     getPersonSchedule,

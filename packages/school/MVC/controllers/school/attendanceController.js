@@ -29,6 +29,8 @@ const matrixRollupService = require('../../services/school/matrixRollupService')
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
+const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
+const rollingEnrollmentWorkspaceService = require('../../services/school/rollingEnrollmentWorkspaceService');
 const attendanceChangeLogService = require('../../services/school/attendanceChangeLogService');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { userCanMarkAttendanceExcused } = require('../../services/school/attendanceMatrixAccessService');
@@ -310,6 +312,43 @@ async function assertAttendanceEnrollmentWindow({ classData, session, studentPer
     if (enrollmentWindow.withinEnrollmentWindow) return enrollmentWindow;
     const sessionDate = normalizeDateOnly(session?.date) || 'this session date';
     throw new Error(`Attendance cannot be updated because this student was not enrolled in the class on ${sessionDate}.`);
+}
+
+async function assertRollingCapacityOneBeforeRosterAdd({
+    classData,
+    session,
+    studentPersonId,
+    reqUser
+}) {
+    if (!classSessionCapacityService.isRollingCapacityOneClass(classData)) return;
+    const activeOrgId = toPublicId(classData?.orgId || reqUser?.activeOrgId || '');
+    const [periodRows, students, statusMap] = await Promise.all([
+        schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser),
+        schoolDataService.fetchAllData('students', {}, reqUser),
+        sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true })
+    ]);
+    const studentToPersonMap = rollingEnrollmentWorkspaceService.buildStudentToPersonMap(students, activeOrgId);
+    let excludeStudentId = '';
+    for (const [studentId, personId] of studentToPersonMap.entries()) {
+        if (idsEqual(personId, studentPersonId)) {
+            excludeStudentId = studentId;
+            break;
+        }
+    }
+    const forceNotApplicableSessionKeys = sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(
+        statusMap,
+        [session]
+    );
+    rollingEnrollmentWorkspaceService.assertSessionHasCapacityForStudent({
+        classData,
+        session,
+        periodRows: Array.isArray(periodRows) ? periodRows : [],
+        studentToPersonMap,
+        statusMap,
+        forceNotApplicableSessionKeys,
+        excludeStudentId,
+        activeOrgId
+    });
 }
 
 async function assertEnrollmentLockedAttendanceEditable(req, { classData, session, studentPersonId }) {
@@ -941,6 +980,12 @@ async function addAttendanceComment(req, res) {
         let rosterRecord = session.roster.find(r => idsEqual(r.personId, studentPersonId));
         
         if (!rosterRecord) {
+            await assertRollingCapacityOneBeforeRosterAdd({
+                classData,
+                session,
+                studentPersonId,
+                reqUser: req.user
+            });
             rosterRecord = { personId: studentPersonId, attendance: 'present', notes: '', comments: [] };
             session.roster.push(rosterRecord);
         }
@@ -1109,6 +1154,12 @@ async function updateAttendanceRosterCell(req, res) {
         if (!session.roster) session.roster = [];
         let rosterRecord = session.roster.find((r) => idsEqual(r.personId, studentPersonId));
         if (!rosterRecord) {
+            await assertRollingCapacityOneBeforeRosterAdd({
+                classData,
+                session,
+                studentPersonId,
+                reqUser: req.user
+            });
             rosterRecord = { personId: studentPersonId, attendance: normalizedAttendance, notes: '', comments: [] };
             session.roster.push(rosterRecord);
         }
