@@ -1436,6 +1436,31 @@
   background: rgba(25, 135, 84, 0.08);
 }
 
+.schedule-session-context-status-item.is-actionable {
+  cursor: pointer;
+  border: 0;
+  width: 100%;
+  background: transparent;
+  text-align: left;
+}
+
+.schedule-session-context-status-item.is-actionable:hover:not(.is-current) {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.schedule-session-context-status-item.is-actionable:focus-visible {
+  outline: 2px solid rgba(13, 110, 253, 0.45);
+  outline-offset: 1px;
+}
+
+[data-event-type="class_session"][data-schedule-editable="1"] {
+  cursor: grab;
+}
+
+[data-event-type="class_session"][data-schedule-editable="1"] .session-cal-draft-resize-handle {
+  cursor: ns-resize;
+}
+
 .schedule-session-context-status-chip {
   display: inline-flex;
   align-items: center;
@@ -1545,22 +1570,56 @@ body.is-schedule-draft-resizing .session-cal-draft-resize-handle {
   font-weight: 600;
 }
 
-.schedule-workspace-save-chip {
+.schedule-workspace-actions {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.18rem;
+  flex-shrink: 0;
+}
+
+.schedule-person-tab-group--with-actions {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+.schedule-workspace-save-chip,
+.schedule-workspace-clear-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
   border-radius: 999px;
-  padding: 0.34rem 0.65rem;
-  border: 1px solid #9ec5fe;
-  background: #eef6ff;
-  color: #084298;
-  font-weight: 850;
-  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+  padding: 0.16rem 0.42rem;
+  font-size: 0.68rem;
+  line-height: 1.1;
+  font-weight: 800;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
   white-space: nowrap;
   cursor: pointer;
 }
 
+.schedule-workspace-save-chip {
+  border: 1px solid #9ec5fe;
+  background: #eef6ff;
+  color: #084298;
+}
+
+.schedule-workspace-clear-chip {
+  border: 1px solid #f1aeb5;
+  background: #fff5f5;
+  color: #842029;
+}
+
 .schedule-workspace-save-chip:hover,
-.schedule-workspace-save-chip:focus-visible {
+.schedule-workspace-save-chip:focus-visible,
+.schedule-workspace-clear-chip:hover,
+.schedule-workspace-clear-chip:focus-visible {
   filter: brightness(0.97);
+}
+
+.schedule-workspace-save-chip .bi,
+.schedule-workspace-clear-chip .bi {
+  font-size: 0.72rem;
 }

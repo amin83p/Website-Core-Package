@@ -664,6 +664,43 @@
         min-width: 3.25rem;
         text-align: right;
     }
+    .schedule-day-size-popover-host {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+    .schedule-day-size-popover {
+        display: none;
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        right: 0;
+        z-index: 1080;
+        min-width: 14.5rem;
+        padding: 0.7rem 0.8rem;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        background: #fff;
+        box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.14);
+    }
+    .schedule-day-size-popover.is-open {
+        display: block;
+    }
+    .schedule-day-size-popover-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .schedule-day-size-popover .schedule-width-control {
+        width: 100%;
+    }
+    .schedule-day-size-popover .schedule-width-control .form-range {
+        width: 100%;
+        flex: 1 1 auto;
+    }
     .schedule-selected-count-pill {
         display: inline-flex;
         align-items: center;
@@ -692,23 +729,52 @@
         color: #6c757d;
         box-shadow: none;
     }
-    .schedule-workspace-save-chip {
+    .schedule-person-tab-group--with-actions {
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
+    }
+    .schedule-workspace-actions {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.18rem;
+        flex-shrink: 0;
+    }
+    .schedule-workspace-save-chip,
+    .schedule-workspace-clear-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.2rem;
         border-radius: 999px;
-        padding: 0.34rem 0.65rem;
-        border: 1px solid #9ec5fe;
-        background: #eef6ff;
-        color: #084298;
-        font-weight: 850;
-        box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+        padding: 0.16rem 0.42rem;
+        font-size: 0.68rem;
+        line-height: 1.1;
+        font-weight: 800;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
         white-space: nowrap;
         cursor: pointer;
     }
+    .schedule-workspace-save-chip {
+        border: 1px solid #9ec5fe;
+        background: #eef6ff;
+        color: #084298;
+    }
+    .schedule-workspace-clear-chip {
+        border: 1px solid #f1aeb5;
+        background: #fff5f5;
+        color: #842029;
+    }
     .schedule-workspace-save-chip:hover,
-    .schedule-workspace-save-chip:focus-visible {
+    .schedule-workspace-save-chip:focus-visible,
+    .schedule-workspace-clear-chip:hover,
+    .schedule-workspace-clear-chip:focus-visible {
         filter: brightness(0.97);
+    }
+    .schedule-workspace-save-chip .bi,
+    .schedule-workspace-clear-chip .bi {
+        font-size: 0.72rem;
     }
     .schedule-loaded-at-wrap {
         display: inline-flex;
@@ -1514,9 +1580,7 @@
     </div>
   </div>
 
-  <% if (canSelectAnyPerson) { %>
   <div class="schedule-person-tabs" id="schedulePersonTabs"></div>
-  <% } %>
 
   <div id="scheduleContainer" class="d-none">
     <div class="card border-0 shadow-sm">
@@ -1547,6 +1611,16 @@
 <div id="scheduleSessionContextMenu" class="schedule-session-context-menu d-none" role="menu" aria-hidden="true">
   <div class="schedule-session-context-menu-header" id="scheduleSessionContextMenuHeader"></div>
   <div class="schedule-session-context-menu-actions">
+    <% if (canDragCreateSessions) { %>
+    <button type="button" class="schedule-session-context-action d-none" id="btn_scheduleSessionContextEdit" role="menuitem">
+      <i class="bi bi-pencil-square" aria-hidden="true"></i>
+      <span>Edit session</span>
+    </button>
+    <button type="button" class="schedule-session-context-action d-none" id="btn_scheduleSessionContextMove" role="menuitem">
+      <i class="bi bi-arrows-move" aria-hidden="true"></i>
+      <span>Move session</span>
+    </button>
+    <% } %>
     <button type="button" class="schedule-session-context-action" id="btn_scheduleSessionContextAttendance" role="menuitem">
       <i class="bi bi-clipboard2-check" aria-hidden="true"></i>
       <span>Attendance List</span>
@@ -1554,6 +1628,10 @@
     <button type="button" class="schedule-session-context-action" id="btn_scheduleSessionContextEnrollment" role="menuitem">
       <i class="bi bi-people" aria-hidden="true"></i>
       <span>Enrollment List</span>
+    </button>
+    <button type="button" class="schedule-session-context-action d-none" id="btn_scheduleSessionContextOpenSession" role="menuitem">
+      <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+      <span>Open Manage Session</span>
     </button>
   </div>
   <div class="schedule-session-context-menu-divider"></div>
@@ -1780,6 +1858,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialLockedPersonName = <%- JSON.stringify(lockedPersonName) %>;
     const initialScheduleViewerPrefs = <%- JSON.stringify(typeof initialScheduleViewerPrefs !== 'undefined' ? initialScheduleViewerPrefs : { startDate: '', endDate: '', activePersonId: '', persons: [], autoChangeDetector: true }) %>;
     const SCHEDULE_VIEWER_PREFS_API = '/school/schedules/api/viewer-preferences';
+    const SCHEDULE_COMMIT_STAGED_API = '/school/schedules/api/commit-staged-sessions';
+    const SCHEDULE_UPDATE_CLASS_SESSION_SCHEDULE_API = '/school/schedules/api/update-class-session-schedule';
+    const SCHEDULE_UPDATE_CLASS_SESSION_STATUS_API = '/school/schedules/api/update-class-session-status';
+    const SCHEDULE_UPDATE_WORK_SESSION_SCHEDULE_API = '/school/schedules/api/update-work-session-schedule';
+    const SCHEDULE_DRAGGABLE_BLOCK_SELECTOR = '[data-event-type="schedule_draft"], .is-schedule-draft[data-session-id], [data-event-type="class_session"][data-schedule-editable="1"]';
+
+    function prefsHaveSavedWorkspace(prefs) {
+        if (!prefs || typeof prefs !== 'object') return false;
+        return Boolean(
+            (Array.isArray(prefs.persons) && prefs.persons.length)
+            || (prefs.startDate && prefs.endDate)
+        );
+    }
     function isLeaveEvent(event) {
         const candidates = [
             event?.eventType,
@@ -1849,6 +1940,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `/school/classes/${encodeURIComponent(event.classId)}/sessions/${encodeURIComponent(event.sessionId)}`
                 : ''
         );
+    }
+
+    function shouldOpenSessionOnClick(event) {
+        if (!event || event.isDraft || canDragCreateSessions) return false;
+        return Boolean(getEventDetailsUrl(event));
+    }
+
+    function buildScheduleSessionBlockClickHandler(event) {
+        const detailsUrl = getEventDetailsUrl(event);
+        if (!shouldOpenSessionOnClick(event) || !detailsUrl) return '';
+        const encodedDetailsUrl = encodeURIComponent(detailsUrl);
+        return `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"`;
     }
     function mergeScheduleBlockLayoutStyle(layoutStyle, scan) {
         const scd = window.ScheduleCompletionDisplay;
@@ -2231,7 +2334,8 @@ document.addEventListener('DOMContentLoaded', () => {
         verticalDayWidthUserAdjusted: false,
         horizontalSliderUserAdjusted: false,
         suppressGridClick: false,
-        autoChangeDetectorEnabled: readScheduleAutoChangeDetector()
+        autoChangeDetectorEnabled: readScheduleAutoChangeDetector(),
+        serverWorkspaceSaved: prefsHaveSavedWorkspace(initialScheduleViewerPrefs)
     };
 
     function readScheduleAutoChangeDetector() {
@@ -2905,6 +3009,118 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshScheduleActiveView();
     }
 
+    function draftEventToStagedSession(ev, person) {
+        return {
+            sessionId: String(ev?.sessionId || ev?.id || '').trim(),
+            date: String(ev?.date || '').trim(),
+            startTime: String(ev?.start || ev?.startTime || '').trim(),
+            endTime: String(ev?.end || ev?.endTime || '').trim(),
+            delivery: {
+                deliveredBy: person?.id || '',
+                deliveredByName: person?.name || person?.id || ''
+            }
+        };
+    }
+
+    function removeDraftSessionsForClass(personId, classId) {
+        const pid = String(personId || '').trim();
+        const cid = String(classId || '').trim();
+        if (!pid || !cid) return;
+        const drafts = Array.isArray(scheduleState.draftEventsByPersonId?.[pid])
+            ? scheduleState.draftEventsByPersonId[pid]
+            : [];
+        scheduleState.draftEventsByPersonId[pid] = drafts.filter((ev) => String(ev?.classId || '') !== cid);
+        const batches = Array.isArray(scheduleState.draftBatchesByPersonId?.[pid])
+            ? scheduleState.draftBatchesByPersonId[pid]
+            : [];
+        scheduleState.draftBatchesByPersonId[pid] = batches.filter((batch) => String(batch?.classId || '') !== cid);
+        scheduleState.selectedDraftSessionIdsByPersonId[pid] = new Set();
+    }
+
+    async function commitScheduleDraftSessions(options = {}) {
+        const person = activeSchedulePerson();
+        if (!person?.id) return;
+        const drafts = Array.isArray(scheduleState.draftEventsByPersonId?.[person.id])
+            ? scheduleState.draftEventsByPersonId[person.id]
+            : [];
+        if (!drafts.length) return;
+
+        const byClass = new Map();
+        drafts.forEach((ev) => {
+            const classId = String(ev?.classId || '').trim();
+            if (!classId) return;
+            if (!byClass.has(classId)) byClass.set(classId, []);
+            byClass.get(classId).push(ev);
+        });
+        if (!byClass.size) {
+            if (typeof uiAlert === 'function') await uiAlert('Staged sessions are missing class information.', 'Save changes');
+            return;
+        }
+
+        if (!options.skipConfirm) {
+            const confirmed = await uiConfirm(
+                `Save ${drafts.length} staged session(s) to ${byClass.size} class schedule(s)?`,
+                'Save changes?'
+            );
+            if (!confirmed) return;
+        }
+
+        let totalCreated = 0;
+        const extendCycleEndDate = options.extendCycleEndDate === true;
+        try {
+            for (const [classId, classDrafts] of byClass.entries()) {
+                const pendingStagedSessions = classDrafts
+                    .map((ev) => draftEventToStagedSession(ev, person))
+                    .filter((row) => row.sessionId && row.date && row.startTime && row.endTime);
+                if (!pendingStagedSessions.length) continue;
+                const res = await fetch(SCHEDULE_COMMIT_STAGED_API, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-AJAX-Request': 'true',
+                        Accept: 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        classId,
+                        personId: person.id,
+                        pendingStagedSessions,
+                        extendCycleEndDate
+                    })
+                });
+                const result = await res.json().catch(() => ({}));
+                if (!res.ok || result.status !== 'success') {
+                    const message = String(result.message || 'Unable to save staged sessions.');
+                    if (!extendCycleEndDate && /cycle extension/i.test(message)) {
+                        const extend = await uiConfirm(`${message}\n\nExtend the class cycle and continue?`, 'Cycle extension required');
+                        if (extend) {
+                            await commitScheduleDraftSessions({ skipConfirm: true, extendCycleEndDate: true });
+                        }
+                        return;
+                    }
+                    throw new Error(message);
+                }
+                totalCreated += Number(result?.data?.createdCount || 0);
+                removeDraftSessionsForClass(person.id, classId);
+            }
+            clearRemoteUpdatePending();
+            delete scheduleState.eventsByPersonId[person.id];
+            delete scheduleState.statusMetaByPersonId[person.id];
+            delete scheduleState.errorByPersonId[person.id];
+            delete scheduleState.lastLoadedAtByPersonId[person.id];
+            delete scheduleState.scheduleFingerprintByPersonId[person.id];
+            scheduleState.loadedPersonIds.delete(person.id);
+            await loadSchedulePerson(person);
+            refreshScheduleActiveView();
+            await uiAlert(totalCreated
+                ? `${totalCreated} session(s) saved to class schedule(s).`
+                : 'No new sessions were saved (dates may already exist).',
+            'Save changes');
+        } catch (error) {
+            await uiAlert(error.message || 'Unable to save staged sessions.', 'Save changes');
+        }
+    }
+
     let scheduleStageEditAttemptId = '';
 
     async function commitScheduleStageCreate() {
@@ -3126,6 +3342,51 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function isScheduleSavedSessionBlock(block) {
+        return String(block?.getAttribute?.('data-event-type') || '').trim() === 'class_session'
+            && block?.getAttribute?.('data-schedule-editable') === '1';
+    }
+
+    function handleScheduleBlockMoveComplete(update = {}) {
+        const sessionId = String(update?.sessionId || '').trim();
+        if (!sessionId) return;
+        const block = document.querySelector(`[data-session-id="${sessionId}"][data-event-type="class_session"][data-schedule-editable="1"]`);
+        if (block) {
+            const event = resolveScheduleContextEventFromTarget(block);
+            if (event) {
+                void applySavedSessionScheduleUpdate({
+                    event,
+                    date: update.date,
+                    startTime: update.startTime,
+                    endTime: update.endTime,
+                    durationHours: update.durationHours
+                });
+                return;
+            }
+        }
+        applyDraftSessionMove(update);
+    }
+
+    function handleScheduleBlockResizeComplete(update = {}) {
+        const sessionId = String(update?.sessionId || '').trim();
+        if (!sessionId) return;
+        const block = document.querySelector(`[data-session-id="${sessionId}"][data-event-type="class_session"][data-schedule-editable="1"]`);
+        if (block) {
+            const event = resolveScheduleContextEventFromTarget(block);
+            if (event) {
+                void applySavedSessionScheduleUpdate({
+                    event,
+                    date: update.date,
+                    startTime: update.startTime,
+                    endTime: update.endTime,
+                    durationHours: update.durationHours
+                });
+                return;
+            }
+        }
+        applyDraftSessionResize(update);
+    }
+
     function bindScheduleDragCreate(container, mode) {
         if (!container || !scheduleCalendarCore?.bindCalendarDragCreate) return;
         scheduleCalendarCore.bindCalendarDragCreate(container, {
@@ -3136,15 +3397,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scheduleCalendarCore.bindCalendarDragMove) {
             scheduleCalendarCore.bindCalendarDragMove(container, {
                 enabled: mode === 'verticalTimeline' && canDragCreateSessions === true,
+                blockSelector: SCHEDULE_DRAGGABLE_BLOCK_SELECTOR,
                 canStartMove: (sessionId, block) => !block?.closest?.('.session-cal-draft-resize-handle'),
                 getConflictSessions: () => {
                     const person = activeSchedulePerson();
                     return person?.id ? collectScheduleConflictSessionsForPerson(person.id) : [];
                 },
                 onMoveConflict: () => {
-                    if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Move staged session');
+                    if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Move session');
                 },
-                onMoveComplete: (update) => { applyDraftSessionMove(update); }
+                onMoveComplete: (update) => { handleScheduleBlockMoveComplete(update); }
             });
         }
         if (scheduleCalendarCore.bindCalendarDragResize) {
@@ -3155,9 +3417,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     return person?.id ? collectScheduleConflictSessionsForPerson(person.id) : [];
                 },
                 onResizeConflict: () => {
-                    if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Resize staged session');
+                    if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Resize session');
                 },
-                onResizeComplete: (update) => { applyDraftSessionResize(update); }
+                onResizeComplete: (update) => { handleScheduleBlockResizeComplete(update); }
             });
         }
     }
@@ -3174,6 +3436,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let scheduleDraftMoveSessionId = '';
     let scheduleDraftMoveSource = 'timeline';
     let scheduleDraftMoveDurationHours = 0;
+    let scheduleSessionEditOverlayMode = 'draft';
+    let scheduleSavedSessionEditEvent = null;
     let scheduleDraftMenuBound = false;
 
     function buildScheduleDraftResizeHandlesHtml() {
@@ -3189,6 +3453,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const sessionId = String(block.getAttribute('data-session-id') || '').trim();
         const events = getScheduleEventsForPerson(person.id);
         return events.find((row) => row?.isDraft === true && String(row?.sessionId || row?.id || '').trim() === sessionId) || null;
+    }
+
+    function openScheduleDraftEditFromTarget(target, source = 'timeline') {
+        const draftEvent = resolveScheduleDraftEventFromTarget(target);
+        if (!draftEvent) return false;
+        openScheduleDraftEditOverlay(draftEvent, source);
+        return true;
+    }
+
+    function isScheduleDraftEditInteractionTarget(target) {
+        return Boolean(
+            target?.closest?.('.schedule-draft-select, [data-schedule-draft-select], .session-cal-draft-resize-handle')
+        );
     }
 
     function hideScheduleDraftSessionContextMenu() {
@@ -3242,7 +3519,7 @@ document.addEventListener('DOMContentLoaded', () => {
             batchSection?.classList.remove('d-none');
         }
         const menuWidth = 280;
-        const menuHeight = isBulkContext ? 120 : 220;
+        const menuHeight = isBulkContext ? 120 : 185;
         const left = Math.min(mouseEvent.clientX, window.innerWidth - menuWidth - 8);
         const top = Math.min(mouseEvent.clientY, window.innerHeight - menuHeight - 8);
         if (menu.parentElement !== document.body) document.body.appendChild(menu);
@@ -3410,6 +3687,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const overlay = document.getElementById('scheduleDraftEditOverlay');
         scheduleDraftEditSessionId = '';
         scheduleDraftEditSource = 'timeline';
+        scheduleSessionEditOverlayMode = 'draft';
+        scheduleSavedSessionEditEvent = null;
         if (!overlay) return;
         overlay.classList.remove('session-enrollment-stage-standalone');
         overlay.classList.add('d-none');
@@ -3428,6 +3707,8 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleDraftMoveSessionId = '';
         scheduleDraftMoveSource = 'timeline';
         scheduleDraftMoveDurationHours = 0;
+        scheduleSessionEditOverlayMode = 'draft';
+        scheduleSavedSessionEditEvent = null;
         if (!overlay) return;
         overlay.classList.remove('session-enrollment-stage-standalone');
         overlay.classList.add('d-none');
@@ -3441,10 +3722,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function openScheduleSavedSessionEditOverlay(event) {
+        if (!event || !isScheduledClassSessionForQuickEdit(event)) return;
+        scheduleSessionEditOverlayMode = 'saved';
+        scheduleSavedSessionEditEvent = event;
+        openScheduleDraftEditOverlay(event, 'timeline');
+    }
+
+    function openScheduleSavedSessionMoveOverlay(event) {
+        if (!event || !isScheduledClassSessionForQuickEdit(event)) return;
+        scheduleSessionEditOverlayMode = 'saved';
+        scheduleSavedSessionEditEvent = event;
+        openScheduleDraftMoveOverlay(event, 'timeline');
+    }
+
     function openScheduleDraftEditOverlay(event, source = 'timeline') {
         if (!event) return;
         const overlay = document.getElementById('scheduleDraftEditOverlay');
         if (!overlay) return;
+        if (scheduleSessionEditOverlayMode !== 'saved') {
+            scheduleSessionEditOverlayMode = 'draft';
+            scheduleSavedSessionEditEvent = null;
+        }
         scheduleDraftEditSessionId = String(event.sessionId || event.id || '').trim();
         scheduleDraftEditSource = source === 'partialModal' ? 'partialModal' : 'timeline';
         const contextEl = document.getElementById('scheduleDraftEditOverlayContext');
@@ -3474,6 +3773,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!event) return;
         const overlay = document.getElementById('scheduleDraftMoveOverlay');
         if (!overlay) return;
+        if (scheduleSessionEditOverlayMode !== 'saved') {
+            scheduleSessionEditOverlayMode = 'draft';
+            scheduleSavedSessionEditEvent = null;
+        }
         scheduleDraftMoveSessionId = String(event.sessionId || event.id || '').trim();
         scheduleDraftMoveSource = source === 'partialModal' ? 'partialModal' : 'timeline';
         scheduleDraftMoveDurationHours = Number(event.duration || event.scheduledDuration || event.durationHours || 0);
@@ -3530,6 +3833,16 @@ document.addEventListener('DOMContentLoaded', () => {
             endTime,
             durationHours
         };
+        if (scheduleSessionEditOverlayMode === 'saved' && scheduleSavedSessionEditEvent) {
+            void applySavedSessionScheduleUpdate({
+                event: scheduleSavedSessionEditEvent,
+                date: values.date,
+                startTime: values.startTime,
+                endTime,
+                durationHours
+            });
+            return;
+        }
         let ok = false;
         if (scheduleDraftMoveSource === 'partialModal' && window.SessionEnrollmentCalendarModal?.moveStagedSession) {
             ok = window.SessionEnrollmentCalendarModal.moveStagedSession(sessionId, movePayload) !== false;
@@ -3566,6 +3879,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorEl.textContent = 'Date and start time are required.';
                 errorEl.classList.remove('d-none');
             }
+            return;
+        }
+        if (scheduleSessionEditOverlayMode === 'saved' && scheduleSavedSessionEditEvent) {
+            const endTime = scheduleCalendarCore?.addDurationToTime
+                ? scheduleCalendarCore.addDurationToTime(values.startTime, values.durationHours)
+                : values.startTime;
+            void applySavedSessionScheduleUpdate({
+                event: scheduleSavedSessionEditEvent,
+                date: values.date,
+                startTime: values.startTime,
+                endTime,
+                durationHours: values.durationHours
+            });
             return;
         }
         let ok = false;
@@ -3782,11 +4108,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        document.getElementById('btn_scheduleDraftContextAdjustStart')?.addEventListener('click', (clickEvent) => {
-            clickEvent.preventDefault();
-            hideScheduleDraftSessionContextMenu();
-        });
-
         document.getElementById('btn_scheduleDraftContextMoveSession')?.addEventListener('click', (clickEvent) => {
             clickEvent.preventDefault();
             const event = scheduleDraftContextEvent;
@@ -3951,7 +4272,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function bindScheduleDragCreate() {}
     function resolveScheduleDraftEventFromTarget() { return null; }
     function bindScheduleDraftSessionContextMenu() {}
+    async function commitScheduleDraftSessions() {}
 <% } %>
+
+    function countActivePersonDraftSessions() {
+        if (!canDragCreateSessions) return 0;
+        const person = activeSchedulePerson();
+        if (!person?.id) return 0;
+        const drafts = scheduleState.draftEventsByPersonId?.[person.id];
+        return Array.isArray(drafts) ? drafts.length : 0;
+    }
+
+    function buildScheduleSaveDraftsButtonHtml() {
+        if (!canDragCreateSessions) return '';
+        const count = countActivePersonDraftSessions();
+        if (!count) return '';
+        const label = count === 1 ? 'Save changes' : `Save changes (${count})`;
+        return `<button type="button" class="btn btn-success btn-sm schedule-save-drafts-btn" data-schedule-save-drafts title="Save staged sessions to class schedules" aria-label="${escapeHtml(label)}"><i class="bi bi-check2-circle" aria-hidden="true"></i><span>${escapeHtml(label)}</span></button>`;
+    }
 
     function saveScheduleViewMode(mode) {
         const normalized = resolveScheduleViewMode(mode);
@@ -3991,6 +4329,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return Boolean(String(event?.classId || '').trim() && String(event?.sessionId || '').trim() && String(event?.date || '').trim());
     }
 
+    function isScheduledClassSessionForQuickEdit(event) {
+        return isClassSessionScheduleEvent(event)
+            && normalizeSessionStatus(event?.status) === 'scheduled'
+            && event?.locked !== true
+            && event?.scheduleDisplayOnly !== true;
+    }
+
+    function isWorkSessionScheduleEvent(event) {
+        return String(event?.eventType || '').trim() === 'school_activity'
+            && String(event?.activityEntryId || '').trim();
+    }
+
     function buildScheduleSessionContextDataAttrs(event) {
         const selectionKey = escapeHtml(scheduleSessionSelectionKey(event));
         const keyAttr = selectionKey ? `data-schedule-session-key="${selectionKey}"` : '';
@@ -4002,11 +4352,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const attemptAttr = attemptId ? ` data-staging-attempt-id="${attemptId}"` : '';
             return `${keyAttr} data-class-id="${classId}" data-session-id="${sessionId}" data-session-date="${sessionDate}" data-event-type="schedule_draft"${attemptAttr}`;
         }
+        if (isWorkSessionScheduleEvent(event)) {
+            const activityId = escapeHtml(String(event.activityId || '').trim());
+            const entryId = escapeHtml(String(event.activityEntryId || '').trim());
+            return `${keyAttr} data-event-type="school_activity" data-activity-id="${activityId}" data-activity-entry-id="${entryId}"`;
+        }
         if (!isClassSessionScheduleEvent(event)) return keyAttr;
         const classId = escapeHtml(String(event.classId || '').trim());
         const sessionId = escapeHtml(String(event.sessionId || '').trim());
         const sessionDate = escapeHtml(String(event.date || '').trim());
-        return `${keyAttr} data-class-id="${classId}" data-session-id="${sessionId}" data-session-date="${sessionDate}" data-event-type="class_session"`;
+        const editableAttr = (canDragCreateSessions && isScheduledClassSessionForQuickEdit(event)) ? ' data-schedule-editable="1"' : '';
+        return `${keyAttr} data-class-id="${classId}" data-session-id="${sessionId}" data-session-date="${sessionDate}" data-event-type="class_session"${editableAttr}`;
+    }
+
+    function resolveWorkSessionEventFromTarget(target) {
+        const block = target?.closest?.('[data-event-type="school_activity"][data-activity-entry-id]');
+        if (!block) return null;
+        const person = activeSchedulePerson();
+        if (!person?.id) return null;
+        const activityId = String(block.getAttribute('data-activity-id') || '').trim();
+        const entryId = String(block.getAttribute('data-activity-entry-id') || '').trim();
+        const events = getScheduleEventsForPerson(person.id);
+        return events.find((row) => String(row?.activityId || '').trim() === activityId
+            && String(row?.activityEntryId || '').trim() === entryId) || null;
     }
 
     function resolveScheduleContextEventFromTarget(target) {
@@ -4062,8 +4430,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 colorBg: row?.colorBg || '#e2e3e5',
                 colorText: row?.colorText || '#41464b',
                 colorBorder: row?.colorBorder || '#c6c8ca',
-                isCurrent: normalizeSessionStatus(row?.code) === currentStatus
+                isCurrent: normalizeSessionStatus(row?.code) === currentStatus,
+                makeUpRequired: row?.makeUpRequired === true,
+                mergedSessionRequired: row?.mergedSessionRequired === true,
+                requiresManageSession: row?.makeUpRequired === true || row?.mergedSessionRequired === true
             }));
+    }
+
+    function buildWorkSessionStatusMenuItems(event) {
+        const evaluationType = String(event?.evaluationType || '').trim().toLowerCase();
+        if (evaluationType === 'completion') {
+            const current = String(event?.completionStatus || event?.status || '').trim().toLowerCase();
+            const isCompleted = current === 'completed';
+            return [
+                {
+                    code: 'pending_completion',
+                    label: 'Pending completion',
+                    completionStatus: 'pending',
+                    isCurrent: !isCompleted,
+                    requiresManageSession: false
+                },
+                {
+                    code: 'completed',
+                    label: 'Completed',
+                    completionStatus: 'completed',
+                    isCurrent: isCompleted,
+                    requiresManageSession: false
+                }
+            ];
+        }
+        const current = String(event?.status || 'attended').trim().toLowerCase();
+        return [
+            { code: 'attended', label: 'Attended', assigneeStatus: 'attended', isCurrent: current === 'attended', requiresManageSession: false },
+            { code: 'absent', label: 'Absent', assigneeStatus: 'absent', isCurrent: current === 'absent', requiresManageSession: false },
+            { code: 'excused', label: 'Excused', assigneeStatus: 'excused', isCurrent: current === 'excused', requiresManageSession: false }
+        ];
     }
 
     function scheduleAttendanceFlagIsTrue(value) {
@@ -4180,6 +4581,266 @@ document.addEventListener('DOMContentLoaded', () => {
         return url.pathname + url.search;
     }
 
+    function patchScheduleEventInState(event, updates = {}) {
+        const person = activeSchedulePerson();
+        if (!person?.id || !event) return null;
+        const events = Array.isArray(scheduleState.eventsByPersonId[person.id]) ? scheduleState.eventsByPersonId[person.id] : [];
+        let patched = null;
+        scheduleState.eventsByPersonId[person.id] = events.map((ev) => {
+            if (isWorkSessionScheduleEvent(event)) {
+                if (String(ev?.activityEntryId || '').trim() !== String(event.activityEntryId || '').trim()) return ev;
+                if (String(ev?.activityId || '').trim() !== String(event.activityId || '').trim()) return ev;
+            } else {
+                if (String(ev?.classId || '').trim() !== String(event.classId || '').trim()
+                    || String(ev?.sessionId || '').trim() !== String(event.sessionId || '').trim()
+                    || String(ev?.date || '').trim() !== String(event.date || '').trim()) return ev;
+            }
+            const next = { ...ev };
+            if (updates.date) next.date = updates.date;
+            if (updates.start) next.start = updates.start;
+            if (updates.end) next.end = updates.end;
+            if (updates.duration !== undefined) next.duration = updates.duration;
+            if (updates.status) next.status = updates.status;
+            if (updates.completionStatus) next.completionStatus = updates.completionStatus;
+            if (updates.statusLabel) next.statusLabel = updates.statusLabel;
+            patched = next;
+            return next;
+        });
+        if (patched) scheduleState.remoteUpdatePending = true;
+        return patched;
+    }
+
+    function findScheduleEventInState(event, previousKey = '') {
+        const person = activeSchedulePerson();
+        const events = getScheduleEventsForPerson(person?.id);
+        const prevKey = String(previousKey || scheduleSessionSelectionKey(event) || '').trim();
+        if (prevKey) {
+            const matched = events.find((row) => scheduleSessionSelectionKey(row) === prevKey);
+            if (matched) return matched;
+        }
+        if (isWorkSessionScheduleEvent(event)) {
+            return events.find((row) => String(row?.activityEntryId || '').trim() === String(event.activityEntryId || '').trim()
+                && String(row?.activityId || '').trim() === String(event.activityId || '').trim()) || null;
+        }
+        return null;
+    }
+
+    function findScheduleSessionBlockElement(event, previousKey = '') {
+        const prevKey = String(previousKey || scheduleSessionSelectionKey(event) || '').trim();
+        if (prevKey) {
+            const byKey = document.querySelector(`[data-schedule-session-key="${prevKey}"]`);
+            if (byKey) return byKey;
+        }
+        if (isWorkSessionScheduleEvent(event)) {
+            const entryId = String(event.activityEntryId || '').trim();
+            const activityId = String(event.activityId || '').trim();
+            if (!entryId) return null;
+            if (activityId) {
+                const scoped = document.querySelector(`[data-event-type="school_activity"][data-activity-entry-id="${entryId}"][data-activity-id="${activityId}"]`);
+                if (scoped) return scoped;
+            }
+            return document.querySelector(`[data-event-type="school_activity"][data-activity-entry-id="${entryId}"]`);
+        }
+        return null;
+    }
+
+    function rerenderScheduleSessionBlockFromState(event, { previousKey } = {}) {
+        const prevKey = String(previousKey || scheduleSessionSelectionKey(event) || '').trim();
+        const updated = findScheduleEventInState(event, prevKey);
+        const block = findScheduleSessionBlockElement(event, prevKey);
+        if (!updated || !block) return false;
+        const mode = normalizedScheduleViewMode();
+        const html = mode === 'timeline'
+            ? buildScheduleHorizontalBlockInner(updated)
+            : buildScheduleVerticalBlockInner(updated);
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html.trim();
+        const next = wrapper.firstElementChild;
+        if (!next) return false;
+        block.replaceWith(next);
+        return true;
+    }
+
+    function patchSavedClassSessionEventInState(event, updates = {}) {
+        return patchScheduleEventInState(event, updates);
+    }
+
+    async function applySavedSessionScheduleUpdate({
+        event,
+        date,
+        startTime,
+        endTime,
+        durationHours,
+        forceConflicts = false
+    } = {}) {
+        if (!canDragCreateSessions || !event) return false;
+        const resolvedEnd = endTime || (scheduleCalendarCore?.addDurationToTime
+            ? scheduleCalendarCore.addDurationToTime(startTime, durationHours || event.duration || 1)
+            : startTime);
+        const errorEl = document.getElementById('scheduleDraftEditError') || document.getElementById('scheduleDraftMoveError');
+        let loadingShown = false;
+        try {
+            if (typeof window.showLoading === 'function') {
+                window.showLoading(forceConflicts === true ? 'Saving session schedule...' : 'Updating session schedule...');
+                loadingShown = true;
+            }
+            const res = await fetch(SCHEDULE_UPDATE_CLASS_SESSION_SCHEDULE_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    classId: event.classId,
+                    sessionId: event.sessionId,
+                    sessionDate: event.date,
+                    date,
+                    startTime,
+                    endTime: resolvedEnd,
+                    forceConflicts: forceConflicts === true
+                })
+            });
+            const result = await res.json();
+            if (res.status === 409 && result.code === 'SESSION_METADATA_CONFLICTS' && forceConflicts !== true) {
+                if (loadingShown && typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+                loadingShown = false;
+                const conflicts = Array.isArray(result.data?.conflicts) ? result.data.conflicts : [];
+                const lines = conflicts.slice(0, 5).map((row) => {
+                    const parts = [row?.date, row?.existTime, row?.teacherName, row?.conflictClass].filter(Boolean);
+                    return parts.join(' · ');
+                }).join('\n');
+                const confirmed = typeof uiConfirm === 'function'
+                    ? await uiConfirm(`${result.message || 'Schedule conflicts were detected.'}${lines ? `\n\n${lines}` : ''}\n\nSave anyway?`, 'Schedule conflict')
+                    : false;
+                if (confirmed) {
+                    return applySavedSessionScheduleUpdate({
+                        event, date, startTime, endTime: resolvedEnd, durationHours, forceConflicts: true
+                    });
+                }
+                return false;
+            }
+            if (!res.ok || result.status !== 'success') {
+                const message = result.message || 'Unable to update session schedule.';
+                if (errorEl) {
+                    errorEl.textContent = message;
+                    errorEl.classList.remove('d-none');
+                } else if (typeof uiAlert === 'function') {
+                    uiAlert(message, 'Update session');
+                }
+                return false;
+            }
+            const session = result.session || {};
+            patchSavedClassSessionEventInState(event, {
+                date: session.date || date,
+                start: session.startTime || startTime,
+                end: session.endTime || resolvedEnd,
+                duration: session.durationHours || durationHours
+            });
+            hideScheduleDraftEditOverlay();
+            hideScheduleDraftMoveOverlay();
+            refreshScheduleActiveView();
+            return true;
+        } catch (error) {
+            const message = error.message || 'Unable to update session schedule.';
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.classList.remove('d-none');
+            } else if (typeof uiAlert === 'function') {
+                uiAlert(message, 'Update session');
+            }
+            return false;
+        } finally {
+            if (loadingShown && typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+        }
+    }
+
+    async function applyClassSessionStatusUpdate(event, status) {
+        if (!canDragCreateSessions || !event || !status) return false;
+        const previousKey = scheduleSessionSelectionKey(event);
+        if (typeof window.showLoading === 'function') window.showLoading('Updating session status...');
+        try {
+            const res = await fetch(SCHEDULE_UPDATE_CLASS_SESSION_STATUS_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    classId: event.classId,
+                    sessionId: event.sessionId,
+                    sessionDate: event.date,
+                    status
+                })
+            });
+            const result = await res.json();
+            if (result.code === 'MANAGE_SESSION_REQUIRED') {
+                window.open(buildSessionManagerUrlForEvent(event), '_blank', 'noopener');
+                return false;
+            }
+            if (!res.ok || result.status !== 'success') {
+                if (typeof uiAlert === 'function') uiAlert(result.message || 'Unable to update session status.', 'Session status');
+                return false;
+            }
+            const session = result.session || {};
+            patchScheduleEventInState(event, { status: session.status || status });
+            hideScheduleSessionContextMenu();
+            if (!rerenderScheduleSessionBlockFromState(event, { previousKey })) {
+                refreshScheduleActiveView();
+            }
+            return true;
+        } catch (error) {
+            if (typeof uiAlert === 'function') uiAlert(error.message || 'Unable to update session status.', 'Session status');
+            return false;
+        } finally {
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+        }
+    }
+
+    async function applyWorkSessionStatusUpdate(event, item) {
+        if (!canDragCreateSessions || !event || !item) return false;
+        const person = activeSchedulePerson();
+        if (!person?.id) return false;
+        const previousKey = scheduleSessionSelectionKey(event);
+        const completionStatus = String(item.getAttribute('data-work-completion-status') || '').trim();
+        const assigneeStatus = String(item.getAttribute('data-work-assignee-status') || '').trim();
+        const body = {
+            activityId: event.activityId,
+            entryId: event.activityEntryId,
+            personId: person.id
+        };
+        if (completionStatus) body.completionStatus = completionStatus;
+        if (assigneeStatus) body.status = assigneeStatus;
+        if (typeof window.showLoading === 'function') window.showLoading('Updating work session status...');
+        try {
+            const res = await fetch(SCHEDULE_UPDATE_WORK_SESSION_SCHEDULE_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                credentials: 'same-origin',
+                body: JSON.stringify(body)
+            });
+            const result = await res.json();
+            if (!res.ok || result.status !== 'success') {
+                if (typeof uiAlert === 'function') uiAlert(result.message || 'Unable to update work session.', 'Work session');
+                return false;
+            }
+            const entry = result.data?.entry || {};
+            const nextStatus = completionStatus === 'completed'
+                ? 'completed'
+                : (completionStatus === 'pending' ? 'pending_completion' : (assigneeStatus || event.status));
+            patchScheduleEventInState(event, {
+                status: nextStatus,
+                completionStatus: completionStatus || event.completionStatus,
+                statusLabel: entry.statusLabel || event.statusLabel
+            });
+            hideScheduleSessionContextMenu();
+            if (!rerenderScheduleSessionBlockFromState(event, { previousKey })) {
+                refreshScheduleActiveView();
+            }
+            return true;
+        } catch (error) {
+            if (typeof uiAlert === 'function') uiAlert(error.message || 'Unable to update work session.', 'Work session');
+            return false;
+        } finally {
+            if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+        }
+    }
+
     function buildSessionManagerUrlForEvent(event) {
         const detailsUrl = String(getEventDetailsUrl(event) || '').trim();
         if (detailsUrl) return detailsUrl;
@@ -4230,17 +4891,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderScheduleSessionContextStatusList(event) {
         const container = document.getElementById('scheduleSessionContextStatusList');
         if (!container) return;
-        const items = buildScheduleSessionStatusMenuItems(event);
+        const items = isWorkSessionScheduleEvent(event)
+            ? buildWorkSessionStatusMenuItems(event)
+            : buildScheduleSessionStatusMenuItems(event);
         if (!items.length) {
             container.innerHTML = '<div class="schedule-session-context-status-empty">No statuses available</div>';
             return;
         }
-        container.innerHTML = items.map((item) => `
-            <div class="schedule-session-context-status-item${item.isCurrent ? ' is-current' : ''}" role="menuitem">
-                <span class="schedule-session-context-status-chip" style="background:${escapeHtml(item.colorBg)};color:${escapeHtml(item.colorText)};border-color:${escapeHtml(item.colorBorder)};">${escapeHtml(item.label)}</span>
-                ${item.isCurrent ? '<i class="bi bi-check-lg ms-auto text-success" aria-hidden="true"></i>' : ''}
-            </div>
-        `).join('');
+        container.innerHTML = items.map((item) => {
+            const attrs = [
+                `data-schedule-session-status="${escapeHtml(item.code)}"`,
+                item.requiresManageSession ? 'data-requires-manage-session="1"' : '',
+                item.completionStatus ? `data-work-completion-status="${escapeHtml(item.completionStatus)}"` : '',
+                item.assigneeStatus ? `data-work-assignee-status="${escapeHtml(item.assigneeStatus)}"` : ''
+            ].filter(Boolean).join(' ');
+            const chipStyle = isWorkSessionScheduleEvent(event)
+                ? ''
+                : `style="background:${escapeHtml(item.colorBg)};color:${escapeHtml(item.colorText)};border-color:${escapeHtml(item.colorBorder)};"`;
+            const itemClass = `schedule-session-context-status-item${item.isCurrent ? ' is-current' : ''}${canDragCreateSessions && !item.isCurrent ? ' is-actionable' : ''}`;
+            const currentMark = item.isCurrent ? '<i class="bi bi-check-lg ms-auto text-success" aria-hidden="true"></i>' : '';
+            const inner = `<span class="schedule-session-context-status-chip" ${chipStyle}>${escapeHtml(item.label)}</span>${currentMark}`;
+            if (canDragCreateSessions) {
+                return `<button type="button" class="${itemClass}" role="menuitem" ${attrs}>${inner}</button>`;
+            }
+            return `<div class="${itemClass}" role="menuitem">${inner}</div>`;
+        }).join('');
     }
 
     function renderScheduleSessionContextMenuHeader(event) {
@@ -4257,10 +4932,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showScheduleSessionContextMenu(event, mouseEvent) {
         const menu = document.getElementById('scheduleSessionContextMenu');
-        if (!menu || !isClassSessionScheduleEvent(event)) return;
+        const isClass = isClassSessionScheduleEvent(event);
+        const isWork = isWorkSessionScheduleEvent(event);
+        if (!menu || (!isClass && !isWork)) return;
         scheduleSessionContextEvent = event;
         renderScheduleSessionContextMenuHeader(event);
         renderScheduleSessionContextStatusList(event);
+        const quickEdit = isClass && isScheduledClassSessionForQuickEdit(event);
+        document.getElementById('btn_scheduleSessionContextEdit')?.classList.toggle('d-none', !quickEdit);
+        document.getElementById('btn_scheduleSessionContextMove')?.classList.toggle('d-none', !quickEdit);
+        document.getElementById('btn_scheduleSessionContextAttendance')?.classList.toggle('d-none', !isClass);
+        document.getElementById('btn_scheduleSessionContextEnrollment')?.classList.toggle('d-none', !isClass);
+        const manageUrl = buildSessionManagerUrlForEvent(event);
+        document.getElementById('btn_scheduleSessionContextOpenSession')?.classList.toggle('d-none', !manageUrl);
         const menuWidth = 280;
         const menuHeight = Math.min(window.innerHeight - 16, 420);
         const left = Math.min(mouseEvent.clientX, window.innerWidth - menuWidth - 8);
@@ -4398,10 +5082,87 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const event = resolveScheduleContextEventFromTarget(mouseEvent.target);
-            if (!event) return;
+            if (!event) {
+                const workEvent = resolveWorkSessionEventFromTarget(mouseEvent.target);
+                if (!workEvent) return;
+                mouseEvent.preventDefault();
+                mouseEvent.stopPropagation();
+                showScheduleSessionContextMenu(workEvent, mouseEvent);
+                return;
+            }
             mouseEvent.preventDefault();
             mouseEvent.stopPropagation();
             showScheduleSessionContextMenu(event, mouseEvent);
+        });
+
+        visualArea.addEventListener('dblclick', (mouseEvent) => {
+            if (isScheduleDraftEditInteractionTarget(mouseEvent.target)) return;
+            if (canDragCreateSessions) {
+                if (openScheduleDraftEditFromTarget(mouseEvent.target, 'timeline')) {
+                    mouseEvent.preventDefault();
+                    mouseEvent.stopPropagation();
+                    return;
+                }
+                const savedEvent = resolveScheduleContextEventFromTarget(mouseEvent.target);
+                if (savedEvent && isScheduledClassSessionForQuickEdit(savedEvent)) {
+                    mouseEvent.preventDefault();
+                    mouseEvent.stopPropagation();
+                    openScheduleSavedSessionEditOverlay(savedEvent);
+                }
+                return;
+            }
+            const savedEvent = resolveScheduleContextEventFromTarget(mouseEvent.target)
+                || resolveWorkSessionEventFromTarget(mouseEvent.target);
+            if (!savedEvent) return;
+            const manageUrl = buildSessionManagerUrlForEvent(savedEvent);
+            if (!manageUrl) return;
+            mouseEvent.preventDefault();
+            mouseEvent.stopPropagation();
+            window.open(manageUrl, '_blank', 'noopener');
+        });
+
+        document.getElementById('btn_scheduleSessionContextOpenSession')?.addEventListener('click', (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            if (!event) return;
+            const manageUrl = buildSessionManagerUrlForEvent(event);
+            if (manageUrl) window.open(manageUrl, '_blank', 'noopener');
+        });
+
+        document.getElementById('btn_scheduleSessionContextEdit')?.addEventListener('click', (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            if (event) openScheduleSavedSessionEditOverlay(event);
+        });
+        document.getElementById('btn_scheduleSessionContextMove')?.addEventListener('click', (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            if (event) openScheduleSavedSessionMoveOverlay(event);
+        });
+        document.getElementById('scheduleSessionContextStatusList')?.addEventListener('click', async (clickEvent) => {
+            if (!canDragCreateSessions) return;
+            const item = clickEvent.target.closest('[data-schedule-session-status]');
+            if (!item || item.classList.contains('is-current')) return;
+            const event = scheduleSessionContextEvent;
+            if (!event) return;
+            clickEvent.preventDefault();
+            clickEvent.stopPropagation();
+            if (item.getAttribute('data-requires-manage-session') === '1') {
+                hideScheduleSessionContextMenu();
+                const manageUrl = isWorkSessionScheduleEvent(event)
+                    ? String(event.detailsUrl || '').trim()
+                    : buildSessionManagerUrlForEvent(event);
+                if (manageUrl) window.open(manageUrl, '_blank', 'noopener');
+                return;
+            }
+            if (isWorkSessionScheduleEvent(event)) {
+                await applyWorkSessionStatusUpdate(event, item);
+                return;
+            }
+            await applyClassSessionStatusUpdate(event, item.getAttribute('data-schedule-session-status'));
         });
 
         document.getElementById('btn_scheduleSessionContextAttendance')?.addEventListener('click', async (clickEvent) => {
@@ -4574,9 +5335,39 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function hasServerSavedWorkspace() {
+        return scheduleState.serverWorkspaceSaved === true;
+    }
+
+    function markServerWorkspaceSaved(saved) {
+        scheduleState.serverWorkspaceSaved = saved === true;
+        if (!saved && initialScheduleViewerPrefs && typeof initialScheduleViewerPrefs === 'object') {
+            initialScheduleViewerPrefs.startDate = '';
+            initialScheduleViewerPrefs.endDate = '';
+            initialScheduleViewerPrefs.activePersonId = '';
+            initialScheduleViewerPrefs.persons = [];
+        }
+    }
+
     function buildScheduleWorkspaceSaveChipHtml() {
-        if (!hasScheduleWorkspaceToSave()) return '';
         return `<button type="button" class="schedule-workspace-save-chip" data-schedule-save-workspace title="Save selected people and date range" aria-label="Save workspace"><i class="bi bi-bookmark" aria-hidden="true"></i><span>Save</span></button>`;
+    }
+
+    function buildScheduleWorkspaceClearChipHtml() {
+        return `<button type="button" class="schedule-workspace-clear-chip" data-schedule-clear-workspace title="Clear saved people and date range for future visits" aria-label="Clear saved workspace"><i class="bi bi-bookmark-x" aria-hidden="true"></i><span>Clear</span></button>`;
+    }
+
+    function buildScheduleWorkspaceActionsHtml() {
+        const parts = [];
+        if (hasScheduleWorkspaceToSave()) parts.push(buildScheduleWorkspaceSaveChipHtml());
+        if (hasServerSavedWorkspace()) parts.push(buildScheduleWorkspaceClearChipHtml());
+        return parts.join('');
+    }
+
+    function buildScheduleWorkspaceActionsContainerHtml() {
+        const actions = buildScheduleWorkspaceActionsHtml();
+        if (!actions) return '';
+        return `<span class="schedule-workspace-actions" data-schedule-workspace-actions>${actions}</span>`;
     }
 
     async function saveScheduleWorkspace() {
@@ -4605,9 +5396,49 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok || result.status !== 'success') {
                 throw new Error(result.message || 'Unable to save workspace.');
             }
+            markServerWorkspaceSaved(true);
+            if (initialScheduleViewerPrefs && typeof initialScheduleViewerPrefs === 'object') {
+                Object.assign(initialScheduleViewerPrefs, payload);
+            }
+            renderSchedulePersonTabs();
             await uiAlert('Workspace saved.', 'Save workspace');
         } catch (error) {
             await uiAlert(error.message || 'Unable to save workspace.', 'Save workspace');
+        }
+    }
+
+    async function clearScheduleWorkspace() {
+        if (!hasServerSavedWorkspace()) return;
+        const confirmed = await uiConfirm(
+            'This removes your saved people and date range. The current screen will stay as-is, but the page will not preload them next time. Continue?',
+            'Clear saved workspace?'
+        );
+        if (!confirmed) return;
+        try {
+            const res = await fetch(SCHEDULE_VIEWER_PREFS_API, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-AJAX-Request': 'true',
+                    Accept: 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    startDate: '',
+                    endDate: '',
+                    activePersonId: '',
+                    persons: []
+                })
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') {
+                throw new Error(result.message || 'Unable to clear saved workspace.');
+            }
+            markServerWorkspaceSaved(false);
+            renderSchedulePersonTabs();
+            await uiAlert('Saved workspace cleared.', 'Clear workspace');
+        } catch (error) {
+            await uiAlert(error.message || 'Unable to clear saved workspace.', 'Clear workspace');
         }
     }
 
@@ -4674,18 +5505,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const host = document.getElementById('schedulePersonTabs');
         if (!host) return;
         sortSchedulePersons();
+        const actionsHtml = buildScheduleWorkspaceActionsContainerHtml();
         if (!scheduleState.persons.length) {
-            host.innerHTML = '';
+            host.innerHTML = actionsHtml;
             syncActivePersonInputs();
             return;
         }
-        host.innerHTML = `${scheduleState.persons.map((person, index) => {
+        const lastIndex = scheduleState.persons.length - 1;
+        host.innerHTML = scheduleState.persons.map((person, index) => {
             const active = person.id === scheduleState.activePersonId;
             const closeButton = canSelectAnyPerson
                 ? `<button type="button" class="schedule-person-tab-close" data-schedule-remove-person="${escapeHtml(person.id)}" aria-label="Close tab" title="Close tab">&times;</button>`
                 : '';
             const roleCount = (Array.isArray(person.availableRoles) && person.availableRoles.length) ? person.availableRoles.length : 'All';
-            return `
+            const tabWrap = `
                 <div class="schedule-person-tab-wrap">
                     <button type="button" class="btn btn-sm schedule-person-tab ${active ? 'active' : ''}" data-schedule-person-tab="${escapeHtml(person.id)}">
                         <i class="bi bi-person-circle"></i>
@@ -4695,7 +5528,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${closeButton}
                 </div>
             `;
-        }).join('')}${buildScheduleWorkspaceSaveChipHtml()}`;
+            if (index === lastIndex) {
+                return `<div class="schedule-person-tab-group schedule-person-tab-group--with-actions">${tabWrap}${actionsHtml}</div>`;
+            }
+            return tabWrap;
+        }).join('');
         syncActivePersonInputs();
     }
 
@@ -5320,6 +6157,68 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    function scheduleDaySizePopoverHostHtml(mode) {
+        const label = mode === 'timeline' ? 'Row height' : 'Day width';
+        const title = mode === 'timeline' ? 'Adjust row height' : 'Adjust day width';
+        return `
+            <div class="schedule-day-size-popover-host">
+                <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-day-size-toggle aria-label="${escapeHtml(title)}" title="${escapeHtml(title)}" aria-expanded="false" aria-controls="scheduleDaySizePopover">
+                    <i class="bi bi-sliders" aria-hidden="true"></i>
+                </button>
+                <div class="schedule-day-size-popover" id="scheduleDaySizePopover" role="dialog" aria-label="${escapeHtml(label)}">
+                    <div class="schedule-day-size-popover-label">${escapeHtml(label)}</div>
+                    ${scheduleWidthControlHtml()}
+                </div>
+            </div>
+        `;
+    }
+
+    function closeScheduleDaySizePopover() {
+        const host = document.querySelector('.schedule-day-size-popover-host');
+        if (!host) return;
+        host.querySelector('.schedule-day-size-popover')?.classList.remove('is-open');
+        const toggle = host.querySelector('[data-schedule-day-size-toggle]');
+        toggle?.setAttribute('aria-expanded', 'false');
+        toggle?.classList.remove('active');
+    }
+
+    function openScheduleDaySizePopover() {
+        const host = document.querySelector('.schedule-day-size-popover-host');
+        if (!host) return;
+        host.querySelector('.schedule-day-size-popover')?.classList.add('is-open');
+        const toggle = host.querySelector('[data-schedule-day-size-toggle]');
+        toggle?.setAttribute('aria-expanded', 'true');
+        toggle?.classList.add('active');
+        syncScheduleWidthControlDisplay();
+    }
+
+    function toggleScheduleDaySizePopover() {
+        const popover = document.querySelector('.schedule-day-size-popover.is-open');
+        if (popover) closeScheduleDaySizePopover();
+        else openScheduleDaySizePopover();
+    }
+
+    function bindScheduleDaySizePopoverDismiss() {
+        if (bindScheduleDaySizePopoverDismiss.bound) return;
+        bindScheduleDaySizePopoverDismiss.bound = true;
+        document.addEventListener('click', (event) => {
+            const host = document.querySelector('.schedule-day-size-popover-host');
+            if (!host) return;
+            const popover = host.querySelector('.schedule-day-size-popover');
+            if (!popover?.classList.contains('is-open')) return;
+            if (host.contains(event.target)) return;
+            closeScheduleDaySizePopover();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            closeScheduleDaySizePopover();
+        });
+    }
+
+    function scheduleGridToolbarControlsHtml() {
+        return buildScheduleSaveDraftsButtonHtml();
+    }
+
     function scheduleLegendItemsForMode(mode) {
         if (mode === 'calendar') {
             return [
@@ -5403,12 +6302,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ].join('');
         }
         const showWeekGridControls = mode === 'verticalTimeline' || mode === 'timeline';
+        const daySizeControl = showWeekGridControls ? scheduleDaySizePopoverHostHtml(mode) : '';
         const hideEmptyDaysButton = showWeekGridControls ? scheduleHideEmptyDaysButtonHtml() : '';
         const row2RightControls = showWeekGridControls
-            ? `<div class="schedule-viewbar-grid-controls">${scheduleWidthControlHtml()}</div>`
+            ? `<div class="schedule-viewbar-grid-controls">${scheduleGridToolbarControlsHtml()}</div>`
             : '';
         const loadedAtChip = buildScheduleLoadedAtChipHtml();
-        const workspaceSaveChip = !canSelectAnyPerson ? buildScheduleWorkspaceSaveChipHtml() : '';
         legend.innerHTML = `
             <div class="schedule-viewbar">
                 <div class="schedule-viewbar-row">
@@ -5416,6 +6315,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
                 </div>
                     <div class="schedule-viewbar-row-right schedule-viewbar-actions">
+                    ${daySizeControl}
                     ${switchButtons}
                         ${hideEmptyDaysButton}
                         <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-open-legend aria-label="Legend" title="Legend"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
@@ -5424,7 +6324,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="schedule-viewbar-row">
                     <div class="schedule-viewbar-row-left schedule-viewbar-chips">
                         ${buildScheduleSelectionChipHtml()}
-                        ${workspaceSaveChip}
                         <div id="lbl_totalHours" class="schedule-toolbar-hours"></div>
                         ${loadedAtChip}
                     </div>
@@ -6247,6 +7146,13 @@ document.addEventListener('DOMContentLoaded', () => {
             void saveScheduleWorkspace();
             return;
         }
+        const clearWorkspaceButton = event.target.closest('[data-schedule-clear-workspace]');
+        if (clearWorkspaceButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            void clearScheduleWorkspace();
+            return;
+        }
         const closeButton = event.target.closest('[data-schedule-remove-person]');
         if (closeButton) {
             event.preventDefault();
@@ -6259,6 +7165,8 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleState.activePersonId = tab.getAttribute('data-schedule-person-tab') || scheduleState.activePersonId;
         refreshScheduleActiveView();
     });
+
+    bindScheduleDaySizePopoverDismiss();
 
     document.getElementById('legendContainer')?.addEventListener('input', (event) => {
         const slider = event.target.closest('#scheduleDayWidth');
@@ -6281,6 +7189,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     document.getElementById('legendContainer')?.addEventListener('click', (event) => {
+        const daySizeToggle = event.target.closest('[data-schedule-day-size-toggle]');
+        if (daySizeToggle) {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleScheduleDaySizePopover();
+            return;
+        }
         const hideEmptyButton = event.target.closest('[data-schedule-hide-empty-days]');
         if (hideEmptyButton) {
             scheduleState.hideEmptyDays = !scheduleState.hideEmptyDays;
@@ -6300,10 +7215,10 @@ document.addEventListener('DOMContentLoaded', () => {
             clearAllScheduleSelections();
             return;
         }
-        const saveWorkspaceButton = event.target.closest('[data-schedule-save-workspace]');
-        if (saveWorkspaceButton) {
+        const saveDraftsButton = event.target.closest('[data-schedule-save-drafts]');
+        if (saveDraftsButton) {
             event.preventDefault();
-            void saveScheduleWorkspace();
+            void commitScheduleDraftSessions();
             return;
         }
         const refreshLoadedButton = event.target.closest('[data-schedule-refresh-loaded]');
@@ -6471,12 +7386,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const selectionControl = buildScheduleSelectionControlHtml(ev);
                 const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
                 const detailsUrl = getEventDetailsUrl(ev);
-                const encodedDetailsUrl = encodeURIComponent(detailsUrl);
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
-        const clickHandler = (detailsUrl && !ev.isDraft) ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
+        const clickHandler = buildScheduleSessionBlockClickHandler(ev);
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
                 const soloStudentHtml = scheduleSoloStudentHtml(ev);
+        const resizeHandles = ev.isDraft || isScheduledClassSessionForQuickEdit(ev)
+            ? buildScheduleDraftResizeHandlesHtml()
+            : '';
         return `
                         <div class="${blockClasses}${selectedClass}${unselectableClass}" 
                  style="${mergeScheduleBlockLayoutStyle('position:absolute;inset:2px;', scan)}"
@@ -6498,7 +7415,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ${makeupBadge}
                              </div>
                              ${soloStudentHtml}
-                             ${ev.isDraft ? buildScheduleDraftResizeHandlesHtml() : ''}
+                             ${resizeHandles}
                     </div>
                 `;
     }
@@ -6516,10 +7433,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const unselectableClass = buildScheduleSessionUnselectableClass(ev);
                 const selectionControl = buildScheduleSelectionControlHtml(ev);
                 const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
-                const detailsUrl = getEventDetailsUrl(ev);
-                const encodedDetailsUrl = encodeURIComponent(detailsUrl);
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
-                const clickHandler = (detailsUrl && !ev.isDraft) ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"` : '';
+                const clickHandler = buildScheduleSessionBlockClickHandler(ev);
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
                 const soloStudentHtml = scheduleSoloStudentHtml(ev);

@@ -143,6 +143,47 @@ test('savePreferences writes merged blob through userSettingsService', async () 
   assert.equal(writes[0].settings.schoolScheduleViewer.startDate, '2026-09-01');
 });
 
+test('savePreferences clears schoolScheduleViewer when workspace payload is empty', async () => {
+  const writes = [];
+  const service = createService({
+    userSettingsService: {
+      async getSettings() {
+        return {
+          schoolScheduleViewer: {
+            startDate: '2026-09-01',
+            endDate: '2026-09-07',
+            persons: [{ id: 'P1', name: 'Alpha' }],
+            autoChangeDetector: true
+          },
+          otherSetting: true
+        };
+      },
+      async setSettings(userId, settings, actor) {
+        writes.push({ userId, settings, actor });
+        return settings;
+      }
+    }
+  });
+
+  const saved = await service.savePreferences(
+    'USER-1',
+    {
+      startDate: '',
+      endDate: '',
+      activePersonId: '',
+      persons: []
+    },
+    { id: 'USER-1' }
+  );
+
+  assert.equal(saved.persons.length, 0);
+  assert.equal(saved.startDate, '');
+  assert.equal(saved.endDate, '');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].settings.schoolScheduleViewer, undefined);
+  assert.equal(writes[0].settings.otherSetting, true);
+});
+
 test('schedule routes expose viewer-preferences endpoints', () => {
   const routeSource = read('MVC/routes/scheduleRoutes.js');
   assert.match(routeSource, /\/api\/viewer-preferences/);
@@ -155,14 +196,78 @@ test('personSchedule wires workspace save and user-settings restore', () => {
 
   assert.match(source, /initialScheduleViewerPrefs/);
   assert.match(source, /data-schedule-save-workspace/);
+  assert.match(source, /data-schedule-clear-workspace/);
   assert.match(source, /saveScheduleWorkspace/);
+  assert.match(source, /clearScheduleWorkspace/);
+  assert.match(source, /buildScheduleWorkspaceActionsHtml/);
+  assert.match(source, /data-schedule-workspace-actions/);
+  assert.match(source, /schedule-person-tab-group--with-actions/);
   assert.match(source, /schedulePersonTabs.*addEventListener\('click'[\s\S]*data-schedule-save-workspace/);
+  assert.match(source, /schedulePersonTabs.*addEventListener\('click'[\s\S]*data-schedule-clear-workspace/);
+  assert.doesNotMatch(source, /schedule-viewbar-row-left schedule-viewbar-chips[\s\S]*data-schedule-workspace-actions/);
   assert.match(source, /initializeScheduleViewer/);
   assert.match(source, /loadAllSavedSchedulePersons/);
   assert.match(source, /SCHEDULE_VIEWER_PREFS_API/);
   assert.match(source, /persistScheduleViewerPreferencesPartial/);
+  assert.doesNotMatch(source, /!canSelectAnyPerson \? buildScheduleWorkspace/);
 
-  assert.doesNotMatch(source, /buildScheduleSaveDraftsButtonHtml/);
-  assert.doesNotMatch(source, /data-schedule-save-drafts/);
+  assert.match(source, /data-schedule-save-drafts/);
+  assert.match(source, /data-schedule-day-size-toggle/);
+  assert.match(source, /schedule-day-size-popover/);
+  assert.match(source, /buildScheduleSaveDraftsButtonHtml/);
+  assert.match(source, /commitScheduleDraftSessions/);
+  assert.match(source, /SCHEDULE_COMMIT_STAGED_API/);
   assert.doesNotMatch(source, /SCHEDULE_AUTO_CHANGE_DETECTOR_KEY/);
+});
+
+test('schedule routes expose saved session mutation endpoints', () => {
+  const routeSource = read('MVC/routes/scheduleRoutes.js');
+  assert.match(routeSource, /\/api\/update-class-session-schedule/);
+  assert.match(routeSource, /SCHOOL_CLASSES, OPERATIONS\.UPDATE/);
+  assert.match(routeSource, /SCHOOL_ACTIVITIES, OPERATIONS\.UPDATE/);
+});
+
+test('personSchedule wires saved session schedule editing for admins', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(source, /isScheduledClassSessionForQuickEdit/);
+  assert.match(source, /isWorkSessionScheduleEvent/);
+  assert.match(source, /data-schedule-editable="1"/);
+  assert.match(source, /resolveWorkSessionEventFromTarget/);
+  assert.match(source, /SCHEDULE_UPDATE_CLASS_SESSION_SCHEDULE_API/);
+  assert.match(source, /applySavedSessionScheduleUpdate/);
+  assert.match(source, /applyClassSessionStatusUpdate/);
+  assert.match(source, /applyWorkSessionStatusUpdate/);
+  assert.match(source, /requiresManageSession/);
+  assert.match(source, /btn_scheduleSessionContextEdit/);
+  assert.match(source, /openScheduleSavedSessionEditOverlay/);
+  assert.match(source, /SCHEDULE_DRAGGABLE_BLOCK_SELECTOR/);
+  assert.match(source, /shouldOpenSessionOnClick/);
+  assert.match(source, /btn_scheduleSessionContextOpenSession/);
+  assert.match(source, /rerenderScheduleSessionBlockFromState/);
+  assert.match(source, /patchScheduleEventInState/);
+});
+
+test('status updates patch state and rerender single block instead of reloading schedule', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const classStatusBlock = source.slice(source.indexOf('async function applyClassSessionStatusUpdate'), source.indexOf('async function applyWorkSessionStatusUpdate'));
+  const workStatusBlock = source.slice(source.indexOf('async function applyWorkSessionStatusUpdate'), source.indexOf('function buildSessionManagerUrlForEvent'));
+  assert.match(classStatusBlock, /showLoading\('Updating session status/);
+  assert.match(classStatusBlock, /rerenderScheduleSessionBlockFromState/);
+  assert.doesNotMatch(classStatusBlock, /loadSchedulePerson/);
+  assert.match(workStatusBlock, /showLoading\('Updating work session status/);
+  assert.match(workStatusBlock, /rerenderScheduleSessionBlockFromState/);
+  assert.doesNotMatch(workStatusBlock, /loadSchedulePerson/);
+});
+
+test('schedule updates show waiting modal during applySavedSessionScheduleUpdate', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const scheduleUpdateBlock = source.slice(
+    source.indexOf('async function applySavedSessionScheduleUpdate'),
+    source.indexOf('async function applyClassSessionStatusUpdate')
+  );
+  assert.match(scheduleUpdateBlock, /showLoading\(forceConflicts === true \? 'Saving session schedule/);
+  assert.match(scheduleUpdateBlock, /'Updating session schedule\.\.\.'/);
+  assert.match(scheduleUpdateBlock, /hideLoading\(\{ force: true \}\)/);
+  assert.match(scheduleUpdateBlock, /loadingShown = false;\s*const conflicts/s);
+  assert.match(scheduleUpdateBlock, /await uiConfirm/);
 });

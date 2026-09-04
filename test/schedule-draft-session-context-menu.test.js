@@ -144,16 +144,27 @@ test('schedule loaded chip includes auto-detect toggle', () => {
   assert.match(view, /function isScheduleDraftWorkActive/);
 });
 
-test('draft context menu includes adjust start time and move session modal', () => {
+test('draft context menu includes move session modal and omits adjust start time', () => {
   const partial = read('packages/school/MVC/views/school/partials/scheduleDraftSessionContextMenu.ejs');
-  assert.match(partial, /btn_scheduleDraftContextAdjustStart/);
-  assert.match(partial, /Adjust start time/);
+  assert.doesNotMatch(partial, /btn_scheduleDraftContextAdjustStart/);
+  assert.doesNotMatch(partial, /Adjust start time/);
   assert.match(partial, /btn_scheduleDraftContextMoveSession/);
   assert.match(partial, /Move session/);
   assert.match(partial, /id="scheduleDraftMoveOverlay"/);
   const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
   assert.match(view, /openScheduleDraftMoveOverlay/);
   assert.match(view, /moveStagedSession/);
+});
+
+test('double-click on staged sessions opens edit overlay in master schedule and partial modal', () => {
+  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const modal = read('packages/school/public/scripts/sessionEnrollmentCalendarModal.js');
+  assert.match(view, /visualArea\.addEventListener\('dblclick'/);
+  assert.match(view, /openScheduleDraftEditFromTarget/);
+  assert.match(view, /openScheduleDraftEditOverlay\(draftEvent, source\)/);
+  assert.match(modal, /handleHostDblClick/);
+  assert.match(modal, /addEventListener\('dblclick', handleHostDblClick\)/);
+  assert.match(modal, /ScheduleDraftSessionMenu\.openEditOverlay\(eventRow, 'partialModal'\)/);
 });
 
 test('staged session multi-select state, controls, and bulk actions', () => {
@@ -188,4 +199,18 @@ test('session-calendar.css includes draft multi-select toolbar styles', () => {
   const css = read('packages/school/public/styles/session-calendar.css');
   assert.match(css, /\.schedule-draft-select/);
   assert.match(css, /\.schedule-save-drafts-btn/);
+});
+
+test('saved session schedule editing styles and context menu wiring', () => {
+  const css = read('packages/school/public/styles/session-calendar.css');
+  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(css, /\.schedule-session-context-status-item\.is-actionable/);
+  assert.match(css, /\[data-event-type="class_session"\]\[data-schedule-editable="1"\]/);
+  assert.match(view, /data-schedule-session-status/);
+  assert.match(view, /data-requires-manage-session/);
+  assert.match(view, /buildWorkSessionStatusMenuItems/);
+  assert.match(view, /shouldOpenSessionOnClick/);
+  assert.match(view, /buildScheduleSessionBlockClickHandler/);
+  assert.match(view, /btn_scheduleSessionContextOpenSession/);
+  assert.match(view, /rerenderScheduleSessionBlockFromState/);
 });

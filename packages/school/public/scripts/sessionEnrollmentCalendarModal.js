@@ -1540,6 +1540,27 @@
     document.addEventListener('scroll', hideContextMenu, true);
   }
 
+  function resolvePartialStagedEventForMenu(sessionId) {
+    const id = String(sessionId || '').trim();
+    if (!id) return null;
+    const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === id);
+    if (!eventRow || eventRow.isStaged !== true) return null;
+    return {
+      sessionId: id,
+      id,
+      classId: state?.classId || eventRow.classId,
+      className: state?.classLabel || eventRow.title,
+      title: state?.classLabel || eventRow.title,
+      date: eventRow.date,
+      start: eventRow.start,
+      end: eventRow.end,
+      duration: eventRow.durationHours,
+      scheduledDuration: eventRow.durationHours,
+      stagingAttemptId: eventRow.stagingAttemptId,
+      isDraft: true
+    };
+  }
+
   function handleHostContextMenu(event) {
     const block = event.target.closest('[data-session-id]');
     if (!block) return;
@@ -1563,6 +1584,19 @@
       return;
     }
     showContextMenu(event, sessionId);
+  }
+
+  function handleHostDblClick(event) {
+    if (!isPartialMode()) return;
+    if (event.target.closest('.schedule-draft-select, [data-schedule-draft-select], .session-cal-draft-resize-handle')) return;
+    const block = event.target.closest('[data-session-id][data-session-kind="staged"]');
+    if (!block) return;
+    const sessionId = String(block.getAttribute('data-session-id') || '').trim();
+    const eventRow = resolvePartialStagedEventForMenu(sessionId);
+    if (!eventRow || !global.ScheduleDraftSessionMenu?.openEditOverlay) return;
+    event.preventDefault();
+    event.stopPropagation();
+    global.ScheduleDraftSessionMenu.openEditOverlay(eventRow, 'partialModal');
   }
 
   function getPartialBlockingScheduleEvents() {
@@ -3051,6 +3085,7 @@
     hostEl = qs('sessionEnrollmentCalendarHost');
     if (hostEl) {
       hostEl.addEventListener('click', handleHostClick);
+      hostEl.addEventListener('dblclick', handleHostDblClick);
       hostEl.addEventListener('contextmenu', handleHostContextMenu);
       bindPartialDraftDragMove();
     }

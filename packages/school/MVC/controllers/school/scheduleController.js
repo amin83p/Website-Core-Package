@@ -21,6 +21,9 @@ const schoolPersonAccessService = require('../../services/school/schoolPersonAcc
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
+const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
+const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
+const scheduleSessionMutationService = require('../../services/school/scheduleSessionMutationService');
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
@@ -2248,6 +2251,117 @@ async function getSessionEnrollmentList(req, res) {
     }
 }
 
+async function postCommitStagedSessions(req, res) {
+    try {
+        const classId = normalizeId(req.body?.classId);
+        if (!classId) throw new Error('classId is required.');
+        const personId = normalizeId(req.body?.personId);
+        if (!personId) throw new Error('personId is required.');
+
+        const capabilities = await scheduleAccessService.buildScheduleCapabilities(req.user, {
+            accessScope: req?.accessScope || '',
+            ipAddress: req?.ip || ''
+        });
+        if (!capabilities.canDragCreateSessions) {
+            throw new Error('You do not have permission to save staged sessions from Master Schedule.');
+        }
+
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+        if (!classData) throw new Error('Class not found.');
+        if (!isUserInstructorOnClass(classData, personId)) {
+            throw new Error('Selected person is not an instructor on this class.');
+        }
+
+        const pendingStagedSessions = rollingEnrollmentSessionAlignmentService.parsePendingStagedSessions(req.body);
+        if (!pendingStagedSessions.length) {
+            throw new Error('No staged sessions to save.');
+        }
+
+        const conflictResult = await sessionConflictDetectionService.evaluateEnrollmentGapBatchConflicts({
+            classData,
+            proposedSessions: pendingStagedSessions,
+            teacherId: personId,
+            enrollingStudentId: '',
+            reqUser: req.user
+        });
+        if (conflictResult.hasConflicts) {
+            throw new Error(sessionConflictDetectionService.buildConflictBlockingMessage(conflictResult.allConflicts));
+        }
+
+        const extendCycleEndDate = req.body?.extendCycleEndDate === true
+            || String(req.body?.extendCycleEndDate || '').trim().toLowerCase() === 'true';
+        const appendResult = await rollingEnrollmentSessionAlignmentService.commitStagedSessions({
+            classData,
+            sessionsToAdd: pendingStagedSessions,
+            extendCycleEndDate,
+            reqUser: req.user
+        });
+
+        const cycleNote = appendResult.cycleEndDateExtended
+            ? ` Cycle end date extended from ${appendResult.previousCycleEndDate || 'not set'} to ${appendResult.newCycleEndDate}.`
+            : '';
+        return res.json({
+            status: 'success',
+            message: appendResult.createdCount
+                ? `${appendResult.createdCount} session(s) saved to the class schedule.${cycleNote}`
+                : 'No new sessions were saved (dates may already exist).',
+            data: {
+                createdCount: appendResult.createdCount,
+                createdSessions: appendResult.createdSessions || [],
+                cycleEndDateExtended: appendResult.cycleEndDateExtended === true,
+                previousCycleEndDate: appendResult.previousCycleEndDate || '',
+                newCycleEndDate: appendResult.newCycleEndDate || ''
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to save staged sessions.' });
+    }
+}
+
+async function postUpdateClassSessionSchedule(req, res) {
+    try {
+        const result = await scheduleSessionMutationService.updateClassSessionSchedule(req.body || {}, req);
+        return res.json({ status: 'success', message: 'Session schedule updated.', session: result.session });
+    } catch (error) {
+        const statusCode = Number(error?.statusCode) || 400;
+        return res.status(statusCode).json({
+            status: statusCode === 409 ? 'warning' : 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to update session schedule.',
+            data: error?.data || undefined
+        });
+    }
+}
+
+async function postUpdateClassSessionStatus(req, res) {
+    try {
+        const result = await scheduleSessionMutationService.updateClassSessionStatus(req.body || {}, req);
+        return res.json({ status: 'success', message: 'Session status updated.', session: result.session });
+    } catch (error) {
+        const statusCode = Number(error?.statusCode) || 400;
+        return res.status(statusCode).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to update session status.'
+        });
+    }
+}
+
+async function postUpdateWorkSessionSchedule(req, res) {
+    try {
+        const result = await scheduleSessionMutationService.updateWorkSessionFromSchedule(req.body || {}, req);
+        return res.json({ status: 'success', message: 'Work session updated.', data: result });
+    } catch (error) {
+        const statusCode = Number(error?.statusCode) || 400;
+        return res.status(statusCode).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to update work session.'
+        });
+    }
+}
+
 module.exports = {
     showSchedulePage,
     getScheduleViewerPreferences,
@@ -2261,6 +2375,10 @@ module.exports = {
     listInstructorClassesForSchedule,
     getSessionAttendanceList,
     getSessionEnrollmentList,
+    postCommitStagedSessions,
+    postUpdateClassSessionSchedule,
+    postUpdateClassSessionStatus,
+    postUpdateWorkSessionSchedule,
     showGlobalSchedulePage,
     getGlobalSchedule,
     buildScheduleViewerAccess,
