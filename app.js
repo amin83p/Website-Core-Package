@@ -974,6 +974,10 @@ async function startServer() {
     const dataBackend = await dataBackendRuntimeService.initializeDataBackend(process.env);
     registerCoreEntityQueryExecutors({ backendMode: dataBackend.mode });
     app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    dataBackendRuntimeService.setBackendChangeListener((config) => {
+      registerCoreEntityQueryExecutors({ backendMode: config.mode });
+      app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    });
     if (sessionStore && typeof sessionStore.ensureIndexes === 'function') {
       await sessionStore.ensureIndexes();
       startupLogger.success('SESSION', 'STORE', 'Mongo session store initialized.', {

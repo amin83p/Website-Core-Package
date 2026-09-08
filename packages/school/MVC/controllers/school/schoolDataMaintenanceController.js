@@ -2,7 +2,6 @@ const schoolDataMaintenanceService = require('../../services/school/schoolDataMa
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
-const { getActiveDataBackendMode } = requireCoreModule('MVC/infrastructure/runtime/dataBackendRuntime');
 
 const {
   getActiveOrgIdOrThrow: getActiveOrgIdOrThrowShared,
@@ -81,7 +80,7 @@ exports.showPage = async (req, res) => {
       actionStateId: req.actionStateId,
       activeOrgId: orgMeta.activeOrgId,
       activeOrgName: orgMeta.activeOrgName,
-      backendMode: getActiveDataBackendMode(),
+      backendMode: await schoolDataMaintenanceService.resolveMaintenanceBackendMode(),
       catalogGroups: listCatalogGroups()
     });
   } catch (error) {

@@ -3,6 +3,9 @@
 const startupLogger = require('../utils/startupLogger');
 const scheduledTaskOrchestratorService = require('./scheduledTaskOrchestratorService');
 const { bootstrapCoreScheduledTaskDefinitions } = require('./coreScheduledTaskRegistration');
+const dataBackendRuntimeService = require('./dataBackendRuntimeService');
+const { resolveDataBackendConfig } = require('../../config/dataBackend');
+const { getActiveDataBackendMode } = require('../infrastructure/runtime/dataBackendRuntime');
 
 let _timer = null;
 let _isRunning = false;
@@ -33,6 +36,17 @@ async function runPass(options = {}) {
   _isRunning = true;
   try {
     await ensureBootstrapped(options);
+    const requestedMode = String(resolveDataBackendConfig(process.env)?.mode || 'json').trim().toLowerCase();
+    const activeMode = String(getActiveDataBackendMode() || 'json').trim().toLowerCase();
+    if (requestedMode === 'mongo' && activeMode !== 'mongo') {
+      const backendStatus = dataBackendRuntimeService.getPublicBackendStatus();
+      startupLogger.warn('SCHEDULED_TASKS', 'TICK', 'Scheduled tasks are using JSON storage while Mongo is configured.', {
+        requestedMode,
+        activeMode,
+        recoveryReason: backendStatus?.fallback?.reason || '',
+        recoveryMessage: backendStatus?.fallback?.message || ''
+      });
+    }
     return await scheduledTaskOrchestratorService.runDueTasks(options);
   } catch (error) {
     startupLogger.warn('SCHEDULED_TASKS', 'TICK', 'Scheduler pass failed.', {

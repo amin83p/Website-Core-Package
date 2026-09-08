@@ -159,22 +159,9 @@ async function retryMongoConnection(env = process.env) {
 
   const checkTime = getNowIso();
   try {
-    await connectMongo({ uri: requestedConfig.mongo.uri });
-    const activeConfig = withRuntimeStatus({
-      ...requestedConfig,
-      fallback: {
-        active: false,
-        targetMode: 'json',
-        reason: '',
-        message: ''
-      }
-    }, {
-      requestedMode: 'mongo',
-      activeMode: 'mongo',
-      lastMongoCheckAt: checkTime || getNowIso(),
-      lastMongoError: null
+    const activeConfig = await activateMongoBackend(requestedConfig, {
+      lastMongoCheckAt: checkTime || getNowIso()
     });
-    setActiveDataBackendConfig(activeConfig);
     startupLogger.success('DATABACKEND', 'MONGO_RETRY', 'Mongo retry succeeded; active backend is mongo.');
     return activeConfig;
   } catch (error) {
@@ -207,10 +194,179 @@ function isRecoveryModeActive() {
   return isDataBackendRecoveryModeActive();
 }
 
+let backendChangeListener = null;
+let syncInProgress = null;
+let lastSyncAttemptAt = 0;
+
+function setBackendChangeListener(listener) {
+  backendChangeListener = typeof listener === 'function' ? listener : null;
+}
+
+function notifyBackendChange(config, previousMode = '') {
+  const nextMode = String(config?.mode || '').trim().toLowerCase();
+  const priorMode = String(previousMode || '').trim().toLowerCase();
+  if (priorMode && priorMode === nextMode && !config?.fallback?.active) return;
+  if (typeof backendChangeListener === 'function') {
+    backendChangeListener(config, priorMode);
+  }
+}
+
+function parseSyncIntervalMs(env = process.env) {
+  const parsed = Number.parseInt(String(env?.DATA_BACKEND_SYNC_INTERVAL_MS ?? '').trim(), 10);
+  if (!Number.isFinite(parsed) || parsed < 1000) return 60000;
+  return parsed;
+}
+
+function buildJsonActiveConfig(requestedConfig, activeConfig = {}) {
+  return withRuntimeStatus(requestedConfig, {
+    requestedMode: requestedConfig.requested || requestedConfig.mode,
+    activeMode: 'json',
+    lastMongoCheckAt: activeConfig?.runtime?.lastMongoCheckAt || '',
+    lastMongoError: activeConfig?.runtime?.lastMongoError || null,
+    lastSyncAttemptAt: activeConfig?.runtime?.lastSyncAttemptAt || lastSyncAttemptAt || 0
+  });
+}
+
+async function activateMongoBackend(requestedConfig, runtimeExtras = {}) {
+  await connectMongo({ uri: requestedConfig.mongo.uri });
+  const previousMode = String(getActiveDataBackendConfig()?.mode || 'json').trim().toLowerCase();
+  const activeConfig = withRuntimeStatus({
+    ...requestedConfig,
+    mode: 'mongo',
+    fallback: {
+      active: false,
+      targetMode: 'json',
+      reason: '',
+      message: ''
+    }
+  }, {
+    requestedMode: 'mongo',
+    activeMode: 'mongo',
+    lastMongoCheckAt: getNowIso(),
+    lastMongoError: null,
+    ...runtimeExtras
+  });
+  setActiveDataBackendConfig(activeConfig);
+  notifyBackendChange(activeConfig, previousMode);
+  return activeConfig;
+}
+
+async function syncActiveDataBackendForRepositoryAccess({ force = false, env = process.env } = {}) {
+  if (syncInProgress) return syncInProgress;
+
+  syncInProgress = (async () => {
+    const requestedConfig = resolveDataBackendConfig(env);
+    const activeConfig = getActiveDataBackendConfig();
+    const previousMode = String(activeConfig?.mode || 'json').trim().toLowerCase();
+    const requestedMode = String(requestedConfig?.mode || 'json').trim().toLowerCase();
+    const recoveryActive = Boolean(activeConfig?.fallback?.active);
+
+    if (requestedMode === 'json') {
+      if (previousMode !== 'json' || recoveryActive) {
+        const nextConfig = buildJsonActiveConfig(requestedConfig, activeConfig);
+        setActiveDataBackendConfig(nextConfig);
+        notifyBackendChange(nextConfig, previousMode);
+        return {
+          mode: 'json',
+          changed: previousMode !== 'json' || recoveryActive,
+          recoveryActive: false,
+          skipped: false
+        };
+      }
+      return { mode: 'json', changed: false, recoveryActive: false, skipped: false };
+    }
+
+    if (previousMode === 'mongo' && !recoveryActive) {
+      return { mode: 'mongo', changed: false, recoveryActive: false, skipped: false };
+    }
+
+    const now = Date.now();
+    const intervalMs = parseSyncIntervalMs(env);
+    const lastAttempt = Number(activeConfig?.runtime?.lastSyncAttemptAt || lastSyncAttemptAt || 0);
+    if (!force && lastAttempt && (now - lastAttempt) < intervalMs) {
+      return {
+        mode: previousMode,
+        changed: false,
+        recoveryActive,
+        skipped: true,
+        throttled: true
+      };
+    }
+
+    lastSyncAttemptAt = now;
+
+    if (!requestedConfig?.mongo?.ready) {
+      if (!recoveryActive) {
+        activateJsonFallback(
+          requestedConfig,
+          'missing_mongo_uri',
+          'Mongo backend was requested, but no Mongo URI is configured. Running in JSON recovery mode.'
+        );
+      }
+      return {
+        mode: 'json',
+        changed: !recoveryActive && previousMode !== 'json',
+        recoveryActive: true,
+        skipped: false,
+        reason: 'missing_mongo_uri'
+      };
+    }
+
+    try {
+      const nextConfig = await activateMongoBackend(requestedConfig, { lastSyncAttemptAt: now });
+      const changed = previousMode !== 'mongo' || recoveryActive;
+      if (changed) {
+        startupLogger.success('DATABACKEND', 'MONGO_SYNC', 'Repository sync restored Mongo backend.');
+      }
+      return {
+        mode: 'mongo',
+        changed,
+        recoveryActive: false,
+        skipped: false
+      };
+    } catch (error) {
+      const wasRecovery = recoveryActive;
+      activateJsonFallback(
+        requestedConfig,
+        'mongo_sync_failed',
+        'Mongo backend sync failed. The app remains in JSON recovery mode.',
+        error
+      );
+      const activeAfter = getActiveDataBackendConfig();
+      setActiveDataBackendConfig(withRuntimeStatus(activeAfter, {
+        ...(activeAfter?.runtime || {}),
+        lastSyncAttemptAt: now
+      }));
+      return {
+        mode: 'json',
+        changed: !wasRecovery && previousMode !== 'json',
+        recoveryActive: true,
+        skipped: false,
+        error: error?.message || String(error)
+      };
+    }
+  })();
+
+  try {
+    return await syncInProgress;
+  } finally {
+    syncInProgress = null;
+  }
+}
+
+function resetSyncStateForTests() {
+  syncInProgress = null;
+  lastSyncAttemptAt = 0;
+  backendChangeListener = null;
+}
+
 module.exports = {
   initializeDataBackend,
   retryMongoConnection,
   getPublicBackendStatus,
   isRecoveryModeActive,
-  maskMongoUri
+  maskMongoUri,
+  setBackendChangeListener,
+  syncActiveDataBackendForRepositoryAccess,
+  resetSyncStateForTests
 };

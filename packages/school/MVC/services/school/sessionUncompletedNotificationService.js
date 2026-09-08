@@ -1,6 +1,5 @@
 'use strict';
 
-const classModel = require('../../models/school/classModel');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
@@ -285,13 +284,8 @@ async function listOrgClasses(orgId = '', reqUser = null) {
   const scopedUser = reqUser && typeof reqUser === 'object'
     ? reqUser
     : { activeOrgId: orgKey };
-  let classes = await schoolDataService.fetchAllData('classes', {}, scopedUser).catch(() => []);
-  if (!Array.isArray(classes) || !classes.length) {
-    const fallback = await classModel.getAllClasses().catch(() => []);
-    classes = (Array.isArray(fallback) ? fallback : [])
-      .filter((row) => cleanText(row?.orgId) === orgKey);
-  }
-  return classes;
+  const classes = await schoolDataService.fetchAllData('classes', {}, scopedUser).catch(() => []);
+  return Array.isArray(classes) ? classes : [];
 }
 
 async function listClassSessions(classData = {}, reqUser = null) {

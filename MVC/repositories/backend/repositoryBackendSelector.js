@@ -1,5 +1,6 @@
 const { normalizeBackendMode } = require('../../../config/dataBackend');
 const { getActiveDataBackendMode } = require('../../infrastructure/runtime/dataBackendRuntime');
+const dataBackendRuntimeService = require('../../services/dataBackendRuntimeService');
 
 function resolveRepositoryBackendMode(options = {}) {
   if (options?.backendMode) {
@@ -9,6 +10,9 @@ function resolveRepositoryBackendMode(options = {}) {
 }
 
 async function runByRepositoryBackend(options = {}, handlers = {}, context = 'repository') {
+  if (!options?.backendMode) {
+    await dataBackendRuntimeService.syncActiveDataBackendForRepositoryAccess();
+  }
   const mode = resolveRepositoryBackendMode(options);
 
   if (mode === 'mongo') {

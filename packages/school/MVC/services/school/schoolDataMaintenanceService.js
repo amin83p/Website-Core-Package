@@ -11,7 +11,7 @@ const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolic
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const { getActiveDataBackendMode } = requireCoreModule('MVC/infrastructure/runtime/dataBackendRuntime');
+const dataBackendRuntimeService = requireCoreModule('MVC/services/dataBackendRuntimeService');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const {
   getCatalogEntry,
@@ -370,6 +370,11 @@ function normalizeTableRow(entityType, row = {}, catalogEntry = null) {
   return output;
 }
 
+async function resolveMaintenanceBackendMode() {
+  await dataBackendRuntimeService.syncActiveDataBackendForRepositoryAccess();
+  return dataBackendRuntimeService.getPublicBackendStatus()?.mode || 'json';
+}
+
 async function buildCollectionSummaries(orgId, reqUser) {
   const targetOrgId = toPublicId(orgId);
   if (!targetOrgId) throw new Error('Active organization is required.');
@@ -396,7 +401,7 @@ async function buildCollectionSummaries(orgId, reqUser) {
 
   return {
     orgId: targetOrgId,
-    backendMode: getActiveDataBackendMode(),
+    backendMode: await resolveMaintenanceBackendMode(),
     groups: listCatalogGroups(),
     collections: summaries
   };
@@ -706,6 +711,7 @@ async function migrateClassSessionIdsForActiveOrg({
 }
 
 module.exports = {
+  resolveMaintenanceBackendMode,
   buildCollectionSummaries,
   listCollectionRows,
   getCollectionRow,

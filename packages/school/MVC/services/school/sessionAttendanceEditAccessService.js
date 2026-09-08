@@ -2,7 +2,7 @@
 
 const { requireCoreModule } = require('./schoolCoreModuleResolver');
 const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
-const timesheetPeriodModel = require('../../models/school/timesheetPeriodModel');
+const schoolRepositories = require('../../repositories/school');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const {
   zonedWallClockToUtcMs,
@@ -107,9 +107,14 @@ function resolveSessionDateKey(session = {}) {
 async function findTimesheetPeriodForSessionDate(orgId, sessionDate) {
   const dateKey = cleanDateKey(sessionDate);
   if (!dateKey) return null;
-  const periods = await timesheetPeriodModel.getAllTimesheetPeriods();
+  const orgKey = String(orgId || '').trim();
+  const periods = await schoolRepositories.timesheetPeriods.list({
+    orgId__eq: orgKey,
+    page: 1,
+    limit: 10000
+  });
   const orgPeriods = (Array.isArray(periods) ? periods : [])
-    .filter((row) => String(row?.orgId || '').trim() === String(orgId || '').trim())
+    .filter((row) => String(row?.orgId || '').trim() === orgKey)
     .filter((row) => cleanDateKey(row?.startDate) && cleanDateKey(row?.endDate))
     .filter((row) => cleanDateKey(row.startDate) <= dateKey && dateKey <= cleanDateKey(row.endDate))
     .sort((left, right) => String(right.endDate).localeCompare(String(left.endDate)));
