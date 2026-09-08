@@ -12,6 +12,7 @@ const {
   isPayableWorkdayEntry
 } = require('../packages/school/MVC/services/school/timesheetWorkdayHistoryService');
 const statutoryHolidayEligibilityService = require('../packages/school/MVC/services/school/statutoryHolidayEligibilityService');
+const holidayModel = require('../packages/school/MVC/models/school/holidayModel');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -55,6 +56,7 @@ test('statutory holiday policy defaults and validation are wired in settings', (
   assert.equal(policy.emptyEnrollmentSessions, 'hide');
   assert.equal(policy.statutoryHolidayPay.enabled, true);
   assert.equal(policy.statutoryHolidayPay.minWorkdays, 30);
+  assert.equal(policy.statutoryHolidayPay.disqualifyOnLeaveDuringHolidayWeek, false);
   assert.deepEqual(policy.statutoryHolidayPay.payableHolidayTypes, ['National Holiday', 'Observance Paid']);
 
   const saved = timesheetParametersPolicyService.validatePolicyInput({
@@ -149,7 +151,29 @@ test('workday match passes when employee worked on the holiday itself', () => {
   assert.equal(passWorkedHoliday.checks.workdayMatch.pass, true);
 });
 
-test('leave during stat week and on adjacent workdays disqualifies pay', () => {
+test('holiday attendance passes without payable hours when no leave on holiday date', () => {
+  const policy = timesheetParametersPolicyService.resolvePolicy({});
+  const holiday = { id: 'HOL-ATT', date: '2026-02-16', title: 'Family Day', type: 'National Holiday' };
+  const history = buildHistoryFromDates([]);
+  for (let i = 1; i <= 40; i += 1) {
+    history.hoursByDate.set(addDays('2026-02-16', -i), 8);
+  }
+  seedWeekdayHistory(history, 1, '2026-02-16', 6, 8);
+
+  const evaluation = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
+    holiday,
+    policy,
+    workdayHistory: history,
+    leaveDates: new Set()
+  });
+
+  assert.equal(evaluation.checks.holidayAttendance.pass, true);
+  assert.equal(evaluation.checks.workdayMatch.regularWorkday, true);
+  assert.equal(evaluation.checks.workdayMatch.workedOnHoliday, false);
+  assert.equal(evaluation.qualified, true);
+});
+
+test('mid-week leave does not disqualify when holiday-week rule is off by default', () => {
   const policy = timesheetParametersPolicyService.resolvePolicy({});
   const holiday = { id: 'HOL-3', date: '2026-09-07', title: 'Labour Day', type: 'National Holiday' };
   const history = buildHistoryFromDates([]);
@@ -162,11 +186,24 @@ test('leave during stat week and on adjacent workdays disqualifies pay', () => {
     holiday,
     policy,
     workdayHistory: history,
-    leaveDates: new Set(['2026-09-09']),
-    supplementalHoursByDate: new Map([['2026-09-07', 8]])
+    leaveDates: new Set(['2026-09-09'])
   });
-  assert.equal(leaveDuringWeek.checks.leaveDuringHolidayWeek.pass, false);
-  assert.equal(leaveDuringWeek.qualified, false);
+  assert.equal(leaveDuringWeek.checks.leaveDuringHolidayWeek, undefined);
+  assert.equal(leaveDuringWeek.qualified, true);
+
+  const strictPolicy = timesheetParametersPolicyService.resolvePolicy({
+    statutoryHolidayPay: {
+      disqualifyOnLeaveDuringHolidayWeek: true
+    }
+  });
+  const strictLeaveDuringWeek = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
+    holiday,
+    policy: strictPolicy,
+    workdayHistory: history,
+    leaveDates: new Set(['2026-09-09'])
+  });
+  assert.equal(strictLeaveDuringWeek.checks.leaveDuringHolidayWeek.pass, false);
+  assert.equal(strictLeaveDuringWeek.qualified, false);
 
   const beforeDate = history.lastWorkdayBefore('2026-09-07', 14);
   const leaveBeforeAfter = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
@@ -223,6 +260,14 @@ test('manager override can force pay or disqualify statutory holiday rows', () =
   });
   assert.equal(evaluation.qualified, false);
 
+  const disqualifiedRow = statutoryHolidayEligibilityService.buildStatHolidayRow({
+    evaluation,
+    personId: 'TEACH-2'
+  });
+  assert.ok(disqualifiedRow);
+  assert.equal(disqualifiedRow.hours, 0);
+  assert.equal(disqualifiedRow.status, 'stat_holiday_not_qualified');
+
   const forced = statutoryHolidayEligibilityService.buildStatHolidayRow({
     evaluation,
     personId: 'TEACH-2',
@@ -241,10 +286,68 @@ test('manager override can force pay or disqualify statutory holiday rows', () =
     allowManagerOverride: true,
     actor: { id: 'MGR-1', name: 'Manager' }
   });
-  assert.equal(trusted.isDeleted, true);
+  assert.notEqual(trusted.isDeleted, true);
+  assert.equal(trusted.hours, 0);
+  assert.equal(trusted.status, 'stat_holiday_not_qualified');
+});
+
+test('holiday model persists statutoryHolidayPayable when provided', () => {
+  const withPayable = holidayModel.sanitizeHolidayInput({
+    orgId: 'ORG-1',
+    date: '2026-04-06',
+    title: 'Stat Holiday',
+    type: 'School Break',
+    notes: '',
+    statutoryHolidayPayable: true
+  });
+  assert.equal(withPayable.statutoryHolidayPayable, true);
+
+  const withoutPayable = holidayModel.sanitizeHolidayInput({
+    orgId: 'ORG-1',
+    date: '2026-04-06',
+    title: 'Stat Holiday',
+    type: 'School Break',
+    notes: ''
+  });
+  assert.equal(withoutPayable.statutoryHolidayPayable, undefined);
+});
+
+test('per-holiday statutoryHolidayPayable flag overrides type-based payability', () => {
+  const payableTypes = ['National Holiday', 'Observance Paid'];
+
+  assert.equal(
+    statutoryHolidayEligibilityService.isPayableHoliday(
+      { type: 'School Break', statutoryHolidayPayable: true },
+      payableTypes
+    ),
+    true
+  );
+  assert.equal(
+    statutoryHolidayEligibilityService.isPayableHoliday(
+      { type: 'National Holiday', statutoryHolidayPayable: false },
+      payableTypes
+    ),
+    false
+  );
+  assert.equal(
+    statutoryHolidayEligibilityService.isPayableHoliday(
+      { type: 'National Holiday' },
+      payableTypes
+    ),
+    true
+  );
+  assert.equal(
+    statutoryHolidayEligibilityService.isPayableHoliday(
+      { type: 'School Break' },
+      payableTypes
+    ),
+    false
+  );
 });
 
 test('observance paid holiday type is supported in holiday management UI', () => {
   const holidaysView = read('packages/school/MVC/views/school/holiday/holidays.ejs');
   assert.match(holidaysView, /Observance Paid/);
+  assert.match(holidaysView, /hol_statutory_payable/);
+  assert.match(holidaysView, /statutoryHolidayPayable/);
 });

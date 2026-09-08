@@ -674,6 +674,19 @@
     });
   }
 
+  function cleanupModalLayerArtifacts() {
+    if (typeof window.hideLoading === 'function') {
+      window.hideLoading({ force: true });
+    }
+    const openModals = document.querySelectorAll('.modal.show');
+    if (!openModals.length) {
+      document.querySelectorAll('.modal-backdrop').forEach((backdrop) => backdrop.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+    }
+  }
+
   function buildTimesheetEditorUrl(periodId, personId) {
     const pid = cleanId(periodId);
     const tid = cleanId(personId);
@@ -1390,6 +1403,7 @@
 
   btnLoad?.addEventListener('click', loadRoster);
   btnPickPeriod?.addEventListener('click', async () => {
+    cleanupModalLayerArtifacts();
     if (!window.GenericPicker || !window.GenericPickerPresets) {
       await showMessage({ title: 'Timesheet Period Picker', icon: 'warning', message: 'The period picker is not available on this page. Please refresh and try again.' });
       return;
@@ -2450,6 +2464,7 @@
         importExecutionPersonRoleByPersonId[personId] = cleanId(payload.defaultPersonRole);
       }
       await hideBootstrapModalAndWait(importReviewModalEl);
+      cleanupModalLayerArtifacts();
       renderImportExecutionTable();
       ensureModalOnBody(importExecutionModalEl)?.show();
       await ensureImportExecutionRoles();
@@ -2637,8 +2652,8 @@
       applyActionStateFromResult(payload);
       importMode = expectedPeriodId ? 'singlePeriod' : 'bulk';
       if (expectedPeriodId) importTargetPeriod = loadedPeriod || importTargetPeriod;
-      const setupModal = ensureModalOnBody(importSetupModalEl);
-      if (setupModal) setupModal.hide();
+      await hideBootstrapModalAndWait(importSetupModalEl);
+      cleanupModalLayerArtifacts();
       openImportReviewModal(payload);
     } catch (error) {
       await showMessage({ title: 'Import Compile Error', icon: 'error', message: escapeHtml(error.message || String(error)) });
@@ -2694,7 +2709,18 @@
     }
     renderImportExecutionTable();
   });
+  function registerImportModalCleanup(modalEl) {
+    modalEl?.addEventListener('hidden.bs.modal', () => {
+      cleanupModalLayerArtifacts();
+    });
+  }
+
+  registerImportModalCleanup(importSetupModalEl);
+  registerImportModalCleanup(importReviewModalEl);
+  registerImportModalCleanup(importRoleModalEl);
+
   importExecutionModalEl?.addEventListener('hidden.bs.modal', () => {
+    cleanupModalLayerArtifacts();
     const hasPending = (importExecutionRows || []).some((row) => String(row.overallStatus || 'pending') === 'pending');
     if (!hasPending) {
       importCompilePayload = null;

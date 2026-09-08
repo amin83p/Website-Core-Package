@@ -118,13 +118,13 @@ async function listHolidays(req, res) {
 async function saveHoliday(req, res) {
     let guardKey = '';
     try {
-        const { id, date, title, type, notes } = req.body;
+        const { id, date, title, type, notes, statutoryHolidayPayable } = req.body;
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
         guardKey = idempotencyGuardService.createGuardKey([
             'holiday_save',
             String(activeOrgId || '').trim(),
             String(id || '').trim(),
-            { date, title, type, notes }
+            { date, title, type, notes, statutoryHolidayPayable }
         ]);
         const guardResult = idempotencyGuardService.beginGuard({
             key: guardKey,
@@ -146,14 +146,22 @@ async function saveHoliday(req, res) {
                 date,
                 title,
                 type,
-                notes
+                notes,
+                statutoryHolidayPayable: statutoryHolidayPayable === true || statutoryHolidayPayable === 'true'
             }, req.user);
             const payloadOut = { status: 'success', message: 'Holiday updated successfully.' };
             idempotencyGuardService.completeGuard(guardKey, payloadOut);
             return res.json(payloadOut);
         } else {
             // Add via Data Service
-            await schoolDataService.addData('holidays', { orgId: activeOrgId, date, title, type, notes }, req.user);
+            await schoolDataService.addData('holidays', {
+                orgId: activeOrgId,
+                date,
+                title,
+                type,
+                notes,
+                statutoryHolidayPayable: statutoryHolidayPayable === true || statutoryHolidayPayable === 'true'
+            }, req.user);
             const payloadOut = { status: 'success', message: 'Holiday added successfully.' };
             idempotencyGuardService.completeGuard(guardKey, payloadOut);
             return res.json(payloadOut);

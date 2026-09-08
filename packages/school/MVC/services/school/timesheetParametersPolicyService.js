@@ -19,7 +19,7 @@ const DEFAULT_STATUTORY_HOLIDAY_PAY = Object.freeze({
   weekdayOccurrencesLookback: 9,
   earningsLookbackWeeks: 4,
   beforeAfterSearchDays: 14,
-  disqualifyOnLeaveDuringHolidayWeek: true,
+  disqualifyOnLeaveDuringHolidayWeek: false,
   disqualifyOnLeaveBeforeAfter: true,
   payableHolidayTypes: [...PAYABLE_HOLIDAY_TYPES]
 });

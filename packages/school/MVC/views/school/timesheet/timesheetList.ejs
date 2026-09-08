@@ -108,7 +108,7 @@
             availabilityClass = 'bg-danger';
           }
           const canOpenFromMenu = p.canOpen !== false;
-          const periodYear = p.startDate ? String(new Date(p.startDate).getFullYear()) : String(selectedYear);
+          const periodYear = p.startDate ? String(p.startDate).slice(0, 4) : String(selectedYear);
           const canImportThisPeriod = typeof canImportMyTimesheets !== 'undefined'
             && canImportMyTimesheets
             && ['draft', 'not_started'].includes(String(p.tsStatus || 'not_started'))

@@ -21,11 +21,11 @@ test('normalizePersonNameKey ignores punctuation and case', () => {
 
 test('buildTimesheetImportMismatchSummary flags name and partial period mismatches', () => {
   const detailedMatchNote = [
-    'Excel period falls inside this app period but dates do not match exactly.',
-    'Excel: 2026-03-16 to 2026-03-28.',
+    'Excel period partially overlaps this app period.',
+    'Excel: 2026-03-10 to 2026-03-20.',
     'App period 2026-MAR-16 (TSP_1): 2026-03-16 to 2026-03-31.',
     'Start dates match.',
-    'Excel end date is 3 days before app period end (2026-03-31).'
+    'Shared overlap window: 2026-03-16 to 2026-03-15.'
   ].join(' ');
   const summary = buildTimesheetImportMismatchSummary([
     {
@@ -34,7 +34,8 @@ test('buildTimesheetImportMismatchSummary flags name and partial period mismatch
       employeeNameFromFile: 'Other Teacher',
       matchStatus: 'partial',
       matchedPeriod: { id: 'TP_1', matchStatus: 'partial' },
-      matchNote: detailedMatchNote
+      matchNote: detailedMatchNote,
+      matchDetails: { kind: 'overlap' }
     }
   ], 'Amin Paknejad');
 
@@ -44,8 +45,24 @@ test('buildTimesheetImportMismatchSummary flags name and partial period mismatch
   assert.ok(summary.issues.some((issue) => issue.type === 'name_mismatch'));
   const periodIssue = summary.issues.find((issue) => issue.type === 'period_partial');
   assert.ok(periodIssue);
-  assert.match(periodIssue.message, /2026-03-16 to 2026-03-28/);
-  assert.match(periodIssue.message, /3 days before app period end/);
+  assert.match(periodIssue.message, /partially overlaps/);
+});
+
+test('buildTimesheetImportMismatchSummary does not warn when excel period is contained in app period', () => {
+  const summary = buildTimesheetImportMismatchSummary([
+    {
+      fileName: 'may.xlsx',
+      status: 'ok',
+      employeeNameFromFile: 'Amin Paknejad',
+      matchStatus: 'exact',
+      matchedPeriod: { id: 'TSP_2026_MAY_16', matchStatus: 'exact' },
+      matchNote: 'Excel period falls within app timesheet period.'
+    }
+  ], 'Amin Paknejad');
+
+  assert.equal(summary.blocking, false);
+  assert.equal(summary.hasIssues, false);
+  assert.ok(!summary.issues.some((issue) => issue.type === 'period_partial'));
 });
 
 test('buildTimesheetImportMismatchSummary blocks unmatched periods', () => {

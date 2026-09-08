@@ -8586,7 +8586,8 @@
       '<input type="hidden" id="hubHolidayId">',
       '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayDate">Date *</label><input type="date" id="hubHolidayDate" class="form-control" required></div>',
       '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayTitle">Title *</label><input type="text" id="hubHolidayTitle" class="form-control" required></div>',
-      '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayType">Type</label><select id="hubHolidayType" class="form-select"><option value="National Holiday">National Holiday</option><option value="School Break">School Break</option><option value="Staff Development">Staff Development</option><option value="Weather Emergency">Weather / Emergency</option><option value="Other">Other</option></select></div>',
+      '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayType">Type</label><select id="hubHolidayType" class="form-select"><option value="National Holiday">National Holiday</option><option value="Observance Paid">Observance Paid</option><option value="School Break">School Break</option><option value="Staff Development">Staff Development</option><option value="Weather Emergency">Weather / Emergency</option><option value="Other">Other</option></select></div>',
+      '<div class="mb-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="hubHolidayStatutoryPayable"><label class="form-check-label fw-bold" for="hubHolidayStatutoryPayable">Statutory holiday payable</label></div><div class="form-text">When checked, this holiday is evaluated for statutory holiday pay on timesheets regardless of type.</div></div>',
       '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayNotes">Notes</label><textarea id="hubHolidayNotes" class="form-control" rows="2"></textarea></div>',
       '</form>',
       '</div>',
@@ -8627,7 +8628,8 @@
           date: button.getAttribute('data-date') || '',
           title: button.getAttribute('data-title') || '',
           type: button.getAttribute('data-type') || 'National Holiday',
-          notes: button.getAttribute('data-notes') || ''
+          notes: button.getAttribute('data-notes') || '',
+          statutoryHolidayPayable: button.getAttribute('data-statutory-payable')
         });
       });
     });
@@ -8638,7 +8640,16 @@
     });
     const saveButton = document.getElementById('hubHolidaySaveBtn');
     if (saveButton) saveButton.addEventListener('click', saveHubHoliday);
+    const hubHolidayType = document.getElementById('hubHolidayType');
+    if (hubHolidayType) {
+      hubHolidayType.addEventListener('change', function () {
+        const payableEl = document.getElementById('hubHolidayStatutoryPayable');
+        if (payableEl) payableEl.checked = HUB_DEFAULT_STAT_PAYABLE_TYPES.includes(hubHolidayType.value);
+      });
+    }
   }
+
+  const HUB_DEFAULT_STAT_PAYABLE_TYPES = ['National Holiday', 'Observance Paid'];
 
   function openHubHolidayModal(row) {
     const modalEl = document.getElementById('hubHolidayModal');
@@ -8652,6 +8663,16 @@
     document.getElementById('hubHolidayTitle').value = row.title || '';
     document.getElementById('hubHolidayType').value = row.type || 'National Holiday';
     document.getElementById('hubHolidayNotes').value = row.notes || '';
+    const payableEl = document.getElementById('hubHolidayStatutoryPayable');
+    if (payableEl) {
+      if (row.statutoryHolidayPayable === true || row.statutoryHolidayPayable === 'true') {
+        payableEl.checked = true;
+      } else if (row.statutoryHolidayPayable === false || row.statutoryHolidayPayable === 'false') {
+        payableEl.checked = false;
+      } else {
+        payableEl.checked = HUB_DEFAULT_STAT_PAYABLE_TYPES.includes(row.type || 'National Holiday');
+      }
+    }
     if (typeof bootstrap !== 'undefined') {
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
@@ -8674,7 +8695,8 @@
         date: document.getElementById('hubHolidayDate')?.value || '',
         title: document.getElementById('hubHolidayTitle')?.value || '',
         type: document.getElementById('hubHolidayType')?.value || 'National Holiday',
-        notes: document.getElementById('hubHolidayNotes')?.value || ''
+        notes: document.getElementById('hubHolidayNotes')?.value || '',
+        statutoryHolidayPayable: document.getElementById('hubHolidayStatutoryPayable')?.checked === true
       };
       const response = await fetch('/school/holidays/save', {
         method: 'POST',
@@ -8747,11 +8769,11 @@
         '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
         '<td class="ps-3"><div class="fw-bold text-primary">' + escapeHtml(row.date || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div></td>',
         '<td><div class="fw-semibold">' + escapeHtml(row.title || 'Holiday') + '</div><div class="small text-muted">' + escapeHtml(row.notes || '-') + '</div></td>',
-        '<td><span class="badge text-bg-info">' + escapeHtml(row.type || 'Holiday') + '</span></td>',
+        '<td><span class="badge text-bg-info">' + escapeHtml(row.type || 'Holiday') + '</span>' + (row.statutoryHolidayPayable === true ? ' <span class="badge bg-success-subtle text-success border border-success ms-1">Stat pay</span>' : '') + '</td>',
         '<td class="small text-muted">' + escapeHtml(row.orgId || '-') + '</td>',
         '<td class="text-end pe-3">',
         '<div class="hub-workspace-actions">',
-        '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-holiday-edit data-id="' + escapeHtml(row.id || '') + '" data-date="' + escapeHtml(row.date || '') + '" data-title="' + escapeHtml(row.title || '') + '" data-type="' + escapeHtml(row.type || '') + '" data-notes="' + escapeHtml(row.notes || '') + '"><i class="bi bi-pencil-square me-1"></i>Edit</button>',
+        '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-holiday-edit data-id="' + escapeHtml(row.id || '') + '" data-date="' + escapeHtml(row.date || '') + '" data-title="' + escapeHtml(row.title || '') + '" data-type="' + escapeHtml(row.type || '') + '" data-notes="' + escapeHtml(row.notes || '') + '" data-statutory-payable="' + escapeHtml(row.statutoryHolidayPayable === true ? 'true' : (row.statutoryHolidayPayable === false ? 'false' : '')) + '"><i class="bi bi-pencil-square me-1"></i>Edit</button>',
         '<button type="button" class="btn btn-outline-danger btn-sm" data-hub-holiday-delete data-id="' + escapeHtml(row.id || '') + '" data-title="' + escapeHtml(row.title || 'Holiday') + '"><i class="bi bi-trash me-1"></i>Delete</button>',
         '</div>',
         '</td>',

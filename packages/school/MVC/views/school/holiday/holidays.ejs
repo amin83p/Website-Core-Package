@@ -49,13 +49,14 @@
                 <th class="draggable ps-4" data-column="date" style="width: 150px;">Date</th>
                 <th class="draggable" data-column="title">Holiday / Event Title</th>
                 <th class="draggable" data-column="type" style="width: 200px;">Type</th>
+                <th class="draggable" data-column="statutoryHolidayPayable" style="width: 140px;">Stat Pay</th>
                 <th class="draggable" data-column="notes">Notes</th>
                 <th class="text-end pe-4" style="width: 150px;">Actions</th>
             </tr>
         </thead>
         <tbody>
             <% if (data.length === 0) { %>
-                <tr><td colspan="5" class="text-center py-5 text-muted">No holidays recorded for <%= currentYear %>.</td></tr>
+                <tr><td colspan="6" class="text-center py-5 text-muted">No holidays recorded for <%= currentYear %>.</td></tr>
             <% } else { %>
                 <% data.forEach(item => { 
                     const displayDate = (typeof formatOrgDate === 'function')
@@ -75,6 +76,15 @@
                         %>
                         <span class="badge <%= badgeClass %>"><%= item.type %></span>
                     </td>
+                    <td>
+                        <% if (item.statutoryHolidayPayable === true) { %>
+                            <span class="badge bg-success-subtle text-success border border-success">Payable</span>
+                        <% } else if (item.statutoryHolidayPayable === false) { %>
+                            <span class="badge bg-light text-muted border">Not payable</span>
+                        <% } else { %>
+                            <span class="badge bg-secondary-subtle text-secondary border">By type</span>
+                        <% } %>
+                    </td>
                     <td class="text-muted small text-truncate" style="max-width: 250px;"><%= item.notes || '-' %></td>
                     <td class="table-actions text-end pe-4">
                         <div class="row-actions-wrap">
@@ -87,7 +97,7 @@
                           </button>
                           <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
                             <button class="btn btn-outline-info btn-sm" 
-                                onclick="openHolidayModal('<%= item.id %>', '<%= item.date %>', '<%= item.title.replace(/'/g, "\\'") %>', '<%= item.type %>', '<%= (item.notes||'').replace(/'/g, "\\'") %>')">
+                                onclick="openHolidayModal('<%= item.id %>', '<%= item.date %>', '<%= item.title.replace(/'/g, "\\'") %>', '<%= item.type %>', '<%= (item.notes||'').replace(/'/g, "\\'") %>', <%= item.statutoryHolidayPayable === true ? 'true' : (item.statutoryHolidayPayable === false ? 'false' : 'null') %>)">
                                 <i class="bi bi-pencil-square me-2"></i>Edit
                             </button>
                             <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>">
@@ -133,6 +143,13 @@
                             <option value="Weather Emergency">Weather / Emergency</option>
                             <option value="Other">Other</option>
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="hol_statutory_payable">
+                            <label class="form-check-label fw-bold" for="hol_statutory_payable">Statutory holiday payable</label>
+                        </div>
+                        <div class="form-text">When checked, this holiday is evaluated for statutory holiday pay on timesheets regardless of type.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Notes</label>
@@ -185,6 +202,7 @@
 <script>
 let modalInstance = null;
 let holidayYearModalInstance = null;
+const DEFAULT_STAT_PAYABLE_TYPES = ['National Holiday', 'Observance Paid'];
 const holidayYearData = <%- JSON.stringify(holidayYearRows || []).replace(/</g, '\\u003c') %>;
 const selectedHolidayYear = Number('<%= currentYear %>') || Number('<%= String(orgToday || currentYear || "").slice(0, 4) %>');
 
@@ -451,6 +469,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const holTypeSelect = document.getElementById('hol_type');
+    if (holTypeSelect) {
+        holTypeSelect.addEventListener('change', () => {
+            const payableEl = document.getElementById('hol_statutory_payable');
+            if (payableEl) payableEl.checked = DEFAULT_STAT_PAYABLE_TYPES.includes(holTypeSelect.value);
+        });
+    }
+
     // 3. Save Logic
     document.getElementById('btn_saveHoliday').addEventListener('click', async () => {
         const form = document.getElementById('holidayForm');
@@ -465,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
             title: document.getElementById('hol_title').value,
             type: document.getElementById('hol_type').value,
             notes: document.getElementById('hol_notes').value,
+            statutoryHolidayPayable: document.getElementById('hol_statutory_payable').checked === true,
             actionStateId
         };
 
@@ -513,13 +540,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Helper Functions ---
 
-function openHolidayModal(id = '', date = '', title = '', type = 'National Holiday', notes = '') {
+function openHolidayModal(id = '', date = '', title = '', type = 'National Holiday', notes = '', statutoryHolidayPayable = null) {
     document.getElementById('holidayModalTitle').innerText = id ? 'Edit Holiday' : 'Add Holiday';
     document.getElementById('hol_id').value = id;
     document.getElementById('hol_date').value = date;
     document.getElementById('hol_title').value = title;
     document.getElementById('hol_type').value = type;
     document.getElementById('hol_notes').value = notes;
+    const payableEl = document.getElementById('hol_statutory_payable');
+    if (payableEl) {
+        if (statutoryHolidayPayable === true || statutoryHolidayPayable === 'true') {
+            payableEl.checked = true;
+        } else if (statutoryHolidayPayable === false || statutoryHolidayPayable === 'false') {
+            payableEl.checked = false;
+        } else {
+            payableEl.checked = DEFAULT_STAT_PAYABLE_TYPES.includes(type);
+        }
+    }
     
     if (modalInstance) modalInstance.show();
 }

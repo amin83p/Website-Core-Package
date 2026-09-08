@@ -21,3 +21,18 @@ After inserts:
 If your Railway DB uses different ids for SCHOOL or access profiles, adjust filters in the script.
 
 App code must define SECTIONS.SCHOOL_GRADEBOOK in config/accessConstants.js (already in repo).
+
+MongoDB patch: SCHOOL_ATTENDANCES session limits (778768)
+============================================================
+
+If attendance users hit "Too many attempts. Limit is 5" on /school/attendances,
+the Mongo `sections` catalog still has temporary test limits. Re-sync from
+`package.manifest.json` (the app reads limits from Mongo at runtime, not JSON files):
+
+  node scripts/seed-school-attendances-section.js
+
+Optional explicit connection:
+
+  node scripts/seed-school-attendances-section.js --uri "<uri>" --db "<db>"
+
+Verify OP1002 sessionAttempts is 50 (not 5) in the `sections` collection after the seed.

@@ -521,6 +521,11 @@
     outline: 2px solid #0d6efd;
     outline-offset: 2px;
   }
+  .ts-stat-calc-steps {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+  }
   .ts-stat-calc-steps .list-group-item {
     border: 1px solid rgba(13, 110, 253, 0.2);
     border-radius: 0.6rem;
@@ -1212,7 +1217,7 @@
         <div class="ts-stat-calc-summary-grid mb-3" id="statHolidayCalcSummary"></div>
         <div id="statHolidayCalcResult" class="mb-3"></div>
         <div class="alert alert-info d-none mb-3" id="statHolidayCalcFallback">Calculation details are not available for this statutory holiday entry.</div>
-        <ol class="list-group list-group-numbered ts-stat-calc-steps" id="statHolidayCalcSteps"></ol>
+        <ul class="list-group ts-stat-calc-steps" id="statHolidayCalcSteps"></ul>
         <div class="alert alert-warning d-none mt-2 mb-0" id="statHolidayCalcOverride"></div>
       </div>
       <div class="modal-footer bg-light border-0">
@@ -1890,20 +1895,40 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         if (isStatutoryHolidayEntry(entry)) {
-            const hours = Number(resolveEntryHours(entry) || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2);
-            const reasons = Array.isArray(entry?.statHolidayMeta?.disqualifyReasons)
-                ? entry.statHolidayMeta.disqualifyReasons.join(' ')
-                : '';
-            const tip = reasons
-                ? `Statutory holiday pay (${hours} hrs). ${reasons}`
-                : `Statutory holiday pay (${hours} hrs).`;
+            const hours = Number(resolveEntryHours(entry) || 0);
+            const calculatedHours = Number(entry?.statHolidayMeta?.calculatedHours || 0);
+            const payBlockedReason = String(entry?.statHolidayMeta?.payBlockedReason || '').trim();
+            const hasChecks = entry?.statHolidayMeta?.checks && typeof entry.statHolidayMeta.checks === 'object';
+            const isPaying = hours > 0;
+            let tip = '';
+            let colorBg = '#f8d7da';
+            let colorText = '#842029';
+            let colorBorder = '#dc3545';
+            let icon = 'bi-balloon-fill';
+
+            if (isPaying) {
+                tip = `Statutory holiday pay (${hours.toFixed(2)} hrs). Click to view calculation steps.`;
+            } else if (payBlockedReason === 'exceeds_max_payable_hours') {
+                tip = `Exceeds max payable hours — view calculation (${calculatedHours.toFixed(2)} hrs calculated).`;
+                colorBg = '#fff3cd';
+                colorText = '#664d03';
+                colorBorder = '#ffc107';
+                icon = 'bi-exclamation-triangle-fill';
+            } else {
+                tip = 'Not qualified — view calculation steps.';
+                colorBg = '#fff3cd';
+                colorText = '#664d03';
+                colorBorder = '#ffc107';
+                icon = 'bi-exclamation-triangle-fill';
+            }
+
             return buildStatusChipHtml({
-                icon: 'bi-balloon-fill',
+                icon,
                 label: tip,
-                colorBg: '#f8d7da',
-                colorText: '#842029',
-                colorBorder: '#dc3545',
-                interactive: true,
+                colorBg,
+                colorText,
+                colorBorder,
+                interactive: hasChecks,
                 sessionId: String(entry?.sessionId || '')
             });
         }
@@ -2727,15 +2752,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const weekdayRule = checks.weekdayRule || {};
         const workdayMatch = checks.workdayMatch || {};
         const holidayAttendance = checks.holidayAttendance || {};
-        const leaveDuringWeek = checks.leaveDuringHolidayWeek || {};
         const leaveBeforeAfter = checks.leaveBeforeAfter || {};
         const calculated = checks.calculatedHours || {};
 
-        const leaveWeekDates = Array.isArray(leaveDuringWeek.leaveDates) ? leaveDuringWeek.leaveDates.filter(Boolean) : [];
         const leaveBeforeAfterDates = Array.isArray(leaveBeforeAfter.leaveDates) ? leaveBeforeAfter.leaveDates.filter(Boolean) : [];
         const weekdayName = String(weekdayRule.weekdayName || '').trim() || 'Target weekday';
         const beforeDateLabel = leaveBeforeAfter.beforeDate ? formatTimesheetDateLabel(leaveBeforeAfter.beforeDate) : 'Not found';
         const afterDateLabel = leaveBeforeAfter.afterDate ? formatTimesheetDateLabel(leaveBeforeAfter.afterDate) : 'Not found';
+        const holidayAttendanceDetails = holidayAttendance.pass
+            ? [String(holidayAttendance.reason || 'No approved leave on the statutory holiday date.')]
+            : [String(holidayAttendance.reason || 'Approved leave on statutory holiday.')];
 
         return [
             statHolidayStepItemHtml('Step 1: Minimum workdays check', minWorkdays.pass, [
@@ -2747,26 +2773,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 `Required matches: ${Number(weekdayRule.required || 0)} in last ${Number(weekdayRule.lookback || 0)} occurrences`,
                 `Your matches: ${Number(weekdayRule.actual || 0)}`
             ]),
-            statHolidayStepItemHtml('Step 3: Worked-on-holiday or regular-workday gate', workdayMatch.pass, [
+            statHolidayStepItemHtml('Step 3: Regular workday or worked on holiday', workdayMatch.pass, [
                 `Regular workday match: ${workdayMatch.regularWorkday ? 'Yes' : 'No'}`,
                 `Worked on holiday: ${workdayMatch.workedOnHoliday ? 'Yes' : 'No'}`
             ]),
-            statHolidayStepItemHtml('Step 4: Holiday attendance check', holidayAttendance.pass, [
-                String(holidayAttendance.reason || 'No additional attendance notes.')
-            ]),
-            statHolidayStepItemHtml('Step 5: Leave during holiday week check', leaveDuringWeek.pass, [
-                leaveWeekDates.length
-                    ? `Approved leave dates in holiday week: ${leaveWeekDates.map((date) => formatTimesheetDateLabel(date)).join(', ')}`
-                    : 'No approved leave during holiday week.'
-            ]),
-            statHolidayStepItemHtml('Step 6: Leave before/after check', leaveBeforeAfter.pass, [
+            statHolidayStepItemHtml('Step 4: Attendance — no approved leave on holiday date', holidayAttendance.pass, holidayAttendanceDetails),
+            statHolidayStepItemHtml('Step 5: Before and after — no approved leave on boundary workdays', leaveBeforeAfter.pass, [
                 `Nearest workday before holiday: ${beforeDateLabel}`,
                 `Nearest workday after holiday: ${afterDateLabel}`,
                 leaveBeforeAfterDates.length
                     ? `Approved leave on these boundary days: ${leaveBeforeAfterDates.map((date) => formatTimesheetDateLabel(date)).join(', ')}`
                     : 'No boundary leave conflicts.'
             ]),
-            statHolidayStepItemHtml('Step 7: Average-hours formula', calculated.pass, [
+            statHolidayStepItemHtml('Step 6: Average-hours formula', calculated.pass, [
                 `Earnings window: ${calculated.earningsStart ? formatTimesheetDateLabel(calculated.earningsStart) : '-'} to ${calculated.earningsEnd ? formatTimesheetDateLabel(calculated.earningsEnd) : '-'}`,
                 `Total hours in window: ${Number(calculated.totalHours || 0).toFixed(2)}`,
                 `Payable workdays in window: ${Number(calculated.workdayCount || 0)}`,
@@ -2789,6 +2808,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payableHours = Number(resolveEntryHours(entry) || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2);
         const calculatedHours = Number(entry?.statHolidayMeta?.calculatedHours || payableHours || 0).toFixed(2);
         const qualified = entry?.statHolidayMeta?.qualified === true;
+        const payBlockedReason = String(entry?.statHolidayMeta?.payBlockedReason || '').trim();
         const disqualifyReasons = Array.isArray(entry?.statHolidayMeta?.disqualifyReasons)
             ? entry.statHolidayMeta.disqualifyReasons.filter(Boolean)
             : [];
@@ -2801,17 +2821,26 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="ts-stat-calc-summary-item"><span class="label">Payable Hours</span><span class="value">${escapeHtml(payableHours)} hrs</span></div>
         `;
 
-        const resultBadgeClass = qualified ? 'text-bg-success' : 'text-bg-warning';
-        const resultLabel = qualified ? 'Qualified for statutory pay' : 'Not qualified automatically';
+        const resultBadgeClass = qualified && Number(payableHours) > 0 ? 'text-bg-success' : 'text-bg-warning';
+        let resultLabel = qualified ? 'Qualified for statutory pay' : 'Not qualified automatically';
+        if (payBlockedReason === 'exceeds_max_payable_hours') {
+            resultLabel = 'Calculated hours exceed the maximum payable per day (24 hrs)';
+        } else if (!qualified && Number(payableHours) > 0) {
+            resultLabel = 'Statutory pay applied by manager override';
+        }
         const reasonsHtml = disqualifyReasons.length
             ? `<ul class="mb-0 mt-2 ps-3">${disqualifyReasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>`
+            : '';
+        const blockedReasonHtml = payBlockedReason === 'exceeds_max_payable_hours'
+            ? '<p class="small text-muted mb-0 mt-2">The average-hours formula produced more than 24 payable hours for this holiday. No automatic pay was applied.</p>'
             : '';
         resultEl.innerHTML = `<div class="alert alert-light border mb-0">
             <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                 <strong>${escapeHtml(resultLabel)}</strong>
-                <span class="badge ${resultBadgeClass}">${qualified ? 'Qualified' : 'Not Qualified'}</span>
+                <span class="badge ${resultBadgeClass}">${qualified && Number(payableHours) > 0 ? 'Qualified' : 'Not Qualified'}</span>
             </div>
             ${reasonsHtml}
+            ${blockedReasonHtml}
         </div>`;
 
         const stepsHtml = buildStatHolidayCalculationStepsHtml(entry);
@@ -5631,9 +5660,13 @@ document.addEventListener('DOMContentLoaded', () => {
             forcePay: false,
             reason: String(entry.statHolidayOverride?.reason || 'Manager disqualified statutory holiday pay').trim()
         };
-        const idx = activeEntries.findIndex((row) => String(row?.sessionId || '') === String(sessionId || ''));
-        if (idx >= 0) activeEntries.splice(idx, 1);
-        deletedAutoSessionIds.push(sessionId);
+        entry.hours = 0;
+        entry.timesheetHours = 0;
+        entry.durationHours = 0;
+        entry.status = 'stat_holiday_not_qualified';
+        if (entry.statHolidayMeta && typeof entry.statHolidayMeta === 'object') {
+            entry.statHolidayMeta.payBlockedReason = 'not_qualified';
+        }
         renderTable();
     };
 

@@ -12,15 +12,15 @@ const timesheetPrintService = require('./timesheetPrintService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
+function resolveHolidayDate(holiday = {}) {
+  return String(holiday?.date || holiday?.holidayDate || '').trim();
+}
+
 function getHolidayWeekRange(holidayDate) {
   const weekday = getWeekday(holidayDate);
   const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
   const start = addDays(holidayDate, mondayOffset);
   return { start, end: addDays(start, 6) };
-}
-
-function resolveHolidayDate(holiday = {}) {
-  return String(holiday?.date || holiday?.holidayDate || '').trim();
 }
 
 function resolveHolidayTitle(holiday = {}) {
@@ -32,6 +32,8 @@ function resolveHolidayType(holiday = {}) {
 }
 
 function isPayableHoliday(holiday, payableHolidayTypes = []) {
+  if (holiday?.statutoryHolidayPayable === true) return true;
+  if (holiday?.statutoryHolidayPayable === false) return false;
   const type = resolveHolidayType(holiday);
   const allowed = Array.isArray(payableHolidayTypes) && payableHolidayTypes.length
     ? payableHolidayTypes
@@ -55,7 +57,7 @@ function summarizeDisqualifyReasons(checks = {}) {
     reasons.push('Holiday is not on a regular workday and no payable hours were logged on the holiday.');
   }
   if (checks.holidayAttendance?.pass === false) {
-    reasons.push(checks.holidayAttendance.reason || 'Absent on statutory holiday.');
+    reasons.push(checks.holidayAttendance.reason || 'Approved leave on statutory holiday.');
   }
   if (checks.leaveDuringHolidayWeek?.pass === false) {
     reasons.push('Approved leave overlaps the calendar week of the holiday.');
@@ -105,15 +107,10 @@ function evaluateHolidayEligibility({
   const workdayMatchPass = regularWorkday || workedOnHoliday;
 
   let holidayAttendancePass = true;
-  let holidayAttendanceReason = '';
-  if (regularWorkday) {
-    if (hasLeaveOnDate(date)) {
-      holidayAttendancePass = false;
-      holidayAttendanceReason = 'Approved leave on statutory holiday.';
-    } else if (!workedOnHoliday) {
-      holidayAttendancePass = false;
-      holidayAttendanceReason = 'Expected to work on this regular workday but no payable hours were logged.';
-    }
+  let holidayAttendanceReason = 'No approved leave on the statutory holiday date.';
+  if (regularWorkday && hasLeaveOnDate(date)) {
+    holidayAttendancePass = false;
+    holidayAttendanceReason = 'Approved leave on statutory holiday.';
   }
 
   const weekRange = getHolidayWeekRange(date);
@@ -121,7 +118,8 @@ function evaluateHolidayEligibility({
   leaveDates.forEach((leaveDate) => {
     if (leaveDate >= weekRange.start && leaveDate <= weekRange.end) leaveDuringWeekIds.push(leaveDate);
   });
-  const leaveDuringHolidayWeekPass = !statPolicy.disqualifyOnLeaveDuringHolidayWeek || leaveDuringWeekIds.length === 0;
+  const enforceWeekLeaveRule = statPolicy.disqualifyOnLeaveDuringHolidayWeek === true;
+  const leaveDuringHolidayWeekPass = !enforceWeekLeaveRule || leaveDuringWeekIds.length === 0;
 
   const beforeDate = workdayHistory.lastWorkdayBefore(date, statPolicy.beforeAfterSearchDays);
   const afterDate = workdayHistory.firstWorkdayAfter(date, statPolicy.beforeAfterSearchDays);
@@ -162,10 +160,10 @@ function evaluateHolidayEligibility({
       pass: holidayAttendancePass,
       reason: holidayAttendanceReason
     },
-    leaveDuringHolidayWeek: {
+    leaveDuringHolidayWeek: enforceWeekLeaveRule ? {
       pass: leaveDuringHolidayWeekPass,
       leaveDates: leaveDuringWeekIds
-    },
+    } : undefined,
     leaveBeforeAfter: {
       pass: leaveBeforeAfterPass,
       beforeDate,
@@ -280,10 +278,7 @@ function buildStatHolidayRow({
   const override = resolveExistingOverride(existingEntry);
   const sessionId = buildStatHolidaySessionId(evaluation.holidayId, personId);
   const payResolution = resolveStatHolidayPayHours({ evaluation, existingEntry, allowManagerOverride });
-  if (!payResolution.shouldPay) {
-    return null;
-  }
-  const hours = payResolution.hours;
+  const hours = payResolution.shouldPay ? payResolution.hours : 0;
 
   const row = {
     sessionId,
@@ -296,13 +291,14 @@ function buildStatHolidayRow({
     isStatutoryHoliday: true,
     isManual: false,
     isFinalStatus: true,
-    status: 'stat_holiday',
+    status: payResolution.shouldPay ? 'stat_holiday' : 'stat_holiday_not_qualified',
     statHolidayMeta: {
       holidayId: evaluation.holidayId,
       qualified: evaluation.qualified,
       calculatedHours: evaluation.calculatedHours,
       checks: evaluation.checks,
-      disqualifyReasons: evaluation.disqualifyReasons
+      disqualifyReasons: evaluation.disqualifyReasons,
+      payBlockedReason: payResolution.blockReason || ''
     }
   };
 
@@ -410,17 +406,7 @@ async function buildStatutoryHolidayTimesheetContext({
       existingEntry,
       allowManagerOverride
     });
-    if (row) {
-      rows.push(row);
-      return;
-    }
-    const warning = buildStatHolidayWarning({
-      evaluation,
-      existingEntry,
-      allowManagerOverride,
-      row
-    });
-    if (warning) warnings.push(warning);
+    rows.push(row);
   });
 
   return { rows, warnings };
@@ -467,17 +453,20 @@ function buildTrustedStatHolidayEntry({
   const forcePay = override?.forcePay === true;
   const forceDisqualify = override?.forcePay === false;
   const shouldPay = (trustedRow.statHolidayMeta?.qualified && !forceDisqualify) || forcePay;
-  if (!shouldPay) {
-    return {
-      sessionId: trustedRow.sessionId,
-      isDeleted: true,
-      ignoredReason: 'stat_holiday_disqualified'
-    };
-  }
 
-  let hours = trustedRow.hours ?? trustedRow.statHolidayMeta?.calculatedHours ?? 0;
-  if (override && Number.isFinite(Number(override.hours))) {
-    hours = Number(Number(override.hours).toFixed(2));
+  let hours = 0;
+  let payBlockedReason = trustedRow.statHolidayMeta?.payBlockedReason || '';
+  if (shouldPay) {
+    hours = trustedRow.hours ?? trustedRow.statHolidayMeta?.calculatedHours ?? 0;
+    if (override && Number.isFinite(Number(override.hours))) {
+      hours = Number(Number(override.hours).toFixed(2));
+    }
+    if (hours > MAX_STAT_HOLIDAY_PAY_HOURS) {
+      hours = 0;
+      payBlockedReason = 'exceeds_max_payable_hours';
+    }
+  } else {
+    payBlockedReason = payBlockedReason || 'not_qualified';
   }
 
   const result = {
@@ -491,9 +480,12 @@ function buildTrustedStatHolidayEntry({
     isStatutoryHoliday: true,
     isManual: false,
     isFinalStatus: true,
-    status: 'stat_holiday',
+    status: hours > 0 ? 'stat_holiday' : 'stat_holiday_not_qualified',
     comment: String(entry?.comment || trustedRow.comment || '').trim(),
-    statHolidayMeta: trustedRow.statHolidayMeta
+    statHolidayMeta: {
+      ...(trustedRow.statHolidayMeta || {}),
+      payBlockedReason
+    }
   };
 
   if (override) result.statHolidayOverride = override;

@@ -6,7 +6,7 @@ const ExcelJS = require('exceljs');
 
 const equilibriumParser = require('../MVC/services/school/timesheetExcel/parsers/equilibriumTimesheetParser');
 const { parseFilenamePeriod } = require('../MVC/services/school/timesheetExcel/timesheetExcelCellUtils');
-const { matchTimesheetPeriod, filterPeriodsForYear } = require('../MVC/services/school/timesheetExcel/timesheetPeriodMatchService');
+const { matchTimesheetPeriod, filterPeriodsForYear, resolvePeriodStartYearToken } = require('../MVC/services/school/timesheetExcel/timesheetPeriodMatchService');
 const { compileTimesheetExcelFiles, sortCompileResultsByPeriod } = require('../MVC/services/school/timesheetExcel/timesheetExcelCompilerService');
 const timesheetController = require('../MVC/controllers/school/timesheetController');
 const timesheetRoutes = require('../MVC/routes/timesheetRoutes');
@@ -107,15 +107,17 @@ test('matchTimesheetPeriod supports exact, partial, and none matches', () => {
   assert.equal(exact.matchDetails, null);
 
   const contained = matchTimesheetPeriod({ startDate: '2026-03-16', endDate: '2026-03-28' }, periods, '2026');
-  assert.equal(contained.matchStatus, 'partial');
-  assert.equal(contained.matchDetails.kind, 'contained');
-  assert.equal(contained.matchDetails.excelStart, '2026-03-16');
-  assert.equal(contained.matchDetails.excelEnd, '2026-03-28');
-  assert.equal(contained.matchDetails.appPeriodId, 'TSP_2026_MAR_16');
-  assert.match(contained.matchNote, /2026-03-16 to 2026-03-28/);
-  assert.match(contained.matchNote, /2026-03-16 to 2026-03-31/);
-  assert.ok(contained.matchDetails.boundaryNotes.some((note) => /Start dates match/.test(note)));
-  assert.ok(contained.matchDetails.boundaryNotes.some((note) => /3 days before app period end/.test(note)));
+  assert.equal(contained.matchStatus, 'exact');
+  assert.equal(contained.matchedPeriod.id, 'TSP_2026_MAR_16');
+  assert.equal(contained.matchDetails, null);
+  assert.match(contained.matchNote, /falls within app timesheet period/);
+
+  const containedMay = matchTimesheetPeriod({ startDate: '2026-05-16', endDate: '2026-05-30' }, [
+    { id: 'TSP_2026_MAY_16', name: '2026-MAY-16', startDate: '2026-05-16', endDate: '2026-05-31' }
+  ], '2026');
+  assert.equal(containedMay.matchStatus, 'exact');
+  assert.equal(containedMay.matchedPeriod.id, 'TSP_2026_MAY_16');
+  assert.equal(containedMay.matchDetails, null);
 
   const partial = matchTimesheetPeriod({ startDate: '2026-03-10', endDate: '2026-03-20' }, periods, '2026');
   assert.equal(partial.matchStatus, 'partial');
@@ -146,10 +148,8 @@ test('compileTimesheetExcelFiles includes detailed partial period warnings', asy
 
   const result = compiled.results[0];
   assert.equal(result.status, 'ok');
-  assert.equal(result.matchStatus, 'partial');
-  assert.equal(result.matchDetails.kind, 'contained');
-  assert.match(result.warnings[0], /2026-03-16 to 2026-03-28/);
-  assert.match(result.warnings[0], /2026-03-16 to 2026-03-31/);
+  assert.equal(result.matchStatus, 'exact');
+  assert.equal(result.warnings.length, 0);
 });
 
 test('filterPeriodsForYear limits periods to selected year', () => {
@@ -160,6 +160,11 @@ test('filterPeriodsForYear limits periods to selected year', () => {
   ];
   const filtered = filterPeriodsForYear(periods, '2026');
   assert.deepEqual(filtered.map((row) => row.id), ['A', 'B']);
+});
+
+test('resolvePeriodStartYearToken avoids local timezone year drift for ISO dates', () => {
+  assert.equal(resolvePeriodStartYearToken({ startDate: '2026-01-01' }, 2025), '2026');
+  assert.notEqual(new Date('2026-01-01').getFullYear(), 2026);
 });
 
 test('compileTimesheetExcelFiles returns per-file ok and error results', async () => {

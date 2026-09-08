@@ -9,6 +9,14 @@ function periodOverlaps(sourceStart, sourceEnd, periodStart, periodEnd) {
   return sourceStart <= periodEnd && sourceEnd >= periodStart;
 }
 
+function resolvePeriodStartYearToken(period, fallbackYear = '') {
+  const startDateToken = String(period?.startDate || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(startDateToken)) return startDateToken.slice(0, 4);
+  const parsedMs = Date.parse(startDateToken);
+  if (Number.isFinite(parsedMs)) return String(new Date(parsedMs).getUTCFullYear());
+  return String(fallbackYear || '');
+}
+
 function periodContainsRange(periodStart, periodEnd, sourceStart, sourceEnd) {
   return periodStart <= sourceStart && periodEnd >= sourceEnd;
 }
@@ -149,17 +157,15 @@ function matchTimesheetPeriod(sourcePeriod = {}, periods = [], year = '') {
     endDate
   ));
   if (containing) {
-    const partial = buildPartialMatchNote({
-      kind: 'contained',
-      excelStart: startDate,
-      excelEnd: endDate,
-      period: containing
-    });
     return {
-      matchedPeriod: shapeMatchedPeriod(containing, 'partial', partial.matchNote),
-      matchStatus: 'partial',
-      matchNote: partial.matchNote,
-      matchDetails: partial.matchDetails
+      matchedPeriod: shapeMatchedPeriod(
+        containing,
+        'exact',
+        'Excel period falls within app timesheet period.'
+      ),
+      matchStatus: 'exact',
+      matchNote: 'Excel period falls within app timesheet period.',
+      matchDetails: null
     };
   }
 
@@ -205,5 +211,6 @@ function shapeMatchedPeriod(period, matchStatus, matchNote) {
 
 module.exports = {
   filterPeriodsForYear,
-  matchTimesheetPeriod
+  matchTimesheetPeriod,
+  resolvePeriodStartYearToken
 };

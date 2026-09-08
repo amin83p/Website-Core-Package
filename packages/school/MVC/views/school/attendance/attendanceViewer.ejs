@@ -541,15 +541,11 @@ let attendanceScopedRollupTimer = null;
 const attendanceScopedRollupQueue = new Set();
 const attendanceScopedRollupWaiters = [];
 const ATTENDANCE_ACTION_STATE_HANDLED_ERROR = '__attendance_action_state_handled__';
-// Set to a positive number only for local UI testing; null uses the server action-state limit.
-const ATTENDANCE_MATRIX_UI_REQUEST_LIMIT_OVERRIDE = null;
-const ATTENDANCE_MATRIX_MUTATION_BUDGET_SOURCES = new Set(['cell-save', 'comment-save']);
 const attendanceRequestBudgetState = {
     maxAttempts: null,
     maxTimeMinutes: null,
     maxVolumeKB: null,
     attemptCount: 0,
-    mutationCount: 0,
     exhausted: false,
     reloadPromptShown: false
 };
@@ -957,18 +953,8 @@ function navigateAttendanceMatrixReload(state) {
 }
 
 function resolveEffectiveAttendanceRequestMaxAttempts() {
-    const override = Number(ATTENDANCE_MATRIX_UI_REQUEST_LIMIT_OVERRIDE);
-    if (Number.isFinite(override) && override > 0) return Math.floor(override);
     const serverMax = attendanceRequestBudgetState.maxAttempts;
     return serverMax > 0 ? serverMax : 0;
-}
-
-function resolveEffectiveAttendanceRequestCount() {
-    const override = Number(ATTENDANCE_MATRIX_UI_REQUEST_LIMIT_OVERRIDE);
-    if (Number.isFinite(override) && override > 0) {
-        return attendanceRequestBudgetState.mutationCount || 0;
-    }
-    return attendanceRequestBudgetState.attemptCount;
 }
 
 function clearAttendanceBudgetNotice() {
@@ -983,7 +969,7 @@ function syncAttendanceRequestBudgetFromUsage() {
 
 function syncAttendanceRequestBudgetExhausted({ prompt = true } = {}) {
     const maxAttempts = resolveEffectiveAttendanceRequestMaxAttempts();
-    const attemptCount = resolveEffectiveAttendanceRequestCount();
+    const attemptCount = attendanceRequestBudgetState.attemptCount;
     const isExhausted = maxAttempts > 0 && attemptCount >= maxAttempts;
     const wasExhausted = attendanceRequestBudgetState.exhausted;
     attendanceRequestBudgetState.exhausted = isExhausted;
@@ -1007,7 +993,7 @@ async function promptAttendanceMatrixReload({ reason = 'limit_reached', serverMe
     attendanceRequestBudgetState.exhausted = true;
 
     const attemptCount = attendanceRequestBudgetState.attemptCount;
-    const effectiveCount = resolveEffectiveAttendanceRequestCount();
+    const effectiveCount = attemptCount;
     const maxAttempts = resolveEffectiveAttendanceRequestMaxAttempts();
     const attemptUsage = maxAttempts > 0
         ? `<p class="small text-muted mt-2 mb-0">Requests used: <strong>${effectiveCount}</strong> / <strong>${maxAttempts}</strong></p>`
@@ -1069,14 +1055,6 @@ function hydrateAttendanceBudgetFromApi(response, result, options = {}) {
         });
     } else if (estimateAttempt && !countedFromServer) {
         attendanceRequestBudgetState.attemptCount += 1;
-    }
-    if (
-        ATTENDANCE_MATRIX_MUTATION_BUDGET_SOURCES.has(source)
-        && result
-        && typeof result === 'object'
-        && result.status === 'success'
-    ) {
-        attendanceRequestBudgetState.mutationCount += 1;
     }
     syncAttendanceRequestBudgetFromUsage();
 }

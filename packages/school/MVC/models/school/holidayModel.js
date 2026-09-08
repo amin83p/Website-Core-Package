@@ -56,6 +56,13 @@ function normalizeHolidayTitle(v) {
     return String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+function cleanOptionalBoolean(v) {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (v === true || v === 'true' || v === 1 || v === '1' || v === 'on' || v === 'yes') return true;
+    if (v === false || v === 'false' || v === 0 || v === '0' || v === 'off' || v === 'no') return false;
+    return undefined;
+}
+
 function sanitizeHolidayInput(input) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
         throw new Error('Invalid holiday payload.');
@@ -68,13 +75,18 @@ function sanitizeHolidayInput(input) {
     if (!orgId) throw new Error('orgId is required for holiday records.');
     if (!title) throw new Error('Holiday title is required.');
 
-    return {
+    const statutoryHolidayPayable = cleanOptionalBoolean(input.statutoryHolidayPayable);
+    const sanitized = {
         orgId: String(orgId),
         date,
         title,
         type: cleanString(input.type, { max: 60, allowEmpty: true }) || 'Holiday',
         notes: cleanString(input.notes, { max: 1000, allowEmpty: true })
     };
+    if (statutoryHolidayPayable !== undefined) {
+        sanitized.statutoryHolidayPayable = statutoryHolidayPayable;
+    }
+    return sanitized;
 }
 
 function assertUniqueInOrg(holidays, candidate, { excludeId = null } = {}) {
@@ -161,7 +173,8 @@ module.exports = {
     getHolidayById,
     addHoliday,
     updateHoliday,
-    deleteHoliday
+    deleteHoliday,
+    sanitizeHolidayInput
 };
 
 

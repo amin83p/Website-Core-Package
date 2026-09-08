@@ -16,18 +16,23 @@ const SESSIONS_SECTION = Object.freeze({
   name: 'SCHOOL_SESSIONS'
 });
 
-const ATTENDANCE_OPERATION_BUNDLE = [
-  { id: 'OP1001', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1002', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1003', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1004', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1005', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1006', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1010', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1012', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1013', sessionAttempts: 5, sessionTime: 15, active: true },
-  { id: 'OP1022', sessionAttempts: 5, sessionTime: 15, active: true }
-];
+function loadAttendanceOperationBundleFromManifest() {
+  const manifestPath = path.join(ROOT_DIR, 'packages', 'school', 'package.manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const section = (Array.isArray(manifest.sections) ? manifest.sections : [])
+    .find((row) => String(row?.id || '') === ATTENDANCES_SECTION.id);
+  if (!section || !Array.isArray(section.operations) || !section.operations.length) {
+    throw new Error(`SCHOOL_ATTENDANCES (${ATTENDANCES_SECTION.id}) operations not found in package.manifest.json`);
+  }
+  return section.operations.map((row) => ({
+    id: String(row.id || '').trim(),
+    sessionAttempts: Number(row.sessionAttempts),
+    sessionTime: Number(row.sessionTime),
+    active: row.active !== false
+  })).filter((row) => row.id);
+}
+
+const ATTENDANCE_OPERATION_BUNDLE = loadAttendanceOperationBundleFromManifest();
 
 const OPERATION_DEFINITIONS = Object.freeze([
   {
@@ -51,6 +56,29 @@ const OPERATION_DEFINITIONS = Object.freeze([
     }
   }
 ]);
+
+function resolveManifestTemplateOperation() {
+  return ATTENDANCE_OPERATION_BUNDLE.find((row) => row.id === 'OP1005')
+    || ATTENDANCE_OPERATION_BUNDLE.find((row) => row.id === 'OP1002')
+    || ATTENDANCE_OPERATION_BUNDLE[0]
+    || null;
+}
+
+function resolveOperationDefaults(operationId) {
+  const id = String(operationId || '').trim();
+  const fromManifest = ATTENDANCE_OPERATION_BUNDLE.find((row) => String(row.id) === id);
+  if (fromManifest) return { ...fromManifest };
+  const template = resolveManifestTemplateOperation();
+  if (!template) {
+    throw new Error(`No manifest limits available for operation ${id}`);
+  }
+  return {
+    id,
+    sessionAttempts: template.sessionAttempts,
+    sessionTime: template.sessionTime,
+    active: true
+  };
+}
 
 function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -111,16 +139,18 @@ function audit(existing = {}) {
 
 function mergeOperations(existing = [], wanted = []) {
   const rows = new Map((Array.isArray(existing) ? existing : []).map((row) => [String(row?.id || ''), row]));
-  wanted.forEach((row) => {
+  (Array.isArray(wanted) ? wanted : []).forEach((row) => {
     const id = String(row?.id || row || '').trim();
     if (!id) return;
+    const defaults = resolveOperationDefaults(id);
     rows.set(id, {
-      id,
-      sessionAttempts: 5,
-      sessionTime: 15,
-      active: true,
       ...(rows.get(id) || {}),
-      ...(typeof row === 'object' ? row : {})
+      ...defaults,
+      ...(typeof row === 'object' ? row : {}),
+      id,
+      sessionAttempts: defaults.sessionAttempts,
+      sessionTime: defaults.sessionTime,
+      active: defaults.active
     });
   });
   return [...rows.values()].filter((row) => row.id);
@@ -185,12 +215,7 @@ async function bindSectionOperations(sections, sectionLookup, operationIds, dryR
     return null;
   }
 
-  const wantedBindings = operationIds.map((id) => ({
-    id: String(id),
-    sessionAttempts: 5,
-    sessionTime: 15,
-    active: true
-  }));
+  const wantedBindings = operationIds.map((id) => resolveOperationDefaults(id));
   const merged = mergeOperations(existing.operations, wantedBindings);
   const summary = {
     sectionId: String(existing.id || ''),
@@ -238,16 +263,19 @@ async function verifyCatalog(db) {
 
   const uploadId = opRows.find((row) => row.name === 'UPLOAD')?.id || '';
   const printId = opRows.find((row) => row.name === 'PRINT')?.id || '';
+  const readOp = (attendances?.operations || []).find((row) => String(row?.id || '') === 'OP1002');
 
   console.log(`  SCHOOL_ATTENDANCES has UPLOAD: ${uploadId ? attendancesIds.has(String(uploadId)) : false}`);
   console.log(`  SCHOOL_ATTENDANCES has PRINT: ${printId ? attendancesIds.has(String(printId)) : false}`);
+  console.log(`  SCHOOL_ATTENDANCES OP1002 sessionAttempts: ${readOp?.sessionAttempts ?? 'missing'}`);
 
   return {
     operations: opRows,
     attendancesBound: {
       upload: uploadId ? attendancesIds.has(String(uploadId)) : false,
       print: printId ? attendancesIds.has(String(printId)) : false
-    }
+    },
+    readSessionAttempts: readOp?.sessionAttempts ?? null
   };
 }
 
@@ -290,9 +318,9 @@ async function main() {
   const attendanceBindings = mergeOperations(
     ATTENDANCE_OPERATION_BUNDLE,
     [
-      { id: uploadId, sessionAttempts: 5, sessionTime: 15, active: true },
-      { id: printId, sessionAttempts: 5, sessionTime: 15, active: true }
-    ].filter((row) => row.id)
+      uploadId ? resolveOperationDefaults(uploadId) : null,
+      printId ? resolveOperationDefaults(printId) : null
+    ].filter(Boolean)
   ).map((row) => row.id);
 
   await bindSectionOperations(
@@ -309,6 +337,7 @@ async function main() {
     resolved.forEach((row) => {
       console.log(`  ${row.name}: ${row.id} (${row.source})`);
     });
+    console.log(`[dry-run] Manifest OP1002 sessionAttempts: ${resolveOperationDefaults('OP1002').sessionAttempts}`);
   }
 
   await client.close();

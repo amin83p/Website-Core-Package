@@ -203,6 +203,8 @@ test('timesheet management exposes legacy import apply/delete wiring when enable
   assert.match(manageView, /actionStateId/);
   assert.match(manageView, /applyActionStateFromResult/);
   assert.match(manageView, /hideBootstrapModalAndWait/);
+  assert.match(manageView, /cleanupModalLayerArtifacts/);
+  assert.match(manageView, /await hideBootstrapModalAndWait\(importSetupModalEl\)/);
   assert.match(manageView, /showImportApplySuccessMessage/);
   assert.match(manageView, /text: 'Open Timesheet'/);
 

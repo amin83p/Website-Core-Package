@@ -32,7 +32,7 @@ const timesheetPrintService = require('../../services/school/timesheetPrintServi
 const deadlineReconciliationService = require('../../services/school/timesheetDeadlineReconciliationService');
 const timesheetPeriodEligibilityService = require('../../services/school/timesheetPeriodEligibilityService');
 const { compileTimesheetExcelFiles } = require('../../services/school/timesheetExcel/timesheetExcelCompilerService');
-const { filterPeriodsForYear } = require('../../services/school/timesheetExcel/timesheetPeriodMatchService');
+const { filterPeriodsForYear, resolvePeriodStartYearToken } = require('../../services/school/timesheetExcel/timesheetPeriodMatchService');
 const timesheetImportPolicyModel = require('../../models/school/timesheetImportPolicyModel');
 const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
 const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
@@ -2019,7 +2019,7 @@ exports.listMyTimesheets = async (req, res) => {
         const fallbackYear = Number(resolveOrgYearFromRequest(req));
         const availableYears = [...new Set(allPeriods.map((p) => {
             if (!p.startDate) return fallbackYear;
-            return new Date(p.startDate).getFullYear();
+            return Number(resolvePeriodStartYearToken(p, fallbackYear));
         }))].sort((a, b) => b - a);
 
         const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: false, operationId: OPERATIONS.READ_ALL });
@@ -2040,7 +2040,7 @@ exports.listMyTimesheets = async (req, res) => {
 
         let mappedPeriods = allPeriods
             .filter((p) => idsEqual(p?.orgId, activeOrgId))
-            .filter((p) => new Date(p.startDate || new Date()).getFullYear().toString() === selectedYear.toString())
+            .filter((p) => resolvePeriodStartYearToken(p, fallbackYear) === selectedYear.toString())
             .map((p) => {
                 const ts = targetTimesheets.find((t) => idsEqual(t.periodId, p.id));
                 const orgId = String(p.orgId || '').trim();

@@ -6914,62 +6914,62 @@
     "operations": [
       {
         "id": "OP1001",
-        "sessionAttempts": 5,
-        "sessionTime": 15,
+        "sessionAttempts": 10,
+        "sessionTime": 30,
         "active": true
       },
       {
         "id": "OP1002",
-        "sessionAttempts": 5,
+        "sessionAttempts": 50,
         "sessionTime": 15,
         "active": true
       },
       {
         "id": "OP1003",
-        "sessionAttempts": 5,
+        "sessionAttempts": 50,
         "sessionTime": 15,
         "active": true
       },
       {
         "id": "OP1004",
-        "sessionAttempts": 5,
-        "sessionTime": 15,
+        "sessionAttempts": 10,
+        "sessionTime": 30,
         "active": true
       },
       {
         "id": "OP1005",
-        "sessionAttempts": 5,
+        "sessionAttempts": 50,
         "sessionTime": 15,
         "active": true
       },
       {
         "id": "OP1006",
-        "sessionAttempts": 5,
-        "sessionTime": 15,
+        "sessionAttempts": 10,
+        "sessionTime": 30,
         "active": true
       },
       {
         "id": "OP1010",
-        "sessionAttempts": 5,
-        "sessionTime": 15,
+        "sessionAttempts": 10,
+        "sessionTime": 30,
         "active": true
       },
       {
         "id": "OP1012",
-        "sessionAttempts": 5,
-        "sessionTime": 15,
+        "sessionAttempts": 10,
+        "sessionTime": 30,
         "active": true
       },
       {
         "id": "OP1013",
-        "sessionAttempts": 5,
-        "sessionTime": 15,
+        "sessionAttempts": 10,
+        "sessionTime": 30,
         "active": true
       },
       {
         "id": "OP1022",
-        "sessionAttempts": 5,
-        "sessionTime": 15,
+        "sessionAttempts": 10,
+        "sessionTime": 30,
         "active": true
       }
     ],

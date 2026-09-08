@@ -38,7 +38,7 @@
       weekdayOccurrencesLookback: 9,
       earningsLookbackWeeks: 4,
       beforeAfterSearchDays: 14,
-      disqualifyOnLeaveDuringHolidayWeek: true,
+      disqualifyOnLeaveDuringHolidayWeek: false,
       disqualifyOnLeaveBeforeAfter: true,
       payableHolidayTypes: ['National Holiday', 'Observance Paid']
     };
@@ -1345,7 +1345,7 @@
               <div class="mt-3">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek" name="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek" value="true" <%= statutoryHolidayPayPolicy.disqualifyOnLeaveDuringHolidayWeek !== false ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <label class="form-check-label" for="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek">Disqualify when approved leave overlaps the holiday week (Mon–Sun)</label>
+                  <label class="form-check-label" for="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek">Disqualify when approved leave overlaps the holiday week (Mon–Sun) — off by default; enable only for strict HR policy</label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="statutoryHolidayDisqualifyOnLeaveBeforeAfter" name="statutoryHolidayDisqualifyOnLeaveBeforeAfter" value="true" <%= statutoryHolidayPayPolicy.disqualifyOnLeaveBeforeAfter !== false ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>

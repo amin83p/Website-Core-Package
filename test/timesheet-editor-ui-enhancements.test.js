@@ -401,7 +401,8 @@ test('timesheet statutory holiday status chip opens calculation modal with step 
   assert.match(editor, /aria-controls="statHolidayCalcModal"/);
   assert.match(editor, /function buildStatHolidayCalculationStepsHtml\(entry\)/);
   assert.match(editor, /Step 1: Minimum workdays check/);
-  assert.match(editor, /Step 7: Average-hours formula/);
+  assert.match(editor, /Step 6: Average-hours formula/);
+  assert.doesNotMatch(editor, /Step 7: Average-hours formula/);
   assert.match(editor, /Calculation details are not available for this statutory holiday entry\./);
   assert.match(editor, /window\.openStatHolidayCalculationModal = function\(sessionId\)/);
   assert.match(editor, /event\.target\.closest\('\.ts-stat-holiday-status-trigger'\)/);
