@@ -30,10 +30,10 @@ test('timesheet management uses generic picker instead of preloaded period dropd
 test('timesheet management period API returns picker-friendly rows', () => {
   const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
 
-  assert.match(controller, /function shapeTimesheetPeriodPickerRow\(period\)/);
+  assert.match(controller, /function shapeTimesheetPeriodPickerRow\(period/);
   assert.match(controller, /const deadlineLabel = formatPeriodDeadlineLabel\(period\)/);
   assert.match(controller, /periodWindowLabel/);
-  assert.match(controller, /results: data\.map\(shapeTimesheetPeriodPickerRow\)/);
+  assert.match(controller, /results: data\.map\(\(period\) => shapeTimesheetPeriodPickerRow\(/);
 });
 
 test('timesheet management department summary includes role-aware pay rate labels', () => {
@@ -154,4 +154,68 @@ test('timesheet management roster can be filtered by timesheet status', () => {
   assert.match(hubView, /id="hubTimesheetManagementStatusFilter"/);
   assert.match(hubView, /rosterParams\.set\('timesheetStatus', requestedStatus\)/);
   assert.match(hubView, /const statusFilter = document\.getElementById\('hubTimesheetManagementStatusFilter'\)/);
+});
+
+test('timesheet management roster uses three-dot row actions menu with print and late submission options', () => {
+  const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
+  const manageView = read('packages/school/MVC/views/school/timesheet/timesheetManage.ejs');
+
+  assert.match(controller, /canAllowLateSubmission/);
+  assert.match(controller, /allowLateSubmission,/);
+  assert.match(controller, /canOpenLateSubmission,/);
+  assert.match(controller, /isSubmissionDeadlinePassed/);
+
+  assert.match(manageView, /CAN_ALLOW_LATE_SUBMISSION/);
+  assert.match(manageView, /btn-row-actions-toggle/);
+  assert.match(manageView, /data-floating-row-actions="true"/);
+  assert.match(manageView, /row-actions-menu/);
+  assert.match(manageView, /renderActionMenu/);
+  assert.match(manageView, /Open Timesheet submission/);
+  assert.match(manageView, /data-print-person/);
+  assert.match(manageView, /openLateSubmission/);
+  assert.match(manageView, /openRowPrintPreview/);
+  assert.match(manageView, /handleTimesheetManageRowActionClick/);
+  assert.match(manageView, /isTimesheetManageRowActionTarget/);
+  assert.match(manageView, /void loadRoster\(\)/);
+  assert.doesNotMatch(manageView, /btn-group btn-group-sm/);
+});
+
+test('timesheet management exposes legacy import apply/delete wiring when enabled', () => {
+  const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
+  const routes = read('packages/school/MVC/routes/timesheetRoutes.js');
+  const manageView = read('packages/school/MVC/views/school/timesheet/timesheetManage.ejs');
+  const listView = read('packages/school/MVC/views/school/timesheet/timesheetList.ejs');
+
+  assert.match(controller, /canImportTimesheets/);
+  assert.match(controller, /hasLegacyImport/);
+  assert.match(controller, /applyTimesheetLegacyImports/);
+  assert.match(controller, /deleteTimesheetLegacyImport/);
+  assert.match(routes, /\/manage\/api\/import\/apply/);
+  assert.match(routes, /\/manage\/api\/import\/legacy/);
+  assert.match(routes, /\/api\/import\/compile/);
+  assert.match(routes, /\/api\/import\/apply/);
+
+  assert.match(manageView, /CAN_IMPORT_TIMESHEETS/);
+  assert.match(manageView, /Delete imported file/);
+  assert.match(manageView, /btnConfirmTimesheetImport/);
+  assert.match(manageView, /applyLegacyImport/);
+  assert.match(manageView, /deleteLegacyImport/);
+  assert.match(manageView, /actionStateId/);
+  assert.match(manageView, /applyActionStateFromResult/);
+  assert.match(manageView, /hideBootstrapModalAndWait/);
+  assert.match(manageView, /showImportApplySuccessMessage/);
+  assert.match(manageView, /text: 'Open Timesheet'/);
+
+  assert.match(listView, /canImportMyTimesheets/);
+  assert.match(listView, /data-my-import-period/);
+  assert.match(listView, /data-my-delete-import-period/);
+  assert.match(manageView, /async function uiConfirm/);
+  assert.match(listView, /async function uiConfirm/);
+  assert.match(listView, /beginImportApplyLoading/);
+  assert.match(listView, /showImportApplySuccessMessage/);
+  assert.match(listView, /text: 'Open Timesheet'/);
+  assert.doesNotMatch(listView, /ensureModalOnBody\(myImportReviewModalEl\)\?\.hide\(\);\s*\n\s*window\.location\.reload\(\)/);
+
+  assert.match(controller, /buildTimesheetEditorLinks/);
+  assert.match(controller, /editorLinks: buildTimesheetEditorLinks\(personId, outcome\.applied\)/);
 });

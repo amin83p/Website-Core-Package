@@ -7,7 +7,7 @@ const ExcelJS = require('exceljs');
 const equilibriumParser = require('../MVC/services/school/timesheetExcel/parsers/equilibriumTimesheetParser');
 const { parseFilenamePeriod } = require('../MVC/services/school/timesheetExcel/timesheetExcelCellUtils');
 const { matchTimesheetPeriod, filterPeriodsForYear } = require('../MVC/services/school/timesheetExcel/timesheetPeriodMatchService');
-const { compileTimesheetExcelFiles } = require('../MVC/services/school/timesheetExcel/timesheetExcelCompilerService');
+const { compileTimesheetExcelFiles, sortCompileResultsByPeriod } = require('../MVC/services/school/timesheetExcel/timesheetExcelCompilerService');
 const timesheetController = require('../MVC/controllers/school/timesheetController');
 const timesheetRoutes = require('../MVC/routes/timesheetRoutes');
 
@@ -104,13 +104,52 @@ test('matchTimesheetPeriod supports exact, partial, and none matches', () => {
   const exact = matchTimesheetPeriod({ startDate: '2026-03-16', endDate: '2026-03-31' }, periods, '2026');
   assert.equal(exact.matchStatus, 'exact');
   assert.equal(exact.matchedPeriod.id, 'TSP_2026_MAR_16');
+  assert.equal(exact.matchDetails, null);
+
+  const contained = matchTimesheetPeriod({ startDate: '2026-03-16', endDate: '2026-03-28' }, periods, '2026');
+  assert.equal(contained.matchStatus, 'partial');
+  assert.equal(contained.matchDetails.kind, 'contained');
+  assert.equal(contained.matchDetails.excelStart, '2026-03-16');
+  assert.equal(contained.matchDetails.excelEnd, '2026-03-28');
+  assert.equal(contained.matchDetails.appPeriodId, 'TSP_2026_MAR_16');
+  assert.match(contained.matchNote, /2026-03-16 to 2026-03-28/);
+  assert.match(contained.matchNote, /2026-03-16 to 2026-03-31/);
+  assert.ok(contained.matchDetails.boundaryNotes.some((note) => /Start dates match/.test(note)));
+  assert.ok(contained.matchDetails.boundaryNotes.some((note) => /3 days before app period end/.test(note)));
 
   const partial = matchTimesheetPeriod({ startDate: '2026-03-10', endDate: '2026-03-20' }, periods, '2026');
   assert.equal(partial.matchStatus, 'partial');
+  assert.equal(partial.matchDetails.kind, 'overlap');
+  assert.equal(partial.matchDetails.overlapStart, '2026-03-10');
+  assert.equal(partial.matchDetails.overlapEnd, '2026-03-15');
+  assert.match(partial.matchNote, /Shared overlap window: 2026-03-10 to 2026-03-15/);
 
   const none = matchTimesheetPeriod({ startDate: '2025-01-01', endDate: '2025-01-15' }, periods, '2026');
   assert.equal(none.matchStatus, 'none');
   assert.equal(none.matchedPeriod, null);
+});
+
+test('compileTimesheetExcelFiles includes detailed partial period warnings', async () => {
+  const workbook = await buildEquilibriumWorkbook({
+    startDate: '2026-03-16',
+    endDate: '2026-03-28',
+    rows: [{ date: '2026-03-16T00:00:00.000Z', className: 'LINC', hours: 6 }]
+  });
+  const buffer = await workbookToBuffer(workbook);
+  const compiled = await compileTimesheetExcelFiles({
+    files: [{ originalname: 'Time Sheet March 16-28,2026.xlsx', buffer }],
+    personId: 'P1',
+    personName: 'Test Teacher',
+    year: '2026',
+    periods: [{ id: 'TSP_2026_MAR_16', name: '2026-MAR-16', startDate: '2026-03-16', endDate: '2026-03-31' }]
+  });
+
+  const result = compiled.results[0];
+  assert.equal(result.status, 'ok');
+  assert.equal(result.matchStatus, 'partial');
+  assert.equal(result.matchDetails.kind, 'contained');
+  assert.match(result.warnings[0], /2026-03-16 to 2026-03-28/);
+  assert.match(result.warnings[0], /2026-03-16 to 2026-03-31/);
 });
 
 test('filterPeriodsForYear limits periods to selected year', () => {
@@ -142,6 +181,67 @@ test('compileTimesheetExcelFiles returns per-file ok and error results', async (
   assert.equal(compiled.results[0].matchedPeriod.matchStatus, 'exact');
   assert.equal(compiled.results[1].status, 'error');
   assert.ok(Array.isArray(compiled.results[1].error.messages));
+});
+
+test('compileTimesheetExcelFiles sorts results by period start date ascending', async () => {
+  const laterWorkbook = await buildEquilibriumWorkbook({
+    startDate: '2026-03-16',
+    endDate: '2026-03-31',
+    rows: [{ date: '2026-03-16T00:00:00.000Z', className: 'LINC', hours: 6 }]
+  });
+  const earlierWorkbook = await buildEquilibriumWorkbook({
+    startDate: '2026-03-01',
+    endDate: '2026-03-15',
+    rows: [{ date: '2026-03-01T00:00:00.000Z', className: 'LINC', hours: 6 }]
+  });
+  const compiled = await compileTimesheetExcelFiles({
+    files: [
+      { originalname: 'Time Sheet March 16-31,2026.xlsx', buffer: await workbookToBuffer(laterWorkbook) },
+      { originalname: 'Time Sheet March 1-15,2026.xlsx', buffer: await workbookToBuffer(earlierWorkbook) }
+    ],
+    personId: 'P1',
+    personName: 'Test Teacher',
+    year: '2026',
+    periods: [
+      { id: 'TSP_2026_MAR_01', name: '2026-MAR-01', startDate: '2026-03-01', endDate: '2026-03-15' },
+      { id: 'TSP_2026_MAR_16', name: '2026-MAR-16', startDate: '2026-03-16', endDate: '2026-03-31' }
+    ]
+  });
+
+  assert.equal(compiled.results.length, 2);
+  assert.equal(compiled.results[0].sourcePeriod.startDate, '2026-03-01');
+  assert.equal(compiled.results[0].sourcePeriod.endDate, '2026-03-15');
+  assert.equal(compiled.results[1].sourcePeriod.startDate, '2026-03-16');
+  assert.equal(compiled.results[1].sourcePeriod.endDate, '2026-03-31');
+});
+
+test('compileTimesheetExcelFiles keeps valid periods before unparseable error files', async () => {
+  const workbook = await buildEquilibriumWorkbook();
+  const buffer = await workbookToBuffer(workbook);
+  const compiled = await compileTimesheetExcelFiles({
+    files: [
+      { originalname: 'bad.txt', buffer: Buffer.from('not excel') },
+      { originalname: 'Time Sheet March 16-31,2026.xlsx', buffer }
+    ],
+    personId: 'P1',
+    personName: 'Test Teacher',
+    year: '2026',
+    periods: [{ id: 'TSP_2026_MAR_16', name: '2026-MAR-16', startDate: '2026-03-16', endDate: '2026-03-31' }]
+  });
+
+  assert.equal(compiled.results.length, 2);
+  assert.equal(compiled.results[0].status, 'ok');
+  assert.equal(compiled.results[0].sourcePeriod.startDate, '2026-03-16');
+  assert.equal(compiled.results[1].status, 'error');
+});
+
+test('sortCompileResultsByPeriod orders by start date then end date then filename', () => {
+  const sorted = sortCompileResultsByPeriod([
+    { fileName: 'z.xlsx', sourcePeriod: { startDate: '2026-04-01', endDate: '2026-04-15' } },
+    { fileName: 'a.xlsx', sourcePeriod: { startDate: '2026-03-01', endDate: '2026-03-15' } },
+    { fileName: 'error.xlsx', status: 'error', sourcePeriod: { startDate: '', endDate: '' } }
+  ]);
+  assert.deepEqual(sorted.map((row) => row.fileName), ['a.xlsx', 'z.xlsx', 'error.xlsx']);
 });
 
 test('compileTimesheetExcelFiles handles empty upload buffer', async () => {
@@ -193,7 +293,14 @@ test('timesheet manage view includes import modals and entry button', () => {
   assert.match(viewSource, /id="timesheetImportSetupModal"/);
   assert.match(viewSource, /id="timesheetImportReviewModal"/);
   assert.match(viewSource, /id="importReviewSummary"/);
+  assert.match(viewSource, /id="importReviewPeriodTabs"/);
+  assert.match(viewSource, /formatImportPeriodTabLabel/);
+  assert.match(viewSource, /renderImportReviewWarnings/);
+  assert.match(viewSource, /renderImportPeriodMatchWarningDetails/);
+  assert.match(viewSource, /ts-import-period-warn-detail/);
+  assert.match(viewSource, /data-import-review-index/);
+  assert.match(viewSource, /ts-import-period-tabs/);
   assert.match(viewSource, /ts-import-ledger-table/);
-  assert.match(viewSource, /id="btnOpenTimesheetImport"/);
+  assert.match(viewSource, /id="btnOpenTimesheetBulkImport"/);
   assert.match(viewSource, /\/school\/timesheets\/manage\/api\/import\/compile/);
 });

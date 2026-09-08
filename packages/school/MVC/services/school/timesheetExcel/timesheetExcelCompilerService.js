@@ -2,9 +2,11 @@
 
 const ExcelJS = require('exceljs');
 const equilibriumParser = require('./parsers/equilibriumTimesheetParser');
+const { parseFilenamePeriod } = require('./timesheetExcelCellUtils');
 const { matchTimesheetPeriod } = require('./timesheetPeriodMatchService');
 
 const PARSERS = [equilibriumParser];
+const UNKNOWN_PERIOD_KEY = { startDate: '9999-12-31', endDate: '9999-12-31' };
 
 function buildErrorResult(fileName, messages = []) {
   const list = (Array.isArray(messages) ? messages : [messages])
@@ -44,6 +46,7 @@ function buildOkResult(fileName, parsed, periodMatch) {
     matchedPeriod: periodMatch.matchedPeriod,
     matchStatus: periodMatch.matchStatus,
     matchNote: periodMatch.matchNote,
+    matchDetails: periodMatch.matchDetails || null,
     employeeNameFromFile: parsed.employeeNameFromFile || '',
     rows: parsed.rows || [],
     warnings,
@@ -97,17 +100,43 @@ async function compileTimesheetExcelFile(file, options = {}) {
   }
 }
 
+function resolveCompileResultPeriodKey(result) {
+  const startDate = String(result?.sourcePeriod?.startDate || '').trim();
+  const endDate = String(result?.sourcePeriod?.endDate || '').trim();
+  if (startDate && endDate) {
+    return { startDate, endDate };
+  }
+  const parsed = parseFilenamePeriod(result?.fileName || '');
+  if (parsed?.startDate && parsed?.endDate) {
+    return { startDate: parsed.startDate, endDate: parsed.endDate };
+  }
+  return { ...UNKNOWN_PERIOD_KEY };
+}
+
+function sortCompileResultsByPeriod(results) {
+  return [...(Array.isArray(results) ? results : [])].sort((a, b) => {
+    const aKey = resolveCompileResultPeriodKey(a);
+    const bKey = resolveCompileResultPeriodKey(b);
+    if (aKey.startDate !== bKey.startDate) {
+      return aKey.startDate.localeCompare(bKey.startDate);
+    }
+    if (aKey.endDate !== bKey.endDate) {
+      return aKey.endDate.localeCompare(bKey.endDate);
+    }
+    return String(a?.fileName || '').localeCompare(String(b?.fileName || ''));
+  });
+}
+
 async function compileTimesheetExcelFiles(options = {}) {
   const files = Array.isArray(options.files) ? options.files : [];
-  const results = [];
-  for (const file of files) {
-    results.push(await compileTimesheetExcelFile(file, options));
-  }
-  return { results };
+  const results = await Promise.all(files.map((file) => compileTimesheetExcelFile(file, options)));
+  return { results: sortCompileResultsByPeriod(results) };
 }
 
 module.exports = {
   compileTimesheetExcelFile,
   compileTimesheetExcelFiles,
+  resolveCompileResultPeriodKey,
+  sortCompileResultsByPeriod,
   PARSERS
 };

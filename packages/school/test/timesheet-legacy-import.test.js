@@ -1,0 +1,663 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const timesheetLegacyImportService = require('../MVC/services/school/timesheetLegacyImportService');
+const dataService = require('../MVC/services/school/schoolDataService');
+const activityService = require('../MVC/services/school/activityService');
+const timesheetImportPolicyModel = require('../MVC/models/school/timesheetImportPolicyModel');
+const timesheetImportLifecycleService = require('../MVC/services/school/timesheetImportLifecycleService');
+const schoolDependencyService = require('../MVC/services/school/schoolDependencyService');
+const timesheetManualMaterializationService = require('../MVC/services/school/timesheetManualMaterializationService');
+const taskService = require('../MVC/services/school/taskService');
+const timesheetImportWorkSessionBuilderService = require('../MVC/services/school/timesheetImportWorkSessionBuilderService');
+
+const ROOT = path.resolve(__dirname, '../../..');
+const REQ_USER = { id: 'USER_1', activeOrgId: 'ORG_1' };
+const POLICY = {
+  importActivityId: 'ACT_IMPORT',
+  allowImportInTimesheetManagement: true,
+  allowImportInMyTimesheets: true,
+  importTargetStatus: 'draft'
+};
+const ACTIVITY = {
+  id: 'ACT_IMPORT',
+  orgId: 'ORG_1',
+  status: 'posted',
+  paid: true,
+  title: 'Legacy Import Activity',
+  departmentId: 'DEPT_1',
+  evaluationType: 'attendance',
+  entries: []
+};
+
+function compileOkResult(periodId, fileName = 'march.xlsx') {
+  return {
+    status: 'ok',
+    fileName,
+    matchedPeriod: { id: periodId, name: periodId, startDate: '2026-03-01', endDate: '2026-03-15' },
+    rows: [{ date: '2026-03-01', className: 'Math', hours: 2 }]
+  };
+}
+
+function stubLegacyImportApplyDeps({
+  existingByPeriod = {},
+  addShouldFailOnPeriod = '',
+  periods = {}
+} = {}) {
+  const originals = {
+    getPolicy: timesheetImportPolicyModel.getPolicyForOrg,
+    getActivity: activityService.getActivity,
+    getById: dataService.getDataById,
+    getTimesheet: dataService.getTimesheetByPeriodAndTeacher,
+    addData: dataService.addData,
+    updateData: dataService.updateData,
+    deleteData: dataService.deleteData,
+    prepare: timesheetImportLifecycleService.prepareImportTargetPayload,
+    finalize: timesheetImportLifecycleService.finalizeImportTargetAfterSave,
+    unlock: schoolDependencyService.unlockSourcesForTimesheet,
+    revert: timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet,
+    resolveTask: taskService.resolveTimesheetTask
+  };
+
+  const created = [];
+  let addCounter = 0;
+
+  timesheetImportPolicyModel.getPolicyForOrg = async () => POLICY;
+  activityService.getActivity = async () => ACTIVITY;
+  dataService.getDataById = async (entityType, id) => {
+    if (entityType === 'timesheetPeriods') {
+      return periods[id] || {
+        id,
+        orgId: 'ORG_1',
+        name: id,
+        startDate: '2026-03-01',
+        endDate: '2026-03-15',
+        status: 'open'
+      };
+    }
+    if (entityType === 'timesheets') {
+      return created.find((row) => row.id === id) || null;
+    }
+    return null;
+  };
+  dataService.getTimesheetByPeriodAndTeacher = async (periodId) => existingByPeriod[periodId] || null;
+  dataService.addData = async (entityType, payload) => {
+    if (entityType !== 'timesheets') return payload;
+    addCounter += 1;
+    if (addShouldFailOnPeriod && payload.periodId === addShouldFailOnPeriod) {
+      throw new Error(`Simulated failure for ${addShouldFailOnPeriod}`);
+    }
+    const saved = { ...payload, id: `TS_${addCounter}` };
+    created.push(saved);
+    return saved;
+  };
+  dataService.updateData = async () => {
+    throw new Error('updateData should not be called during create-only legacy import apply');
+  };
+  dataService.deleteData = async (entityType, id) => {
+    const index = created.findIndex((row) => row.id === id);
+    if (index >= 0) created.splice(index, 1);
+    return { entityType, id };
+  };
+  timesheetImportLifecycleService.prepareImportTargetPayload = ({ basePayload }) => ({
+    payload: basePayload,
+    requiresPostSaveFinalization: false,
+    appliedStatus: 'draft'
+  });
+  timesheetImportLifecycleService.finalizeImportTargetAfterSave = async ({ savedTimesheet }) => savedTimesheet;
+  schoolDependencyService.unlockSourcesForTimesheet = async () => ({ unlocked: true });
+  timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet = async () => ({ reverted: true });
+  taskService.resolveTimesheetTask = async () => null;
+
+  return {
+    getCreated: () => [...created],
+    restore: () => {
+      timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
+      activityService.getActivity = originals.getActivity;
+      dataService.getDataById = originals.getById;
+      dataService.getTimesheetByPeriodAndTeacher = originals.getTimesheet;
+      dataService.addData = originals.addData;
+      dataService.updateData = originals.updateData;
+      dataService.deleteData = originals.deleteData;
+      timesheetImportLifecycleService.prepareImportTargetPayload = originals.prepare;
+      timesheetImportLifecycleService.finalizeImportTargetAfterSave = originals.finalize;
+      schoolDependencyService.unlockSourcesForTimesheet = originals.unlock;
+      timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet = originals.revert;
+      taskService.resolveTimesheetTask = originals.resolveTask;
+    }
+  };
+}
+
+function stubLegacyImportDeleteDeps({
+  existingByPeriod = {},
+  policy = POLICY,
+  periods = {},
+  activity = ACTIVITY
+} = {}) {
+  const originals = {
+    getPolicy: timesheetImportPolicyModel.getPolicyForOrg,
+    getById: dataService.getDataById,
+    getTimesheet: dataService.getTimesheetByPeriodAndTeacher,
+    updateData: dataService.updateData,
+    deleteData: dataService.deleteData,
+    unlock: schoolDependencyService.unlockSourcesForTimesheet,
+    revert: timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet,
+    revertEntry: timesheetManualMaterializationService.revertMaterializedActivityManualEntry,
+    removeBatch: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId
+  };
+  const store = Object.fromEntries(
+    Object.entries(existingByPeriod).map(([periodId, row]) => [periodId, { ...row }])
+  );
+  const activityUpdates = [];
+  const batchRemovals = [];
+
+  timesheetImportPolicyModel.getPolicyForOrg = async () => policy;
+  dataService.getDataById = async (entityType, id) => {
+    if (entityType === 'timesheetPeriods') {
+      return periods[id] || {
+        id,
+        orgId: 'ORG_1',
+        name: id,
+        startDate: '2026-03-01',
+        endDate: '2026-03-15',
+        status: 'open'
+      };
+    }
+    if (entityType === 'activities') {
+      return { ...activity, id: id || activity.id, entries: Array.isArray(activity.entries) ? activity.entries : [] };
+    }
+    return null;
+  };
+  dataService.getTimesheetByPeriodAndTeacher = async (periodId) => {
+    const row = store[periodId];
+    return row ? { ...row, entries: Array.isArray(row.entries) ? [...row.entries] : [] } : null;
+  };
+  dataService.updateData = async (entityType, id, payload) => {
+    if (entityType === 'activities') {
+      activityUpdates.push({ id, payload });
+      return payload;
+    }
+    if (entityType !== 'timesheets') return payload;
+    const saved = { ...payload, id: String(id ?? '').trim() || payload.id };
+    store[saved.periodId] = saved;
+    return saved;
+  };
+  schoolDependencyService.unlockSourcesForTimesheet = async () => ({ unlocked: true });
+  timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet = async () => ({ reverted: true });
+  timesheetManualMaterializationService.revertMaterializedActivityManualEntry = async () => ({ reverted: true });
+  timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId = async (args) => {
+    batchRemovals.push(args);
+    return {
+      removedEntries: 2,
+      removedAssignees: 0
+    };
+  };
+  dataService.deleteData = async (entityType, id) => {
+    if (entityType !== 'timesheets') return { entityType, id };
+    Object.keys(store).forEach((periodId) => {
+      if (store[periodId]?.id === id) delete store[periodId];
+    });
+    return { entityType, id };
+  };
+
+  return {
+    getStore: () => ({ ...store }),
+    getActivityUpdates: () => [...activityUpdates],
+    getBatchRemovals: () => [...batchRemovals],
+    restore: () => {
+      timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
+      dataService.getDataById = originals.getById;
+      dataService.getTimesheetByPeriodAndTeacher = originals.getTimesheet;
+      dataService.updateData = originals.updateData;
+      dataService.deleteData = originals.deleteData;
+      schoolDependencyService.unlockSourcesForTimesheet = originals.unlock;
+      timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet = originals.revert;
+      timesheetManualMaterializationService.revertMaterializedActivityManualEntry = originals.revertEntry;
+      timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId = originals.removeBatch;
+    }
+  };
+}
+
+test('buildExistingTimesheetSkipDescriptor includes status and legacy filename', () => {
+  const skip = timesheetLegacyImportService.buildExistingTimesheetSkipDescriptor(
+    {
+      id: 'TS_1',
+      status: 'draft',
+      periodId: 'PER_A',
+      legacyImport: { sourceFileName: 'march.xlsx' }
+    },
+    { id: 'PER_A', name: '2026-MAR-01' }
+  );
+  assert.equal(skip.periodId, 'PER_A');
+  assert.equal(skip.timesheetId, 'TS_1');
+  assert.equal(skip.legacyImportFileName, 'march.xlsx');
+  assert.match(skip.message, /Delete the imported file \(march\.xlsx\)/);
+});
+
+test('resolveImportOutcomeStatus maps applied and skipped combinations', () => {
+  assert.equal(timesheetLegacyImportService.resolveImportOutcomeStatus([{ periodId: 'A' }], []), 'success');
+  assert.equal(timesheetLegacyImportService.resolveImportOutcomeStatus([], [{ periodId: 'A' }]), 'partial');
+  assert.equal(
+    timesheetLegacyImportService.resolveImportOutcomeStatus([{ periodId: 'A' }], [{ periodId: 'B' }]),
+    'success'
+  );
+});
+
+test('buildImportOutcomeMessage summarizes skipped and applied periods', () => {
+  const mixed = timesheetLegacyImportService.buildImportOutcomeMessage({
+    applied: [{ rowCount: 2 }],
+    skipped: [{ periodId: 'PER_B' }],
+    totalRows: 2
+  });
+  assert.match(mixed, /Imported 2 row\(s\) across 1 period\(s\)/);
+  assert.match(mixed, /1 period\(s\) were skipped/);
+
+  const allSkipped = timesheetLegacyImportService.buildImportOutcomeMessage({
+    applied: [],
+    skipped: [{ periodId: 'PER_A' }, { periodId: 'PER_B' }],
+    totalRows: 0
+  });
+  assert.match(allSkipped, /No timesheets were imported/);
+  assert.match(allSkipped, /2 period\(s\) already have a timesheet/);
+});
+
+test('applyLegacyImports skips periods that already have a timesheet', async () => {
+  const stub = stubLegacyImportApplyDeps({
+    existingByPeriod: {
+      PER_B: { id: 'TS_EXISTING', status: 'draft', periodId: 'PER_B' }
+    }
+  });
+  try {
+    const outcome = await timesheetLegacyImportService.applyLegacyImports({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      compileResults: [
+        compileOkResult('PER_A'),
+        compileOkResult('PER_B')
+      ],
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.responseStatus, 'success');
+    assert.equal(outcome.applied.length, 1);
+    assert.equal(outcome.applied[0].periodId, 'PER_A');
+    assert.equal(outcome.skipped.length, 1);
+    assert.equal(outcome.skipped[0].periodId, 'PER_B');
+    assert.equal(stub.getCreated().length, 1);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('applyLegacyImports returns partial when every matched period is skipped', async () => {
+  const stub = stubLegacyImportApplyDeps({
+    existingByPeriod: {
+      PER_A: { id: 'TS_EXISTING', status: 'draft', periodId: 'PER_A' }
+    }
+  });
+  try {
+    const outcome = await timesheetLegacyImportService.applyLegacyImports({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      compileResults: [compileOkResult('PER_A')],
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.responseStatus, 'partial');
+    assert.equal(outcome.applied.length, 0);
+    assert.equal(outcome.skipped.length, 1);
+    assert.equal(stub.getCreated().length, 0);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('applyLegacyImports rolls back earlier periods when a later apply fails', async () => {
+  const stub = stubLegacyImportApplyDeps({
+    addShouldFailOnPeriod: 'PER_B'
+  });
+  try {
+    await assert.rejects(
+      () => timesheetLegacyImportService.applyLegacyImports({
+        orgId: 'ORG_1',
+        personId: 'PERSON_1',
+        compileResults: [
+          compileOkResult('PER_A'),
+          compileOkResult('PER_B')
+        ],
+        reqUser: REQ_USER,
+        scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+      }),
+      (error) => {
+        assert.match(error.message, /rolled back/i);
+        assert.equal(Array.isArray(error.rolledBack), true);
+        assert.equal(error.rolledBack.length, 1);
+        assert.equal(error.rolledBack[0].periodId, 'PER_A');
+        return true;
+      }
+    );
+    assert.equal(stub.getCreated().length, 0);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('buildLegacyImportEntries maps compiled rows to activity-linked legacy entries', () => {
+  const rows = timesheetLegacyImportService.buildLegacyImportEntries({
+    compiledRows: [{
+      date: '2026-03-01',
+      className: 'Math 10',
+      hours: 2.5,
+      comment: 'Legacy row'
+    }],
+    activity: {
+      id: 'ACT_IMPORT',
+      title: 'Legacy Import Activity',
+      departmentId: 'DEPT_1',
+      departmentName: 'Academics',
+      categoryName: 'Teaching',
+      visibilityScope: 'school'
+    },
+    personId: 'PERSON_1',
+    periodId: 'PERIOD_1'
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].activityId, 'ACT_IMPORT');
+  assert.equal(rows[0].isLegacyImport, true);
+  assert.equal(rows[0].isSchoolActivity, true);
+  assert.match(rows[0].sessionId, /^legacyimp-PERIOD_1-PERSON_1-/);
+  assert.equal(rows[0].hours, 2.5);
+});
+
+test('strip legacy import entries via isLegacyImportEntry helper', () => {
+  assert.equal(timesheetLegacyImportService.isLegacyImportEntry({ isLegacyImport: true }), true);
+  assert.equal(timesheetLegacyImportService.isLegacyImportEntry({ sessionId: 'legacyimp-1-2-3' }), true);
+  assert.equal(timesheetLegacyImportService.isLegacyImportEntry({ sessionId: 'sess-1' }), false);
+});
+
+test('groupCompileResultsByPeriod filters to selected period', () => {
+  const grouped = timesheetLegacyImportService.groupCompileResultsByPeriod([
+    { status: 'ok', matchedPeriod: { id: 'PER_A' }, rows: [{ date: '2026-01-01', hours: 1, className: 'A' }] },
+    { status: 'ok', matchedPeriod: { id: 'PER_B' }, rows: [{ date: '2026-01-02', hours: 2, className: 'B' }] }
+  ], 'PER_B');
+  assert.equal(grouped.size, 1);
+  assert.ok(grouped.has('PER_B'));
+});
+
+test('timesheet editor merge includes legacy import entries in active grid', () => {
+  const editor = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editor, /isLegacyImportEntry\(e\)/);
+  assert.match(editor, /isManual \|\| e\.isPriorPeriodAdjustment \|\| isLegacyImportEntry\(e\)/);
+});
+
+test('effective entry service includes stored legacy import rows', () => {
+  const effective = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '../MVC/services/school/timesheetEffectiveEntryService.js'),
+    'utf8'
+  );
+  assert.match(effective, /legacyImportEntries/);
+  assert.match(effective, /timesheetLegacyImportService\.isLegacyImportEntry/);
+});
+
+test('legacy import apply resolves scoped target status and lifecycle wiring', () => {
+  const legacy = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '../MVC/services/school/timesheetLegacyImportService.js'),
+    'utf8'
+  );
+  assert.match(legacy, /resolveImportTargetStatusForScope\(policy, scope\)/);
+  assert.match(legacy, /timesheetImportLifecycleService\.prepareImportTargetPayload/);
+  assert.match(legacy, /timesheetImportLifecycleService\.finalizeImportTargetAfterSave/);
+  assert.match(legacy, /detectExistingTimesheetForImport/);
+  assert.match(legacy, /rollbackAppliedLegacyImports/);
+  assert.match(legacy, /responseStatus/);
+});
+
+test('timesheet manage and list views handle skipped and rollback import responses', () => {
+  const manageView = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/timesheet/timesheetManage.ejs'), 'utf8');
+  const listView = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/timesheet/timesheetList.ejs'), 'utf8');
+  assert.match(manageView, /renderImportSkippedSummary/);
+  assert.match(manageView, /showImportApplyResultMessage/);
+  assert.match(manageView, /renderImportRollbackSummary/);
+  assert.match(listView, /renderImportSkippedSummary/);
+  assert.match(listView, /showImportApplyResultMessage/);
+});
+
+test('listMyTimesheets passes admin legacy delete flag to timesheet list view', () => {
+  const controller = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/controllers/school/timesheetController.js'),
+    'utf8'
+  );
+  const listView = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/timesheet/timesheetList.ejs'), 'utf8');
+  assert.match(controller, /canDeleteMyTimesheetLegacyImport = await isTimesheetSectionAdmin\(req\.user, OPERATIONS\.DELETE\)/);
+  assert.match(controller, /canDeleteMyTimesheetLegacyImport,/);
+  assert.match(controller, /skipImportPolicyCheck: canAdminDelete/);
+  assert.match(controller, /deleteMyTimesheetLegacyImport[\s\S]*?operationId: OPERATIONS\.DELETE/);
+  assert.match(listView, /canDeleteImportedTimesheet/);
+  assert.match(listView, /canDeleteMyTimesheetLegacyImport/);
+  assert.match(listView, /data-period-id="/);
+  assert.match(listView, /params\.set\('teacherId', resolvedTeacherId\)/);
+  assert.match(listView, /beginLegacyDeleteLoading/);
+  assert.match(listView, /Removing Imported Timesheet/);
+});
+
+test('timesheet list view keeps legacy delete handlers outside import-only script guard', () => {
+  const listView = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/timesheet/timesheetList.ejs'), 'utf8');
+  const scriptStart = listView.indexOf('<script>');
+  const scriptBlock = listView.slice(scriptStart);
+  const importGuardIndex = scriptBlock.indexOf('<% if (typeof canImportMyTimesheets !== \'undefined\' && canImportMyTimesheets) { %>');
+  const deleteHandlerIndex = scriptBlock.indexOf('function deleteMyLegacyImport');
+  const rowPatchIndex = scriptBlock.indexOf('function applyMyTimesheetRowAfterLegacyDelete');
+  assert.ok(importGuardIndex >= 0);
+  assert.ok(deleteHandlerIndex >= 0 && deleteHandlerIndex < importGuardIndex);
+  assert.ok(rowPatchIndex >= 0 && rowPatchIndex < importGuardIndex);
+  const deleteFn = scriptBlock.slice(deleteHandlerIndex, scriptBlock.indexOf('document.addEventListener(\'click\', (event) => {', deleteHandlerIndex));
+  assert.match(deleteFn, /applyMyTimesheetRowAfterLegacyDelete/);
+  assert.doesNotMatch(deleteFn, /window\.location\.reload\(\)/);
+});
+
+test('deleteLegacyImport honors skipImportPolicyCheck for admin delete override', async () => {
+  const disabledPolicy = { ...POLICY, allowImportInMyTimesheets: false };
+  const stub = stubLegacyImportDeleteDeps({
+    policy: disabledPolicy,
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_LEGACY',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'draft',
+        entries: [{ isLegacyImport: true, hours: 4, sessionId: 'legacyimp-PER_A-PERSON_1-1' }],
+        legacyImport: { sourceFileName: 'march.xlsx', importedAt: '2026-03-01' },
+        totalHours: 4
+      }
+    }
+  });
+  try {
+    await assert.rejects(
+      () => timesheetLegacyImportService.deleteLegacyImport({
+        orgId: 'ORG_1',
+        personId: 'PERSON_1',
+        periodId: 'PER_A',
+        reqUser: REQ_USER,
+        scope: timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS,
+        skipImportPolicyCheck: false
+      }),
+      (error) => error.statusCode === 403
+    );
+
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS,
+      skipImportPolicyCheck: true
+    });
+    assert.equal(outcome.hadLegacyImport, true);
+    assert.equal(outcome.hasLegacyImport, false);
+    assert.equal(outcome.periodId, 'PER_A');
+    assert.equal(outcome.totalHours, 0);
+    assert.equal(outcome.tsStatus, 'not_started');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('deleteLegacyImport returns row refresh payload after removing legacy rows', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_LEGACY',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'draft',
+        entries: [
+          { isLegacyImport: true, hours: 4, sessionId: 'legacyimp-PER_A-PERSON_1-1' },
+          { sessionId: 'sess-manual', hours: 1.5 }
+        ],
+        legacyImport: { sourceFileName: 'march.xlsx', importedAt: '2026-03-01' },
+        totalHours: 5.5
+      }
+    }
+  });
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS
+    });
+    assert.equal(outcome.removedRows, 1);
+    assert.equal(outcome.hadLegacyImport, true);
+    assert.equal(outcome.hasLegacyImport, false);
+    assert.equal(outcome.periodId, 'PER_A');
+    assert.equal(outcome.timesheetId, 'TS_LEGACY');
+    assert.equal(outcome.totalHours, 1.5);
+    assert.equal(outcome.tsStatus, 'draft');
+    assert.equal(outcome.sourceFileName, 'march.xlsx');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('deleteLegacyImport removes legacy rows from submitted imported timesheet', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_LEGACY',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'submitted',
+        entries: [{
+          isLegacyImport: true,
+          hours: 4,
+          sessionId: 'legacyimp-PER_A-PERSON_1-1',
+          activityId: 'ACT_IMPORT'
+        }],
+        legacyImport: {
+          activityId: 'ACT_IMPORT',
+          sourceFileName: 'march.xlsx',
+          importedAt: '2026-03-01'
+        },
+        totalHours: 4
+      }
+    },
+    activity: {
+      ...ACTIVITY,
+      entries: [{
+        entryId: 'ENTRY_1',
+        assignees: [{
+          personId: 'PERSON_1',
+          materializedFromTimesheetId: 'TS_LEGACY',
+          materializedFromTimesheetEntryId: 'legacyimp-PER_A-PERSON_1-1'
+        }]
+      }]
+    }
+  });
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS
+    });
+    assert.equal(outcome.hadLegacyImport, true);
+    assert.equal(outcome.hasLegacyImport, false);
+    assert.equal(outcome.removedRows, 1);
+    assert.equal(outcome.tsStatus, 'not_started');
+    assert.equal(outcome.totalHours, 0);
+    assert.equal(stub.getActivityUpdates().length, 1);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('deleteLegacyImport removes activity-first imported timesheet and work sessions by batch id', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_IMPORTED',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'processed',
+        entries: [
+          { sessionId: 'act-ACT_IMPORT-ENT-1-PERSON_1', hours: 2 },
+          { sessionId: 'stat-holiday-2026-03-10', hours: 8 }
+        ],
+        legacyImport: {
+          sourceFileName: 'march.xlsx',
+          importedAt: '2026-03-01',
+          activityId: 'ACT_IMPORT',
+          legacyImportBatchId: 'BATCH_1',
+          executionMode: 'activity_first'
+        },
+        totalHours: 10
+      }
+    }
+  });
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.deletedTimesheet, true);
+    assert.equal(outcome.timesheetId, '');
+    assert.equal(outcome.tsStatus, 'not_started');
+    assert.equal(outcome.importWorkSessionCleanup?.removedEntries, 2);
+    assert.deepEqual(stub.getBatchRemovals()[0], {
+      activityId: 'ACT_IMPORT',
+      batchId: 'BATCH_1',
+      reqUser: REQ_USER
+    });
+    assert.equal(stub.getStore().PER_A, undefined);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('assertTimesheetEditable still blocks submitted status for import apply', () => {
+  assert.throws(
+    () => timesheetLegacyImportService.assertTimesheetEditable({ status: 'submitted' }, { status: 'open' }),
+    /Imported timesheets can only be applied/
+  );
+});

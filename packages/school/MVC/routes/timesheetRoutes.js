@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const ctrl = require('../controllers/school/timesheetController');
+const { requireMyTimesheetLegacyDeleteAccess } = require('./timesheetImportRouteGuards');
 const {
   requireAuth,
   requireAccess,
@@ -71,6 +72,42 @@ router.post('/manage/api/import/compile',
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL, { keepActive: true }),
   handleTimesheetImportUpload,
   ctrl.compileTimesheetExcelImports);
+
+router.post('/manage/api/import/apply',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.applyTimesheetLegacyImports);
+
+router.post('/manage/api/import/execution/plan',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.planTimesheetImportExecution);
+
+router.post('/manage/api/import/execution/perform',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.CONFIGURE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.CONFIGURE, timesheetEditorMutationActionState),
+  ctrl.performTimesheetImportExecution);
+
+router.delete('/manage/api/import/legacy',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.deleteTimesheetLegacyImport);
+
+router.post('/api/import/compile',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, { keepActive: true }),
+  handleTimesheetImportUpload,
+  ctrl.compileMyTimesheetExcelImports);
+
+router.post('/api/import/apply',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.applyMyTimesheetLegacyImports);
+
+router.delete('/api/import/legacy',
+  requireMyTimesheetLegacyDeleteAccess,
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.deleteMyTimesheetLegacyImport);
 
 router.post('/manage/print',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.EXPORT),

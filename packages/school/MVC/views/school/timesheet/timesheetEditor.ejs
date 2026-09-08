@@ -2050,6 +2050,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isEdited = <%= isManuallyEdited %>;
 
     const savedComments = {};
+    const isLegacyImportEntry = (entry) => (
+        entry?.isLegacyImport === true || String(entry?.sessionId || '').startsWith('legacyimp-')
+    );
     const persistedTimesheetEntryIds = new Set(
         (Array.isArray(TIMESHEET_ENTRIES) ? TIMESHEET_ENTRIES : [])
             .filter((row) => row && row.isDeleted !== true)
@@ -2061,7 +2064,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (IS_ADMIN || e.isManual || e.isPriorPeriodAdjustment) {
                 deletedAutoSessionIds.push(e.sessionId);
             }
-        } else if (e.isManual || e.isPriorPeriodAdjustment) {
+        } else if (e.isManual || e.isPriorPeriodAdjustment || isLegacyImportEntry(e)) {
             activeEntries.push(e);
         } else {
             savedComments[e.sessionId] = e.comment;

@@ -46,6 +46,12 @@
   const payableHolidayTypesSelected = Array.isArray(statutoryHolidayPayPolicy.payableHolidayTypes)
     ? statutoryHolidayPayPolicy.payableHolidayTypes
     : ['National Holiday', 'Observance Paid'];
+  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft' }).replace(/</g, '\\u003c');
+  const timesheetImportActivityOptionsList = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
+  const timesheetImportActivityIdValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importActivityId) || '').trim();
+  const allowImportInTimesheetManagementValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.allowImportInTimesheetManagement === true;
+  const allowImportInMyTimesheetsValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.allowImportInMyTimesheets === true;
+  const timesheetImportTargetStatusValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importTargetStatus) || 'draft').trim().toLowerCase();
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
     : attendanceThresholdsEnabled !== false;
@@ -1357,6 +1363,65 @@
           </form>
         </div>
       </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="timesheet-import" role="tabpanel" aria-labelledby="settings-tab-timesheet-import" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Timesheet Import</h2>
+              <p class="small text-muted mb-0">Configure legacy Excel import under a school activity and control where import is available.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <div class="alert alert-danger d-none js-settings-error" id="timesheetImportSettingsError" role="alert"></div>
+          <form id="timesheetImportSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="rollup-feature-card">
+              <div class="fw-semibold mb-1">Legacy import activity</div>
+              <p class="small text-muted mb-3">Timesheet Management import uses this posted, paid activity to create real work sessions from Excel rows, then assembles the full effective timesheet (including statutory holidays when qualified) and marks it processed through the execution modal.</p>
+              <label class="form-label small fw-semibold" for="timesheetImportActivityId">Activity</label>
+              <select class="form-select" id="timesheetImportActivityId" name="importActivityId" <%= canUpdateFlag ? '' : 'disabled' %>>
+                <option value="">Select a posted activity...</option>
+                <% timesheetImportActivityOptionsList.forEach((activity) => { %>
+                  <option value="<%= activity.id %>" <%= activity.id === timesheetImportActivityIdValue ? 'selected' : '' %>><%= activity.title %><%= activity.departmentName ? ' (' + activity.departmentName + ')' : '' %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="rollup-feature-card mt-4">
+              <div class="fw-semibold mb-1">Import availability</div>
+              <p class="small text-muted mb-3">Turn import on only where staff should upload legacy Equilibrium Excel timesheets.</p>
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch" id="allowImportInTimesheetManagement" name="allowImportInTimesheetManagement" value="true" <%= allowImportInTimesheetManagementValue ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                <label class="form-check-label" for="allowImportInTimesheetManagement">Allow import in Timesheet Management</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="allowImportInMyTimesheets" name="allowImportInMyTimesheets" value="true" <%= allowImportInMyTimesheetsValue ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                <label class="form-check-label" for="allowImportInMyTimesheets">Allow import in My Timesheets</label>
+              </div>
+            </div>
+            <div class="rollup-feature-card mt-4">
+              <div class="fw-semibold mb-1">Imported timesheet status</div>
+              <p class="small text-muted mb-3">After a successful Timesheet Management import, set the resulting timesheet lifecycle. My Timesheets import always saves as Draft regardless of this setting.</p>
+              <label class="form-label small fw-semibold" for="timesheetImportTargetStatus">Status after import</label>
+              <select class="form-select" id="timesheetImportTargetStatus" name="importTargetStatus" <%= canUpdateFlag ? '' : 'disabled' %>>
+                <option value="draft" <%= timesheetImportTargetStatusValue === 'draft' ? 'selected' : '' %>>Draft</option>
+                <option value="submitted" <%= timesheetImportTargetStatusValue === 'submitted' ? 'selected' : '' %>>Submitted</option>
+                <option value="manager_approved" <%= timesheetImportTargetStatusValue === 'manager_approved' ? 'selected' : '' %>>Manager Approved</option>
+                <option value="processed" <%= timesheetImportTargetStatusValue === 'processed' ? 'selected' : '' %>>Processed</option>
+              </select>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end mt-4">
+                <button class="btn btn-primary" type="submit" id="btnSaveTimesheetImportSettings">
+                  <i class="bi bi-save me-1"></i>Save Timesheet Import
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -1388,6 +1453,7 @@
   const sessionNotificationEmailContextSources = <%- sessionNotificationEmailContextSourcesJson %>;
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
   let timesheetParametersPolicy = <%- timesheetParametersPolicyJson %>;
+  let timesheetImportPolicy = <%- timesheetImportPolicyJson %>;
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
   let sarReportTemplateCapabilities = <%- studentAttendanceReportTemplateCapabilitiesJson %>;
   let sarOverallTemplates = [];
@@ -2383,6 +2449,22 @@
     }, button, 'timesheetParametersSettingsError');
     if (!result) return;
     timesheetParametersPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetParametersPolicy;
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
+  document.getElementById('timesheetImportSettingsForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveTimesheetImportSettings');
+    if (!button) return;
+    const result = await postSettings('/school/settings/timesheet-import', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      importActivityId: document.getElementById('timesheetImportActivityId')?.value || '',
+      allowImportInTimesheetManagement: document.getElementById('allowImportInTimesheetManagement')?.checked ? 'true' : 'false',
+      allowImportInMyTimesheets: document.getElementById('allowImportInMyTimesheets')?.checked ? 'true' : 'false',
+      importTargetStatus: document.getElementById('timesheetImportTargetStatus')?.value || 'draft'
+    }, button, 'timesheetImportSettingsError');
+    if (!result) return;
+    timesheetImportPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetImportPolicy;
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 

@@ -108,20 +108,32 @@
             availabilityClass = 'bg-danger';
           }
           const canOpenFromMenu = p.canOpen !== false;
-          const showThreeDotActionsMenu = p.tsStatus === 'submitted' || p.eligibilityPhase === 'deadline_passed';
+          const periodYear = p.startDate ? String(new Date(p.startDate).getFullYear()) : String(selectedYear);
+          const canImportThisPeriod = typeof canImportMyTimesheets !== 'undefined'
+            && canImportMyTimesheets
+            && ['draft', 'not_started'].includes(String(p.tsStatus || 'not_started'))
+            && String(p.tsStatus || '') !== 'processed';
+          const canDeleteImportedTimesheet = p.hasLegacyImport === true && (
+            (typeof canDeleteMyTimesheetLegacyImport !== 'undefined' && canDeleteMyTimesheetLegacyImport)
+            || (typeof canImportMyTimesheets !== 'undefined' && canImportMyTimesheets)
+          );
+          const showThreeDotActionsMenu = p.tsStatus === 'submitted'
+            || p.eligibilityPhase === 'deadline_passed'
+            || canImportThisPeriod
+            || canDeleteImportedTimesheet;
         %>
-        <tr>
+        <tr data-period-id="<%= p.id %>" data-ts-status="<%= p.tsStatus %>" data-can-open="<%= canOpenFromMenu ? '1' : '0' %>">
           <td class="ps-4 fw-bold text-dark"><i class="bi bi-calendar-range me-2 text-muted"></i><%= p.name %></td>
           <td class="small text-muted"><%= p.startDate %> <i class="bi bi-arrow-right mx-1"></i> <%= p.endDate %></td>
           <td class="small fw-bold text-danger">
             <div><%= deadlineLabel %></div>
             <% if (availabilityBadge) { %><div class="mt-1"><span class="badge <%= availabilityClass %>"><%= availabilityBadge %></span></div><% } %>
           </td>
-          <td class="text-center">
+          <td class="text-center" data-period-status>
              <span class="badge <%= badge %> px-2 py-1"><%= p.tsStatus.replace('_', ' ').toUpperCase() %></span>
-             <% if (p.tsStatus === 'submitted' && p.managerApproved) { %><span class="badge bg-success ms-1">MANAGER APPROVED</span><% } %>
+             <% if (p.tsStatus === 'submitted' && p.managerApproved) { %><span class="badge bg-success ms-1 manager-approved-badge">MANAGER APPROVED</span><% } %>
           </td>
-          <td class="fw-bold text-success"><%= p.totalHours || '0.00' %> Hrs</td>
+          <td class="fw-bold text-success" data-period-hours><%= p.totalHours || '0.00' %> Hrs</td>
           <td class="table-actions text-center align-middle">
              <% if (isAdmin && !targetTeacherId) { %>
                 <button type="button" class="btn btn-sm btn-filled btn-edit" disabled title="Select a teacher first">
@@ -150,6 +162,16 @@
                       <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="See Paystub is not available yet.">
                         <i class="bi bi-receipt me-2"></i>See Paystub
                       </button>
+                      <% if (canImportThisPeriod) { %>
+                      <button type="button" class="btn btn-outline-primary btn-sm mt-1" data-my-import-period="<%= p.id %>" data-my-import-year="<%= periodYear %>" data-my-import-name="<%= p.name %>">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Excel
+                      </button>
+                      <% } %>
+                      <% if (canDeleteImportedTimesheet) { %>
+                      <button type="button" class="btn btn-outline-danger btn-sm mt-1" data-my-delete-import-period="<%= p.id %>" data-my-delete-import-name="<%= p.name %>" data-my-delete-import-file="<%= p.legacyImportFileName || 'imported file' %>">
+                        <i class="bi bi-trash me-2"></i>Delete imported file
+                      </button>
+                      <% } %>
                     </div>
                   </div>
                 <% } else if (p.canOpen === false && p.tsStatus !== 'processed') { %>
@@ -170,6 +192,59 @@
 </div>
 
 <span id="urlRef" data-id="school/timesheets/my-timesheets" hidden></span>
+
+<% if (typeof canImportMyTimesheets !== 'undefined' && canImportMyTimesheets) { %>
+<div class="modal fade" id="myTimesheetImportSetupModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius:14px;">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-spreadsheet me-2 text-primary"></i> Import Legacy Timesheet</h5>
+          <div class="small text-muted" id="myImportSetupSubtitle">Upload an Excel file for the selected period.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="myImportPeriodId" value="">
+        <input type="hidden" id="myImportYear" value="">
+        <div class="mb-2">
+          <label for="myImportExcelFiles" class="form-label fw-bold small mb-1">Excel File</label>
+          <input type="file" id="myImportExcelFiles" class="form-control" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="btnCompileMyTimesheetImport" class="btn btn-primary">
+          <i class="bi bi-gear-wide-connected me-1"></i> Compile
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="myTimesheetImportReviewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-clipboard-data me-2 text-primary"></i> Import Compile Report</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="myImportReviewSummary" class="alert alert-light border small mb-3"></div>
+        <div id="myImportReviewWarnings" class="alert alert-warning d-none small"></div>
+        <div id="myImportReviewErrors" class="alert alert-danger d-none small"></div>
+        <div id="myImportReviewStats" class="small text-muted"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" id="btnConfirmMyTimesheetImport" class="btn btn-primary">
+          <i class="bi bi-check2-circle me-1"></i> Confirm Import
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
 
 <%- include('partials/pagination', { 
     pagination, 
@@ -216,10 +291,483 @@ document.addEventListener('DOMContentLoaded', () => {
                 placeholder: 'Search teacher or staff...',
                 onSelect: (item) => {
                     document.getElementById('filter_teacherId').value = item.id;
-                    filterTimesheets(); 
+                    filterTimesheets();
                 }
             }));
         });
     }
+
+    let actionStateId = '<%= (typeof actionStateId !== "undefined" && actionStateId) ? actionStateId : "" %>';
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function showMessage(options) {
+        if (typeof window.showMessageModal === 'function') return window.showMessageModal(options);
+        if (options && options.message) alert(String(options.message).replace(/<[^>]+>/g, ' '));
+        return Promise.resolve();
+    }
+
+    async function uiConfirm(message, title = 'Confirm') {
+        try {
+            if (typeof window.showMessageModal === 'function') {
+                const res = await window.showMessageModal({
+                    title,
+                    icon: 'warning',
+                    message,
+                    size: 'md',
+                    buttons: [
+                        { text: 'No', class: 'btn-secondary btn-md' },
+                        { text: 'Yes', class: 'btn-primary btn-md' }
+                    ]
+                });
+                return res === 'Yes';
+            }
+        } catch (e) { /* fall back */ }
+        return confirm(String(message || '').replace(/<[^>]+>/g, ' '));
+    }
+
+    function applyActionStateFromResult(result) {
+        if (result?.actionStateId) actionStateId = String(result.actionStateId);
+    }
+
+    function resolveMyTimesheetStatusBadgeClass(tsStatus) {
+        const status = String(tsStatus || 'not_started');
+        if (status === 'draft') return 'bg-info text-dark';
+        if (status === 'submitted') return 'bg-primary';
+        if (status === 'processed') return 'bg-success';
+        return 'bg-secondary';
+    }
+
+    function formatMyTimesheetStatusLabel(tsStatus) {
+        return String(tsStatus || 'not_started').replace('_', ' ').toUpperCase();
+    }
+
+    function applyMyTimesheetRowAfterLegacyDelete(periodId, payload) {
+        const targetPeriodId = String(periodId || '').trim();
+        if (!targetPeriodId) return;
+        const row = document.querySelector('tr[data-period-id="' + targetPeriodId.replace(/"/g, '\\"') + '"]');
+        if (!row) return;
+
+        const tsStatus = String(payload?.tsStatus || 'not_started');
+        const totalHours = Number(payload?.totalHours || 0).toFixed(2);
+        row.setAttribute('data-ts-status', tsStatus);
+
+        const hoursCell = row.querySelector('[data-period-hours]');
+        if (hoursCell) hoursCell.textContent = totalHours + ' Hrs';
+
+        const statusCell = row.querySelector('[data-period-status]');
+        if (statusCell) {
+            const badgeClass = resolveMyTimesheetStatusBadgeClass(tsStatus);
+            statusCell.innerHTML = '<span class="badge ' + badgeClass + ' px-2 py-1">'
+                + escapeHtml(formatMyTimesheetStatusLabel(tsStatus)) + '</span>';
+        }
+
+        row.querySelector('[data-my-delete-import-period]')?.remove();
+
+        const menu = row.querySelector('.row-actions-menu');
+        const wrap = row.querySelector('.row-actions-wrap');
+        if (!menu || !wrap) return;
+
+        const actionable = menu.querySelectorAll('a.btn, button.btn:not([disabled]):not(.btn-row-actions-toggle)');
+        if (actionable.length) return;
+
+        const actionsTd = row.querySelector('.table-actions');
+        if (!actionsTd) return;
+        const canOpen = row.getAttribute('data-can-open') === '1';
+        if (canOpen) {
+            const openLink = menu.querySelector('a.btn-outline-primary');
+            const href = openLink?.getAttribute('href') || '#';
+            actionsTd.innerHTML = '<a href="' + escapeHtml(href) + '" class="btn btn-sm btn-filled btn-edit">Open Timesheet</a>';
+            return;
+        }
+        const disabledOpen = menu.querySelector('button.btn-outline-primary[disabled]');
+        const title = disabledOpen?.getAttribute('title') || 'This timesheet is not open for submission.';
+        const tsStatusNow = String(row.getAttribute('data-ts-status') || '');
+        const label = tsStatusNow === 'processed' ? 'Processed' : 'Unavailable';
+        actionsTd.innerHTML = '<button type="button" class="btn btn-sm btn-filled btn-edit" disabled title="'
+            + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
+    }
+
+    function beginLegacyDeleteLoading() {
+        if (typeof window.showLoading !== 'function') return null;
+        return window.showLoading({
+            title: 'Removing Imported Timesheet',
+            note: 'Clearing imported rows and linked activity data...',
+            operation: 'Timesheet Import Delete'
+        });
+    }
+
+    function endLegacyDeleteLoading(token) {
+        if (typeof window.hideLoading !== 'function') return;
+        if (token) window.hideLoading(token);
+        else window.hideLoading({ force: true });
+    }
+
+    let myLegacyDeleteInProgress = false;
+
+    async function deleteMyLegacyImport(periodId, periodName) {
+        const targetPeriodId = String(periodId || '').trim();
+        if (!targetPeriodId || myLegacyDeleteInProgress) return;
+        const confirmed = await uiConfirm(
+            'Remove imported timesheet rows for <b>' + escapeHtml(periodName || targetPeriodId) + '</b>?',
+            'Delete imported file?'
+        );
+        if (!confirmed) return;
+
+        myLegacyDeleteInProgress = true;
+        const loadingToken = beginLegacyDeleteLoading();
+        try {
+            const params = new URLSearchParams({ periodId: targetPeriodId });
+            const filterTeacherId = document.getElementById('filter_teacherId') ? String(document.getElementById('filter_teacherId').value || '').trim() : '';
+            const pageTeacherId = '<%= targetTeacherId || "" %>';
+            const resolvedTeacherId = filterTeacherId || pageTeacherId;
+            if (resolvedTeacherId) params.set('teacherId', resolvedTeacherId);
+            if (actionStateId) params.set('actionStateId', actionStateId);
+            const res = await fetch('/school/timesheets/api/import/legacy?' + params.toString(), {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify({ actionStateId })
+            });
+            const payload = await res.json();
+            if (!res.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Delete request failed.');
+            }
+            applyActionStateFromResult(payload);
+            applyMyTimesheetRowAfterLegacyDelete(targetPeriodId, payload);
+            await showMessage({
+                title: 'Import Removed',
+                icon: 'success',
+                message: escapeHtml(payload.message || 'Imported timesheet rows were removed.'),
+                buttons: [{ text: 'OK', class: 'btn-primary' }]
+            });
+        } catch (error) {
+            await showMessage({ title: 'Delete Error', icon: 'error', message: escapeHtml(error.message || String(error)) });
+        } finally {
+            myLegacyDeleteInProgress = false;
+            endLegacyDeleteLoading(loadingToken);
+        }
+    }
+
+    document.addEventListener('click', (event) => {
+        const deleteBtn = event.target.closest('[data-my-delete-import-period]');
+        if (deleteBtn) {
+            event.preventDefault();
+            void deleteMyLegacyImport(
+                deleteBtn.getAttribute('data-my-delete-import-period'),
+                deleteBtn.getAttribute('data-my-delete-import-name') || ''
+            );
+        }
+    });
+
+    <% if (typeof canImportMyTimesheets !== 'undefined' && canImportMyTimesheets) { %>
+    const myImportSetupModalEl = document.getElementById('myTimesheetImportSetupModal');
+    const myImportReviewModalEl = document.getElementById('myTimesheetImportReviewModal');
+    const myImportPeriodId = document.getElementById('myImportPeriodId');
+    const myImportYear = document.getElementById('myImportYear');
+    const myImportSetupSubtitle = document.getElementById('myImportSetupSubtitle');
+    const myImportExcelFiles = document.getElementById('myImportExcelFiles');
+    const btnCompileMyTimesheetImport = document.getElementById('btnCompileMyTimesheetImport');
+    const btnConfirmMyTimesheetImport = document.getElementById('btnConfirmMyTimesheetImport');
+    const myImportReviewSummary = document.getElementById('myImportReviewSummary');
+    const myImportReviewWarnings = document.getElementById('myImportReviewWarnings');
+    const myImportReviewErrors = document.getElementById('myImportReviewErrors');
+    const myImportReviewStats = document.getElementById('myImportReviewStats');
+    let myImportCompilePayload = null;
+
+    function ensureModalOnBody(modalEl) {
+        if (!modalEl) return null;
+        if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+        if (!window.bootstrap?.Modal) return null;
+        return window.bootstrap.Modal.getOrCreateInstance(modalEl);
+    }
+
+    function cleanId(value) {
+        return String(value || '').trim();
+    }
+
+    function hideBootstrapModalAndWait(modalEl) {
+        if (!modalEl || !window.bootstrap?.Modal) return Promise.resolve();
+        const instance = window.bootstrap.Modal.getInstance(modalEl)
+            || window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        if (!instance || !modalEl.classList.contains('show')) return Promise.resolve();
+        return new Promise((resolve) => {
+            modalEl.addEventListener('hidden.bs.modal', () => resolve(), { once: true });
+            instance.hide();
+        });
+    }
+
+    function buildTimesheetEditorUrl(periodId, personId) {
+        const pid = cleanId(periodId);
+        const tid = cleanId(personId);
+        if (!pid || !tid) return '';
+        return '/school/timesheets/editor/' + encodeURIComponent(pid) + '?teacherId=' + encodeURIComponent(tid);
+    }
+
+    function resolveImportedEditorTarget(payload, fallbackPeriodId, fallbackPersonId) {
+        const link = Array.isArray(payload?.editorLinks) ? payload.editorLinks[0] : null;
+        if (link?.url) {
+            return {
+                periodId: cleanId(link.periodId),
+                personId: cleanId(link.personId),
+                url: String(link.url).trim()
+            };
+        }
+        const applied = Array.isArray(payload?.applied) ? payload.applied[0] : null;
+        const periodId = cleanId(applied?.periodId || fallbackPeriodId);
+        const personId = cleanId(fallbackPersonId);
+        return {
+            periodId,
+            personId,
+            url: buildTimesheetEditorUrl(periodId, personId)
+        };
+    }
+
+    function renderImportSkippedSummary(skipped) {
+        const rows = Array.isArray(skipped) ? skipped : [];
+        if (!rows.length) return '';
+        const lines = rows.map((row) => (
+            '<li><b>' + escapeHtml(row.periodName || row.periodId || 'Period') + ':</b> '
+            + escapeHtml(row.message || 'A timesheet already exists for this period.')
+            + '</li>'
+        )).join('');
+        return '<ul class="mb-0 ps-3 mt-2 text-start">' + lines + '</ul>';
+    }
+
+    function renderImportRollbackSummary(rolledBack) {
+        const rows = Array.isArray(rolledBack) ? rolledBack : [];
+        if (!rows.length) return '';
+        const lines = rows.map((row) => (
+            '<li>' + escapeHtml(row.periodId || 'Period') + ' (' + escapeHtml(row.timesheetId || 'timesheet') + ')</li>'
+        )).join('');
+        return '<div class="mt-2"><strong>Rolled back:</strong><ul class="mb-0 ps-3">' + lines + '</ul></div>';
+    }
+
+    async function showImportApplyResultMessage(payload, fallbackPeriodId, fallbackPersonId) {
+        const responseStatus = String(payload?.status || 'success').toLowerCase();
+        const skippedHtml = renderImportSkippedSummary(payload?.skipped);
+        const summary = escapeHtml(payload?.message || 'Imported timesheet rows were saved.') + skippedHtml;
+
+        if (responseStatus === 'partial') {
+            await showMessage({
+                title: 'Import Skipped',
+                icon: 'warning',
+                message: summary,
+                buttons: [{ text: 'OK', class: 'btn-primary' }]
+            });
+            return;
+        }
+
+        const target = resolveImportedEditorTarget(payload, fallbackPeriodId, fallbackPersonId);
+        const choice = await showMessage({
+            title: 'Import Complete',
+            icon: 'success',
+            message: summary,
+            buttons: target.url
+                ? [
+                    { text: 'OK', class: 'btn-secondary' },
+                    { text: 'Open Timesheet', class: 'btn-primary' }
+                ]
+                : [{ text: 'OK', class: 'btn-primary' }]
+        });
+        if (choice === 'Open Timesheet' && target.url) {
+            window.open(target.url, '_blank', 'noopener');
+        }
+    }
+
+    async function showImportApplySuccessMessage(payload, fallbackPeriodId, fallbackPersonId) {
+        return showImportApplyResultMessage(payload, fallbackPeriodId, fallbackPersonId);
+    }
+
+    function beginImportApplyLoading() {
+        if (typeof window.showLoading !== 'function') return null;
+        return window.showLoading({
+            title: 'Importing Timesheet',
+            note: 'Saving compiled rows...',
+            operation: 'Timesheet Import'
+        });
+    }
+
+    function endImportApplyLoading(token) {
+        if (typeof window.hideLoading !== 'function') return;
+        if (token) window.hideLoading(token);
+        else window.hideLoading({ force: true });
+    }
+
+    const MY_TIMESHEET_TARGET_TEACHER_ID = '<%= targetTeacherId %>';
+    let myImportApplyInProgress = false;
+
+    function openMyImportSetup({ periodId, year, periodName }) {
+        if (!periodId || !year) return;
+        myImportPeriodId.value = periodId;
+        myImportYear.value = year;
+        if (myImportSetupSubtitle) {
+            myImportSetupSubtitle.textContent = 'Upload an Excel file for ' + (periodName || 'the selected period') + '.';
+        }
+        if (myImportExcelFiles) myImportExcelFiles.value = '';
+        ensureModalOnBody(myImportSetupModalEl)?.show();
+    }
+
+    function renderMyImportReview(payload) {
+        myImportCompilePayload = payload || null;
+        const result = Array.isArray(payload?.results) ? payload.results[0] : null;
+        const isError = String(result?.status || '').toLowerCase() === 'error';
+        if (myImportReviewSummary) {
+            myImportReviewSummary.innerHTML = result
+                ? '<strong>' + escapeHtml(result.fileName || 'File') + '</strong>'
+                    + ' | Matched period: ' + escapeHtml(result?.matchedPeriod?.name || result?.matchedPeriod?.id || 'None')
+                : 'No compile results.';
+        }
+        if (myImportReviewErrors) {
+            myImportReviewErrors.classList.toggle('d-none', !isError);
+            myImportReviewErrors.textContent = isError
+                ? ((result?.error?.messages || [result?.error?.title || 'Compile failed.']).join(' '))
+                : '';
+        }
+        if (myImportReviewWarnings) {
+            const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
+            myImportReviewWarnings.classList.toggle('d-none', isError || !warnings.length);
+            myImportReviewWarnings.textContent = warnings.join(' ');
+        }
+        if (myImportReviewStats) {
+            const stats = result?.stats || {};
+            myImportReviewStats.textContent = isError
+                ? ''
+                : 'Rows: ' + Number(stats.rowCount || (result?.rows || []).length || 0)
+                    + ' | Total hours: ' + Number(stats.totalHours || 0).toFixed(2);
+        }
+        if (btnConfirmMyTimesheetImport) {
+            btnConfirmMyTimesheetImport.disabled = isError || !String(result?.matchedPeriod?.id || '').trim();
+        }
+        ensureModalOnBody(myImportReviewModalEl)?.show();
+    }
+
+    async function compileMyTimesheetImport() {
+        const periodId = String(myImportPeriodId?.value || '').trim();
+        const year = String(myImportYear?.value || '').trim();
+        const file = myImportExcelFiles?.files?.[0];
+        if (!periodId || !/^\d{4}$/.test(year)) {
+            await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Select a valid period before importing.' });
+            return;
+        }
+        if (!file) {
+            await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Please attach an .xlsx file.' });
+            return;
+        }
+        const formData = new FormData();
+        formData.append('year', year);
+        formData.append('files', file);
+        const originalHtml = btnCompileMyTimesheetImport?.innerHTML || '';
+        if (btnCompileMyTimesheetImport) {
+            btnCompileMyTimesheetImport.disabled = true;
+            btnCompileMyTimesheetImport.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Compiling...';
+        }
+        try {
+            const res = await fetch('/school/timesheets/api/import/compile', {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' },
+                body: formData
+            });
+            const payload = await res.json();
+            if (!res.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Compile request failed.');
+            }
+            payload.periodId = periodId;
+            ensureModalOnBody(myImportSetupModalEl)?.hide();
+            renderMyImportReview(payload);
+        } catch (error) {
+            await showMessage({ title: 'Import Compile Error', icon: 'error', message: escapeHtml(error.message || String(error)) });
+        } finally {
+            if (btnCompileMyTimesheetImport) {
+                btnCompileMyTimesheetImport.disabled = false;
+                btnCompileMyTimesheetImport.innerHTML = originalHtml;
+            }
+        }
+    }
+
+    async function applyMyLegacyImport() {
+        if (myImportApplyInProgress || !myImportCompilePayload) return;
+        const periodId = String(myImportCompilePayload.periodId || myImportPeriodId?.value || '').trim();
+        const results = Array.isArray(myImportCompilePayload.results) ? myImportCompilePayload.results : [];
+        if (!periodId || !results.length) return;
+        const confirmMessage = 'Import compiled rows into this timesheet period only if no timesheet already exists. If a timesheet is present, delete or clear it first, then import again. Continue?';
+        const confirmed = await uiConfirm(confirmMessage, 'Confirm Import');
+        if (!confirmed) return;
+
+        const originalHtml = btnConfirmMyTimesheetImport?.innerHTML || '';
+        myImportApplyInProgress = true;
+        if (btnConfirmMyTimesheetImport) {
+            btnConfirmMyTimesheetImport.disabled = true;
+        }
+        const loadingToken = beginImportApplyLoading();
+        try {
+            const res = await fetch('/school/timesheets/api/import/apply', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-AJAX-Request': 'true'
+                },
+                body: JSON.stringify({ periodId, results, actionStateId })
+            });
+            const payload = await res.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(payload, { busyTitle: 'Import In Progress', replayTitle: 'Import Already Processed' })
+                : { stop: false };
+            if (guarded.stop) {
+                endImportApplyLoading(loadingToken);
+                return;
+            }
+            if (!res.ok || payload.status === 'error') {
+                const rollbackHtml = renderImportRollbackSummary(payload?.rolledBack);
+                const err = new Error(payload.message || 'Import request failed.');
+                err.rollbackHtml = rollbackHtml;
+                throw err;
+            }
+            applyActionStateFromResult(payload);
+            endImportApplyLoading(loadingToken);
+            await hideBootstrapModalAndWait(myImportReviewModalEl);
+            myImportCompilePayload = null;
+            await showImportApplyResultMessage(payload, periodId, MY_TIMESHEET_TARGET_TEACHER_ID);
+            window.location.reload();
+        } catch (error) {
+            endImportApplyLoading(loadingToken);
+            const rollbackHtml = error?.rollbackHtml || renderImportRollbackSummary(error?.rolledBack);
+            await showMessage({
+                title: 'Import Error',
+                icon: 'error',
+                message: escapeHtml(error.message || String(error)) + (rollbackHtml || ''),
+                buttons: [{ text: 'OK', class: 'btn-danger' }]
+            });
+        } finally {
+            myImportApplyInProgress = false;
+            if (btnConfirmMyTimesheetImport) {
+                btnConfirmMyTimesheetImport.disabled = false;
+                btnConfirmMyTimesheetImport.innerHTML = originalHtml;
+            }
+        }
+    }
+
+    document.addEventListener('click', (event) => {
+        const importBtn = event.target.closest('[data-my-import-period]');
+        if (importBtn) {
+            event.preventDefault();
+            openMyImportSetup({
+                periodId: importBtn.getAttribute('data-my-import-period'),
+                year: importBtn.getAttribute('data-my-import-year'),
+                periodName: importBtn.getAttribute('data-my-import-name') || ''
+            });
+        }
+    });
+
+    btnCompileMyTimesheetImport?.addEventListener('click', () => { void compileMyTimesheetImport(); });
+    btnConfirmMyTimesheetImport?.addEventListener('click', () => { void applyMyLegacyImport(); });
+    <% } %>
 });
 </script>

@@ -1,7 +1,11 @@
 <%
-  const timesheetManageOptionalBtnsBeforePrint = (typeof canPrintManagedTimesheets !== 'undefined' && canPrintManagedTimesheets)
-    ? ['<button type="button" id="btnPrintSelectedTimesheets" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Select submitted or processed timesheets to print">🖨 Print</button>']
-    : [];
+  const timesheetManageOptionalBtnsBeforePrint = [];
+  if (typeof canImportTimesheets !== 'undefined' && canImportTimesheets) {
+    timesheetManageOptionalBtnsBeforePrint.push('<button type="button" id="btnOpenTimesheetBulkImport" class="btn btn-filled btn-add btn-md me-2 mb-2">📦 Import</button>');
+  }
+  if (typeof canPrintManagedTimesheets !== 'undefined' && canPrintManagedTimesheets) {
+    timesheetManageOptionalBtnsBeforePrint.push('<button type="button" id="btnPrintSelectedTimesheets" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Select submitted or processed timesheets to print">🖨 Print</button>');
+  }
 %>
 <%- include('partials/tablePages-start', {
   title,
@@ -42,6 +46,26 @@
     border-bottom: 1px solid #e2e8f0;
     padding: 1rem 1.25rem;
   }
+  #timesheetImportExecutionModal {
+    z-index: 1065;
+  }
+  #timesheetImportExecutionModal .modal-content,
+  #timesheetImportRoleModal .modal-content {
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  #timesheetImportExecutionModal .modal-header {
+    background: linear-gradient(135deg, #f0fdf4 0%, #eef2ff 100%);
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .ts-import-exec-status {
+    font-size: .78rem;
+    line-height: 1.35;
+  }
+  .ts-import-exec-status.is-pending { color: #64748b; }
+  .ts-import-exec-status.is-running { color: #0d6efd; }
+  .ts-import-exec-status.is-success { color: #198754; }
+  .ts-import-exec-status.is-error { color: #dc3545; }
   #timesheetImportSetupModal .modal-content {
     border-radius: 14px;
   }
@@ -118,6 +142,14 @@
     letter-spacing: .02em;
     text-transform: uppercase;
   }
+  .ts-import-period-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+  }
+  .ts-import-file-nav .file-name .ts-import-summary-sub {
+    font-weight: 400;
+  }
   .ts-import-match-pill {
     display: inline-flex;
     align-items: center;
@@ -142,6 +174,48 @@
     background: #fee2e2;
     color: #991b1b;
     border-color: #fca5a5;
+  }
+  .ts-import-period-warn-item {
+    margin-bottom: .35rem;
+  }
+  .ts-import-period-warn-detail {
+    margin-top: .55rem;
+    padding: .65rem .75rem;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(133, 77, 14, 0.18);
+    border-radius: 10px;
+  }
+  .ts-import-period-warn-row + .ts-import-period-warn-row {
+    margin-top: .55rem;
+    padding-top: .55rem;
+    border-top: 1px dashed rgba(133, 77, 14, 0.18);
+  }
+  .ts-import-period-warn-label {
+    display: block;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #92400e;
+    margin-bottom: .15rem;
+  }
+  .ts-import-period-warn-value {
+    display: block;
+    font-size: .88rem;
+    font-weight: 600;
+    color: #78350f;
+    line-height: 1.35;
+  }
+  .ts-import-period-warn-sub {
+    font-size: .76rem;
+    color: #92400e;
+    margin-top: .1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  .ts-import-period-warn-notes {
+    margin-top: .55rem;
+    font-size: .82rem;
+    color: #78350f;
   }
   .ts-import-ledger-wrap {
     border: 1px solid #e2e8f0;
@@ -302,9 +376,6 @@
     <button type="button" id="btnClearRoster" class="btn btn-outline-secondary btn-md">
       <i class="bi bi-x-circle me-1"></i> Clear
     </button>
-    <button type="button" id="btnOpenTimesheetImport" class="btn btn-outline-primary btn-md">
-      <i class="bi bi-file-earmark-spreadsheet me-1"></i> Import Excel
-    </button>
   </div>
   <div id="periodMeta" class="small text-muted w-100">
     Pick a timesheet period, then load the active teacher/staff roster for your active organization.
@@ -319,7 +390,7 @@
     </div>
     <div class="small text-muted">Rows are scoped to the active organization.</div>
   </div>
-  <div class="table-responsive">
+  <div class="table-responsive table-scroll-wrapper" data-floating-row-actions="true">
     <table class="table table-hover align-middle mb-0" id="timesheetManageTable">
       <thead class="table-light">
         <tr>
@@ -353,13 +424,17 @@
     <div class="modal-content border-0 shadow-lg" style="border-radius:14px;">
       <div class="modal-header" style="background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);border-bottom:1px solid #e2e8f0;">
         <div>
-          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-spreadsheet me-2 text-primary"></i> Import Legacy Timesheets</h5>
-          <div class="small text-muted">Upload one or more Excel files for a selected teacher and year.</div>
+          <h5 class="modal-title fw-bold" id="importSetupModalTitle"><i class="bi bi-file-earmark-spreadsheet me-2 text-primary"></i> Import Legacy Timesheets</h5>
+          <div class="small text-muted" id="importSetupModalSubtitle">Upload one or more Excel files for a selected teacher and year.</div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="mb-3">
+        <div class="mb-3 d-none" id="importPeriodFieldWrap">
+          <label class="form-label fw-bold small mb-1">Timesheet Period</label>
+          <input type="text" id="importPeriodDisplay" class="form-control" readonly>
+        </div>
+        <div class="mb-3" id="importTeacherFieldWrap">
           <label class="form-label fw-bold small mb-1">Teacher / Staff</label>
           <div class="input-group">
             <input type="hidden" id="importTeacherId" value="">
@@ -368,14 +443,14 @@
             <button type="button" id="btnClearImportTeacher" class="btn btn-outline-secondary" title="Clear teacher"><i class="bi bi-x-lg"></i></button>
           </div>
         </div>
-        <div class="mb-3">
+        <div class="mb-3" id="importYearFieldWrap">
           <label for="importYear" class="form-label fw-bold small mb-1">Year</label>
           <select id="importYear" class="form-select"></select>
         </div>
         <div class="mb-2">
-          <label for="importExcelFiles" class="form-label fw-bold small mb-1">Excel Files</label>
-          <input type="file" id="importExcelFiles" class="form-control" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple>
-          <div class="form-text">Supported format: .xlsx (Equilibrium School legacy timesheet template).</div>
+          <label for="importExcelFiles" class="form-label fw-bold small mb-1" id="importExcelFilesLabel">Excel Files</label>
+          <input type="file" id="importExcelFiles" class="form-control" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <div class="form-text" id="importExcelFilesHelp">Supported format: .xlsx (Equilibrium School legacy timesheet template).</div>
         </div>
         <ul id="importFileList" class="list-group list-group-flush small"></ul>
       </div>
@@ -400,14 +475,16 @@
         <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body bg-light-subtle" style="background:#f8fafc;">
-        <div id="importReviewSummary" class="ts-import-summary"></div>
         <div id="importReviewFileNav" class="ts-import-file-nav d-none">
-          <div>
-            <div class="file-counter" id="importReviewFileIndicator"></div>
-            <div class="file-name" id="importReviewFileName"></div>
+          <div class="w-100">
+            <div>
+              <div class="file-counter" id="importReviewFileIndicator"></div>
+              <div class="file-name" id="importReviewFileName"></div>
+            </div>
+            <div id="importReviewPeriodTabs" class="ts-import-period-tabs mt-2"></div>
           </div>
-          <div id="importReviewNavDots" class="d-flex gap-1"></div>
         </div>
+        <div id="importReviewSummary" class="ts-import-summary"></div>
         <div id="importReviewErrorPanel" class="alert alert-danger border-0 shadow-sm d-none">
           <div class="fw-bold"><i class="bi bi-exclamation-octagon me-1"></i> Error</div>
           <ul id="importReviewErrorList" class="mb-0 ps-3 mt-2"></ul>
@@ -424,6 +501,75 @@
           <button type="button" id="importReviewPrevBtn" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i> Back</button>
           <button type="button" id="importReviewNextBtn" class="btn btn-outline-secondary">Next <i class="bi bi-chevron-right"></i></button>
         </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <% if (typeof canImportTimesheets !== 'undefined' && canImportTimesheets) { %>
+          <button type="button" id="btnConfirmTimesheetImport" class="btn btn-primary">
+            <i class="bi bi-check2-circle me-1"></i> Confirm Import
+          </button>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="timesheetImportRoleModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" style="z-index: 1070;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-person-badge me-2 text-primary"></i> Payroll Role</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3" id="importRolePromptText">Which payroll role should this import use?</p>
+        <label class="form-label fw-semibold" for="importExecutionPersonRole">Role</label>
+        <select id="importExecutionPersonRole" class="form-select">
+          <option value="teacher">Teacher</option>
+          <option value="staff">Staff</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="btnConfirmImportExecutionRole" class="btn btn-primary">Save Role</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="timesheetImportExecutionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div class="w-100">
+          <h5 class="modal-title fw-bold mb-0"><i class="bi bi-play-circle me-2 text-success"></i> Import Execution</h5>
+          <div class="small text-muted mt-1">Create activity work sessions, assemble the full timesheet, then mark it processed.</div>
+        </div>
+        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light-subtle" style="background:#f8fafc;">
+        <div id="importExecutionAlerts"></div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle bg-white border rounded-3 overflow-hidden mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>File</th>
+                <th>Person</th>
+                <th>Period</th>
+                <th>Creating Work Sessions</th>
+                <th>Creating the timesheet</th>
+                <th>Making the timesheet processed</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="importExecutionTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer bg-white border-top d-flex justify-content-between">
+        <button type="button" id="btnPerformAllImportExecutions" class="btn btn-outline-primary">
+          <i class="bi bi-collection-play me-1"></i> Perform All
+        </button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
@@ -458,6 +604,9 @@
 <script>
 (function () {
   const CAN_PRINT_MANAGED_TIMESHEETS = <%= (typeof canPrintManagedTimesheets !== 'undefined' && canPrintManagedTimesheets) ? 'true' : 'false' %>;
+  const CAN_ALLOW_LATE_SUBMISSION = <%= (typeof canAllowLateSubmission !== 'undefined' && canAllowLateSubmission) ? 'true' : 'false' %>;
+  const CAN_IMPORT_TIMESHEETS = <%= (typeof canImportTimesheets !== 'undefined' && canImportTimesheets) ? 'true' : 'false' %>;
+  let actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
   const TIMESHEET_MANAGE_PRINT_ACTION = '/school/timesheets/manage/print';
   const HAS_PRINT_SELECTION = CAN_PRINT_MANAGED_TIMESHEETS;
   const TABLE_COLSPAN = HAS_PRINT_SELECTION ? 7 : 6;
@@ -497,6 +646,152 @@
     return Promise.resolve();
   }
 
+  async function uiConfirm(message, title = 'Confirm') {
+    try {
+      if (typeof window.showMessageModal === 'function') {
+        const res = await window.showMessageModal({
+          title,
+          icon: 'warning',
+          message,
+          size: 'md',
+          buttons: [
+            { text: 'No', class: 'btn-secondary btn-md' },
+            { text: 'Yes', class: 'btn-primary btn-md' }
+          ]
+        });
+        return res === 'Yes';
+      }
+    } catch (e) { /* fall back */ }
+    return confirm(String(message || '').replace(/<[^>]+>/g, ' '));
+  }
+
+  function hideBootstrapModalAndWait(modalEl) {
+    if (!modalEl || !window.bootstrap?.Modal) return Promise.resolve();
+    const instance = window.bootstrap.Modal.getInstance(modalEl)
+      || window.bootstrap.Modal.getOrCreateInstance(modalEl);
+    if (!instance || !modalEl.classList.contains('show')) return Promise.resolve();
+    return new Promise((resolve) => {
+      modalEl.addEventListener('hidden.bs.modal', () => resolve(), { once: true });
+      instance.hide();
+    });
+  }
+
+  function buildTimesheetEditorUrl(periodId, personId) {
+    const pid = cleanId(periodId);
+    const tid = cleanId(personId);
+    if (!pid || !tid) return '';
+    return '/school/timesheets/editor/' + encodeURIComponent(pid) + '?teacherId=' + encodeURIComponent(tid);
+  }
+
+  function resolveImportedEditorTarget(payload, fallbackPeriodId, fallbackPersonId) {
+    const link = Array.isArray(payload?.editorLinks) ? payload.editorLinks[0] : null;
+    if (link?.url) {
+      return {
+        periodId: cleanId(link.periodId),
+        personId: cleanId(link.personId),
+        url: String(link.url).trim()
+      };
+    }
+    const applied = Array.isArray(payload?.applied) ? payload.applied[0] : null;
+    const periodId = cleanId(applied?.periodId || fallbackPeriodId);
+    const personId = cleanId(fallbackPersonId);
+    return {
+      periodId,
+      personId,
+      url: buildTimesheetEditorUrl(periodId, personId)
+    };
+  }
+
+  function renderImportSkippedSummary(skipped) {
+    const rows = Array.isArray(skipped) ? skipped : [];
+    if (!rows.length) return '';
+    const lines = rows.map((row) => (
+      '<li><b>' + escapeHtml(row.periodName || row.periodId || 'Period') + ':</b> '
+      + escapeHtml(row.message || 'A timesheet already exists for this period.')
+      + '</li>'
+    )).join('');
+    return '<ul class="mb-0 ps-3 mt-2 text-start">' + lines + '</ul>';
+  }
+
+  function renderImportRollbackSummary(rolledBack) {
+    const rows = Array.isArray(rolledBack) ? rolledBack : [];
+    if (!rows.length) return '';
+    const lines = rows.map((row) => (
+      '<li>' + escapeHtml(row.periodId || 'Period') + ' (' + escapeHtml(row.timesheetId || 'timesheet') + ')</li>'
+    )).join('');
+    return '<div class="mt-2"><strong>Rolled back:</strong><ul class="mb-0 ps-3">' + lines + '</ul></div>';
+  }
+
+  async function showImportApplyResultMessage(payload, fallbackPeriodId, fallbackPersonId) {
+    const responseStatus = String(payload?.status || 'success').toLowerCase();
+    const skippedHtml = renderImportSkippedSummary(payload?.skipped);
+    const summary = escapeHtml(payload?.message || 'Imported timesheet rows were saved.') + skippedHtml;
+
+    if (responseStatus === 'partial') {
+      await showMessage({
+        title: 'Import Skipped',
+        icon: 'warning',
+        message: summary,
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+
+    const target = resolveImportedEditorTarget(payload, fallbackPeriodId, fallbackPersonId);
+    const choice = await showMessage({
+      title: 'Import Complete',
+      icon: 'success',
+      message: summary,
+      buttons: target.url
+        ? [
+          { text: 'OK', class: 'btn-secondary' },
+          { text: 'Open Timesheet', class: 'btn-primary' }
+        ]
+        : [{ text: 'OK', class: 'btn-primary' }]
+    });
+    if (choice === 'Open Timesheet' && target.url) {
+      window.open(target.url, '_blank', 'noopener');
+    }
+  }
+
+  async function showImportApplySuccessMessage(payload, fallbackPeriodId, fallbackPersonId) {
+    return showImportApplyResultMessage(payload, fallbackPeriodId, fallbackPersonId);
+  }
+
+  function beginImportApplyLoading() {
+    if (typeof window.showLoading !== 'function') return null;
+    return window.showLoading({
+      title: 'Importing Timesheet',
+      note: 'Saving compiled rows...',
+      operation: 'Timesheet Import'
+    });
+  }
+
+  function endImportApplyLoading(token) {
+    if (typeof window.hideLoading !== 'function') return;
+    if (token) window.hideLoading(token);
+    else window.hideLoading({ force: true });
+  }
+
+  function beginLegacyDeleteLoading() {
+    if (typeof window.showLoading !== 'function') return null;
+    return window.showLoading({
+      title: 'Removing Imported Timesheet',
+      note: 'Clearing imported rows and linked activity data...',
+      operation: 'Timesheet Import Delete'
+    });
+  }
+
+  function endLegacyDeleteLoading(token) {
+    if (typeof window.hideLoading !== 'function') return;
+    if (token) window.hideLoading(token);
+    else window.hideLoading({ force: true });
+  }
+
+  function applyActionStateFromResult(result) {
+    if (result?.actionStateId) actionStateId = String(result.actionStateId);
+  }
+
   function statusBadge(status) {
     const normalized = String(status || 'not_started').toLowerCase();
     const map = {
@@ -522,6 +817,110 @@
   function isPrintableRow(row) {
     const status = String(row?.status || 'not_started').toLowerCase();
     return status === 'submitted' || status === 'processed';
+  }
+
+  function isTimesheetManageRowActionTarget(node) {
+    if (!node) return false;
+    if (tbody?.contains(node)) return true;
+    const menu = node.closest?.('body > .row-actions-menu[data-row-actions-id^="timesheet-manage-"]');
+    return Boolean(menu);
+  }
+
+  function handleTimesheetManageRowActionClick(event) {
+    if (!isTimesheetManageRowActionTarget(event.target)) return;
+
+    const printBtn = event.target.closest('[data-print-person]');
+    if (printBtn) {
+      event.preventDefault();
+      void openRowPrintPreview(printBtn.getAttribute('data-print-person'));
+      return;
+    }
+    const lateSubmissionBtn = event.target.closest('[data-late-submission-person]');
+    if (lateSubmissionBtn) {
+      event.preventDefault();
+      void openLateSubmission(
+        lateSubmissionBtn.getAttribute('data-late-submission-person'),
+        lateSubmissionBtn.getAttribute('data-late-submission-name') || ''
+      );
+      return;
+    }
+    const importBtn = event.target.closest('[data-import-person]');
+    if (importBtn) {
+      event.preventDefault();
+      openRowImportSetupModal({
+        personId: importBtn.getAttribute('data-import-person'),
+        name: importBtn.getAttribute('data-import-person-name') || ''
+      });
+      return;
+    }
+    const deleteImportBtn = event.target.closest('[data-delete-import-person]');
+    if (deleteImportBtn) {
+      event.preventDefault();
+      void deleteLegacyImport(
+        deleteImportBtn.getAttribute('data-delete-import-person'),
+        deleteImportBtn.getAttribute('data-delete-import-name') || '',
+        deleteImportBtn.getAttribute('data-delete-import-file') || ''
+      );
+      return;
+    }
+    const btn = event.target.closest('[data-summary-person]');
+    if (!btn) return;
+    event.preventDefault();
+    loadSummary(btn.getAttribute('data-summary-person'));
+  }
+
+  function renderActionMenu(row) {
+    const personId = String(row?.personId || '').trim();
+    const menuId = 'timesheet-manage-' + personId;
+    const showLateSubmission = CAN_ALLOW_LATE_SUBMISSION && row?.canOpenLateSubmission === true;
+    const showPrint = CAN_PRINT_MANAGED_TIMESHEETS && isPrintableRow(row);
+    const showDeleteImport = CAN_IMPORT_TIMESHEETS && row?.hasLegacyImport === true;
+    const menuItems = [
+      '<a href="' + escapeHtml(row.openUrl) + '" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">',
+      '<i class="bi bi-box-arrow-up-right me-2"></i>Open Timesheet',
+      '</a>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-summary-person="' + escapeHtml(personId) + '">',
+      '<i class="bi bi-diagram-3 me-2"></i>Department Summary',
+      '</button>'
+    ];
+    if (CAN_IMPORT_TIMESHEETS) {
+      menuItems.push(
+        '<button type="button" class="btn btn-outline-primary btn-sm mt-1" data-import-person="' + escapeHtml(personId) + '" data-import-person-name="' + escapeHtml(row.name || personId) + '">',
+        '<i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Excel',
+        '</button>'
+      );
+    }
+    if (showDeleteImport) {
+      menuItems.push(
+        '<button type="button" class="btn btn-outline-danger btn-sm mt-1" data-delete-import-person="' + escapeHtml(personId) + '" data-delete-import-name="' + escapeHtml(row.name || personId) + '" data-delete-import-file="' + escapeHtml(row.legacyImportFileName || 'imported file') + '">',
+        '<i class="bi bi-trash me-2"></i>Delete imported file',
+        '</button>'
+      );
+    }
+    if (showLateSubmission) {
+      menuItems.push(
+        '<button type="button" class="btn btn-outline-warning btn-sm mt-1" data-late-submission-person="' + escapeHtml(personId) + '" data-late-submission-name="' + escapeHtml(row.name || personId) + '">',
+        '<i class="bi bi-unlock me-2"></i>Open Timesheet submission',
+        '</button>'
+      );
+    }
+    if (showPrint) {
+      menuItems.push(
+        '<button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-print-person="' + escapeHtml(personId) + '">',
+        '<i class="bi bi-printer me-2"></i>Print',
+        '</button>'
+      );
+    }
+    return [
+      '<div class="row-actions-wrap">',
+      '<button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="' + escapeHtml(menuId) + '" title="Timesheet actions">',
+      '<i class="bi bi-three-dots-vertical"></i>',
+      '</button>',
+      '<div class="row-actions-menu d-none" data-row-actions-id="' + escapeHtml(menuId) + '">',
+      menuItems.join(''),
+      '</div>',
+      '</div>'
+    ].join('');
   }
 
   function getVisibleRows() {
@@ -615,18 +1014,8 @@
             ${Number(row.revisionCount || 0) > 0 ? `<div class="small text-muted mt-1" title="${escapeHtml(row.lastReopenNote || '')}"><i class="bi bi-arrow-repeat me-1"></i>${Number(row.revisionCount)} revision${Number(row.revisionCount) === 1 ? '' : 's'}</div>` : ''}
           </td>
           <td class="text-end fw-bold text-success">${hours} Hrs</td>
-          <td class="text-end pe-4">
-            <div class="btn-group btn-group-sm">
-              <a class="btn btn-outline-primary" href="${escapeHtml(row.openUrl)}" target="_blank" rel="noopener">
-                <i class="bi bi-box-arrow-up-right me-1"></i> Open
-              </a>
-              <button type="button" class="btn btn-outline-secondary" data-summary-person="${escapeHtml(row.personId)}">
-                <i class="bi bi-diagram-3 me-1"></i> Summary
-              </button>
-              <button type="button" class="btn btn-outline-primary" data-import-person="${escapeHtml(row.personId)}" data-import-person-name="${escapeHtml(row.name || row.personId)}">
-                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Import
-              </button>
-            </div>
+          <td class="table-actions text-end pe-4">
+            ${renderActionMenu(row)}
           </td>
         </tr>
       `;
@@ -697,7 +1086,7 @@
     periodMeta.innerHTML = '<b>' + escapeHtml(period.name || period.title || id) + '</b> | ' +
       escapeHtml(period.periodWindowLabel || [period.startDate, period.endDate].filter(Boolean).join(' to ')) +
       (deadline !== '-' ? ' | Deadline: <b class="text-danger">' + escapeHtml(deadline) + '</b>' : '');
-    resetLoadedRoster('Click <b>Load Timesheets</b> to load this period.');
+    void loadRoster();
   }
 
   async function loadRoster() {
@@ -838,7 +1227,7 @@
     }
   }
 
-  async function openSelectedTimesheetPrintPreview(printSettings = null, printReviewType = null) {
+  async function openSelectedTimesheetPrintPreview(printSettings = null, printReviewType = null, personIdsOverride = null) {
     if (!CAN_PRINT_MANAGED_TIMESHEETS) {
       await showMessage({ title: 'Print Access Required', icon: 'warning', message: 'EXPORT access is required to print timesheets.' });
       return;
@@ -848,7 +1237,9 @@
       await showMessage({ title: 'Timesheet Management', icon: 'warning', message: 'Please load a timesheet period first.' });
       return;
     }
-    const personIds = Array.from(selectedPersonIds).filter(Boolean);
+    const personIds = Array.isArray(personIdsOverride)
+      ? personIdsOverride.filter(Boolean)
+      : Array.from(selectedPersonIds).filter(Boolean);
     if (!personIds.length) {
       await showMessage({ title: 'Timesheet Management', icon: 'warning', message: 'Select at least one submitted or processed timesheet to print.' });
       return;
@@ -857,7 +1248,7 @@
     if (!printReviewType && window.AppPrintManager?.openTimesheetReviewTypeChooser) {
       const selectedReviewType = await window.AppPrintManager.openTimesheetReviewTypeChooser();
       if (!selectedReviewType) return;
-      return openSelectedTimesheetPrintPreview(printSettings, selectedReviewType);
+      return openSelectedTimesheetPrintPreview(printSettings, selectedReviewType, personIdsOverride);
     }
 
     if (!printSettings && window.AppPrintManager?.openSettings) {
@@ -869,7 +1260,7 @@
           density: 'compact'
         },
         onConfirm: (settings) => {
-          void openSelectedTimesheetPrintPreview({ ...settings, printReviewType: printReviewType || 'managerial' }, printReviewType || 'managerial');
+          void openSelectedTimesheetPrintPreview({ ...settings, printReviewType: printReviewType || 'managerial' }, printReviewType || 'managerial', personIdsOverride);
         }
       });
       return;
@@ -935,6 +1326,65 @@
     }
   }
 
+  async function openRowPrintPreview(personId) {
+    const normalizedPersonId = String(personId || '').trim();
+    if (!normalizedPersonId) return;
+    const row = loadedRows.find((entry) => String(entry?.personId || '').trim() === normalizedPersonId);
+    if (!row || !isPrintableRow(row)) {
+      await showMessage({ title: 'Print Unavailable', icon: 'warning', message: 'Only submitted or processed timesheets can be printed.' });
+      return;
+    }
+    await openSelectedTimesheetPrintPreview(null, null, [normalizedPersonId]);
+  }
+
+  async function openLateSubmission(personId, personName) {
+    if (!CAN_ALLOW_LATE_SUBMISSION) {
+      await showMessage({ title: 'Access Required', icon: 'warning', message: 'UPDATE access is required to open timesheet submission after the deadline.' });
+      return;
+    }
+    const normalizedPersonId = String(personId || '').trim();
+    const row = loadedRows.find((entry) => String(entry?.personId || '').trim() === normalizedPersonId);
+    if (!row || row.canOpenLateSubmission !== true) {
+      await showMessage({ title: 'Unavailable', icon: 'warning', message: 'This timesheet is not eligible for late submission.' });
+      return;
+    }
+    const periodId = String(loadedPeriod?.id || periodSelect?.value || '').trim();
+    if (!periodId) {
+      await showMessage({ title: 'Timesheet Management', icon: 'warning', message: 'Please load a timesheet period first.' });
+      return;
+    }
+    const ok = await confirmAction({
+      title: 'Open Timesheet submission',
+      message: 'Allow ' + (personName || normalizedPersonId) + ' to submit this timesheet once after the deadline?',
+      confirmText: 'Allow Once',
+      cancelText: 'Cancel',
+      icon: 'warning',
+      confirmBtnClass: 'btn-primary'
+    });
+    if (!ok) return;
+    try {
+      const params = new URLSearchParams();
+      params.set('teacherId', normalizedPersonId);
+      if (actionStateId) params.set('actionStateId', actionStateId);
+      const res = await fetch('/school/timesheets/editor/' + encodeURIComponent(periodId) + '/allow-late-submission?' + params.toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify({ actionStateId })
+      });
+      const result = await res.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Request In Progress', replayTitle: 'Request Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status !== 'success') throw new Error(result.message || 'Request failed.');
+      if (result.actionStateId) actionStateId = String(result.actionStateId);
+      await showMessage({ title: 'Late Submission Allowed', icon: 'success', message: result.message || 'Done.' });
+      await loadRoster();
+    } catch (error) {
+      await showMessage({ title: 'Error', icon: 'error', message: error.message || String(error) });
+    }
+  }
+
   btnLoad?.addEventListener('click', loadRoster);
   btnPickPeriod?.addEventListener('click', async () => {
     if (!window.GenericPicker || !window.GenericPickerPresets) {
@@ -969,19 +1419,7 @@
   timesheetStatusFilter?.addEventListener('change', () => {
     if (periodSelect.value) loadRoster();
   });
-  tbody?.addEventListener('click', (event) => {
-    const importBtn = event.target.closest('[data-import-person]');
-    if (importBtn) {
-      openImportSetupModal({
-        personId: importBtn.getAttribute('data-import-person'),
-        name: importBtn.getAttribute('data-import-person-name') || ''
-      });
-      return;
-    }
-    const btn = event.target.closest('[data-summary-person]');
-    if (!btn) return;
-    loadSummary(btn.getAttribute('data-summary-person'));
-  });
+  document.addEventListener('click', handleTimesheetManageRowActionClick);
   tbody?.addEventListener('change', (event) => {
     const input = event.target.closest('.timesheet-print-select');
     if (!input) return;
@@ -1007,7 +1445,23 @@
 
   const importSetupModalEl = document.getElementById('timesheetImportSetupModal');
   const importReviewModalEl = document.getElementById('timesheetImportReviewModal');
-  const btnOpenTimesheetImport = document.getElementById('btnOpenTimesheetImport');
+  const importExecutionModalEl = document.getElementById('timesheetImportExecutionModal');
+  const importRoleModalEl = document.getElementById('timesheetImportRoleModal');
+  const importExecutionTableBody = document.getElementById('importExecutionTableBody');
+  const importExecutionAlerts = document.getElementById('importExecutionAlerts');
+  const btnPerformAllImportExecutions = document.getElementById('btnPerformAllImportExecutions');
+  const importExecutionPersonRole = document.getElementById('importExecutionPersonRole');
+  const importRolePromptText = document.getElementById('importRolePromptText');
+  const btnConfirmImportExecutionRole = document.getElementById('btnConfirmImportExecutionRole');
+  const btnOpenTimesheetBulkImport = document.getElementById('btnOpenTimesheetBulkImport');
+  const importSetupModalTitle = document.getElementById('importSetupModalTitle');
+  const importSetupModalSubtitle = document.getElementById('importSetupModalSubtitle');
+  const importPeriodFieldWrap = document.getElementById('importPeriodFieldWrap');
+  const importPeriodDisplay = document.getElementById('importPeriodDisplay');
+  const importTeacherFieldWrap = document.getElementById('importTeacherFieldWrap');
+  const importYearFieldWrap = document.getElementById('importYearFieldWrap');
+  const importExcelFilesHelp = document.getElementById('importExcelFilesHelp');
+  const importExcelFilesLabel = document.getElementById('importExcelFilesLabel');
   const btnPickImportTeacher = document.getElementById('btnPickImportTeacher');
   const btnClearImportTeacher = document.getElementById('btnClearImportTeacher');
   const importTeacherId = document.getElementById('importTeacherId');
@@ -1020,7 +1474,7 @@
   const importReviewFileNav = document.getElementById('importReviewFileNav');
   const importReviewFileIndicator = document.getElementById('importReviewFileIndicator');
   const importReviewFileName = document.getElementById('importReviewFileName');
-  const importReviewNavDots = document.getElementById('importReviewNavDots');
+  const importReviewPeriodTabs = document.getElementById('importReviewPeriodTabs');
   const importReviewErrorPanel = document.getElementById('importReviewErrorPanel');
   const importReviewErrorList = document.getElementById('importReviewErrorList');
   const importReviewWarningsPanel = document.getElementById('importReviewWarningsPanel');
@@ -1029,10 +1483,22 @@
   const importReviewStats = document.getElementById('importReviewStats');
   const importReviewPrevBtn = document.getElementById('importReviewPrevBtn');
   const importReviewNextBtn = document.getElementById('importReviewNextBtn');
+  const btnConfirmTimesheetImport = document.getElementById('btnConfirmTimesheetImport');
 
   let importCompilePayload = null;
   let importReviewIndex = 0;
+  let importMode = 'bulk';
+  let importTargetPeriod = null;
   let importCompileInProgress = false;
+  let importApplyInProgress = false;
+  let importExecutionInProgress = false;
+  let importExecutionRows = [];
+  let importExecutionPlan = null;
+  let importExecutionPersonRoleByPersonId = {};
+  let importExecutionRoleResolver = null;
+  let importReviewNavBusy = false;
+  const importReviewPrevBtnHtml = importReviewPrevBtn?.innerHTML || '';
+  const importReviewNextBtnHtml = importReviewNextBtn?.innerHTML || '';
 
   function ensureModalOnBody(modalEl) {
     if (!modalEl) return null;
@@ -1086,11 +1552,148 @@
     return (size / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
-  function openImportSetupModal(prefillPerson) {
+  function resetImportFileInput() {
+    if (!importExcelFiles) return;
+    importExcelFiles.value = '';
+  }
+
+  function resolveImportYearFromPeriod(period) {
+    const startDate = String(period?.startDate || '').trim();
+    const endDate = String(period?.endDate || '').trim();
+    const token = (/^\d{4}/.test(startDate) && startDate) || (/^\d{4}/.test(endDate) && endDate) || '';
+    return token ? token.slice(0, 4) : String(new Date().getFullYear());
+  }
+
+  function formatImportPeriodLabel(period) {
+    if (!period) return '';
+    const name = String(period.name || period.id || '').trim();
+    const range = formatImportPeriodRange(period.startDate || '', period.endDate || '');
+    return name ? (name + ' · ' + range) : range;
+  }
+
+  function configureImportSetupModal(mode) {
+    importMode = mode === 'singlePeriod' ? 'singlePeriod' : 'bulk';
+    const isSinglePeriod = importMode === 'singlePeriod';
+    if (importPeriodFieldWrap) importPeriodFieldWrap.classList.toggle('d-none', !isSinglePeriod);
+    if (importYearFieldWrap) importYearFieldWrap.classList.toggle('d-none', isSinglePeriod);
+    if (importTeacherFieldWrap) importTeacherFieldWrap.classList.remove('d-none');
+    if (btnPickImportTeacher) btnPickImportTeacher.classList.toggle('d-none', isSinglePeriod);
+    if (btnClearImportTeacher) btnClearImportTeacher.classList.toggle('d-none', isSinglePeriod);
+    if (importTeacherDisplay) importTeacherDisplay.readOnly = true;
+    if (importExcelFiles) {
+      if (isSinglePeriod) importExcelFiles.removeAttribute('multiple');
+      else importExcelFiles.setAttribute('multiple', 'multiple');
+    }
+    if (importExcelFilesHelp) {
+      importExcelFilesHelp.textContent = isSinglePeriod
+        ? 'Upload one .xlsx file that matches the loaded timesheet period.'
+        : 'Supported format: .xlsx (Equilibrium School legacy timesheet template). You may select multiple files.';
+    }
+    if (importExcelFilesLabel) {
+      importExcelFilesLabel.textContent = isSinglePeriod ? 'Excel File' : 'Excel Files';
+    }
+    if (importSetupModalTitle) {
+      importSetupModalTitle.innerHTML = isSinglePeriod
+        ? '<i class="bi bi-file-earmark-spreadsheet me-2 text-primary"></i> Import Excel for Loaded Period'
+        : '<i class="bi bi-file-earmark-spreadsheet me-2 text-primary"></i> Import Legacy Timesheets';
+    }
+    if (importSetupModalSubtitle) {
+      importSetupModalSubtitle.textContent = isSinglePeriod
+        ? 'Upload one Excel file for the selected teacher and the loaded timesheet period.'
+        : 'Upload one or more Excel files for a selected teacher and year.';
+    }
+  }
+
+  function normalizeImportPersonNameKey(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function buildImportMismatchSummary(results, personName) {
+    const rows = Array.isArray(results) ? results : [];
+    const selectedNameKey = normalizeImportPersonNameKey(personName);
+    const issues = [];
+    let blocking = false;
+
+    rows.forEach((result) => {
+      const fileName = String(result?.fileName || 'Unknown file').trim() || 'Unknown file';
+      if (String(result?.status || '').toLowerCase() === 'error') {
+        blocking = true;
+        issues.push({
+          fileName,
+          message: String(result?.error?.messages?.[0] || 'The file could not be compiled.'),
+          blocking: true
+        });
+        return;
+      }
+      const matchStatus = String(result?.matchStatus || result?.matchedPeriod?.matchStatus || 'none').toLowerCase();
+      const matchedPeriodId = String(result?.matchedPeriod?.id || '').trim();
+      if (!matchedPeriodId || matchStatus === 'none') {
+        blocking = true;
+        issues.push({
+          fileName,
+          message: 'No matching app timesheet period was found for this file.',
+          blocking: true
+        });
+      } else if (matchStatus === 'partial') {
+        issues.push({
+          fileName,
+          message: String(result?.matchNote || 'Excel period dates do not exactly match the app period.'),
+          blocking: false
+        });
+      }
+      const employeeFromFile = String(result?.employeeNameFromFile || '').trim();
+      if (
+        employeeFromFile
+        && selectedNameKey
+        && normalizeImportPersonNameKey(employeeFromFile) !== selectedNameKey
+      ) {
+        issues.push({
+          fileName,
+          message: 'Employee name in file (' + employeeFromFile + ') differs from selected teacher (' + personName + ').',
+          blocking: false
+        });
+      }
+    });
+
+    return { issues, blocking, hasIssues: issues.length > 0 };
+  }
+
+  function openBulkImportSetupModal() {
+    importTargetPeriod = null;
+    configureImportSetupModal('bulk');
     populateImportYearOptions();
+    clearImportTeacher();
+    resetImportFileInput();
+    renderImportFileList();
+    const modal = ensureModalOnBody(importSetupModalEl);
+    if (modal) modal.show();
+  }
+
+  async function openRowImportSetupModal(prefillPerson) {
+    const period = loadedPeriod || null;
+    const periodId = cleanId(period?.id || periodSelect?.value || '');
+    if (!periodId || !period) {
+      await showMessage({
+        title: 'Import Excel',
+        icon: 'warning',
+        message: 'Load a timesheet period before importing from the row menu.'
+      });
+      return;
+    }
+    importTargetPeriod = period;
+    configureImportSetupModal('singlePeriod');
+    if (importPeriodDisplay) importPeriodDisplay.value = formatImportPeriodLabel(period);
+    if (importYear) importYear.value = resolveImportYearFromPeriod(period);
     if (prefillPerson?.personId) {
       setImportTeacher({ id: prefillPerson.personId, name: prefillPerson.name });
+    } else {
+      clearImportTeacher();
     }
+    resetImportFileInput();
     renderImportFileList();
     const modal = ensureModalOnBody(importSetupModalEl);
     if (modal) modal.show();
@@ -1126,6 +1729,16 @@
   function formatImportPeriodRange(startDate, endDate) {
     if (!startDate || !endDate) return 'Unavailable';
     return formatImportDateShort(startDate) + ' → ' + formatImportDateShort(endDate);
+  }
+
+  function formatImportPeriodTabLabel(dateToken) {
+    const token = String(dateToken || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token || '—';
+    const parsed = new Date(token + 'T12:00:00');
+    if (Number.isNaN(parsed.getTime())) return token;
+    const month = parsed.toLocaleDateString('en-US', { month: 'short' });
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return month + ' ' + day;
   }
 
   function groupImportRowsByDate(rows) {
@@ -1278,32 +1891,116 @@
       + '</div>';
   }
 
+  function resolveImportResultPeriodKey(result) {
+    const startDate = String(result?.sourcePeriod?.startDate || '').trim();
+    const endDate = String(result?.sourcePeriod?.endDate || '').trim();
+    if (startDate && endDate) return { startDate, endDate };
+    return { startDate: '9999-12-31', endDate: '9999-12-31' };
+  }
+
+  function sortImportCompileResults(results) {
+    return [...(Array.isArray(results) ? results : [])].sort((a, b) => {
+      const aKey = resolveImportResultPeriodKey(a);
+      const bKey = resolveImportResultPeriodKey(b);
+      if (aKey.startDate !== bKey.startDate) return aKey.startDate.localeCompare(bKey.startDate);
+      if (aKey.endDate !== bKey.endDate) return aKey.endDate.localeCompare(bKey.endDate);
+      return String(a?.fileName || '').localeCompare(String(b?.fileName || ''));
+    });
+  }
+
   function renderImportFileNav(results, index) {
     if (!importReviewFileNav) return;
     const total = results.length;
+    const result = results[index] || {};
     importReviewFileNav.classList.toggle('d-none', total <= 0);
     if (importReviewFileIndicator) {
       importReviewFileIndicator.textContent = total > 1
-        ? ('File ' + (index + 1) + ' of ' + total)
-        : 'Compiled file';
+        ? ('Period ' + (index + 1) + ' of ' + total)
+        : 'Compiled period';
     }
     if (importReviewFileName) {
-      importReviewFileName.textContent = String(results[index]?.fileName || 'timesheet.xlsx');
+      const startDate = String(result?.sourcePeriod?.startDate || '').trim();
+      const endDate = String(result?.sourcePeriod?.endDate || '').trim();
+      const periodLabel = (startDate && endDate)
+        ? formatImportPeriodRange(startDate, endDate)
+        : String(result?.fileName || 'timesheet.xlsx');
+      const fileName = String(result?.fileName || 'timesheet.xlsx');
+      importReviewFileName.innerHTML = (startDate && endDate)
+        ? escapeHtml(periodLabel) + '<div class="ts-import-summary-sub">' + escapeHtml(fileName) + '</div>'
+        : escapeHtml(fileName);
     }
-    if (importReviewNavDots && total > 1) {
-      importReviewNavDots.innerHTML = results.map((item, dotIndex) => {
-        const isActive = dotIndex === index;
+    if (importReviewPeriodTabs && total > 1) {
+      importReviewPeriodTabs.innerHTML = results.map((item, tabIndex) => {
+        const isActive = tabIndex === index;
         const isError = String(item?.status || '').toLowerCase() === 'error';
-        const klass = isActive ? 'bg-primary' : (isError ? 'bg-danger' : 'bg-secondary');
-        return '<span class="rounded-circle ' + klass + '" style="width:.55rem;height:.55rem;opacity:' + (isActive ? '1' : '.45') + ';"></span>';
+        const startDate = String(item?.sourcePeriod?.startDate || '').trim();
+        const endDate = String(item?.sourcePeriod?.endDate || '').trim();
+        const label = startDate
+          ? formatImportPeriodTabLabel(startDate)
+          : String(item?.fileName || ('Period ' + (tabIndex + 1)));
+        const tabTitle = (startDate && endDate)
+          ? (formatImportPeriodRange(startDate, endDate) + ' · ' + String(item?.fileName || ''))
+          : String(item?.fileName || ('Period ' + (tabIndex + 1)));
+        const btnClass = isActive
+          ? 'btn btn-sm btn-primary'
+          : (isError ? 'btn btn-sm btn-outline-danger' : 'btn btn-sm btn-outline-secondary');
+        return '<button type="button" class="' + btnClass + '" data-import-review-index="' + tabIndex + '" title="' + escapeHtml(tabTitle) + '">' + escapeHtml(label) + '</button>';
       }).join('');
-    } else if (importReviewNavDots) {
-      importReviewNavDots.innerHTML = '';
+    } else if (importReviewPeriodTabs) {
+      importReviewPeriodTabs.innerHTML = '';
     }
   }
 
   function renderMatchedPeriodBadge(result) {
     return renderImportMatchPill(result);
+  }
+
+  function renderImportPeriodMatchWarningDetails(result) {
+    const details = result?.matchDetails;
+    if (!details) return '';
+    const headline = details.kind === 'contained'
+      ? 'Excel period falls inside this app period but dates do not match exactly.'
+      : 'Excel period partially overlaps this app period.';
+    const appIdentity = details.appPeriodName && details.appPeriodId && details.appPeriodName !== details.appPeriodId
+      ? escapeHtml(details.appPeriodName) + ' <span class="font-monospace opacity-75">(' + escapeHtml(details.appPeriodId) + ')</span>'
+      : escapeHtml(details.appPeriodName || details.appPeriodId || 'Unknown period');
+    const boundaryHtml = (Array.isArray(details.boundaryNotes) ? details.boundaryNotes : [])
+      .map((note) => '<li>' + escapeHtml(note) + '</li>').join('');
+    const overlapHtml = details.kind === 'overlap' && details.overlapStart && details.overlapEnd
+      ? '<div class="ts-import-period-warn-row"><span class="ts-import-period-warn-label">Shared overlap</span>'
+        + '<span class="ts-import-period-warn-value">' + escapeHtml(formatImportPeriodRange(details.overlapStart, details.overlapEnd)) + '</span>'
+        + '<div class="ts-import-period-warn-sub">' + escapeHtml(details.overlapStart + ' to ' + details.overlapEnd) + '</div></div>'
+      : '';
+
+    return ''
+      + '<li class="ts-import-period-warn-item">'
+      + '<div class="fw-semibold">' + escapeHtml(headline) + '</div>'
+      + '<div class="ts-import-period-warn-detail">'
+      + '<div class="ts-import-period-warn-row"><span class="ts-import-period-warn-label">Excel period</span>'
+      + '<span class="ts-import-period-warn-value">' + escapeHtml(formatImportPeriodRange(details.excelStart, details.excelEnd)) + '</span>'
+      + '<div class="ts-import-period-warn-sub">' + escapeHtml(details.excelStart + ' to ' + details.excelEnd) + '</div></div>'
+      + '<div class="ts-import-period-warn-row"><span class="ts-import-period-warn-label">App period</span>'
+      + '<span class="ts-import-period-warn-value">' + appIdentity + '</span>'
+      + '<div class="ts-import-period-warn-sub">' + escapeHtml(details.appStart + ' to ' + details.appEnd) + '</div></div>'
+      + overlapHtml
+      + (boundaryHtml ? '<ul class="ts-import-period-warn-notes mb-0 ps-3">' + boundaryHtml + '</ul>' : '')
+      + '</div></li>';
+  }
+
+  function renderImportReviewWarnings(result) {
+    const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
+    const matchNote = String(result?.matchNote || '').trim();
+    const parts = [];
+    if (result?.matchDetails) {
+      parts.push(renderImportPeriodMatchWarningDetails(result));
+    }
+    warnings.forEach((msg) => {
+      const text = String(msg || '').trim();
+      if (!text) return;
+      if (result?.matchDetails && text === matchNote) return;
+      parts.push('<li>' + escapeHtml(text) + '</li>');
+    });
+    return parts.join('');
   }
 
   function renderImportReviewCurrent() {
@@ -1333,8 +2030,7 @@
       importReviewStats.innerHTML = '';
     } else {
       importReviewErrorList.innerHTML = '';
-      const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
-      importReviewWarningsList.innerHTML = warnings.map((msg) => '<li>' + escapeHtml(msg) + '</li>').join('');
+      importReviewWarningsList.innerHTML = renderImportReviewWarnings(result);
       const rows = Array.isArray(result?.rows) ? result.rows : [];
       importReviewTableWrap.innerHTML = renderImportDayGroups(rows);
       const stats = result?.stats || {};
@@ -1346,23 +2042,480 @@
         + '<div><strong>Template:</strong> ' + escapeHtml(result?.templateId || '—') + '</div>';
     }
 
-    if (importReviewPrevBtn) importReviewPrevBtn.disabled = importReviewIndex <= 0;
-    if (importReviewNextBtn) importReviewNextBtn.disabled = importReviewIndex >= results.length - 1;
+    if (importReviewPrevBtn) importReviewPrevBtn.disabled = importReviewNavBusy || importReviewIndex <= 0;
+    if (importReviewNextBtn) importReviewNextBtn.disabled = importReviewNavBusy || importReviewIndex >= results.length - 1;
+    updateImportReviewConfirmButton();
+    if (importReviewPeriodTabs) {
+      importReviewPeriodTabs.querySelectorAll('[data-import-review-index]').forEach((btn) => {
+        btn.disabled = importReviewNavBusy;
+      });
+    }
+  }
+
+  function cleanId(value) {
+    return String(value || '').trim();
+  }
+
+  function importResultsReadyForApply(results = []) {
+    return (Array.isArray(results) ? results : []).some((row) => (
+      String(row?.status || '').toLowerCase() === 'ok' && cleanId(row?.matchedPeriod?.id)
+    ));
+  }
+
+  function updateImportReviewConfirmButton() {
+    if (!btnConfirmTimesheetImport) return;
+    const results = Array.isArray(importCompilePayload?.results) ? importCompilePayload.results : [];
+    btnConfirmTimesheetImport.disabled = importApplyInProgress
+      || importReviewNavBusy
+      || !importResultsReadyForApply(results);
+  }
+
+  function beginImportExecutionLoading(note) {
+    if (typeof window.showLoading !== 'function') return null;
+    return window.showLoading({
+      title: 'Running Import Execution',
+      note: note || 'Creating work sessions, assembling timesheet, and processing...',
+      operation: 'Timesheet Import Execution'
+    });
+  }
+
+  function renderImportExecutionStepCell(step) {
+    const status = String(step?.status || 'pending').toLowerCase();
+    const summary = String(step?.summary || '').trim();
+    const error = String(step?.error || '').trim();
+    if (status === 'running') {
+      return '<div class="ts-import-exec-status is-running"><span class="spinner-border spinner-border-sm me-1"></span>Running...</div>';
+    }
+    if (status === 'success') {
+      return '<div class="ts-import-exec-status is-success"><i class="bi bi-check-circle me-1"></i>' + escapeHtml(summary || 'Done') + '</div>';
+    }
+    if (status === 'error') {
+      return '<div class="ts-import-exec-status is-error"><i class="bi bi-x-circle me-1"></i>' + escapeHtml(error || summary || 'Failed') + '</div>';
+    }
+    return '<div class="ts-import-exec-status is-pending text-muted">Pending</div>';
+  }
+
+  function resolveImportExecutionPersonRole(personId) {
+    const targetPersonId = cleanId(personId);
+    const selected = cleanId(importExecutionPersonRoleByPersonId[targetPersonId]);
+    if (selected) return selected;
+    const needs = Array.isArray(importExecutionPlan?.needsRoleSelection) ? importExecutionPlan.needsRoleSelection : [];
+    const match = needs.find((row) => idsEqual(row.personId, targetPersonId));
+    if (match && match.roles?.length === 1) return cleanId(match.roles[0]);
+    return cleanId(importExecutionPlan?.defaultPersonRole || '');
+  }
+
+  function importExecutionRoleReady(personId) {
+    const targetPersonId = cleanId(personId);
+    const needs = Array.isArray(importExecutionPlan?.needsRoleSelection) ? importExecutionPlan.needsRoleSelection : [];
+    const match = needs.find((row) => idsEqual(row.personId, targetPersonId));
+    if (!match || !Array.isArray(match.roles) || match.roles.length <= 1) return true;
+    return Boolean(resolveImportExecutionPersonRole(targetPersonId));
+  }
+
+  function renderImportExecutionAlerts() {
+    if (!importExecutionAlerts) return;
+    const needs = Array.isArray(importExecutionPlan?.needsRoleSelection) ? importExecutionPlan.needsRoleSelection : [];
+    if (!needs.length) {
+      importExecutionAlerts.innerHTML = '';
+      return;
+    }
+    const pending = needs.filter((row) => !importExecutionRoleReady(row.personId));
+    if (!pending.length) {
+      importExecutionAlerts.innerHTML = '<div class="alert alert-success border-0 shadow-sm py-2">Payroll roles are set for all people in this import.</div>';
+      return;
+    }
+    const lines = pending.map((row) => (
+      '<li><b>' + escapeHtml(row.personName || row.personId) + '</b> needs a payroll role before Perform.</li>'
+    )).join('');
+    importExecutionAlerts.innerHTML = '<div class="alert alert-warning border-0 shadow-sm py-2"><div class="fw-semibold mb-1">Role selection required</div><ul class="mb-0 ps-3 small">' + lines + '</ul></div>';
+  }
+
+  function renderImportExecutionTable() {
+    if (!importExecutionTableBody) return;
+    importExecutionTableBody.innerHTML = (Array.isArray(importExecutionRows) ? importExecutionRows : []).map((row, index) => {
+      const steps = row.steps || {};
+      const canPerform = !importExecutionInProgress
+        && String(row.overallStatus || 'pending') === 'pending'
+        && importExecutionRoleReady(row.personId);
+      return ''
+        + '<tr data-import-exec-index="' + index + '">'
+        + '<td>' + escapeHtml(row.fileName || '—') + '</td>'
+        + '<td>' + escapeHtml(row.personName || row.personId || '—') + '</td>'
+        + '<td>' + escapeHtml(row.periodName || row.periodId || '—') + '</td>'
+        + '<td>' + renderImportExecutionStepCell(steps.workSessions) + '</td>'
+        + '<td>' + renderImportExecutionStepCell(steps.timesheet) + '</td>'
+        + '<td>' + renderImportExecutionStepCell(steps.processed) + '</td>'
+        + '<td class="text-end">'
+        + '<button type="button" class="btn btn-sm btn-primary" data-import-exec-perform="' + index + '"'
+        + (canPerform ? '' : ' disabled')
+        + '><i class="bi bi-play-fill me-1"></i>Perform</button>'
+        + '</td>'
+        + '</tr>';
+    }).join('');
+    if (btnPerformAllImportExecutions) {
+      const pendingCount = (importExecutionRows || []).filter((row) => String(row.overallStatus || 'pending') === 'pending').length;
+      btnPerformAllImportExecutions.disabled = importExecutionInProgress || !pendingCount
+        || !(importExecutionRows || []).every((row) => String(row.overallStatus || 'pending') !== 'pending' || importExecutionRoleReady(row.personId));
+    }
+    renderImportExecutionAlerts();
+  }
+
+  function promptImportExecutionRole(personRow) {
+    return new Promise((resolve) => {
+      if (!importRoleModalEl || !importExecutionPersonRole) {
+        resolve('');
+        return;
+      }
+      const roles = Array.isArray(personRow?.roles) ? personRow.roles : ['teacher', 'staff'];
+      importExecutionPersonRole.innerHTML = roles.map((role) => (
+        '<option value="' + escapeHtml(role) + '">' + escapeHtml(role.charAt(0).toUpperCase() + role.slice(1)) + '</option>'
+      )).join('');
+      const existing = resolveImportExecutionPersonRole(personRow?.personId);
+      importExecutionPersonRole.value = existing || personRow?.defaultRole || roles[0] || 'teacher';
+      if (importRolePromptText) {
+        importRolePromptText.textContent = 'Which payroll role should this import use for '
+          + String(personRow?.personName || personRow?.personId || 'this person')
+          + '?';
+      }
+      importExecutionRoleResolver = resolve;
+      ensureModalOnBody(importRoleModalEl)?.show();
+    });
+  }
+
+  async function ensureImportExecutionRoles() {
+    const needs = Array.isArray(importExecutionPlan?.needsRoleSelection) ? importExecutionPlan.needsRoleSelection : [];
+    for (const row of needs) {
+      if (importExecutionRoleReady(row.personId)) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await promptImportExecutionRole(row);
+      if (!importExecutionRoleReady(row.personId)) {
+        throw new Error('Payroll role selection is required before performing the import.');
+      }
+    }
+  }
+
+  async function performImportExecutionRow(rowIndex) {
+    const row = importExecutionRows[rowIndex];
+    if (!row || importExecutionInProgress || String(row.overallStatus || 'pending') !== 'pending') return null;
+    if (!importExecutionRoleReady(row.personId)) {
+      await ensureImportExecutionRoles();
+    }
+    const personRole = resolveImportExecutionPersonRole(row.personId);
+    row.steps = {
+      workSessions: { status: 'running', summary: '', error: '' },
+      timesheet: { status: 'pending', summary: '', error: '' },
+      processed: { status: 'pending', summary: '', error: '' }
+    };
+    renderImportExecutionTable();
+
+    const loadingToken = beginImportExecutionLoading('Running import steps for ' + (row.fileName || row.periodName || 'selected file') + '...');
+    try {
+      const res = await fetch('/school/timesheets/manage/api/import/execution/perform', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({
+          personId: row.personId,
+          periodId: row.periodId,
+          personRole,
+          batchId: row.batchId,
+          compileResult: row.compileResult,
+          actionStateId
+        })
+      });
+      const payload = await res.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(payload, { busyTitle: 'Import Execution In Progress', replayTitle: 'Import Execution Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return null;
+      if (!res.ok || payload.status === 'error') {
+        row.steps = payload.steps || row.steps;
+        row.overallStatus = 'error';
+        row.errorMessage = payload.message || 'Import execution failed.';
+        throw new Error(payload.message || 'Import execution failed.');
+      }
+      applyActionStateFromResult(payload);
+      row.steps = payload.steps || row.steps;
+      row.overallStatus = 'success';
+      row.timesheetId = payload.timesheetId || '';
+      return payload;
+    } catch (error) {
+      if (String(row.overallStatus || '') !== 'success') row.overallStatus = 'error';
+      row.errorMessage = error.message || String(error);
+      throw error;
+    } finally {
+      endImportApplyLoading(loadingToken);
+      renderImportExecutionTable();
+    }
+  }
+
+  async function performAllImportExecutions() {
+    if (importExecutionInProgress) return;
+    importExecutionInProgress = true;
+    renderImportExecutionTable();
+    try {
+      await ensureImportExecutionRoles();
+      for (let index = 0; index < importExecutionRows.length; index += 1) {
+        if (String(importExecutionRows[index]?.overallStatus || 'pending') !== 'pending') continue;
+        // eslint-disable-next-line no-await-in-loop
+        await performImportExecutionRow(index);
+      }
+    } finally {
+      importExecutionInProgress = false;
+      renderImportExecutionTable();
+    }
+  }
+
+  async function openImportExecutionModal() {
+    if (!CAN_IMPORT_TIMESHEETS || importApplyInProgress || !importCompilePayload) return;
+    const personId = cleanId(importCompilePayload.personId);
+    const results = Array.isArray(importCompilePayload.results) ? importCompilePayload.results : [];
+    if (!personId || !importResultsReadyForApply(results)) {
+      await showMessage({
+        title: 'Import Excel',
+        icon: 'warning',
+        message: 'No compiled files matched an app timesheet period for import.',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+
+    const isSinglePeriod = importMode === 'singlePeriod';
+    const periodId = isSinglePeriod
+      ? cleanId(importTargetPeriod?.id || loadedPeriod?.id || periodSelect?.value || '')
+      : '';
+
+    if (isSinglePeriod && !periodId) {
+      await showMessage({
+        title: 'Import Excel',
+        icon: 'warning',
+        message: 'Load a timesheet period before importing.'
+      });
+      return;
+    }
+
+    if (!isSinglePeriod) {
+      const mismatch = buildImportMismatchSummary(results, importCompilePayload.personName || personId);
+      if (mismatch.blocking) {
+        const lines = mismatch.issues
+          .filter((issue) => issue.blocking)
+          .map((issue) => '<li><b>' + escapeHtml(issue.fileName) + ':</b> ' + escapeHtml(issue.message) + '</li>')
+          .join('');
+        await showMessage({
+          title: 'Import Blocked',
+          icon: 'error',
+          message: 'Some files cannot be imported:<ul class="mb-0 ps-3 mt-2">' + lines + '</ul>',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+        return;
+      }
+      if (mismatch.hasIssues) {
+        const lines = mismatch.issues
+          .map((issue) => '<li><b>' + escapeHtml(issue.fileName) + ':</b> ' + escapeHtml(issue.message) + '</li>')
+          .join('');
+        const mismatchConfirmed = await uiConfirm(
+          'Review these differences before importing:<ul class="mb-0 ps-3 mt-2 text-start">' + lines + '</ul>',
+          'Confirm Import Mismatches'
+        );
+        if (!mismatchConfirmed) return;
+      }
+    }
+
+    const existingTimesheetRows = loadedRows.filter((row) => idsEqual(row.personId, personId) && cleanId(row.timesheetId));
+    const replaceMessage = isSinglePeriod
+      ? (existingTimesheetRows.length
+        ? 'A timesheet already exists for this period. Import will be skipped unless you delete or clear the existing timesheet first. Continue?'
+        : 'Run the 3-step import execution for the loaded timesheet period?')
+      : (existingTimesheetRows.length
+        ? 'Some matched periods already have timesheets and will be skipped. Continue importing into periods without an existing timesheet?'
+        : 'Run the 3-step import execution for matched period(s) that do not already have a timesheet?');
+    const confirmed = await uiConfirm(replaceMessage, 'Confirm Import');
+    if (!confirmed) return;
+
+    importApplyInProgress = true;
+    updateImportReviewConfirmButton();
+    const loadingToken = beginImportExecutionLoading('Preparing import execution plan...');
+    try {
+      const res = await fetch('/school/timesheets/manage/api/import/execution/plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({
+          personId,
+          periodId,
+          results,
+          actionStateId
+        })
+      });
+      const payload = await res.json();
+      if (!res.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Import execution plan failed.');
+      }
+      applyActionStateFromResult(payload);
+      importExecutionPlan = payload;
+      importExecutionRows = (Array.isArray(payload.rows) ? payload.rows : []).map((row) => ({
+        ...row,
+        overallStatus: 'pending',
+        steps: {
+          workSessions: { status: 'pending', summary: '', error: '' },
+          timesheet: { status: 'pending', summary: '', error: '' },
+          processed: { status: 'pending', summary: '', error: '' }
+        }
+      }));
+      if (!importExecutionRows.length) {
+        const skipped = Array.isArray(payload.skipped) ? payload.skipped : [];
+        const skipLines = skipped.map((row) => '<li>' + escapeHtml(row.message || row.fileName || 'Skipped') + '</li>').join('');
+        await showMessage({
+          title: 'Import Execution',
+          icon: 'warning',
+          message: 'No files are ready to execute.'
+            + (skipLines ? '<ul class="mb-0 ps-3 mt-2">' + skipLines + '</ul>' : '')
+        });
+        return;
+      }
+      if (cleanId(payload.defaultPersonRole)) {
+        importExecutionPersonRoleByPersonId[personId] = cleanId(payload.defaultPersonRole);
+      }
+      await hideBootstrapModalAndWait(importReviewModalEl);
+      renderImportExecutionTable();
+      ensureModalOnBody(importExecutionModalEl)?.show();
+      await ensureImportExecutionRoles();
+      renderImportExecutionTable();
+    } catch (error) {
+      await showMessage({
+        title: 'Import Execution Error',
+        icon: 'error',
+        message: escapeHtml(error.message || String(error)),
+        buttons: [{ text: 'OK', class: 'btn-danger' }]
+      });
+    } finally {
+      endImportApplyLoading(loadingToken);
+      importApplyInProgress = false;
+      updateImportReviewConfirmButton();
+    }
+  }
+
+  async function applyLegacyImport() {
+    return openImportExecutionModal();
+  }
+
+  async function deleteLegacyImport(personId, personName, sourceFileName) {
+    if (!CAN_IMPORT_TIMESHEETS) return;
+    const targetPersonId = cleanId(personId);
+    const periodId = cleanId(loadedPeriod?.id || periodSelect?.value || '');
+    if (!targetPersonId || !periodId) {
+      await showMessage({ title: 'Delete Imported File', icon: 'warning', message: 'Load a timesheet period before deleting an imported timesheet.' });
+      return;
+    }
+    const label = cleanId(sourceFileName) || 'imported file';
+    const confirmed = await uiConfirm(
+      'Remove imported timesheet rows from <b>' + escapeHtml(personName || targetPersonId) + '</b> for this period?<br><span class="small text-muted">Source: ' + escapeHtml(label) + '</span>',
+      'Delete imported file?'
+    );
+    if (!confirmed) return;
+
+    const loadingToken = beginLegacyDeleteLoading();
+    try {
+      const params = new URLSearchParams({ personId: targetPersonId, periodId });
+      if (actionStateId) params.set('actionStateId', actionStateId);
+      const res = await fetch('/school/timesheets/manage/api/import/legacy?' + params.toString(), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify({ actionStateId })
+      });
+      const payload = await res.json();
+      if (!res.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Delete request failed.');
+      }
+      applyActionStateFromResult(payload);
+      await loadRoster();
+      await showMessage({
+        title: 'Imported Timesheet Removed',
+        icon: 'success',
+        message: escapeHtml(payload.message || 'Imported timesheet rows were removed.')
+      });
+    } catch (error) {
+      await showMessage({ title: 'Delete Error', icon: 'error', message: escapeHtml(error.message || String(error)) });
+    } finally {
+      endLegacyDeleteLoading(loadingToken);
+    }
+  }
+
+  function idsEqual(left, right) {
+    return cleanId(left).toLowerCase() === cleanId(right).toLowerCase();
+  }
+
+  function setImportReviewNavBusy(busy) {
+    importReviewNavBusy = busy;
+    const total = Array.isArray(importCompilePayload?.results) ? importCompilePayload.results.length : 0;
+    if (importReviewPrevBtn) {
+      importReviewPrevBtn.disabled = busy || importReviewIndex <= 0;
+      importReviewPrevBtn.innerHTML = busy
+        ? '<span class="spinner-border spinner-border-sm me-1"></span> Loading...'
+        : importReviewPrevBtnHtml;
+    }
+    if (importReviewNextBtn) {
+      importReviewNextBtn.disabled = busy || importReviewIndex >= total - 1;
+      importReviewNextBtn.innerHTML = busy
+        ? '<span class="spinner-border spinner-border-sm me-1"></span> Loading...'
+        : importReviewNextBtnHtml;
+    }
+    if (importReviewPeriodTabs) {
+      importReviewPeriodTabs.querySelectorAll('[data-import-review-index]').forEach((btn) => {
+        btn.disabled = busy;
+      });
+    }
+    updateImportReviewConfirmButton();
+  }
+
+  function scheduleImportReviewRender() {
+    setImportReviewNavBusy(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        renderImportReviewCurrent();
+        setImportReviewNavBusy(false);
+      });
+    });
+  }
+
+  function navigateImportReview(nextIndex) {
+    if (importReviewNavBusy) return;
+    const total = Array.isArray(importCompilePayload?.results) ? importCompilePayload.results.length : 0;
+    if (!Number.isFinite(nextIndex) || nextIndex < 0 || nextIndex >= total) return;
+    importReviewIndex = nextIndex;
+    scheduleImportReviewRender();
   }
 
   function openImportReviewModal(payload) {
+    if (payload && Array.isArray(payload.results)) {
+      payload = { ...payload, results: sortImportCompileResults(payload.results) };
+    }
     importCompilePayload = payload || null;
     importReviewIndex = 0;
-    renderImportReviewCurrent();
     const modal = ensureModalOnBody(importReviewModalEl);
     if (modal) modal.show();
+    scheduleImportReviewRender();
   }
 
   async function compileTimesheetImport() {
     if (importCompileInProgress) return;
+    const isSinglePeriod = importMode === 'singlePeriod';
     const personId = String(importTeacherId?.value || '').trim();
-    const year = String(importYear?.value || '').trim();
+    const year = isSinglePeriod
+      ? resolveImportYearFromPeriod(importTargetPeriod || loadedPeriod)
+      : String(importYear?.value || '').trim();
     const files = Array.from(importExcelFiles?.files || []);
+    const expectedPeriodId = isSinglePeriod
+      ? cleanId(importTargetPeriod?.id || loadedPeriod?.id || periodSelect?.value || '')
+      : '';
+
     if (!personId) {
       await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Please select a teacher or staff member.' });
       return;
@@ -1375,10 +2528,19 @@
       await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Please attach at least one .xlsx file.' });
       return;
     }
+    if (isSinglePeriod && files.length !== 1) {
+      await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Row import accepts exactly one Excel file.' });
+      return;
+    }
+    if (isSinglePeriod && !expectedPeriodId) {
+      await showMessage({ title: 'Import Excel', icon: 'warning', message: 'Load a timesheet period before importing.' });
+      return;
+    }
 
     const formData = new FormData();
     formData.append('personId', personId);
     formData.append('year', year);
+    if (expectedPeriodId) formData.append('expectedPeriodId', expectedPeriodId);
     files.forEach((file) => formData.append('files', file));
 
     const originalHtml = btnCompileTimesheetImport?.innerHTML || '';
@@ -1398,6 +2560,8 @@
       if (!res.ok || payload.status !== 'success') {
         throw new Error(payload.message || 'Compile request failed.');
       }
+      importMode = expectedPeriodId ? 'singlePeriod' : 'bulk';
+      if (expectedPeriodId) importTargetPeriod = loadedPeriod || importTargetPeriod;
       const setupModal = ensureModalOnBody(importSetupModalEl);
       if (setupModal) setupModal.hide();
       openImportReviewModal(payload);
@@ -1413,8 +2577,58 @@
   }
 
   populateImportYearOptions();
-  btnOpenTimesheetImport?.addEventListener('click', () => openImportSetupModal());
+  btnOpenTimesheetBulkImport?.addEventListener('click', () => openBulkImportSetupModal());
+  btnConfirmTimesheetImport?.addEventListener('click', () => { void openImportExecutionModal(); });
+  btnPerformAllImportExecutions?.addEventListener('click', () => { void performAllImportExecutions(); });
+  importExecutionTableBody?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-import-exec-perform]');
+    if (!btn || btn.disabled || importExecutionInProgress) return;
+    const rowIndex = Number(btn.getAttribute('data-import-exec-perform'));
+    importExecutionInProgress = true;
+    renderImportExecutionTable();
+    performImportExecutionRow(rowIndex)
+      .then(async (payload) => {
+        if (payload && loadedPeriod?.id) await loadRoster();
+        if (payload) {
+          await showImportApplyResultMessage(payload, payload.periodId, payload.personId);
+        }
+      })
+      .catch(async (error) => {
+        await showMessage({
+          title: 'Import Execution Error',
+          icon: 'error',
+          message: escapeHtml(error.message || String(error)),
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      })
+      .finally(() => {
+        importExecutionInProgress = false;
+        renderImportExecutionTable();
+      });
+  });
+  btnConfirmImportExecutionRole?.addEventListener('click', () => {
+    const needs = Array.isArray(importExecutionPlan?.needsRoleSelection) ? importExecutionPlan.needsRoleSelection : [];
+    const pending = needs.find((row) => !importExecutionRoleReady(row.personId));
+    const personId = cleanId(pending?.personId || importCompilePayload?.personId);
+    const role = cleanId(importExecutionPersonRole?.value || '');
+    if (personId && role) importExecutionPersonRoleByPersonId[personId] = role;
+    if (importRoleModalEl) bootstrap.Modal.getOrCreateInstance(importRoleModalEl).hide();
+    if (typeof importExecutionRoleResolver === 'function') {
+      importExecutionRoleResolver(role);
+      importExecutionRoleResolver = null;
+    }
+    renderImportExecutionTable();
+  });
+  importExecutionModalEl?.addEventListener('hidden.bs.modal', () => {
+    const hasPending = (importExecutionRows || []).some((row) => String(row.overallStatus || 'pending') === 'pending');
+    if (!hasPending) {
+      importCompilePayload = null;
+      importExecutionPlan = null;
+      importExecutionRows = [];
+    }
+  });
   btnPickImportTeacher?.addEventListener('click', async () => {
+    if (importMode === 'singlePeriod') return;
     if (!window.GenericPicker || !window.GenericPickerPresets) {
       await showMessage({ title: 'Teacher Picker', icon: 'warning', message: 'The person picker is not available on this page. Please refresh and try again.' });
       return;
@@ -1426,21 +2640,24 @@
       onSelect: (item) => setImportTeacher(item)
     }));
   });
-  btnClearImportTeacher?.addEventListener('click', clearImportTeacher);
+  btnClearImportTeacher?.addEventListener('click', () => {
+    if (importMode === 'singlePeriod') return;
+    clearImportTeacher();
+  });
   importExcelFiles?.addEventListener('change', renderImportFileList);
   btnCompileTimesheetImport?.addEventListener('click', () => { void compileTimesheetImport(); });
   importReviewPrevBtn?.addEventListener('click', () => {
-    if (importReviewIndex > 0) {
-      importReviewIndex -= 1;
-      renderImportReviewCurrent();
-    }
+    if (importReviewIndex > 0) navigateImportReview(importReviewIndex - 1);
   });
   importReviewNextBtn?.addEventListener('click', () => {
     const total = Array.isArray(importCompilePayload?.results) ? importCompilePayload.results.length : 0;
-    if (importReviewIndex < total - 1) {
-      importReviewIndex += 1;
-      renderImportReviewCurrent();
-    }
+    if (importReviewIndex < total - 1) navigateImportReview(importReviewIndex + 1);
+  });
+  importReviewFileNav?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-import-review-index]');
+    if (!btn || btn.disabled) return;
+    const nextIndex = Number(btn.getAttribute('data-import-review-index'));
+    navigateImportReview(nextIndex);
   });
 })();
 </script>

@@ -129,6 +129,13 @@ test('school package pass9 owns timesheetRoutes implementation', () => {
   assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/timesheetController'\)/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TIMESHEETS,\s*OPERATIONS\.READ_ALL\)/);
   assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TIMESHEETS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireMyTimesheetLegacyDeleteAccess/);
+  assert.match(routeSource, /router\.delete\('\/api\/import\/legacy'[\s\S]*?requireMyTimesheetLegacyDeleteAccess/);
+  assert.match(routeSource, /router\.post\('\/manage\/api\/import\/execution\/plan'/);
+  assert.match(routeSource, /router\.post\('\/manage\/api\/import\/execution\/perform'/);
+  assert.match(routeSource, /ctrl\.planTimesheetImportExecution/);
+  assert.match(routeSource, /ctrl\.performTimesheetImportExecution/);
+  assert.match(routeSource, /ctrl\.deleteMyTimesheetLegacyImport/);
   assert.match(routeSource, /ctrl\.listMyTimesheets/);
   assert.match(routeSource, /ctrl\.listEligibleTimesheetPersons/);
   assert.match(routeSource, /ctrl\.viewTimesheet/);

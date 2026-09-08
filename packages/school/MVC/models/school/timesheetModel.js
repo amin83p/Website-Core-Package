@@ -616,6 +616,21 @@ function sanitizePriorPeriodReconciliation(input) {
     return result;
 }
 
+function sanitizeLegacyImport(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const activityId = cleanString(input.activityId, { max: 80, allowEmpty: true });
+    if (!activityId) return null;
+    const rowCount = cleanNonNegativeInteger(input.rowCount, 0);
+    return {
+        activityId,
+        sourceFileName: cleanString(input.sourceFileName, { max: 260, allowEmpty: true }),
+        importedAt: cleanString(input.importedAt, { max: 40, allowEmpty: true }),
+        importedBy: cleanString(input.importedBy, { max: 120, allowEmpty: true }),
+        rowCount,
+        matchedPeriodId: cleanString(input.matchedPeriodId, { max: 64, allowEmpty: true })
+    };
+}
+
 function sanitizeEntry(entry) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
         throw new Error('Invalid timesheet entry payload.');
@@ -625,7 +640,8 @@ function sanitizeEntry(entry) {
     if (!sessionId) throw new Error('Timesheet entry sessionId is required.');
 
     const isReportReflection = entry.isReportReflection === true || sessionId.startsWith('rptref-');
-    const isSchoolActivity = entry.isSchoolActivity === true || sessionId.startsWith('act-');
+    const isLegacyImport = entry.isLegacyImport === true || sessionId.startsWith('legacyimp-');
+    const isSchoolActivity = entry.isSchoolActivity === true || sessionId.startsWith('act-') || isLegacyImport;
     const isPriorPeriodAdjustment = entry.isPriorPeriodAdjustment === true || sessionId.startsWith('adj-');
 
     if (entry.isDeleted === true) {
@@ -695,6 +711,10 @@ function sanitizeEntry(entry) {
         }
     }
     if (isReportReflection) row.isReportReflection = true;
+    if (isLegacyImport) {
+        row.isLegacyImport = true;
+        row.isFinalStatus = entry.isFinalStatus !== false;
+    }
     if (isSchoolActivity) {
         row.isSchoolActivity = true;
         row.activityId = cleanString(entry.activityId, { max: 80, allowEmpty: true });
@@ -809,6 +829,13 @@ function sanitizeTimesheetPayload(input) {
 
     if (input.reviewHistory !== undefined) {
         result.reviewHistory = sanitizeReviewHistory(input.reviewHistory);
+    }
+
+    if (input.legacyImport !== undefined) {
+        const legacyImport = input.legacyImport === null
+            ? null
+            : sanitizeLegacyImport(input.legacyImport);
+        if (legacyImport) result.legacyImport = legacyImport;
     }
 
     return result;
@@ -948,6 +975,7 @@ module.exports = {
     sanitizeReviewHistory,
     sanitizeReviewHistoryEntry,
     sanitizeManagerReview,
+    sanitizeLegacyImport,
     normalizeTimesheetStatus,
     normalizeLegacyTimesheetRecord,
     TIMESHEET_STATUSES: Object.freeze([...TIMESHEET_STATUSES]),

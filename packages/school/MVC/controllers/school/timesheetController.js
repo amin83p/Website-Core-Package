@@ -33,6 +33,10 @@ const deadlineReconciliationService = require('../../services/school/timesheetDe
 const timesheetPeriodEligibilityService = require('../../services/school/timesheetPeriodEligibilityService');
 const { compileTimesheetExcelFiles } = require('../../services/school/timesheetExcel/timesheetExcelCompilerService');
 const { filterPeriodsForYear } = require('../../services/school/timesheetExcel/timesheetPeriodMatchService');
+const timesheetImportPolicyModel = require('../../models/school/timesheetImportPolicyModel');
+const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
+const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
+const timesheetLegacyImportExecutionService = require('../../services/school/timesheetLegacyImportExecutionService');
 const schoolRepositories = require('../../repositories/school');
 const {
     resolveOrgTodayFromRequest,
@@ -1175,9 +1179,104 @@ exports.listEligibleTimesheetPersons = async (req, res) => {
     }
 };
 
+async function loadTimesheetImportPageFlags(activeOrgId) {
+    const policy = await timesheetImportPolicyModel.getPolicyForOrg(activeOrgId);
+    return {
+        policy,
+        canImportInTimesheetManagement: timesheetImportPolicyService.isImportAllowedForScope(
+            policy,
+            timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+        ),
+        canImportInMyTimesheets: timesheetImportPolicyService.isImportAllowedForScope(
+            policy,
+            timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS
+        )
+    };
+}
+
+async function compileTimesheetExcelImportsForScope(req, res, scope) {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    await timesheetLegacyImportService.assertImportAllowed({ orgId: activeOrgId, scope });
+
+    const personId = String(req.body?.personId || '').trim();
+    const year = String(req.body?.year || '').trim();
+    const expectedPeriodId = String(req.body?.expectedPeriodId || '').trim();
+    const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+
+    if (!personId) throw new Error('A teacher/staff person is required.');
+    if (!/^\d{4}$/.test(year)) throw new Error('A valid four-digit year is required.');
+    if (!uploadedFiles.length) throw new Error('At least one Excel file (.xlsx) is required.');
+    if (expectedPeriodId && uploadedFiles.length !== 1) {
+        throw new Error('Single-period import accepts exactly one Excel file.');
+    }
+
+    const eligiblePeople = await loadTimesheetEligiblePeople(activeOrgId, req.user);
+    const personRow = eligiblePeople.find((row) => idsEqual(row.personId, personId));
+    if (!personRow) {
+        throw new Error('The selected person is not eligible for timesheet import in the active organization.');
+    }
+
+    const allPeriods = scope === timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+        ? await loadTimesheetManagementPeriods(req, {})
+        : await dataService.fetchData('timesheetPeriods', { orgId__eq: activeOrgId }, req.user);
+    const periods = filterPeriodsForYear(allPeriods, year);
+    const files = uploadedFiles.map((file) => ({
+        originalname: file.originalname,
+        buffer: file.buffer
+    }));
+
+    const compiled = await compileTimesheetExcelFiles({
+        files,
+        personId,
+        personName: personRow.name || buildPersonName(personRow.person),
+        year,
+        orgId: activeOrgId,
+        periods
+    });
+
+    const results = compiled.results || [];
+    if (expectedPeriodId) {
+        const result = results[0];
+        if (!result || String(result.status || '').toLowerCase() !== 'ok') {
+            const message = result?.error?.messages?.[0]
+                || 'The uploaded file could not be compiled for the selected period.';
+            const error = new Error(message);
+            error.statusCode = 400;
+            throw error;
+        }
+        const matchedPeriodId = String(result?.matchedPeriod?.id || '').trim();
+        const matchStatus = String(result?.matchStatus || result?.matchedPeriod?.matchStatus || 'none').toLowerCase();
+        if (!matchedPeriodId || matchStatus === 'none') {
+            const error = new Error('The Excel file does not match any app timesheet period for the loaded period.');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (!idsEqual(matchedPeriodId, expectedPeriodId)) {
+            const error = new Error('The Excel file matches a different timesheet period than the one currently loaded.');
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+
+    return {
+        personId,
+        personName: personRow.name || buildPersonName(personRow.person),
+        year,
+        expectedPeriodId: expectedPeriodId || null,
+        results
+    };
+}
+
 exports.showTimesheetManagement = async (req, res) => {
     try {
-        const canPrintManagedTimesheets = await hasTimesheetManagementAuthority(req.user, OPERATIONS.EXPORT);
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const [canPrintManagedTimesheets, canAllowLateSubmission, importFlags] = await Promise.all([
+            hasTimesheetManagementAuthority(req.user, OPERATIONS.EXPORT),
+            hasTimesheetManagementAuthority(req.user, OPERATIONS.UPDATE),
+            loadTimesheetImportPageFlags(activeOrgId)
+        ]);
+        const canImportTimesheets = importFlags.canImportInTimesheetManagement
+            && await hasTimesheetManagementAuthority(req.user, OPERATIONS.UPDATE);
         res.render('school/timesheet/timesheetManage', {
             title: 'Timesheet Management',
             tableName: 'Timesheet_Management',
@@ -1188,6 +1287,8 @@ exports.showTimesheetManagement = async (req, res) => {
             print: false,
             includePrintManager: true,
             canPrintManagedTimesheets,
+            canAllowLateSubmission,
+            canImportTimesheets,
             user: req.user,
             actionStateId: req.actionStateId
         });
@@ -1221,46 +1322,303 @@ exports.listTimesheetManagementPeriods = async (req, res) => {
 
 exports.compileTimesheetExcelImports = async (req, res) => {
     try {
+        const payload = await compileTimesheetExcelImportsForScope(
+            req,
+            res,
+            timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+        );
+        return res.json({ status: 'success', ...payload });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.compileMyTimesheetExcelImports = async (req, res) => {
+    try {
+        const teacherContext = await resolveTargetTeacherContext(req, {
+            requireTeacher: true,
+            operationId: OPERATIONS.UPDATE
+        });
+        if (!teacherContext.targetTeacherId) {
+            throw new Error('A teacher/staff profile is required to import timesheets.');
+        }
+        req.body = {
+            ...(req.body || {}),
+            personId: teacherContext.targetTeacherId
+        };
+        const payload = await compileTimesheetExcelImportsForScope(
+            req,
+            res,
+            timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS
+        );
+        return res.json({ status: 'success', ...payload });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+function buildTimesheetEditorLinks(personId, applied = []) {
+    const normalizedPersonId = String(personId || '').trim();
+    if (!normalizedPersonId) return [];
+    return (Array.isArray(applied) ? applied : [])
+        .map(({ periodId }) => {
+            const normalizedPeriodId = String(periodId || '').trim();
+            if (!normalizedPeriodId) return null;
+            return {
+                periodId: normalizedPeriodId,
+                personId: normalizedPersonId,
+                url: `/school/timesheets/editor/${encodeURIComponent(normalizedPeriodId)}?teacherId=${encodeURIComponent(normalizedPersonId)}`
+            };
+        })
+        .filter(Boolean);
+}
+
+exports.applyTimesheetLegacyImports = async (req, res) => {
+    try {
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
         const personId = String(req.body?.personId || '').trim();
-        const year = String(req.body?.year || '').trim();
-        const uploadedFiles = Array.isArray(req.files) ? req.files : [];
-
+        const periodId = String(req.body?.periodId || '').trim();
+        const results = Array.isArray(req.body?.results) ? req.body.results : [];
         if (!personId) throw new Error('A teacher/staff person is required.');
-        if (!/^\d{4}$/.test(year)) throw new Error('A valid four-digit year is required.');
-        if (!uploadedFiles.length) throw new Error('At least one Excel file (.xlsx) is required.');
+        if (!results.length) throw new Error('Compiled import results are required.');
 
         const eligiblePeople = await loadTimesheetEligiblePeople(activeOrgId, req.user);
-        const personRow = eligiblePeople.find((row) => idsEqual(row.personId, personId));
-        if (!personRow) {
-            throw new Error('The selected person is not eligible for timesheet management in the active organization.');
+        if (!eligiblePeople.some((row) => idsEqual(row.personId, personId))) {
+            throw new Error('The selected person is not eligible for timesheet import in the active organization.');
         }
 
-        const allPeriods = await loadTimesheetManagementPeriods(req, {});
-        const periods = filterPeriodsForYear(allPeriods, year);
-        const files = uploadedFiles.map((file) => ({
-            originalname: file.originalname,
-            buffer: file.buffer
-        }));
-
-        const compiled = await compileTimesheetExcelFiles({
-            files,
-            personId,
-            personName: personRow.name || buildPersonName(personRow.person),
-            year,
+        const outcome = await timesheetLegacyImportService.applyLegacyImports({
             orgId: activeOrgId,
-            periods
-        });
-
-        return res.json({
-            status: 'success',
             personId,
-            personName: personRow.name || buildPersonName(personRow.person),
-            year,
-            results: compiled.results || []
+            compileResults: results,
+            reqUser: req.user,
+            scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT,
+            periodFilterId: periodId
+        });
+        return res.json({
+            status: outcome.responseStatus || 'success',
+            message: outcome.message || `Imported ${outcome.totalRows} row(s) across ${outcome.applied.length} period(s).`,
+            editorLinks: buildTimesheetEditorLinks(personId, outcome.applied),
+            actionStateId: req.actionStateId || null,
+            appliedStatus: outcome.appliedStatus || 'draft',
+            applied: outcome.applied || [],
+            skipped: outcome.skipped || [],
+            rolledBack: outcome.rolledBack || [],
+            totalRows: outcome.totalRows || 0
         });
     } catch (error) {
-        return res.status(400).json({ status: 'error', message: error.message });
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message,
+            rolledBack: Array.isArray(error?.rolledBack) ? error.rolledBack : []
+        });
+    }
+};
+
+exports.applyMyTimesheetLegacyImports = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, {
+            requireTeacher: true,
+            operationId: OPERATIONS.UPDATE
+        });
+        const personId = teacherContext.targetTeacherId;
+        const periodId = String(req.body?.periodId || '').trim();
+        const results = Array.isArray(req.body?.results) ? req.body.results : [];
+        if (!periodId) throw new Error('Timesheet period is required.');
+        if (!results.length) throw new Error('Compiled import results are required.');
+
+        const outcome = await timesheetLegacyImportService.applyLegacyImports({
+            orgId: activeOrgId,
+            personId,
+            compileResults: results,
+            reqUser: req.user,
+            scope: timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS,
+            periodFilterId: periodId
+        });
+        return res.json({
+            status: outcome.responseStatus || 'success',
+            message: outcome.message || `Imported ${outcome.totalRows} row(s).`,
+            editorLinks: buildTimesheetEditorLinks(personId, outcome.applied),
+            actionStateId: req.actionStateId || null,
+            appliedStatus: outcome.appliedStatus || 'draft',
+            applied: outcome.applied || [],
+            skipped: outcome.skipped || [],
+            rolledBack: outcome.rolledBack || [],
+            totalRows: outcome.totalRows || 0
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message,
+            rolledBack: Array.isArray(error?.rolledBack) ? error.rolledBack : []
+        });
+    }
+};
+
+exports.planTimesheetImportExecution = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const personId = String(req.body?.personId || '').trim();
+        const periodId = String(req.body?.periodId || '').trim();
+        const results = Array.isArray(req.body?.results) ? req.body.results : [];
+        if (!personId) throw new Error('A teacher/staff person is required.');
+        if (!results.length) throw new Error('Compiled import results are required.');
+
+        const eligiblePeople = await loadTimesheetEligiblePeople(activeOrgId, req.user);
+        if (!eligiblePeople.some((row) => idsEqual(row.personId, personId))) {
+            throw new Error('The selected person is not eligible for timesheet import in the active organization.');
+        }
+
+        const plan = await timesheetLegacyImportExecutionService.buildImportExecutionPlan({
+            orgId: activeOrgId,
+            personId,
+            compileResults: results,
+            reqUser: req.user,
+            periodFilterId: periodId
+        });
+        return res.json({
+            status: 'success',
+            actionStateId: req.actionStateId || null,
+            ...plan
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.performTimesheetImportExecution = async (req, res) => {
+    let guardKey = '';
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        if (!await hasTimesheetManagementAuthority(req.user, OPERATIONS.CONFIGURE)) {
+            throw new Error('Timesheet Management CONFIGURE access is required to perform imported timesheet processing.');
+        }
+
+        const personId = String(req.body?.personId || '').trim();
+        const periodId = String(req.body?.periodId || '').trim();
+        const personRole = String(req.body?.personRole || '').trim();
+        const batchId = String(req.body?.batchId || '').trim();
+        const compileResult = req.body?.compileResult && typeof req.body.compileResult === 'object'
+            ? req.body.compileResult
+            : null;
+        if (!personId) throw new Error('A teacher/staff person is required.');
+        if (!periodId) throw new Error('Timesheet period is required.');
+        if (!compileResult) throw new Error('Compiled import result is required.');
+
+        guardKey = idempotencyGuardService.createGuardKey([
+            'timesheet_import_execution',
+            activeOrgId,
+            periodId,
+            personId,
+            batchId || String(compileResult?.fileName || '')
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 180000,
+            replayTtlMs: 15000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'Import execution is already in progress. Please wait.')) return;
+
+        const eligiblePeople = await loadTimesheetEligiblePeople(activeOrgId, req.user);
+        if (!eligiblePeople.some((row) => idsEqual(row.personId, personId))) {
+            throw new Error('The selected person is not eligible for timesheet import in the active organization.');
+        }
+
+        const outcome = await timesheetLegacyImportExecutionService.performImportExecution({
+            orgId: activeOrgId,
+            personId,
+            periodId,
+            personRole,
+            compileResult,
+            batchId,
+            reqUser: req.user
+        });
+        const payloadOut = {
+            status: 'success',
+            message: 'Imported timesheet was created, assembled, and processed.',
+            actionStateId: req.actionStateId || null,
+            editorLinks: buildTimesheetEditorLinks(personId, [{ periodId: outcome.periodId }]),
+            ...outcome
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message,
+            steps: error?.steps || null,
+            rolledBack: error?.rolledBack || null
+        });
+    }
+};
+
+exports.deleteTimesheetLegacyImport = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const personId = String(req.query?.personId || req.body?.personId || '').trim();
+        const periodId = String(req.query?.periodId || req.body?.periodId || '').trim();
+        if (!personId) throw new Error('A teacher/staff person is required.');
+        if (!periodId) throw new Error('Timesheet period is required.');
+
+        const eligiblePeople = await loadTimesheetEligiblePeople(activeOrgId, req.user);
+        if (!eligiblePeople.some((row) => idsEqual(row.personId, personId))) {
+            throw new Error('The selected person is not eligible for timesheet import in the active organization.');
+        }
+
+        const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+            orgId: activeOrgId,
+            personId,
+            periodId,
+            reqUser: req.user,
+            scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+        });
+        if (!outcome.hadLegacyImport) {
+            return res.status(404).json({ status: 'error', message: 'No imported timesheet was found for this person and period.' });
+        }
+        return res.json({
+            status: 'success',
+            message: 'Imported timesheet rows were removed.',
+            actionStateId: req.actionStateId || null,
+            ...outcome
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.deleteMyTimesheetLegacyImport = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, {
+            requireTeacher: true,
+            operationId: OPERATIONS.DELETE
+        });
+        const personId = teacherContext.targetTeacherId;
+        const periodId = String(req.query?.periodId || req.body?.periodId || '').trim();
+        if (!periodId) throw new Error('Timesheet period is required.');
+
+        const canAdminDelete = await isTimesheetSectionAdmin(req.user, OPERATIONS.DELETE);
+        const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+            orgId: activeOrgId,
+            personId,
+            periodId,
+            reqUser: req.user,
+            scope: timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS,
+            skipImportPolicyCheck: canAdminDelete
+        });
+        if (!outcome.hadLegacyImport) {
+            return res.status(404).json({ status: 'error', message: 'No imported timesheet was found for this period.' });
+        }
+        return res.json({
+            status: 'success',
+            message: 'Imported timesheet rows were removed.',
+            actionStateId: req.actionStateId || null,
+            ...outcome
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({ status: 'error', message: error.message });
     }
 };
 
@@ -1286,9 +1644,17 @@ exports.getTimesheetManagementRoster = async (req, res) => {
         );
 
         const requestedTimesheetStatus = String(req.query.timesheetStatus || '').trim().toLowerCase();
+        const orgTimeZone = req.orgTimeZone || req.user?.activeOrgTimeZone || '';
+        const isSubmissionDeadlinePassed = isPeriodSubmissionDeadlinePassed(period, orgTimeZone);
+        const periodProcessed = String(period?.status || '').toLowerCase() === 'processed';
         const rows = eligiblePeople.map((personRow) => {
             const timesheet = timesheetByPersonId.get(personRow.personId) || null;
             const status = String(timesheet?.status || 'not_started').toLowerCase();
+            const allowLateSubmission = Boolean(timesheet?.allowLateSubmission);
+            const canOpenLateSubmission = isSubmissionDeadlinePassed
+                && !periodProcessed
+                && ['draft', 'not_started'].includes(status)
+                && !allowLateSubmission;
             const summaryEntries = ['submitted', 'processed'].includes(status)
                 && Array.isArray(timesheet?.submissionSnapshot?.entries)
                 && timesheet.submissionSnapshot.entries.length
@@ -1322,6 +1688,10 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                     .filter((node) => Array.isArray(node?.openReasons) && node.openReasons.length > 0).length,
                 revisionCount: countReviewReopenCycles(timesheet),
                 lastReopenNote: getLastReopenNote(timesheet),
+                allowLateSubmission,
+                canOpenLateSubmission,
+                hasLegacyImport: Boolean(timesheet?.legacyImport?.importedAt),
+                legacyImportFileName: String(timesheet?.legacyImport?.sourceFileName || '').trim(),
                 openUrl: `/school/timesheets/editor/${encodeURIComponent(periodId)}?teacherId=${encodeURIComponent(personRow.personId)}`
             };
         }).filter((row) => {
@@ -1339,7 +1709,8 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 endDate: String(period?.endDate || ''),
                 submissionDeadline: String(period?.submissionDeadline || ''),
                 submissionDeadlineTime: String(period?.submissionDeadlineTime || '23:59'),
-                status: String(period?.status || '')
+                status: String(period?.status || ''),
+                isSubmissionDeadlinePassed
             },
             rows
         });
@@ -1668,7 +2039,9 @@ exports.listMyTimesheets = async (req, res) => {
                     timesheetId: ts ? ts.id : null,
                     tsStatus: ts ? ts.status : 'not_started',
                     managerApproved: Boolean(ts && isManagerApproved(ts)),
-                    totalHours: ts ? ts.totalHours : 0
+                    totalHours: ts ? ts.totalHours : 0,
+                    hasLegacyImport: Boolean(ts?.legacyImport?.importedAt),
+                    legacyImportFileName: String(ts?.legacyImport?.sourceFileName || '').trim()
                 }, eligibilityOptions);
             });
 
@@ -1686,6 +2059,9 @@ exports.listMyTimesheets = async (req, res) => {
 
         const viewingOtherTeacher = teacherContext.targetTeacherId && teacherContext.currentTeacherId &&
             !idsEqual(teacherContext.targetTeacherId, teacherContext.currentTeacherId);
+        const importFlags = await loadTimesheetImportPageFlags(activeOrgId);
+        const canImportMyTimesheets = importFlags.canImportInMyTimesheets;
+        const canDeleteMyTimesheetLegacyImport = await isTimesheetSectionAdmin(req.user, OPERATIONS.DELETE);
 
         res.render('school/timesheet/timesheetList', {
             title: viewingOtherTeacher
@@ -1705,6 +2081,8 @@ exports.listMyTimesheets = async (req, res) => {
             currentTeacherId: teacherContext.currentTeacherId,
             targetTeacherId: teacherContext.targetTeacherId,
             selectedTeacherName: teacherContext.selectedTeacherName,
+            canImportMyTimesheets,
+            canDeleteMyTimesheetLegacyImport,
             includeModal: true,
             includeModal_Table: true,
             print: true,

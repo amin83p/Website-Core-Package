@@ -7,6 +7,7 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const { buildReportReflectionLiveSessions } = require('./reportTimesheetReflectionService');
 const activityService = require('./activityService');
+const timesheetLegacyImportService = require('./timesheetLegacyImportService');
 const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const timesheetSessionStudentLabelService = require('./timesheetSessionStudentLabelService');
 const deadlineReconciliationService = require('./timesheetDeadlineReconciliationService');
@@ -188,11 +189,14 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
     .filter(Boolean));
   const savedComments = new Map();
   existingEntries.forEach((entry) => {
-    if (!entry || entry.isDeleted || entry.isManual) return;
+    if (!entry || entry.isDeleted || entry.isManual || timesheetLegacyImportService.isLegacyImportEntry(entry)) return;
     const sessionId = String(entry.sessionId || '').trim();
     if (sessionId) savedComments.set(sessionId, String(entry.comment || ''));
   });
 
+  const legacyImportEntries = existingEntries
+    .filter((entry) => entry?.isDeleted !== true && timesheetLegacyImportService.isLegacyImportEntry(entry))
+    .map((entry) => ({ ...entry, isManual: false }));
   const manualEntries = existingEntries
     .filter((entry) => entry?.isManual === true && entry?.isDeleted !== true)
     .map((entry) => ({ ...entry, isManual: true }));
@@ -208,7 +212,7 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
     }));
 
   return {
-    entries: [...manualEntries, ...autoEntries],
+    entries: [...manualEntries, ...legacyImportEntries, ...autoEntries],
     liveEntries,
     classes: classRows,
     departments: Array.isArray(departments) ? departments : [],

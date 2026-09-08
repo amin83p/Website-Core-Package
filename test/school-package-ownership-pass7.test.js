@@ -141,12 +141,13 @@ test('school package pass10 owns attendanceRoutes implementation', () => {
   assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/attendanceController'\)/);
   assert.match(routeSource, /const\s+settingsCtrl\s*=\s*require\('\.\.\/controllers\/school\/schoolSettingsController'\)/);
   assert.match(routeSource, /\/settings'[\s\S]*?SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.READ_ALL/);
-  assert.match(routeSource, /router\.get\('\/'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
-  assert.match(routeSource, /\/api\/data'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /router\.get\('\/'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.READ\)/);
+  assert.match(routeSource, /\/api\/data'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.READ\)/);
   assert.match(routeSource, /settingsCtrl\.redirectLegacyAttendanceSettings/);
   assert.match(routeSource, /settingsCtrl\.saveAttendanceMatrix/);
   assert.match(routeSource, /ctrl\.showAttendancePage/);
   assert.match(routeSource, /ctrl\.updateAttendanceRosterCell/);
+  assert.match(routeSource, /\/api\/files\/upload'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.UPLOAD\)/);
 });
 
 test('school package pass10 owns sampleDataRoutes implementation', () => {
