@@ -15,6 +15,12 @@
     : []
 }) %>
 
+<% if (typeof showStudentCaseAccessAlert !== 'undefined' && showStudentCaseAccessAlert) { %>
+<div class="alert alert-warning border-0 shadow-sm mb-3" role="alert">
+  Case list data requires <strong>SCHOOL_SESSION_STUDENT_CASES</strong> READ_ALL access. Contact your administrator to update your access profile.
+</div>
+<% } %>
+
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
     <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Student Cases</div>
@@ -111,7 +117,7 @@
     </thead>
     <tbody>
       <% if (!data || data.length === 0) { %>
-        <tr><td colspan="9" class="text-center py-5 text-muted">No student cases found.</td></tr>
+        <tr><td colspan="9" class="text-center py-5 text-muted"><% if (typeof showStudentCaseAccessAlert !== 'undefined' && showStudentCaseAccessAlert) { %>Student case list data requires READ_ALL access.<% } else { %>No student cases found.<% } %></td></tr>
       <% } %>
       <% (data || []).forEach((item) => { %>
         <%
@@ -119,9 +125,9 @@
           const isClosed = ['resolved', 'cancelled'].includes(rowStatus);
           const isLocked = item.locked === true;
           const canResolveRow = canResolveCases === true && !isClosed;
-          const canDeleteRow = isClosed && isLocked ? (canResolveCases === true) : (canDeleteCases === true);
-          const canReadRow = canReadCases === true;
-          const hasCaseActions = canReadRow || canResolveRow || canDeleteRow === true;
+          const canDeleteRow = isClosed && isLocked ? (canOverrideLockedCaseDelete === true) : (canDeleteCases === true);
+          const canViewRow = canViewCases === true;
+          const hasCaseActions = canViewRow || canResolveRow || canDeleteRow === true;
           const hasCaseContext = Boolean(item.id && item.classId && item.sessionId);
         %>
         <tr>
@@ -147,7 +153,7 @@
                   <i class="bi bi-three-dots-vertical"></i>
                 </button>
                 <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
-                  <% if (canReadRow) { %>
+                  <% if (canViewRow) { %>
                   <button
                     type="button"
                     class="btn btn-outline-primary btn-sm js-student-case-open-here"
@@ -208,7 +214,7 @@
       allowCreate: <%= canCreateCases === true ? 'true' : 'false' %>,
       capabilities: {
         canCreate: <%= canCreateCases === true ? 'true' : 'false' %>,
-        canRead: <%= canReadCases === true ? 'true' : 'false' %>,
+        canRead: <%= canViewCases === true ? 'true' : 'false' %>,
         canUpdate: <%= canUpdateCases === true ? 'true' : 'false' %>,
         canResolve: <%= canResolveCases === true ? 'true' : 'false' %>,
         canDelete: <%= canDeleteCases === true ? 'true' : 'false' %>

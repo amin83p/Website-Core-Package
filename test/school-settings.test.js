@@ -95,6 +95,10 @@ test('School Settings routes use standard access and action-state protection', (
   );
   assert.match(
     routes,
+    /router\.post\('\/timesheet-import'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
+  );
+  assert.match(
+    routes,
     /router\.get\('\/session-access\/email-template-check'[\s\S]*?checkSessionNotificationEmailTemplate/
   );
   assert.doesNotMatch(routes, /AdminMiddleware|adminAuthority|schoolAdminAccessService/);
@@ -133,7 +137,7 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   const catalog = require('../packages/school/MVC/config/schoolSettingsCatalog');
   assert.deepEqual(
     catalog.listSchoolSettingsGroups().map((row) => row.key),
-    ['conduct-rating-scale', 'attendance-matrix', 'attendance-marks', 'attendance-rollup', 'autosave', 'session-access', 'student-attendance-report', 'timesheet-parameters']
+    ['conduct-rating-scale', 'attendance-matrix', 'attendance-marks', 'attendance-rollup', 'autosave', 'session-access', 'student-attendance-report', 'timesheet-parameters', 'timesheet-import']
   );
   const rollupGroup = catalog.listSchoolSettingsGroups().find((row) => row.key === 'attendance-rollup');
   assert.equal(rollupGroup?.href, undefined);
@@ -144,8 +148,13 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.match(view, /id="attendance-matrix"/);
   assert.match(view, /id="student-attendance-report"/);
   assert.match(view, /id="timesheet-parameters"/);
+  assert.match(view, /id="timesheet-import"/);
   assert.match(view, /Sessions with no student enrollment/);
   assert.match(view, /\/school\/settings\/timesheet-parameters/);
+  assert.match(view, /\/school\/settings\/timesheet-import/);
+  assert.match(view, /id="timesheetImportTargetStatus"/);
+  assert.match(view, /importTargetStatus/);
+  assert.match(view, /My Timesheets import always saves as Draft/);
   assert.match(view, /emptyEnrollmentSessions/);
   assert.match(view, /statutoryHolidayPayEnabled/);
   assert.match(view, /id="sarReportTemplateId"/);
@@ -277,6 +286,13 @@ test('settings page renders in editable and read-only modes with valid client Ja
     timesheetParametersPolicy: {
       emptyEnrollmentSessions: 'hide'
     },
+    timesheetImportPolicy: {
+      importActivityId: '',
+      allowImportInTimesheetManagement: false,
+      allowImportInMyTimesheets: false,
+      importTargetStatus: 'draft'
+    },
+    timesheetImportActivityOptions: [],
     actionStateId: 'state-1',
     schoolSectionDashboardHref: '/dashboard/section-nav/SCHOOL'
   };

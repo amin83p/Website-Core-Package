@@ -7391,7 +7391,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
                 const soloStudentHtml = scheduleSoloStudentHtml(ev);
-        const resizeHandles = ev.isDraft || isScheduledClassSessionForQuickEdit(ev)
+        const resizeHandles = canDragCreateSessions && (ev.isDraft || isScheduledClassSessionForQuickEdit(ev))
             ? buildScheduleDraftResizeHandlesHtml()
             : '';
         return `

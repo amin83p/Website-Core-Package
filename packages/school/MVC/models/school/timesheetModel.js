@@ -621,7 +621,14 @@ function sanitizeLegacyImport(input) {
     const activityId = cleanString(input.activityId, { max: 80, allowEmpty: true });
     if (!activityId) return null;
     const rowCount = cleanNonNegativeInteger(input.rowCount, 0);
-    return {
+    const executionModeRaw = cleanString(input.executionMode, { max: 40, allowEmpty: true }).toLowerCase();
+    const executionMode = executionModeRaw === 'activity_first' ? 'activity_first' : '';
+    const legacyImportBatchId = cleanString(input.legacyImportBatchId, { max: 260, allowEmpty: true });
+    const workSessionEntryIds = (Array.isArray(input.workSessionEntryIds) ? input.workSessionEntryIds : [])
+        .map((value) => cleanString(value, { max: 120, allowEmpty: true }))
+        .filter(Boolean)
+        .slice(0, 200);
+    const result = {
         activityId,
         sourceFileName: cleanString(input.sourceFileName, { max: 260, allowEmpty: true }),
         importedAt: cleanString(input.importedAt, { max: 40, allowEmpty: true }),
@@ -629,6 +636,10 @@ function sanitizeLegacyImport(input) {
         rowCount,
         matchedPeriodId: cleanString(input.matchedPeriodId, { max: 64, allowEmpty: true })
     };
+    if (executionMode) result.executionMode = executionMode;
+    if (legacyImportBatchId) result.legacyImportBatchId = legacyImportBatchId;
+    if (workSessionEntryIds.length) result.workSessionEntryIds = workSessionEntryIds;
+    return result;
 }
 
 function sanitizeEntry(entry) {
@@ -832,10 +843,15 @@ function sanitizeTimesheetPayload(input) {
     }
 
     if (input.legacyImport !== undefined) {
-        const legacyImport = input.legacyImport === null
-            ? null
-            : sanitizeLegacyImport(input.legacyImport);
-        if (legacyImport) result.legacyImport = legacyImport;
+        if (input.legacyImport === null) {
+            result.__unsetFields = Array.from(new Set([
+                ...(Array.isArray(result.__unsetFields) ? result.__unsetFields : []),
+                'legacyImport'
+            ]));
+        } else {
+            const legacyImport = sanitizeLegacyImport(input.legacyImport);
+            if (legacyImport) result.legacyImport = legacyImport;
+        }
     }
 
     return result;

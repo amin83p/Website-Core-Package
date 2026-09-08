@@ -273,6 +273,20 @@
     "trackState": true
   },
   {
+    "id": "OP1026",
+    "active": true,
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-09-04T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-09-04T00:00:00.000Z"
+    },
+    "keepActive": false,
+    "name": "BROADCAST",
+    "system": false,
+    "trackState": true
+  },
+  {
     "name": "START",
     "active": true,
     "trackState": true,

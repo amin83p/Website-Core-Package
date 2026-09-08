@@ -98,9 +98,9 @@ function normalizeAttachmentRows(rows = []) {
 }
 
 async function assertGlobalChatAdmin(user, ipAddress) {
-  const allowed = await chatAccessService.isGlobalChatAdmin(user, ipAddress);
+  const allowed = await chatAccessService.isChatBroadcastAdmin(user, ipAddress);
   if (!allowed) {
-    throw createHttpError('Global conversation management requires full chat administration access.', 403);
+    throw createHttpError('Broadcast requires dedicated chat broadcast access.', 403);
   }
 }
 

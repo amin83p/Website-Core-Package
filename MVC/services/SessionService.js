@@ -89,11 +89,11 @@ async function cleanupExpiredSessions(userId) {
         const absoluteExpiry = new Date(session.absoluteExpiry);
 
         const idleMins = parseSafeInt(session.idleTimeoutMinutes, 30);
-        const idleLimitMs = idleMins * 60 * 1000;
+        const idleLimitMs = idleMins > 0 ? idleMins * 60 * 1000 : null;
 
         let isExpired = false;
         if (now > absoluteExpiry) isExpired = true;
-        if (!isExpired && (now - lastActive) > idleLimitMs) isExpired = true;
+        if (!isExpired && idleLimitMs && (now - lastActive) > idleLimitMs) isExpired = true;
 
         if (isExpired) {
             sessionRecordCacheService.markRevoked(session.id);
@@ -125,6 +125,7 @@ async function createSession(user, orgId, deviceInfo, tokenSignature) {
         lastActivityAt: now.toISOString(),
         absoluteExpiry: expiryTime.toISOString(),
         idleTimeoutMinutes: Number(limits.idleTimeoutMins),
+        maxDurationMinutes: Number(limits.maxDurationMins),
         currentOrgId: orgId,
         orgHistory: [{
             orgId,
@@ -138,14 +139,55 @@ async function createSession(user, orgId, deviceInfo, tokenSignature) {
     return created;
 }
 
-async function touchSession(sessionId) {
-    const now = new Date().toISOString();
-    await dataService.updateData('sessions', sessionId, {
-        lastActivityAt: now
-    }, SYSTEM_CONTEXT);
-    const cached = sessionRecordCacheService.get(sessionId);
+async function touchSession(sessionId, meta = {}) {
+    const normalizedSessionId = String(sessionId || '').trim();
+    if (!normalizedSessionId) return;
+    const now = new Date();
+    const nowIso = now.toISOString();
+    let session = sessionRecordCacheService.get(normalizedSessionId);
+    if (session?.revoked) session = null;
+    if (!session || !session.id) {
+        try {
+            session = await dataService.getDataById('sessions', normalizedSessionId, SYSTEM_CONTEXT);
+        } catch (_) {
+            session = null;
+        }
+    }
+    const updates = { lastActivityAt: nowIso };
+    if (session && typeof session === 'object') {
+        const storedMax = parseSafeInt(session.maxDurationMinutes, null);
+        let maxDurationMinutes = storedMax;
+        if (!maxDurationMinutes) {
+            const absoluteExpiry = session.absoluteExpiry ? new Date(session.absoluteExpiry) : null;
+            const createdAt = session.createdAt ? new Date(session.createdAt) : null;
+            if (
+                absoluteExpiry && createdAt
+                && !Number.isNaN(absoluteExpiry.getTime())
+                && !Number.isNaN(createdAt.getTime())
+            ) {
+                maxDurationMinutes = Math.max(1, Math.round((absoluteExpiry.getTime() - createdAt.getTime()) / 60000));
+            }
+        }
+        if (maxDurationMinutes > 0) {
+            updates.absoluteExpiry = new Date(now.getTime() + (maxDurationMinutes * 60 * 1000)).toISOString();
+            if (!storedMax) updates.maxDurationMinutes = maxDurationMinutes;
+        }
+    }
+    await dataService.updateData('sessions', normalizedSessionId, updates, SYSTEM_CONTEXT);
+    const cached = sessionRecordCacheService.get(normalizedSessionId);
     if (cached && !cached.revoked) {
-        sessionRecordCacheService.set(sessionId, { ...cached, lastActivityAt: now });
+        sessionRecordCacheService.set(normalizedSessionId, { ...cached, ...updates });
+    } else if (session && typeof session === 'object') {
+        sessionRecordCacheService.set(normalizedSessionId, { ...session, ...updates });
+    }
+    if (meta.source) {
+        const sessionAuthDiagnosticLogService = require('./diagnostics/sessionAuthDiagnosticLogService');
+        sessionAuthDiagnosticLogService.logSessionAuthEvent({
+            event: 'SESSION_TOUCHED',
+            reason: String(meta.reason || meta.source || 'touch_session').trim(),
+            session: session || { id: normalizedSessionId },
+            details: { source: String(meta.source || '').trim() }
+        });
     }
 }
 
@@ -215,6 +257,7 @@ async function validateOrgSwitch(user, currentSessionId, targetOrgId) {
     await dataService.updateData('sessions', currentSessionId, {
         currentOrgId: targetOrgId,
         idleTimeoutMinutes: Number(limits.idleTimeoutMins),
+        maxDurationMinutes: Number(limits.maxDurationMins),
         orgHistory: history
     }, SYSTEM_CONTEXT);
 
@@ -222,6 +265,7 @@ async function validateOrgSwitch(user, currentSessionId, targetOrgId) {
         ...currentSession,
         currentOrgId: targetOrgId,
         idleTimeoutMinutes: Number(limits.idleTimeoutMins),
+        maxDurationMinutes: Number(limits.maxDurationMins),
         orgHistory: history
     };
     sessionRecordCacheService.set(currentSessionId, updatedSession);
@@ -266,6 +310,96 @@ async function terminateAllSessionsForUser(userId) {
     return { terminated };
 }
 
+async function invalidateSessionRecordCacheForUser(userId) {
+    const normalizedUserId = toPublicId(userId);
+    if (!normalizedUserId) return { sessionCount: 0 };
+
+    const sessions = await dataService.fetchData('sessions', {
+        q: normalizedUserId,
+        type: 'exact_match',
+        searchFields: 'userId'
+    }, SYSTEM_CONTEXT);
+    const rows = Array.isArray(sessions) ? sessions : [];
+    rows.forEach((session) => {
+        const sessionId = String(session?.id || '').trim();
+        if (sessionId) sessionRecordCacheService.invalidate(sessionId);
+    });
+    return { sessionCount: rows.length };
+}
+
+async function refreshSessionPolicyLimitsForUser(userId) {
+    const normalizedUserId = toPublicId(userId);
+    if (!normalizedUserId) return { sessionCount: 0, refreshed: 0 };
+
+    const user = await dataService.getDataById('users', normalizedUserId, SYSTEM_CONTEXT);
+    if (!user) return { sessionCount: 0, refreshed: 0 };
+
+    const sessions = await dataService.fetchData('sessions', {
+        q: normalizedUserId,
+        type: 'exact_match',
+        searchFields: 'userId'
+    }, SYSTEM_CONTEXT);
+    const rows = Array.isArray(sessions) ? sessions : [];
+    let refreshed = 0;
+    const now = new Date();
+
+    for (const session of rows) {
+        const sessionId = String(session?.id || '').trim();
+        if (!sessionId) continue;
+
+        const orgId = session.currentOrgId || user.activeOrgId || user.primaryOrgId;
+        const limits = await resolvePolicyLimits(
+            { ...user, activeOrgId: orgId },
+            orgId
+        );
+        const absoluteExpiry = resolveRefreshedAbsoluteExpiry(session, limits, now);
+        const nextIdleTimeoutMinutes = Number(limits.idleTimeoutMins);
+        const nextLastActivityAt = now.toISOString();
+
+        sessionRecordCacheService.invalidate(sessionId);
+
+        await dataService.updateData('sessions', sessionId, {
+            idleTimeoutMinutes: nextIdleTimeoutMinutes,
+            absoluteExpiry,
+            lastActivityAt: nextLastActivityAt
+        }, SYSTEM_CONTEXT);
+        sessionRecordCacheService.set(sessionId, {
+            ...session,
+            idleTimeoutMinutes: nextIdleTimeoutMinutes,
+            absoluteExpiry,
+            lastActivityAt: nextLastActivityAt
+        });
+        refreshed += 1;
+    }
+
+    return { sessionCount: rows.length, refreshed };
+}
+
+function resolveRefreshedAbsoluteExpiry(session = {}, limits = {}, now = new Date()) {
+    const policyExpiry = new Date(now.getTime() + (Number(limits.maxDurationMins || 0) * 60 * 1000));
+    const existingExpiry = session.absoluteExpiry ? new Date(session.absoluteExpiry) : null;
+    if (existingExpiry && !Number.isNaN(existingExpiry.getTime()) && existingExpiry > policyExpiry) {
+        return existingExpiry.toISOString();
+    }
+    return policyExpiry.toISOString();
+}
+
+async function refreshSessionPolicyLimitsForUsers(userIds = []) {
+    const ids = [...new Set(
+        (Array.isArray(userIds) ? userIds : [userIds])
+            .map((id) => toPublicId(id))
+            .filter(Boolean)
+    )];
+    let sessionCount = 0;
+    let refreshed = 0;
+    for (const userId of ids) {
+        const result = await refreshSessionPolicyLimitsForUser(userId);
+        sessionCount += result.sessionCount || 0;
+        refreshed += result.refreshed || 0;
+    }
+    return { userCount: ids.length, sessionCount, refreshed };
+}
+
 module.exports = {
     resolvePolicyLimits,
     cleanupExpiredSessions,
@@ -274,5 +408,9 @@ module.exports = {
     checkLoginEligibility,
     validateOrgSwitch,
     terminateSession,
-    terminateAllSessionsForUser
+    terminateAllSessionsForUser,
+    invalidateSessionRecordCacheForUser,
+    refreshSessionPolicyLimitsForUser,
+    refreshSessionPolicyLimitsForUsers,
+    resolveRefreshedAbsoluteExpiry
 };

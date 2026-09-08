@@ -5,6 +5,7 @@ const { SEARCH_DEFAULT_KEYWORD } = require('../../config/constants');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 const {isSuperAdmin, isAdmin}= require('../services/adminChekersService');
 const { invalidateAuthContextForAccessProfileId } = require('../services/cache/authContextInvalidationService');
+const { toPublicId } = require('../utils/idAdapter');
 // NOTE: Categories must come from the server layer (model/service), not the view.
 const ACCESS_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'name', 'description', 'orgId', 'active', 'fullAdmin'],
@@ -246,7 +247,8 @@ async function editAccess(req, res) {
         const updates = await buildAccessFromBody(req.body, req.user, existing, req);
     
         const result = await dataService.updateData('accesses', req.params.id, updates, req.user);
-        await invalidateAuthContextForAccessProfileId(req.params.id);
+        const invalidatedProfileId = toPublicId(result?.id || req.params.id);
+        await invalidateAuthContextForAccessProfileId(invalidatedProfileId);
         
         if (req.headers['x-ajax-request']) {
           return res.json({ status: 'success', result, message: 'Access Definition updated.' });

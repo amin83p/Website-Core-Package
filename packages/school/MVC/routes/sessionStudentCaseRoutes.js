@@ -28,7 +28,9 @@ const {
 
   requireCaseStatusMutationAccess,
 
-  requireCaseRoutingAdmin
+  requireCaseRoutingAdmin,
+
+  requireStudentCaseOperation
 
 } = require('./sessionStudentCaseRouteGuards');
 
@@ -54,7 +56,7 @@ router.use(requireAuth);
 
 router.get('/',
 
-  requireCaseSectionOperationAny([OPERATIONS.READ, OPERATIONS.READ_ALL]),
+  requireStudentCaseOperation(OPERATIONS.READ),
 
   trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, {
 
@@ -122,7 +124,7 @@ router.post('/api/routing',
 
 router.get('/:caseId/review-context',
 
-  requireCaseSectionOperationAny([OPERATIONS.READ, OPERATIONS.READ_ALL]),
+  requireCaseSectionOperationAny([OPERATIONS.READ_ALL]),
 
   ctrl.getReviewContext);
 
@@ -130,7 +132,7 @@ router.get('/:caseId/review-context',
 
 router.post('/:caseId',
 
-  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE),
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
 
   trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
 
@@ -150,7 +152,7 @@ router.post('/:caseId/status',
 
 router.delete('/:caseId',
 
-  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.DELETE),
+  requireStudentCaseOperation(OPERATIONS.DELETE),
 
   trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.DELETE, {
 

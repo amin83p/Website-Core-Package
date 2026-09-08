@@ -53,6 +53,14 @@ const {
 const COUNT_CACHE_TTL_MS = 30000;
 const countCache = new Map();
 
+async function invalidateAccessProfileCacheAfterWrite(profileId, source = 'entityGateway') {
+  const normalizedProfileId = toPublicId(profileId);
+  if (!normalizedProfileId) return null;
+  const { invalidateAuthContextForAccessProfileId } = require('../cache/authContextInvalidationService');
+  const result = await invalidateAuthContextForAccessProfileId(normalizedProfileId);
+  return result;
+}
+
 function toPositiveInteger(value, fallback = null) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -420,7 +428,11 @@ const entityGatewayService = {
       case 'operations': return await trackCreate(operationRepository.create(data, options));
       case 'roles': return await trackCreate(roleRepository.create(data, options));
       case 'scopes': return await trackCreate(scopeRepository.create(data, options));
-      case 'accesses': return await trackCreate(accessRepository.create(data, options));
+      case 'accesses': {
+        const created = await trackCreate(accessRepository.create(data, options));
+        await invalidateAccessProfileCacheAfterWrite(created?.id || data?.id, 'create');
+        return created;
+      }
       case 'accessPolicies': return await trackCreate(accessPolicyRepository.create(data, options));
       case 'tableSettings': return await trackCreate(tableSettingsRepository.create({ ...data, auditUser }, options));
       case 'userSettings': return await trackCreate(userSettingsRepository.create({ ...data, auditUser }, options));
@@ -499,7 +511,11 @@ const entityGatewayService = {
       case 'operations': return await trackUpdate(operationRepository.update(id, data, options));
       case 'roles': return await trackUpdate(roleRepository.update(id, data, options));
       case 'scopes': return await trackUpdate(scopeRepository.update(id, data, options));
-      case 'accesses': return await trackUpdate(accessRepository.update(id, data, options));
+      case 'accesses': {
+        const updated = await trackUpdate(accessRepository.update(id, data, options));
+        await invalidateAccessProfileCacheAfterWrite(toPublicId(id) || updated?.id, 'update');
+        return updated;
+      }
       case 'accessPolicies': return await trackUpdate(accessPolicyRepository.update(id, data, options));
       case 'tableSettings': return await trackUpdate(tableSettingsRepository.update(null, { ...data, auditUser }, options));
       case 'userSettings': return await trackUpdate(userSettingsRepository.update(id, { ...data, auditUser }, options));
@@ -589,7 +605,11 @@ const entityGatewayService = {
       case 'operations': return await trackDelete(operationRepository.remove(id, options));
       case 'roles': return await trackDelete(roleRepository.remove(id, options));
       case 'scopes': return await trackDelete(scopeRepository.remove(id, options));
-      case 'accesses': return await trackDelete(accessRepository.remove(id, options));
+      case 'accesses': {
+        const deleted = await trackDelete(accessRepository.remove(id, options));
+        await invalidateAccessProfileCacheAfterWrite(id, 'delete');
+        return deleted;
+      }
       case 'accessPolicies': return await trackDelete(accessPolicyRepository.remove(id, options));
       case 'logs': return await trackDelete(logRepository.remove(id, options));
       case 'tableSettings':

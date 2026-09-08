@@ -17,6 +17,20 @@ function read(relativePath) {
 }
 
 function createReq(overrides = {}) {
+  const baseAccess = {
+    canOpenMatrix: true,
+    canViewRosterFields: true,
+    canEditRoster: true,
+    canUploadFiles: true,
+    canExportExcel: true,
+    canPrintMatrix: true,
+    canViewRollups: true,
+    canViewChangeHistory: true,
+    canMarkExcused: true,
+    canOverrideSessionLock: false,
+    isAttendanceAdminViewer: false
+  };
+  const { _attendanceAccess: accessOverrides, ...rest } = overrides;
   return {
     body: {},
     user: {
@@ -24,7 +38,11 @@ function createReq(overrides = {}) {
       activeOrgId: 'ORG-1',
       name: 'Test User'
     },
-    ...overrides
+    _attendanceAccess: {
+      ...baseAccess,
+      ...(accessOverrides || {})
+    },
+    ...rest
   };
 }
 
@@ -71,7 +89,7 @@ test('attendance controller uses shared session edit guard with makeup policy ch
 test('attendance matrix view blocks makeup-required sessions in allowEdit and comment controls', () => {
   const source = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
   assert.match(source, /const makeupRequired = record\.applicability === 'makeup_required'/);
-  assert.match(source, /const allowEdit = canEdit && !makeupRequired && \(!locked \|\| canOverride\)/);
+  assert.match(source, /const allowEdit = canEdit && !outsideEnrollmentWindow && !makeupRequired && \(!locked \|\| canOverride\)/);
   assert.match(source, /cell_modal_makeup_notice/);
   assert.match(source, /\['inp_newComment', 'inp_newCommentFile', 'btn_saveComment', 'btn_mentionUser'\]/);
   assert.match(source, /if \(el\) el\.disabled = !allowEdit/);
@@ -157,6 +175,7 @@ test('updateAttendanceRosterCell allows locked session with admin override', asy
 
   try {
     const req = createReq({
+      _attendanceAccess: { canOverrideSessionLock: true },
       body: {
         classId: 'CLS-1',
         sessionId: 'SES-1',

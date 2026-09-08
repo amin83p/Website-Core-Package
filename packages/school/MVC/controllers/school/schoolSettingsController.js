@@ -28,9 +28,12 @@ const {
 } = requireCoreModule('MVC/utils/timezoneUtils');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+const timesheetImportPolicyModel = require('../../models/school/timesheetImportPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
+const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
+const activityService = require('../../services/school/activityService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
 const overallReportService = require('../../services/school/overallReportService');
@@ -359,6 +362,7 @@ async function loadSettingsPageData(req) {
     sessionAccessPolicy,
     studentAttendanceReportPolicy,
     timesheetParametersPolicy,
+    timesheetImportPolicy,
     canUpdate
   ] = await Promise.all([
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
@@ -369,6 +373,7 @@ async function loadSettingsPageData(req) {
     sessionAccessPolicyModel.getPolicyForOrg(activeOrgId),
     studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId),
+    timesheetImportPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
   const studentAttendanceReportLabels = await resolveStudentAttendanceReportLabels(
@@ -376,6 +381,19 @@ async function loadSettingsPageData(req) {
     req.user
   );
   const enrichedSessionAccessPolicy = await enrichSessionAccessPolicyForView(sessionAccessPolicy, req.user);
+  const postedActivities = await activityService.listActivities({
+    orgId: activeOrgId,
+    reqUser: req.user
+  });
+  const timesheetImportActivityOptions = (Array.isArray(postedActivities) ? postedActivities : [])
+    .filter((row) => String(row?.status || '').trim().toLowerCase() === 'posted')
+    .map((row) => ({
+      id: String(row?.id || '').trim(),
+      title: String(row?.title || row?.id || '').trim(),
+      departmentName: String(row?.departmentName || '').trim()
+    }))
+    .filter((row) => row.id)
+    .sort((a, b) => a.title.localeCompare(b.title));
 
   return {
     activeOrgId,
@@ -400,6 +418,8 @@ async function loadSettingsPageData(req) {
     autosaveSections: listAutosaveSections(),
     studentAttendanceReportPolicy,
     timesheetParametersPolicy,
+    timesheetImportPolicy,
+    timesheetImportActivityOptions,
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
     studentAttendanceReportTemplateCapabilities: studentAttendanceReportLabels.reportTemplateCapabilities,
     studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel,
@@ -827,6 +847,37 @@ async function checkSessionNotificationEmailTemplate(req, res) {
   }
 }
 
+async function saveTimesheetImportPolicy(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const normalized = timesheetImportPolicyService.validatePolicyInput(req.body || {});
+    if (normalized.importActivityId) {
+      const activity = await activityService.getActivity(normalized.importActivityId, req.user);
+      if (!activity || String(activity.orgId || '').trim() !== activeOrgId) {
+        throw new Error('The selected legacy import activity was not found in the active organization.');
+      }
+      if (String(activity.status || '').trim().toLowerCase() !== 'posted') {
+        throw new Error('The legacy import activity must be posted.');
+      }
+    }
+    const policy = await timesheetImportPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      normalized,
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Timesheet Import settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save Timesheet Import settings.'
+    });
+  }
+}
+
 async function saveTimesheetParametersPolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -892,6 +943,7 @@ module.exports = {
   saveAttendanceRollupFormula,
   saveStudentAttendanceReportSettings,
   saveTimesheetParametersPolicy,
+  saveTimesheetImportPolicy,
   saveAutosavePolicy,
   saveSessionAccessPolicy,
   previewSessionAccessTestNotification,

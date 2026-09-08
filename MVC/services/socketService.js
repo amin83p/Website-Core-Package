@@ -3,10 +3,30 @@ const socketIo = require('socket.io');
 const chatRepository = require('../repositories/chatRepository');
 const authService = require('./authService');
 const chatAccessService = require('./chatAccessService');
+const chatOperationPolicyService = require('./chatOperationPolicyService');
+const chatPendingAttachmentService = require('./chatPendingAttachmentService');
+const sessionService = require('./SessionService');
 const { OPERATIONS } = require('../../config/accessConstants');
 
 let io;
 const onlineUsers = new Map(); // Maps userId -> Set<socketId>
+const sessionTouchLastAt = new Map();
+const SESSION_TOUCH_THROTTLE_MS = 60 * 1000;
+
+function extractSessionIdFromToken(token = '') {
+    const parts = String(token || '').split('.');
+    return parts.length === 3 ? String(parts[2] || '').trim() : '';
+}
+
+function touchSessionFromTokenThrottled(token, source = 'socket') {
+    const sessionId = extractSessionIdFromToken(token);
+    if (!sessionId) return;
+    const now = Date.now();
+    const last = sessionTouchLastAt.get(sessionId) || 0;
+    if (now - last < SESSION_TOUCH_THROTTLE_MS) return;
+    sessionTouchLastAt.set(sessionId, now);
+    void sessionService.touchSession(sessionId, { source, reason: source }).catch(() => {});
+}
 
 function getUserRoom(userId) {
     return `chat:user:${String(userId || '').trim()}`;
@@ -92,13 +112,24 @@ async function emitNewMessageToRecipients({
     return { recipientIds: recipients };
 }
 
-async function emitMessagesDeleted({ convId = '', messageIds = [], deletedByUserId = '' } = {}) {
+async function emitMessagesDeleted({
+    convId = '',
+    messageIds = [],
+    deletedByUserId = '',
+    deletionMode = 'two-sided'
+} = {}) {
     if (!io || !convId || !Array.isArray(messageIds) || !messageIds.length) return;
-    io.to(String(convId)).emit('message_deleted', {
+    const payload = {
         convId: String(convId),
         messageIds: messageIds.map((id) => String(id)),
-        deletedByUserId: String(deletedByUserId || '')
-    });
+        deletedByUserId: String(deletedByUserId || ''),
+        deletionMode: String(deletionMode || 'two-sided')
+    };
+    if (deletionMode === 'one-sided' && deletedByUserId) {
+        io.to(getUserRoom(deletedByUserId)).emit('message_deleted', payload);
+        return;
+    }
+    io.to(String(convId)).emit('message_deleted', payload);
 }
 
 function buildReplySnapshot(message = null) {
@@ -141,18 +172,16 @@ async function authenticateSocket(socket, next) {
         }
 
         const user = await authService.getUserFromToken(token);
-        const readAccess = await chatAccessService.canUseChatOperation(
-            user,
-            [OPERATIONS.READ, OPERATIONS.READ_ALL],
-            socket.handshake?.address
-        );
-        if (!readAccess.allowed) {
-            return next(new Error(readAccess.reason || 'Chat access denied.'));
+        const chatAccess = await chatAccessService.buildChatAccess(user, socket.handshake?.address);
+        if (!chatAccess.canUse) {
+            return next(new Error('Chat access denied.'));
         }
 
         socket.user = user;
         socket.userId = String(user.id);
         socket.authToken = token;
+        socket.chatAccess = chatAccess;
+        touchSessionFromTokenThrottled(token, 'socket_connect');
         return next();
     } catch (error) {
         return next(new Error(error?.message || 'Socket authentication failed.'));
@@ -209,11 +238,12 @@ function init(server) {
 
         socket.on('join_room', async (convId) => {
             try {
+                touchSessionFromTokenThrottled(socket.authToken, 'socket_join_room');
                 const access = await loadConversationForSocket(
                     socket,
                     convId,
-                    [OPERATIONS.READ, OPERATIONS.READ_ALL],
-                    false
+                    [OPERATIONS.READ_ALL],
+                    true
                 );
                 if (!access.allowed) return emitChatError(socket, access.reason || 'Unable to join conversation.');
                 socket.join(String(convId));
@@ -226,6 +256,7 @@ function init(server) {
 
         socket.on('send_message', async (data = {}) => {
             try {
+                touchSessionFromTokenThrottled(socket.authToken, 'socket_send_message');
                 const access = await loadConversationForSocket(
                     socket,
                     data.convId,
@@ -236,6 +267,47 @@ function init(server) {
                     return emitChatError(socket, access.reason || 'You cannot send messages in this conversation.');
                 }
 
+                const rawType = String(data.type || 'text').trim();
+                if (rawType === 'system') {
+                    return emitChatError(socket, 'System messages cannot be sent from the client.');
+                }
+
+                let messageType = ['text', 'image', 'file'].includes(rawType) ? rawType : 'text';
+                let resolvedFileUrl = null;
+                let fileSizeBytes = 0;
+                const incomingFileUrl = String(data.fileUrl || '').trim();
+                if (incomingFileUrl) {
+                    const attachment = chatPendingAttachmentService.consumePendingAttachment({
+                        convId: data.convId,
+                        senderId: socket.userId,
+                        fileUrl: incomingFileUrl
+                    });
+                    if (!attachment.allowed) {
+                        return emitChatError(socket, attachment.reason || 'Attachment is not authorized for this conversation.');
+                    }
+                    resolvedFileUrl = attachment.fileUrl;
+                    fileSizeBytes = Number(attachment.sizeBytes || 0);
+                    messageType = attachment.type || messageType;
+                } else if (messageType !== 'text') {
+                    return emitChatError(socket, 'Attachment messages require a server-issued upload reference.');
+                }
+
+                const pendingCount = 1;
+                const limitCheck = await chatOperationPolicyService.assertUpdateWithinLimits({
+                    user: socket.user,
+                    conversation: access.conversation,
+                    scopeId: access.scopeId,
+                    limits: access.limits || {},
+                    pendingCount,
+                    fileSizeBytes,
+                    countSentMessages: (conversationId, senderId) => (
+                        chatRepository.countSentMessagesByUser(conversationId, senderId)
+                    )
+                });
+                if (!limitCheck.allowed) {
+                    return emitChatError(socket, limitCheck.reason || 'Update limit reached.');
+                }
+
                 let replyTo = null;
                 const replyToMessageId = String(data.replyToMessageId || '').trim();
                 if (replyToMessageId) {
@@ -244,12 +316,18 @@ function init(server) {
                     replyTo = buildReplySnapshot(target);
                 }
 
+                const content = String(data.content || '').trim()
+                    || (messageType === 'image' ? 'Image' : (messageType === 'file' ? 'File' : ''));
+                if (!content && !resolvedFileUrl) {
+                    return emitChatError(socket, 'Message content is required.');
+                }
+
                 const savedMsg = await chatRepository.addMessage(
                     data.convId,
                     socket.userId,
-                    data.content,
-                    data.type,
-                    data.fileUrl,
+                    content,
+                    messageType,
+                    resolvedFileUrl,
                     { replyTo }
                 );
 
@@ -310,8 +388,8 @@ function init(server) {
                 const access = await loadConversationForSocket(
                     socket,
                     data.convId,
-                    [OPERATIONS.READ, OPERATIONS.READ_ALL],
-                    false
+                    [OPERATIONS.READ_ALL],
+                    true
                 );
                 if (!access.allowed) return;
                 if (!chatAccessService.conversationHasParticipant(access.conversation, socket.userId)) return;

@@ -8,6 +8,10 @@
   btn_export: true
 }) %>
 
+<% const adminChatAccess = (typeof chatAccess !== 'undefined' && chatAccess) ? chatAccess : {}; %>
+<% const canReviewHistory = !!adminChatAccess.canReviewConversationHistory; %>
+<% const canDeleteAllChats = !!adminChatAccess.canDeleteAll; %>
+
 <%- include('../partials/tablePages-search', {
     placeholder: 'Search conversations...',
     fields: []
@@ -65,13 +69,20 @@
           </td>
 
           <td class="table-actions">
+            <% if (canReviewHistory) { %>
             <button class="btn btn-sm btn-filled btn-edit" onclick="adminViewChat('<%= conv.id %>', '<%= conv.participants %>')">
                 View
             </button>
+            <% } %>
             
+            <% if (canDeleteAllChats) { %>
             <button class="btn btn-sm btn-filled btn-delete delete-btn" onclick="adminDeleteChat('<%= conv.id %>')">
                 Delete
             </button>
+            <% } %>
+            <% if (!canReviewHistory && !canDeleteAllChats) { %>
+              <span class="text-muted small">No actions</span>
+            <% } %>
           </td>
         </tr>
       <% }) %>
@@ -151,8 +162,18 @@
 </style>
 
 <script>
+const adminCanReviewHistory = <%= canReviewHistory ? 'true' : 'false' %>;
+
+function getAdminAttachmentUrl(convId, fileRef) {
+    const token = String(fileRef || '').split(/[?#]/)[0].replace(/\\/g, '/');
+    const fileName = decodeURIComponent(token.split('/').pop() || '');
+    if (!convId || !fileName) return '';
+    return `/chat/attachments/${encodeURIComponent(convId)}/${encodeURIComponent(fileName)}`;
+}
+
 // ✅ NEW: View Chat Logic
 async function adminViewChat(convId, participants) {
+    if (!adminCanReviewHistory) return;
     const modalEl = document.getElementById('adminChatViewModal');
     const titleEl = document.getElementById('adminChatTitle');
     const subTitleEl = document.getElementById('adminChatSubtitle');
@@ -186,8 +207,7 @@ async function adminViewChat(convId, participants) {
                 // Content Handling
                 let contentHtml = msg.content;
                 if(msg.type === 'image') {
-                    // Ensure URL is encoded properly
-                    const safeUrl = encodeURI(msg.fileUrl).replace(/%25/g, '%'); 
+                    const safeUrl = getAdminAttachmentUrl(convId, msg.fileUrl);
                     contentHtml = `
                         <div class="mt-1">
                             <a href="${safeUrl}" target="_blank">
@@ -196,9 +216,10 @@ async function adminViewChat(convId, participants) {
                             <div class="small text-muted mt-1"><i class="bi bi-image"></i> Image Attachment</div>
                         </div>`;
                 } else if (msg.type === 'file') {
+                    const safeUrl = getAdminAttachmentUrl(convId, msg.fileUrl);
                     contentHtml = `
                         <div class="mt-1">
-                            <a href="${msg.fileUrl}" target="_blank" class="admin-file-link">
+                            <a href="${safeUrl}" target="_blank" class="admin-file-link">
                                 <i class="bi bi-file-earmark-arrow-down fs-5 me-2 text-primary"></i> 
                                 <div>
                                     <div class="fw-bold">File Attachment</div>

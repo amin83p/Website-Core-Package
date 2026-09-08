@@ -1,4 +1,4 @@
-﻿// MVC/routes/school/classRoutes.js
+// MVC/routes/school/classRoutes.js
 const express = require('express');
 const router = express.Router();
 const classCtrl = require('../controllers/school/classController');
@@ -15,9 +15,11 @@ const upload = requireCoreModule('MVC/middleware/upload');
 const { SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
 const {
   requireCaseSectionOperationAny,
-  requireCaseStatusMutationAccess
+  requireCaseStatusMutationAccess,
+  requireStudentCaseOperation
 } = require('./sessionStudentCaseRouteGuards');
 const { requireBookCoveringOperationAny } = require('./bookCoveringReportRouteGuards');
+const { requireSessionFileUploadRouteAccess } = require('./sessionFileUploadRouteGuards');
 
 router.use(requireAuth);
 
@@ -522,7 +524,7 @@ router.get('/:id/sessions/:sessionId',
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   classCtrl.manageSession);
 router.get('/:id/sessions/:sessionId/cases',
-  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.READ_ALL),
+  requireStudentCaseOperation(OPERATIONS.READ_ALL),
   classCtrl.listSessionStudentCases);
 router.get('/:id/sessions/:sessionId/report-instances',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
@@ -543,7 +545,7 @@ router.delete('/:id/sessions/:sessionId/book-covering-reports/:reportId',
   trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.DELETE, sessionReportAssignmentActionState),
   classCtrl.deleteBookCoveringForSession);
 router.post('/:id/sessions/:sessionId/files/upload',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  requireSessionFileUploadRouteAccess(),
   upload('school-class-workspace', true).single('file'),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
   classCtrl.uploadSessionFile);
@@ -600,11 +602,11 @@ router.post('/:id/sessions/:sessionId/merge/unmerge',
   }),
   classCtrl.unmergeSession);
 router.post('/:id/sessions/:sessionId/cases',
-  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.CREATE),
+  requireStudentCaseOperation(OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.CREATE, sessionStudentCaseMutationActionState),
   classCtrl.saveSessionStudentCase);
 router.post('/:id/sessions/:sessionId/cases/:caseId',
-  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE),
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, sessionStudentCaseMutationActionState),
   classCtrl.saveSessionStudentCase);
 router.post('/:id/sessions/:sessionId/cases/:caseId/status',
@@ -612,7 +614,7 @@ router.post('/:id/sessions/:sessionId/cases/:caseId/status',
   trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, sessionStudentCaseMutationActionState),
   classCtrl.updateSessionStudentCaseStatus);
 router.delete('/:id/sessions/:sessionId/cases/:caseId',
-  requireAccess(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.DELETE),
+  requireStudentCaseOperation(OPERATIONS.DELETE),
   trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.DELETE, sessionStudentCaseMutationActionState),
   classCtrl.deleteSessionStudentCase);
 router.get('/:id/sessions/:sessionId/delete-preview',

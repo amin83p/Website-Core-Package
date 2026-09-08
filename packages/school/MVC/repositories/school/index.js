@@ -475,6 +475,48 @@ function attachMaintenancePurgeById(repository, { collectionName, label, jsonRem
   };
 }
 
+function attachMaintenanceReplaceActivityEntries(repository, { collectionName, jsonReplace }) {
+  if (!repository || typeof repository !== 'object') return;
+  repository.maintenanceReplaceActivityEntries = async (id, payload = {}, options = {}) => {
+    const normalizedId = toPublicId(id);
+    if (!normalizedId) throw new Error('Activity id is required.');
+    return runByRepositoryBackend(options, {
+      json: async () => {
+        if (typeof jsonReplace !== 'function') {
+          throw new Error('Maintenance activity entry replace is not supported.');
+        }
+        return jsonReplace(normalizedId, payload);
+      },
+      mongo: async () => {
+        const collection = getMongoCollection(collectionName);
+        const existingRaw = await collection.findOne(resolveMongoIdFilter(normalizedId));
+        if (!existingRaw) throw new Error('School activity not found.');
+        const existing = normalizeMongoDocument(existingRaw);
+        const entries = Array.isArray(payload.entries) ? payload.entries : (existing.entries || []);
+        const next = {
+          ...existing,
+          entries,
+          attendees: Array.isArray(payload.attendees) ? payload.attendees : existing.attendees,
+          locked: payload.locked === true,
+          updatedAt: new Date().toISOString()
+        };
+        if (!next.locked) {
+          delete next.lockReason;
+          delete next.lockedTimesheetId;
+        }
+        next.id = toPublicId(existing?.id || existingRaw?._id);
+        const { _id, ...toSet } = next;
+        const updateOperation = { $set: toSet };
+        if (!next.locked) {
+          updateOperation.$unset = { lockReason: '', lockedTimesheetId: '' };
+        }
+        await collection.updateOne({ _id: existingRaw._id }, updateOperation);
+        return normalizeMongoDocument(await collection.findOne({ _id: existingRaw._id }));
+      }
+    }, 'school.activities.maintenanceReplaceActivityEntries');
+  };
+}
+
 function normalizeDateOnlyToken(value) {
   const token = String(value || '').trim();
   if (!token) return '';
@@ -2606,6 +2648,11 @@ attachMaintenancePurgeById(schoolRepositories.timesheets, {
   collectionName: 'schoolTimesheets',
   label: 'timesheets',
   jsonRemove: (id) => timesheetModel.removeTimesheetById(id)
+});
+
+attachMaintenanceReplaceActivityEntries(schoolRepositories.activities, {
+  collectionName: 'schoolActivities',
+  jsonReplace: (id, payload) => activityModel.maintenanceReplaceActivityEntries(id, payload)
 });
 
 schoolRepositories.studentProgramRegistrations.maintenancePurgeById = async (id, options = {}) => (

@@ -22,7 +22,8 @@ const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: f
 const {
   getCachedAuthContext,
   setCachedAuthContext,
-  invalidateAuthContextForUser
+  invalidateAuthContextForUser,
+  invalidateAuthContextForSession
 } = require('./cache/authContextCacheService');
 const { cloneCacheValue } = require('./cache/cacheClone');
 
@@ -246,13 +247,74 @@ async function login(username, password, deviceInfo) {
   };
 }
 
+function resolveActiveProfileSourceIds(profile) {
+  if (!profile || typeof profile !== 'object') return [];
+  if (Array.isArray(profile.sourceProfileIds) && profile.sourceProfileIds.length) {
+    return profile.sourceProfileIds.map((id) => toPublicId(id)).filter(Boolean);
+  }
+  const profileId = String(profile.id || '').trim();
+  if (profileId.startsWith('MERGED_')) {
+    return profileId.replace(/^MERGED_/, '').split('_').map((id) => toPublicId(id)).filter(Boolean);
+  }
+  const singleId = toPublicId(profile.id);
+  return singleId ? [singleId] : [];
+}
+
+function resolveProfileFreshnessStamp(profile) {
+  return String(profile?.updatedAt || profile?.audit?.lastUpdateDateTime || '').trim();
+}
+
+function isProfileFreshnessStampCurrent(cachedStamp, freshStamp) {
+  if (!freshStamp) return true;
+  if (!cachedStamp) return false;
+  const cachedMs = Date.parse(cachedStamp);
+  const freshMs = Date.parse(freshStamp);
+  if (Number.isFinite(cachedMs) && Number.isFinite(freshMs)) {
+    return freshMs <= cachedMs;
+  }
+  return cachedStamp === freshStamp;
+}
+
+async function isCachedAuthContextProfileCurrent(cached) {
+  const profile = cached?.activeProfile;
+  if (!profile) return true;
+  const profileId = String(profile.id || '').trim();
+  if (!profileId || profileId === 'VIRTUAL_ROOT') return true;
+
+  const sourceIds = resolveActiveProfileSourceIds(profile);
+  if (!sourceIds.length) return true;
+
+  const freshProfile = await loadMergedProfileByIds(sourceIds, SYSTEM_CONTEXT);
+  if (!freshProfile) return true;
+
+  return isProfileFreshnessStampCurrent(
+    resolveProfileFreshnessStamp(profile),
+    resolveProfileFreshnessStamp(freshProfile)
+  );
+}
+
 /* ============================================================
    CONTEXT RESOLVER (Token -> Full User Context)
 ============================================================ */
 async function getUserFromToken(token) {
   const decoded = jwt.verify(token, SECRET_KEY);
   const sessionId = extractSessionIdFromToken(token);
-  const cached = getCachedAuthContext(decoded.id, sessionId);
+  let cached = getCachedAuthContext(decoded.id, sessionId);
+
+  if (cached) {
+    const profileCurrent = await isCachedAuthContextProfileCurrent(cached);
+    if (!profileCurrent) {
+      invalidateAuthContextForSession(decoded.id, sessionId);
+      try {
+        const sessionRecordCacheService = require('./cache/sessionRecordCacheService');
+        sessionRecordCacheService.invalidate(sessionId);
+      } catch (_) {
+        // ignore
+      }
+      cached = null;
+    }
+  }
+
   if (cached) return cached;
 
   const userContext = await hydrateUserContextFromToken(token, decoded);

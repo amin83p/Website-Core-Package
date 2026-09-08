@@ -9,6 +9,7 @@ const timesheetImportPolicyModel = require('../../models/school/timesheetImportP
 const timesheetImportPolicyService = require('./timesheetImportPolicyService');
 const timesheetImportLifecycleService = require('./timesheetImportLifecycleService');
 const timesheetImportWorkSessionBuilderService = require('./timesheetImportWorkSessionBuilderService');
+const schoolRepositories = require('../../repositories/school');
 const { sanitizeTimesheetPayload } = require('../../models/school/timesheetModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -26,6 +27,15 @@ function cleanId(value) {
 
 function normalizeStatus(value) {
   return String(value ?? '').trim().toLowerCase();
+}
+
+async function purgeImportedTimesheetRecord(timesheetId, reqUser) {
+  const normalizedId = cleanId(timesheetId);
+  if (!normalizedId) return;
+  await schoolRepositories.timesheets.maintenancePurgeById(normalizedId, {
+    scope: { canViewAll: true },
+    requestingUser: reqUser
+  });
 }
 
 async function loadImportPolicy(orgId) {
@@ -82,8 +92,21 @@ function assertTimesheetEditable(timesheet, period) {
 }
 
 function isActivityFirstLegacyImport(timesheet = {}) {
-  return String(timesheet?.legacyImport?.executionMode || '').trim().toLowerCase() === 'activity_first'
-    || Boolean(cleanId(timesheet?.legacyImport?.legacyImportBatchId));
+  if (String(timesheet?.legacyImport?.executionMode || '').trim().toLowerCase() === 'activity_first') {
+    return true;
+  }
+  if (cleanId(timesheet?.legacyImport?.legacyImportBatchId)) {
+    return true;
+  }
+  const hasLegacyMeta = Boolean(
+    timesheet?.legacyImport?.importedAt
+    || timesheet?.legacyImport?.sourceFileName
+    || timesheet?.legacyImport?.activityId
+  );
+  if (!hasLegacyMeta) {
+    return false;
+  }
+  return listActiveLegacyImportEntries(timesheet).length === 0;
 }
 
 function assertLegacyImportDeletable(timesheet) {
@@ -153,7 +176,198 @@ async function removeLegacyImportRowsFromActivity({ activityId, timesheet, legac
   return { removedAssignees, removedEntries };
 }
 
-async function purgeLegacyImportSideEffects({ timesheet, reqUser }) {
+function collectImportWorkSessionEntryIds(timesheet = {}, personId = '') {
+  const activityId = cleanId(timesheet?.legacyImport?.activityId);
+  const targetPersonId = cleanId(personId) || cleanId(timesheet?.teacherId);
+  const storedIds = (Array.isArray(timesheet?.legacyImport?.workSessionEntryIds)
+    ? timesheet.legacyImport.workSessionEntryIds
+    : [])
+    .map((entryId) => cleanId(entryId))
+    .filter(Boolean);
+  if (storedIds.length) return [...new Set(storedIds)];
+  return timesheetImportWorkSessionBuilderService.extractActivityEntryIdsFromTimesheetEntries(
+    timesheet?.entries,
+    { activityId, personId: targetPersonId }
+  );
+}
+
+async function cleanupImportWorkSessionsOnDelete({
+  timesheet,
+  orgId = '',
+  personId = '',
+  period = null,
+  reqUser,
+  forceOrphanRecovery = false
+} = {}) {
+  const activityId = cleanId(timesheet?.legacyImport?.activityId);
+  const batchId = cleanId(timesheet?.legacyImport?.legacyImportBatchId);
+  const targetPersonId = cleanId(personId) || cleanId(timesheet?.teacherId);
+  const periodId = cleanId(period?.id);
+  const periodStartDate = cleanId(period?.startDate);
+  const periodEndDate = cleanId(period?.endDate);
+  const shouldCleanup = forceOrphanRecovery
+    || isActivityFirstLegacyImport(timesheet)
+    || Boolean(activityId && batchId)
+    || Boolean(activityId && targetPersonId && periodStartDate && periodEndDate);
+  if (!shouldCleanup) {
+    return null;
+  }
+
+  let cleanup = { removedEntries: 0, removedAssignees: 0, strategies: [], errors: [] };
+  const targetOptions = {
+    personId: targetPersonId,
+    periodId,
+    periodStartDate,
+    periodEndDate
+  };
+
+  const recordCleanupError = (strategy, error) => {
+    cleanup.errors.push({ strategy, message: String(error?.message || error || 'Unknown error') });
+  };
+
+  if (activityId && batchId) {
+    try {
+      const batchCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId({
+        activityId,
+        batchId,
+        reqUser
+      });
+      cleanup = {
+        ...mergeImportWorkSessionCleanupTotals(cleanup, batchCleanup),
+        strategies: [...cleanup.strategies, 'batchId'],
+        errors: cleanup.errors
+      };
+    } catch (error) {
+      recordCleanupError('batchId', error);
+      throw error;
+    }
+  }
+
+  const entryIds = collectImportWorkSessionEntryIds(timesheet, targetPersonId);
+  if (activityId && entryIds.length) {
+    try {
+      const entryCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds({
+        activityId,
+        entryIds,
+        reqUser
+      });
+      if (entryCleanup.removedEntries || entryCleanup.removedAssignees) {
+        cleanup = {
+          ...mergeImportWorkSessionCleanupTotals(cleanup, entryCleanup),
+          strategies: [...cleanup.strategies, 'entryIds'],
+          errors: cleanup.errors
+        };
+      }
+    } catch (error) {
+      recordCleanupError('entryIds', error);
+      throw error;
+    }
+  }
+
+  if (activityId && targetPersonId && periodStartDate && periodEndDate) {
+    try {
+      const targetCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget({
+        activityId,
+        ...targetOptions,
+        reqUser
+      });
+      if (targetCleanup.removedEntries || targetCleanup.removedAssignees) {
+        cleanup = {
+          ...mergeImportWorkSessionCleanupTotals(cleanup, targetCleanup),
+          strategies: [...cleanup.strategies, 'personPeriodTarget'],
+          errors: cleanup.errors
+        };
+      }
+    } catch (error) {
+      recordCleanupError('personPeriodTarget', error);
+      throw error;
+    }
+  }
+
+  if (cleanId(orgId) && targetPersonId && periodStartDate && periodEndDate) {
+    try {
+      const trackedCleanup = await timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod({
+        orgId,
+        ...targetOptions,
+        importActivityId: activityId,
+        reqUser
+      });
+      if (trackedCleanup.removedEntries) {
+        cleanup = {
+          ...mergeImportWorkSessionCleanupTotals(cleanup, trackedCleanup),
+          strategies: [...cleanup.strategies, 'trackedImportActivities'],
+          cleanedActivities: trackedCleanup.cleanedActivities,
+          errors: cleanup.errors
+        };
+      }
+    } catch (error) {
+      recordCleanupError('trackedImportActivities', error);
+      throw error;
+    }
+  }
+
+  if (!cleanup.removedEntries && !cleanup.removedAssignees) {
+    if (cleanup.errors.length) {
+      const error = new Error(`Import work session cleanup failed: ${cleanup.errors.map((row) => row.message).join('; ')}`);
+      error.statusCode = 500;
+      throw error;
+    }
+    return null;
+  }
+  delete cleanup.errors;
+  return cleanup;
+}
+
+function buildLegacyImportDeleteMessage(outcome = {}) {
+  const cleanup = outcome?.importWorkSessionCleanup || null;
+  const removedSessions = Number(cleanup?.removedEntries || 0);
+  const parts = [];
+  if (outcome?.timesheetAlreadyRemoved) {
+    parts.push('Imported timesheet was already removed for this period.');
+  } else if (outcome?.deletedTimesheet) {
+    parts.push('Imported timesheet was removed.');
+  } else if (outcome?.hadLegacyImport) {
+    parts.push('Imported timesheet rows were removed.');
+  }
+  if (removedSessions > 0) {
+    parts.push(`${removedSessions} import work session${removedSessions === 1 ? '' : 's'} removed from the import activity.`);
+  } else if (outcome?.hadLegacyImport && !outcome?.timesheetAlreadyRemoved) {
+    parts.push('No import work sessions were found on the import activity.');
+  }
+  return parts.join(' ') || 'Imported timesheet rows were removed.';
+}
+
+async function countOrphanImportWorkSessionsForPersonPeriod({
+  orgId,
+  personId,
+  period,
+  reqUser
+} = {}) {
+  const policy = await loadImportPolicy(orgId);
+  const importActivityId = cleanId(policy?.importActivityId);
+  if (!importActivityId) return 0;
+  const countsByPerson = await timesheetImportWorkSessionBuilderService.countOrphanImportWorkSessionsByPerson({
+    orgId,
+    periodId: cleanId(period?.id),
+    periodStartDate: cleanId(period?.startDate),
+    periodEndDate: cleanId(period?.endDate),
+    importActivityId,
+    reqUser
+  });
+  return Number(countsByPerson.get(cleanId(personId)) || 0);
+}
+
+function mergeImportWorkSessionCleanupTotals(left = {}, right = {}) {
+  return timesheetImportWorkSessionBuilderService.mergeImportWorkSessionCleanupTotals(left, right);
+}
+
+async function purgeLegacyImportSideEffects({
+  timesheet,
+  orgId = '',
+  personId = '',
+  period = null,
+  reqUser
+}) {
   const timesheetId = cleanId(timesheet?.id);
   if (!timesheetId) {
     return { revertedMaterialization: false, unlockedSources: false, activityCleanup: null };
@@ -198,19 +412,14 @@ async function purgeLegacyImportSideEffects({ timesheet, reqUser }) {
 
   const activityId = cleanId(timesheet?.legacyImport?.activityId)
     || cleanId(legacyEntries[0]?.activityId);
-  const batchId = cleanId(timesheet?.legacyImport?.legacyImportBatchId);
   let importWorkSessionCleanup = null;
-  if (activityId && batchId) {
-    try {
-      importWorkSessionCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId({
-        activityId,
-        batchId,
-        reqUser
-      });
-    } catch (error) {
-      console.warn(`Legacy import delete work-session cleanup skipped for batch ${batchId}: ${error.message}`);
-    }
-  }
+  importWorkSessionCleanup = await cleanupImportWorkSessionsOnDelete({
+    timesheet,
+    orgId,
+    personId,
+    period,
+    reqUser
+  });
   const activityCleanup = activityId && legacyEntries.length
     ? await removeLegacyImportRowsFromActivity({ activityId, timesheet, legacyEntries, reqUser })
     : null;
@@ -281,6 +490,47 @@ async function detectExistingTimesheetForImport({ periodId, personId, reqUser, p
   if (!existing?.id) return null;
   const resolvedPeriod = period || await dataService.getDataById('timesheetPeriods', periodId, reqUser);
   return buildExistingTimesheetSkipDescriptor(existing, resolvedPeriod || { id: periodId });
+}
+
+function buildImportExecutionExistingTimesheetSummary(timesheet = {}, period = {}) {
+  const descriptor = buildExistingTimesheetSkipDescriptor(timesheet, period);
+  return {
+    id: descriptor.timesheetId,
+    status: descriptor.timesheetStatus,
+    legacyImportFileName: descriptor.legacyImportFileName,
+    periodId: descriptor.periodId,
+    periodName: descriptor.periodName
+  };
+}
+
+async function resolveImportExecutionEligibility({ periodId, personId, reqUser, period = null }) {
+  const existing = await dataService.getTimesheetByPeriodAndTeacher(periodId, personId, reqUser);
+  if (!existing?.id) {
+    return {
+      state: 'ready',
+      existingTimesheet: null,
+      message: ''
+    };
+  }
+
+  const resolvedPeriod = period || await dataService.getDataById('timesheetPeriods', periodId, reqUser);
+  const existingTimesheet = buildImportExecutionExistingTimesheetSummary(existing, resolvedPeriod || { id: periodId });
+  const status = normalizeStatus(existing?.status || 'draft') || 'draft';
+
+  if (status === 'draft' || status === 'not_started') {
+    return {
+      state: 'ready',
+      existingTimesheet,
+      message: ''
+    };
+  }
+
+  const skipDescriptor = buildExistingTimesheetSkipDescriptor(existing, resolvedPeriod || { id: periodId });
+  return {
+    state: 'blocked',
+    existingTimesheet,
+    message: skipDescriptor.message
+  };
 }
 
 function buildLegacyImportEntries({
@@ -494,7 +744,7 @@ async function rollbackAppliedLegacyImports(rollbackStack = [], reqUser) {
           console.warn(`Import rollback task sync skipped for timesheet ${timesheetId}: ${error.message}`);
         }
       }
-      await dataService.deleteData('timesheets', timesheetId, reqUser, { skipDeletionGuard: true });
+      await purgeImportedTimesheetRecord(timesheetId, reqUser);
       rolledBack.push({
         periodId: cleanId(entry?.periodId),
         timesheetId
@@ -634,25 +884,92 @@ async function deleteLegacyImport({
 
   const timesheet = await dataService.getTimesheetByPeriodAndTeacher(targetPeriodId, personId, reqUser);
   if (!timesheet?.id) {
+    const policy = skipImportPolicyCheck
+      ? await loadImportPolicy(orgId)
+      : await assertImportAllowed({ orgId, scope });
+    const importActivityId = cleanId(policy?.importActivityId);
+    if (!importActivityId) {
+      return {
+        removedRows: 0,
+        hadLegacyImport: false,
+        periodId: targetPeriodId,
+        tsStatus: 'not_started',
+        totalHours: 0,
+        hasLegacyImport: false,
+        timesheetId: ''
+      };
+    }
+
+    const orphanSessionCount = await countOrphanImportWorkSessionsForPersonPeriod({
+      orgId,
+      personId,
+      period,
+      reqUser
+    });
+    if (!orphanSessionCount) {
+      return {
+        removedRows: 0,
+        hadLegacyImport: false,
+        periodId: targetPeriodId,
+        tsStatus: 'not_started',
+        totalHours: 0,
+        hasLegacyImport: false,
+        timesheetId: ''
+      };
+    }
+
+    const importWorkSessionCleanup = await cleanupImportWorkSessionsOnDelete({
+      timesheet: {
+        teacherId: personId,
+        legacyImport: { activityId: importActivityId }
+      },
+      orgId,
+      personId,
+      period,
+      reqUser,
+      forceOrphanRecovery: true
+    });
+    if (!importWorkSessionCleanup?.removedEntries && !importWorkSessionCleanup?.removedAssignees) {
+      return {
+        removedRows: 0,
+        hadLegacyImport: false,
+        periodId: targetPeriodId,
+        tsStatus: 'not_started',
+        totalHours: 0,
+        hasLegacyImport: false,
+        timesheetId: ''
+      };
+    }
+
     return {
       removedRows: 0,
-      hadLegacyImport: false,
+      hadLegacyImport: true,
+      timesheetAlreadyRemoved: true,
+      sourceFileName: '',
       periodId: targetPeriodId,
       tsStatus: 'not_started',
       totalHours: 0,
       hasLegacyImport: false,
-      timesheetId: ''
+      timesheetId: '',
+      importWorkSessionCleanup
     };
   }
   assertLegacyImportDeletable(timesheet);
 
-  const sideEffects = await purgeLegacyImportSideEffects({ timesheet, reqUser });
   const activityFirst = isActivityFirstLegacyImport(timesheet);
+
+  const sideEffects = await purgeLegacyImportSideEffects({
+    timesheet,
+    orgId,
+    personId,
+    period,
+    reqUser
+  });
 
   if (activityFirst) {
     const timesheetId = cleanId(timesheet?.id);
     if (timesheetId) {
-      await dataService.deleteData('timesheets', timesheetId, reqUser, { skipDeletionGuard: true });
+      await purgeImportedTimesheetRecord(timesheetId, reqUser);
     }
     return {
       removedRows: Array.isArray(timesheet.entries) ? timesheet.entries.length : 0,
@@ -700,7 +1017,8 @@ async function deleteLegacyImport({
     totalHours: calculateStoredEntryTotalHours(nextEntries),
     hasLegacyImport: false,
     timesheetId: cleanId(saved?.id || timesheet?.id),
-    activityCleanup: sideEffects?.activityCleanup || null
+    activityCleanup: sideEffects?.activityCleanup || null,
+    importWorkSessionCleanup: sideEffects?.importWorkSessionCleanup || null
   };
 }
 
@@ -712,10 +1030,14 @@ module.exports = {
   buildExistingTimesheetSkipDescriptor,
   buildLegacyImportEntries,
   buildImportOutcomeMessage,
+  buildLegacyImportDeleteMessage,
+  countOrphanImportWorkSessionsForPersonPeriod,
   detectExistingTimesheetForImport,
+  resolveImportExecutionEligibility,
   groupCompileResultsByPeriod,
   isLegacyImportEntry,
   isActivityFirstLegacyImport,
+  purgeImportedTimesheetRecord,
   resolveImportOutcomeStatus,
   rollbackAppliedLegacyImports,
   applyLegacyImports,

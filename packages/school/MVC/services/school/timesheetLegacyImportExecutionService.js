@@ -14,6 +14,17 @@ function cleanId(value) {
   return String(value ?? '').trim();
 }
 
+function buildImportSupplementalEntryFilter(batchId = '') {
+  const targetBatchId = cleanId(batchId);
+  if (!targetBatchId) return null;
+  return (entry) => {
+    const entryBatchId = cleanId(entry?.legacyImportBatchId);
+    if (entryBatchId && idsEqual(entryBatchId, targetBatchId)) return false;
+    const assignees = Array.isArray(entry?.assignees) ? entry.assignees : [];
+    return !assignees.some((assignee) => idsEqual(cleanId(assignee?.legacyImportBatchId), targetBatchId));
+  };
+}
+
 function isPerformableCompileResult(result = {}) {
   return String(result?.status || '').toLowerCase() === 'ok' && cleanId(result?.matchedPeriod?.id);
 }
@@ -68,6 +79,8 @@ async function buildImportExecutionPlan({
   const rows = [];
   const skipped = [];
   const filterId = cleanId(periodFilterId);
+  let readyCount = 0;
+  let blockedCount = 0;
 
   for (const result of (Array.isArray(compileResults) ? compileResults : [])) {
     if (!isPerformableCompileResult(result)) continue;
@@ -75,22 +88,14 @@ async function buildImportExecutionPlan({
     if (filterId && !idsEqual(periodId, filterId)) continue;
 
     const period = await dataService.getDataById('timesheetPeriods', periodId, reqUser);
-    const skipDescriptor = await timesheetLegacyImportService.detectExistingTimesheetForImport({
+    const eligibility = await timesheetLegacyImportService.resolveImportExecutionEligibility({
       periodId,
       personId: targetPersonId,
       reqUser,
       period
     });
-    if (skipDescriptor) {
-      skipped.push({
-        fileName: String(result?.fileName || '').trim(),
-        periodId,
-        message: skipDescriptor.message
-      });
-      continue;
-    }
-
-    rows.push({
+    const existingTimesheet = eligibility.existingTimesheet || null;
+    const row = {
       fileName: String(result?.fileName || '').trim(),
       personId: targetPersonId,
       personName: payrollContext.personName,
@@ -102,13 +107,33 @@ async function buildImportExecutionPlan({
         periodId,
         personId: targetPersonId,
         sourceFileName: result?.fileName
-      })
-    });
+      }),
+      eligibility: eligibility.state,
+      blockReason: eligibility.state === 'blocked' ? String(eligibility.message || '').trim() : '',
+      existingTimesheetId: cleanId(existingTimesheet?.id),
+      existingTimesheetStatus: String(existingTimesheet?.status || '').trim(),
+      legacyImportFileName: String(existingTimesheet?.legacyImportFileName || '').trim()
+    };
+
+    rows.push(row);
+    if (eligibility.state === 'blocked') {
+      blockedCount += 1;
+      skipped.push({
+        fileName: row.fileName,
+        periodId,
+        periodName: row.periodName,
+        message: row.blockReason
+      });
+    } else {
+      readyCount += 1;
+    }
   }
 
   return {
     rows,
     skipped,
+    readyCount,
+    blockedCount,
     needsRoleSelection,
     defaultPersonRole: payrollContext.roles.length === 1 ? payrollContext.roles[0] : payrollContext.defaultRole
   };
@@ -149,7 +174,7 @@ async function rollbackImportExecution({
           timesheet
         }], reqUser);
       } else {
-        await dataService.deleteData('timesheets', targetTimesheetId, reqUser, { skipDeletionGuard: true });
+        await timesheetLegacyImportService.purgeImportedTimesheetRecord(targetTimesheetId, reqUser);
       }
       rolledBack.timesheet = { timesheetId: targetTimesheetId };
     } catch (error) {
@@ -193,17 +218,27 @@ async function performImportExecution({
   if (!period) throw new Error('Timesheet period not found.');
   if (!idsEqual(period.orgId, orgId)) throw new Error('Timesheet period is not in the active organization.');
 
-  const existingSkip = await timesheetLegacyImportService.detectExistingTimesheetForImport({
+  const eligibility = await timesheetLegacyImportService.resolveImportExecutionEligibility({
     periodId: targetPeriodId,
     personId: targetPersonId,
     reqUser,
     period
   });
-  if (existingSkip) {
-    const error = new Error(existingSkip.message);
+  if (eligibility.state === 'blocked') {
+    const blockedTimesheet = await dataService.getTimesheetByPeriodAndTeacher(targetPeriodId, targetPersonId, reqUser);
+    const error = new Error(eligibility.message || 'This timesheet period is not eligible for import execution.');
     error.statusCode = 409;
-    error.skipDescriptor = existingSkip;
+    error.skipDescriptor = timesheetLegacyImportService.buildExistingTimesheetSkipDescriptor(
+      blockedTimesheet || {},
+      period
+    );
     throw error;
+  }
+
+  let priorTimesheet = null;
+  const existingTimesheetId = cleanId(eligibility.existingTimesheet?.id);
+  if (existingTimesheetId) {
+    priorTimesheet = await dataService.getDataById('timesheets', existingTimesheetId, reqUser);
   }
 
   const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
@@ -240,6 +275,21 @@ async function performImportExecution({
 
   try {
     steps.workSessions.status = 'running';
+    await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget({
+      activityId: cleanId(activity.id),
+      personId: targetPersonId,
+      periodStartDate: period.startDate,
+      periodEndDate: period.endDate,
+      reqUser
+    });
+    await timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod({
+      orgId,
+      personId: targetPersonId,
+      periodStartDate: period.startDate,
+      periodEndDate: period.endDate,
+      importActivityId: cleanId(activity.id),
+      reqUser
+    });
     const workSessionOutcome = await timesheetImportWorkSessionBuilderService.createImportWorkSessions({
       orgId,
       activity,
@@ -260,13 +310,24 @@ async function performImportExecution({
     };
 
     steps.timesheet.status = 'running';
+    const allowedImportSessionIds = timesheetImportWorkSessionBuilderService.buildImportActivitySessionIds({
+      activityId: activity.id,
+      personId: targetPersonId,
+      entryIds: workSessionOutcome.createdEntryIds
+    });
     const assembly = await timesheetLiveAssemblyService.buildImportedTimesheetEntries({
       orgId,
       personId: targetPersonId,
       period,
       reqUser,
       personRole: resolvedPersonRole || payrollContext.defaultRole,
-      allowManagerOverride: true
+      allowManagerOverride: true,
+      supplementalEntryFilter: buildImportSupplementalEntryFilter(resolvedBatchId),
+      importActivitySessionGuard: {
+        activityId: cleanId(activity.id),
+        personId: targetPersonId,
+        allowedSessionIds: allowedImportSessionIds
+      }
     });
     if (!assembly.entries.length) {
       throw new Error('No timesheet entries were assembled for the selected period.');
@@ -292,6 +353,9 @@ async function performImportExecution({
         workSessionEntryIds: workSessionOutcome.createdEntryIds
       }
     };
+    if (priorTimesheet?.id) {
+      basePayload.id = cleanId(priorTimesheet.id);
+    }
 
     const { payload: lifecyclePayload, requiresPostSaveFinalization } =
       timesheetImportLifecycleService.prepareImportTargetPayload({
@@ -299,7 +363,7 @@ async function performImportExecution({
         period,
         targetStatus: 'processed',
         reqUser,
-        priorTimesheet: null
+        priorTimesheet
       });
 
     let saved = await timesheetLegacyImportService.persistTimesheetPayload(lifecyclePayload, reqUser);

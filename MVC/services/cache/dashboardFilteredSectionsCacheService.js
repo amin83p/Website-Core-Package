@@ -8,11 +8,16 @@ function buildDashboardAllSectionsCacheKey(user = null) {
   const userId = String(safeUser.id || '').trim() || 'ANON';
   const activeOrgId = String(safeUser.activeOrgId || '').trim() || 'NO_ORG';
   const role = String(safeUser.role || '').trim() || 'NO_ROLE';
-  const accessProfileId = String(safeUser.accessProfileId || '').trim() || 'NO_ACCESS_PROFILE';
-  const orgAccessProfileId = String(safeUser.orgAccessProfileId || '').trim() || 'NO_ORG_ACCESS_PROFILE';
+  const activeProfileId = String(safeUser.activeProfile?.id || safeUser.accessProfileId || '').trim() || 'NO_ACTIVE_PROFILE';
+  const activeProfileStamp = String(
+    safeUser.activeProfile?.updatedAt
+    || safeUser.activeProfile?.audit?.lastUpdateDateTime
+    || ''
+  ).trim() || 'NO_PROFILE_STAMP';
+  const profileMode = String(safeUser.currentProfileMode || '').trim() || 'NO_PROFILE_MODE';
   const systemAccessProfileId = String(safeUser.systemAccessProfileId || '').trim() || 'NO_SYSTEM_ACCESS_PROFILE';
   const virtualFlag = safeUser.isVirtualSuperAdmin ? 'VSA1' : 'VSA0';
-  return [userId, activeOrgId, role, accessProfileId, orgAccessProfileId, systemAccessProfileId, virtualFlag].join('|');
+  return [userId, activeOrgId, role, activeProfileId, activeProfileStamp, profileMode, systemAccessProfileId, virtualFlag].join('|');
 }
 
 function readDashboardAllSectionsCache(cacheKey) {

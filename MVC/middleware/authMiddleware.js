@@ -177,7 +177,7 @@ async function requireAuth(req, res, next) {
     attachOrgTimezoneContext(req, res);
     next();
   } catch (error) {
-    console.warn('Auth Context Failed:', error.message);    
+    console.warn('Auth Context Failed:', error.message);
     // ✅ 4. Clear the invalid session so they aren't stuck
     res.clearCookie('auth_token');
 

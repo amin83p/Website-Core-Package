@@ -36,6 +36,7 @@ const { filterPeriodsForYear } = require('../../services/school/timesheetExcel/t
 const timesheetImportPolicyModel = require('../../models/school/timesheetImportPolicyModel');
 const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
 const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
+const timesheetImportWorkSessionBuilderService = require('../../services/school/timesheetImportWorkSessionBuilderService');
 const timesheetLegacyImportExecutionService = require('../../services/school/timesheetLegacyImportExecutionService');
 const schoolRepositories = require('../../repositories/school');
 const {
@@ -1579,7 +1580,7 @@ exports.deleteTimesheetLegacyImport = async (req, res) => {
         }
         return res.json({
             status: 'success',
-            message: 'Imported timesheet rows were removed.',
+            message: timesheetLegacyImportService.buildLegacyImportDeleteMessage(outcome),
             actionStateId: req.actionStateId || null,
             ...outcome
         });
@@ -1613,7 +1614,7 @@ exports.deleteMyTimesheetLegacyImport = async (req, res) => {
         }
         return res.json({
             status: 'success',
-            message: 'Imported timesheet rows were removed.',
+            message: timesheetLegacyImportService.buildLegacyImportDeleteMessage(outcome),
             actionStateId: req.actionStateId || null,
             ...outcome
         });
@@ -1632,10 +1633,19 @@ exports.getTimesheetManagementRoster = async (req, res) => {
         if (!period) throw new Error('Timesheet period not found.');
         assertPeriodOrgAccess(period, activeOrgId, req.user);
 
-        const [eligiblePeople, allTimesheets] = await Promise.all([
+        const [eligiblePeople, allTimesheets, importPolicy] = await Promise.all([
             loadTimesheetEligiblePeople(activeOrgId, req.user),
-            dataService.fetchAllData('timesheets', { periodId__eq: periodId, orgId__eq: activeOrgId }, req.user, dataService.buildRouteAccessContext(req))
+            dataService.fetchAllData('timesheets', { periodId__eq: periodId, orgId__eq: activeOrgId }, req.user, dataService.buildRouteAccessContext(req)),
+            timesheetImportPolicyModel.getPolicyForOrg(activeOrgId)
         ]);
+        const orphanSessionCounts = await timesheetImportWorkSessionBuilderService.countOrphanImportWorkSessionsByPerson({
+            orgId: activeOrgId,
+            periodId,
+            periodStartDate: String(period?.startDate || ''),
+            periodEndDate: String(period?.endDate || ''),
+            importActivityId: String(importPolicy?.importActivityId || '').trim(),
+            reqUser: req.user
+        });
         const timesheetByPersonId = new Map(
             (Array.isArray(allTimesheets) ? allTimesheets : [])
                 .map((row) => normalizeTimesheetLifecycle(row))
@@ -1692,6 +1702,8 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 canOpenLateSubmission,
                 hasLegacyImport: Boolean(timesheet?.legacyImport?.importedAt),
                 legacyImportFileName: String(timesheet?.legacyImport?.sourceFileName || '').trim(),
+                orphanImportWorkSessionCount: Number(orphanSessionCounts.get(personRow.personId) || 0),
+                hasOrphanImportWorkSessions: Number(orphanSessionCounts.get(personRow.personId) || 0) > 0,
                 openUrl: `/school/timesheets/editor/${encodeURIComponent(periodId)}?teacherId=${encodeURIComponent(personRow.personId)}`
             };
         }).filter((row) => {

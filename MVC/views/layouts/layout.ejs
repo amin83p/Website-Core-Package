@@ -110,7 +110,7 @@
   <%- include('../partials/quickMenu') %>
   <%- include('../partials/startMenu') %>
   <%- include('../partials/loadingModal') %>
-  <% if (typeof user !== 'undefined' && user && typeof chatAccess !== 'undefined' && chatAccess && (chatAccess.canRead || chatAccess.canReadAll)) { %>
+  <% if (typeof user !== 'undefined' && user && typeof chatAccess !== 'undefined' && chatAccess && (chatAccess.canUse || chatAccess.canReadInbox || chatAccess.canReadMessageContent || chatAccess.canCreate || chatAccess.canUpdate)) { %>
     <%- include('../partials/chatModal') %>
   <% } %>
   <% if ((typeof print !== 'undefined' && print) || (typeof includePrintManager !== 'undefined' && includePrintManager)) { %>

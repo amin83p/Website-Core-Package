@@ -36,6 +36,6 @@ test('attendance mutations save sessions with route access context', () => {
 test('attendance active class list uses route access context', () => {
   assert.match(
     source,
-    /listActiveAttendanceClasses[\s\S]*fetchData\('classes', \{\}, req\.user, routeAccessContext\)/
+    /listActiveAttendanceClasses[\s\S]*fetchAllData\('classes', \{\}, req\.user, routeAccessContext\)/
   );
 });

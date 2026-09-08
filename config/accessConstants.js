@@ -69,12 +69,15 @@ const OPERATIONS = {
     CONFIGURE: 'CONFIGURE', // Configure settings/state
     DELETE: 'DELETE',  // Remove item
     DELETE_ALL: 'DELETE_ALL',  // Remove item
+    BROADCAST: 'BROADCAST',  // Privileged chat broadcast fan-out
 
     // Extended Actions
     START: 'START', // Start a process/session
     SAVE: 'SAVE', // Save progress/state
     EXPORT: 'EXPORT',  // Export data (CSV/JSON)
     IMPORT: 'IMPORT',  // Bulk import
+    UPLOAD: 'UPLOAD',  // Upload files attached to records
+    PRINT: 'PRINT',  // Print visible page content
     DOWNLOAD_FILE: 'DOWNLOAD_FILE',
     DELETE_FILE: 'DELETE_FILE',
     AI_SCORING: 'AI_SCORING', // Run AI scoring/feedback workflows

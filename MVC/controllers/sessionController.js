@@ -1,5 +1,6 @@
 // MVC/controllers/sessionController.js
-const sessionService = require('../services/SessionService');const { idsEqual } = require('../utils/idAdapter');
+const sessionService = require('../services/SessionService');
+const { idsEqual } = require('../utils/idAdapter');
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const { formatInstantInTimezone } = require('../utils/timezoneUtils');
 

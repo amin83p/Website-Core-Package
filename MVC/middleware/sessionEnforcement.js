@@ -3,6 +3,45 @@ const dataService = require('../services/dataService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { sanitizeCurrentPath } = require('../utils/pagePathUtils');
 const sessionRecordCacheService = require('../services/cache/sessionRecordCacheService');
+const sessionAuthDiagnosticLogService = require('../services/diagnostics/sessionAuthDiagnosticLogService');
+
+const SESSION_HEARTBEAT_MS = 60 * 1000;
+
+function parseSafeInt(value, fallback) {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function resolveSessionMaxDurationMinutes(session = {}) {
+    const stored = parseSafeInt(session.maxDurationMinutes, null);
+    if (stored > 0) return stored;
+    const createdAt = session.createdAt ? new Date(session.createdAt) : null;
+    const absoluteExpiry = session.absoluteExpiry ? new Date(session.absoluteExpiry) : null;
+    if (!createdAt || !absoluteExpiry || Number.isNaN(createdAt.getTime()) || Number.isNaN(absoluteExpiry.getTime())) {
+        return 720;
+    }
+    const mins = Math.round((absoluteExpiry.getTime() - createdAt.getTime()) / 60000);
+    return mins > 0 ? mins : 720;
+}
+
+function buildSessionExpiryDiagnostics(session = {}, now = new Date()) {
+    const lastActive = session?.lastActivityAt ? new Date(session.lastActivityAt) : null;
+    const absoluteExpiry = session?.absoluteExpiry ? new Date(session.absoluteExpiry) : null;
+    const idleLimitMs = sessionRecordCacheService.resolveEffectiveIdleLimitMs(session);
+    const minutesSinceActivity = lastActive && !Number.isNaN(lastActive.getTime())
+        ? Math.round((now - lastActive) / 60000)
+        : null;
+    const minutesUntilAbsoluteExpiry = absoluteExpiry && !Number.isNaN(absoluteExpiry.getTime())
+        ? Math.round((absoluteExpiry - now) / 60000)
+        : null;
+    return {
+        expiryReason: sessionRecordCacheService.resolveSessionExpiryReason(session, now) || '',
+        idleTimeoutMinutes: parseSafeInt(session?.idleTimeoutMinutes, 30),
+        maxDurationMinutes: resolveSessionMaxDurationMinutes(session),
+        minutesSinceActivity,
+        minutesUntilAbsoluteExpiry
+    };
+}
 
 const CURRENT_PATH_UPDATE_THROTTLE_MS = 3 * 60 * 1000;
 const PUBLIC_STATIC_PREFIXES = Object.freeze([
@@ -77,7 +116,14 @@ async function updateSessionCurrentPath(req, currentPath = '') {
     return true;
 }
 
-function rejectMissingSession(req, res) {
+function rejectMissingSession(req, res, session = null) {
+    sessionAuthDiagnosticLogService.logSessionAuthEvent({
+        event: 'SESSION_REJECTED',
+        reason: 'missing_or_revoked',
+        req,
+        session,
+        details: buildSessionExpiryDiagnostics(session || {})
+    });
     res.clearCookie('auth_token');
     if (req.xhr || req.headers['x-ajax-request']) {
         return res.status(401).json({ status: 'error', message: 'Session expired or revoked.' });
@@ -85,12 +131,25 @@ function rejectMissingSession(req, res) {
     return res.redirect('/login?warning=Your session has been terminated.');
 }
 
-function rejectTimedOutSession(req, res) {
+function rejectTimedOutSession(req, res, session = null, expiryReason = 'timeout') {
+    const normalizedReason = String(expiryReason || 'timeout').trim() || 'timeout';
+    sessionAuthDiagnosticLogService.logSessionAuthEvent({
+        event: 'SESSION_REJECTED',
+        reason: normalizedReason,
+        req,
+        session,
+        details: buildSessionExpiryDiagnostics(session || {})
+    });
     res.clearCookie('auth_token');
+    const warning = normalizedReason === 'idle'
+        ? 'Session timed out due to inactivity.'
+        : (normalizedReason === 'absolute'
+            ? 'Session timed out due to maximum session length.'
+            : 'Session timed out.');
     if (req.xhr || req.headers['x-ajax-request']) {
         return res.status(401).json({ status: 'error', message: 'Session timed out.' });
     }
-    return res.redirect('/login?warning=Session timed out due to inactivity.');
+    return res.redirect(`/login?warning=${encodeURIComponent(warning)}`);
 }
 
 async function loadSessionRecord(sessionId) {
@@ -105,6 +164,30 @@ async function loadSessionRecord(sessionId) {
     }
     sessionRecordCacheService.set(sessionId, session);
     return session;
+}
+
+async function resolveActiveSessionRecord(sessionId, session, now = new Date()) {
+    if (!session) return null;
+
+    const cachedReason = sessionRecordCacheService.resolveSessionExpiryReason(session, now);
+    if (!cachedReason) return session;
+
+    sessionRecordCacheService.invalidate(sessionId);
+    const freshSession = await dataService.getDataById('sessions', sessionId, SYSTEM_CONTEXT);
+    if (!freshSession) {
+        sessionRecordCacheService.markRevoked(sessionId);
+        return null;
+    }
+
+    const freshReason = sessionRecordCacheService.resolveSessionExpiryReason(freshSession, now);
+
+    if (freshReason) {
+        sessionRecordCacheService.set(sessionId, freshSession);
+        return null;
+    }
+
+    sessionRecordCacheService.set(sessionId, freshSession);
+    return freshSession;
 }
 
 async function enforceSession(req, res, next) {
@@ -126,26 +209,36 @@ async function enforceSession(req, res, next) {
         const session = await loadSessionRecord(sessionId);
 
         if (!session) {
-            return rejectMissingSession(req, res);
+            return rejectMissingSession(req, res, null);
         }
 
         const now = new Date();
-        if (sessionRecordCacheService.isSessionExpired(session, now)) {
-            sessionRecordCacheService.markRevoked(sessionId);
-            await dataService.deleteData('sessions', sessionId, SYSTEM_CONTEXT).catch(() => {});
-            return rejectTimedOutSession(req, res);
+        const activeSession = await resolveActiveSessionRecord(sessionId, session, now);
+        if (!activeSession) {
+            sessionRecordCacheService.invalidate(sessionId);
+            const expiryReason = sessionRecordCacheService.resolveSessionExpiryReason(session, now) || 'timeout';
+            return rejectTimedOutSession(req, res, session, expiryReason);
         }
 
-        const lastActive = new Date(session.lastActivityAt);
-        const heartbeatDue = (now - lastActive) > 60 * 1000;
+        const lastActive = new Date(activeSession.lastActivityAt);
+        const heartbeatDue = !Number.isNaN(lastActive.getTime())
+            ? ((now - lastActive) > SESSION_HEARTBEAT_MS)
+            : true;
         if (heartbeatDue) {
-            const updates = { lastActivityAt: now.toISOString() };
+            const maxDurationMinutes = resolveSessionMaxDurationMinutes(activeSession);
+            const updates = {
+                lastActivityAt: now.toISOString(),
+                absoluteExpiry: new Date(now.getTime() + (maxDurationMinutes * 60 * 1000)).toISOString()
+            };
+            if (!parseSafeInt(activeSession.maxDurationMinutes, null)) {
+                updates.maxDurationMinutes = maxDurationMinutes;
+            }
             await dataService.updateData('sessions', sessionId, updates, SYSTEM_CONTEXT);
-            Object.assign(session, updates);
-            sessionRecordCacheService.set(sessionId, session);
+            Object.assign(activeSession, updates);
+            sessionRecordCacheService.set(sessionId, activeSession);
         }
 
-        req.userSession = session;
+        req.userSession = activeSession;
 
         next();
 
@@ -174,3 +267,4 @@ module.exports.shouldTrackCurrentPathForRequest = shouldTrackCurrentPathForReque
 module.exports.trackCurrentPathAfterAuth = trackCurrentPathAfterAuth;
 module.exports.updateSessionCurrentPath = updateSessionCurrentPath;
 module.exports.loadSessionRecord = loadSessionRecord;
+module.exports.resolveActiveSessionRecord = resolveActiveSessionRecord;

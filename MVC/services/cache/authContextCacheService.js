@@ -8,6 +8,29 @@ const {
 } = require('./requestCacheConfig');
 
 let authContextCache = null;
+let accessProfileCacheGeneration = 0;
+
+function bumpAccessProfileCacheGeneration() {
+  accessProfileCacheGeneration += 1;
+  return accessProfileCacheGeneration;
+}
+
+function getAccessProfileCacheGeneration() {
+  return accessProfileCacheGeneration;
+}
+
+function wrapAuthContextCacheEntry(userContext) {
+  return {
+    generation: accessProfileCacheGeneration,
+    userContext
+  };
+}
+
+function unwrapAuthContextCacheEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  if (Number(entry.generation) !== accessProfileCacheGeneration) return null;
+  return entry.userContext || null;
+}
 
 function createAuthContextCache() {
   return createTtlLruCache({
@@ -37,13 +60,18 @@ function getCachedAuthContext(userId, sessionId) {
   const cacheKey = buildAuthContextCacheKey(userId, sessionId);
   if (!cacheKey) return null;
   const cached = getAuthContextCache().get(cacheKey);
-  return cached ? cloneCacheValue(cached) : null;
+  const userContext = unwrapAuthContextCacheEntry(cached);
+  return userContext ? cloneCacheValue(userContext) : null;
 }
 
 function setCachedAuthContext(userId, sessionId, userContext) {
   const cacheKey = buildAuthContextCacheKey(userId, sessionId);
   if (!cacheKey || !userContext) return;
-  getAuthContextCache().set(cacheKey, userContext, resolveRequestCacheTtlMs());
+  getAuthContextCache().set(
+    cacheKey,
+    wrapAuthContextCacheEntry(userContext),
+    resolveRequestCacheTtlMs()
+  );
 }
 
 function invalidateAuthContextForUser(userId) {
@@ -58,6 +86,20 @@ function invalidateAuthContextForUser(userId) {
   } catch (_) {
     // ignore
   }
+  try {
+    const dashboardFilteredSectionsCacheService = require('./dashboardFilteredSectionsCacheService');
+    if (dashboardFilteredSectionsCacheService && typeof dashboardFilteredSectionsCacheService.clearDashboardFilteredSectionsCache === 'function') {
+      dashboardFilteredSectionsCacheService.clearDashboardFilteredSectionsCache();
+    }
+  } catch (_) {
+    // ignore
+  }
+  try {
+    const sessionService = require('../SessionService');
+    void sessionService.refreshSessionPolicyLimitsForUser(normalizedUserId).catch(() => {});
+  } catch (_) {
+    // ignore
+  }
   return removed;
 }
 
@@ -69,6 +111,7 @@ function invalidateAuthContextForSession(userId, sessionId) {
 
 function clearAuthContextCache() {
   if (authContextCache) authContextCache.clear();
+  bumpAccessProfileCacheGeneration();
 }
 
 function clearAllRequestCaches() {
@@ -105,5 +148,7 @@ module.exports = {
   clearAuthContextCache,
   clearAllRequestCaches,
   rebuildAuthContextCache,
+  bumpAccessProfileCacheGeneration,
+  getAccessProfileCacheGeneration,
   _authContextCache: () => getAuthContextCache()
 };

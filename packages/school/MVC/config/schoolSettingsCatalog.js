@@ -56,6 +56,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     description: 'Configure how class sessions with no student enrollment appear on timesheets.',
     icon: 'bi-calendar2-week',
     order: 45
+  }),
+  Object.freeze({
+    key: 'timesheet-import',
+    title: 'Timesheet Import',
+    description: 'Configure legacy Excel import activity and where import is allowed.',
+    icon: 'bi-file-earmark-spreadsheet',
+    order: 46
   })
 ]);
 

@@ -18,7 +18,7 @@ test('matrix API applies the authoritative catalog without exposing policy setti
   assert.doesNotMatch(controller, /payload\.attendancePolicy/);
   assert.match(controller, /getPolicyCatalogForOrg/);
   assert.match(controller, /resolvePolicy\(classData,\s*orgPolicyLayer\)/);
-  assert.match(controller, /computeStudentMatrixSummary\(\s*records,\s*classData,\s*orgPolicyCatalog\s*\)/);
+  assert.match(controller, /filterMatrixPayloadForScope/);
 });
 
 test('attendance viewer contains no settings link or threshold tooltip', () => {
@@ -32,9 +32,9 @@ test('attendance viewer contains no settings link or threshold tooltip', () => {
 test('attendance viewer hides manage buttons for limited access like master schedule', () => {
   const viewer = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
   const controller = read('packages/school/MVC/controllers/school/attendanceController.js');
+  assert.match(controller, /resolveAttendanceAccessForRequest/);
+  assert.match(controller, /getAttendanceAccessForRequest/);
   assert.match(controller, /isAttendanceAdminViewer/);
-  assert.match(controller, /isAttendancesAdminViewerAsync/);
-  assert.match(controller, /OPERATIONS\.READ_ALL/);
   assert.match(viewer, /showAttendanceManageBtns/);
   assert.match(viewer, /manageBtns:\s*attManageBtns/);
   assert.match(viewer, /showAttendanceManageBtns\s*\?\s*\[/);
@@ -67,23 +67,23 @@ test('open-matrix access remains distinct from School Settings access', () => {
   const matrixAccess = read('packages/school/MVC/services/school/attendanceMatrixAccessService.js');
   const settingsAccess = read('packages/school/MVC/services/school/schoolSettingsAccessService.js');
   assert.match(matrixAccess, /userCanOpenAttendanceMatrix/);
-  assert.match(matrixAccess, /SECTIONS\.SCHOOL_ATTENDANCES/);
-  assert.match(matrixAccess, /isAttendancesAdminViewerAsync/);
+  assert.match(matrixAccess, /buildAttendanceAccess/);
+  assert.match(matrixAccess, /canOpenMatrix/);
   assert.match(settingsAccess, /SECTIONS\.SCHOOL_SETTINGS/);
   assert.match(settingsAccess, /OPERATIONS\.READ_ALL/);
   assert.match(settingsAccess, /OPERATIONS\.UPDATE/);
 });
 
-test('attendance matrix excuse marking is admin-only in access service, controller, and viewer', () => {
+test('attendance matrix excuse marking follows access flags in controller and viewer', () => {
   const matrixAccess = read('packages/school/MVC/services/school/attendanceMatrixAccessService.js');
   const controller = read('packages/school/MVC/controllers/school/attendanceController.js');
   const viewer = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
 
   assert.match(matrixAccess, /userCanMarkAttendanceExcused/);
-  assert.match(matrixAccess, /isAttendancesAdminViewerAsync\(user, operationId\)/);
+  assert.match(matrixAccess, /canMarkExcused/);
 
-  assert.match(controller, /userCanMarkAttendanceExcused/);
   assert.match(controller, /canMarkAttendanceExcused/);
+  assert.match(controller, /resolveAttendanceAccessForRequest/);
   assert.match(controller, /savedExcuseState/);
   assert.match(controller, /if \(canMarkAttendanceExcused\) \{[\s\S]*rosterRecord\.lateExcused/);
   assert.match(controller, /else \{[\s\S]*rosterRecord\.lateExcused = savedExcuseState\.lateExcused/);
@@ -93,4 +93,26 @@ test('attendance matrix excuse marking is admin-only in access service, controll
   assert.match(viewer, /syncExcuseNotesAccess/);
   assert.match(viewer, /if \(attendanceCanMarkExcused\(\)\) \{[\s\S]*payload\.lateExcused/);
   assert.match(viewer, /if \(!attendanceCanMarkExcused\(\)\) \{[\s\S]*wrapper\.classList\.add\('d-none'\)/);
+});
+
+test('attendance file uploads are gated only on SCHOOL_ATTENDANCES UPLOAD', () => {
+  const routes = read('packages/school/MVC/routes/attendanceRoutes.js');
+  const classRoutes = read('packages/school/MVC/routes/classRoutes.js');
+  const accessService = read('packages/school/MVC/services/school/attendanceAccessService.js');
+  const policy = read('packages/school/MVC/services/school/attendanceOperationPolicyService.js');
+  const classController = read('packages/school/MVC/controllers/school/classController.js');
+  const sessionManager = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  const viewer = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
+
+  assert.match(routes, /\/api\/files\/upload'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.UPLOAD\)/);
+  assert.doesNotMatch(routes, /\/api\/files\/upload'[\s\S]*?SCHOOL_SESSIONS[\s\S]*?OPERATIONS\.UPLOAD/);
+  assert.doesNotMatch(accessService, /SECTIONS\.SCHOOL_SESSIONS[\s\S]*?OPERATIONS\.UPLOAD/);
+  assert.doesNotMatch(policy, /sessionsUploadPolicy/);
+  assert.match(classRoutes, /requireSessionFileUploadRouteAccess\(\)/);
+  assert.match(classController, /assertSessionFileUploadAccess[\s\S]*canUploadFiles/);
+  assert.match(classController, /ATTENDANCE_SESSION_UPLOAD_KINDS/);
+  assert.match(sessionManager, /sessionCanUploadAttendanceFiles/);
+  assert.match(sessionManager, /attendanceUploadDisabledAttr/);
+  assert.match(viewer, /CAN_UPLOAD_ATTENDANCE_FILES/);
+  assert.match(viewer, /allowUpload/);
 });

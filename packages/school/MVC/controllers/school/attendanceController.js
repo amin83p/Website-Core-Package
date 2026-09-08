@@ -33,10 +33,30 @@ const classSessionCapacityService = require('../../services/school/classSessionC
 const rollingEnrollmentWorkspaceService = require('../../services/school/rollingEnrollmentWorkspaceService');
 const attendanceChangeLogService = require('../../services/school/attendanceChangeLogService');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const { userCanMarkAttendanceExcused } = require('../../services/school/attendanceMatrixAccessService');
+const {
+    getAttendanceAccessForRequest,
+    userCanMarkAttendanceExcused
+} = require('../../services/school/attendanceMatrixAccessService');
+const attendanceAccessService = require('../../services/school/attendanceAccessService');
+const attendanceOperationPolicyService = require('../../services/school/attendanceOperationPolicyService');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
+}
+
+async function resolveAttendanceAccessForRequest(req) {
+    if (req._attendanceAccess) return req._attendanceAccess;
+    const access = await getAttendanceAccessForRequest(req.user, req.ip);
+    req._attendanceAccess = access;
+    return access;
+}
+
+function assertAttendanceAccess(access, flagName, message) {
+    if (!access?.[flagName]) {
+        const error = new Error(message || 'You do not have permission for this attendance action.');
+        error.statusCode = 403;
+        throw error;
+    }
 }
 
 function resolveSessionDateFromRequest(req) {
@@ -206,23 +226,14 @@ function normalizeDateOnly(value) {
 }
 
 async function assertAttendanceMatrixSessionEditable(req, classData, session) {
+    const access = await resolveAttendanceAccessForRequest(req);
     const isSessionLocked = session.locked === true || String(session.locked) === 'true';
-    const canOverride = await adminAuthorityService.isAdminForRequestAsync(
-        req.user,
-        SECTIONS.SCHOOL_ATTENDANCES,
-        OPERATIONS.UPDATE,
-        { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
-    );
+    const canOverride = Boolean(access.canOverrideSessionLock);
     if (isSessionLocked && !canOverride) {
         throw new Error('This session is locked and cannot be edited. Please contact an administrator.');
     }
 
-    const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
-        req.user,
-        SECTIONS.SCHOOL_ATTENDANCES,
-        OPERATIONS.UPDATE,
-        { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
-    );
+    const canOverrideAttendanceEdit = canOverride || Boolean(access.canOverrideSessionLock);
     await sessionAttendanceEditAccessService.assertSessionAttendanceEditable({
         orgId: String(classData?.orgId || req.user?.activeOrgId || '').trim(),
         session,
@@ -395,23 +406,24 @@ async function resolveAttendanceMarkAppearanceForRequest(req) {
 
 async function showAttendancePage(req, res) {
     try {
-        const editEval = await accessService.evaluateAccess({
-            user: req.user,
-            sectionId: SECTIONS.SCHOOL_ATTENDANCES,
-            operationId: OPERATIONS.UPDATE,
-            ipAddress: req.ip
-        });
-        const canEditAttendanceRoster = Boolean(editEval?.allowed);
-        const isAttendanceAdminViewer = await schoolAdminAccessService.isAttendancesAdminViewerAsync(
-            req.user,
-            OPERATIONS.READ_ALL
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(
+            attendanceAccess,
+            'canOpenMatrix',
+            'You do not have permission to open the Attendance Matrix.'
         );
-        let canOverrideSessionLock = await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_ATTENDANCES,
-            OPERATIONS.UPDATE,
-            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
-        );
+        const {
+            canEditRoster: canEditAttendanceRoster,
+            canUploadFiles,
+            canExportExcel,
+            canPrintMatrix,
+            canViewRollups,
+            canViewChangeHistory,
+            canMarkExcused: canMarkAttendanceExcused,
+            canOverrideSessionLock,
+            isAttendanceAdminViewer,
+            canViewRosterFields
+        } = attendanceAccess;
 
         const q = req.query || {};
         const initialClassId = String(q.classId || '').trim();
@@ -436,7 +448,6 @@ async function showAttendancePage(req, res) {
         }
 
         const attendanceMarkAppearanceResolved = await resolveAttendanceMarkAppearanceForRequest(req);
-        const canMarkAttendanceExcused = await userCanMarkAttendanceExcused(req.user);
         const parsePositiveLimit = (value) => {
             const n = Number(value);
             return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
@@ -458,6 +469,13 @@ async function showAttendancePage(req, res) {
             isAttendanceAdminViewer,
             canMarkAttendanceExcused,
             canOverrideSessionLock,
+            canUploadFiles,
+            canExportExcel,
+            canPrintMatrix,
+            canViewRollups,
+            canViewChangeHistory,
+            canViewRosterFields,
+            showAttendanceAccessAlert: Boolean(attendanceAccess.canOpenMatrix && !attendanceAccess.canViewRosterFields),
             attendanceMarkAppearanceResolved,
             initialClassId,
             initialClassName,
@@ -475,6 +493,12 @@ async function showAttendancePage(req, res) {
 
 async function listActiveAttendanceClasses(req, res) {
     try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(
+            attendanceAccess,
+            'canViewRosterFields',
+            'You need SCHOOL_ATTENDANCES READ_ALL access to load attendance classes.'
+        );
         const activeOrgId = String(req.user?.activeOrgId || '').trim();
         const routeAccessContext = buildAttendanceRouteAccessContext(req);
         const classes = await schoolDataService.fetchAllData('classes', {}, req.user, routeAccessContext);
@@ -615,8 +639,24 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
 
 async function buildAttendanceMatrixPayload(req, options = {}) {
         const query = req?.query && typeof req.query === 'object' ? req.query : {};
-        const { classId, startDate, endDate } = query;
+        let { classId, startDate, endDate } = query;
         if (!classId) throw new Error('Class ID is required.');
+
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(
+            attendanceAccess,
+            'canViewRosterFields',
+            'You need SCHOOL_ATTENDANCES READ_ALL access to view attendance fields.'
+        );
+
+        const scopeId = attendanceAccess.readAllScopeId || attendanceAccess.updateScopeId || attendanceAccess.readScopeId;
+        const policyWindow = attendanceOperationPolicyService.resolveAttendanceDateWindow(
+            scopeId,
+            resolveOrgTodayFromRequest(req)
+        );
+        const clampedWindow = attendanceOperationPolicyService.clampDateWindow(startDate, endDate, policyWindow);
+        startDate = clampedWindow.startDate;
+        endDate = clampedWindow.endDate;
 
         const routeAccessContext = buildAttendanceRouteAccessContext(req);
         const classData = await getAttendanceClassOrThrow(req, classId);
@@ -858,13 +898,15 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
                 ? 'canonical_active_only_rolling'
                 : String(enrollmentSnapshot?.source || 'legacy'),
             enrollmentUsedFallback: Boolean(enrollmentSnapshot?.usedFallback),
-            window: buildPlan.window
+            window: buildPlan.window,
+            accessDateWindow: policyWindow
         };
 
-        return matrixRollupService.recomputeAttendanceMatrixRollups(payload, {
+        const rolledUp = matrixRollupService.recomputeAttendanceMatrixRollups(payload, {
             classData,
             orgPolicyCatalog
         });
+        return attendanceOperationPolicyService.filterMatrixPayloadForScope(rolledUp, attendanceAccess);
 }
 
 async function getAttendanceData(req, res) {
@@ -883,6 +925,8 @@ async function getAttendanceData(req, res) {
 
 async function exportAttendanceExcel(req, res) {
     try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(attendanceAccess, 'canExportExcel', 'You do not have permission to export attendance.');
         const payload = await buildAttendanceMatrixPayload(req, {
             applyWindow: false,
             filterSessionIds: req.query?.sessionIds,
@@ -913,6 +957,8 @@ async function exportAttendanceExcel(req, res) {
 
 async function postAttendanceRollups(req, res) {
     try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(attendanceAccess, 'canViewRollups', 'You do not have permission to view attendance rollups.');
         const classId = String(req.body?.classId || req.query?.classId || '').trim();
         if (!classId) throw new Error('Class ID is required.');
         const startDate = String(req.body?.startDate || req.query?.startDate || '').trim();
@@ -952,6 +998,8 @@ async function postAttendanceRollups(req, res) {
 // --- Interactive Comment Engine with Chat Integration ---
 async function addAttendanceComment(req, res) {
     try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(attendanceAccess, 'canEditRoster', 'You do not have permission to add attendance comments.');
         const { classId, sessionId, studentPersonId, text, mentions, attachment } = req.body;
         if (!classId || !sessionId || !studentPersonId || !text) throw new Error('Missing required fields.');
 
@@ -1013,19 +1061,26 @@ async function addAttendanceComment(req, res) {
         if (normalizedMentions.length > 0) {
             const className = classData ? classData.title : 'a class';
             
-            // Format the message with HTML to include a styled, clickable link!
-            // Format the message with HTML to include a styled, clickable link!
-            const chatMsgContent = `
-                ðŸ“ <b>System Message:</b> I mentioned you in an attendance note for <b>${className}</b> (Date: ${session.date}):
-                <br><br>
-                <div style="border-left: 3px solid #0d6efd; padding-left: 10px; color: #6c757d; font-style: italic;">
-                    "${text.trim()}"
-                </div>
-                <br>
-                <a href="/school/attendances?classId=${classId}&studentId=${studentPersonId}&sessionId=${sessionId}" target="_blank" class="text-decoration-none fw-bold">
-                    âž¡ï¸ Open Specific Note
-                </a>
-            `;
+            const noteLink = `/school/attendances?classId=${classId}&studentId=${studentPersonId}&sessionId=${sessionId}`;
+            const escapeHtml = (value) => String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+            const safeClassName = escapeHtml(className);
+            const safeNoteText = escapeHtml(text.trim());
+            const chatMsgContent = [
+                '<i class="bi bi-pin-map-fill text-primary"></i> <strong>System Message:</strong>',
+                `I mentioned you in an attendance note for <strong>${safeClassName}</strong> (Date: ${session.date}):`,
+                '<br><br>',
+                '<div style="border-left: 3px solid #0d6efd; padding-left: 10px; color: #6c757d; font-style: italic;">',
+                `"${safeNoteText}"`,
+                '</div>',
+                '<br>',
+                `<a href="${noteLink}" target="_blank" rel="noopener" class="text-decoration-none fw-bold">`,
+                '<i class="bi bi-box-arrow-up-right"></i> Open Specific Note',
+                '</a>'
+            ].join('\n');
 
             for (const mention of normalizedMentions) {
                 try {
@@ -1038,7 +1093,7 @@ async function addAttendanceComment(req, res) {
                     const conv = await chatRepository.create({ userIds: [authorIdStr, targetIdStr] });
 
                     // FIX 3: Save the message to the chat database using the author's exact ID
-                    const savedMsg = await chatRepository.addMessage(conv.id, authorIdStr, chatMsgContent.trim(), 'text', null);
+                    const savedMsg = await chatRepository.addMessage(conv.id, authorIdStr, chatMsgContent.trim(), 'system', null);
 
                     // Broadcast the message in real-time via Socket.io
                     try {
@@ -1065,6 +1120,8 @@ async function addAttendanceComment(req, res) {
 
 async function uploadAttendanceFile(req, res) {
     try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(attendanceAccess, 'canUploadFiles', 'You do not have permission to upload attendance files.');
         const classId = String(req.body?.classId || '').trim();
         const sessionId = String(req.body?.sessionId || '').trim();
         const studentPersonId = String(req.body?.studentPersonId || '').trim();
@@ -1102,6 +1159,8 @@ async function uploadAttendanceFile(req, res) {
 
 async function updateAttendanceRosterCell(req, res) {
     try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(attendanceAccess, 'canEditRoster', 'You do not have permission to edit attendance.');
         const classId = String(req.body?.classId || '').trim();
         const sessionId = String(req.body?.sessionId || '').trim();
         const studentPersonId = String(req.body?.studentPersonId || '').trim();
@@ -1142,7 +1201,7 @@ async function updateAttendanceRosterCell(req, res) {
                 ? existingRosterRecord.excuseAttachment
                 : null
         };
-        const canMarkAttendanceExcused = await userCanMarkAttendanceExcused(req.user);
+        const canMarkAttendanceExcused = Boolean(attendanceAccess.canMarkExcused);
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
         const normalizedAttendance = attendanceMatrixMetricsService.assertAttendanceStatusAllowedForSave({
             status: req.body?.attendance,
@@ -1186,9 +1245,17 @@ async function updateAttendanceRosterCell(req, res) {
                 rosterRecord.excuseRef = String(req.body.excuseRef || '').trim();
             }
             if (req.body?.excuseAttachment !== undefined) {
-                rosterRecord.excuseAttachment = req.body.excuseAttachment && typeof req.body.excuseAttachment === 'object'
+                const incomingAttachment = req.body.excuseAttachment && typeof req.body.excuseAttachment === 'object'
                     ? req.body.excuseAttachment
                     : null;
+                if (!incomingAttachment && savedExcuseState.excuseAttachment) {
+                    assertAttendanceAccess(
+                        attendanceAccess,
+                        'canDeleteFiles',
+                        'You do not have permission to delete attendance files.'
+                    );
+                }
+                rosterRecord.excuseAttachment = incomingAttachment;
             }
         } else {
             rosterRecord.lateExcused = savedExcuseState.lateExcused;
@@ -1282,6 +1349,7 @@ async function updateAttendanceRosterCell(req, res) {
 
 async function showStudentAttendanceReportPage(req, res) {
     try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
         const q = req.query || {};
         const initialStartDate = String(q.startDate || '').trim();
         const initialEndDate = String(q.endDate || '').trim();
@@ -1322,7 +1390,9 @@ async function showStudentAttendanceReportPage(req, res) {
             initialEndDate,
             initialStudentIds,
             initialStudents,
-            canGenerateReport: Boolean(policy.reportTemplateId),
+            canGenerateReport: Boolean(reportAccess.canGenerateReport && policy.reportTemplateId),
+            canExportReport: Boolean(reportAccess.canExportReport),
+            canOpenReport: Boolean(reportAccess.canOpenReport),
             reportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
                 reportTemplate,
                 policy.reportTemplateId
@@ -1337,6 +1407,13 @@ async function showStudentAttendanceReportPage(req, res) {
 
 async function generateStudentAttendanceReport(req, res) {
     try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canGenerateReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to generate student attendance reports.'
+            });
+        }
         const studentAttendanceReportGenerationService = require('../../services/school/studentAttendanceReportGenerationService');
         const body = req.body && typeof req.body === 'object' ? req.body : {};
         const fauxReq = {
@@ -1374,6 +1451,13 @@ async function getStudentAttendanceReportData(req, res) {
 
 async function getStudentAttendanceReportExportPlan(req, res) {
     try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canExportReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance reports.'
+            });
+        }
         const studentAttendanceReportGenerationService = require('../../services/school/studentAttendanceReportGenerationService');
         const q = req.query || {};
         const fauxReq = {
@@ -1396,6 +1480,13 @@ async function getStudentAttendanceReportExportPlan(req, res) {
 
 async function exportStudentAttendanceReport(req, res) {
     try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canExportReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance reports.'
+            });
+        }
         const studentAttendanceReportGenerationService = require('../../services/school/studentAttendanceReportGenerationService');
         const body = req.body && typeof req.body === 'object' ? req.body : {};
         const fauxReq = {
@@ -1438,6 +1529,8 @@ function parseIdListParam(value = '') {
 
 async function getAttendanceChangeLog(req, res) {
     try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(attendanceAccess, 'canViewChangeHistory', 'You do not have permission to view attendance change history.');
         const classId = String(req.query?.classId || '').trim();
         const sessionId = String(req.query?.sessionId || '').trim();
         const studentPersonId = String(req.query?.studentPersonId || '').trim();
@@ -1465,6 +1558,8 @@ async function getAttendanceChangeLog(req, res) {
 
 async function queryAttendanceChangeLogs(req, res) {
     try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(attendanceAccess, 'canViewChangeHistory', 'You do not have permission to view attendance change history.');
         const classId = String(req.body?.classId || '').trim();
         const startDate = String(req.body?.startDate || '').trim();
         const endDate = String(req.body?.endDate || '').trim();

@@ -348,6 +348,19 @@ const schoolDataService = {
         throw new Error('This record is void and cannot be edited. Restore it before making changes.');
       }
     }
+    if (entityType === 'activities' && options.maintenanceActivityEntries === true) {
+      if (typeof config.repository.maintenanceReplaceActivityEntries !== 'function') {
+        throw new Error('Maintenance activity entry replace is not supported for activities.');
+      }
+      const result = await config.repository.maintenanceReplaceActivityEntries(id, data, options);
+      recordTransactionOperation(options, {
+        type: 'update',
+        entityType: String(entityType || ''),
+        id: toPublicId(id)
+      });
+      clearSchoolCountCacheOnWrite();
+      return result;
+    }
     const result = await config.repository.update(id, data, { ...options, requestingUser });
     recordTransactionOperation(options, {
       type: 'update',

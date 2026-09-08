@@ -472,6 +472,30 @@ async function updateActivity(id, payload) {
   });
 }
 
+async function maintenanceReplaceActivityEntries(id, payload = {}) {
+  return queueWrite(async () => {
+    const rows = await getAllActivities();
+    const index = rows.findIndex((row) => String(row.id) === String(id));
+    if (index < 0) throw new Error('School activity not found.');
+    const existing = rows[index];
+    const entries = Array.isArray(payload.entries) ? payload.entries : (existing.entries || []);
+    const next = {
+      ...existing,
+      entries,
+      attendees: Array.isArray(payload.attendees) ? payload.attendees : existing.attendees,
+      locked: payload.locked === true,
+      updatedAt: new Date().toISOString()
+    };
+    if (!next.locked) {
+      delete next.lockReason;
+      delete next.lockedTimesheetId;
+    }
+    rows[index] = next;
+    await fs.writeFile(dataPath, JSON.stringify(rows, null, 2));
+    return next;
+  });
+}
+
 async function deleteActivity(id) {
   return queueWrite(async () => {
     const rows = await getAllActivities();
@@ -484,6 +508,7 @@ module.exports = {
   getActivityById,
   addActivity,
   updateActivity,
+  maintenanceReplaceActivityEntries,
   deleteActivity,
   sanitizeActivityPayload,
   sanitizeAttendee,

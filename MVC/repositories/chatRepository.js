@@ -228,12 +228,20 @@ const chatRepository = {
 
   async getMessages(convId, options = {}) {
     const { paginateChatMessages } = require('../services/chatMessagePaginationService');
+    const chatMessageVisibilityService = require('../services/chatMessageVisibilityService');
     return runByRepositoryBackend(options, {
       json: async () => chatModel.getMessages(convId, options),
       mongo: async () => {
         const row = await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(convId), { projection: { messages: 1 } });
+        const viewerUserId = options?.viewerUserId || null;
         const messages = Array.isArray(row?.messages)
-          ? row.messages.map((message) => normalizeMessage(message))
+          ? row.messages
+            .map((message) => normalizeMessage(message))
+            .map((message) => (
+              viewerUserId
+                ? chatMessageVisibilityService.applyVisibilityToMessage(message, viewerUserId)
+                : message
+            ))
           : [];
         return paginateChatMessages(messages, options);
       }
@@ -362,20 +370,25 @@ const chatRepository = {
   },
 
   async hasActiveAttachment(convId, fileName, options = {}) {
+    const chatMessageVisibilityService = require('../services/chatMessageVisibilityService');
+    const viewerUserId = options?.viewerUserId || null;
     return runByRepositoryBackend(options, {
-      json: async () => chatModel.hasActiveAttachment(convId, fileName),
+      json: async () => chatModel.hasActiveAttachment(convId, fileName, viewerUserId),
       mongo: async () => {
         const row = await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(convId), {
           projection: { messages: 1 }
         });
         return (Array.isArray(row?.messages) ? row.messages : []).some((message) => (
-          !message?.deletedAt && attachmentReferenceMatches(message?.fileUrl, fileName)
+          !message?.deletedAt
+          && (!viewerUserId || !chatMessageVisibilityService.isHiddenForViewer(message, viewerUserId))
+          && attachmentReferenceMatches(message?.fileUrl, fileName)
         ));
       }
     }, 'core.chat.hasActiveAttachment');
   },
 
   async softDeleteMessages(convId, messageIds = [], deleteOptions = {}, options = {}) {
+    const chatMessageVisibilityService = require('../services/chatMessageVisibilityService');
     const ids = [...new Set((Array.isArray(messageIds) ? messageIds : [])
       .map((id) => toPublicId(id)).filter(Boolean))];
     if (!ids.length) throw new Error('Select at least one message.');
@@ -389,18 +402,33 @@ const chatRepository = {
         const found = messages.filter((message) => ids.some((id) => idsEqual(message?.id, id)));
         if (found.length !== ids.length) throw new Error('One or more messages were not found.');
         const now = new Date().toISOString();
-        const nextMessages = messages.map((message) => (
-          ids.some((id) => idsEqual(message?.id, id)) && !message?.deletedAt
-            ? {
-                ...message,
-                content: 'Message deleted',
-                fileUrl: null,
-                deletedAt: now,
-                deletedByUserId: toPublicId(deleteOptions?.deletedByUserId),
-                deletionScope: String(deleteOptions?.scopeMode || '')
-              }
-            : message
-        ));
+        const scopeMode = chatMessageVisibilityService.normalizeScopeMode(deleteOptions?.scopeMode);
+        const deleterId = toPublicId(deleteOptions?.deletedByUserId);
+        const twoSided = chatMessageVisibilityService.isTwoSidedDeletionScope(scopeMode);
+        const nextMessages = messages.map((message) => {
+          if (!ids.some((id) => idsEqual(message?.id, id))) return message;
+          if (twoSided) {
+            if (message?.deletedAt) return message;
+            return {
+              ...message,
+              content: 'Message deleted',
+              fileUrl: null,
+              deletedAt: now,
+              deletedByUserId: deleterId,
+              deletionScope: scopeMode
+            };
+          }
+          const hiddenForUserIds = chatMessageVisibilityService.normalizeHiddenForUserIds(message);
+          if (deleterId && !hiddenForUserIds.some((userId) => idsEqual(userId, deleterId))) {
+            hiddenForUserIds.push(deleterId);
+          }
+          return {
+            ...message,
+            hiddenForUserIds,
+            deletedByUserId: deleterId,
+            deletionScope: scopeMode
+          };
+        });
         const active = nextMessages.filter((message) => !message?.deletedAt);
         const last = active.slice().sort((left, right) => (
           new Date(right?.timestamp || 0).getTime() - new Date(left?.timestamp || 0).getTime()
@@ -418,7 +446,12 @@ const chatRepository = {
             updatedAt: now
           }
         });
-        return { messageIds: ids, deletedAt: now };
+        return {
+          messageIds: ids,
+          deletedAt: now,
+          deletionMode: twoSided ? 'two-sided' : 'one-sided',
+          scopeMode
+        };
       }
     }, 'core.chat.softDeleteMessages');
   },
@@ -556,6 +589,21 @@ const chatRepository = {
         userId
       }
     });
+  },
+
+  async countSentMessagesByUser(convId, senderId, options = {}) {
+    return runByRepositoryBackend(options, {
+      json: async () => chatModel.countSentMessagesByUser(convId, senderId),
+      mongo: async () => {
+        const row = await getMongoCollection('chatConversations').findOne(resolveMongoIdFilter(convId), {
+          projection: { messages: 1 }
+        });
+        const senderKey = toPublicId(senderId);
+        return (Array.isArray(row?.messages) ? row.messages : []).filter((message) => (
+          !message?.deletedAt && idsEqual(message?.senderId, senderKey)
+        )).length;
+      }
+    }, 'core.chat.countSentMessagesByUser');
   }
 };
 

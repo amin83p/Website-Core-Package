@@ -132,6 +132,7 @@ test('school package pass9 owns timesheetRoutes implementation', () => {
   assert.match(routeSource, /requireMyTimesheetLegacyDeleteAccess/);
   assert.match(routeSource, /router\.delete\('\/api\/import\/legacy'[\s\S]*?requireMyTimesheetLegacyDeleteAccess/);
   assert.match(routeSource, /router\.post\('\/manage\/api\/import\/execution\/plan'/);
+  assert.match(routeSource, /router\.post\('\/manage\/api\/import\/execution\/plan'[\s\S]*?timesheetEditorMutationActionState/);
   assert.match(routeSource, /router\.post\('\/manage\/api\/import\/execution\/perform'/);
   assert.match(routeSource, /ctrl\.planTimesheetImportExecution/);
   assert.match(routeSource, /ctrl\.performTimesheetImportExecution/);

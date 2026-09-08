@@ -109,7 +109,13 @@ function mergeAccessProfiles(profiles, scopeLevelMap) {
     active: true,
     fullAdmin: list.some((p) => p?.fullAdmin === true),
     adminCategories: Array.from(mergedCategorySet).filter(Boolean),
-    sections: Array.from(mergedSections.values())
+    sections: Array.from(mergedSections.values()),
+    sourceProfileIds: list.map((p) => toPublicId(p.id)).filter(Boolean),
+    updatedAt: list
+      .map((p) => String(p?.updatedAt || p?.audit?.lastUpdateDateTime || '').trim())
+      .filter(Boolean)
+      .sort()
+      .slice(-1)[0] || null
   };
 
   if (list.some((p) => !p?.orgId)) mergedProfile.orgId = null;

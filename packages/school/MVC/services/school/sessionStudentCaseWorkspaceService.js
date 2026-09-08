@@ -4,6 +4,7 @@ const schoolRecordAccessService = require('./schoolRecordAccessService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const sessionStudentCaseRoutingService = require('./sessionStudentCaseRoutingService');
+const studentCaseAccessService = require('./studentCaseAccessService');
 const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -134,8 +135,20 @@ function teacherPersonMatchesScope(row, access = {}) {
   return aliasIds.some((aliasId) => idsEqual(teacherPersonId, aliasId));
 }
 
+async function resolveStudentCaseAccessContext(req, accessContext = {}) {
+  const built = await studentCaseAccessService.buildStudentCaseAccess(req.user, req.ip);
+  const scopeId = built.readAllScopeId
+    || accessContext?.scopeId
+    || req?.accessScope
+    || '';
+  return { scopeId, built };
+}
+
 async function resolveAssignmentAccessContext(req, accessContext = {}) {
-  const access = schoolRecordAccessService.resolveAccessFromRequest(req);
+  const scopeId = normalizeText(accessContext?.scopeId);
+  const access = scopeId
+    ? schoolRecordAccessService.resolveAccessFromUser(req.user, { scopeId })
+    : schoolRecordAccessService.resolveAccessFromRequest(req);
   if (access.scopeMode !== SCOPE_MODES.ASSIGNMENT) return access;
   const scope = { ...access };
   const teachers = await schoolDataService.fetchAllData('teachers', { personId__eq: scope.personId, page: 1, limit: 100 }, req.user, { scopeId: 'SCP_ORG' });
@@ -149,7 +162,11 @@ async function filterCasesByAccessScope({ rows, req, accessContext = {}, applyAc
   const list = Array.isArray(rows) ? rows : [];
   if (!applyAccessScope) return list;
 
-  const access = await resolveAssignmentAccessContext(req, accessContext);
+  const { scopeId, built } = await resolveStudentCaseAccessContext(req, accessContext);
+  if (!built?.canViewCases) return [];
+
+  const effectiveContext = { scopeId };
+  const access = await resolveAssignmentAccessContext(req, effectiveContext);
   let scoped;
   if (schoolRecordAccessService.isOrgWideScope(access)) {
     scoped = list;
@@ -203,8 +220,13 @@ async function listSessionStudentCasesForRequest(req, options = {}) {
     queryInput = {},
     searchQuery = '',
     applyAccessScope = true,
-    accessContext = schoolDataService.buildRouteAccessContext(req)
+    accessContext: providedAccessContext = null
   } = options;
+
+  const accessContext = providedAccessContext
+    || (applyAccessScope
+      ? await resolveStudentCaseAccessContext(req, schoolDataService.buildRouteAccessContext(req))
+      : schoolDataService.buildRouteAccessContext(req));
 
   const orgId = getActiveOrgId(req.user);
   const rawRows = await schoolRepositories.sessionStudentCases.list({

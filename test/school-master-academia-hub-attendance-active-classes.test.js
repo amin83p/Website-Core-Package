@@ -9,11 +9,11 @@ function read(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
-test('attendance routes expose active classes endpoint with section UPDATE access', () => {
+test('attendance routes expose active classes endpoint with section READ_ALL access', () => {
   const routeSource = read('packages/school/MVC/routes/attendanceRoutes.js');
 
   assert.match(routeSource, /router\.get\('\/api\/active-classes'/);
-  assert.match(routeSource, /\/api\/active-classes'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /\/api\/active-classes'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.READ_ALL\)/);
   assert.match(routeSource, /ctrl\.listActiveAttendanceClasses/);
 });
 
@@ -21,7 +21,7 @@ test('attendance controller returns active class rows for the active org', () =>
   const controllerSource = read('packages/school/MVC/controllers/school/attendanceController.js');
 
   assert.match(controllerSource, /async function listActiveAttendanceClasses\(req,\s*res\)/);
-  assert.match(controllerSource, /schoolDataService\.fetchData\('classes'/);
+  assert.match(controllerSource, /schoolDataService\.fetchAllData\('classes'/);
   assert.match(controllerSource, /filter\(\(row\) => classBelongsToActiveOrg\(row,\s*activeOrgId\)\)/);
   assert.match(controllerSource, /filter\(isActiveAttendanceClass\)/);
   assert.match(controllerSource, /status === 'active'/);

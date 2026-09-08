@@ -2,12 +2,7 @@
 
 const schoolRecordAccessService = require('./schoolRecordAccessService');
 const sessionStudentCaseRoutingService = require('./sessionStudentCaseRoutingService');
-const { requireCoreModule } = require('./schoolCoreContracts');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
-
-const accessService = requireCoreModule('MVC/services/security/index');
-
-const CASE_SECTION = SECTIONS.SCHOOL_SESSION_STUDENT_CASES;
+const studentCaseAccessService = require('./studentCaseAccessService');
 
 function createDeniedError(message = 'You do not have access to this student case.', statusCode = 403) {
   const error = new Error(message);
@@ -15,29 +10,46 @@ function createDeniedError(message = 'You do not have access to this student cas
   return error;
 }
 
-async function evaluateOperation(req, operationId) {
-  try {
-    const evaluation = await accessService.evaluateAccess({
-      user: req.user,
-      sectionId: CASE_SECTION,
-      operationId,
-      ipAddress: req?.ip
-    });
-    return evaluation?.allowed === true;
-  } catch (_) {
-    return false;
-  }
+async function loadStudentCaseAccess(req) {
+  if (req._studentCaseAccess) return req._studentCaseAccess;
+  const access = await studentCaseAccessService.buildStudentCaseAccess(req.user, req.ip);
+  req._studentCaseAccess = access;
+  return access;
 }
 
-function resolveSessionMutationOk(req, classData, session) {
+function resolveSessionMutationOk(user, classData, session, sectionAccess) {
   if (!classData || !session) return true;
-  const access = schoolRecordAccessService.resolveAccessFromRequest(req);
+  const access = sectionAccess
+    || studentCaseAccessService.buildStudentCaseSectionAccessContext(user, {});
   return schoolRecordAccessService.isSessionAccessible({
     classRow: classData,
     session,
     access,
     context: 'mutation'
   });
+}
+
+function mapAccessToCapabilities(sectionAccess, sessionMutationOk) {
+  const canRead = Boolean(sectionAccess.canOpenList || sectionAccess.adminFlags?.read);
+  const canReadAll = Boolean(sectionAccess.canViewCases);
+  const canCreate = Boolean(sectionAccess.canCreateCases && sessionMutationOk);
+  const canUpdate = Boolean(sectionAccess.canUpdateCases && sessionMutationOk);
+  const canResolve = Boolean(sectionAccess.canResolveCases && sessionMutationOk);
+  const canDelete = Boolean(sectionAccess.canDeleteCases && sessionMutationOk);
+  const readOnly = (canRead || canReadAll) && !canUpdate;
+
+  return {
+    canCreate,
+    canRead,
+    canReadAll,
+    canUpdate,
+    canResolve,
+    canDelete,
+    canOverrideLockedCaseEdit: Boolean(sectionAccess.canOverrideLockedCaseEdit),
+    canOverrideLockedCaseDelete: Boolean(sectionAccess.canOverrideLockedCaseDelete),
+    readOnly,
+    canEdit: canUpdate
+  };
 }
 
 async function isCaseRoutedToViewer(req, caseRow = null) {
@@ -49,63 +61,34 @@ async function isCaseRoutedToViewer(req, caseRow = null) {
   return sessionStudentCaseRoutingService.isCaseRoutedToPerson(caseRow, personId, policy);
 }
 
-async function applyRoutedCaseCapabilityOverrides(req, capabilities, caseRow = null) {
+async function applyRoutedCaseCapabilityOverrides(req, capabilities, caseRow = null, sectionAccess = null) {
   if (!caseRow) return capabilities;
+  const access = sectionAccess || await loadStudentCaseAccess(req);
+  if (!access.canViewCases) return capabilities;
+
   const isRouted = await isCaseRoutedToViewer(req, caseRow);
   if (!isRouted) return capabilities;
 
   const next = {
     ...capabilities,
     canRead: true,
-    canReadAll: capabilities.canReadAll || true
+    canReadAll: true
   };
-  const canResolveOp = await evaluateOperation(req, OPERATIONS.RESOLVE);
-  if (canResolveOp) {
+  if (access.canResolveCases) {
     next.canResolve = true;
   }
   return next;
 }
 
 async function resolveCaseCapabilities(req, { classData = null, session = null, caseRow = null } = {}) {
-  const [
-    canCreateOp,
-    canReadOp,
-    canReadAllOp,
-    canUpdateOp,
-    canResolveOp,
-    canDeleteOp
-  ] = await Promise.all([
-    evaluateOperation(req, OPERATIONS.CREATE),
-    evaluateOperation(req, OPERATIONS.READ),
-    evaluateOperation(req, OPERATIONS.READ_ALL),
-    evaluateOperation(req, OPERATIONS.UPDATE),
-    evaluateOperation(req, OPERATIONS.RESOLVE),
-    evaluateOperation(req, OPERATIONS.DELETE)
-  ]);
+  const sectionAccess = await loadStudentCaseAccess(req);
+  const sectionContext = studentCaseAccessService.buildStudentCaseSectionAccessContext(req.user, sectionAccess);
+  const sessionMutationOk = resolveSessionMutationOk(req.user, classData, session, sectionContext);
 
-  const sessionMutationOk = resolveSessionMutationOk(req, classData, session);
-
-  const canCreate = canCreateOp && sessionMutationOk;
-  const canUpdate = canUpdateOp && sessionMutationOk;
-  let canResolve = canResolveOp && sessionMutationOk;
-  const canDelete = canDeleteOp && sessionMutationOk;
-  const canRead = canReadOp;
-  const canReadAll = canReadAllOp;
-  const readOnly = (canRead || canReadAll) && !canUpdate;
-
-  let capabilities = {
-    canCreate,
-    canRead,
-    canReadAll,
-    canUpdate,
-    canResolve,
-    canDelete,
-    readOnly,
-    canEdit: canUpdate
-  };
+  let capabilities = mapAccessToCapabilities(sectionAccess, sessionMutationOk);
 
   if (caseRow) {
-    capabilities = await applyRoutedCaseCapabilityOverrides(req, capabilities, caseRow);
+    capabilities = await applyRoutedCaseCapabilityOverrides(req, capabilities, caseRow, sectionAccess);
     capabilities.readOnly = (capabilities.canRead || capabilities.canReadAll) && !capabilities.canUpdate;
     capabilities.canEdit = capabilities.canUpdate;
   }
@@ -114,7 +97,8 @@ async function resolveCaseCapabilities(req, { classData = null, session = null, 
 }
 
 async function resolveListCapabilities(req) {
-  return resolveCaseCapabilities(req);
+  const sectionAccess = await loadStudentCaseAccess(req);
+  return mapAccessToCapabilities(sectionAccess, true);
 }
 
 async function assertCapability(req, capabilities, key, message) {
@@ -132,6 +116,12 @@ async function assertCanRead(req, classData, session, caseRow = null) {
   const capabilities = await resolveCaseCapabilities(req, { classData, session, caseRow });
   if (capabilities.canRead || capabilities.canReadAll) return capabilities;
   throw createDeniedError('You do not have permission to view this student case.');
+}
+
+async function assertCanViewCases(req, classData = null, session = null, caseRow = null) {
+  const capabilities = await resolveCaseCapabilities(req, { classData, session, caseRow });
+  await assertCapability(req, capabilities, 'canReadAll', 'Student case list data requires READ_ALL access.');
+  return capabilities;
 }
 
 async function assertCanUpdate(req, classData, session, caseRow = null) {
@@ -170,11 +160,13 @@ module.exports = {
   resolveListCapabilities,
   assertCanCreate,
   assertCanRead,
+  assertCanViewCases,
   assertCanUpdate,
   assertCanResolve,
   assertCanDelete,
   assertCanSave,
   createDeniedError,
   isCaseRoutedToViewer,
-  applyRoutedCaseCapabilityOverrides
+  applyRoutedCaseCapabilityOverrides,
+  loadStudentCaseAccess
 };

@@ -34,15 +34,17 @@ test('class routes expose session student case endpoints under SCHOOL_SESSION_ST
   assert.match(src, /classCtrl\.updateSessionStudentCaseStatus/);
   assert.match(src, /router\.delete\('\/:id\/sessions\/:sessionId\/cases\/:caseId'/);
   assert.match(src, /classCtrl\.deleteSessionStudentCase/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.READ_ALL\)/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.CREATE\)/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.UPDATE\)/);
-  assert.match(src, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS\.DELETE\)/);
+  assert.match(src, /requireStudentCaseOperation\(OPERATIONS\.READ_ALL\)/);
+  assert.match(src, /requireStudentCaseOperation\(OPERATIONS\.CREATE\)/);
+  assert.match(src, /requireStudentCaseOperation\(OPERATIONS\.UPDATE\)/);
+  assert.match(src, /requireStudentCaseOperation\(OPERATIONS\.DELETE\)/);
   assert.match(src, /requireCaseStatusMutationAccess/);
   assert.match(controller, /studentCaseCapabilities/);
   assert.match(controller, /sessionStudentCaseAccessService/);
   assert.match(controller, /sessionStudentCaseService\.deleteCase/);
-  assert.match(controller, /sessionStudentCaseSummary:\s*sessionStudentCaseService\.summarizeSessionCases\(sessionStudentCases\)/);
+  assert.match(controller, /sessionStudentCaseSummary:\s*sessionStudentCaseService\.summarizeSessionCases\(visibleSessionStudentCases\)/);
+  assert.match(controller, /showStudentCaseAccessAlert/);
+  assert.match(controller, /canViewStudentCaseFields/);
 });
 
 test('session manager renders student cases tab, modal, and avoids attendance duplicate fields', () => {
@@ -212,23 +214,45 @@ test('applyResultFieldsForSave strips resolver-only writes from non-resolvers', 
   assert.equal(allowed.locked, true);
 });
 
-test('locked resolved case permissions require resolve access for edit and delete', () => {
+test('locked resolved case permissions require resolve or admin override', () => {
   const lockedCase = { status: 'resolved', locked: true };
   const unlockedCase = { status: 'resolved', locked: false };
   const editorCaps = { canUpdate: true, canDelete: true, canResolve: false };
   const resolverCaps = { canUpdate: true, canDelete: true, canResolve: true };
+  const adminEditCaps = { canUpdate: true, canDelete: true, canResolve: false, canOverrideLockedCaseEdit: true };
+  const adminDeleteCaps = { canUpdate: false, canDelete: true, canResolve: false, canOverrideLockedCaseDelete: true };
 
   assert.equal(sessionStudentCaseResultVisibilityService.canEditCase(lockedCase, editorCaps), false);
   assert.equal(sessionStudentCaseResultVisibilityService.canDeleteCase(lockedCase, editorCaps), false);
   assert.equal(sessionStudentCaseResultVisibilityService.canEditCase(unlockedCase, editorCaps), true);
   assert.equal(sessionStudentCaseResultVisibilityService.canDeleteCase(unlockedCase, editorCaps), true);
   assert.equal(sessionStudentCaseResultVisibilityService.canEditCase(lockedCase, resolverCaps), true);
-  assert.equal(sessionStudentCaseResultVisibilityService.canDeleteCase(lockedCase, resolverCaps), true);
+  assert.equal(sessionStudentCaseResultVisibilityService.canDeleteCase(lockedCase, resolverCaps), false);
+  assert.equal(sessionStudentCaseResultVisibilityService.canEditCase(lockedCase, adminEditCaps), true);
+  assert.equal(sessionStudentCaseResultVisibilityService.canDeleteCase(lockedCase, adminDeleteCaps), true);
 
   assert.throws(
     () => sessionStudentCaseResultVisibilityService.assertCaseMutationAllowed(lockedCase, editorCaps, { action: 'edit' }),
     /locked/i
   );
+});
+
+test('applyResultFieldsForSave auto-locks resolved and cancelled cases', () => {
+  const resolved = sessionStudentCaseResultVisibilityService.applyResultFieldsForSave({
+    input: {},
+    existing: { status: 'open', locked: false },
+    canManageResultFields: false,
+    nextStatus: 'resolved'
+  });
+  assert.equal(resolved.locked, true);
+
+  const cancelled = sessionStudentCaseResultVisibilityService.applyResultFieldsForSave({
+    input: {},
+    existing: { status: 'in_progress', locked: false },
+    canManageResultFields: false,
+    nextStatus: 'cancelled'
+  });
+  assert.equal(cancelled.locked, true);
 });
 
 test('reopening a locked case clears locked flag on save', () => {
@@ -290,7 +314,7 @@ test('session student case delete removes its source task and scoped case record
   }
 });
 
-test('deleteCase rejects locked resolved case without resolve access', async () => {
+test('deleteCase rejects locked resolved case without admin delete override', async () => {
   const originals = {
     getById: schoolRepositories.sessionStudentCases.getById
   };
@@ -309,7 +333,7 @@ test('deleteCase rejects locked resolved case without resolve access', async () 
         sessionId: 'SES-1',
         caseId: 'SSC-LOCKED',
         reqUser: { id: 'USR-1', activeOrgId: '900000' },
-        capabilities: { canDelete: true, canResolve: false }
+        capabilities: { canDelete: true, canResolve: true, canOverrideLockedCaseDelete: false }
       }),
       /locked/i
     );

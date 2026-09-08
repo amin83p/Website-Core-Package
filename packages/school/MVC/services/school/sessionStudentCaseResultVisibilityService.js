@@ -45,22 +45,30 @@ function canManageResultFields(capabilities = {}) {
 }
 
 function canManageLockedField(capabilities = {}) {
-  return capabilities?.canResolve === true;
+  return capabilities?.canResolve === true || capabilities?.canOverrideLockedCaseEdit === true;
+}
+
+function canEditLockedCase(capabilities = {}) {
+  return capabilities?.canResolve === true || capabilities?.canOverrideLockedCaseEdit === true;
+}
+
+function canDeleteLockedCase(capabilities = {}) {
+  return capabilities?.canOverrideLockedCaseDelete === true;
 }
 
 function canEditCase(caseRow = {}, capabilities = {}) {
-  if (isLockedClosedCase(caseRow)) return capabilities?.canResolve === true;
+  if (isLockedClosedCase(caseRow)) return canEditLockedCase(capabilities);
   return capabilities?.canUpdate === true || capabilities?.canEdit === true;
 }
 
 function canDeleteCase(caseRow = {}, capabilities = {}) {
-  if (isLockedClosedCase(caseRow)) return capabilities?.canResolve === true;
+  if (isLockedClosedCase(caseRow)) return canDeleteLockedCase(capabilities);
   return capabilities?.canDelete === true;
 }
 
 function canReopenCase(caseRow = {}, capabilities = {}) {
   if (!isClosedCaseStatus(caseRow?.status)) return false;
-  if (isLockedClosedCase(caseRow)) return capabilities?.canResolve === true;
+  if (isLockedClosedCase(caseRow)) return canEditLockedCase(capabilities);
   return capabilities?.canUpdate === true || capabilities?.canEdit === true;
 }
 
@@ -116,9 +124,12 @@ function applyResultFieldsForSave({
       };
     })();
 
-  if (status === 'resolved' || status === 'cancelled') {
-    if (!canManage && !Object.prototype.hasOwnProperty.call(input || {}, 'locked')) {
-      base.locked = existing?.locked === true;
+  if (reopening) {
+    base.locked = false;
+  } else if (status === 'resolved' || status === 'cancelled') {
+    const hasLocked = Object.prototype.hasOwnProperty.call(input || {}, 'locked');
+    if (!(canManage && hasLocked)) {
+      base.locked = true;
     }
   } else if (!isClosedCaseStatus(status)) {
     base.locked = false;
@@ -129,11 +140,15 @@ function applyResultFieldsForSave({
 
 function assertCaseMutationAllowed(existing = null, capabilities = {}, { action = 'edit' } = {}) {
   if (!existing || !isLockedClosedCase(existing)) return;
-  if (capabilities?.canResolve === true) return;
+  if (action === 'delete') {
+    if (canDeleteLockedCase(capabilities)) return;
+  } else if (canEditLockedCase(capabilities)) {
+    return;
+  }
   const messages = {
-    edit: 'This resolved case is locked. Only users with resolve access can modify it.',
-    delete: 'This resolved case is locked. Only users with resolve access can delete it.',
-    reopen: 'This resolved case is locked. Only users with resolve access can reopen it.'
+    edit: 'This resolved case is locked. Only users with resolve access or admin override can modify it.',
+    delete: 'This resolved case is locked. Only users with admin delete override can remove it.',
+    reopen: 'This resolved case is locked. Only users with resolve access or admin override can reopen it.'
   };
   const error = new Error(messages[action] || messages.edit);
   error.statusCode = 403;

@@ -80,7 +80,7 @@ router.post('/manage/api/import/apply',
 
 router.post('/manage/api/import/execution/plan',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, { keepActive: true }),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
   ctrl.planTimesheetImportExecution);
 
 router.post('/manage/api/import/execution/perform',

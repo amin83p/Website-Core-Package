@@ -14,6 +14,8 @@ const schoolDependencyService = require('../MVC/services/school/schoolDependency
 const timesheetManualMaterializationService = require('../MVC/services/school/timesheetManualMaterializationService');
 const taskService = require('../MVC/services/school/taskService');
 const timesheetImportWorkSessionBuilderService = require('../MVC/services/school/timesheetImportWorkSessionBuilderService');
+const schoolRepositories = require('../MVC/repositories/school');
+const { sanitizeLegacyImport, sanitizeTimesheetPayload } = require('../MVC/models/school/timesheetModel');
 
 const ROOT = path.resolve(__dirname, '../../..');
 const REQ_USER = { id: 'USER_1', activeOrgId: 'ORG_1' };
@@ -56,6 +58,7 @@ function stubLegacyImportApplyDeps({
     addData: dataService.addData,
     updateData: dataService.updateData,
     deleteData: dataService.deleteData,
+    purgeRepo: schoolRepositories.timesheets.maintenancePurgeById,
     prepare: timesheetImportLifecycleService.prepareImportTargetPayload,
     finalize: timesheetImportLifecycleService.finalizeImportTargetAfterSave,
     unlock: schoolDependencyService.unlockSourcesForTimesheet,
@@ -103,6 +106,11 @@ function stubLegacyImportApplyDeps({
     if (index >= 0) created.splice(index, 1);
     return { entityType, id };
   };
+  schoolRepositories.timesheets.maintenancePurgeById = async (id) => {
+    const index = created.findIndex((row) => row.id === id);
+    if (index >= 0) created.splice(index, 1);
+    return { id };
+  };
   timesheetImportLifecycleService.prepareImportTargetPayload = ({ basePayload }) => ({
     payload: basePayload,
     requiresPostSaveFinalization: false,
@@ -123,6 +131,7 @@ function stubLegacyImportApplyDeps({
       dataService.addData = originals.addData;
       dataService.updateData = originals.updateData;
       dataService.deleteData = originals.deleteData;
+      schoolRepositories.timesheets.maintenancePurgeById = originals.purgeRepo;
       timesheetImportLifecycleService.prepareImportTargetPayload = originals.prepare;
       timesheetImportLifecycleService.finalizeImportTargetAfterSave = originals.finalize;
       schoolDependencyService.unlockSourcesForTimesheet = originals.unlock;
@@ -143,17 +152,23 @@ function stubLegacyImportDeleteDeps({
     getById: dataService.getDataById,
     getTimesheet: dataService.getTimesheetByPeriodAndTeacher,
     updateData: dataService.updateData,
-    deleteData: dataService.deleteData,
+    purgeRepo: schoolRepositories.timesheets.maintenancePurgeById,
     unlock: schoolDependencyService.unlockSourcesForTimesheet,
     revert: timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet,
     revertEntry: timesheetManualMaterializationService.revertMaterializedActivityManualEntry,
-    removeBatch: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId
+    removeBatch: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId,
+    removeEntryIds: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds,
+    removeTarget: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget,
+    removeTracked: timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod
   };
   const store = Object.fromEntries(
     Object.entries(existingByPeriod).map(([periodId, row]) => [periodId, { ...row }])
   );
   const activityUpdates = [];
   const batchRemovals = [];
+  const entryIdRemovals = [];
+  const targetRemovals = [];
+  const trackedRemovals = [];
 
   timesheetImportPolicyModel.getPolicyForOrg = async () => policy;
   dataService.getDataById = async (entityType, id) => {
@@ -196,6 +211,28 @@ function stubLegacyImportDeleteDeps({
       removedAssignees: 0
     };
   };
+  timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds = async (args) => {
+    entryIdRemovals.push(args);
+    return {
+      removedEntries: Array.isArray(args?.entryIds) ? args.entryIds.length : 0,
+      removedAssignees: 0
+    };
+  };
+  timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = async (args) => {
+    targetRemovals.push(args);
+    return {
+      removedEntries: 1,
+      removedAssignees: 0
+    };
+  };
+  timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = async (args) => {
+    trackedRemovals.push(args);
+    return {
+      removedEntries: 1,
+      scannedActivities: 1,
+      cleanedActivities: [{ activityId: args?.importActivityId || 'ACT_IMPORT', removedEntries: 1 }]
+    };
+  };
   dataService.deleteData = async (entityType, id) => {
     if (entityType !== 'timesheets') return { entityType, id };
     Object.keys(store).forEach((periodId) => {
@@ -203,24 +240,64 @@ function stubLegacyImportDeleteDeps({
     });
     return { entityType, id };
   };
+  schoolRepositories.timesheets.maintenancePurgeById = async (id) => {
+    Object.keys(store).forEach((periodId) => {
+      if (store[periodId]?.id === id) delete store[periodId];
+    });
+    return { id };
+  };
 
   return {
     getStore: () => ({ ...store }),
     getActivityUpdates: () => [...activityUpdates],
     getBatchRemovals: () => [...batchRemovals],
+    getEntryIdRemovals: () => [...entryIdRemovals],
+    getTargetRemovals: () => [...targetRemovals],
+    getTrackedRemovals: () => [...trackedRemovals],
     restore: () => {
       timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
       dataService.getDataById = originals.getById;
       dataService.getTimesheetByPeriodAndTeacher = originals.getTimesheet;
       dataService.updateData = originals.updateData;
-      dataService.deleteData = originals.deleteData;
+      schoolRepositories.timesheets.maintenancePurgeById = originals.purgeRepo;
       schoolDependencyService.unlockSourcesForTimesheet = originals.unlock;
       timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet = originals.revert;
       timesheetManualMaterializationService.revertMaterializedActivityManualEntry = originals.revertEntry;
       timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId = originals.removeBatch;
+      timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds = originals.removeEntryIds;
+      timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = originals.removeTarget;
+      timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = originals.removeTracked;
     }
   };
 }
+
+test('sanitizeLegacyImport persists activity-first import trace metadata', () => {
+  const sanitized = sanitizeLegacyImport({
+    activityId: 'ACT_IMPORT',
+    sourceFileName: 'january.xlsx',
+    importedAt: '2026-01-01T00:00:00.000Z',
+    importedBy: 'USER_1',
+    rowCount: 5,
+    matchedPeriodId: 'PER_A',
+    executionMode: 'activity_first',
+    legacyImportBatchId: 'BATCH_1',
+    workSessionEntryIds: ['ENT-ACT_IMPORT-0001', 'ENT-ACT_IMPORT-0002']
+  });
+  assert.equal(sanitized.executionMode, 'activity_first');
+  assert.equal(sanitized.legacyImportBatchId, 'BATCH_1');
+  assert.deepEqual(sanitized.workSessionEntryIds, ['ENT-ACT_IMPORT-0001', 'ENT-ACT_IMPORT-0002']);
+
+  const payload = sanitizeTimesheetPayload({
+    orgId: 'ORG_1',
+    periodId: 'PER_A',
+    teacherId: 'PERSON_1',
+    status: 'processed',
+    entries: [],
+    legacyImport: sanitized
+  });
+  assert.equal(payload.legacyImport.legacyImportBatchId, 'BATCH_1');
+  assert.deepEqual(payload.legacyImport.workSessionEntryIds, ['ENT-ACT_IMPORT-0001', 'ENT-ACT_IMPORT-0002']);
+});
 
 test('buildExistingTimesheetSkipDescriptor includes status and legacy filename', () => {
   const skip = timesheetLegacyImportService.buildExistingTimesheetSkipDescriptor(
@@ -643,7 +720,7 @@ test('deleteLegacyImport removes activity-first imported timesheet and work sess
     assert.equal(outcome.deletedTimesheet, true);
     assert.equal(outcome.timesheetId, '');
     assert.equal(outcome.tsStatus, 'not_started');
-    assert.equal(outcome.importWorkSessionCleanup?.removedEntries, 2);
+    assert.equal(outcome.importWorkSessionCleanup?.removedEntries >= 2, true);
     assert.deepEqual(stub.getBatchRemovals()[0], {
       activityId: 'ACT_IMPORT',
       batchId: 'BATCH_1',
@@ -652,6 +729,422 @@ test('deleteLegacyImport removes activity-first imported timesheet and work sess
     assert.equal(stub.getStore().PER_A, undefined);
   } finally {
     stub.restore();
+  }
+});
+
+test('deleteLegacyImport removes activity-first imported timesheet without batch metadata using fallback cleanup', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_IMPORTED_NO_BATCH',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'processed',
+        entries: [
+          { sessionId: 'act-ACT_IMPORT-ENT-1-PERSON_1', hours: 2 },
+          { sessionId: 'stat-holiday-2026-03-10', hours: 8 }
+        ],
+        legacyImport: {
+          sourceFileName: 'august.xlsx',
+          importedAt: '2026-08-01',
+          activityId: 'ACT_IMPORT'
+        },
+        totalHours: 10
+      }
+    }
+  });
+  try {
+    assert.equal(
+      timesheetLegacyImportService.isActivityFirstLegacyImport(stub.getStore().PER_A),
+      true
+    );
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.deletedTimesheet, true);
+    assert.equal(outcome.timesheetId, '');
+    assert.equal(outcome.tsStatus, 'not_started');
+    assert.equal(outcome.hasLegacyImport, false);
+    assert.equal(stub.getStore().PER_A, undefined);
+    assert.equal(stub.getBatchRemovals().length, 0);
+    assert.equal(stub.getTargetRemovals().length, 1);
+    assert.equal(stub.getTrackedRemovals().length, 1);
+    assert.ok(outcome.importWorkSessionCleanup);
+    assert.ok(outcome.importWorkSessionCleanup.removedEntries >= 2);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('deleteLegacyImport removes activity-first work sessions by stored entry ids', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_IMPORTED_ENTRY_IDS',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'processed',
+        entries: [
+          { sessionId: 'act-ACT_IMPORT-ENT-1-PERSON_1', hours: 2 },
+          { sessionId: 'act-ACT_IMPORT-ENT-2-PERSON_1', hours: 3 }
+        ],
+        legacyImport: {
+          sourceFileName: 'august.xlsx',
+          importedAt: '2026-08-01',
+          activityId: 'ACT_IMPORT',
+          executionMode: 'activity_first',
+          workSessionEntryIds: ['ENT-1', 'ENT-2']
+        },
+        totalHours: 5
+      }
+    }
+  });
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.deletedTimesheet, true);
+    assert.equal(stub.getEntryIdRemovals().length, 1);
+    assert.deepEqual(stub.getEntryIdRemovals()[0], {
+      activityId: 'ACT_IMPORT',
+      entryIds: ['ENT-1', 'ENT-2'],
+      reqUser: REQ_USER
+    });
+  } finally {
+    stub.restore();
+  }
+});
+
+test('buildLegacyImportDeleteMessage reports work session cleanup counts', () => {
+  assert.match(timesheetLegacyImportService.buildLegacyImportDeleteMessage({
+    deletedTimesheet: true,
+    importWorkSessionCleanup: { removedEntries: 3 }
+  }), /3 import work sessions removed/);
+  assert.match(timesheetLegacyImportService.buildLegacyImportDeleteMessage({
+    timesheetAlreadyRemoved: true,
+    importWorkSessionCleanup: { removedEntries: 2 }
+  }), /already removed/);
+});
+
+test('deleteLegacyImport recovers orphan import work sessions when timesheet is already gone', async () => {
+  const activityStore = {
+    id: 'ACT_IMPORT',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    title: 'Historical Timesheet Import 2026',
+    entries: [
+      {
+        entryId: 'ENT-1',
+        date: '2026-01-09',
+        legacyImportPersonId: 'PERSON_1',
+        legacyImportPeriodId: 'PER_A',
+        assignees: [{ personId: 'PERSON_1', status: 'attended', paid: true, paidHours: 6 }]
+      },
+      {
+        entryId: 'ENT-2',
+        date: '2026-01-10',
+        legacyImportPersonId: 'PERSON_2',
+        legacyImportPeriodId: 'PER_A',
+        assignees: [{ personId: 'PERSON_2', status: 'attended', paid: true, paidHours: 3 }]
+      }
+    ]
+  };
+  const originals = {
+    getPolicy: timesheetImportPolicyModel.getPolicyForOrg,
+    getById: dataService.getDataById,
+    getTimesheet: dataService.getTimesheetByPeriodAndTeacher,
+    getActivity: activityService.getActivity,
+    updateData: dataService.updateData,
+    listActivities: activityService.listActivities
+  };
+
+  timesheetImportPolicyModel.getPolicyForOrg = async () => POLICY;
+  dataService.getDataById = async (entityType, id) => {
+    if (entityType === 'timesheetPeriods') {
+      return {
+        id,
+        orgId: 'ORG_1',
+        name: id,
+        startDate: '2026-01-01',
+        endDate: '2026-01-15',
+        status: 'open'
+      };
+    }
+    return null;
+  };
+  dataService.getTimesheetByPeriodAndTeacher = async () => null;
+  dataService.updateData = async (entityType, id, payload) => {
+    if (entityType === 'activities') {
+      activityStore.entries = payload.entries;
+      activityStore.locked = payload.locked;
+      return payload;
+    }
+    return payload;
+  };
+  activityService.getActivity = async () => ({
+    ...activityStore,
+    entries: activityStore.entries.map((entry) => ({ ...entry, assignees: entry.assignees.map((row) => ({ ...row })) }))
+  });
+  activityService.listActivities = async () => [{
+    ...activityStore,
+    entries: activityStore.entries.map((entry) => ({ ...entry, assignees: entry.assignees.map((row) => ({ ...row })) }))
+  }];
+
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.hadLegacyImport, true);
+    assert.equal(outcome.timesheetAlreadyRemoved, true);
+    assert.equal(outcome.importWorkSessionCleanup?.removedEntries, 1);
+    assert.equal(activityStore.entries.length, 1);
+    assert.equal(activityStore.entries[0].entryId, 'ENT-2');
+  } finally {
+    timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
+    dataService.getDataById = originals.getById;
+    dataService.getTimesheetByPeriodAndTeacher = originals.getTimesheet;
+    dataService.updateData = originals.updateData;
+    activityService.getActivity = originals.getActivity;
+    activityService.listActivities = originals.listActivities;
+  }
+});
+
+test('deleteLegacyImport removes locked import-stamped work sessions after unlock', async () => {
+  const realRemovers = {
+    removeBatch: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId,
+    removeEntryIds: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds,
+    removeTarget: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget,
+    removeTracked: timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod
+  };
+  const activityStore = {
+    id: 'ACT_IMPORT',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    title: 'Historical Timesheet Import 2026',
+    locked: true,
+    lockReason: 'timesheet_approved',
+    lockedTimesheetId: 'TS_IMPORTED',
+    entries: [
+      {
+        entryId: 'ENT-1',
+        date: '2026-03-01',
+        legacyImportPersonId: 'PERSON_1',
+        legacyImportPeriodId: 'PER_A',
+        legacyImportBatchId: 'BATCH_1',
+        locked: true,
+        lockReason: 'timesheet_approved',
+        lockedTimesheetId: 'TS_IMPORTED',
+        assignees: [{
+          personId: 'PERSON_1',
+          status: 'attended',
+          paid: true,
+          paidHours: 6,
+          legacyImportBatchId: 'BATCH_1',
+          locked: true,
+          lockReason: 'timesheet_approved',
+          lockedTimesheetId: 'TS_IMPORTED'
+        }]
+      }
+    ]
+  };
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_IMPORTED',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        teacherId: 'PERSON_1',
+        status: 'processed',
+        entries: [{ sessionId: 'act-ACT_IMPORT-ENT-1-PERSON_1', hours: 6 }],
+        legacyImport: {
+          sourceFileName: 'march.xlsx',
+          importedAt: '2026-03-01',
+          activityId: 'ACT_IMPORT',
+          legacyImportBatchId: 'BATCH_1',
+          executionMode: 'activity_first'
+        },
+        totalHours: 6
+      }
+    },
+    periods: {
+      PER_A: {
+        id: 'PER_A',
+        orgId: 'ORG_1',
+        name: 'PER_A',
+        startDate: '2026-03-01',
+        endDate: '2026-03-15',
+        status: 'open'
+      }
+    }
+  });
+  const originals = {
+    getActivity: activityService.getActivity,
+    updateData: dataService.updateData,
+    listActivities: activityService.listActivities
+  };
+
+  activityService.getActivity = async () => ({
+    ...activityStore,
+    entries: activityStore.entries.map((entry) => ({
+      ...entry,
+      assignees: entry.assignees.map((row) => ({ ...row }))
+    }))
+  });
+  dataService.updateData = async (entityType, id, payload) => {
+    if (entityType === 'activities') {
+      activityStore.entries = payload.entries;
+      activityStore.locked = payload.locked;
+      delete activityStore.lockReason;
+      delete activityStore.lockedTimesheetId;
+      return payload;
+    }
+    return payload;
+  };
+  activityService.listActivities = async () => [{
+    ...activityStore,
+    entries: activityStore.entries.map((entry) => ({
+      ...entry,
+      assignees: entry.assignees.map((row) => ({ ...row }))
+    }))
+  }];
+  timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId = realRemovers.removeBatch;
+  timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds = realRemovers.removeEntryIds;
+  timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = realRemovers.removeTarget;
+  timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = realRemovers.removeTracked;
+
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.deletedTimesheet, true);
+    assert.equal(activityStore.entries.length, 0);
+    assert.equal(outcome.importWorkSessionCleanup?.removedEntries >= 1, true);
+  } finally {
+    activityService.getActivity = originals.getActivity;
+    dataService.updateData = originals.updateData;
+    activityService.listActivities = originals.listActivities;
+    stub.restore();
+  }
+});
+
+test('deleteLegacyImport recovers orphan import work sessions when activity has invalid over-24h entries', async () => {
+  const realRemovers = {
+    removeBatch: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId,
+    removeEntryIds: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds,
+    removeTarget: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget,
+    removeTracked: timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod
+  };
+  const activityStore = {
+    id: 'ACT_IMPORT',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    title: 'Historical Timesheet Import 2026',
+    entries: [
+      {
+        entryId: 'ENT-ORPHAN-30',
+        date: '2026-01-15',
+        durationHours: 30,
+        assignees: [{ personId: 'PERSON_1', status: 'attended', paid: true, paidHours: 30 }]
+      },
+      {
+        entryId: 'ENT-1',
+        date: '2026-01-09',
+        durationHours: 6,
+        legacyImportPersonId: 'PERSON_1',
+        legacyImportPeriodId: 'PER_A',
+        assignees: [{ personId: 'PERSON_1', status: 'attended', paid: true, paidHours: 6 }]
+      }
+    ]
+  };
+  const originals = {
+    getPolicy: timesheetImportPolicyModel.getPolicyForOrg,
+    getById: dataService.getDataById,
+    getTimesheet: dataService.getTimesheetByPeriodAndTeacher,
+    getActivity: activityService.getActivity,
+    updateData: dataService.updateData,
+    listActivities: activityService.listActivities
+  };
+
+  timesheetImportPolicyModel.getPolicyForOrg = async () => POLICY;
+  dataService.getDataById = async (entityType, id) => {
+    if (entityType === 'timesheetPeriods') {
+      return {
+        id,
+        orgId: 'ORG_1',
+        name: id,
+        startDate: '2026-01-01',
+        endDate: '2026-01-15',
+        status: 'open'
+      };
+    }
+    return null;
+  };
+  dataService.getTimesheetByPeriodAndTeacher = async () => null;
+  dataService.updateData = async (entityType, id, payload) => {
+    if (entityType === 'activities') {
+      activityStore.entries = payload.entries;
+      activityStore.locked = payload.locked;
+      return payload;
+    }
+    return payload;
+  };
+  activityService.getActivity = async () => ({
+    ...activityStore,
+    entries: activityStore.entries.map((entry) => ({ ...entry, assignees: entry.assignees.map((row) => ({ ...row })) }))
+  });
+  activityService.listActivities = async () => [{
+    ...activityStore,
+    entries: activityStore.entries.map((entry) => ({ ...entry, assignees: entry.assignees.map((row) => ({ ...row })) }))
+  }];
+
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.hadLegacyImport, true);
+    assert.ok(outcome.importWorkSessionCleanup?.removedEntries >= 1);
+    assert.equal(activityStore.entries.some((entry) => entry.entryId === 'ENT-1'), false);
+  } finally {
+    timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
+    dataService.getDataById = originals.getById;
+    dataService.getTimesheetByPeriodAndTeacher = originals.getTimesheet;
+    dataService.updateData = originals.updateData;
+    activityService.getActivity = originals.getActivity;
+    activityService.listActivities = originals.listActivities;
+    timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId = realRemovers.removeBatch;
+    timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds = realRemovers.removeEntryIds;
+    timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = realRemovers.removeTarget;
+    timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = realRemovers.removeTracked;
   }
 });
 

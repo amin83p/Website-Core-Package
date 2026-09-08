@@ -19,7 +19,8 @@ const CHAT_OPERATION_BUNDLE = [
   { id: 'OP1012', sessionAttempts: 5, sessionTime: 15, active: true }, // EXPORT
   { id: 'OP1013', sessionAttempts: 5, sessionTime: 15, active: true }, // IMPORT
   { id: 'OP1022', sessionAttempts: 5, sessionTime: 15, active: true }, // DELETE_ALL
-  { id: 'OP1023', sessionAttempts: 5, sessionTime: 15, active: true }  // DOWNLOAD_FILE
+  { id: 'OP1023', sessionAttempts: 5, sessionTime: 15, active: true }, // DOWNLOAD_FILE
+  { id: 'OP1026', sessionAttempts: 5, sessionTime: 15, active: true }  // BROADCAST
 ];
 
 const CHAT_SYMBOL_DOC = {

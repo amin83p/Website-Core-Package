@@ -217,4 +217,124 @@ test('sessionRecordCacheService evaluates idle and absolute expiry', () => {
     idleTimeoutMinutes: 30,
     absoluteExpiry: '2026-08-23T11:00:00.000Z'
   }, now), true);
+
+  assert.equal(sessionRecordCacheService.resolveSessionExpiryReason({
+    lastActivityAt: '2026-08-23T10:00:00.000Z',
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: '2026-08-24T12:00:00.000Z'
+  }, now), 'idle');
+
+  assert.equal(sessionRecordCacheService.resolveSessionExpiryReason({
+    lastActivityAt: '2026-08-23T10:00:00.000Z',
+    idleTimeoutMinutes: 0,
+    absoluteExpiry: '2026-08-24T12:00:00.000Z'
+  }, now), '');
+});
+
+test('loadSessionRecord rechecks database when cached session appears expired', async () => {
+  const sessionId = 'SES_STALE_CACHE';
+  const now = new Date('2026-08-23T12:00:00.000Z');
+  const staleSession = {
+    id: sessionId,
+    lastActivityAt: '2026-08-23T10:00:00.000Z',
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: '2026-08-24T12:00:00.000Z'
+  };
+  const freshSession = {
+    ...staleSession,
+    lastActivityAt: '2026-08-23T11:55:00.000Z'
+  };
+  const originalGetDataById = dataService.getDataById;
+
+  sessionRecordCacheService.clearSessionRecordCache();
+  sessionRecordCacheService.set(sessionId, staleSession);
+  dataService.getDataById = async (entityType, id) => (
+    entityType === 'sessions' && id === sessionId ? { ...freshSession } : null
+  );
+
+  try {
+    const loaded = await sessionEnforcement.loadSessionRecord(sessionId);
+    assert.equal(loaded.lastActivityAt, staleSession.lastActivityAt);
+    const active = await sessionEnforcement.resolveActiveSessionRecord(sessionId, loaded, now);
+    assert.equal(active.lastActivityAt, freshSession.lastActivityAt);
+  } finally {
+    dataService.getDataById = originalGetDataById;
+    sessionRecordCacheService.clearSessionRecordCache();
+  }
+});
+
+test('resolveRefreshedAbsoluteExpiry extends from now and preserves later existing expiry', () => {
+  const sessionService = require('../MVC/services/SessionService');
+  const now = new Date('2026-09-07T14:00:00.000Z');
+  const laterExisting = '2026-09-08T08:00:00.000Z';
+  const refreshed = sessionService.resolveRefreshedAbsoluteExpiry(
+    { absoluteExpiry: laterExisting },
+    { maxDurationMins: 720 },
+    now
+  );
+  assert.equal(refreshed, laterExisting);
+
+  const fromNow = sessionService.resolveRefreshedAbsoluteExpiry(
+    { absoluteExpiry: '2026-09-07T10:00:00.000Z' },
+    { maxDurationMins: 720 },
+    now
+  );
+  assert.equal(fromNow, '2026-09-08T02:00:00.000Z');
+  assert.ok(new Date(fromNow).getTime() > now.getTime());
+});
+
+test('refreshSessionPolicyLimitsForUser bumps activity and avoids past absolute expiry', async () => {
+  const sessionService = require('../MVC/services/SessionService');
+  const sessionRecordCacheService = require('../MVC/services/cache/sessionRecordCacheService');
+  const originals = {
+    fetchData: dataService.fetchData,
+    getDataById: dataService.getDataById,
+    updateData: dataService.updateData,
+    getWebsitePolicy: dataService.getWebsitePolicy
+  };
+  const sessionRow = {
+    id: 'SES_POLICY_REFRESH',
+    userId: 'USR_POLICY',
+    createdAt: '2026-09-07T08:00:00.000Z',
+    lastActivityAt: '2026-09-07T08:05:00.000Z',
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: '2026-09-07T09:00:00.000Z',
+    currentOrgId: 'ORG_1'
+  };
+  let updatedPayload = null;
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    if (entityType === 'sessions' && query.searchFields === 'userId') return [sessionRow];
+    if (entityType === 'accessPolicies') return [];
+    if (entityType === 'orgPolicies') return [];
+    return [];
+  };
+  dataService.getDataById = async (entityType, id) => (
+    entityType === 'users' && id === 'USR_POLICY'
+      ? { id: 'USR_POLICY', activeOrgId: 'ORG_1', primaryOrgId: 'ORG_1' }
+      : null
+  );
+  dataService.updateData = async (entityType, id, payload) => {
+    if (entityType === 'sessions' && id === 'SES_POLICY_REFRESH') {
+      updatedPayload = payload;
+      Object.assign(sessionRow, payload);
+    }
+    return payload;
+  };
+  dataService.getWebsitePolicy = async () => ({
+    sessionControl: { maxSessions: 10, maxDuration: 720, idleTimeout: 120 }
+  });
+
+  try {
+    const result = await sessionService.refreshSessionPolicyLimitsForUser('USR_POLICY');
+    assert.equal(result.refreshed, 1);
+    assert.equal(updatedPayload?.idleTimeoutMinutes, 120);
+    assert.ok(updatedPayload?.lastActivityAt);
+    assert.ok(new Date(updatedPayload.absoluteExpiry).getTime() > Date.now() - 5000);
+    const cached = sessionRecordCacheService.get('SES_POLICY_REFRESH');
+    assert.equal(cached?.lastActivityAt, updatedPayload.lastActivityAt);
+  } finally {
+    Object.assign(dataService, originals);
+    sessionRecordCacheService.clearSessionRecordCache();
+  }
 });

@@ -271,6 +271,23 @@ function copyTimesheetLockFields(source = {}, target = {}) {
   return target;
 }
 
+function pickLegacyImportTraceFields(entry = {}) {
+  const fields = [
+    'legacyImportBatchId',
+    'legacyImportPersonId',
+    'legacyImportPeriodId',
+    'legacyImportSourceFileName',
+    'legacyImportRowIndex'
+  ];
+  const out = {};
+  fields.forEach((field) => {
+    const value = entry?.[field];
+    if (value == null || String(value).trim() === '') return;
+    out[field] = value;
+  });
+  return out;
+}
+
 function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
   const assignees = normalizeActivityAssigneeRows(parseJsonArray(entry.assignees));
   const fallbackAssignees = normalizeActivityAssigneeRows(parseJsonArray(entry.attendees));
@@ -278,6 +295,7 @@ function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
   const endTime = normalizeId(entry.endTime || activity.endTime);
   const durationHours = Number(entry.durationHours || calculateDurationHours(startTime, endTime) || 0);
   return copyTimesheetLockFields(entry, {
+    ...pickLegacyImportTraceFields(entry),
     entryId: normalizeId(entry.entryId || entry.id || `ENTRY-${index + 1}`),
     title: normalizeId(entry.title),
     date: normalizeId(entry.date || entry.activityDate || entry.startDate || activity.date || activity.activityDate || activity.startDate),
@@ -295,6 +313,9 @@ function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
 }
 
 function getActivityEntries(activity = {}) {
+  if (Array.isArray(activity.entries) && activity.entries.length === 0) {
+    return [];
+  }
   const entries = parseJsonArray(activity.entries);
   if (entries.length) {
     return entries.map((entry, index) => normalizeActivityEntry(entry, activity, index));
@@ -341,6 +362,7 @@ function flattenActivityAssignees(entries = []) {
 
 function normalizeActivityRecord(activity = {}) {
   const parsedAttendees = parseJsonArray(activity.attendees);
+  const usesExplicitEntryList = Array.isArray(activity.entries);
   const entries = getActivityEntries(activity);
   const firstEntry = entries[0] || {};
   const attendees = parsedAttendees.length ? normalizeActivityAssigneeRows(parsedAttendees) : flattenActivityAssignees(entries);
@@ -355,13 +377,26 @@ function normalizeActivityRecord(activity = {}) {
   }
   const excludedSet = new Set(excludedPersonIds);
   allowedPersonIds = allowedPersonIds.filter((personId) => !excludedSet.has(personId));
+  const computedTotalDurationHours = Number(entries.reduce((sum, entry) => {
+    return sum + (Number(entry.durationHours) || 0);
+  }, 0).toFixed(2));
   return {
     ...activity,
-    date: activity.date || firstEntry.date || '',
-    startTime: activity.startTime || firstEntry.startTime || '',
-    endTime: activity.endTime || firstEntry.endTime || '',
-    durationHours: Number(activity.durationHours || firstEntry.durationHours || 0),
-    totalDurationHours: Number(activity.totalDurationHours || entries.reduce((sum, entry) => sum + (Number(entry.durationHours) || 0), 0) || 0),
+    date: usesExplicitEntryList
+      ? (firstEntry.date || '')
+      : (activity.date || firstEntry.date || ''),
+    startTime: usesExplicitEntryList
+      ? (firstEntry.startTime || '')
+      : (activity.startTime || firstEntry.startTime || ''),
+    endTime: usesExplicitEntryList
+      ? (firstEntry.endTime || '')
+      : (activity.endTime || firstEntry.endTime || ''),
+    durationHours: usesExplicitEntryList
+      ? (entries.length ? Number(firstEntry.durationHours || 0) : 0)
+      : Number(activity.durationHours || firstEntry.durationHours || 0),
+    totalDurationHours: usesExplicitEntryList
+      ? computedTotalDurationHours
+      : Number(activity.totalDurationHours || computedTotalDurationHours || 0),
     evaluationType: normalizeEvaluationType(activity.evaluationType),
     visibilityScope,
     allowedPersonIds,

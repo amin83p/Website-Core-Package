@@ -96,7 +96,8 @@ const sessionGradebookService = require('../../services/school/sessionGradebookS
 const teachingOutlineSuggestionService = require('../../services/school/teachingOutlineSuggestionService');
 const teachingOutlineCatalogService = require('../../services/school/teachingOutlineCatalogService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
-const { userCanOpenAttendanceMatrix } = require('../../services/school/attendanceMatrixAccessService');
+const { userCanOpenAttendanceMatrix, getAttendanceAccessForRequest } = require('../../services/school/attendanceMatrixAccessService');
+const attendanceAccessService = require('../../services/school/attendanceAccessService');
 const { userCanViewSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
 
 function isSafeChildPath(basePath, targetPath) {
@@ -221,6 +222,22 @@ function resolveAttendanceTimingFieldsForSave(incRec = {}, existRec = {}, sessio
         lateMinutes: clampAttendanceMinuteForSession(incRec.lateMinutes, sessionMinutes),
         earlyLeaveMinutes: clampAttendanceMinuteForSession(incRec.earlyLeaveMinutes, sessionMinutes)
     };
+}
+
+function resolveExcuseAttachmentForRosterMerge(incRec = {}, existRec = {}, canDeleteFiles = false) {
+    if (incRec.excuseAttachment === undefined) {
+        return existRec.excuseAttachment && typeof existRec.excuseAttachment === 'object'
+            ? existRec.excuseAttachment
+            : null;
+    }
+    const incomingAttachment = incRec.excuseAttachment && typeof incRec.excuseAttachment === 'object'
+        ? incRec.excuseAttachment
+        : null;
+    const hadAttachment = existRec.excuseAttachment && typeof existRec.excuseAttachment === 'object';
+    if (!incomingAttachment && hadAttachment && !canDeleteFiles) {
+        return existRec.excuseAttachment;
+    }
+    return incomingAttachment;
 }
 
 function resolveAttendanceExcuseFieldsForSave({ canOverride, incoming = {}, existing = {} }) {
@@ -1319,7 +1336,7 @@ function normalizeSessionContentOrder(raw = []) {
         .filter(Boolean)));
 }
 
-async function cleanupRemovedExcuseAttachments(existingRoster, incomingRoster) {
+async function cleanupRemovedExcuseAttachments(existingRoster, incomingRoster, { canDeleteFiles = false } = {}) {
     const existing = Array.isArray(existingRoster) ? existingRoster : [];
     const incoming = Array.isArray(incomingRoster) ? incomingRoster : [];
     for (const incRec of incoming) {
@@ -1328,6 +1345,9 @@ async function cleanupRemovedExcuseAttachments(existingRoster, incomingRoster) {
         const hadAttachment = existRec.excuseAttachment && typeof existRec.excuseAttachment === 'object';
         const incomingClears = incRec.excuseAttachment !== undefined && !incRec.excuseAttachment;
         if (hadAttachment && incomingClears) {
+            if (!canDeleteFiles) {
+                throw new Error('You do not have permission to delete attendance files.');
+            }
             await schoolFileService.deleteAttachmentFile(existRec.excuseAttachment).catch(() => {});
         }
     }
@@ -3856,7 +3876,7 @@ async function manageSession1(req, res) {
             )
         }));
         const canViewSchoolSettings = await userCanViewSchoolSettings(req.user, req.ip);
-        const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
+        const attendanceAccessSm1 = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
 
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
@@ -3868,7 +3888,12 @@ async function manageSession1(req, res) {
             attendanceMatrixPolicyResolved,
             enabledAttendanceStatuses,
             canViewSchoolSettings,
-            canOpenAttendanceMatrix,
+            canOpenAttendanceMatrix: Boolean(attendanceAccessSm1.canOpenMatrix),
+            canViewAttendanceFields: Boolean(attendanceAccessSm1.canViewRosterFields),
+            canEditAttendanceRoster: Boolean(attendanceAccessSm1.canEditRoster),
+            canUploadAttendanceFiles: Boolean(attendanceAccessSm1.canUploadFiles),
+            canDeleteAttendanceFiles: Boolean(attendanceAccessSm1.canDeleteFiles),
+            showAttendanceAccessAlert: !attendanceAccessSm1.canViewRosterFields,
             user: req.user
         });
     } catch (error) {
@@ -3911,7 +3936,11 @@ async function saveSession1(req, res) {
                 sessionMinutesSave1
             );
             const matrixPolicySave1 = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave1);
-            await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster);
+            const attendanceAccessSave1 = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
+            const canDeleteAttendanceFilesSave1 = Boolean(attendanceAccessSave1.canDeleteFiles);
+            await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster, {
+                canDeleteFiles: canDeleteAttendanceFilesSave1
+            });
             sessions[sessionIndex].roster = incomingRoster.map(incRec => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
@@ -3949,7 +3978,11 @@ async function saveSession1(req, res) {
                     earlyLeaveExcused: excuseFields.earlyLeaveExcused,
                     absenceExcused: excuseFields.absenceExcused,
                     excuseRef: incRec.excuseRef,
-                    excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
+                    excuseAttachment: resolveExcuseAttachmentForRosterMerge(
+                        incRec,
+                        existRec,
+                        canDeleteAttendanceFilesSave1
+                    ),
                     classEffortPercent: incRec.classEffortPercent === undefined
                         ? existingClassEffort
                         : normalizeSessionRatingPercent(incRec.classEffortPercent, null),
@@ -4210,14 +4243,11 @@ async function manageSession(req, res) {
                 statusMap: completedSessionStatusMap
             })
         ]);
-        const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_ATTENDANCES,
-            OPERATIONS.UPDATE,
-            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
-        );
+        const attendanceAccess = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
+        const canOverrideAttendanceEdit = canOverride || Boolean(attendanceAccess.canOverrideSessionLock);
         const canOverrideCompletedSections = Boolean(canOverride);
-        const attendanceEditLocked = !attendanceEditAccess.editable && !canOverrideAttendanceEdit;
+        const attendanceEditLocked = !attendanceAccess.canEditRoster
+            || (!attendanceEditAccess.editable && !canOverrideAttendanceEdit);
         const notesEditLocked = !notesEditAccess.editable && !canOverrideCompletedSections;
         const gradebookEditLocked = !gradebookEditAccess.editable && !canOverrideCompletedSections;
         const conductEditLocked = !conductEditAccess.editable && !canOverrideCompletedSections;
@@ -4275,7 +4305,6 @@ async function manageSession(req, res) {
             sessionReportViewerContext,
             orgPolicyCatalogMs,
             canViewSchoolSettings,
-            canOpenAttendanceMatrix,
             conductRatingScaleResolved,
             autosavePolicyResolved,
             sessionStudentCases,
@@ -4296,7 +4325,6 @@ async function manageSession(req, res) {
             }),
             attendanceMatrixPolicyModel.getPolicyCatalogForOrg(orgIdForPolicies),
             userCanViewSchoolSettings(req.user, req.ip),
-            userCanOpenAttendanceMatrix(req.user, req.ip),
             conductRatingScalePolicyModel.getPolicyForOrg(orgIdForPolicies),
             autosavePolicyModel.getPolicyForOrg(orgIdForPolicies),
             sessionStudentCaseService.listCasesForSession({
@@ -4338,6 +4366,15 @@ async function manageSession(req, res) {
             sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session })
         ]);
         logManageSessionStep(req, 'parallel_context', parallelStart);
+
+        const canViewStudentCaseFields = Boolean(studentCaseCapabilities?.canReadAll);
+        const showStudentCaseAccessAlert = Boolean(
+            studentCaseCapabilities?.canRead
+            && !studentCaseCapabilities?.canReadAll
+        );
+        const visibleSessionStudentCases = canViewStudentCaseFields
+            ? (Array.isArray(sessionStudentCases) ? sessionStudentCases : [])
+            : [];
 
         const assignedOutlineSkillIds = sessionSkillPolicy.selectable
             .filter((skill) => skill.supportsTeachingOutline === true)
@@ -4572,11 +4609,18 @@ async function manageSession(req, res) {
             canToggleCoTeacherEdit,
             attendanceMatrixPolicyResolved,
             enabledAttendanceStatuses,
-            canOpenAttendanceMatrix,
+            canOpenAttendanceMatrix: Boolean(attendanceAccess.canOpenMatrix),
+            canViewAttendanceFields: Boolean(attendanceAccess.canViewRosterFields),
+            canEditAttendanceRoster: Boolean(attendanceAccess.canEditRoster),
+            canUploadAttendanceFiles: Boolean(attendanceAccess.canUploadFiles),
+            canDeleteAttendanceFiles: Boolean(attendanceAccess.canDeleteFiles),
+            showAttendanceAccessAlert: !attendanceAccess.canViewRosterFields,
+            canViewStudentCaseFields,
+            showStudentCaseAccessAlert,
             conductRatingScaleResolved,
             autosavePolicyResolved,
-            sessionStudentCases,
-            sessionStudentCaseSummary: sessionStudentCaseService.summarizeSessionCases(sessionStudentCases),
+            sessionStudentCases: visibleSessionStudentCases,
+            sessionStudentCaseSummary: sessionStudentCaseService.summarizeSessionCases(visibleSessionStudentCases),
             studentCaseDetailPresets: getPresetConfig(),
             gradebookSkills: sessionSkillPolicy.renderCatalog,
             teachingOutlineContext,
@@ -5143,6 +5187,33 @@ async function deleteLinkedMakeupSession(req, res) {
     }
 }
 
+const ATTENDANCE_SESSION_UPLOAD_KINDS = new Set(['excuse', 'attendance', 'comment']);
+
+async function assertSessionFileUploadAccess(req, kind) {
+    const normalizedKind = String(kind || 'file').trim().toLowerCase() || 'file';
+    if (ATTENDANCE_SESSION_UPLOAD_KINDS.has(normalizedKind)) {
+        const attendanceAccess = await getAttendanceAccessForRequest(req.user, req.ip);
+        attendanceAccessService.assertAttendanceAccessFlag(
+            attendanceAccess,
+            'canUploadFiles',
+            'You do not have permission to upload attendance files.'
+        );
+        return;
+    }
+
+    const evaluation = await accessService.evaluateAccess({
+        user: req.user,
+        sectionId: SECTIONS.SCHOOL_SESSIONS,
+        operationId: OPERATIONS.UPDATE,
+        ipAddress: req.ip
+    });
+    if (!evaluation?.allowed) {
+        const error = new Error(evaluation?.reason || 'You do not have permission to upload session files.');
+        error.statusCode = 403;
+        throw error;
+    }
+}
+
 async function uploadSessionFile(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -5150,6 +5221,8 @@ async function uploadSessionFile(req, res) {
         const kind = String(req.body?.kind || 'file').trim() || 'file';
         if (!classId || !sessionId) throw new Error('classId and sessionId are required.');
         if (!req.file) throw new Error('No file was uploaded.');
+
+        await assertSessionFileUploadAccess(req, kind);
 
         const { classData, session } = await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, session, req.user);
@@ -5164,7 +5237,7 @@ async function uploadSessionFile(req, res) {
 
         return res.json({ status: 'success', message: 'File uploaded.', file });
     } catch (error) {
-        return res.status(400).json({ status: 'error', message: error.message });
+        return res.status(error.statusCode || 400).json({ status: 'error', message: error.message });
     }
 }
 
@@ -5918,8 +5991,12 @@ async function saveSession(req, res) {
             );
             const matrixPolicySave = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave);
             const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
+            const attendanceAccessSave = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
+            const canDeleteAttendanceFilesSave = Boolean(attendanceAccessSave.canDeleteFiles);
 
-            await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster);
+            await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster, {
+                canDeleteFiles: canDeleteAttendanceFilesSave
+            });
             originalSession.roster = incomingRoster.map((incRec) => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 if (!incomingPersonId) return null;
@@ -5958,7 +6035,11 @@ async function saveSession(req, res) {
                     earlyLeaveExcused: excuseFields.earlyLeaveExcused,
                     absenceExcused: excuseFields.absenceExcused,
                     excuseRef: incRec.excuseRef,
-                    excuseAttachment: incRec.excuseAttachment === undefined ? (existRec.excuseAttachment || null) : (incRec.excuseAttachment || null),
+                    excuseAttachment: resolveExcuseAttachmentForRosterMerge(
+                        incRec,
+                        existRec,
+                        canDeleteAttendanceFilesSave
+                    ),
                     classEffortPercent: canOverride
                         ? (incRec.classEffortPercent === undefined
                             ? existingClassEffort

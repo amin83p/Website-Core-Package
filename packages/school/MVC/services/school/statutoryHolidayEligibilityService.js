@@ -222,6 +222,55 @@ function resolveExistingOverride(existingEntry = null) {
   return override;
 }
 
+const MAX_STAT_HOLIDAY_PAY_HOURS = 24;
+
+function resolveStatHolidayPayHours({
+  evaluation,
+  existingEntry = null,
+  allowManagerOverride = false
+} = {}) {
+  const override = resolveExistingOverride(existingEntry);
+  const forcePay = override?.forcePay === true;
+  const forceDisqualify = override?.forcePay === false;
+  const shouldPay = (evaluation.qualified && !forceDisqualify) || forcePay;
+  if (!shouldPay) {
+    return { shouldPay: false, hours: 0, blockReason: 'not_qualified' };
+  }
+
+  let hours = evaluation.calculatedHours;
+  if (allowManagerOverride && override && Number.isFinite(Number(override.hours))) {
+    hours = Number(Number(override.hours).toFixed(2));
+  }
+  if (hours > MAX_STAT_HOLIDAY_PAY_HOURS) {
+    return { shouldPay: false, hours, blockReason: 'exceeds_max_payable_hours' };
+  }
+  return { shouldPay: true, hours, blockReason: '' };
+}
+
+function buildStatHolidayWarning({
+  evaluation,
+  existingEntry = null,
+  allowManagerOverride = false,
+  row = null
+}) {
+  if (row) return null;
+  const reasons = [...(Array.isArray(evaluation?.disqualifyReasons) ? evaluation.disqualifyReasons : [])];
+  const payResolution = resolveStatHolidayPayHours({ evaluation, existingEntry, allowManagerOverride });
+  if (payResolution.blockReason === 'exceeds_max_payable_hours') {
+    reasons.push(
+      `Calculated statutory holiday hours (${payResolution.hours}) exceed the maximum payable per day (${MAX_STAT_HOLIDAY_PAY_HOURS}).`
+    );
+  }
+  return {
+    holidayId: evaluation.holidayId,
+    date: evaluation.date,
+    title: evaluation.title,
+    reasons,
+    checks: evaluation.checks,
+    calculatedHours: evaluation.calculatedHours
+  };
+}
+
 function buildStatHolidayRow({
   evaluation,
   personId,
@@ -230,15 +279,11 @@ function buildStatHolidayRow({
 }) {
   const override = resolveExistingOverride(existingEntry);
   const sessionId = buildStatHolidaySessionId(evaluation.holidayId, personId);
-  const forcePay = override?.forcePay === true;
-  const forceDisqualify = override?.forcePay === false;
-  const shouldPay = (evaluation.qualified && !forceDisqualify) || forcePay;
-  if (!shouldPay) return null;
-
-  let hours = evaluation.calculatedHours;
-  if (allowManagerOverride && override && Number.isFinite(Number(override.hours))) {
-    hours = Number(Number(override.hours).toFixed(2));
+  const payResolution = resolveStatHolidayPayHours({ evaluation, existingEntry, allowManagerOverride });
+  if (!payResolution.shouldPay) {
+    return null;
   }
+  const hours = payResolution.hours;
 
   const row = {
     sessionId,
@@ -278,6 +323,7 @@ async function buildStatutoryHolidayTimesheetContext({
   policy,
   holidays = [],
   supplementalEntries = [],
+  supplementalEntryFilter = null,
   existingEntries = [],
   reqUser,
   allowManagerOverride = false
@@ -325,16 +371,19 @@ async function buildStatutoryHolidayTimesheetContext({
       .filter(Boolean)
   );
 
+  const filteredSupplementalEntries = (Array.isArray(supplementalEntries) ? supplementalEntries : [])
+    .filter((entry) => typeof supplementalEntryFilter !== 'function' || supplementalEntryFilter(entry));
+
   const workdayHistory = await buildWorkdayHistory({
     orgId,
     personId,
     endDate: maxHolidayDate,
     lookbackDays,
     reqUser,
-    supplementalEntries
+    supplementalEntries: filteredSupplementalEntries
   });
 
-  const supplementalHoursByDate = buildSupplementalHoursByDate(supplementalEntries);
+  const supplementalHoursByDate = buildSupplementalHoursByDate(filteredSupplementalEntries);
   const existingBySessionId = new Map(
     (Array.isArray(existingEntries) ? existingEntries : [])
       .filter((entry) => entry && entry.isDeleted !== true)
@@ -365,14 +414,13 @@ async function buildStatutoryHolidayTimesheetContext({
       rows.push(row);
       return;
     }
-    warnings.push({
-      holidayId: evaluation.holidayId,
-      date: evaluation.date,
-      title: evaluation.title,
-      reasons: evaluation.disqualifyReasons,
-      checks: evaluation.checks,
-      calculatedHours: evaluation.calculatedHours
+    const warning = buildStatHolidayWarning({
+      evaluation,
+      existingEntry,
+      allowManagerOverride,
+      row
     });
+    if (warning) warnings.push(warning);
   });
 
   return { rows, warnings };

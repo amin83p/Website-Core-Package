@@ -12,6 +12,7 @@ const activityService = require('../MVC/services/school/activityService');
 const dataService = require('../MVC/services/school/schoolDataService');
 const timesheetPayrollContextService = require('../MVC/services/school/timesheetPayrollContextService');
 const timesheetImportLifecycleService = require('../MVC/services/school/timesheetImportLifecycleService');
+const schoolRepositories = require('../MVC/repositories/school');
 
 const REQ_USER = { id: 'USER_1', activeOrgId: 'ORG_1' };
 const POLICY = {
@@ -51,12 +52,14 @@ function stubExecutionDeps({
     getTimesheet: dataService.getTimesheetByPeriodAndTeacher,
     payroll: timesheetPayrollContextService.resolvePayrollPersonContext,
     createSessions: timesheetImportWorkSessionBuilderService.createImportWorkSessions,
+    preCleanSessions: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget,
+    trackedCleanSessions: timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod,
     removeSessions: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId,
     assemble: timesheetLiveAssemblyService.buildImportedTimesheetEntries,
     persist: timesheetLegacyImportService.persistTimesheetPayload,
     prepare: timesheetImportLifecycleService.prepareImportTargetPayload,
     finalize: timesheetImportLifecycleService.finalizeImportTargetAfterSave,
-    deleteData: dataService.deleteData
+    purgeRepo: schoolRepositories.timesheets.maintenancePurgeById
   };
 
   const createdTimesheets = [];
@@ -77,7 +80,9 @@ function stubExecutionDeps({
       };
     }
     if (entityType === 'timesheets') {
-      return createdTimesheets.find((row) => row.id === id) || null;
+      const created = createdTimesheets.find((row) => row.id === id);
+      if (created) return created;
+      return Object.values(existingByPeriod).find((row) => row.id === id) || null;
     }
     return null;
   };
@@ -90,6 +95,15 @@ function stubExecutionDeps({
     defaultRole: payrollRoles[0] || 'teacher',
     roleRecords: {},
     warnings: []
+  });
+  timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = async () => ({
+    removedEntries: 0,
+    removedAssignees: 0
+  });
+  timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = async () => ({
+    removedEntries: 0,
+    scannedActivities: 0,
+    cleanedActivities: []
   });
   timesheetImportWorkSessionBuilderService.createImportWorkSessions = async ({ batchId, compiledRows }) => {
     savedActivityEntries = compiledRows.map((row, index) => ({
@@ -131,12 +145,17 @@ function stubExecutionDeps({
   });
   timesheetLegacyImportService.persistTimesheetPayload = async (payload) => {
     addCounter += 1;
-    const saved = { ...payload, id: `TS_${addCounter}` };
-    createdTimesheets.push(saved);
+    const saved = { ...payload, id: String(payload?.id || '').trim() || `TS_${addCounter}` };
+    const existingIndex = createdTimesheets.findIndex((row) => row.id === saved.id);
+    if (existingIndex >= 0) {
+      createdTimesheets[existingIndex] = saved;
+    } else {
+      createdTimesheets.push(saved);
+    }
     return saved;
   };
-  timesheetImportLifecycleService.prepareImportTargetPayload = ({ basePayload }) => ({
-    payload: basePayload,
+  timesheetImportLifecycleService.prepareImportTargetPayload = ({ basePayload, priorTimesheet = null }) => ({
+    payload: priorTimesheet?.id ? { ...basePayload, id: priorTimesheet.id } : basePayload,
     requiresPostSaveFinalization: true,
     appliedStatus: 'processed'
   });
@@ -146,10 +165,10 @@ function stubExecutionDeps({
     if (index >= 0) createdTimesheets[index] = updated;
     return updated;
   };
-  dataService.deleteData = async (entityType, id) => {
+  schoolRepositories.timesheets.maintenancePurgeById = async (id) => {
     const index = createdTimesheets.findIndex((row) => row.id === id);
     if (index >= 0) createdTimesheets.splice(index, 1);
-    return { entityType, id };
+    return { id };
   };
   activityService.isPersonEligibleForActivity = () => true;
 
@@ -162,12 +181,14 @@ function stubExecutionDeps({
       dataService.getTimesheetByPeriodAndTeacher = originals.getTimesheet;
       timesheetPayrollContextService.resolvePayrollPersonContext = originals.payroll;
       timesheetImportWorkSessionBuilderService.createImportWorkSessions = originals.createSessions;
+      timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = originals.preCleanSessions;
+      timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = originals.trackedCleanSessions;
       timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId = originals.removeSessions;
       timesheetLiveAssemblyService.buildImportedTimesheetEntries = originals.assemble;
       timesheetLegacyImportService.persistTimesheetPayload = originals.persist;
       timesheetImportLifecycleService.prepareImportTargetPayload = originals.prepare;
       timesheetImportLifecycleService.finalizeImportTargetAfterSave = originals.finalize;
-      dataService.deleteData = originals.deleteData;
+      schoolRepositories.timesheets.maintenancePurgeById = originals.purgeRepo;
     }
   };
 }
@@ -183,6 +204,9 @@ test('buildImportExecutionPlan returns performable rows and role selection', asy
     });
     assert.equal(plan.rows.length, 1);
     assert.equal(plan.rows[0].periodId, 'PER_A');
+    assert.equal(plan.rows[0].eligibility, 'ready');
+    assert.equal(plan.readyCount, 1);
+    assert.equal(plan.blockedCount, 0);
     assert.equal(plan.needsRoleSelection.length, 0);
     assert.equal(plan.defaultPersonRole, 'teacher');
   } finally {
@@ -190,7 +214,7 @@ test('buildImportExecutionPlan returns performable rows and role selection', asy
   }
 });
 
-test('buildImportExecutionPlan skips existing timesheets', async () => {
+test('buildImportExecutionPlan returns blocked rows for existing processed timesheets', async () => {
   const stub = stubExecutionDeps({
     existingByPeriod: {
       PER_A: { id: 'TS_EXISTING', status: 'processed', periodId: 'PER_A' }
@@ -203,8 +227,86 @@ test('buildImportExecutionPlan skips existing timesheets', async () => {
       compileResults: [compileOkResult('PER_A')],
       reqUser: REQ_USER
     });
-    assert.equal(plan.rows.length, 0);
+    assert.equal(plan.rows.length, 1);
+    assert.equal(plan.rows[0].eligibility, 'blocked');
+    assert.match(plan.rows[0].blockReason, /delete|clear|processed/i);
+    assert.equal(plan.readyCount, 0);
+    assert.equal(plan.blockedCount, 1);
     assert.equal(plan.skipped.length, 1);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('buildImportExecutionPlan marks draft timesheets as ready', async () => {
+  const stub = stubExecutionDeps({
+    existingByPeriod: {
+      PER_A: { id: 'TS_DRAFT', status: 'draft', periodId: 'PER_A' }
+    }
+  });
+  try {
+    const plan = await executionService.buildImportExecutionPlan({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      compileResults: [compileOkResult('PER_A')],
+      reqUser: REQ_USER
+    });
+    assert.equal(plan.rows.length, 1);
+    assert.equal(plan.rows[0].eligibility, 'ready');
+    assert.equal(plan.rows[0].existingTimesheetId, 'TS_DRAFT');
+    assert.equal(plan.rows[0].existingTimesheetStatus, 'draft');
+    assert.equal(plan.readyCount, 1);
+    assert.equal(plan.blockedCount, 0);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('performImportExecution updates an existing draft instead of rejecting', async () => {
+  const stub = stubExecutionDeps({
+    existingByPeriod: {
+      PER_A: { id: 'TS_DRAFT', status: 'draft', periodId: 'PER_A', teacherId: 'PERSON_1' }
+    }
+  });
+  try {
+    const compileResult = compileOkResult('PER_A');
+    const outcome = await executionService.performImportExecution({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      personRole: 'teacher',
+      compileResult,
+      batchId: 'BATCH_1',
+      reqUser: REQ_USER
+    });
+    assert.equal(outcome.steps.processed.status, 'success');
+    const saved = stub.getCreatedTimesheets()[0];
+    assert.equal(saved.id, 'TS_DRAFT');
+    assert.equal(saved.status, 'processed');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('performImportExecution rejects processed existing timesheets', async () => {
+  const stub = stubExecutionDeps({
+    existingByPeriod: {
+      PER_A: { id: 'TS_EXISTING', status: 'processed', periodId: 'PER_A', teacherId: 'PERSON_1' }
+    }
+  });
+  try {
+    await assert.rejects(
+      () => executionService.performImportExecution({
+        orgId: 'ORG_1',
+        personId: 'PERSON_1',
+        periodId: 'PER_A',
+        personRole: 'teacher',
+        compileResult: compileOkResult('PER_A'),
+        batchId: 'BATCH_1',
+        reqUser: REQ_USER
+      }),
+      (error) => error.statusCode === 409
+    );
   } finally {
     stub.restore();
   }

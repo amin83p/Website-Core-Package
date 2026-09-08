@@ -23,12 +23,13 @@ test('direct static reads are blocked only for chat upload folders', () => {
   assert.equal(chatAttachmentAccessService.isProtectedChatUploadPath('/GLOBAL/chat-assets/logo.png'), false);
 });
 
-test('chat routes declare separate READ_ALL list and DOWNLOAD_FILE attachment gates', () => {
+test('chat routes declare separate READ inbox, READ_ALL history, and scoped list gates', () => {
   const source = fs.readFileSync(path.join(ROOT_DIR, 'MVC/routes/chatRoutes.js'), 'utf8');
 
+  assert.match(source, /router\.get\('\/conversations',\s*requireChatAccessAny\(OPERATIONS\.READ,\s*OPERATIONS\.READ\)/);
+  assert.match(source, /router\.get\('\/messages\/:convId',\s*requireChatAccessAny\(OPERATIONS\.READ_ALL,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(source, /router\.get\('\/list',\s*requireChatAccessAny\(\[OPERATIONS\.READ,\s*OPERATIONS\.READ_ALL\],\s*OPERATIONS\.READ\)/);
   assert.match(source, /router\.get\('\/attachments\/:convId\/:fileName',\s*requireChatAccessAny\(OPERATIONS\.DOWNLOAD_FILE\)/);
-  assert.match(source, /router\.get\('\/list',\s*requireChatAccessAny\(OPERATIONS\.READ_ALL\)/);
-  assert.doesNotMatch(source, /requireAccess\(SECTIONS\.CHATS,\s*OPERATIONS\.READ_ALL\)/);
 });
 
 test('app static uploads route delegates chat folder detection before serving files', () => {

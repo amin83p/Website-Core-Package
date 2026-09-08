@@ -554,11 +554,9 @@
             <thead class="table-light">
               <tr>
                 <th>File</th>
-                <th>Person</th>
                 <th>Period</th>
-                <th>Creating Work Sessions</th>
-                <th>Creating the timesheet</th>
-                <th>Making the timesheet processed</th>
+                <th>Work Sessions</th>
+                <th>Timesheet</th>
                 <th class="text-end">Action</th>
               </tr>
             </thead>
@@ -859,7 +857,9 @@
       void deleteLegacyImport(
         deleteImportBtn.getAttribute('data-delete-import-person'),
         deleteImportBtn.getAttribute('data-delete-import-name') || '',
-        deleteImportBtn.getAttribute('data-delete-import-file') || ''
+        deleteImportBtn.getAttribute('data-delete-import-file') || '',
+        deleteImportBtn.getAttribute('data-delete-import-orphan') === '1',
+        deleteImportBtn.getAttribute('data-delete-import-session-count') || '0'
       );
       return;
     }
@@ -874,7 +874,10 @@
     const menuId = 'timesheet-manage-' + personId;
     const showLateSubmission = CAN_ALLOW_LATE_SUBMISSION && row?.canOpenLateSubmission === true;
     const showPrint = CAN_PRINT_MANAGED_TIMESHEETS && isPrintableRow(row);
-    const showDeleteImport = CAN_IMPORT_TIMESHEETS && row?.hasLegacyImport === true;
+    const showDeleteImport = CAN_IMPORT_TIMESHEETS && (row?.hasLegacyImport === true || row?.hasOrphanImportWorkSessions === true);
+    const deleteImportLabel = row?.hasLegacyImport === true
+      ? 'Delete imported file'
+      : 'Clean import work sessions';
     const menuItems = [
       '<a href="' + escapeHtml(row.openUrl) + '" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">',
       '<i class="bi bi-box-arrow-up-right me-2"></i>Open Timesheet',
@@ -892,8 +895,8 @@
     }
     if (showDeleteImport) {
       menuItems.push(
-        '<button type="button" class="btn btn-outline-danger btn-sm mt-1" data-delete-import-person="' + escapeHtml(personId) + '" data-delete-import-name="' + escapeHtml(row.name || personId) + '" data-delete-import-file="' + escapeHtml(row.legacyImportFileName || 'imported file') + '">',
-        '<i class="bi bi-trash me-2"></i>Delete imported file',
+        '<button type="button" class="btn btn-outline-danger btn-sm mt-1" data-delete-import-person="' + escapeHtml(personId) + '" data-delete-import-name="' + escapeHtml(row.name || personId) + '" data-delete-import-file="' + escapeHtml(row.legacyImportFileName || 'imported file') + '" data-delete-import-orphan="' + (row?.hasOrphanImportWorkSessions === true && row?.hasLegacyImport !== true ? '1' : '0') + '" data-delete-import-session-count="' + escapeHtml(String(row.orphanImportWorkSessionCount || 0)) + '">',
+        '<i class="bi bi-trash me-2"></i>' + escapeHtml(deleteImportLabel),
         '</button>'
       );
     }
@@ -2083,6 +2086,9 @@
     const status = String(step?.status || 'pending').toLowerCase();
     const summary = String(step?.summary || '').trim();
     const error = String(step?.error || '').trim();
+    if (status === 'blocked') {
+      return '<div class="ts-import-exec-status is-warning text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>' + escapeHtml(error || summary || 'Blocked') + '</div>';
+    }
     if (status === 'running') {
       return '<div class="ts-import-exec-status is-running"><span class="spinner-border spinner-border-sm me-1"></span>Running...</div>';
     }
@@ -2093,6 +2099,54 @@
       return '<div class="ts-import-exec-status is-error"><i class="bi bi-x-circle me-1"></i>' + escapeHtml(error || summary || 'Failed') + '</div>';
     }
     return '<div class="ts-import-exec-status is-pending text-muted">Pending</div>';
+  }
+
+  function renderImportExecutionTimesheetCell(row) {
+    const steps = row?.steps || {};
+    const parts = [];
+    if (String(row?.overallStatus || '') === 'blocked') {
+      parts.push(renderImportExecutionStepCell({
+        status: 'blocked',
+        summary: '',
+        error: String(row?.blockReason || steps.timesheet?.error || 'Import blocked for this period.').trim()
+      }));
+    } else {
+      parts.push(renderImportExecutionStepCell(steps.timesheet));
+      if (String(steps.processed?.status || 'pending') !== 'pending') {
+        parts.push(renderImportExecutionStepCell(steps.processed));
+      }
+    }
+    if (String(row?.existingTimesheetStatus || '').toLowerCase() === 'draft' && cleanId(row?.existingTimesheetId)) {
+      parts.push(
+        '<a class="btn btn-link btn-sm p-0 mt-1" data-import-exec-open-draft href="'
+        + escapeHtml(buildTimesheetEditorUrl(row.periodId, row.personId))
+        + '" target="_blank" rel="noopener">Open timesheet</a>'
+      );
+    }
+    return parts.join('');
+  }
+
+  function buildImportExecutionConfirmMessage(planPayload = {}) {
+    const rows = Array.isArray(planPayload.rows) ? planPayload.rows : [];
+    const readyCount = Number(planPayload.readyCount);
+    const blockedCount = Number(planPayload.blockedCount);
+    const resolvedReadyCount = Number.isFinite(readyCount)
+      ? readyCount
+      : rows.filter((row) => String(row.eligibility || '') === 'ready').length;
+    const resolvedBlockedCount = Number.isFinite(blockedCount)
+      ? blockedCount
+      : rows.filter((row) => String(row.eligibility || '') === 'blocked').length;
+    if (resolvedReadyCount && resolvedBlockedCount) {
+      return resolvedReadyCount + ' file(s) are ready to import. '
+        + resolvedBlockedCount + ' file(s) are blocked by existing timesheets and will appear in the execution table with Perform disabled. Continue?';
+    }
+    if (resolvedReadyCount) {
+      return 'Run the 3-step import execution for ' + resolvedReadyCount + ' matched period file(s)?';
+    }
+    if (resolvedBlockedCount) {
+      return 'All ' + resolvedBlockedCount + ' matched file(s) are blocked by existing timesheets. Open the execution review to see why Perform is disabled?';
+    }
+    return 'Review the import execution plan for the matched period file(s)?';
   }
 
   function resolveImportExecutionPersonRole(personId) {
@@ -2135,17 +2189,17 @@
     if (!importExecutionTableBody) return;
     importExecutionTableBody.innerHTML = (Array.isArray(importExecutionRows) ? importExecutionRows : []).map((row, index) => {
       const steps = row.steps || {};
+      const isBlocked = String(row.eligibility || '') === 'blocked' || String(row.overallStatus || '') === 'blocked';
       const canPerform = !importExecutionInProgress
+        && !isBlocked
         && String(row.overallStatus || 'pending') === 'pending'
         && importExecutionRoleReady(row.personId);
       return ''
-        + '<tr data-import-exec-index="' + index + '">'
+        + '<tr data-import-exec-index="' + index + '"' + (isBlocked ? ' class="table-warning"' : '') + '>'
         + '<td>' + escapeHtml(row.fileName || '—') + '</td>'
-        + '<td>' + escapeHtml(row.personName || row.personId || '—') + '</td>'
         + '<td>' + escapeHtml(row.periodName || row.periodId || '—') + '</td>'
         + '<td>' + renderImportExecutionStepCell(steps.workSessions) + '</td>'
-        + '<td>' + renderImportExecutionStepCell(steps.timesheet) + '</td>'
-        + '<td>' + renderImportExecutionStepCell(steps.processed) + '</td>'
+        + '<td>' + renderImportExecutionTimesheetCell(row) + '</td>'
         + '<td class="text-end">'
         + '<button type="button" class="btn btn-sm btn-primary" data-import-exec-perform="' + index + '"'
         + (canPerform ? '' : ' disabled')
@@ -2154,9 +2208,16 @@
         + '</tr>';
     }).join('');
     if (btnPerformAllImportExecutions) {
-      const pendingCount = (importExecutionRows || []).filter((row) => String(row.overallStatus || 'pending') === 'pending').length;
-      btnPerformAllImportExecutions.disabled = importExecutionInProgress || !pendingCount
-        || !(importExecutionRows || []).every((row) => String(row.overallStatus || 'pending') !== 'pending' || importExecutionRoleReady(row.personId));
+      const readyCount = (importExecutionRows || []).filter((row) => (
+        String(row.eligibility || '') === 'ready'
+        && String(row.overallStatus || 'pending') === 'pending'
+      )).length;
+      btnPerformAllImportExecutions.disabled = importExecutionInProgress || !readyCount
+        || !(importExecutionRows || []).every((row) => (
+          String(row.eligibility || '') !== 'ready'
+          || String(row.overallStatus || 'pending') !== 'pending'
+          || importExecutionRoleReady(row.personId)
+        ));
     }
     renderImportExecutionAlerts();
   }
@@ -2197,7 +2258,9 @@
 
   async function performImportExecutionRow(rowIndex) {
     const row = importExecutionRows[rowIndex];
-    if (!row || importExecutionInProgress || String(row.overallStatus || 'pending') !== 'pending') return null;
+    if (!row) return null;
+    if (String(row.eligibility || '') === 'blocked' || String(row.overallStatus || '') === 'blocked') return null;
+    if (String(row.overallStatus || 'pending') !== 'pending') return null;
     if (!importExecutionRoleReady(row.personId)) {
       await ensureImportExecutionRoles();
     }
@@ -2260,7 +2323,9 @@
     try {
       await ensureImportExecutionRoles();
       for (let index = 0; index < importExecutionRows.length; index += 1) {
-        if (String(importExecutionRows[index]?.overallStatus || 'pending') !== 'pending') continue;
+        const candidate = importExecutionRows[index];
+        if (String(candidate?.eligibility || '') !== 'ready') continue;
+        if (String(candidate?.overallStatus || 'pending') !== 'pending') continue;
         // eslint-disable-next-line no-await-in-loop
         await performImportExecutionRow(index);
       }
@@ -2325,16 +2390,6 @@
       }
     }
 
-    const existingTimesheetRows = loadedRows.filter((row) => idsEqual(row.personId, personId) && cleanId(row.timesheetId));
-    const replaceMessage = isSinglePeriod
-      ? (existingTimesheetRows.length
-        ? 'A timesheet already exists for this period. Import will be skipped unless you delete or clear the existing timesheet first. Continue?'
-        : 'Run the 3-step import execution for the loaded timesheet period?')
-      : (existingTimesheetRows.length
-        ? 'Some matched periods already have timesheets and will be skipped. Continue importing into periods without an existing timesheet?'
-        : 'Run the 3-step import execution for matched period(s) that do not already have a timesheet?');
-    const confirmed = await uiConfirm(replaceMessage, 'Confirm Import');
-    if (!confirmed) return;
 
     importApplyInProgress = true;
     updateImportReviewConfirmButton();
@@ -2360,26 +2415,37 @@
       }
       applyActionStateFromResult(payload);
       importExecutionPlan = payload;
-      importExecutionRows = (Array.isArray(payload.rows) ? payload.rows : []).map((row) => ({
-        ...row,
-        overallStatus: 'pending',
-        steps: {
-          workSessions: { status: 'pending', summary: '', error: '' },
-          timesheet: { status: 'pending', summary: '', error: '' },
-          processed: { status: 'pending', summary: '', error: '' }
-        }
-      }));
-      if (!importExecutionRows.length) {
-        const skipped = Array.isArray(payload.skipped) ? payload.skipped : [];
-        const skipLines = skipped.map((row) => '<li>' + escapeHtml(row.message || row.fileName || 'Skipped') + '</li>').join('');
+      const planRows = Array.isArray(payload.rows) ? payload.rows : [];
+      if (!planRows.length) {
         await showMessage({
           title: 'Import Execution',
           icon: 'warning',
-          message: 'No files are ready to execute.'
-            + (skipLines ? '<ul class="mb-0 ps-3 mt-2">' + skipLines + '</ul>' : '')
+          message: 'No compiled files matched an app timesheet period for import execution.'
         });
         return;
       }
+
+      const confirmed = await uiConfirm(buildImportExecutionConfirmMessage(payload), 'Confirm Import');
+      if (!confirmed) return;
+
+      importExecutionRows = planRows.map((row) => {
+        const isBlocked = String(row.eligibility || '') === 'blocked';
+        return {
+          ...row,
+          overallStatus: isBlocked ? 'blocked' : 'pending',
+          steps: isBlocked
+            ? {
+              workSessions: { status: 'blocked', summary: '', error: String(row.blockReason || 'Import blocked for this period.').trim() },
+              timesheet: { status: 'blocked', summary: '', error: String(row.blockReason || 'Import blocked for this period.').trim() },
+              processed: { status: 'blocked', summary: '', error: '' }
+            }
+            : {
+              workSessions: { status: 'pending', summary: '', error: '' },
+              timesheet: { status: 'pending', summary: '', error: '' },
+              processed: { status: 'pending', summary: '', error: '' }
+            }
+        };
+      });
       if (cleanId(payload.defaultPersonRole)) {
         importExecutionPersonRoleByPersonId[personId] = cleanId(payload.defaultPersonRole);
       }
@@ -2406,7 +2472,7 @@
     return openImportExecutionModal();
   }
 
-  async function deleteLegacyImport(personId, personName, sourceFileName) {
+  async function deleteLegacyImport(personId, personName, sourceFileName, isOrphanCleanup, orphanSessionCount) {
     if (!CAN_IMPORT_TIMESHEETS) return;
     const targetPersonId = cleanId(personId);
     const periodId = cleanId(loadedPeriod?.id || periodSelect?.value || '');
@@ -2415,10 +2481,12 @@
       return;
     }
     const label = cleanId(sourceFileName) || 'imported file';
-    const confirmed = await uiConfirm(
-      'Remove imported timesheet rows from <b>' + escapeHtml(personName || targetPersonId) + '</b> for this period?<br><span class="small text-muted">Source: ' + escapeHtml(label) + '</span>',
-      'Delete imported file?'
-    );
+    const orphanCount = Number.parseInt(String(orphanSessionCount || '0'), 10) || 0;
+    const confirmMessage = isOrphanCleanup
+      ? 'Remove <b>' + orphanCount + '</b> leftover import work session' + (orphanCount === 1 ? '' : 's') + ' for <b>' + escapeHtml(personName || targetPersonId) + '</b> from the import activity?<br><span class="small text-muted">The imported timesheet for this period is already gone.</span>'
+      : 'Remove imported timesheet rows from <b>' + escapeHtml(personName || targetPersonId) + '</b> for this period?<br><span class="small text-muted">Source: ' + escapeHtml(label) + '</span>';
+    const confirmTitle = isOrphanCleanup ? 'Clean import work sessions?' : 'Delete imported file?';
+    const confirmed = await uiConfirm(confirmMessage, confirmTitle);
     if (!confirmed) return;
 
     const loadingToken = beginLegacyDeleteLoading();
@@ -2436,10 +2504,16 @@
       }
       applyActionStateFromResult(payload);
       await loadRoster();
+      const removedSessions = Number(payload?.importWorkSessionCleanup?.removedEntries || 0);
+      const showWarning = payload?.hadLegacyImport === true
+        && !payload?.timesheetAlreadyRemoved
+        && removedSessions <= 0;
       await showMessage({
-        title: 'Imported Timesheet Removed',
-        icon: 'success',
-        message: escapeHtml(payload.message || 'Imported timesheet rows were removed.')
+        title: isOrphanCleanup ? 'Import Work Sessions Cleaned' : 'Imported Timesheet Removed',
+        icon: showWarning ? 'warning' : 'success',
+        message: escapeHtml(payload.message || (isOrphanCleanup
+          ? 'Import work sessions were removed from the import activity.'
+          : 'Imported timesheet rows were removed.'))
       });
     } catch (error) {
       await showMessage({ title: 'Delete Error', icon: 'error', message: escapeHtml(error.message || String(error)) });
@@ -2560,6 +2634,7 @@
       if (!res.ok || payload.status !== 'success') {
         throw new Error(payload.message || 'Compile request failed.');
       }
+      applyActionStateFromResult(payload);
       importMode = expectedPeriodId ? 'singlePeriod' : 'bulk';
       if (expectedPeriodId) importTargetPeriod = loadedPeriod || importTargetPeriod;
       const setupModal = ensureModalOnBody(importSetupModalEl);

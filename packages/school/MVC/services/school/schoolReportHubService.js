@@ -1101,7 +1101,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     const access = await evaluateModuleAccess(req, {
       label: 'Attendance',
       sectionId: SECTIONS.SCHOOL_ATTENDANCES,
-      operationId: OPERATIONS.UPDATE
+      operationId: OPERATIONS.READ
     });
     if (!access.allowed) {
       const error = new Error('You do not have access to Attendance.');

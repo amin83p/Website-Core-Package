@@ -57,18 +57,27 @@ function parseSafeInt(value, fallback) {
 }
 
 function isSessionExpired(session = {}, now = new Date()) {
+  return Boolean(resolveSessionExpiryReason(session, now));
+}
+
+function resolveEffectiveIdleLimitMs(session = {}) {
+  const idleMins = parseSafeInt(session.idleTimeoutMinutes, 30);
+  if (idleMins <= 0) return null;
+  return idleMins * 60 * 1000;
+}
+
+function resolveSessionExpiryReason(session = {}, now = new Date()) {
   const lastActive = session.lastActivityAt ? new Date(session.lastActivityAt) : null;
   const absoluteExpiry = session.absoluteExpiry ? new Date(session.absoluteExpiry) : null;
-  const idleMins = parseSafeInt(session.idleTimeoutMinutes, 30);
-  const idleLimitMs = idleMins * 60 * 1000;
+  const idleLimitMs = resolveEffectiveIdleLimitMs(session);
 
   if (absoluteExpiry && !Number.isNaN(absoluteExpiry.getTime()) && now > absoluteExpiry) {
-    return true;
+    return 'absolute';
   }
-  if (lastActive && !Number.isNaN(lastActive.getTime()) && (now - lastActive) > idleLimitMs) {
-    return true;
+  if (idleLimitMs && lastActive && !Number.isNaN(lastActive.getTime()) && (now - lastActive) > idleLimitMs) {
+    return 'idle';
   }
-  return false;
+  return '';
 }
 
 module.exports = {
@@ -78,5 +87,7 @@ module.exports = {
   invalidate,
   clearSessionRecordCache,
   isSessionExpired,
+  resolveEffectiveIdleLimitMs,
+  resolveSessionExpiryReason,
   _sessionRecordCache: sessionRecordCache
 };

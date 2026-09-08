@@ -87,7 +87,15 @@ test('filterCasesByAccessScope unions routed category cases for assignment scope
   });
 
   delete require.cache[require.resolve('../MVC/services/school/sessionStudentCaseWorkspaceService')];
+  delete require.cache[require.resolve('../MVC/services/school/studentCaseAccessService')];
   const workspaceService = require('../MVC/services/school/sessionStudentCaseWorkspaceService');
+  const studentCaseAccessService = require('../MVC/services/school/studentCaseAccessService');
+  const originalBuildAccess = studentCaseAccessService.buildStudentCaseAccess;
+  studentCaseAccessService.buildStudentCaseAccess = async () => ({
+    canViewCases: true,
+    canOpenList: true,
+    readAllScopeId: null
+  });
 
   const rows = [
     { id: 'SSC-1', classId: 'CLS-OUT', category: 'behavior', teacherPersonId: 'TEA-OTHER' },
@@ -103,6 +111,7 @@ test('filterCasesByAccessScope unions routed category cases for assignment scope
     const ids = scoped.map((row) => row.id).sort();
     assert.deepEqual(ids, ['SSC-1']);
   } finally {
+    studentCaseAccessService.buildStudentCaseAccess = originalBuildAccess;
     schoolRecordAccessService.resolveAccessFromRequest = originalResolve;
     schoolRecordAccessService.isOrgWideScope = originalIsOrgWide;
     schoolRecordAccessService.isRecordOwnedByUser = originalIsOwned;
@@ -117,11 +126,17 @@ test('routed reviewer with RESOLVE can resolve without session mutation access',
   const routingService = require('../MVC/services/school/sessionStudentCaseRoutingService');
   const securityPath = require.resolve('../../../MVC/services/security/index');
   const accessPath = require.resolve('../MVC/services/school/sessionStudentCaseAccessService');
+  const adminPath = require.resolve('../MVC/services/school/schoolAdminAccessService');
+  const policyPath = require.resolve('../MVC/services/school/studentCaseOperationPolicyService');
+  const builderPath = require.resolve('../MVC/services/school/studentCaseAccessService');
 
   const originalSessionAccessible = schoolRecordAccessService.isSessionAccessible;
   const originalGetPolicy = routingService.getRoutingPolicyForOrg;
   const originalSecurity = require.cache[securityPath];
   const originalAccess = require.cache[accessPath];
+  const originalAdmin = require.cache[adminPath];
+  const originalPolicy = require.cache[policyPath];
+  const originalBuilder = require.cache[builderPath];
 
   schoolRecordAccessService.isSessionAccessible = () => false;
   routingService.getRoutingPolicyForOrg = async () => routingService.normalizePolicyInput({
@@ -133,15 +148,28 @@ test('routed reviewer with RESOLVE can resolve without session mutation access',
     }
   });
 
-  const allowedOps = new Set(['RESOLVE', 'READ']);
+  const allowedOps = new Set(['RESOLVE', 'READ', 'READ_ALL']);
   require.cache[securityPath] = {
     id: securityPath,
     filename: securityPath,
     loaded: true,
     exports: {
-      evaluateAccess: async ({ operationId }) => ({ allowed: allowedOps.has(operationId) })
+      evaluateAccess: async ({ operationId }) => ({
+        allowed: allowedOps.has(operationId),
+        scopeId: 'SCP_DEPT'
+      })
     }
   };
+  require.cache[adminPath] = {
+    id: adminPath,
+    filename: adminPath,
+    loaded: true,
+    exports: {
+      isAdminForRequestAsync: async () => false
+    }
+  };
+  delete require.cache[policyPath];
+  delete require.cache[builderPath];
   delete require.cache[accessPath];
   const accessService = require('../MVC/services/school/sessionStudentCaseAccessService');
 
@@ -155,6 +183,7 @@ test('routed reviewer with RESOLVE can resolve without session mutation access',
       }
     );
     assert.equal(capabilities.canRead, true);
+    assert.equal(capabilities.canReadAll, true);
     assert.equal(capabilities.canResolve, true);
     assert.equal(capabilities.canUpdate, false);
   } finally {
@@ -162,6 +191,12 @@ test('routed reviewer with RESOLVE can resolve without session mutation access',
     routingService.getRoutingPolicyForOrg = originalGetPolicy;
     if (originalSecurity === undefined) delete require.cache[securityPath];
     else require.cache[securityPath] = originalSecurity;
+    if (originalAdmin === undefined) delete require.cache[adminPath];
+    else require.cache[adminPath] = originalAdmin;
+    if (originalPolicy === undefined) delete require.cache[policyPath];
+    else require.cache[policyPath] = originalPolicy;
+    if (originalBuilder === undefined) delete require.cache[builderPath];
+    else require.cache[builderPath] = originalBuilder;
     if (originalAccess === undefined) delete require.cache[accessPath];
     else require.cache[accessPath] = originalAccess;
   }
@@ -178,9 +213,11 @@ test('student case routing routes and admin gate are registered', () => {
   assert.match(routeSource, /router\.post\('\/api\/routing'/);
   assert.match(routeSource, /router\.get\('\/api\/routing\/eligible-persons'/);
   assert.match(routeSource, /requireCaseRoutingAdmin/);
-  assert.match(routeSource, /requireCaseSectionOperationAny\(\[OPERATIONS\.READ, OPERATIONS\.READ_ALL\]\)/);
+  assert.match(routeSource, /router\.get\('\/'[\s\S]*?requireStudentCaseOperation\(OPERATIONS\.READ\)/);
+  assert.doesNotMatch(routeSource, /router\.get\('\/'[\s\S]*?requireCaseSectionOperationAny\(\[OPERATIONS\.READ, OPERATIONS\.READ_ALL\]\)/);
   assert.match(guardSource, /requireCaseRoutingAdmin/);
-  assert.match(guardSource, /isStudentCaseRoutingAdminViewer/);
+  assert.match(guardSource, /buildStudentCaseAccess/);
+  assert.match(guardSource, /canConfigureRouting/);
   assert.match(adminSource, /isStudentCaseRoutingAdminViewer/);
   assert.match(adminSource, /SCHOOL_SESSION_STUDENT_CASES/);
   assert.match(adminSource, /OPERATIONS\.CONFIGURE/);

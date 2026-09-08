@@ -80,7 +80,12 @@
        const headerBuyMeACoffeeText = String(headerBrand.headerBuyMeACoffeeText || 'Buy me a coffee').trim();
        const headerBuyMeACoffeeTitle = String(headerBrand.headerBuyMeACoffeeTitle || 'Support the work - one coffee at a time.').trim();
        const headerChatAccess = (typeof chatAccess !== 'undefined' && chatAccess && typeof chatAccess === 'object') ? chatAccess : {};
-       const canUseHeaderChat = !!(headerChatAccess.canRead || headerChatAccess.canReadAll);
+       const canUseHeaderChat = !!(
+         headerChatAccess.canReadInbox
+         || headerChatAccess.canReadMessageContent
+         || headerChatAccess.canCreate
+         || headerChatAccess.canUpdate
+       );
        const headerTaskManagerAccess = (typeof scheduledTaskManagerAccess !== 'undefined' && scheduledTaskManagerAccess && typeof scheduledTaskManagerAccess === 'object') ? scheduledTaskManagerAccess : {};
        const canUseScheduledTaskManager = headerTaskManagerAccess.canView === true;
        const headerFallbackPublicMenu = [

@@ -255,7 +255,7 @@ test('switchOrganization invalidates cached auth context for the user', async ()
     assert.equal(switched.success, true);
 
     const refreshed = await authService.getUserFromToken(token);
-    assert.equal(userReads, 3);
+    assert.equal(userReads, 4);
     assert.equal(refreshed.activeOrgId, 'ORG_SWITCH');
   } finally {
     Object.assign(dataService, originals);
@@ -315,10 +315,192 @@ test('invalidateAuthContextForAccessProfileId invalidates system and org-local p
     assert.equal(result.userCount, 2);
     assert.equal(authContextCacheService.getCachedAuthContext('USR_SYS', 'SES_1'), null);
     assert.equal(authContextCacheService.getCachedAuthContext('USR_ORG', 'SES_2'), null);
-    assert.equal(authContextCacheService.getCachedAuthContext('USR_NONE', 'SES_3')?.id, 'USR_NONE');
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_NONE', 'SES_3'), null);
   } finally {
     Object.assign(dataService, originals);
     authContextCacheService.clearAuthContextCache();
+  }
+});
+
+test('invalidateAuthContextForAccessProfileId invalidates users with directAccessProfileIds only', async () => {
+  const profileId = 'APF_DIRECT_1';
+  const originals = {
+    fetchData: dataService.fetchData
+  };
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    if (entityType === 'users' && query.searchFields === 'systemAccessProfileId') {
+      return [];
+    }
+    if (entityType === 'users' && !query.searchFields) {
+      return [
+        {
+          id: 'USR_DIRECT',
+          organizations: [{ orgId: 'ORG_1', directAccessProfileIds: [profileId], accessProfileIds: [] }]
+        },
+        {
+          id: 'USR_MANAGED',
+          organizations: [{
+            orgId: 'ORG_1',
+            managedAccessProfiles: [{ profileId }],
+            accessProfileIds: []
+          }]
+        },
+        { id: 'USR_NONE', organizations: [{ orgId: 'ORG_2', directAccessProfileIds: ['OTHER'] }] }
+      ];
+    }
+    return [];
+  };
+
+  authContextCacheService.clearAuthContextCache();
+  authContextCacheService.setCachedAuthContext('USR_DIRECT', 'SES_D', { id: 'USR_DIRECT' });
+  authContextCacheService.setCachedAuthContext('USR_MANAGED', 'SES_M', { id: 'USR_MANAGED' });
+  authContextCacheService.setCachedAuthContext('USR_NONE', 'SES_N', { id: 'USR_NONE' });
+
+  try {
+    const result = await authContextInvalidationService.invalidateAuthContextForAccessProfileId(profileId);
+    assert.equal(result.userCount, 2);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_DIRECT', 'SES_D'), null);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_MANAGED', 'SES_M'), null);
+    assert.equal(authContextCacheService.getCachedAuthContext('USR_NONE', 'SES_N'), null);
+  } finally {
+    Object.assign(dataService, originals);
+    authContextCacheService.clearAuthContextCache();
+  }
+});
+
+test('bumpAccessProfileCacheGeneration invalidates cached auth contexts without deleting keys', () => {
+  authContextCacheService.clearAuthContextCache();
+  authContextCacheService.setCachedAuthContext('USR_GEN', 'SES_1', { id: 'USR_GEN', activeProfile: { id: 'P1' } });
+  assert.ok(authContextCacheService.getCachedAuthContext('USR_GEN', 'SES_1'));
+  authContextCacheService.bumpAccessProfileCacheGeneration();
+  assert.equal(authContextCacheService.getCachedAuthContext('USR_GEN', 'SES_1'), null);
+});
+
+test('invalidateAuthContextForAccessProfileId refreshes session policy limits for affected users', async () => {
+  const profileId = 'APF_REFRESH_1';
+  const sessionService = require('../MVC/services/SessionService');
+  const sessionRecordCacheService = require('../MVC/services/cache/sessionRecordCacheService');
+  const originals = {
+    fetchData: dataService.fetchData,
+    getDataById: dataService.getDataById,
+    updateData: dataService.updateData,
+    getWebsitePolicy: dataService.getWebsitePolicy
+  };
+  const sessionRow = {
+    id: 'SES_REFRESH_1',
+    userId: 'USR_REFRESH',
+    createdAt: '2026-09-07T00:00:00.000Z',
+    lastActivityAt: '2026-09-07T01:00:00.000Z',
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: '2026-09-07T08:00:00.000Z',
+    currentOrgId: 'ORG_1'
+  };
+  let updatedPayload = null;
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    if (entityType === 'users' && query.searchFields === 'systemAccessProfileId') {
+      return [{ id: 'USR_REFRESH', systemAccessProfileId: profileId, activeOrgId: 'ORG_1', primaryOrgId: 'ORG_1' }];
+    }
+    if (entityType === 'users' && !query.searchFields) {
+      return [{ id: 'USR_REFRESH', systemAccessProfileId: profileId, activeOrgId: 'ORG_1', primaryOrgId: 'ORG_1' }];
+    }
+    if (entityType === 'sessions' && query.searchFields === 'userId') {
+      return [sessionRow];
+    }
+    if (entityType === 'accessPolicies') return [];
+    if (entityType === 'orgPolicies') return [];
+    return [];
+  };
+  dataService.getDataById = async (entityType, id) => {
+    if (entityType === 'users' && id === 'USR_REFRESH') {
+      return { id: 'USR_REFRESH', activeOrgId: 'ORG_1', primaryOrgId: 'ORG_1' };
+    }
+    return null;
+  };
+  dataService.updateData = async (entityType, id, payload) => {
+    if (entityType === 'sessions' && id === 'SES_REFRESH_1') {
+      updatedPayload = payload;
+      Object.assign(sessionRow, payload);
+    }
+    return payload;
+  };
+  dataService.getWebsitePolicy = async () => ({
+    sessionControl: { maxSessions: 10, maxDuration: 2880, idleTimeout: 2880 }
+  });
+
+  sessionRecordCacheService.set('SES_REFRESH_1', { ...sessionRow });
+
+  try {
+    const result = await authContextInvalidationService.invalidateAuthContextForAccessProfileId(profileId);
+    assert.equal(result.userCount, 1);
+    assert.equal(result.sessionsRefreshed, 1);
+    assert.equal(updatedPayload?.idleTimeoutMinutes, 2880);
+    assert.ok(updatedPayload?.lastActivityAt);
+    assert.ok(new Date(updatedPayload.absoluteExpiry).getTime() > Date.now() - 5000);
+    const cached = sessionRecordCacheService.get('SES_REFRESH_1');
+    assert.equal(cached?.idleTimeoutMinutes, 2880);
+    assert.equal(cached?.lastActivityAt, updatedPayload.lastActivityAt);
+  } finally {
+    Object.assign(dataService, originals);
+    authContextCacheService.clearAuthContextCache();
+    sessionRecordCacheService.clearSessionRecordCache();
+  }
+});
+
+test('invalidateAuthContextForUser refreshes session policy limits for affected user', async () => {
+  const sessionService = require('../MVC/services/SessionService');
+  const sessionRecordCacheService = require('../MVC/services/cache/sessionRecordCacheService');
+  const originals = {
+    fetchData: dataService.fetchData,
+    getDataById: dataService.getDataById,
+    updateData: dataService.updateData,
+    getWebsitePolicy: dataService.getWebsitePolicy
+  };
+  const sessionRow = {
+    id: 'SES_AUTH_REFRESH',
+    userId: 'USR_AUTH_REFRESH',
+    createdAt: '2026-09-07T08:00:00.000Z',
+    lastActivityAt: '2026-09-07T08:05:00.000Z',
+    idleTimeoutMinutes: 30,
+    absoluteExpiry: '2026-09-07T09:00:00.000Z',
+    currentOrgId: 'ORG_1'
+  };
+  let updateCount = 0;
+
+  dataService.fetchData = async (entityType, query = {}) => {
+    if (entityType === 'sessions' && query.searchFields === 'userId') return [sessionRow];
+    if (entityType === 'accessPolicies') return [];
+    if (entityType === 'orgPolicies') return [];
+    return [];
+  };
+  dataService.getDataById = async (entityType, id) => (
+    entityType === 'users' && id === 'USR_AUTH_REFRESH'
+      ? { id: 'USR_AUTH_REFRESH', activeOrgId: 'ORG_1', primaryOrgId: 'ORG_1' }
+      : null
+  );
+  dataService.updateData = async (entityType, id, payload) => {
+    if (entityType === 'sessions' && id === 'SES_AUTH_REFRESH') {
+      updateCount += 1;
+      Object.assign(sessionRow, payload);
+    }
+    return payload;
+  };
+  dataService.getWebsitePolicy = async () => ({
+    sessionControl: { maxSessions: 10, maxDuration: 720, idleTimeout: 120 }
+  });
+
+  try {
+    authContextCacheService.setCachedAuthContext('USR_AUTH_REFRESH', 'SES_AUTH_REFRESH', { id: 'USR_AUTH_REFRESH' });
+    authContextCacheService.invalidateAuthContextForUser('USR_AUTH_REFRESH');
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(updateCount, 1);
+    assert.equal(sessionRow.idleTimeoutMinutes, 120);
+    assert.ok(sessionRecordCacheService.get('SES_AUTH_REFRESH')?.lastActivityAt);
+  } finally {
+    Object.assign(dataService, originals);
+    authContextCacheService.clearAuthContextCache();
+    sessionRecordCacheService.clearSessionRecordCache();
   }
 });
 

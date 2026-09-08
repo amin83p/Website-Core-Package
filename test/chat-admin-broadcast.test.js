@@ -34,7 +34,7 @@ test('broadcast service enforces global chat admin access', async () => {
       getAccessibleUsers: async () => []
     }, originals);
     stubModule('../MVC/services/chatAccessService', {
-      isGlobalChatAdmin: async () => false
+      isChatBroadcastAdmin: async () => false
     }, originals);
 
     delete require.cache[SERVICE_PATH];
@@ -58,7 +58,7 @@ test('broadcast service fans out direct messages, dedupes recipients, and never 
   const addMessageCalls = [];
   try {
     stubModule('../MVC/services/chatAccessService', {
-      isGlobalChatAdmin: async () => true
+      isChatBroadcastAdmin: async () => true
     }, originals);
     stubModule('../MVC/services/dataService', {
       getAccessibleUsers: async () => [
@@ -119,7 +119,7 @@ test('broadcast recipient search is query-filtered, sorted, and excludes sender/
   try {
     stubModule('../MVC/repositories/chatRepository', {}, originals);
     stubModule('../MVC/services/chatAccessService', {
-      isGlobalChatAdmin: async () => true
+      isChatBroadcastAdmin: async () => true
     }, originals);
     stubModule('../MVC/services/dataService', {
       getAccessibleUsers: async () => [
@@ -156,7 +156,8 @@ test('chat modal shows broadcast trigger only for chat admins', async () => {
       canCreate: true,
       canUpdate: true,
       canDelete: true,
-      canDeleteAll: true
+      canDeleteAll: true,
+      canBroadcast: true
     }
   }, { filename: templatePath, async: true });
   const regularRendered = await ejs.render(template, {

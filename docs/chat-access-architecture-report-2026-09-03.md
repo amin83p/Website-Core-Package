@@ -19,7 +19,7 @@ Chat now translates operation scopes into live Person membership and package-rol
 | --- | --- |
 | Section identifier | `CHATS` |
 | Conversation type | Direct conversation; one reusable conversation is created per same set of participants. |
-| Read model | Participants can read their own history with `READ`; `READ_ALL` can read non-participant history. |
+| Read model | Participants can list conversations with `READ`; message bodies require `READ_ALL`. Non-participant audit reads require scoped `READ_ALL`. |
 | Write model | A participant needs `UPDATE` and must remain eligible under the contact-scope policy. |
 | Contact model | `CREATE` and `UPDATE` use the effective scope: standard user/owner behavior, shared package domain (`DEPARTMENT`), exact package role (`DIVISION`), or active organization membership (`ORGANIZATION`/`ADMIN`). |
 | Attachments | Stored in the global Chat upload area; served only through a permission-checked Chat route. |
@@ -67,7 +67,7 @@ An Access Profile configures a section and its operations. For Chat, the operati
 | Operation access type | `custom` is an explicit operation grant; `full_access` grants the operation and makes it operation-admin level; `full_ban` denies it. |
 | Scope | A scope record ID/name, such as `USER`, `OWNER`, `DEPARTMENT`, `DIVISION`, `ORGANIZATION`, `ADMIN`, or `GLOBAL`. It is returned as `scopeId` from central access evaluation. |
 | Operation admin access | `adminAccess: true` makes the operation an operation-administration grant. An `ADMIN` scope also resolves as operation-admin in the generic authority service. |
-| Limits | The effective access evaluator returns operation limits. Chat passes these through to the request context, but the current Chat controllers do not define Chat-specific numeric limits beyond upload middleware limits. |
+| Limits | The effective access evaluator returns operation limits. Chat enforces docx UPDATE caps through `chatOperationPolicyService` (OWNER: 15 messages / 50 KB; DEPARTMENT/DIVISION: 100 messages / 1 MB) and still honors profile limits when configured. |
 | Profile organization | A profile associated with an organization applies only in that organization context. A profile without an organization may apply more broadly, subject to policy. |
 
 ### Effective Access Precedence
@@ -88,11 +88,11 @@ Only the following generic operations have Chat behavior today.
 
 | Operation | What it enables | Chat-specific condition | Recommended least-privilege assignment |
 | --- | --- | --- |
-| `READ` | Open Chat, list the actor's conversations, and read participant history. | The actor must be a conversation participant. | Standard Chat users. |
-| `READ_ALL` | View the global conversation-management list and read history where the actor is not a participant. | No participant requirement for HTTP history/list management. | Auditors/support staff with a documented need. |
-| `CREATE` | Search eligible contacts and start a direct conversation. | Target must pass current contact-scope eligibility; self-chat is denied. | Users who may initiate conversations. |
-| `UPDATE` | Send text, upload an attachment, and send a real-time message. | Actor must be a participant and still be eligible to message every other participant. | Users who may send messages. |
-| `DOWNLOAD_FILE` | View inline or download a Chat attachment. | Actor must also be able to read the conversation. | Users who need attachment access. |
+| `READ` | Open Chat and list the actor's participant conversations (inbox only). | The actor must be a conversation participant. Does not expose message bodies without `READ_ALL`. `USER` scope is denied. | Standard Chat users at `OWNER` or broader. |
+| `READ_ALL` | View message history (bodies, replies, attachments) and scoped Conversation Management history. | Participant history with `READ_ALL`; non-participant history only within the configured review scope. `USER` scope is denied. | Auditors/support staff with a documented need. |
+| `CREATE` | Search eligible contacts and start a direct conversation. | Target must pass current contact-scope eligibility; self-chat is denied. `USER` scope is denied. | Users who may initiate conversations at `OWNER` or broader. |
+| `UPDATE` | Send text, upload an attachment, and send a real-time message. | Actor must be a conversation participant and remain eligible to message every other participant. `USER` scope is denied. OWNER/DEPARTMENT/DIVISION caps are enforced server-side. | Users who may send messages at `OWNER` or broader. |
+| `DOWNLOAD_FILE` | View inline or download a Chat attachment. | Actor must also be able to read message content (`READ_ALL`) for the conversation. `USER` scope is denied. | Users who need attachment access at `OWNER` or broader. |
 | `DELETE` | Soft-delete authorized messages and, at broader scopes, delete an authorized whole conversation. | `USER`/`OWNER`: own messages only. `DEPARTMENT`, `DIVISION`, `ORGANIZATION`, and `ADMIN`: every participant must be within the live boundary. | Restrict carefully; individual message deletion leaves a visible tombstone. |
 | `DELETE_ALL` | Delete any conversation and use broadcast recipient search/direct-message fan-out. | Global-management check is repeated in the service. | A very small Chat operations-admin group. |
 
@@ -214,16 +214,16 @@ All Chat routes are mounted at `/chat`, require authenticated HTTP access, and u
 
 | Method and route | Initial operation gate | Controller-level protection and behavior |
 | --- | --- | --- |
-| `GET /chat/conversations` | `READ` or `READ_ALL` | Returns only conversations where the requester is a participant. `READ_ALL` does not currently make this inbox global. |
-| `GET /chat/messages/:convId` | `READ` or `READ_ALL` | Participant may read; a user with `READ_ALL` may read a non-participant conversation. Participant reads update last-read state when not paginating older history. |
+| `GET /chat/conversations` | `READ` | Returns only conversations where the requester is a participant. Inbox/list metadata only; message bodies require `READ_ALL`. |
+| `GET /chat/messages/:convId` | `READ_ALL` | Participant or scoped non-participant audit read. Participant reads update last-read state when not paginating older history. |
 | `GET /chat/attachments/:convId/:fileName` | `DOWNLOAD_FILE` | Requires download permission, conversation readability, and a non-deleted message that still references the file. Supports `?download=1` for attachment disposition. |
 | `POST /chat/start` | `CREATE` | Rejects self-chat and requires the selected target to pass contact-scope eligibility. |
 | `GET /chat/users/search` | `CREATE` | Returns up to 20 eligible contacts by default, maximum 50. |
-| `POST /chat/upload` | `UPDATE` | Accepts up to 5 files, then confirms the requester is an eligible conversation participant before returning stored file references. |
+| `POST /chat/upload` | `UPDATE` | Accepts up to 5 files, confirms participant/contact eligibility, and enforces scope UPDATE limits before returning stored file references. |
 | `DELETE /chat/messages/:convId/:messageId` | `DELETE` or `DELETE_ALL` | Atomically authorizes and soft-deletes one message. `USER`/`OWNER` may delete only their own messages; broader scopes use the all-participants boundary. |
 | `POST /chat/messages/bulk-delete` | `DELETE` or `DELETE_ALL` | Accepts `{ messageIds }`. Every message is checked before any write; any invalid/stale ID rejects the entire deletion. |
 | `DELETE /chat/delete/:convId` | `DELETE` or `DELETE_ALL` | Whole-conversation deletion. `USER`/`OWNER` are denied; scoped staff must match every participant; `DELETE_ALL` is global. Existing whole-conversation attachment cleanup is retained. |
-| `GET /chat/list` | `READ_ALL` | Renders the global conversation-management list. |
+| `GET /chat/list` | `READ` or `READ_ALL` | Renders Conversation Management for scoped `READ` list access (DEPARTMENT/DIVISION/ORG/ADMIN). History review on that page still requires scoped `READ_ALL`. |
 | `GET /chat/broadcast/users/search` | `DELETE_ALL` | Re-checks global Chat manager status and lists active recipients, default 50, maximum 200. |
 | `POST /chat/broadcast/:convId` | `DELETE_ALL` | Re-checks global manager status; delivers text/files as direct messages to selected active users. The path parameter is not used to authorize or choose the recipient conversations. |
 
@@ -236,13 +236,13 @@ All Chat routes are mounted at `/chat`, require authenticated HTTP access, and u
 
 ## Real-Time Socket Events
 
-Socket.IO validates the `auth_token` cookie and requires `READ` or `READ_ALL` before connecting. The current token is re-resolved before conversation-level events.
+Socket.IO validates the `auth_token` cookie and requires any effective Chat permission before connecting. The current token is re-resolved before conversation-level events.
 
 | Event | Required Chat condition | Notes |
 | --- | --- | --- |
 | `identify` | Authenticated socket | Supplied user ID is ignored, preventing identity spoofing. |
-| `join_room` | `READ` or `READ_ALL`, but participant-only target check | A `READ_ALL` auditor cannot join a non-participant room through this event because the socket path does not enable global read. HTTP history still permits the audit read. |
-| `send_message` | `UPDATE`, participant, and current contact eligibility | Message sender ID comes from the authenticated socket. Optional `replyToMessageId` is resolved to a server-created reply snapshot. |
+| `join_room` | `READ_ALL` with participant or scoped audit eligibility | Aligns realtime message delivery with message-content permissions. |
+| `send_message` | `UPDATE`, participant, current contact eligibility, and scope UPDATE limits | Message sender ID comes from the authenticated socket. Optional `replyToMessageId` is resolved to a server-created reply snapshot. |
 | `mark_delivered` | Readable participant conversation | Updates message delivery state. |
 | `mark_read` | Readable participant conversation | Updates status; only a participant can update their unread state. |
 | `mark_conversation_read` | Readable participant conversation | Marks the actor's conversation read and emits an unread-state update. |
@@ -303,7 +303,8 @@ These are the remaining safeguards and design decisions after implementing scope
 
 | Priority | Item | Why it matters | Recommended action |
 | --- | --- | --- | --- |
-| High | `READ_ALL` remains global. | Its configured scope label does not narrow the current audit list/history implementation. | Add a dedicated scoped audit operation and resolver before delegating organization/department/division review. |
+| High | Scoped review still lacks immutable audit records. | `READ_ALL` exposes private message history and Conversation Management is now scope-filtered, but review events are not logged. | Record immutable events for list/history/attachment review: actor, operation, scope, target, timestamp, IP/request ID, and outcome. |
+| Medium | One-sided delete remains deferred. | Docx describes per-scope delete visibility; Chat still uses global tombstones. | Implement per-user soft delete only if product policy requires it. |
 | High | `DELETE_ALL` doubles as broadcast permission. | Broadcast is not deletion; a broadcaster receives global destructive authority. | Add a dedicated `BROADCAST` operation, move both broadcast routes/services to it, and retain `DELETE_ALL` only for deletion. |
 | High | Socket message payload includes client-supplied `fileUrl`. | A direct socket caller can submit an arbitrary file reference unless the client/server contract is further constrained elsewhere. | Accept only server-issued attachment IDs/references tied to the conversation and sender; validate before storing. |
 | Medium | Upload is written before controller conversation authorization. | Multer saves the file before `convId`/participant eligibility is checked; the controller cleans up on failure, but authorization-before-write is stronger. | Add a pre-upload conversation authorization middleware that reads/validates `convId` before storage, or use temporary quarantine storage followed by an authorized move. |
@@ -315,7 +316,7 @@ These are the remaining safeguards and design decisions after implementing scope
 
 ## Remaining Scoped-Review Work
 
-Chat now has shared contact/delete scope resolvers. A separate review resolver is still needed if `READ_ALL` must become scoped rather than global:
+Chat now uses `chatOperationPolicyService` for USER-scope denials, split inbox/content flags, scoped Conversation Management filtering, UPDATE limits, and admin bypass through `isAdminForRequestAsync` with `activeOrgId`. Remaining follow-up:
 
 1. Resolve the effective scope definition from the allowed operation.
 2. Resolve the actor's active organization, permitted departments, divisions, user ID, and Person ID from the scope bindings.

@@ -4,9 +4,12 @@ const { idsEqual } = require('../utils/idAdapter');
 
 const dataService = require('../services/dataService'); 
 const chatAccessService = require('../services/chatAccessService');
+const chatOperationPolicyService = require('../services/chatOperationPolicyService');
 const chatContactScopeService = require('../services/chatContactScopeService');
 const chatBroadcastService = require('../services/chatBroadcastService');
 const chatAttachmentAccessService = require('../services/chatAttachmentAccessService');
+const chatPendingAttachmentService = require('../services/chatPendingAttachmentService');
+const chatReviewAuditService = require('../services/chatReviewAuditService');
 const socketService = require('../services/socketService');
 const coreFilesService = require('../services/coreFilesService');
 const fs = require('fs');
@@ -111,18 +114,47 @@ async function loadConversationOrThrow(convId) {
     return conversation;
 }
 
-async function assertCanReadConversation(req, conversation) {
+async function assertCanReadMessageContent(req, conversation) {
     const result = await chatAccessService.canAccessConversation({
         user: req.user,
         conversation,
-        operationIds: [OPERATIONS.READ, OPERATIONS.READ_ALL],
+        operationIds: [OPERATIONS.READ_ALL],
         ipAddress: req.ip,
-        allowGlobalAdmin: true
+        allowGlobalAdmin: true,
+        requireMessageContent: true
     });
     if (!result.allowed) {
-        throw createHttpError(result.reason || 'Conversation is outside your chat access scope.', 403);
+        throw createHttpError(result.reason || 'Message content requires READ_ALL chat access.', 403);
     }
     return result;
+}
+
+async function assertCanReadInbox(req) {
+    const inboxAccess = await chatAccessService.canUseChatOperation(req.user, OPERATIONS.READ, req.ip);
+    if (!inboxAccess.allowed) {
+        throw createHttpError(inboxAccess.reason || 'Chat inbox access requires READ chat access.', 403);
+    }
+    return inboxAccess;
+}
+
+async function assertUpdateWithinLimits(req, conversation, { pendingCount = 1, fileSizeBytes = 0 } = {}) {
+    const updateAccess = await chatAccessService.canUseChatOperation(req.user, OPERATIONS.UPDATE, req.ip);
+    if (!updateAccess.allowed) {
+        throw createHttpError(updateAccess.reason || 'You cannot update this conversation.', 403);
+    }
+    const limitCheck = await chatOperationPolicyService.assertUpdateWithinLimits({
+        user: req.user,
+        conversation,
+        scopeId: updateAccess.scopeId,
+        limits: updateAccess.limits || req.accessLimits || {},
+        pendingCount,
+        fileSizeBytes,
+        countSentMessages: (convId, senderId) => chatRepository.countSentMessagesByUser(convId, senderId)
+    });
+    if (!limitCheck.allowed) {
+        throw createHttpError(limitCheck.reason || 'Update limit reached.', 403);
+    }
+    return { updateAccess, limitCheck };
 }
 
 async function assertCanUpdateConversation(req, conversation) {
@@ -202,19 +234,23 @@ async function enrichConversations(conversations, currentUserId, requestingUser,
 // 1. ADMIN LIST
 exports.listAllChats = async (req, res) => {
     try {
-        const canViewGlobalChatList = await chatAccessService.canReadAllConversations(req.user, req.ip);
-        if (!canViewGlobalChatList.allowed) {
+        const listAccess = await chatAccessService.canManageConversationReviewList(req.user, req.ip);
+        if (!listAccess.allowed) {
             return res.status(403).render('error', {
                 title: 'Access Denied',
-                message: canViewGlobalChatList.reason || 'Global conversation list access requires READ_ALL chat access.',
+                message: listAccess.reason || 'Conversation management list access requires scoped READ chat access.',
                 user: req.user
             });
         }
 
-        const allConvs = await chatRepository.list({
-            query: {},
-            scope: { canViewAll: true }
-        });
+        const allConvs = await chatAccessService.filterReviewConversations(
+            req.user,
+            await chatRepository.list({
+                query: {},
+                scope: { canViewAll: true }
+            }),
+            listAccess.scopeId
+        );
         const allUsers = await dataService.getAccessibleUsers({ isSuperAdmin: true });
         const userMap = new Map(allUsers.map(u => [String(u.id), u]));
 
@@ -254,8 +290,16 @@ exports.listAllChats = async (req, res) => {
             title: 'Conversation Management',
             tableName: 'System Conversations',
             data: enriched,
+            chatAccess: await chatAccessService.buildChatAccess(req.user, req.ip),
             newUrl: '', newLabel: '', includeModal: true, print: true, user: req.user, pagination: null, filters: {}
         });
+
+        await chatReviewAuditService.auditConversationListReview(
+            req.user,
+            req.ip,
+            listAccess.scopeId,
+            { globalRead: chatContactScopeService.normalizeChatScopeMode(listAccess.scopeId) === 'global', outcome: 'success' }
+        );
 
     } catch (err) {
         res.status(500).render('error', { title: 'Error', message: err.message });
@@ -280,10 +324,21 @@ exports.downloadAttachment = async (req, res) => {
 
         // A deleted message removes the attachment reference, so an old URL cannot bypass the tombstone.
         const isActiveAttachment = typeof chatRepository.hasActiveAttachment === 'function'
-            ? await chatRepository.hasActiveAttachment(convId, fileName)
+            ? await chatRepository.hasActiveAttachment(convId, fileName, { viewerUserId: req.user?.id })
             : true;
         if (!isActiveAttachment) {
             return res.status(404).json({ status: 'error', message: 'Attachment not found.' });
+        }
+
+        if (access.globalRead === true || access.participant === false) {
+            await chatReviewAuditService.auditAttachmentReview(
+                req.user,
+                req.ip,
+                convId,
+                fileName,
+                access.downloadAccess?.scopeId || access.readAccess?.scopeId || req.accessScope,
+                { globalRead: access.globalRead === true, outcome: 'success' }
+            );
         }
 
         const attachment = await chatAttachmentAccessService.loadAttachment(convId, fileName);
@@ -301,28 +356,42 @@ exports.downloadAttachment = async (req, res) => {
 // 2. UPLOAD ATTACHMENT
 exports.uploadAttachment = async (req, res) => {
     try {
-        // 1. Validate
         if (!req.files || req.files.length === 0) throw new Error("No files uploaded");
         if (!req.body.convId) throw new Error("Conversation ID missing");
-        const conversation = await loadConversationOrThrow(req.body.convId);
-        await assertCanUpdateConversation(req, conversation);
+        const conversation = req.chatUploadConversation || await loadConversationOrThrow(req.body.convId);
+        if (!req.chatUploadConversation) {
+            await assertCanUpdateConversation(req, conversation);
+        }
+        const totalUploadBytes = (Array.isArray(req.files) ? req.files : [])
+            .reduce((sum, file) => sum + Number(file?.size || 0), 0);
+        await assertUpdateWithinLimits(req, conversation, {
+            pendingCount: Math.max(1, (req.files || []).length),
+            fileSizeBytes: totalUploadBytes
+        });
 
-        // 2. Process
-        // Multer (Middleware) + PathResolver have already saved the files 
-        // to the correct folder. We just need to generate the URLs.
-        
-        const uploadedResults = req.files.map(file => ({
-            status: 'success',
-            // ✅ Derive URL dynamically from the file's actual location
-            url: uploadMiddleware.getStoredFileUrl(file) || uploadMiddleware.getStoredFilePath(file),
-            type: file.mimetype.startsWith('image/') ? 'image' : 'file',
-            originalName: file.originalname
-        }));
+        const uploadedResults = req.files.map(file => {
+            const storedUrl = uploadMiddleware.getStoredFileUrl(file) || uploadMiddleware.getStoredFilePath(file);
+            const fileName = chatAttachmentAccessService.getFileNameFromReference(storedUrl);
+            const secureUrl = chatAttachmentAccessService.getSecureAttachmentUrl(conversation.id, fileName);
+            chatPendingAttachmentService.registerPendingAttachment({
+                convId: conversation.id,
+                senderId: req.user?.id,
+                fileUrl: secureUrl,
+                fileName,
+                sizeBytes: Number(file?.size || 0),
+                type: file.mimetype.startsWith('image/') ? 'image' : 'file'
+            });
+            return {
+                status: 'success',
+                url: secureUrl,
+                type: file.mimetype.startsWith('image/') ? 'image' : 'file',
+                originalName: file.originalname
+            };
+        });
 
         res.json({ status: 'success', files: uploadedResults });
 
     } catch (err) {
-        // Cleanup: If logic fails, try to delete the uploaded files
         if(req.files) {
             await uploadMiddleware.deleteUploadedFiles(req).catch(() => {});
         }
@@ -414,7 +483,8 @@ exports.deleteMessages = async (req, res) => {
         await socketService.emitMessagesDeleted({
             convId,
             messageIds: result.messageIds,
-            deletedByUserId: req.user?.id
+            deletedByUserId: req.user?.id,
+            deletionMode: result.deletionMode || 'two-sided'
         });
         return res.json({ status: 'success', data: result });
     } catch (err) {
@@ -425,6 +495,7 @@ exports.deleteMessages = async (req, res) => {
 // 4. STANDARD ACTIONS (No changes needed here)
 exports.getInbox = async (req, res) => {
     try {
+        await assertCanReadInbox(req);
         const [rawConvs, updateAccess] = await Promise.all([
             chatRepository.getConversationsForUser(req.user.id),
             chatAccessService.canUseChatOperation(req.user, OPERATIONS.UPDATE, req.ip)
@@ -444,7 +515,17 @@ exports.getHistory = async (req, res) => {
     try {
         const convId = req.params.convId;
         const conversation = await loadConversationOrThrow(convId);
-        await assertCanReadConversation(req, conversation);
+        const readAccess = await assertCanReadMessageContent(req, conversation);
+
+        if (readAccess.participant === false || readAccess.globalRead === true) {
+            await chatReviewAuditService.auditConversationHistoryReview(
+                req.user,
+                req.ip,
+                convId,
+                readAccess.scopeId || req.accessScope,
+                { globalRead: readAccess.globalRead === true, outcome: 'success' }
+            );
+        }
 
         const beforeCursor = req.query.before ? String(req.query.before) : '';
         if (!beforeCursor && chatAccessService.conversationHasParticipant(conversation, req.user.id)) {
@@ -457,7 +538,10 @@ exports.getHistory = async (req, res) => {
         };
 
         const [messagePage, writeAccess] = await Promise.all([
-            chatRepository.getMessages(convId, paginationOptions),
+            chatRepository.getMessages(convId, {
+                ...paginationOptions,
+                viewerUserId: req.user?.id
+            }),
             chatAccessService.canAccessConversation({
                 user: req.user,
                 conversation,

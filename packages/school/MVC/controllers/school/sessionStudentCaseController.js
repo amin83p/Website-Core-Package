@@ -3,6 +3,7 @@
 const sessionStudentCaseWorkspaceService = require('../../services/school/sessionStudentCaseWorkspaceService');
 const sessionStudentCaseReviewService = require('../../services/school/sessionStudentCaseReviewService');
 const sessionStudentCaseAccessService = require('../../services/school/sessionStudentCaseAccessService');
+const studentCaseAccessService = require('../../services/school/studentCaseAccessService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const sessionStudentCaseRoutingService = require('../../services/school/sessionStudentCaseRoutingService');
 const sessionStudentCaseResultVisibilityService = require('../../services/school/sessionStudentCaseResultVisibilityService');
@@ -57,6 +58,19 @@ exports.listSessionStudentCases = async (req, res) => {
     const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
     if (query.q === searchDefaultKeyword) query.q = '';
 
+    const sectionAccess = await studentCaseAccessService.buildStudentCaseAccess(req.user, req.ip);
+    const canViewCases = Boolean(sectionAccess.canViewCases);
+    const canOpenList = Boolean(sectionAccess.canOpenList);
+    if (!canOpenList) {
+      return res.status(403).render('error', {
+        title: 'Access Needed',
+        statusCode: 403,
+        message: 'You do not have permission to open Session Student Cases.',
+        user: req.user
+      });
+    }
+    const showStudentCaseAccessAlert = canOpenList && !canViewCases;
+
     const accessContext = schoolDataService.buildRouteAccessContext(req);
     const workspace = await sessionStudentCaseWorkspaceService.listSessionStudentCasesForRequest(req, {
       queryInput: req.query || {},
@@ -65,7 +79,8 @@ exports.listSessionStudentCases = async (req, res) => {
       accessContext
     });
 
-    const { data, pagination } = paginate(workspace.rows, query.page, query.limit);
+    const listRows = canViewCases ? workspace.rows : [];
+    const { data, pagination } = paginate(listRows, query.page, query.limit);
     const rows = data.map((row) => ({
       ...row,
       sessionDateTimeLabel: formatSessionDateTime(row),
@@ -87,7 +102,7 @@ exports.listSessionStudentCases = async (req, res) => {
     );
 
     const caseCapabilities = await sessionStudentCaseAccessService.resolveListCapabilities(req);
-    const canConfigureRouting = sessionStudentCaseRoutingService.isRoutingAdminViewer(req.user);
+    const canConfigureRouting = Boolean(sectionAccess.canConfigureRouting);
 
     if (isAjax(req)) {
       return res.json({ status: 'success', results: rows, pagination });
@@ -112,10 +127,14 @@ exports.listSessionStudentCases = async (req, res) => {
       user: req.user,
       actionStateId: req.actionStateId,
       canCreateCases: caseCapabilities.canCreate,
-      canReadCases: caseCapabilities.canRead || caseCapabilities.canReadAll,
+      canOpenList,
+      canViewCases,
+      showStudentCaseAccessAlert,
+      canReadCases: canViewCases,
       canUpdateCases: caseCapabilities.canUpdate,
       canResolveCases: caseCapabilities.canResolve,
       canDeleteCases: caseCapabilities.canDelete,
+      canOverrideLockedCaseDelete: caseCapabilities.canOverrideLockedCaseDelete,
       canConfigureRouting
     });
   } catch (error) {

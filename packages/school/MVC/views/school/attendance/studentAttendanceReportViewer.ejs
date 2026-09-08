@@ -238,7 +238,7 @@
   ];
   const optionalBtnsBeforePrint = [
     '<button type="button" id="btn_copyReportLink" class="btn btn-outline-primary btn-md me-2 mb-2" title="Copy a shareable link with the current students and date range"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>',
-    '<button type="button" id="btn_exportSar" class="btn btn-filled btn-success btn-md me-2 mb-2"' + (canGenerateReport ? '' : ' disabled') + ' title="Export class and overall attendance reports"><i class="bi bi-cloud-download me-1"></i> Export</button>'
+    '<button type="button" id="btn_exportSar" class="btn btn-filled btn-success btn-md me-2 mb-2"' + ((canGenerateReport && (typeof canExportReport === 'undefined' || canExportReport)) ? '' : ' disabled') + ' title="Export class and overall attendance reports"><i class="bi bi-cloud-download me-1"></i> Export</button>'
   ];
 %>
 
@@ -595,6 +595,7 @@
     const initialStartDate = <%- JSON.stringify(initialStartDate || '') %>;
     const initialEndDate = <%- JSON.stringify(initialEndDate || '') %>;
     const canGenerateReport = <%= (typeof canGenerateReport !== 'undefined' && canGenerateReport) ? 'true' : 'false' %>;
+    const canExportReport = <%= (typeof canExportReport !== 'undefined' && canExportReport) ? 'true' : 'false' %>;
     const sarActionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
 
     let selectedStudents = [];

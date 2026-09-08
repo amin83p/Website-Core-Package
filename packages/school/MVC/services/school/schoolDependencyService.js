@@ -977,6 +977,158 @@ function forceUnlockAllActivityTimesheetLocks({
   return { activity: nextActivity, changed, unlockedEntryIds, skippedLiveLockEntryIds };
 }
 
+function importStampMatchesPersonPeriod(entry = {}, {
+  personId = '',
+  periodId = ''
+} = {}) {
+  const targetPersonId = normalizeId(personId);
+  const targetPeriodId = normalizeId(periodId);
+  if (!targetPersonId) return false;
+
+  const stampedPersonId = normalizeId(entry?.legacyImportPersonId);
+  const stampedPeriodId = normalizeId(entry?.legacyImportPeriodId);
+  if (stampedPersonId && idsEqual(stampedPersonId, targetPersonId)) {
+    if (stampedPeriodId && targetPeriodId && idsEqual(stampedPeriodId, targetPeriodId)) return true;
+    if (stampedPeriodId && !targetPeriodId) return true;
+    if (!stampedPeriodId) return true;
+  }
+
+  return (Array.isArray(entry.assignees) ? entry.assignees : []).some((assignee) => {
+    const assigneePersonId = normalizeId(assignee?.legacyImportPersonId);
+    const assigneePeriodId = normalizeId(assignee?.legacyImportPeriodId);
+    if (!assigneePersonId || !idsEqual(assigneePersonId, targetPersonId)) return false;
+    if (assigneePeriodId && targetPeriodId && idsEqual(assigneePeriodId, targetPeriodId)) return true;
+    if (assigneePeriodId && !targetPeriodId) return true;
+    return !assigneePeriodId;
+  });
+}
+
+function entryDateInImportPeriod(date, periodStartDate = '', periodEndDate = '') {
+  const token = normalizeId(date);
+  const start = normalizeId(periodStartDate);
+  const end = normalizeId(periodEndDate);
+  if (!token) return false;
+  if (start && token < start) return false;
+  if (end && token > end) return false;
+  return true;
+}
+
+function importStampedEntryMatchesTarget(entry = {}, {
+  personId = '',
+  periodId = '',
+  periodStartDate = '',
+  periodEndDate = ''
+} = {}) {
+  const date = normalizeId(entry?.date);
+  if (!date) return false;
+  if (!entryDateInImportPeriod(date, periodStartDate, periodEndDate)) return false;
+  return importStampMatchesPersonPeriod(entry, { personId, periodId });
+}
+
+function forceUnlockImportStampedActivityEntries({
+  activity = {},
+  personId = '',
+  periodId = '',
+  periodStartDate = '',
+  periodEndDate = '',
+  reqUser = null,
+  note = ''
+} = {}) {
+  if (!activity || typeof activity !== 'object') {
+    return { activity, changed: false, unlockedEntryIds: [] };
+  }
+  const unlockedEntryIds = [];
+  let changed = false;
+  const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((entry) => {
+    if (!importStampedEntryMatchesTarget(entry, {
+      personId,
+      periodId,
+      periodStartDate,
+      periodEndDate
+    })) {
+      return entry;
+    }
+    const result = forceClearEntryTimesheetLocks(entry, reqUser, note);
+    if (result.changed) {
+      changed = true;
+      const entryId = normalizeId(entry?.entryId || entry?.id);
+      if (entryId) unlockedEntryIds.push(entryId);
+    }
+    return result.entry;
+  });
+  if (!changed) return { activity, changed: false, unlockedEntryIds: [] };
+  return {
+    activity: recomputeActivityTimesheetLocked(activity, entries),
+    changed: true,
+    unlockedEntryIds
+  };
+}
+
+function forceUnlockImportBatchActivityEntries({
+  activity = {},
+  batchId = '',
+  reqUser = null,
+  note = ''
+} = {}) {
+  const targetBatchId = normalizeId(batchId);
+  if (!activity || typeof activity !== 'object' || !targetBatchId) {
+    return { activity, changed: false, unlockedEntryIds: [] };
+  }
+  const unlockedEntryIds = [];
+  let changed = false;
+  const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((entry) => {
+    const entryBatchId = normalizeId(entry?.legacyImportBatchId);
+    const assigneeBatch = (Array.isArray(entry.assignees) ? entry.assignees : [])
+      .some((assignee) => idsEqual(assignee?.legacyImportBatchId, targetBatchId));
+    if (!idsEqual(entryBatchId, targetBatchId) && !assigneeBatch) return entry;
+    const result = forceClearEntryTimesheetLocks(entry, reqUser, note);
+    if (result.changed) {
+      changed = true;
+      const entryId = normalizeId(entry?.entryId || entry?.id);
+      if (entryId) unlockedEntryIds.push(entryId);
+    }
+    return result.entry;
+  });
+  if (!changed) return { activity, changed: false, unlockedEntryIds: [] };
+  return {
+    activity: recomputeActivityTimesheetLocked(activity, entries),
+    changed: true,
+    unlockedEntryIds
+  };
+}
+
+function forceUnlockActivityEntryIdsTimesheetLocks({
+  activity = {},
+  entryIds = [],
+  reqUser = null,
+  note = ''
+} = {}) {
+  const targetEntryIds = new Set(
+    (Array.isArray(entryIds) ? entryIds : []).map(normalizeId).filter(Boolean)
+  );
+  if (!activity || typeof activity !== 'object' || !targetEntryIds.size) {
+    return { activity, changed: false, unlockedEntryIds: [] };
+  }
+  const unlockedEntryIds = [];
+  let changed = false;
+  const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((entry) => {
+    const entryId = normalizeId(entry?.entryId || entry?.id);
+    if (!entryId || !targetEntryIds.has(entryId)) return entry;
+    const result = forceClearEntryTimesheetLocks(entry, reqUser, note);
+    if (result.changed) {
+      changed = true;
+      unlockedEntryIds.push(entryId);
+    }
+    return result.entry;
+  });
+  if (!changed) return { activity, changed: false, unlockedEntryIds: [] };
+  return {
+    activity: recomputeActivityTimesheetLocked(activity, entries),
+    changed: true,
+    unlockedEntryIds
+  };
+}
+
 async function unlockReportAssignmentsForTimesheet({ timesheetId, reqUser }) {
   const token = normalizeId(timesheetId);
   if (!token) return;
@@ -1348,5 +1500,8 @@ module.exports = {
   listOrphanTimesheetLockedActivityEntries,
   listExistingTimesheetIds,
   forceUnlockActivityEntryTimesheetLocks,
-  forceUnlockAllActivityTimesheetLocks
+  forceUnlockAllActivityTimesheetLocks,
+  forceUnlockImportStampedActivityEntries,
+  forceUnlockImportBatchActivityEntries,
+  forceUnlockActivityEntryIdsTimesheetLocks
 };

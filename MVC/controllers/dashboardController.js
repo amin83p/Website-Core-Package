@@ -81,6 +81,25 @@ async function hasSectionAccess(user, section, allSections, visited = new Set())
     return false;
   }
 
+  const sectionKey = String(section?.name || section?.id || '').trim().toUpperCase();
+  if (sectionKey === 'SCHOOL_ATTENDANCES') {
+    try {
+      const { userCanOpenAttendanceMatrix } = require('../../packages/school/MVC/services/school/attendanceMatrixAccessService');
+      return await userCanOpenAttendanceMatrix(user, '');
+    } catch (_) {
+      // Fall back to generic operation checks when school package is unavailable.
+    }
+  }
+
+  if (sectionKey === 'SCHOOL_SESSION_STUDENT_CASES') {
+    try {
+      const { userCanOpenStudentCaseSection } = require('../../packages/school/MVC/services/school/studentCaseAccessService');
+      return await userCanOpenStudentCaseSection(user, '');
+    } catch (_) {
+      // Fall back to generic operation checks when school package is unavailable.
+    }
+  }
+
   const ops = section.operations || [];
   if (ops.length === 0) return false;
   for (const op of ops) {

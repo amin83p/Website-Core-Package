@@ -1347,13 +1347,19 @@
 
 <div class="sections-page session-manager-page">
     <% const disabledAttr = isReadOnly ? 'disabled' : ''; %>
-    <% const attendanceReadOnly = isReadOnly || (typeof attendanceEditLocked !== 'undefined' && attendanceEditLocked); %>
+    <% const attendanceReadOnly = isReadOnly
+        || (typeof attendanceEditLocked !== 'undefined' && attendanceEditLocked)
+        || (typeof canEditAttendanceRoster !== 'undefined' && !canEditAttendanceRoster); %>
+    <% const attendanceUploadReadOnly = attendanceReadOnly
+        || (typeof canUploadAttendanceFiles !== 'undefined' && !canUploadAttendanceFiles); %>
+    <% const canViewAttendancePanel = typeof canViewAttendanceFields === 'undefined' || canViewAttendanceFields === true; %>
     <% const sessionNotesReadOnly = isReadOnly || (typeof notesEditLocked !== 'undefined' && notesEditLocked); %>
     <% const gradebookSectionReadOnly = isReadOnly || (typeof gradebookEditLocked !== 'undefined' && gradebookEditLocked); %>
     <% const conductSectionReadOnly = isReadOnly || (typeof conductEditLocked !== 'undefined' && conductEditLocked); %>
     <% const curriculumSectionReadOnly = isReadOnly || (typeof curriculumEditLocked !== 'undefined' && curriculumEditLocked); %>
     <% const studentCasesSectionReadOnly = isReadOnly || (typeof studentCasesEditLocked !== 'undefined' && studentCasesEditLocked); %>
     <% const attendanceDisabledAttr = attendanceReadOnly ? 'disabled' : ''; %>
+    <% const attendanceUploadDisabledAttr = attendanceUploadReadOnly ? 'disabled' : ''; %>
     <% const sessionNotesDisabledAttr = sessionNotesReadOnly ? 'disabled' : ''; %>
     <% const canEditSessionMetadataPageFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true; %>
     <% const enrollmentLockedPersonIdSet = new Set((Array.isArray(enrollmentLockedAttendancePersonIds) ? enrollmentLockedAttendancePersonIds : []).map((id) => String(id || '').trim()).filter(Boolean)); %>
@@ -2042,8 +2048,8 @@
                     <span id="sessionBookCoveringNavBadge" class="badge rounded-pill session-nav-badge <%= sessionBookCoveringSummary?.status === 'submitted' ? 'bg-success' : 'bg-danger' %><%= hasSessionBookCoveringReport ? '' : ' d-none' %>" aria-hidden="<%= hasSessionBookCoveringReport ? 'false' : 'true' %>" title="<%= sessionBookCoveringSummary?.status === 'submitted' ? 'Book covering report submitted' : (hasSessionBookCoveringReport ? 'Book covering report draft' : 'Book covering report') %>"><%= hasSessionBookCoveringReport ? 'BR' : '' %></span>
                 </button>
                 <% } %>
-                <% if (typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canReadAll) { %>
-                <% const studentCaseNavSummary = (typeof sessionStudentCaseSummary !== 'undefined' && sessionStudentCaseSummary) ? sessionStudentCaseSummary : { hasCases: false, activeCount: 0, resolvedCount: 0 }; %>
+                <% if (typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canRead) { %>
+                <% const studentCaseNavSummary = (typeof canViewStudentCaseFields !== 'undefined' && canViewStudentCaseFields && typeof sessionStudentCaseSummary !== 'undefined' && sessionStudentCaseSummary) ? sessionStudentCaseSummary : { hasCases: false, activeCount: 0, resolvedCount: 0 }; %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="student-cases" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-folder-check fs-5"></i><span class="session-manager-nav-label">Student Cases</span>
                     <span id="sessionStudentCasesNavBadges" class="session-nav-badge-group<%= studentCaseNavSummary.hasCases ? '' : ' d-none' %>" aria-hidden="<%= studentCaseNavSummary.hasCases ? 'false' : 'true' %>" title="<%= studentCaseNavSummary.hasCases ? [studentCaseNavSummary.activeCount ? `${studentCaseNavSummary.activeCount} unresolved` : '', studentCaseNavSummary.resolvedCount ? `${studentCaseNavSummary.resolvedCount} resolved` : ''].filter(Boolean).join(', ') : 'Student cases' %>">
@@ -2080,6 +2086,15 @@
                 </div>
             <% } %>
             <div class="session-panel active" id="session-panel-attendance" role="tabpanel">
+                <% if (typeof showAttendanceAccessAlert !== 'undefined' && showAttendanceAccessAlert) { %>
+                <div class="alert alert-warning border-0 shadow-sm mb-3" role="alert">
+                    Attendance roster details require <strong>SCHOOL_ATTENDANCES</strong> READ_ALL access. Contact your administrator to update your access profile.
+                </div>
+                <% } else if (!canViewAttendancePanel) { %>
+                <div class="alert alert-secondary border-0 shadow-sm mb-3" role="alert">
+                    You can open Manage Session, but attendance field visibility is not granted for this profile.
+                </div>
+                <% } else { %>
                 <div class="row g-2 mb-3" id="attendanceStatusSummary">
                     <div class="col-6 col-md">
                         <div class="session-summary-card h-100">
@@ -2236,6 +2251,7 @@
                         </div>
                     </div>
                 </div>
+                <% } %>
             </div>
 
             <% if (canViewClassConductPanelFlag) { %>
@@ -2710,6 +2726,11 @@
                         <h5 class="m-0 fw-bold text-primary"><i class="bi bi-folder-check me-2"></i>Student Cases</h5>
                         <div class="small text-muted mt-1">Open a case when one or more students need extra reflection, support, or office follow-up.</div>
                     </div>
+                    <% if (typeof showStudentCaseAccessAlert !== 'undefined' && showStudentCaseAccessAlert) { %>
+                    <div class="alert alert-warning border-0 shadow-sm m-3 mb-0" role="alert">
+                        Student case list data requires <strong>SCHOOL_SESSION_STUDENT_CASES</strong> READ_ALL access. Contact your administrator to update your access profile.
+                    </div>
+                    <% } %>
                     <% if (!studentCasesSectionReadOnly && typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canCreate) { %>
                     <div class="student-case-cta-zone">
                         <button type="button" class="btn btn-outline-secondary student-case-open-btn w-100" id="btnOpenStudentCaseWizard">
@@ -2905,7 +2926,7 @@
                         <label class="form-label fw-bold small" for="modalExcuseRef">Excuse / reference notes</label>
                         <textarea class="form-control" id="modalExcuseRef" rows="3" placeholder="Add details..." <%- attendanceDisabledAttr %>></textarea>
                         <label class="form-label fw-bold small mt-2" for="modalExcuseFile">Attach supporting file</label>
-                        <input type="file" class="form-control form-control-sm" id="modalExcuseFile" <%- attendanceDisabledAttr %>>
+                        <input type="file" class="form-control form-control-sm" id="modalExcuseFile" <%- attendanceUploadDisabledAttr %>>
                         <div class="small text-muted mt-1">Browse, or paste a screenshot / file (Ctrl+V / Cmd+V).</div>
                         <div class="small mt-2" id="modalExcuseAttachmentPreview"></div>
                     </div>
@@ -3668,6 +3689,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag && !timesheetMetadataLockActiveFlag)) %>;
     const sessionAttendanceReadOnly = <%- jsonForScript(Boolean(attendanceReadOnly)) %>;
+    const sessionCanUploadAttendanceFiles = <%- jsonForScript(Boolean(typeof canUploadAttendanceFiles !== 'undefined' && canUploadAttendanceFiles)) %>;
+    const sessionCanDeleteAttendanceFiles = <%- jsonForScript(Boolean(typeof canDeleteAttendanceFiles !== 'undefined' && canDeleteAttendanceFiles)) %>;
     const sessionNotesSectionReadOnly = <%- jsonForScript(Boolean(sessionNotesReadOnly)) %>;
     const sessionConductSectionReadOnly = <%- jsonForScript(Boolean(conductSectionReadOnly)) %>;
     const sessionCurriculumSectionReadOnly = <%- jsonForScript(Boolean(curriculumSectionReadOnly)) %>;
@@ -3704,6 +3727,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function uploadSchoolSessionFile(input, category, personId = '') {
         const file = input?.files && input.files[0];
         if (!file) return null;
+        const normalizedCategory = String(category || 'file').trim().toLowerCase() || 'file';
+        if (['excuse', 'attendance', 'comment'].includes(normalizedCategory) && sessionCanUploadAttendanceFiles !== true) {
+            throw new Error('You do not have permission to upload attendance files.');
+        }
         const body = new FormData();
         body.append('kind', category || 'file');
         body.append('classId', sessionManagerClassId);
@@ -3785,14 +3812,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderExcuseAttachmentPreview(attachment, emptyText = '<span class="text-muted">No file attached.</span>') {
         const excusePreview = document.getElementById('modalExcuseAttachmentPreview');
         if (!excusePreview) return;
-        const removable = !sessionAttendanceReadOnly;
+        const removableStored = sessionCanDeleteAttendanceFiles && !sessionAttendanceReadOnly;
         if (!attachment) {
             excusePreview.innerHTML = emptyText;
             return;
         }
         if (attachment.pending) {
             const label = attendanceAttachmentEscape(attachment.name || 'Selected file');
-            const removeBtn = removable
+            const removablePending = !sessionAttendanceReadOnly;
+            const removeBtn = removablePending
                 ? `<button type="button" class="btn-close att-excuse-chip-remove" title="Remove file" aria-label="Remove file"></button>`
                 : '';
             excusePreview.innerHTML = `<span class="badge rounded-pill bg-light text-dark border attendance-excuse-chip"><i class="bi bi-paperclip me-1"></i><span class="text-success">${label} (ready to apply)</span>${removeBtn}</span>`;
@@ -3806,7 +3834,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-        excusePreview.innerHTML = renderAttendanceAttachmentChip(attachment, { removable });
+        excusePreview.innerHTML = renderAttendanceAttachmentChip(attachment, { removable: removableStored });
         bindAttendanceAttachmentChipRemove(excusePreview);
     }
 
@@ -3825,7 +3853,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function bindAttendanceAttachmentChipRemove(hostEl) {
-        if (!hostEl) return;
+        if (!hostEl || !sessionCanDeleteAttendanceFiles || sessionAttendanceReadOnly) return;
         const btn = hostEl.querySelector('.att-excuse-chip-remove');
         if (!btn) return;
         btn.addEventListener('click', () => {
@@ -5414,6 +5442,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const canUpdateStudentCases = Boolean(studentCaseCapabilities.canUpdate);
     const canResolveStudentCases = Boolean(studentCaseCapabilities.canResolve);
     const canReadStudentCases = Boolean(studentCaseCapabilities.canRead || studentCaseCapabilities.canReadAll);
+    const canViewStudentCases = Boolean(typeof canViewStudentCaseFields !== 'undefined' ? canViewStudentCaseFields : studentCaseCapabilities.canReadAll);
+    const canOverrideLockedStudentCases = Boolean(studentCaseCapabilities.canOverrideLockedCaseEdit);
+    const canOverrideLockedStudentCaseDelete = Boolean(studentCaseCapabilities.canOverrideLockedCaseDelete);
     let sessionReportInstancesState = <%- jsonForScript(Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : []) %>;
     let sessionRosterReconciliationState = <%- jsonForScript(Array.isArray(sessionRosterReconciliation) ? sessionRosterReconciliation : []) %>;
     const dismissedRosterReconciliationKeys = new Set();
@@ -5521,6 +5552,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeBadge = document.getElementById('sessionStudentCasesActiveNavBadge');
         const resolvedBadge = document.getElementById('sessionStudentCasesResolvedNavBadge');
         if (!group || !activeBadge || !resolvedBadge) return;
+        if (!canViewStudentCases) {
+            group.classList.add('d-none');
+            group.setAttribute('aria-hidden', 'true');
+            group.removeAttribute('title');
+            activeBadge.classList.add('d-none');
+            activeBadge.textContent = '';
+            activeBadge.setAttribute('aria-hidden', 'true');
+            resolvedBadge.classList.add('d-none');
+            resolvedBadge.textContent = '';
+            resolvedBadge.setAttribute('aria-hidden', 'true');
+            return;
+        }
 
         const rows = Array.isArray(studentCasesState) ? studentCasesState : [];
         const activeCount = rows.filter((row) => isActiveStudentCaseStatus(row?.status)).length;
@@ -5571,6 +5614,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderStudentCases() {
         const body = document.getElementById('studentCasesTableBody');
         if (!body) return;
+        if (!canViewStudentCases) {
+            body.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">Student case list data requires READ_ALL access.</td></tr>';
+            syncSessionStudentCasesNavBadge();
+            return;
+        }
         const rows = Array.isArray(studentCasesState) ? studentCasesState : [];
         if (!rows.length) {
             body.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No student cases for this session.</td></tr>';
@@ -5584,14 +5632,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const isClosed = ['resolved', 'cancelled'].includes(status);
             const isLocked = row.locked === true;
             const canResolve = canResolveStudentCases && !isClosed;
-            const canReopen = isClosed && (isLocked ? canResolveStudentCases : canUpdateStudentCases);
-            const canOpenRow = isClosed && isLocked
-              ? (canResolveStudentCases || canReadStudentCases)
-              : (canUpdateStudentCases || canReadStudentCases);
+            const canReopen = isClosed && (isLocked ? (canResolveStudentCases || canOverrideLockedStudentCases) : canUpdateStudentCases);
+            const canOpenRow = canViewStudentCases && (isClosed && isLocked
+              ? (canResolveStudentCases || canOverrideLockedStudentCases || canReadStudentCases)
+              : (canUpdateStudentCases || canReadStudentCases));
             const canEditRow = isClosed && isLocked
-              ? canResolveStudentCases
+              ? (canResolveStudentCases || canOverrideLockedStudentCases)
               : canUpdateStudentCases;
-            const canDeleteRow = isClosed && isLocked ? canResolveStudentCases : canDeleteStudentCases;
+            const canDeleteRow = isClosed && isLocked ? canOverrideLockedStudentCaseDelete : canDeleteStudentCases;
             const editLabel = canEditRow ? 'Edit student case' : 'View student case';
             const editIcon = canEditRow ? 'pencil-square' : 'eye';
             const studentPersonId = String(row.studentPersonId || '').trim();
@@ -7670,6 +7718,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (row) {
                     const details = getAttendanceDetails(personId);
+                    const snapshotHadAttachment = Boolean(detailsModalSnapshot?.hasExcuseAttachment);
+                    const attachmentRemovedWithoutAccess = snapshotHadAttachment
+                        && !details?.excuseAttachment
+                        && !document.getElementById('modalExcuseFile')?.files?.length
+                        && !sessionCanDeleteAttendanceFiles;
+                    if (attachmentRemovedWithoutAccess) {
+                        await sessionMessageBox({
+                            title: 'Cannot remove file',
+                            icon: 'error',
+                            message: 'You do not have permission to delete attendance files.',
+                            okText: 'Close',
+                            okClass: 'btn-secondary'
+                        });
+                        return;
+                    }
                     const selectedExcuseAttachment = await uploadSchoolSessionFile(document.getElementById('modalExcuseFile'), 'excuse', personId);
                     const excuseAttachment = selectedExcuseAttachment || details.excuseAttachment || null;
                     details.excuseAttachment = excuseAttachment || null;
@@ -7748,6 +7811,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailsModalSnapshot = captureDetailsModalFormSnapshot();
                 detailsModalAllowClose = true;
                 if (detailsModalInstance) detailsModalInstance.hide();
+            } catch (err) {
+                await sessionMessageBox({
+                    title: 'Upload failed',
+                    icon: 'error',
+                    message: err?.message || 'Could not upload file.',
+                    okText: 'Close',
+                    okClass: 'btn-secondary'
+                });
             } finally {
                 originalButtons.forEach(({ btn, html }) => {
                     btn.innerHTML = html;

@@ -14,6 +14,7 @@ const {
     buildUnreadSummary
 } = require('../services/chatUnreadStateService');
 const { paginateChatMessages } = require('../services/chatMessagePaginationService');
+const chatMessageVisibilityService = require('../services/chatMessageVisibilityService');
 
 const CONV_FILE = path.join(__dirname, '../../data/conversations.json');
 const MSG_DIR = path.join(__dirname, '../../data/messages/');
@@ -36,7 +37,14 @@ async function getMessages(convId, options = {}) {
     try {
         const filePath = path.join(MSG_DIR, `${convId}.json`);
         const data = await fs.readFile(filePath, 'utf8').catch(() => '[]');
-        const messages = JSON.parse(data).map((message) => normalizeMessage(message));
+        const viewerUserId = options?.viewerUserId || null;
+        const messages = JSON.parse(data)
+            .map((message) => normalizeMessage(message))
+            .map((message) => (
+                viewerUserId
+                    ? chatMessageVisibilityService.applyVisibilityToMessage(message, viewerUserId)
+                    : message
+            ));
         return paginateChatMessages(messages, options);
     } catch (e) {
         return paginateChatMessages([], options);
@@ -65,12 +73,14 @@ function attachmentReferenceMatches(fileUrl, fileName) {
     }
 }
 
-async function hasActiveAttachment(convId, fileName) {
+async function hasActiveAttachment(convId, fileName, viewerUserId = null) {
     try {
         const msgPath = path.join(MSG_DIR, `${convId}.json`);
         const messages = JSON.parse(await fs.readFile(msgPath, 'utf8'));
         return messages.some((message) => (
-            !message?.deletedAt && attachmentReferenceMatches(message?.fileUrl, fileName)
+            !message?.deletedAt
+            && (!viewerUserId || !chatMessageVisibilityService.isHiddenForViewer(message, viewerUserId))
+            && attachmentReferenceMatches(message?.fileUrl, fileName)
         ));
     } catch (_) {
         return false;
@@ -105,15 +115,31 @@ async function softDeleteMessages(convId, messageIds = [], options = {}) {
         if (found.length !== targetIds.size) throw new Error('One or more messages were not found.');
 
         const now = new Date().toISOString();
+        const scopeMode = chatMessageVisibilityService.normalizeScopeMode(options?.scopeMode);
+        const deleterId = toPublicId(options?.deletedByUserId);
+        const twoSided = chatMessageVisibilityService.isTwoSidedDeletionScope(scopeMode);
         messages = messages.map((message) => {
-            if (!targetIds.has(String(message?.id || '')) || message?.deletedAt) return message;
+            if (!targetIds.has(String(message?.id || ''))) return message;
+            if (twoSided) {
+                if (message?.deletedAt) return message;
+                return {
+                    ...message,
+                    content: 'Message deleted',
+                    fileUrl: null,
+                    deletedAt: now,
+                    deletedByUserId: deleterId,
+                    deletionScope: scopeMode
+                };
+            }
+            const hiddenForUserIds = chatMessageVisibilityService.normalizeHiddenForUserIds(message);
+            if (deleterId && !hiddenForUserIds.some((userId) => idsEqual(userId, deleterId))) {
+                hiddenForUserIds.push(deleterId);
+            }
             return {
                 ...message,
-                content: 'Message deleted',
-                fileUrl: null,
-                deletedAt: now,
-                deletedByUserId: toPublicId(options?.deletedByUserId),
-                deletionScope: String(options?.scopeMode || '')
+                hiddenForUserIds,
+                deletedByUserId: deleterId,
+                deletionScope: scopeMode
             };
         });
         await fs.writeFile(msgPath, JSON.stringify(messages, null, 2));
@@ -129,7 +155,12 @@ async function softDeleteMessages(convId, messageIds = [], options = {}) {
             };
             await fs.writeFile(CONV_FILE, JSON.stringify(conversations, null, 2));
         }
-        return { messageIds: [...targetIds], deletedAt: now };
+        return {
+            messageIds: [...targetIds],
+            deletedAt: now,
+            deletionMode: twoSided ? 'two-sided' : 'one-sided',
+            scopeMode
+        };
     });
 }
 
@@ -356,6 +387,19 @@ async function getUnreadSummaryForUser(userId) {
     return buildUnreadSummary(conversations, userId);
 }
 
+async function countSentMessagesByUser(convId, senderId) {
+    try {
+        const msgPath = path.join(MSG_DIR, `${convId}.json`);
+        const messages = JSON.parse(await fs.readFile(msgPath, 'utf8').catch(() => '[]'));
+        const senderKey = toPublicId(senderId);
+        return (Array.isArray(messages) ? messages : []).filter((message) => (
+            !message?.deletedAt && idsEqual(message?.senderId, senderKey)
+        )).length;
+    } catch (_) {
+        return 0;
+    }
+}
+
 module.exports = {
     getConversations,
     getMessages,
@@ -372,5 +416,6 @@ module.exports = {
     queryConversations,
     buildConversationQueryPlan,
     updateConversation,
-    getUnreadSummaryForUser
+    getUnreadSummaryForUser,
+    countSentMessagesByUser
 };

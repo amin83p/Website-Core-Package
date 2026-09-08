@@ -2,12 +2,15 @@
   const modalChatAccess = (typeof chatAccess !== 'undefined' && chatAccess && typeof chatAccess === 'object') ? chatAccess : {};
   const canChatCreate = !!modalChatAccess.canCreate;
   const canChatUpdate = !!modalChatAccess.canUpdate;
+  const canChatReadInbox = !!modalChatAccess.canReadInbox;
+  const canChatReadContent = !!modalChatAccess.canReadMessageContent;
+  const canChatManageReview = !!modalChatAccess.canManageConversationList;
   const canChatDelete = !!(modalChatAccess.canDelete || modalChatAccess.canDeleteAll);
   const deleteScopeToken = String(modalChatAccess.deleteScopeId || '').trim().toUpperCase();
   const canChatDeleteConversation = !!modalChatAccess.canDeleteAll || (
     !!modalChatAccess.canDelete && !['SCP_OWNER', 'OWNER', 'SCP_USER', 'USER'].includes(deleteScopeToken)
   );
-  const canChatBroadcast = !!modalChatAccess.canDeleteAll;
+  const canChatBroadcast = !!modalChatAccess.canBroadcast;
 %>
 <div class="modal fade" id="chatInterfaceModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered chat-shell-dialog" id="chatModalDialog" style="max-width: calc(100vw - 8px); width: min(900px, calc(100vw - 8px)); margin: 4px auto;"> 
@@ -228,6 +231,8 @@
     .msg-sent { background-color: #d1e7dd; align-self: flex-end; border-bottom-right-radius: 2px; }
     .msg-received { background-color: #fff; border: 1px solid #eee; align-self: flex-start; border-bottom-left-radius: 2px; }
     .msg-text-content { white-space: pre-wrap; word-break: break-word; }
+    .msg-system-content { white-space: normal; }
+    .msg-system-content a { word-break: break-word; }
     .msg-time { font-size: 0.65rem; color: #adb5bd; margin-bottom: 8px; text-align: right; margin-right: 4px; }
     
     /* Scrollbar */
@@ -361,14 +366,18 @@ const CHAT_MESSAGE_PAGE_SIZE = 50;
 let currentConvId = null;
 let currentUser = { id: '<%= user.id %>' };
 const chatAccess = <%- JSON.stringify({
-    canRead: !!(modalChatAccess.canRead || modalChatAccess.canReadAll),
+    canRead: !!canChatReadInbox,
+    canReadInbox: !!canChatReadInbox,
+    canReadMessageContent: !!canChatReadContent,
+    canManageConversationList: !!canChatManageReview,
     canCreate: canChatCreate,
     canUpdate: canChatUpdate,
     canDelete: canChatDelete,
     canDeleteAll: !!modalChatAccess.canDeleteAll,
     deleteScopeId: modalChatAccess.deleteScopeId || '',
     canDownloadFile: !!modalChatAccess.canDownloadFile,
-    canBroadcast: canChatBroadcast
+    canBroadcast: canChatBroadcast,
+    updateLimits: modalChatAccess.updateLimits || { maxMessages: null, maxFileSizeKB: null }
 }) %>;
 let isSidebarVisible = true;
 let previousSidebarWidth = 280;
@@ -734,7 +743,7 @@ function bindChatSocketHandlers() {
 }
 
 async function ensureChatSocket() {
-    if (!chatAccess.canRead) return null;
+    if (!chatAccess.canReadInbox && !chatAccess.canCreate && !chatAccess.canUpdate && !chatAccess.canReadMessageContent) return null;
     if (socket && socket.connected) return socket;
     if (socketReadyPromise) return socketReadyPromise;
 
@@ -837,8 +846,8 @@ function initMessageScrollLoader() {
 }
 
 function initChatSystem() {
-    if (!chatAccess.canRead) return;
-    refreshInbox();
+    if (!chatAccess.canReadInbox && !chatAccess.canCreate) return;
+    if (chatAccess.canReadInbox) refreshInbox();
     initMessageScrollLoader();
     initChatFormHandler();
     document.addEventListener('click', hideMessageContextMenu);
@@ -1059,6 +1068,25 @@ function normalizeMessageTextForDisplay(value) {
         .replace(/\r/g, '\n');
 }
 
+function stripHtmlForPreview(value) {
+    return String(value || '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function isLegacySystemHtmlMessage(content) {
+    const raw = String(content || '');
+    return /<(?:b|strong)>System Message:<\/(?:b|strong)>/i.test(raw)
+        && /<a\s+href=/i.test(raw);
+}
+
+function normalizeLegacySystemHtml(content) {
+    return String(content || '')
+        .replace(/^[\s\S]*?(?=<(?:b|strong)>System Message)/i, '<i class="bi bi-pin-map-fill text-primary"></i> ')
+        .replace(/âž[\s\S]*?(?=Open Specific Note)/i, '<i class="bi bi-box-arrow-up-right"></i> ');
+}
+
 function getChatAttachmentFileName(fileUrl) {
     const token = String(fileUrl || '').split(/[?#]/)[0].replace(/\\/g, '/');
     const parts = token.split('/').filter(Boolean);
@@ -1100,7 +1128,11 @@ function buildMessageHtml(msg, isTemp = false) {
 
     const replyHtml = msg.replyTo ? `<div class="chat-reply-quote"><strong>${String(msg.replyTo.senderId) === String(currentUser.id) ? 'You' : 'Reply'}</strong><br>${safeText(msg.replyTo.preview || 'Message')}</div>` : '';
     let contentHtml = `<div class="msg-text-content">${safeText(normalizeMessageTextForDisplay(msg.content))}</div>`;
-    if (!isDeleted && msg.type === 'image') {
+    if (!isDeleted && msg.type === 'system') {
+        contentHtml = `<div class="msg-text-content msg-system-content">${String(msg.content || '')}</div>`;
+    } else if (!isDeleted && msg.type === 'text' && isLegacySystemHtmlMessage(msg.content)) {
+        contentHtml = `<div class="msg-text-content msg-system-content">${normalizeLegacySystemHtml(msg.content)}</div>`;
+    } else if (!isDeleted && msg.type === 'image') {
         const safeUrl = buildChatAttachmentUrl(msg, false);
         const downloadUrl = buildChatAttachmentUrl(msg, true);
         contentHtml = safeUrl
@@ -1380,10 +1412,19 @@ function handleFileSelection(input) {
         return;
     }
     if (!input.files || input.files.length === 0) return;
-    const MAX_SIZE = 5 * 1024 * 1024; 
+    const profileMaxKB = Number(chatAccess.updateLimits?.maxFileSizeKB);
+    const MAX_SIZE = Number.isFinite(profileMaxKB) && profileMaxKB > 0
+        ? profileMaxKB * 1024
+        : (5 * 1024 * 1024);
     Array.from(input.files).forEach(file => {
         if (pendingAttachments.length >= 3) { safeShowAlert("Maximum 3 files allowed.", "warning"); return; }
-        if (file.size > MAX_SIZE) { safeShowAlert("File too large (Max 5MB).", "error"); return; }
+        if (file.size > MAX_SIZE) {
+            const limitLabel = Number.isFinite(profileMaxKB) && profileMaxKB > 0
+                ? `${profileMaxKB} KB`
+                : '5 MB';
+            safeShowAlert(`File too large (Max ${limitLabel}).`, "error");
+            return;
+        }
         pendingAttachments.push(file);
     });
     renderPreviews();
@@ -1990,6 +2031,14 @@ function showInbox() {
 
 async function refreshInbox() {
     const listEl = document.getElementById('conversationList');
+    if (!chatAccess.canReadInbox) {
+        if (listEl) {
+            listEl.innerHTML = chatAccess.canCreate
+                ? '<div class="text-center text-muted mt-5 small px-3">Search for a contact to start a new chat.</div>'
+                : '<div class="text-center text-muted mt-5 small px-3">Inbox access requires READ chat access.</div>';
+        }
+        return;
+    }
     try {
         const resp = await fetch('/chat/conversations');
         const res = await resp.json();
@@ -2014,7 +2063,8 @@ async function refreshInbox() {
                 const isUnreadClass = unreadNum > 0 ? 'unread' : '';
                 const lastMsg = c.lastMessage ? String(c.lastMessage.content || '') : 'New Chat';
                 
-                let displayMsg = lastMsg.length > 25 ? lastMsg.substring(0,25)+'...' : lastMsg;
+                let displayMsg = stripHtmlForPreview(lastMsg);
+                displayMsg = displayMsg.length > 25 ? displayMsg.substring(0,25)+'...' : displayMsg;
                 if(c.lastMessage && String(c.lastMessage.senderId) === String(currentUser.id)) {
                     displayMsg = 'You: ' + displayMsg;
                 }
@@ -2207,6 +2257,12 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
     }
 
     const container = document.getElementById('chatMessageContainer');
+    if (!chatAccess.canReadMessageContent) {
+        container.innerHTML = '<div class="text-muted text-center p-4 small">Message content requires READ_ALL chat access.</div>';
+        if (chatAccess.canReadInbox) refreshInbox();
+        return;
+    }
+
     container.innerHTML = '<div class="text-center py-5"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
     
     try {

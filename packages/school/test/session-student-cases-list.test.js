@@ -28,6 +28,73 @@ function restoreRequireStubs(originals) {
   }
 }
 
+function clearStudentCaseAccessModuleCache() {
+  const modulePaths = [
+    '../MVC/services/school/sessionStudentCaseAccessService',
+    '../MVC/services/school/studentCaseAccessService',
+    '../MVC/services/school/studentCaseOperationPolicyService',
+    '../MVC/services/school/studentCaseWorkspaceAccessService',
+    '../../../MVC/services/security/index',
+    '../MVC/services/school/schoolRecordAccessService',
+    '../MVC/services/school/schoolAdminAccessService'
+  ];
+  modulePaths.forEach((relativePath) => {
+    try {
+      delete require.cache[require.resolve(relativePath)];
+    } catch (_) {
+      // ignore missing modules
+    }
+  });
+}
+
+function stubStudentCaseCapabilityDeps(originals, {
+  allowedOps = new Set(),
+  sessionMutationOk = true
+} = {}) {
+  clearStudentCaseAccessModuleCache();
+  const accessServicePath = require.resolve('../../../MVC/services/security/index');
+  const recordAccessPath = require.resolve('../MVC/services/school/schoolRecordAccessService');
+  const adminAccessPath = require.resolve('../MVC/services/school/schoolAdminAccessService');
+
+  setRequireStub(accessServicePath, {
+    async evaluateAccess({ operationId }) {
+      return { allowed: allowedOps.has(operationId), scopeId: 'SCP_DEPT' };
+    }
+  }, originals);
+  setRequireStub(adminAccessPath, {
+    async isAdminForRequestAsync() {
+      return false;
+    }
+  }, originals);
+  setRequireStub(recordAccessPath, {
+    resolveAccessFromUser() {
+      return { scopeMode: 'assignment' };
+    },
+    resolveAccessFromRequest() {
+      return { scopeMode: 'assignment' };
+    },
+    isSessionAccessible() {
+      return sessionMutationOk;
+    }
+  }, originals);
+}
+
+function stubStudentCaseListViewAccess(originals) {
+  const studentCaseAccessPath = require.resolve('../MVC/services/school/studentCaseAccessService');
+  setRequireStub(studentCaseAccessPath, {
+    async buildStudentCaseAccess() {
+      return {
+        canViewCases: true,
+        canOpenList: true,
+        readAllScopeId: null
+      };
+    },
+    resolveSectionScopeIdFromAccess(access = {}) {
+      return access.readAllScopeId || null;
+    }
+  }, originals);
+}
+
 const workspaceService = require('../MVC/services/school/sessionStudentCaseWorkspaceService');
 const { SCOPE_MODES } = require('../MVC/services/school/schoolDataScopeBuilder');
 
@@ -40,7 +107,8 @@ test('session student cases section is registered in access constants and routes
   assert.match(accessSource, /SCHOOL_SESSION_STUDENT_CASES:\s*'SCHOOL_SESSION_STUDENT_CASES'/);
   assert.match(mainRouteSource, /router\.use\('\/session-student-cases',\s*require\('\.\/sessionStudentCaseRoutes'\)\)/);
   assert.match(routeSource, /SECTIONS\.SCHOOL_SESSION_STUDENT_CASES/);
-  assert.match(routeSource, /requireCaseSectionOperationAny\(\[OPERATIONS\.READ, OPERATIONS\.READ_ALL\]\)/);
+  assert.match(routeSource, /requireStudentCaseOperation\(OPERATIONS\.READ\)/);
+  assert.doesNotMatch(routeSource, /router\.get\('\/'[\s\S]*?requireCaseSectionOperationAny\(\[OPERATIONS\.READ, OPERATIONS\.READ_ALL\]\)/);
   const listRouteBlock = routeSource.slice(routeSource.indexOf("router.get('/'"), routeSource.indexOf("router.get('/routing'"));
   const listTrackActionStateCount = (listRouteBlock.match(/trackActionState\(/g) || []).length;
   assert.equal(listTrackActionStateCount, 1, 'GET list route must use a single trackActionState to avoid res.send recursion');
@@ -48,6 +116,7 @@ test('session student cases section is registered in access constants and routes
   assert.match(controllerSource, /exports\.listSessionStudentCases/);
   assert.match(controllerSource, /sessionStudentCaseWorkspaceService\.listSessionStudentCasesForRequest/);
   assert.match(routeSource, /review-context/);
+  assert.match(routeSource, /requireCaseSectionOperationAny\(\[OPERATIONS\.READ_ALL\]\)/);
   assert.match(routeSource, /requireCaseSectionOperationAny/);
   assert.match(routeSource, /requireCaseStatusMutationAccess/);
   assert.doesNotMatch(routeSource, /SCHOOL_SESSIONS/);
@@ -96,10 +165,14 @@ test('session student cases list view contains table and row action menu wiring'
   assert.doesNotMatch(viewSource, /js-review-student-case/);
   assert.match(viewSource, /baseUrlPath:\s*'school\/session-student-cases'/);
   assert.match(viewSource, /item\.reviewHref/);
+  assert.match(viewSource, /canViewCases/);
+  assert.match(viewSource, /showStudentCaseAccessAlert/);
   assert.match(viewSource, /canResolveCases/);
   assert.match(viewSource, /canDeleteCases/);
-  assert.match(viewSource, /canReadCases/);
-  assert.match(viewSource, /canReadRow/);
+  assert.match(controllerSource, /canViewCases/);
+  assert.match(controllerSource, /showStudentCaseAccessAlert/);
+  assert.match(controllerSource, /if \(!canOpenList\)/);
+  assert.doesNotMatch(controllerSource, /!canOpenList && !canViewCases/);
   assert.match(viewSource, /sessionStudentCaseModalAssets/);
   assert.match(viewSource, /SessionStudentCaseModal\.wireListRowActions/);
   assert.match(clientSource, /wireListRowActions/);
@@ -185,6 +258,7 @@ test('filterCasesByAccessScope returns all rows for org-wide access', async () =
   const dataPath = require.resolve('../MVC/services/school/schoolDataService');
   [servicePath, accessPath, dataPath].forEach((modulePath) => delete require.cache[modulePath]);
 
+  stubStudentCaseListViewAccess(originals);
   setRequireStub(accessPath, {
     resolveAccessFromRequest() {
       return { scopeMode: SCOPE_MODES.ORG_WIDE, canViewAll: true };
@@ -223,6 +297,7 @@ test('filterCasesByAccessScope limits assignment scope to accessible classes and
   const dataPath = require.resolve('../MVC/services/school/schoolDataService');
   [servicePath, accessPath, dataPath].forEach((modulePath) => delete require.cache[modulePath]);
 
+  stubStudentCaseListViewAccess(originals);
   setRequireStub(accessPath, {
     resolveAccessFromRequest() {
       return { scopeMode: SCOPE_MODES.ASSIGNMENT, personId: 'TEA_1', delivererAliasIds: [] };
@@ -267,6 +342,7 @@ test('filterCasesByAccessScope keeps only owner-created cases for owner scope', 
   const dataPath = require.resolve('../MVC/services/school/schoolDataService');
   [servicePath, accessPath, dataPath].forEach((modulePath) => delete require.cache[modulePath]);
 
+  stubStudentCaseListViewAccess(originals);
   setRequireStub(accessPath, {
     resolveAccessFromRequest() {
       return { scopeMode: SCOPE_MODES.OWNER, userId: 'USER_1' };
@@ -301,17 +377,50 @@ test('filterCasesByAccessScope keeps only owner-created cases for owner scope', 
   assert.deepEqual(filtered.map((row) => row.id), ['CASE_OWNED']);
 });
 
+test('filterCasesByAccessScope returns empty rows without READ_ALL', async () => {
+  const originals = new Map();
+  const servicePath = require.resolve('../MVC/services/school/sessionStudentCaseWorkspaceService');
+  const studentCaseAccessPath = require.resolve('../MVC/services/school/studentCaseAccessService');
+  delete require.cache[servicePath];
+  delete require.cache[studentCaseAccessPath];
+
+  setRequireStub(studentCaseAccessPath, {
+    async buildStudentCaseAccess() {
+      return {
+        canViewCases: false,
+        canOpenList: true,
+        readAllScopeId: null
+      };
+    }
+  }, originals);
+
+  const service = require(servicePath);
+  const filtered = await service.filterCasesByAccessScope({
+    rows: [{ id: 'CASE_1', classId: 'CLS_1' }],
+    req: { user: { id: 'USER_1' } },
+    applyAccessScope: true
+  });
+
+  restoreRequireStubs(originals);
+  delete require.cache[servicePath];
+
+  assert.deepEqual(filtered, []);
+});
+
 test('review service exposes review context and capability checks', () => {
   const reviewSource = read('packages/school/MVC/services/school/sessionStudentCaseReviewService.js');
   const accessSource = read('packages/school/MVC/services/school/sessionStudentCaseAccessService.js');
+  const accessBuilderSource = read('packages/school/MVC/services/school/studentCaseAccessService.js');
   assert.match(reviewSource, /async function getReviewContext/);
+  assert.match(reviewSource, /assertCanViewCases/);
   assert.match(reviewSource, /async function assertCanMutate/);
   assert.match(reviewSource, /sessionStudentCaseAccessService\.resolveCaseCapabilities/);
   assert.match(reviewSource, /filterCasesByAccessScope/);
   assert.doesNotMatch(reviewSource, /SCHOOL_SESSIONS/);
   assert.match(accessSource, /resolveCaseCapabilities/);
   assert.match(accessSource, /assertCanResolve/);
-  assert.match(accessSource, /OPERATIONS\.RESOLVE/);
+  assert.match(accessSource, /buildStudentCaseSectionAccessContext/);
+  assert.match(accessBuilderSource, /OPERATIONS\.RESOLVE/);
   assert.match(accessSource, /readOnly/);
 });
 
@@ -322,31 +431,50 @@ test('manage session uses shared student case modal assets and capability flags'
   assert.match(sessionManagerSource, /studentCaseCapabilities/);
   assert.match(sessionManagerSource, /canCreateStudentCases/);
   assert.match(sessionManagerSource, /canResolveStudentCases/);
-  assert.match(sessionManagerSource, /canReadAll/);
+  assert.match(sessionManagerSource, /studentCaseCapabilities\.canRead/);
+  assert.doesNotMatch(sessionManagerSource, /studentCaseCapabilities\.canRead \|\| studentCaseCapabilities\.canReadAll\)[\s\S]{0,40}Student Cases/);
+  assert.match(sessionManagerSource, /showStudentCaseAccessAlert/);
+  assert.match(sessionManagerSource, /canViewStudentCases/);
+});
+
+test('session mutation scope uses student-case section context not req.accessScope', () => {
+  const accessSource = read('packages/school/MVC/services/school/sessionStudentCaseAccessService.js');
+  assert.match(accessSource, /buildStudentCaseSectionAccessContext/);
+  assert.doesNotMatch(accessSource, /resolveAccessFromRequest\(req\)/);
+});
+
+test('student case policy and access builder do not reference SCHOOL_SESSIONS', () => {
+  const policySource = read('packages/school/MVC/services/school/studentCaseOperationPolicyService.js');
+  const accessBuilderSource = read('packages/school/MVC/services/school/studentCaseAccessService.js');
+  assert.doesNotMatch(policySource, /SCHOOL_SESSIONS/);
+  assert.doesNotMatch(accessBuilderSource, /SCHOOL_SESSIONS/);
+});
+
+test('resolveCaseCapabilities maps READ without READ_ALL as page-only access', async () => {
+  const originals = new Map();
+  stubStudentCaseCapabilityDeps(originals, {
+    allowedOps: new Set(['READ'])
+  });
+  const servicePath = require.resolve('../MVC/services/school/sessionStudentCaseAccessService');
+  const service = require(servicePath);
+  const capabilities = await service.resolveCaseCapabilities(
+    { user: { id: 'USR_1' }, ip: '127.0.0.1' },
+    { classData: { id: 'CLS_1' }, session: { sessionId: 'SES_1' } }
+  );
+
+  restoreRequireStubs(originals);
+  delete require.cache[servicePath];
+
+  assert.equal(capabilities.canRead, true);
+  assert.equal(capabilities.canReadAll, false);
 });
 
 test('resolveCaseCapabilities maps section operations without SCHOOL_SESSIONS fallback', async () => {
   const originals = new Map();
-  const accessServicePath = require.resolve('../../../MVC/services/security/index');
-  const recordAccessPath = require.resolve('../MVC/services/school/schoolRecordAccessService');
+  stubStudentCaseCapabilityDeps(originals, {
+    allowedOps: new Set(['READ', 'READ_ALL'])
+  });
   const servicePath = require.resolve('../MVC/services/school/sessionStudentCaseAccessService');
-  [accessServicePath, recordAccessPath, servicePath].forEach((modulePath) => delete require.cache[modulePath]);
-
-  const allowedOps = new Set(['READ', 'READ_ALL']);
-  setRequireStub(accessServicePath, {
-    async evaluateAccess({ operationId }) {
-      return { allowed: allowedOps.has(operationId), scopeId: 'SCP_DEPT' };
-    }
-  }, originals);
-  setRequireStub(recordAccessPath, {
-    resolveAccessFromRequest() {
-      return { scopeMode: 'assignment' };
-    },
-    isSessionAccessible() {
-      return true;
-    }
-  }, originals);
-
   const service = require(servicePath);
   const req = { user: { id: 'USR_1' }, ip: '127.0.0.1' };
   const capabilities = await service.resolveCaseCapabilities(req, {
@@ -367,25 +495,11 @@ test('resolveCaseCapabilities maps section operations without SCHOOL_SESSIONS fa
 
 test('resolveCaseCapabilities requires session mutation access for write operations', async () => {
   const originals = new Map();
-  const accessServicePath = require.resolve('../../../MVC/services/security/index');
-  const recordAccessPath = require.resolve('../MVC/services/school/schoolRecordAccessService');
+  stubStudentCaseCapabilityDeps(originals, {
+    allowedOps: new Set(['CREATE', 'UPDATE', 'RESOLVE', 'DELETE']),
+    sessionMutationOk: false
+  });
   const servicePath = require.resolve('../MVC/services/school/sessionStudentCaseAccessService');
-  [accessServicePath, recordAccessPath, servicePath].forEach((modulePath) => delete require.cache[modulePath]);
-
-  setRequireStub(accessServicePath, {
-    async evaluateAccess({ operationId }) {
-      return { allowed: ['CREATE', 'UPDATE', 'RESOLVE', 'DELETE'].includes(operationId), scopeId: 'SCP_DEPT' };
-    }
-  }, originals);
-  setRequireStub(recordAccessPath, {
-    resolveAccessFromRequest() {
-      return { scopeMode: 'assignment' };
-    },
-    isSessionAccessible() {
-      return false;
-    }
-  }, originals);
-
   const service = require(servicePath);
   const capabilities = await service.resolveCaseCapabilities(
     { user: { id: 'USR_1' }, ip: '127.0.0.1' },
@@ -403,25 +517,10 @@ test('resolveCaseCapabilities requires session mutation access for write operati
 
 test('resolveCaseCapabilities allows resolve without update when only RESOLVE is granted', async () => {
   const originals = new Map();
-  const accessServicePath = require.resolve('../../../MVC/services/security/index');
-  const recordAccessPath = require.resolve('../MVC/services/school/schoolRecordAccessService');
+  stubStudentCaseCapabilityDeps(originals, {
+    allowedOps: new Set(['READ', 'RESOLVE'])
+  });
   const servicePath = require.resolve('../MVC/services/school/sessionStudentCaseAccessService');
-  [accessServicePath, recordAccessPath, servicePath].forEach((modulePath) => delete require.cache[modulePath]);
-
-  setRequireStub(accessServicePath, {
-    async evaluateAccess({ operationId }) {
-      return { allowed: ['READ', 'RESOLVE'].includes(operationId), scopeId: 'SCP_DEPT' };
-    }
-  }, originals);
-  setRequireStub(recordAccessPath, {
-    resolveAccessFromRequest() {
-      return { scopeMode: 'assignment' };
-    },
-    isSessionAccessible() {
-      return true;
-    }
-  }, originals);
-
   const service = require(servicePath);
   const capabilities = await service.resolveCaseCapabilities(
     { user: { id: 'USR_1' }, ip: '127.0.0.1' },

@@ -11,6 +11,7 @@ const {
   SECTIONS,
   OPERATIONS
 } = require('./schoolRouteDependencies');
+const { requireAttendanceOperation } = require('./attendanceRouteGuards');
 
 const upload = requireCoreModule('MVC/middleware/upload');
 
@@ -34,53 +35,53 @@ router.post('/settings',
   settingsCtrl.saveAttendanceMatrix);
 
 router.get('/',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAttendanceOperation(OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ, { keepActive: true }),
   ctrl.showAttendancePage);
 
 router.get('/report',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),
   ctrl.showStudentAttendanceReportPage);
 
 router.get('/report/api/data',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),
   ctrl.getStudentAttendanceReportData);
 
 router.post('/report/api/generate',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.generateStudentAttendanceReport);
 
 router.get('/report/api/export-plan',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.getStudentAttendanceReportExportPlan);
 
 router.post('/report/api/export',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.exportStudentAttendanceReport);
 
 router.get('/api/data',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAttendanceOperation(OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.getAttendanceData);
 
 router.post('/api/rollups',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  requireAttendanceOperation(OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.postAttendanceRollups);
 
 router.get('/api/export.xlsx',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAttendanceOperation(OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.exportAttendanceExcel);
 
 router.get('/api/active-classes',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAttendanceOperation(OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.listActiveAttendanceClasses);
 
 router.post('/api/comment',
@@ -89,24 +90,24 @@ router.post('/api/comment',
   ctrl.addAttendanceComment);
 
 router.post('/api/files/upload',
-  requireAccessAny([SECTIONS.SCHOOL_ATTENDANCES, SECTIONS.SCHOOL_SESSIONS].filter(Boolean), OPERATIONS.UPDATE),
+  requireAttendanceOperation(OPERATIONS.UPLOAD),
   upload('school-class-workspace', true).single('file'),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, attendanceMatrixMutationActionState),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPLOAD, attendanceMatrixMutationActionState),
   ctrl.uploadAttendanceFile);
 
 router.post('/api/update-roster-cell',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
+  requireAttendanceOperation(OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, attendanceMatrixMutationActionState),
   ctrl.updateAttendanceRosterCell);
 
 router.get('/api/change-log',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAttendanceOperation(OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.getAttendanceChangeLog);
 
 router.post('/api/change-log/query',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
+  requireAttendanceOperation(OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.queryAttendanceChangeLogs);
 
 module.exports = router;

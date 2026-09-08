@@ -229,6 +229,15 @@
     '<button type="button" id="btn_copyLink" class="btn btn-outline-primary btn-md mb-2" onclick="navigator.clipboard.writeText(window.location.href); alert(\'Link copied\');"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>',
     '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>'
   ] : [];
+  const showAttendanceExportBtn = typeof canExportExcel !== 'undefined' && canExportExcel === true;
+  const showAttendancePrintBtn = typeof canPrintMatrix !== 'undefined' && canPrintMatrix === true;
+  const attendanceOptionalBtns = [];
+  if (showAttendanceExportBtn) {
+    attendanceOptionalBtns.push('<button type="button" id="btn_exportAttendanceExcel" class="btn btn-filled btn-success btn-md me-2 mb-2" disabled title="Load the matrix first"><i class="bi bi-cloud-download me-1"></i> Export</button>');
+  }
+  if (showAttendancePrintBtn) {
+    attendanceOptionalBtns.push('<button type="button" id="btn_printAttendanceMatrix" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load the matrix first">🖨 Print</button>');
+  }
 %>
 
 <%- include('partials/tablePages-start', {
@@ -239,10 +248,7 @@
   tableName: typeof tableName !== 'undefined' ? tableName : 'Attendance_Matrix',
   btn_export: false,
   print: false,
-  optionalBtnsBeforePrint: [
-    '<button type="button" id="btn_exportAttendanceExcel" class="btn btn-filled btn-success btn-md me-2 mb-2" disabled title="Load the matrix first"><i class="bi bi-cloud-download me-1"></i> Export</button>',
-    '<button type="button" id="btn_printAttendanceMatrix" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load the matrix first">🖨 Print</button>'
-  ],
+  optionalBtnsBeforePrint: attendanceOptionalBtns,
   headerManageBtns: [
     '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
@@ -252,6 +258,12 @@
 
 <div class="schedule-shell">
     <p class="text-muted small mb-3">View and manage class attendance across sessions. Pick a class, set a date range, then apply to load the matrix.</p>
+
+    <% if (typeof showAttendanceAccessAlert !== 'undefined' && showAttendanceAccessAlert) { %>
+    <div class="alert alert-warning border-0 shadow-sm mb-3" role="alert">
+      Attendance matrix data requires <strong>SCHOOL_ATTENDANCES</strong> READ_ALL access. Contact your administrator to update your access profile.
+    </div>
+    <% } %>
 
     <div class="card border-0 shadow-sm mb-3">
         <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
@@ -832,6 +844,9 @@ const attendanceAttachmentEscape = (value) => String(value ?? '')
 async function uploadAttendanceFile(input, category, classId, sessionId, studentPersonId = '') {
     const file = input?.files && input.files[0];
     if (!file) return null;
+    if (window.CAN_UPLOAD_ATTENDANCE_FILES !== true) {
+        throw new Error('You do not have permission to upload attendance files.');
+    }
     if (!(await ensureAttendanceRequestBudgetAvailable())) {
         throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
     }
@@ -1345,6 +1360,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
     window.CAN_MARK_ATTENDANCE_EXCUSED = <%= (typeof canMarkAttendanceExcused !== 'undefined' && canMarkAttendanceExcused) ? 'true' : 'false' %>;
     window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
+    window.CAN_UPLOAD_ATTENDANCE_FILES = <%= (typeof canUploadFiles !== 'undefined' && canUploadFiles) ? 'true' : 'false' %>;
+    window.CAN_EXPORT_ATTENDANCE = <%= (typeof canExportExcel !== 'undefined' && canExportExcel) ? 'true' : 'false' %>;
+    window.CAN_PRINT_ATTENDANCE = <%= (typeof canPrintMatrix !== 'undefined' && canPrintMatrix) ? 'true' : 'false' %>;
+    window.CAN_VIEW_ATTENDANCE_ROLLUPS = <%= (typeof canViewRollups !== 'undefined' && canViewRollups) ? 'true' : 'false' %>;
+    window.CAN_VIEW_ATTENDANCE_CHANGE_LOG = <%= (typeof canViewChangeHistory !== 'undefined' && canViewChangeHistory) ? 'true' : 'false' %>;
+    window.CAN_VIEW_ATTENDANCE_FIELDS = <%= (typeof canViewRosterFields !== 'undefined' && canViewRosterFields) ? 'true' : 'false' %>;
 
     if (typeof bootstrap !== 'undefined') {
         detailsModalInstance = new bootstrap.Modal(document.getElementById('cellDetailsModal'));
@@ -2042,6 +2063,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function refreshAttendanceDisplayRollups(options = {}) {
+        if (window.CAN_VIEW_ATTENDANCE_ROLLUPS !== true) return false;
         const data = window.currentMatrixData;
         if (!data?.classId || !Array.isArray(data.matrix)) return false;
         if (!(await ensureAttendanceRequestBudgetAvailable())) return false;
@@ -3301,8 +3323,10 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     const makeupRequired = record.applicability === 'makeup_required';
     const outsideEnrollmentWindow = record.withinEnrollmentWindow === false;
     const canEdit = window.CAN_EDIT_ATTENDANCE_ROSTER === true;
+    const canUploadFiles = window.CAN_UPLOAD_ATTENDANCE_FILES === true;
     const canOverride = window.CAN_OVERRIDE_SESSION_LOCK === true;
     const allowEdit = canEdit && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
+    const allowUpload = canUploadFiles && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
     const fs = document.getElementById('fieldset_cell_attendance');
     if (fs) fs.disabled = !allowEdit;
     const lockNotice = document.getElementById('cell_modal_lock_notice');
@@ -3322,9 +3346,13 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     if (saveAttBtn) {
         saveAttBtn.disabled = !allowEdit;
     }
-    ['inp_newComment', 'inp_newCommentFile', 'btn_saveComment', 'btn_mentionUser'].forEach((id) => {
+    ['inp_newComment', 'btn_saveComment', 'btn_mentionUser'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.disabled = !allowEdit;
+    });
+    ['inp_cellExcuseFile', 'inp_newCommentFile'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !allowUpload;
     });
 
     const thread = document.getElementById('det_commentsThread');

@@ -77,7 +77,20 @@ test('timesheet manage view uses split bulk and row import entry points', () => 
   assert.match(viewSource, /importExecutionPersonRoleByPersonId/);
   assert.match(viewSource, /\/manage\/api\/import\/execution\/plan/);
   assert.match(viewSource, /\/manage\/api\/import\/execution\/perform/);
+  assert.match(viewSource, /applyActionStateFromResult\(payload\)/);
+  assert.match(viewSource, /buildImportExecutionConfirmMessage/);
+  assert.match(viewSource, /renderImportExecutionTimesheetCell/);
+  assert.match(viewSource, /data-import-exec-open-draft/);
+  assert.doesNotMatch(viewSource, /No files are ready to execute/);
   assert.doesNotMatch(viewSource, /\/manage\/api\/import\/apply/);
+});
+
+test('timesheet manage view opens execution modal from plan rows including blocked entries', () => {
+  const viewSource = fs.readFileSync(MANAGE_VIEW, 'utf8');
+  assert.match(viewSource, /ensureModalOnBody\(importExecutionModalEl\)\?\.show\(\)/);
+  assert.match(viewSource, /overallStatus: isBlocked \? 'blocked' : 'pending'/);
+  assert.match(viewSource, /String\(row\.eligibility \|\| ''\) === 'blocked'/);
+  assert.match(viewSource, /buildImportExecutionConfirmMessage\(payload\)/);
 });
 
 test('timesheet controller exposes import execution endpoints', () => {

@@ -67,6 +67,7 @@ const packageRegistryService = require('./MVC/services/packageRegistryService');
 const packageRegistryInstallerService = require('./MVC/services/packageRegistryInstallerService');
 const packageNavigationService = require('./MVC/services/packageNavigationService');
 const { getPackageStorageRootAbsolute } = require('./MVC/utils/packageStoragePathUtils');
+const sessionAuthDiagnosticLogService = require('./MVC/services/diagnostics/sessionAuthDiagnosticLogService');
 const startupLogger = require('./MVC/utils/startupLogger');
 const actionStateRetentionService = require('./MVC/services/actionStateRetentionService');
 const { registerCoreScheduledTasks } = require('./MVC/services/coreScheduledTaskRegistration');
@@ -1078,6 +1079,11 @@ async function startServer() {
     }
     await listenHttpServer(server, PORT, () => {
       startupLogger.success('APP', 'HTTP_SERVER', 'Server listening.', { url: describeListenTarget(PORT) });
+      const sessionAuthDiag = sessionAuthDiagnosticLogService.initializeSessionAuthDiagnostics();
+      startupLogger.info('APP', 'SESSION_AUTH_DIAG', 'Session/auth diagnostic log ready.', {
+        logFile: sessionAuthDiag.logFile
+      });
+      console.log(`[session-auth-diagnostic] Writing to: ${sessionAuthDiag.logFile}`);
       const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
       const appSettingsSnapshot = (() => {
         const appSettings = settingService.get().app || {};

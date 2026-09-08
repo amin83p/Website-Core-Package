@@ -86,4 +86,9 @@ router.post('/timesheet-parameters',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveTimesheetParametersPolicy);
 
+router.post('/timesheet-import',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
+  ctrl.saveTimesheetImportPolicy);
+
 module.exports = router;

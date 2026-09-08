@@ -6,6 +6,7 @@ const path = require('node:path');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CONTROLLER_PATH = path.join(ROOT_DIR, 'MVC/controllers/chatController.js');
 const ACCESS_SERVICE_PATH = path.join(ROOT_DIR, 'MVC/services/chatAccessService.js');
+const POLICY_PATH = path.join(ROOT_DIR, 'MVC/services/chatOperationPolicyService.js');
 const ATTACHMENT_SERVICE_PATH = path.join(ROOT_DIR, 'MVC/services/chatAttachmentAccessService.js');
 
 function stubModule(modulePath, exportsValue, originals) {
@@ -22,6 +23,7 @@ function stubModule(modulePath, exportsValue, originals) {
 function restoreModules(originals) {
   delete require.cache[CONTROLLER_PATH];
   delete require.cache[ACCESS_SERVICE_PATH];
+  delete require.cache[POLICY_PATH];
   delete require.cache[ATTACHMENT_SERVICE_PATH];
   originals.forEach((entry, resolved) => {
     if (entry) require.cache[resolved] = entry;
@@ -54,20 +56,22 @@ function createResponse() {
   };
 }
 
-test('existing participant history stays readable while UPDATE is denied by contact scope', async () => {
+test('existing participant inbox stays available while UPDATE is denied by contact scope', async () => {
   const originals = new Map();
   let contactAllowed = false;
   try {
     stubModule('../MVC/services/security/index', {
       evaluateAccess: async ({ operationId }) => ({
         allowed: true,
-        operationId
+        operationId,
+        scopeId: 'OWNER'
       })
     }, originals);
     stubModule('../MVC/services/adminAuthorityService', {
       isAdminForRequestAsync: async () => false
     }, originals);
     stubModule('../MVC/services/chatContactScopeService', {
+      normalizeChatScopeMode: (scopeId) => String(scopeId || '').toLowerCase(),
       getConversationMessagingEligibility: async () => ({
         canMessage: contactAllowed,
         reason: contactAllowed ? '' : 'Role scope changed.'
@@ -75,6 +79,7 @@ test('existing participant history stays readable while UPDATE is denied by cont
     }, originals);
 
     delete require.cache[ACCESS_SERVICE_PATH];
+    delete require.cache[POLICY_PATH];
     const chatAccessService = require(ACCESS_SERVICE_PATH);
     const user = { id: 'USER-1' };
     const conversation = {
@@ -113,21 +118,25 @@ test('READ_ALL grants global conversation reads even when READ is evaluated firs
   try {
     stubModule('../MVC/services/security/index', {
       evaluateAccess: async ({ operationId }) => ({
-        allowed: operationId === 'READ' || operationId === 'READ_ALL',
-        operationId
+        allowed: operationId === 'READ_ALL',
+        operationId,
+        scopeId: 'ADMIN'
       })
     }, originals);
     stubModule('../MVC/services/adminAuthorityService', {
       isAdminForRequestAsync: async () => false
     }, originals);
     stubModule('../MVC/services/chatContactScopeService', {
+      normalizeChatScopeMode: (scopeId) => String(scopeId || '').toLowerCase(),
       getConversationMessagingEligibility: async () => ({
         canMessage: false,
         reason: 'No write access.'
-      })
+      }),
+      getConversationScopeEligibility: async () => ({ allowed: true })
     }, originals);
 
     delete require.cache[ACCESS_SERVICE_PATH];
+    delete require.cache[POLICY_PATH];
     const chatAccessService = require(ACCESS_SERVICE_PATH);
     const result = await chatAccessService.canAccessConversation({
       user: { id: 'USER-ADMIN' },
@@ -135,8 +144,9 @@ test('READ_ALL grants global conversation reads even when READ is evaluated firs
         id: 'CONV-1',
         participants: [{ userId: 'USER-1' }, { userId: 'USER-2' }]
       },
-      operationIds: ['READ', 'READ_ALL'],
-      allowGlobalAdmin: true
+      operationIds: ['READ_ALL'],
+      allowGlobalAdmin: true,
+      requireMessageContent: true
     });
 
     assert.equal(result.allowed, true);
@@ -315,7 +325,10 @@ test('Chat source keeps historical reads while applying role scope to writes and
   );
 
   assert.equal(accessSource.includes('getConversationMessagingEligibility'), true);
-  assert.equal(accessSource.includes('canReadAllConversations'), true);
+  assert.equal(accessSource.includes('canManageConversationReviewList'), true);
+  assert.equal(accessSource.includes('chatOperationPolicyService'), true);
+  assert.equal(modalSource.includes('canReadMessageContent'), true);
+  assert.equal(modalSource.includes('canReadInbox'), true);
   assert.equal(accessSource.includes('canDownloadConversationAttachment'), true);
   assert.equal(accessSource.includes('operationResult.operationId === OPERATIONS.UPDATE'), true);
   assert.equal(socketSource.includes('loadConversationForSocket'), true);

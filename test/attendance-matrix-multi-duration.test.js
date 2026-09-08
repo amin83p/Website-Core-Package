@@ -152,8 +152,10 @@ test('attendance routes keep matrix access and protect settings alias with Schoo
   const routes = read('packages/school/MVC/routes/attendanceRoutes.js');
   assert.match(routes, /\/settings'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.READ_ALL\)/);
   assert.match(routes, /\/settings'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)/);
-  assert.match(routes, /router\.get\('\/'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
-  assert.match(routes, /\/api\/data'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routes, /router\.get\('\/'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.READ\)/);
+  assert.match(routes, /\/api\/data'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.READ\)/);
+  assert.match(routes, /\/api\/export\.xlsx'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.EXPORT\)/);
+  assert.match(routes, /\/api\/update-roster-cell'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.UPDATE\)/);
 });
 
 test('settings access uses standard access evaluation, independent of attendance admin', () => {

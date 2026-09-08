@@ -6,7 +6,8 @@ const { idsEqual, toPublicId } = require('../../utils/idAdapter');
 const {
   invalidateAuthContextForUser,
   invalidateAuthContextForSession,
-  clearAuthContextCache
+  clearAuthContextCache,
+  bumpAccessProfileCacheGeneration
 } = require('./authContextCacheService');
 
 function normalizeUserIdList(userIds = []) {
@@ -21,6 +22,22 @@ function normalizeUserIdList(userIds = []) {
   return out;
 }
 
+async function refreshSessionRecordsForUserIds(userIds = []) {
+  const sessionService = require('../SessionService');
+  const ids = normalizeUserIdList(userIds);
+  let sessionCount = 0;
+  for (const userId of ids) {
+    const invalidated = await sessionService.invalidateSessionRecordCacheForUser(userId);
+    sessionCount += invalidated.sessionCount || 0;
+  }
+  const refreshed = await sessionService.refreshSessionPolicyLimitsForUsers(ids);
+  return {
+    userCount: ids.length,
+    sessionCount,
+    sessionsRefreshed: refreshed.refreshed || 0
+  };
+}
+
 function invalidateAuthContextForUserIds(userIds = []) {
   const ids = normalizeUserIdList(userIds);
   let removed = 0;
@@ -28,6 +45,12 @@ function invalidateAuthContextForUserIds(userIds = []) {
     removed += invalidateAuthContextForUser(userId);
   });
   return { userCount: ids.length, cacheEntriesRemoved: removed };
+}
+
+async function invalidateAuthContextForUserIdsWithSessionRefresh(userIds = []) {
+  const result = invalidateAuthContextForUserIds(userIds);
+  const sessionRefresh = await refreshSessionRecordsForUserIds(userIds);
+  return { ...result, ...sessionRefresh };
 }
 
 /**
@@ -50,7 +73,7 @@ async function fetchUserIdsByPersonId(personId) {
 
 async function invalidateAuthContextForPersonId(personId) {
   const userIds = await fetchUserIdsByPersonId(personId);
-  return invalidateAuthContextForUserIds(userIds);
+  return invalidateAuthContextForUserIdsWithSessionRefresh(userIds);
 }
 
 function userHasOrgMembership(userRow = {}, orgId = '') {
@@ -71,7 +94,26 @@ async function fetchUserIdsForOrgId(orgId) {
 
 async function invalidateAuthContextForOrgId(orgId) {
   const userIds = await fetchUserIdsForOrgId(orgId);
-  return invalidateAuthContextForUserIds(userIds);
+  return invalidateAuthContextForUserIdsWithSessionRefresh(userIds);
+}
+
+function orgMembershipProfileIds(org = {}) {
+  const ids = [];
+  const pushId = (value) => {
+    const normalized = toPublicId(
+      value && typeof value === 'object'
+        ? (value.profileId || value.id || value.accessProfileId)
+        : value
+    );
+    if (normalized) ids.push(normalized);
+  };
+
+  (Array.isArray(org?.accessProfileIds) ? org.accessProfileIds : []).forEach(pushId);
+  (Array.isArray(org?.directAccessProfileIds) ? org.directAccessProfileIds : []).forEach(pushId);
+  (Array.isArray(org?.managedAccessProfiles) ? org.managedAccessProfiles : []).forEach((row) => {
+    pushId(row?.profileId || row?.id || row?.accessProfileId || row);
+  });
+  return ids;
 }
 
 function userReferencesAccessProfile(userRow = {}, profileId = '') {
@@ -79,10 +121,7 @@ function userReferencesAccessProfile(userRow = {}, profileId = '') {
   if (!targetProfileId) return false;
   if (idsEqual(userRow?.systemAccessProfileId, targetProfileId)) return true;
   const orgs = Array.isArray(userRow?.organizations) ? userRow.organizations : [];
-  return orgs.some((org) => {
-    const ids = Array.isArray(org?.accessProfileIds) ? org.accessProfileIds : [];
-    return ids.some((id) => idsEqual(id, targetProfileId));
-  });
+  return orgs.some((org) => orgMembershipProfileIds(org).some((id) => idsEqual(id, targetProfileId)));
 }
 
 async function fetchUserIdsForAccessProfileId(profileId) {
@@ -104,8 +143,27 @@ async function fetchUserIdsForAccessProfileId(profileId) {
 }
 
 async function invalidateAuthContextForAccessProfileId(profileId) {
-  const userIds = await fetchUserIdsForAccessProfileId(profileId);
-  return invalidateAuthContextForUserIds(userIds);
+  const targetProfileId = toPublicId(profileId);
+  const userIds = await fetchUserIdsForAccessProfileId(targetProfileId);
+  const result = await invalidateAuthContextForUserIdsWithSessionRefresh(userIds);
+  const generation = bumpAccessProfileCacheGeneration();
+  try {
+    const accessUiService = require('../security/accessUiService');
+    if (accessUiService && typeof accessUiService.clearUiAccessCache === 'function') {
+      accessUiService.clearUiAccessCache();
+    }
+  } catch (_) {
+    // ignore
+  }
+  try {
+    const dashboardFilteredSectionsCacheService = require('./dashboardFilteredSectionsCacheService');
+    if (dashboardFilteredSectionsCacheService && typeof dashboardFilteredSectionsCacheService.clearDashboardFilteredSectionsCache === 'function') {
+      dashboardFilteredSectionsCacheService.clearDashboardFilteredSectionsCache();
+    }
+  } catch (_) {
+    // ignore
+  }
+  return { ...result, cacheGeneration: generation };
 }
 
 function invalidateAuthContextForAllUsers() {
@@ -128,6 +186,8 @@ async function hardRevokeAuthContextForUser(userId) {
 
 module.exports = {
   invalidateAuthContextForUserIds,
+  invalidateAuthContextForUserIdsWithSessionRefresh,
+  refreshSessionRecordsForUserIds,
   invalidateAuthContextForAllSessionsOfUser,
   invalidateAuthContextForPersonId,
   invalidateAuthContextForOrgId,

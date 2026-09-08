@@ -8,7 +8,7 @@ const ALLOWED_EXTENSIONS = new Set([
   // Images
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic',
   // Documents
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf', '.md',
   // Archives (if needed, though often risky, keeping common ones)
   '.zip', '.rar', '.7z', '.tar', '.gz'
 ]);
@@ -26,6 +26,8 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'text/plain',
   'text/csv',
+  'text/markdown',
+  'text/x-markdown',
   'application/rtf',
   // Archives
   'application/zip',
