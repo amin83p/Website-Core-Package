@@ -7,6 +7,9 @@ const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const SETTINGS_ROOT = 'schoolScheduleViewer';
 const MAX_PERSONS = 50;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DEFAULT_TIMELINE_START_HOUR = 7;
+const DEFAULT_TIMELINE_END_HOUR = 22;
+const TIMELINE_MIN_SPAN_HOURS = 2;
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -54,13 +57,33 @@ function normalizePersons(persons = []) {
   return next.slice(0, MAX_PERSONS);
 }
 
+function normalizeTimelineHour(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.floor(parsed);
+}
+
+function normalizeTimelineBounds(startHour, endHour) {
+  let start = normalizeTimelineHour(startHour, DEFAULT_TIMELINE_START_HOUR);
+  let end = normalizeTimelineHour(endHour, DEFAULT_TIMELINE_END_HOUR);
+  start = Math.max(0, Math.min(23, start));
+  end = Math.max(1, Math.min(24, end));
+  if (end <= start || end - start < TIMELINE_MIN_SPAN_HOURS) {
+    start = DEFAULT_TIMELINE_START_HOUR;
+    end = DEFAULT_TIMELINE_END_HOUR;
+  }
+  return { timelineStartHour: start, timelineEndHour: end };
+}
+
 function emptyPreferences() {
   return {
     startDate: '',
     endDate: '',
     activePersonId: '',
     persons: [],
-    autoChangeDetector: true
+    autoChangeDetector: true,
+    timelineStartHour: DEFAULT_TIMELINE_START_HOUR,
+    timelineEndHour: DEFAULT_TIMELINE_END_HOUR
   };
 }
 
@@ -77,12 +100,15 @@ function extractPreferences(source = {}) {
   if (typeof source.autoChangeDetector === 'boolean') {
     autoChangeDetector = source.autoChangeDetector;
   }
+  const timeline = normalizeTimelineBounds(source.timelineStartHour, source.timelineEndHour);
   return {
     startDate,
     endDate,
     activePersonId: validActive,
     persons,
-    autoChangeDetector
+    autoChangeDetector,
+    timelineStartHour: timeline.timelineStartHour,
+    timelineEndHour: timeline.timelineEndHour
   };
 }
 
@@ -154,6 +180,19 @@ function mergePreferences(current = {}, incoming = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(incoming, 'autoChangeDetector')) {
     next.autoChangeDetector = incoming.autoChangeDetector === true;
+  }
+  if (Object.prototype.hasOwnProperty.call(incoming, 'timelineStartHour')
+    || Object.prototype.hasOwnProperty.call(incoming, 'timelineEndHour')) {
+    const timeline = normalizeTimelineBounds(
+      Object.prototype.hasOwnProperty.call(incoming, 'timelineStartHour')
+        ? incoming.timelineStartHour
+        : next.timelineStartHour,
+      Object.prototype.hasOwnProperty.call(incoming, 'timelineEndHour')
+        ? incoming.timelineEndHour
+        : next.timelineEndHour
+    );
+    next.timelineStartHour = timeline.timelineStartHour;
+    next.timelineEndHour = timeline.timelineEndHour;
   }
   return extractPreferences(next);
 }

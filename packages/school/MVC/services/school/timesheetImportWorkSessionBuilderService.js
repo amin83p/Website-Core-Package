@@ -67,13 +67,27 @@ function buildAssigneeRoleFields(role) {
   return { role: normalized, roles: [normalized] };
 }
 
+function resolveImportBillableHours(row = {}) {
+  const regular = Math.max(0, Number(parseFloat(row?.hours) || 0));
+  const optional = row?.optionalHours != null && Number.isFinite(Number(row.optionalHours))
+    ? Math.max(0, Number(row.optionalHours))
+    : 0;
+  return Number((regular + optional).toFixed(2));
+}
+
+function buildImportOptionalHoursComment(optionalHours) {
+  const value = Number(optionalHours);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  const label = value === 1 ? 'hr' : 'hrs';
+  return `This hour was optional (${value} ${label})`;
+}
+
 function buildImportRowNotes(row = {}) {
   const commentParts = [];
   if (row?.comment) commentParts.push(String(row.comment).trim());
   if (row?.studentName) commentParts.push(`Student: ${String(row.studentName).trim()}`);
-  if (row?.optionalHours != null && Number.isFinite(Number(row.optionalHours))) {
-    commentParts.push(`Optional hours: ${Number(row.optionalHours)}`);
-  }
+  const optionalComment = buildImportOptionalHoursComment(row?.optionalHours);
+  if (optionalComment) commentParts.push(optionalComment);
   return commentParts.filter(Boolean).join(' | ');
 }
 
@@ -95,7 +109,7 @@ function stackCompiledRowsByDate(compiledRows = []) {
   const prepared = (Array.isArray(compiledRows) ? compiledRows : [])
     .map((row, index) => {
       const date = normalizeImportRowDate(row?.date);
-      const hours = Number(parseFloat(row?.hours) || 0);
+      const hours = resolveImportBillableHours(row);
       return {
         ...row,
         date,
@@ -664,6 +678,8 @@ function buildImportBatchId({ periodId = '', personId = '', sourceFileName = '' 
 
 module.exports = {
   normalizeImportRowDate,
+  resolveImportBillableHours,
+  buildImportOptionalHoursComment,
   stackCompiledRowsByDate,
   buildImportRowNotes,
   buildCompletedAssignee,

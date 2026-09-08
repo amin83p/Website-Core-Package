@@ -298,6 +298,160 @@ function isStatutoryHolidayEntry(entry = {}) {
   return entry.isStatutoryHoliday === true || sessionId.startsWith('stathol-');
 }
 
+function formatStatHolidayDateLabel(dateKey) {
+  const token = cleanText(dateKey);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token || '-';
+  return formatDateKey(token, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function resolveStatHolidayPayStatusLabel(entry = {}) {
+  const meta = entry?.statHolidayMeta && typeof entry.statHolidayMeta === 'object'
+    ? entry.statHolidayMeta
+    : {};
+  const payableHours = roundHours(Number(entry.payableHours || 0));
+  const qualified = meta.qualified === true;
+  const payBlockedReason = cleanText(meta.payBlockedReason);
+  const override = entry?.statHolidayOverride && typeof entry.statHolidayOverride === 'object'
+    ? entry.statHolidayOverride
+    : null;
+  const forcePay = override?.forcePay === true;
+  const forceDisqualify = override?.forcePay === false;
+
+  if (payBlockedReason === 'exceeds_max_payable_hours') return 'Exceeds max payable';
+  if (forceDisqualify) return 'Disqualified by manager';
+  if (payableHours > 0 && forcePay) return 'Manager override';
+  if (payableHours > 0 && qualified) return 'Paid';
+  if (payableHours > 0) return 'Manager override';
+  return 'Not qualified';
+}
+
+function buildStatHolidayOverrideNote(entry = {}) {
+  const override = entry?.statHolidayOverride;
+  if (!override || typeof override !== 'object') return '';
+  const parts = [];
+  if (override.forcePay === true) parts.push('Manager forced pay');
+  else if (override.forcePay === false) parts.push('Manager disqualified');
+  const hours = Number(override.hours);
+  if (Number.isFinite(hours) && hours > 0) parts.push(`Override hours: ${hours.toFixed(2)}`);
+  const reason = cleanText(override.reason);
+  if (reason) parts.push(reason);
+  return parts.join(' — ');
+}
+
+function buildStatHolidayPrintSteps(entry = {}) {
+  const checks = entry?.statHolidayMeta?.checks;
+  if (!checks || typeof checks !== 'object') return [];
+
+  const minWorkdays = checks.minWorkdays || {};
+  const weekdayRule = checks.weekdayRule || {};
+  const workdayMatch = checks.workdayMatch || {};
+  const holidayAttendance = checks.holidayAttendance || {};
+  const leaveBeforeAfter = checks.leaveBeforeAfter || {};
+  const calculated = checks.calculatedHours || {};
+  const weekdayName = cleanText(weekdayRule.weekdayName) || 'Target weekday';
+  const beforeDateLabel = leaveBeforeAfter.beforeDate
+    ? formatStatHolidayDateLabel(leaveBeforeAfter.beforeDate)
+    : 'Not found';
+  const afterDateLabel = leaveBeforeAfter.afterDate
+    ? formatStatHolidayDateLabel(leaveBeforeAfter.afterDate)
+    : 'Not found';
+  const leaveBeforeAfterDates = Array.isArray(leaveBeforeAfter.leaveDates)
+    ? leaveBeforeAfter.leaveDates.filter(Boolean)
+    : [];
+  const holidayAttendanceDetails = holidayAttendance.pass === true
+    ? [cleanText(holidayAttendance.reason) || 'No approved leave on the statutory holiday date.']
+    : [cleanText(holidayAttendance.reason) || 'Approved leave on statutory holiday.'];
+
+  return [
+    {
+      title: 'Step 1: Minimum workdays check',
+      pass: minWorkdays.pass === true,
+      details: [
+        `Required workdays: ${Number(minWorkdays.required || 0)}`,
+        `Counted workdays: ${Number(minWorkdays.actual || 0)}`
+      ]
+    },
+    {
+      title: 'Step 2: Weekday pattern check',
+      pass: weekdayRule.pass === true,
+      details: [
+        `Weekday: ${weekdayName}`,
+        `Required matches: ${Number(weekdayRule.required || 0)} in last ${Number(weekdayRule.lookback || 0)} occurrences`,
+        `Your matches: ${Number(weekdayRule.actual || 0)}`
+      ]
+    },
+    {
+      title: 'Step 3: Regular workday or worked on holiday',
+      pass: workdayMatch.pass === true,
+      details: [
+        `Regular workday match: ${workdayMatch.regularWorkday ? 'Yes' : 'No'}`,
+        `Worked on holiday: ${workdayMatch.workedOnHoliday ? 'Yes' : 'No'}`
+      ]
+    },
+    {
+      title: 'Step 4: Attendance — no approved leave on holiday date',
+      pass: holidayAttendance.pass === true,
+      details: holidayAttendanceDetails
+    },
+    {
+      title: 'Step 5: Before and after — no approved leave on boundary workdays',
+      pass: leaveBeforeAfter.pass === true,
+      details: [
+        `Nearest workday before holiday: ${beforeDateLabel}`,
+        `Nearest workday after holiday: ${afterDateLabel}`,
+        leaveBeforeAfterDates.length
+          ? `Approved leave on these boundary days: ${leaveBeforeAfterDates.map((date) => formatStatHolidayDateLabel(date)).join(', ')}`
+          : 'No boundary leave conflicts.'
+      ]
+    },
+    {
+      title: 'Step 6: Average-hours formula',
+      pass: calculated.pass === true,
+      details: [
+        `Earnings window: ${calculated.earningsStart ? formatStatHolidayDateLabel(calculated.earningsStart) : '-'} to ${calculated.earningsEnd ? formatStatHolidayDateLabel(calculated.earningsEnd) : '-'}`,
+        `Total hours in window: ${Number(calculated.totalHours || 0).toFixed(2)}`,
+        `Payable workdays in window: ${Number(calculated.workdayCount || 0)}`,
+        `Average payable hours: ${Number(calculated.averageHours || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2)}`
+      ]
+    }
+  ];
+}
+
+function buildStatutoryHolidayPrintSummaries(entries = []) {
+  return (Array.isArray(entries) ? entries : [])
+    .filter(isStatutoryHolidayEntry)
+    .sort((left, right) => {
+      const dateCompare = cleanText(left.date).localeCompare(cleanText(right.date));
+      if (dateCompare !== 0) return dateCompare;
+      return cleanText(left.sessionId).localeCompare(cleanText(right.sessionId));
+    })
+    .map((entry) => {
+      const meta = entry?.statHolidayMeta && typeof entry.statHolidayMeta === 'object'
+        ? entry.statHolidayMeta
+        : {};
+      const payableHours = roundHours(Number(entry.payableHours || 0));
+      const calculatedHours = roundHours(Number(meta.calculatedHours ?? payableHours ?? 0));
+      const steps = buildStatHolidayPrintSteps(entry);
+      const disqualifyReasons = Array.isArray(meta.disqualifyReasons)
+        ? meta.disqualifyReasons.filter(Boolean)
+        : [];
+      const date = cleanText(entry.date);
+      return {
+        holidayName: cleanText(entry.className || entry.description || entry.secondaryLabel || 'Statutory holiday'),
+        date,
+        dateLabel: formatStatHolidayDateLabel(date),
+        payableHours,
+        calculatedHours,
+        qualified: meta.qualified === true,
+        payStatusLabel: resolveStatHolidayPayStatusLabel(entry),
+        disqualifyReasons,
+        overrideNote: buildStatHolidayOverrideNote(entry),
+        calculationAvailable: steps.length > 0,
+        steps
+      };
+    });
+}
+
 function resolveStatusLabel(entry = {}) {
   if (entry.isPriorPeriodAdjustment === true) return 'Prior Period Adjustment';
   if (isStatutoryHolidayEntry(entry)) return 'Statutory Holiday Pay';
@@ -531,6 +685,11 @@ async function buildTimesheetPrintDocument({
   const openMakeupNodes = openMakeupChains
     .flatMap((chain) => Array.isArray(chain?.nodes) ? chain.nodes : [])
     .filter((node) => Array.isArray(node?.openReasons) && node.openReasons.length > 0);
+  const statutoryHolidaySummaries = buildStatutoryHolidayPrintSummaries(entries);
+  const statutoryHolidayPaidCount = statutoryHolidaySummaries.filter((row) => row.payableHours > 0).length;
+  const statutoryHolidayPaidHours = roundHours(
+    statutoryHolidaySummaries.reduce((sum, row) => sum + row.payableHours, 0)
+  );
   return {
     person: {
       id: personId,
@@ -557,7 +716,10 @@ async function buildTimesheetPrintDocument({
     openMakeupNodeCount: openMakeupNodes.length,
     payableTotalHours: roundHours(entries.reduce((sum, entry) => sum + entry.payableHours, 0)),
     regularTotalHours: roundHours(entries.reduce((sum, entry) => sum + (entry.regularDisplayHours || 0), 0)),
-    optionalTotalHours: roundHours(entries.reduce((sum, entry) => sum + (entry.optionalHours || 0), 0))
+    optionalTotalHours: roundHours(entries.reduce((sum, entry) => sum + (entry.optionalHours || 0), 0)),
+    statutoryHolidaySummaries,
+    statutoryHolidayPaidCount,
+    statutoryHolidayPaidHours
   };
 }
 
@@ -658,6 +820,7 @@ module.exports = {
   buildDepartmentTotals,
   buildDepartmentTotalsFromEffective,
   buildShapedPrintEntriesFromEffective,
+  buildStatutoryHolidayPrintSummaries,
   buildDateKeys,
   calculateHoursFromRange,
   fillLegacyDisplayMetadata,
@@ -675,6 +838,7 @@ module.exports = {
   resolveRegularDisplayHours,
   filterDaysForPrintReview,
   isWeekendDateKey,
+  isStatutoryHolidayEntry,
   shapePrintEntry,
   sortEntriesBySchedule
 };

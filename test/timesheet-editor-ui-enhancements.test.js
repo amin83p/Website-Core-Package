@@ -718,3 +718,53 @@ test('timesheet editor and controller expose makeup session status metadata', ()
   assert.match(model, /makeupOriginalDate/);
   assert.match(model, /makeupOriginalStartTime/);
 });
+
+const timesheetPeriodNavigationService = require('../packages/school/MVC/services/school/timesheetPeriodNavigationService');
+
+test('resolveAdjacentPeriods returns prev and next within same year only', () => {
+  const periods = [
+    { id: 'P1', startDate: '2026-01-01', name: 'Jan' },
+    { id: 'P2', startDate: '2026-02-01', name: 'Feb' },
+    { id: 'P3', startDate: '2026-03-01', name: 'Mar' },
+    { id: 'Y2025', startDate: '2025-12-01', name: 'Dec 2025' }
+  ];
+  const middle = timesheetPeriodNavigationService.resolveAdjacentPeriods({
+    periods,
+    currentPeriodId: 'P2',
+    year: '2026'
+  });
+  assert.equal(middle.prevPeriod?.id, 'P1');
+  assert.equal(middle.nextPeriod?.id, 'P3');
+
+  const first = timesheetPeriodNavigationService.resolveAdjacentPeriods({
+    periods,
+    currentPeriodId: 'P1',
+    year: '2026'
+  });
+  assert.equal(first.prevPeriod, null);
+  assert.equal(first.nextPeriod?.id, 'P2');
+
+  assert.equal(
+    timesheetPeriodNavigationService.buildTimesheetEditorHref({ periodId: 'P2', teacherId: 'TEACH-1', year: '2026' }),
+    '/school/timesheets/editor/P2?year=2026&teacherId=TEACH-1'
+  );
+});
+
+test('timesheet list and editor expose year bulk delete and period navigation', () => {
+  const list = read('packages/school/MVC/views/school/timesheet/timesheetList.ejs');
+  const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
+  const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
+  const routes = read('packages/school/MVC/routes/timesheetRoutes.js');
+
+  assert.match(list, /btnDeleteAllImportedTimesheets/);
+  assert.match(list, /deleteAllImportedTimesheetsForYear/);
+  assert.match(list, /api\/import\/legacy\/year/);
+  assert.match(list, /\?year=\$\{encodeURIComponent\(selectedYear\)\}/);
+
+  assert.match(editor, /ts-period-nav/);
+  assert.match(editor, /navigateToAdjacentTimesheetPeriod/);
+  assert.match(editor, /prevPeriodNav/);
+  assert.match(controller, /deleteMyTimesheetLegacyImportsForYear/);
+  assert.match(controller, /prevPeriodNav/);
+  assert.match(routes, /\/api\/import\/legacy\/year/);
+});

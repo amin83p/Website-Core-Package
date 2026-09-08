@@ -12,6 +12,23 @@ const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const timesheetSessionStudentLabelService = require('./timesheetSessionStudentLabelService');
 const deadlineReconciliationService = require('./timesheetDeadlineReconciliationService');
 
+function isWorkSessionTimesheetEntry(entry = {}) {
+  return entry?.isSchoolActivity === true || String(entry?.sessionId || '').startsWith('act-');
+}
+
+function resolveAutoTimesheetComment(sessionId, entry = {}, savedComments = new Map()) {
+  const normalizedSessionId = String(sessionId || entry?.sessionId || '').trim();
+  const saved = savedComments instanceof Map
+    ? savedComments.get(normalizedSessionId)
+    : savedComments?.[normalizedSessionId];
+  const savedTrimmed = String(saved ?? '').trim();
+  if (savedTrimmed) return savedTrimmed;
+  if (isWorkSessionTimesheetEntry(entry)) {
+    return String(entry?.comment || entry?.notes || '').trim();
+  }
+  return saved !== undefined ? String(saved || '') : '';
+}
+
 function buildTimesheetMakeupMeta(sessionRow, classRow, sessionsByClassId = null) {
   const isMakeupSession = sessionRow?.makeup?.isMakeup === true;
   if (!isMakeupSession) {
@@ -205,9 +222,7 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
     .filter((entry) => !deletedAutoSessionIds.has(String(entry?.sessionId || '').trim()))
     .map((entry) => ({
       ...entry,
-      // The timesheet comment is user-authored timesheet data. Never seed it from
-      // class-session or activity notes carried by the authoritative live entry.
-      comment: savedComments.get(String(entry?.sessionId || '').trim()) || '',
+      comment: resolveAutoTimesheetComment(entry?.sessionId, entry, savedComments),
       isManual: false
     }));
 
@@ -222,5 +237,7 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
 
 module.exports = {
   buildEffectiveTimesheetEntries,
-  buildTimesheetMakeupMeta
+  buildTimesheetMakeupMeta,
+  isWorkSessionTimesheetEntry,
+  resolveAutoTimesheetComment
 };

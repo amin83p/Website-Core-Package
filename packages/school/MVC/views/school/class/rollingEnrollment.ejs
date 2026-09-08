@@ -2504,6 +2504,24 @@
   const groupEnrollmentResultsModalEl = qs('groupEnrollmentResultsModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
 
+  function syncRollingModalLayer() {
+    const openModals = document.querySelectorAll('.modal.show');
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    if (!openModals.length) {
+      backdrops.forEach((backdrop) => backdrop.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+    } else if (backdrops.length > openModals.length) {
+      for (let index = backdrops.length - 1; index >= openModals.length; index -= 1) {
+        backdrops[index]?.remove();
+      }
+    }
+    if (typeof window.hideLoading === 'function' && !openModals.length && rollingBusyDepth <= 0) {
+      window.hideLoading({ force: true });
+    }
+  }
+
   function createModalController(modalEl) {
     if (!modalEl) return null;
 
@@ -4725,6 +4743,9 @@
       return;
     }
     if (isGenericPickerOpen()) return;
+    addEnrollmentModal?.hide();
+    groupEnrollmentModal?.hide();
+    syncRollingModalLayer();
     GenericPicker.open(GenericPickerPresets.class({
       title: 'Select rolling class',
       icon: 'bi-book',
@@ -9209,6 +9230,10 @@
   });
   addEnrollmentModalEl?.addEventListener('hidden.bs.modal', () => {
     if (enrollWizardStep === 'addSessions' || pendingStagedSessions.length) captureGapFormDraft();
+    syncRollingModalLayer();
+  });
+  document.getElementById('genericPickerModal')?.addEventListener('hidden.bs.modal', () => {
+    syncRollingModalLayer();
   });
   programShortcutModalEl?.addEventListener('hidden.bs.modal', () => {
     if (groupEnrollmentResultRepairContext?.mode === 'program') {

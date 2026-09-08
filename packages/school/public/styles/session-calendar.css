@@ -96,10 +96,17 @@
 }
 
 .session-cal-week-row {
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
+  border: 1px solid #d7dee8;
+  border-radius: 10px;
   background: #fff;
   overflow: hidden;
+  box-shadow: 0 0.2rem 0.65rem rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.session-cal-week-row:hover {
+  border-color: #c5d0dc;
+  box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.09);
 }
 
 .session-cal-week-label,
@@ -107,7 +114,7 @@
   padding: 8px 12px;
   font-size: 0.78rem;
   font-weight: 600;
-  background: linear-gradient(180deg, #f8f9fa 0%, #eef1f4 100%);
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f6 100%);
   border-bottom: 1px solid #dee2e6;
   color: #495057;
 }
@@ -116,8 +123,34 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem 0.55rem;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
   line-height: 1.35;
+}
+
+.session-cal-week-label-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.session-cal-week-label-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.schedule-week-time-btn {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .session-cal-week-label-primary {
@@ -1468,7 +1501,32 @@
 .schedule-visual-area.schedule-week-grid-host .session-cal-day-grid {
   flex: 1 1 auto;
   height: auto;
-  min-height: calc(var(--session-hour-height, 28px) * 15);
+  min-height: calc(var(--session-hour-height, 28px) * var(--session-hour-slot-count, 15));
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-hour-grid-line:nth-child(even) {
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-day-header.is-today,
+.schedule-visual-area.schedule-week-grid-host .session-cal-day-cell.is-today {
+  background: rgba(219, 234, 254, 0.35);
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-timeline-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: 0 1px 0 #dee2e6;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-timeline-day-row {
+  border-bottom: 1px solid #edf1f5;
+}
+
+.schedule-visual-area.schedule-week-grid-host .session-cal-timeline-day-row:last-child {
+  border-bottom: 0;
 }
 
 .schedule-visual-area.schedule-week-grid-host .session-cal-hour-grid {

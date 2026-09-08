@@ -451,6 +451,34 @@ test('buildLegacyImportEntries maps compiled rows to activity-linked legacy entr
   assert.equal(rows[0].hours, 2.5);
 });
 
+test('buildLegacyImportEntries maps optional-only rows to billable hours with optional comment', () => {
+  const rows = timesheetLegacyImportService.buildLegacyImportEntries({
+    compiledRows: [{
+      date: '2026-03-01',
+      className: 'ELA One on One',
+      hours: 0,
+      optionalHours: 1.5,
+      studentName: 'Student A'
+    }],
+    activity: {
+      id: 'ACT_IMPORT',
+      title: 'Legacy Import Activity',
+      departmentId: 'DEPT_1',
+      departmentName: 'Academics',
+      categoryName: 'Teaching',
+      visibilityScope: 'school'
+    },
+    personId: 'PERSON_1',
+    periodId: 'PERIOD_1'
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].hours, 1.5);
+  assert.equal(rows[0].timesheetHours, 1.5);
+  assert.match(rows[0].comment, /This hour was optional \(1\.5 hrs\)/);
+  assert.match(rows[0].comment, /Student: Student A/);
+});
+
 test('strip legacy import entries via isLegacyImportEntry helper', () => {
   assert.equal(timesheetLegacyImportService.isLegacyImportEntry({ isLegacyImport: true }), true);
   assert.equal(timesheetLegacyImportService.isLegacyImportEntry({ sessionId: 'legacyimp-1-2-3' }), true);
@@ -1153,4 +1181,94 @@ test('assertTimesheetEditable still blocks submitted status for import apply', (
     () => timesheetLegacyImportService.assertTimesheetEditable({ status: 'submitted' }, { status: 'open' }),
     /Imported timesheets can only be applied/
   );
+});
+
+test('deleteLegacyImportsForYear deletes imported periods in year and skips non-imported periods', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_A',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'draft',
+        entries: [{ isLegacyImport: true, hours: 4, sessionId: 'legacyimp-PER_A-PERSON_1-1' }],
+        legacyImport: { sourceFileName: 'jan.xlsx', importedAt: '2026-01-01' },
+        totalHours: 4
+      },
+      PER_B: {
+        id: 'TS_B',
+        orgId: 'ORG_1',
+        periodId: 'PER_B',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'draft',
+        entries: [],
+        totalHours: 0
+      },
+      PER_C: {
+        id: 'TS_C',
+        orgId: 'ORG_1',
+        periodId: 'PER_C',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'draft',
+        entries: [{ isLegacyImport: true, hours: 2, sessionId: 'legacyimp-PER_C-PERSON_1-1' }],
+        legacyImport: { sourceFileName: 'mar.xlsx', importedAt: '2026-03-01' },
+        totalHours: 2
+      }
+    },
+    periods: {
+      PER_A: { id: 'PER_A', orgId: 'ORG_1', name: 'Jan', startDate: '2026-01-01', endDate: '2026-01-15', status: 'open' },
+      PER_B: { id: 'PER_B', orgId: 'ORG_1', name: 'Feb', startDate: '2026-02-01', endDate: '2026-02-15', status: 'open' },
+      PER_C: { id: 'PER_C', orgId: 'ORG_1', name: 'Mar', startDate: '2026-03-01', endDate: '2026-03-15', status: 'open' },
+      PER_2025: { id: 'PER_2025', orgId: 'ORG_1', name: 'Dec 2025', startDate: '2025-12-01', endDate: '2025-12-15', status: 'open' }
+    }
+  });
+  const originalFetch = dataService.fetchData;
+  dataService.fetchData = async (entityType) => {
+    if (entityType === 'timesheetPeriods') {
+      return [
+        { id: 'PER_A', orgId: 'ORG_1', name: 'Jan', startDate: '2026-01-01', endDate: '2026-01-15', status: 'open' },
+        { id: 'PER_B', orgId: 'ORG_1', name: 'Feb', startDate: '2026-02-01', endDate: '2026-02-15', status: 'open' },
+        { id: 'PER_C', orgId: 'ORG_1', name: 'Mar', startDate: '2026-03-01', endDate: '2026-03-15', status: 'open' },
+        { id: 'PER_2025', orgId: 'ORG_1', name: 'Dec 2025', startDate: '2025-12-01', endDate: '2025-12-15', status: 'open' }
+      ];
+    }
+    return originalFetch(entityType);
+  };
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImportsForYear({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      year: '2026',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS,
+      skipImportPolicyCheck: true
+    });
+    assert.equal(outcome.deletedCount, 2);
+    assert.equal(outcome.results.length, 2);
+    assert.deepEqual(
+      outcome.results.map((row) => row.periodId).sort(),
+      ['PER_A', 'PER_C']
+    );
+    assert.equal(outcome.failures.length, 0);
+  } finally {
+    dataService.fetchData = originalFetch;
+    stub.restore();
+  }
+});
+
+test('my timesheets list and routes expose bulk year legacy delete', () => {
+  const controller = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/controllers/school/timesheetController.js'), 'utf8');
+  const listView = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/timesheet/timesheetList.ejs'), 'utf8');
+  const routes = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/routes/timesheetRoutes.js'), 'utf8');
+  assert.match(controller, /deleteMyTimesheetLegacyImportsForYear/);
+  assert.match(controller, /deleteLegacyImportsForYear/);
+  assert.match(controller, /canDeleteAllImportedTimesheets/);
+  assert.match(listView, /btnDeleteAllImportedTimesheets/);
+  assert.match(listView, /deleteAllImportedTimesheetsForYear/);
+  assert.match(listView, /api\/import\/legacy\/year/);
+  assert.match(routes, /\/api\/import\/legacy\/year/);
 });

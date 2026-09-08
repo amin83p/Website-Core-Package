@@ -36,6 +36,8 @@ test('extractPreferences normalizes dates, persons, and autoChangeDetector', () 
   assert.equal(prefs.persons.length, 2);
   assert.equal(prefs.persons[0].id, 'P1');
   assert.equal(prefs.autoChangeDetector, false);
+  assert.equal(prefs.timelineStartHour, 7);
+  assert.equal(prefs.timelineEndHour, 22);
 });
 
 test('extractPreferences rejects invalid dates and defaults active person', () => {
@@ -65,6 +67,44 @@ test('mergePreferences preserves existing values for partial updates', () => {
   assert.equal(merged.endDate, '2026-09-07');
   assert.equal(merged.persons.length, 1);
   assert.equal(merged.autoChangeDetector, false);
+});
+
+test('extractPreferences normalizes timeline hours and rejects invalid bounds', () => {
+  const prefs = extractPreferences({
+    timelineStartHour: 8,
+    timelineEndHour: 18
+  });
+  assert.equal(prefs.timelineStartHour, 8);
+  assert.equal(prefs.timelineEndHour, 18);
+
+  const invalid = extractPreferences({
+    timelineStartHour: 20,
+    timelineEndHour: 21
+  });
+  assert.equal(invalid.timelineStartHour, 7);
+  assert.equal(invalid.timelineEndHour, 22);
+});
+
+test('mergePreferences updates timeline hours without clearing workspace fields', () => {
+  const current = extractPreferences({
+    startDate: '2026-09-01',
+    endDate: '2026-09-07',
+    activePersonId: 'P1',
+    persons: [{ id: 'P1', name: 'Alpha' }],
+    timelineStartHour: 7,
+    timelineEndHour: 22
+  });
+  const merged = mergePreferences(current, { timelineStartHour: 6, timelineEndHour: 20 });
+  assert.equal(merged.startDate, '2026-09-01');
+  assert.equal(merged.persons.length, 1);
+  assert.equal(merged.timelineStartHour, 6);
+  assert.equal(merged.timelineEndHour, 20);
+});
+
+test('emptyPreferences includes default timeline hours', () => {
+  const prefs = emptyPreferences();
+  assert.equal(prefs.timelineStartHour, 7);
+  assert.equal(prefs.timelineEndHour, 22);
 });
 
 test('sanitizeForAccess keeps only locked person for non-admin viewers', () => {
@@ -214,6 +254,8 @@ test('personSchedule wires workspace save and user-settings restore', () => {
   assert.match(source, /data-schedule-save-drafts/);
   assert.match(source, /data-schedule-day-size-toggle/);
   assert.match(source, /schedule-day-size-popover/);
+  assert.match(source, /data-schedule-time-range-toggle/);
+  assert.match(source, /data-schedule-week-expand-time/);
   assert.match(source, /buildScheduleSaveDraftsButtonHtml/);
   assert.match(source, /commitScheduleDraftSessions/);
   assert.match(source, /SCHEDULE_COMMIT_STAGED_API/);

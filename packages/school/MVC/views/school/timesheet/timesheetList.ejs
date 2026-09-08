@@ -54,6 +54,22 @@
             </div>
         </div>
     <% } %>
+
+    <% if (typeof canDeleteAllImportedTimesheets !== 'undefined' && canDeleteAllImportedTimesheets) { %>
+    <div class="ms-auto">
+        <label class="form-label fw-bold small mb-1 d-block invisible" aria-hidden="true">Bulk actions</label>
+        <button
+            type="button"
+            id="btnDeleteAllImportedTimesheets"
+            class="btn btn-outline-danger btn-sm shadow-sm"
+            data-selected-year="<%= selectedYear %>"
+            data-imported-count="<%= importedPeriodCountInYear || 0 %>"
+            title="Remove imported timesheets from all periods in <%= selectedYear %>"
+        >
+            <i class="bi bi-trash me-1"></i>Delete All Imported Timesheets
+        </button>
+    </div>
+    <% } %>
 </div>
 
 <% if (isAdmin && String(targetTeacherId) !== String(currentTeacherId) && selectedTeacherName) { %>
@@ -93,7 +109,7 @@
       <% data.forEach(p => { %>
         <%
           const deadlineLabel = formatDeadline(p);
-          const editorHref = `/school/timesheets/editor/${p.id}?teacherId=${isAdmin ? targetTeacherId : ''}`;
+          const editorHref = `/school/timesheets/editor/${p.id}?year=${encodeURIComponent(selectedYear)}${isAdmin ? `&teacherId=${encodeURIComponent(targetTeacherId)}` : ''}`;
           let badge = 'bg-secondary';
           if (p.tsStatus === 'draft') badge = 'bg-info text-dark';
           if (p.tsStatus === 'submitted') badge = 'bg-primary';
@@ -464,6 +480,81 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteBtn.getAttribute('data-my-delete-import-name') || ''
             );
         }
+    });
+
+    let myLegacyYearDeleteInProgress = false;
+
+    async function deleteAllImportedTimesheetsForYear() {
+        const trigger = document.getElementById('btnDeleteAllImportedTimesheets');
+        if (!trigger || myLegacyYearDeleteInProgress) return;
+        const year = String(trigger.getAttribute('data-selected-year') || document.getElementById('topYearFilter')?.value || '').trim();
+        const importedCount = Number(trigger.getAttribute('data-imported-count') || 0);
+        if (!year) return;
+
+        const confirmed = await uiConfirm(
+            'Remove imported timesheets from <b>' + importedCount + '</b> period'
+            + (importedCount === 1 ? '' : 's') + ' in <b>' + escapeHtml(year) + '</b>?',
+            'Delete all imported timesheets?'
+        );
+        if (!confirmed) return;
+
+        myLegacyYearDeleteInProgress = true;
+        const loadingToken = beginLegacyDeleteLoading();
+        try {
+            const params = new URLSearchParams({ year });
+            const filterTeacherId = document.getElementById('filter_teacherId') ? String(document.getElementById('filter_teacherId').value || '').trim() : '';
+            const pageTeacherId = '<%= targetTeacherId || "" %>';
+            const resolvedTeacherId = filterTeacherId || pageTeacherId;
+            if (resolvedTeacherId) params.set('teacherId', resolvedTeacherId);
+            if (actionStateId) params.set('actionStateId', actionStateId);
+            const res = await fetch('/school/timesheets/api/import/legacy/year?' + params.toString(), {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify({ actionStateId, year })
+            });
+            const payload = await res.json();
+            if (!res.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Bulk delete request failed.');
+            }
+            applyActionStateFromResult(payload);
+            const results = Array.isArray(payload.results) ? payload.results : [];
+            results.forEach((row) => {
+                if (row?.periodId) applyMyTimesheetRowAfterLegacyDelete(row.periodId, row);
+            });
+            const failureCount = Array.isArray(payload.failures) ? payload.failures.length : 0;
+            if (failureCount) {
+                const failureLines = payload.failures.map((row) => escapeHtml(row.periodName || row.periodId || 'Period') + ': ' + escapeHtml(row.message || 'Delete failed.'));
+                await showMessage({
+                    title: 'Partial Delete',
+                    icon: 'warning',
+                    message: escapeHtml(payload.message || 'Some imported timesheets were removed.') + '<div class="small mt-2 text-start">' + failureLines.join('<br>') + '</div>',
+                    buttons: [{ text: 'OK', class: 'btn-primary' }]
+                });
+            } else {
+                await showMessage({
+                    title: 'Imports Removed',
+                    icon: 'success',
+                    message: escapeHtml(payload.message || 'Imported timesheets were removed for the selected year.'),
+                    buttons: [{ text: 'OK', class: 'btn-primary' }]
+                });
+            }
+            if (Number(payload.deletedCount || 0) >= importedCount) {
+                trigger.remove();
+            } else {
+                const remaining = Math.max(0, importedCount - Number(payload.deletedCount || 0));
+                trigger.setAttribute('data-imported-count', String(remaining));
+                if (!remaining) trigger.remove();
+            }
+        } catch (error) {
+            await showMessage({ title: 'Delete Error', icon: 'error', message: escapeHtml(error.message || String(error)) });
+        } finally {
+            myLegacyYearDeleteInProgress = false;
+            endLegacyDeleteLoading(loadingToken);
+        }
+    }
+
+    document.getElementById('btnDeleteAllImportedTimesheets')?.addEventListener('click', () => {
+        void deleteAllImportedTimesheetsForYear();
     });
 
     <% if (typeof canImportMyTimesheets !== 'undefined' && canImportMyTimesheets) { %>

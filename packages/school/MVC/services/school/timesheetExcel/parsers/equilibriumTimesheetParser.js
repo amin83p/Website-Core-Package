@@ -11,6 +11,7 @@ const {
   parseFilenamePeriod,
   deriveDayOfWeek
 } = require('../timesheetExcelCellUtils');
+const { resolveImportBillableHours } = require('../../timesheetImportWorkSessionBuilderService');
 
 const TEMPLATE_ID = 'equilibrium-v1';
 
@@ -213,7 +214,7 @@ function parse(workbook, options = {}) {
     warnings.push(`Employee name in file (${employeeNameFromFile}) differs from selected teacher (${selectedTeacherName}).`);
   }
 
-  const totalHours = rows.reduce((sum, row) => sum + (Number(row.hours) || 0), 0);
+  const totalHours = rows.reduce((sum, row) => sum + resolveImportBillableHours(row), 0);
   return {
     templateId: TEMPLATE_ID,
     employeeNameFromFile,

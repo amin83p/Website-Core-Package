@@ -424,6 +424,18 @@ window.GenericPicker = (function() {
             document.querySelectorAll('.modal-backdrop.show').forEach((backdrop) => {
                 backdrop.style.removeProperty('z-index');
             });
+            const openModals = document.querySelectorAll('.modal.show');
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            if (!openModals.length) {
+                backdrops.forEach((backdrop) => backdrop.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            } else if (backdrops.length > openModals.length) {
+                for (let index = backdrops.length - 1; index >= openModals.length; index -= 1) {
+                    backdrops[index]?.remove();
+                }
+            }
         });
         if (loadMoreBtn) {
             loadMoreBtn.addEventListener('click', () => {

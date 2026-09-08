@@ -88,6 +88,60 @@ test('stackCompiledRowsByDate rejects more than 24 hours on one day', () => {
   );
 });
 
+test('stackCompiledRowsByDate treats optional-only rows as billable hours', () => {
+  const stacked = builder.stackCompiledRowsByDate([
+    { date: '2026-03-01', hours: 0, optionalHours: 1.5, className: 'ELA One on One', studentName: 'Student A' }
+  ]);
+
+  assert.equal(stacked.length, 1);
+  assert.equal(stacked[0].durationHours, 1.5);
+  assert.equal(stacked[0].startTime, '00:00');
+  assert.equal(stacked[0].endTime, '01:30');
+});
+
+test('stackCompiledRowsByDate sums regular and optional hours on the same row', () => {
+  const stacked = builder.stackCompiledRowsByDate([
+    { date: '2026-03-01', hours: 2, optionalHours: 1, className: 'Math' }
+  ]);
+
+  assert.equal(stacked.length, 1);
+  assert.equal(stacked[0].durationHours, 3);
+  assert.equal(stacked[0].endTime, '03:00');
+});
+
+test('buildImportRowNotes mentions optional hours in comment', () => {
+  const notes = builder.buildImportRowNotes({
+    comment: 'Cancelled session',
+    optionalHours: 1.5
+  });
+  assert.match(notes, /Cancelled session/);
+  assert.match(notes, /This hour was optional \(1\.5 hrs\)/);
+});
+
+test('buildImportWorkSessionEntryDrafts bills optional-only rows with optional comment', () => {
+  const drafts = builder.buildImportWorkSessionEntryDrafts({
+    compiledRows: [{
+      date: '2026-03-01',
+      hours: 0,
+      optionalHours: 1,
+      className: 'ELA One on One',
+      studentName: 'Student A'
+    }],
+    activity: ACTIVITY,
+    personId: 'PERSON_1',
+    personRole: 'teacher',
+    periodId: 'PER_A',
+    batchId: 'BATCH_1',
+    sourceFileName: 'march.xlsx'
+  });
+
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].durationHours, 1);
+  assert.equal(drafts[0].assignees[0].paidHours, 1);
+  assert.match(drafts[0].notes, /This hour was optional \(1 hr\)/);
+  assert.match(drafts[0].notes, /Student: Student A/);
+});
+
 test('buildCompletedAssignee marks attendance activities attended', () => {
   const assignee = builder.buildCompletedAssignee({
     activity: ACTIVITY,

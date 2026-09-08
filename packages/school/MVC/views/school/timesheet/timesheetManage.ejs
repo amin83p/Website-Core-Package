@@ -1722,6 +1722,14 @@
     return num.toFixed(2);
   }
 
+  function resolveImportBillableHours(row) {
+    const regular = Math.max(0, Number(parseFloat(row?.hours) || 0));
+    const optional = row?.optionalHours != null && Number.isFinite(Number(row.optionalHours))
+      ? Math.max(0, Number(row.optionalHours))
+      : 0;
+    return Number((regular + optional).toFixed(2));
+  }
+
   function formatImportDateLong(dateToken) {
     const token = String(dateToken || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token || 'Unknown date';
@@ -1856,7 +1864,7 @@
 
     const bodyHtml = groups.map((group, groupIndex) => {
       const bandClass = groupIndex % 2 === 0 ? 'ts-import-band-even' : 'ts-import-band-odd';
-      const dayHours = group.rows.reduce((sum, row) => sum + (Number(row.hours) || 0), 0);
+      const dayHours = group.rows.reduce((sum, row) => sum + resolveImportBillableHours(row), 0);
       const rowSpan = group.rows.length + 1;
       const dateMain = escapeHtml(formatImportDateShort(group.date));
       const dateLong = escapeHtml(formatImportDateLong(group.date));

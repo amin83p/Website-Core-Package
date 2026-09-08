@@ -109,6 +109,11 @@ router.delete('/api/import/legacy',
   trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
   ctrl.deleteMyTimesheetLegacyImport);
 
+router.delete('/api/import/legacy/year',
+  requireMyTimesheetLegacyDeleteAccess,
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.deleteMyTimesheetLegacyImportsForYear);
+
 router.post('/manage/print',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.EXPORT),
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.EXPORT),

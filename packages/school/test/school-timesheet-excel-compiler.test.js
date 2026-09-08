@@ -86,6 +86,21 @@ test('equilibrium parser extracts period, rows, and employee name', async () => 
   assert.equal(parsed.rows[1].studentName, 'Student A');
 });
 
+test('equilibrium parser totalHours includes optional column values', async () => {
+  const workbook = await buildEquilibriumWorkbook({
+    rows: [
+      { date: '2026-03-16T00:00:00.000Z', className: 'LINC', hours: 6 },
+      { date: '2026-03-16T00:00:00.000Z', className: 'ELA One on One', hours: 0, optionalHours: 1.5, studentName: 'Student A' }
+    ]
+  });
+  const parsed = equilibriumParser.parse(workbook, {
+    fileName: 'Time Sheet March 16-31,2026.xlsx',
+    personName: 'Test Teacher'
+  });
+
+  assert.equal(parsed.stats.totalHours, 7.5);
+});
+
 test('equilibrium parser falls back to filename dates when metadata is missing', async () => {
   const workbook = await buildEquilibriumWorkbook({ includePeriodMetadata: false });
   const parsed = equilibriumParser.parse(workbook, {

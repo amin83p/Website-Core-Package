@@ -7,6 +7,84 @@
   const HOUR_SLOT_COUNT = TIMELINE_END_HOUR - TIMELINE_START_HOUR;
   const TIMELINE_SNAP_MINUTES = 30;
   const TIMELINE_SNAP_THRESHOLD_MINUTES = 10;
+  const TIMELINE_MIN_SPAN_HOURS = 2;
+
+  function resolveTimelineBounds(options = {}) {
+    const source = options && typeof options === 'object' ? options : {};
+    let startHour = Number(source.timelineStartHour ?? source.startHour ?? TIMELINE_START_HOUR);
+    let endHour = Number(source.timelineEndHour ?? source.endHour ?? TIMELINE_END_HOUR);
+    if (!Number.isFinite(startHour)) startHour = TIMELINE_START_HOUR;
+    if (!Number.isFinite(endHour)) endHour = TIMELINE_END_HOUR;
+    startHour = Math.max(0, Math.min(23, Math.floor(startHour)));
+    endHour = Math.max(1, Math.min(24, Math.floor(endHour)));
+    const hasExplicitStart = source.timelineStartHour != null || source.startHour != null;
+    const hasExplicitEnd = source.timelineEndHour != null || source.endHour != null;
+    if (endHour <= startHour || endHour - startHour < TIMELINE_MIN_SPAN_HOURS) {
+      if (!hasExplicitStart && !hasExplicitEnd) {
+        startHour = TIMELINE_START_HOUR;
+        endHour = TIMELINE_END_HOUR;
+      } else {
+        startHour = TIMELINE_START_HOUR;
+        endHour = TIMELINE_END_HOUR;
+      }
+    }
+    const slotCount = endHour - startHour;
+    const totalMinutes = slotCount * 60;
+    return { startHour, endHour, slotCount, totalMinutes };
+  }
+
+  function computeSessionTimeExtents(events = []) {
+    let minStart = Infinity;
+    let maxEnd = -Infinity;
+    (Array.isArray(events) ? events : []).forEach((ev) => {
+      const startMin = timeToMinutes(ev?.start);
+      const endMin = timeToMinutes(ev?.end);
+      if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) return;
+      if (startMin < minStart) minStart = startMin;
+      if (endMin > maxEnd) maxEnd = endMin;
+    });
+    if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd)) {
+      return { minStartMin: null, maxEndMin: null };
+    }
+    return { minStartMin: minStart, maxEndMin: maxEnd };
+  }
+
+  function sessionsOutsideTimelineBounds(events = [], boundsInput = {}) {
+    const bounds = resolveTimelineBounds(boundsInput);
+    const timelineStartMin = bounds.startHour * 60;
+    const timelineEndMin = bounds.endHour * 60;
+    return (Array.isArray(events) ? events : []).some((ev) => {
+      const startMin = timeToMinutes(ev?.start);
+      const endMin = timeToMinutes(ev?.end);
+      if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) return false;
+      return startMin < timelineStartMin || endMin > timelineEndMin;
+    });
+  }
+
+  function expandTimelineBoundsToFitSessions(boundsInput = {}, events = [], paddingMinutes = 0) {
+    const base = resolveTimelineBounds(boundsInput);
+    const extents = computeSessionTimeExtents(events);
+    if (extents.minStartMin === null || extents.maxEndMin === null) return base;
+    const pad = Math.max(0, Number(paddingMinutes) || 0);
+    let startMin = Math.max(0, extents.minStartMin - pad);
+    let endMin = Math.min(24 * 60, extents.maxEndMin + pad);
+    let startHour = Math.max(0, Math.floor(startMin / 60));
+    let endHour = Math.min(24, Math.ceil(endMin / 60));
+    if (endHour - startHour < TIMELINE_MIN_SPAN_HOURS) {
+      endHour = Math.min(24, startHour + TIMELINE_MIN_SPAN_HOURS);
+    }
+    return resolveTimelineBounds({ timelineStartHour: startHour, timelineEndHour: endHour });
+  }
+
+  function getTimelineBoundsFromWeekRow(row) {
+    if (!row) return resolveTimelineBounds();
+    const start = row.getAttribute('data-timeline-start-hour');
+    const end = row.getAttribute('data-timeline-end-hour');
+    if (start !== null && end !== null) {
+      return resolveTimelineBounds({ timelineStartHour: start, timelineEndHour: end });
+    }
+    return resolveTimelineBounds();
+  }
 
   const VIEW_PRESETS = ['day', 'week', 'twoWeeks', 'thirtyDays', 'month', 'twoMonths', 'threeMonths', 'fourMonths', 'fiveMonths', 'sixMonths', 'wholeCycle', 'custom'];
   const VIEW_MODES = ['singleDay', 'vertical', 'timeline', 'month'];
@@ -389,6 +467,17 @@
     return inRange ? '' : 'is-out-of-range is-outside-month';
   }
 
+  function isTodayDate(dateStr) {
+    const normalized = normalizeDateOnly(dateStr);
+    if (!normalized) return false;
+    const today = parseAnchorDate('');
+    return normalized === today;
+  }
+
+  function todayDayClass(dateStr) {
+    return isTodayDate(dateStr) ? 'is-today' : '';
+  }
+
   function datePartsToIso(year, monthIndex, day) {
     return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
@@ -418,16 +507,17 @@
     return (h * 60) + (m || 0);
   }
 
-  function calculatePosition(startStr, endStr) {
+  function calculatePosition(startStr, endStr, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
     let startMin = timeToMinutes(startStr);
     let endMin = timeToMinutes(endStr);
-    const timelineStartMin = TIMELINE_START_HOUR * 60;
-    const timelineEndMin = TIMELINE_END_HOUR * 60;
+    const timelineStartMin = bounds.startHour * 60;
+    const timelineEndMin = bounds.endHour * 60;
     if (startMin < timelineStartMin) startMin = timelineStartMin;
     if (endMin > timelineEndMin) endMin = timelineEndMin;
     if (endMin <= startMin) endMin = startMin + 30;
-    const leftPercent = ((startMin - timelineStartMin) / TOTAL_MINUTES) * 100;
-    const widthPercent = ((endMin - startMin) / TOTAL_MINUTES) * 100;
+    const leftPercent = ((startMin - timelineStartMin) / bounds.totalMinutes) * 100;
+    const widthPercent = ((endMin - startMin) / bounds.totalMinutes) * 100;
     return { left: leftPercent, width: widthPercent, startMin, endMin };
   }
 
@@ -597,10 +687,11 @@
     `;
   }
 
-  function assignTracks(dayEvents) {
+  function assignTracks(dayEvents, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
     const tracks = [];
     dayEvents.forEach((ev) => {
-      const pos = calculatePosition(ev.start, ev.end);
+      const pos = calculatePosition(ev.start, ev.end, bounds);
       ev.pos = pos;
       let placed = false;
       for (let i = 0; i < tracks.length; i += 1) {
@@ -620,10 +711,11 @@
     return tracks;
   }
 
-  function formatSnappedTimelineLabel(offsetMinutes) {
-    const timelineStartMin = TIMELINE_START_HOUR * 60;
+  function formatSnappedTimelineLabel(offsetMinutes, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
+    const timelineStartMin = bounds.startHour * 60;
     const total = timelineStartMin + Math.max(0, Math.round(offsetMinutes));
-    const capped = Math.min(timelineStartMin + TOTAL_MINUTES, total);
+    const capped = Math.min(timelineStartMin + bounds.totalMinutes, total);
     const h24 = Math.floor(capped / 60);
     const m = capped % 60;
     const period = h24 >= 12 ? 'PM' : 'AM';
@@ -632,36 +724,41 @@
     return `${h12}:${String(m).padStart(2, '0')} ${period}`;
   }
 
-  function snapTimelineOffsetMinutes(offsetMinutes, thresholdMinutes = TIMELINE_SNAP_THRESHOLD_MINUTES) {
-    const raw = Math.max(0, Math.min(TOTAL_MINUTES, Number(offsetMinutes) || 0));
+  function snapTimelineOffsetMinutes(offsetMinutes, thresholdMinutes = TIMELINE_SNAP_THRESHOLD_MINUTES, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
+    const raw = Math.max(0, Math.min(bounds.totalMinutes, Number(offsetMinutes) || 0));
     const snapped = Math.round(raw / TIMELINE_SNAP_MINUTES) * TIMELINE_SNAP_MINUTES;
-    const capped = Math.max(0, Math.min(TOTAL_MINUTES, snapped));
+    const capped = Math.max(0, Math.min(bounds.totalMinutes, snapped));
     if (Math.abs(raw - capped) > thresholdMinutes) return null;
     return capped;
   }
 
-  function snapTimelineOffsetMinutesForClick(offsetMinutes) {
-    const raw = Math.max(0, Math.min(TOTAL_MINUTES, Number(offsetMinutes) || 0));
+  function snapTimelineOffsetMinutesForClick(offsetMinutes, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
+    const raw = Math.max(0, Math.min(bounds.totalMinutes, Number(offsetMinutes) || 0));
     const snapped = Math.round(raw / TIMELINE_SNAP_MINUTES) * TIMELINE_SNAP_MINUTES;
-    return Math.max(0, Math.min(TOTAL_MINUTES, snapped));
+    return Math.max(0, Math.min(bounds.totalMinutes, snapped));
   }
 
-  function offsetMinutesFromGridY(y, height) {
+  function offsetMinutesFromGridY(y, height, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
     const h = Number(height || 0);
     if (!h) return 0;
     const ratio = Math.max(0, Math.min(1, Number(y || 0) / h));
-    return ratio * TOTAL_MINUTES;
+    return ratio * bounds.totalMinutes;
   }
 
-  function offsetMinutesFromGridX(x, width) {
+  function offsetMinutesFromGridX(x, width, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
     const w = Number(width || 0);
     if (!w) return 0;
     const ratio = Math.max(0, Math.min(1, Number(x || 0) / w));
-    return ratio * TOTAL_MINUTES;
+    return ratio * bounds.totalMinutes;
   }
 
-  function timelineMinutesFromOffset(offsetMinutes) {
-    return TIMELINE_START_HOUR * 60 + offsetMinutes;
+  function timelineMinutesFromOffset(offsetMinutes, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
+    return bounds.startHour * 60 + offsetMinutes;
   }
 
   function isPointerOverSessionUi(target) {
@@ -1373,6 +1470,8 @@
 
   function updateVerticalTimeHover(row, clientY, target) {
     if (!row) return;
+    const weekRow = row.closest('.session-cal-week-row');
+    const bounds = getTimelineBoundsFromWeekRow(weekRow);
     if (isPointerOverSessionUi(target)) {
       row.classList.remove('is-time-hover');
       return;
@@ -1396,18 +1495,18 @@
     }
     const y = clientY - trackRect.top;
     const height = trackRect.height;
-    const snappedOffset = snapTimelineOffsetMinutes(offsetMinutesFromGridY(y, height));
+    const snappedOffset = snapTimelineOffsetMinutes(offsetMinutesFromGridY(y, height, bounds), undefined, bounds);
     if (snappedOffset === null || isSnappedTimeOccupiedOnDay(dayCell, snappedOffset)) {
       row.classList.remove('is-time-hover');
       return;
     }
-    const pct = (snappedOffset / TOTAL_MINUTES) * 100;
+    const pct = (snappedOffset / bounds.totalMinutes) * 100;
     const line = row.querySelector('.session-cal-hover-line');
     const label = row.querySelector('.session-cal-hover-time-label');
     if (line) line.style.top = `${pct}%`;
     if (label) {
       label.style.top = `${pct}%`;
-      label.textContent = formatSnappedTimelineLabel(snappedOffset);
+      label.textContent = formatSnappedTimelineLabel(snappedOffset, bounds);
     }
     row.classList.add('is-time-hover');
   }
@@ -1421,6 +1520,7 @@
 
   function updateTimelineTimeHover(weekRow, clientX, target) {
     if (!weekRow) return;
+    const bounds = getTimelineBoundsFromWeekRow(weekRow);
     if (isPointerOverSessionUi(target)) {
       weekRow.classList.remove('is-time-hover');
       return;
@@ -1444,20 +1544,20 @@
     }
     const x = clientX - trackRect.left;
     const width = trackRect.width;
-    const snappedOffset = snapTimelineOffsetMinutes(offsetMinutesFromGridX(x, width));
+    const snappedOffset = snapTimelineOffsetMinutes(offsetMinutesFromGridX(x, width, bounds), undefined, bounds);
     if (snappedOffset === null || isSnappedTimeOccupiedInTrack(track, snappedOffset)) {
       weekRow.classList.remove('is-time-hover');
       return;
     }
     const shellRect = shell.getBoundingClientRect();
-    const pct = snappedOffset / TOTAL_MINUTES;
+    const pct = snappedOffset / bounds.totalMinutes;
     const lineLeft = trackRect.left - shellRect.left + pct * trackRect.width;
     const line = weekRow.querySelector('.session-cal-hover-line-vertical');
     const label = weekRow.querySelector('.session-cal-hover-time-label-horizontal');
     if (line) line.style.left = `${lineLeft}px`;
     if (label) {
       label.style.left = `${lineLeft}px`;
-      label.textContent = formatSnappedTimelineLabel(snappedOffset);
+      label.textContent = formatSnappedTimelineLabel(snappedOffset, bounds);
     }
     weekRow.classList.add('is-time-hover');
   }
@@ -1495,36 +1595,56 @@
     bindCalendarTimeHover(container);
   }
 
-  function buildVerticalTimeGutterHtml() {
+  function buildVerticalTimeGutterHtml(boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
     let html = '<div class="session-cal-time-gutter" aria-hidden="true">';
-    for (let h = TIMELINE_START_HOUR; h < TIMELINE_END_HOUR; h += 1) {
+    for (let h = bounds.startHour; h < bounds.endHour; h += 1) {
       html += `<div class="session-cal-hour-slot"><span class="session-cal-hour-label">${formatHourLabelCompact(h)}</span></div>`;
     }
     html += '</div>';
     return html;
   }
 
-  function buildHorizontalTimeHeaderHtml() {
+  function buildHorizontalTimeHeaderHtml(boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
     let html = '<div class="session-cal-time-header" aria-hidden="true">';
-    for (let h = TIMELINE_START_HOUR; h < TIMELINE_END_HOUR; h += 1) {
+    for (let h = bounds.startHour; h < bounds.endHour; h += 1) {
       html += `<div class="session-cal-hour-slot session-cal-hour-header-slot"><span class="session-cal-hour-label">${formatHourLabel(h)}</span></div>`;
     }
     html += '</div>';
     return html;
   }
 
-  function buildHourGridBackgroundHtml() {
+  function buildHourGridBackgroundHtml(boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
     let html = '<div class="session-cal-hour-grid" aria-hidden="true">';
-    for (let h = TIMELINE_START_HOUR; h < TIMELINE_END_HOUR; h += 1) {
+    for (let h = bounds.startHour; h < bounds.endHour; h += 1) {
       html += '<div class="session-cal-hour-grid-line"></div>';
     }
     html += '</div>';
     return html;
   }
 
+  function buildWeekLabelRowHtml(weekStart, weekEnd, extraHtml = '', boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
+    const actions = String(extraHtml || '').trim();
+    return `
+      <div class="session-cal-week-label">
+        <div class="session-cal-week-label-main">${formatWeekLabelHtml(weekStart, weekEnd)}</div>
+        ${actions ? `<div class="session-cal-week-label-actions">${actions}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function weekRowTimelineAttrs(boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
+    return `data-timeline-start-hour="${bounds.startHour}" data-timeline-end-hour="${bounds.endHour}"`;
+  }
+
   function renderVerticalDayCell(dateStr, dayEvents, inRange, holidayDates, options = {}) {
     const selectedSet = options.selectedSet || null;
-    const tracks = assignTracks((dayEvents || []).slice());
+    const timelineBounds = resolveTimelineBounds(options.timelineBounds || options);
+    const tracks = assignTracks((dayEvents || []).slice(), timelineBounds);
     const trackCount = Math.max(1, tracks.length);
     const extraClass = resolveDayExtraClasses({ date: dateStr, inRange }, dayEvents, inRange, 'vertical', options);
     const dayClass = buildDayCalendarClasses(
@@ -1532,6 +1652,7 @@
       holidayDates,
       'session-cal-day-cell',
       outOfViewRangeDayClass(inRange),
+      todayDayClass(dateStr),
       extraClass
     );
     let sessionsHtml = '';
@@ -1552,7 +1673,7 @@
     return `
       <div class="${dayClass}" data-cal-date="${escapeHtml(dateStr)}">
         <div class="session-cal-day-grid">
-          ${buildHourGridBackgroundHtml()}
+          ${buildHourGridBackgroundHtml(timelineBounds)}
           ${sessionsHtml}
           ${buildVerticalDragOverlayHtml()}
         </div>
@@ -1580,45 +1701,61 @@
     let renderedWeekCount = 0;
     let visibleDayCount = 0;
 
+    const defaultBounds = resolveTimelineBounds(options);
+    const resolveWeekBounds = typeof options.resolveWeekTimelineBounds === 'function'
+      ? options.resolveWeekTimelineBounds
+      : null;
+    const buildWeekLabelExtra = typeof options.buildWeekLabelExtraHtml === 'function'
+      ? options.buildWeekLabelExtraHtml
+      : null;
+
     let html = '<div class="session-cal-vertical-scroll"><div class="session-cal-week-stack">';
     weekBlocks.forEach((week) => {
       const days = filterWeekDaysForDisplay(week.days, eventsByDate, filterEmptyDays);
       if (!days.length) return;
       renderedWeekCount += 1;
       visibleDayCount = Math.max(visibleDayCount, days.length);
+      const weekBounds = resolveWeekBounds
+        ? resolveWeekBounds(week.weekStart, week.weekEnd, week.days, eventsByDate)
+        : defaultBounds;
+      const labelExtra = buildWeekLabelExtra
+        ? buildWeekLabelExtra(week.weekStart, week.weekEnd, week.days, eventsByDate, weekBounds)
+        : '';
+      const weekCellOptions = { ...cellOptions, timelineBounds: weekBounds };
       html += `
-        <div class="session-cal-week-row">
-          <div class="session-cal-week-label">${formatWeekLabelHtml(week.weekStart, week.weekEnd)}</div>
+        <div class="session-cal-week-row" ${weekRowTimelineAttrs(weekBounds)}>
+          ${buildWeekLabelRowHtml(week.weekStart, week.weekEnd, labelExtra, weekBounds)}
           <div class="session-cal-week-grid-vertical">
             <div class="session-cal-day-header-row">
               <div class="session-cal-time-gutter-spacer" aria-hidden="true"></div>
       `;
       days.forEach((day) => {
         const dayEvents = eventsByDate[day.date] || [];
-        const headerExtra = resolveDayExtraClasses(day, dayEvents, day.inRange, 'vertical-header', cellOptions);
+        const headerExtra = resolveDayExtraClasses(day, dayEvents, day.inRange, 'vertical-header', weekCellOptions);
         const headerClass = buildDayCalendarClasses(
           day.date,
           holidayDates,
           'session-cal-day-header',
           outOfViewRangeDayClass(day.inRange),
+          todayDayClass(day.date),
           headerExtra
         );
         html += `
           <div class="${headerClass}">
             ${formatDayHeaderHtml(day.date, 'vertical')}
-            ${resolveDayHeaderBadgeHtml(day, dayEvents, day.inRange, cellOptions)}
+            ${resolveDayHeaderBadgeHtml(day, dayEvents, day.inRange, weekCellOptions)}
           </div>
         `;
       });
       html += `
             </div>
             <div class="session-cal-week-body-row session-cal-time-track">
-              ${buildVerticalTimeGutterHtml()}
+              ${buildVerticalTimeGutterHtml(weekBounds)}
               <div class="session-cal-days-row">
       `;
       days.forEach((day) => {
         const dayEvents = day.inRange ? (eventsByDate[day.date] || []) : [];
-        html += renderVerticalDayCell(day.date, dayEvents, day.inRange, holidayDates, cellOptions);
+        html += renderVerticalDayCell(day.date, dayEvents, day.inRange, holidayDates, weekCellOptions);
       });
       html += '</div><div class="session-cal-hover-line" aria-hidden="true"></div><div class="session-cal-hover-time-label" aria-hidden="true"></div></div></div></div>';
     });
@@ -1653,25 +1790,40 @@
     container.style.setProperty('--session-timeline-track-step', `${timelineTrackStep}px`);
     let renderedWeekCount = 0;
 
+    const defaultBounds = resolveTimelineBounds(options);
+    const resolveWeekBounds = typeof options.resolveWeekTimelineBounds === 'function'
+      ? options.resolveWeekTimelineBounds
+      : null;
+    const buildWeekLabelExtra = typeof options.buildWeekLabelExtraHtml === 'function'
+      ? options.buildWeekLabelExtraHtml
+      : null;
+
     let html = '<div class="session-cal-vertical-scroll"><div class="session-cal-week-stack session-cal-week-stack-timeline">';
     weekBlocks.forEach((week) => {
       const days = filterWeekDaysForDisplay(week.days, eventsByDate, filterEmptyDays);
       if (!days.length) return;
       renderedWeekCount += 1;
+      const weekBounds = resolveWeekBounds
+        ? resolveWeekBounds(week.weekStart, week.weekEnd, week.days, eventsByDate)
+        : defaultBounds;
+      const labelExtra = buildWeekLabelExtra
+        ? buildWeekLabelExtra(week.weekStart, week.weekEnd, week.days, eventsByDate, weekBounds)
+        : '';
+      const weekCellOptions = { ...cellOptions, timelineBounds: weekBounds };
       html += `
-        <div class="session-cal-week-row session-cal-week-row-timeline session-cal-timeline-time-track">
-          <div class="session-cal-week-label">${formatWeekLabelHtml(week.weekStart, week.weekEnd)}</div>
+        <div class="session-cal-week-row session-cal-week-row-timeline session-cal-timeline-time-track" ${weekRowTimelineAttrs(weekBounds)}>
+          ${buildWeekLabelRowHtml(week.weekStart, week.weekEnd, labelExtra, weekBounds)}
           <div class="session-cal-timeline-hover-shell">
             <div class="session-cal-timeline-header-row">
               <div class="session-cal-day-label-spacer" aria-hidden="true"></div>
               <div class="session-cal-time-header-wrap">
-                ${buildHorizontalTimeHeaderHtml()}
+                ${buildHorizontalTimeHeaderHtml(weekBounds)}
               </div>
             </div>
       `;
       days.forEach((day) => {
         const dayEvents = day.inRange ? (eventsByDate[day.date] || []) : [];
-        assignTracks(dayEvents.slice());
+        assignTracks(dayEvents.slice(), weekBounds);
         const tracks = [];
         dayEvents.forEach((ev) => {
           if (!tracks[ev.trackIndex]) tracks[ev.trackIndex] = [];
@@ -1679,19 +1831,20 @@
         });
         const trackCount = Math.max(1, tracks.length);
         const bodyHeight = Math.max(72, trackCount * timelineTrackStep + 12);
-        const extraClass = resolveDayExtraClasses(day, dayEvents, day.inRange, 'timeline', cellOptions);
+        const extraClass = resolveDayExtraClasses(day, dayEvents, day.inRange, 'timeline', weekCellOptions);
         const rowClass = buildDayCalendarClasses(
           day.date,
           holidayDates,
           'session-cal-timeline-day-row',
           outOfViewRangeDayClass(day.inRange),
+          todayDayClass(day.date),
           extraClass
         );
         let sessionsHtml = '';
         dayEvents.forEach((ev) => {
           const topPos = (ev.trackIndex * timelineTrackStep) + 4;
           const blockHeight = Math.max(48, timelineTrackStep - 8);
-          const block = resolvePositionedBlockHtml(ev, selectedSet, cellOptions, {
+          const block = resolvePositionedBlockHtml(ev, selectedSet, weekCellOptions, {
             mode: 'timeline',
             topPos,
             trackIndex: ev.trackIndex,
@@ -1703,7 +1856,7 @@
           <div class="${rowClass}" data-cal-date="${escapeHtml(day.date)}">
             <div class="session-cal-day-row-label">${formatDayHeaderHtml(day.date, 'horizontal')}</div>
             <div class="session-cal-timeline-track" style="height:${bodyHeight}px;">
-              ${buildHourGridBackgroundHtml()}
+              ${buildHourGridBackgroundHtml(weekBounds)}
               ${sessionsHtml}
             </div>
           </div>
@@ -2542,6 +2695,10 @@
   }
 
   global.SessionCalendarCore = {
+    resolveTimelineBounds,
+    expandTimelineBoundsToFitSessions,
+    computeSessionTimeExtents,
+    sessionsOutsideTimelineBounds,
     TIMELINE_START_HOUR,
     TIMELINE_END_HOUR,
     TOTAL_MINUTES,

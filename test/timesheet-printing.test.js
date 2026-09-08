@@ -8,6 +8,10 @@ const ejs = require('ejs');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const printService = require('../packages/school/MVC/services/school/timesheetPrintService');
+const {
+  resolveAutoTimesheetComment,
+  isWorkSessionTimesheetEntry
+} = require('../packages/school/MVC/services/school/timesheetEffectiveEntryService');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
@@ -266,25 +270,74 @@ test('Optional Hours remain informational and are listed separately by departmen
   );
 });
 
-test('print comments use only user-authored timesheet comments', () => {
-  const withoutTimesheetComment = printService.shapePrintEntry({
+test('print comments exclude class session notes but include work session notes', () => {
+  const classSessionWithoutComment = printService.shapePrintEntry({
     sessionId: 'session-note-only',
-    notes: 'Internal session note that must not print',
+    notes: 'Internal class session note that must not print',
     timesheetHours: 1
   }, { classMap: new Map(), departmentMap: new Map() });
-  const withTimesheetComment = printService.shapePrintEntry({
+  const classSessionWithUserComment = printService.shapePrintEntry({
     sessionId: 'user-comment',
-    notes: 'Internal session note',
+    notes: 'Internal class session note',
     comment: 'User entered this on the timesheet',
     timesheetHours: 1
   }, { classMap: new Map(), departmentMap: new Map() });
+  const workSessionWithNotes = printService.shapePrintEntry({
+    sessionId: 'act-ACT-1-ENTRY-1-PERSON-1',
+    isSchoolActivity: true,
+    comment: 'Prep for parent meeting',
+    timesheetHours: 1
+  }, { classMap: new Map(), departmentMap: new Map() });
+  const workSessionWithUserOverride = printService.shapePrintEntry({
+    sessionId: 'act-ACT-2-ENTRY-2-PERSON-1',
+    isSchoolActivity: true,
+    notes: 'Original work session note',
+    comment: 'User override on timesheet',
+    timesheetHours: 1
+  }, { classMap: new Map(), departmentMap: new Map() });
 
-  assert.equal(withoutTimesheetComment.commentLabel, '');
-  assert.equal(withTimesheetComment.commentLabel, 'User entered this on the timesheet');
+  assert.equal(classSessionWithoutComment.commentLabel, '');
+  assert.equal(classSessionWithUserComment.commentLabel, 'User entered this on the timesheet');
+  assert.equal(workSessionWithNotes.commentLabel, 'Prep for parent meeting');
+  assert.equal(workSessionWithUserOverride.commentLabel, 'User override on timesheet');
+});
+
+test('resolveAutoTimesheetComment prefers user comments and seeds work session notes', () => {
+  const savedComments = new Map([
+    ['act-1', ''],
+    ['act-2', 'Saved on timesheet'],
+    ['sess-1', ''],
+    ['sess-2', 'Class comment']
+  ]);
+
+  assert.equal(isWorkSessionTimesheetEntry({ sessionId: 'act-1', isSchoolActivity: true }), true);
+  assert.equal(isWorkSessionTimesheetEntry({ sessionId: 'sess-1' }), false);
+
+  assert.equal(resolveAutoTimesheetComment('act-1', {
+    sessionId: 'act-1',
+    isSchoolActivity: true,
+    comment: 'Work session note'
+  }, savedComments), 'Work session note');
+
+  assert.equal(resolveAutoTimesheetComment('act-2', {
+    sessionId: 'act-2',
+    isSchoolActivity: true,
+    comment: 'Ignored when user saved'
+  }, savedComments), 'Saved on timesheet');
+
+  assert.equal(resolveAutoTimesheetComment('sess-1', {
+    sessionId: 'sess-1',
+    notes: 'Class session note'
+  }, savedComments), '');
+
+  assert.equal(resolveAutoTimesheetComment('sess-2', {
+    sessionId: 'sess-2',
+    notes: 'Class session note'
+  }, savedComments), 'Class comment');
 
   const effectiveSource = read('packages/school/MVC/services/school/timesheetEffectiveEntryService.js');
-  assert.match(effectiveSource, /comment: savedComments\.get\(String\(entry\?\.sessionId \|\| ''\)\.trim\(\)\) \|\| ''/);
-  assert.doesNotMatch(effectiveSource, /comment: savedComments[\s\S]{0,120}\|\| entry\?\.comment/);
+  assert.match(effectiveSource, /resolveAutoTimesheetComment/);
+  assert.match(effectiveSource, /isWorkSessionTimesheetEntry/);
 });
 
 test('organization print title resolves a name and never falls back to the organization id', () => {
@@ -297,6 +350,65 @@ test('organization print title resolves a name and never falls back to the organ
   const serviceSource = read('packages/school/MVC/services/school/timesheetPrintService.js');
   assert.match(serviceSource, /getDataById\('organizations', targetOrgId, reqUser\)/);
   assert.doesNotMatch(serviceSource, /\|\| activeOrgId\s*\)/);
+});
+
+function sampleStatHolidayEntry(overrides = {}) {
+  return {
+    sessionId: 'stathol-HOL-1-PERSON-1',
+    date: '2026-07-01',
+    className: 'Canada Day',
+    description: 'Statutory holiday pay',
+    isStatutoryHoliday: true,
+    payableHours: 7.5,
+    regularDisplayHours: 7.5,
+    regularHoursLabel: '7.50',
+    optionalHours: 0,
+    optionalHoursLabel: '—',
+    statHolidayMeta: {
+      qualified: true,
+      calculatedHours: 7.5,
+      disqualifyReasons: [],
+      checks: {
+        minWorkdays: { pass: true, actual: 12, required: 10 },
+        weekdayRule: { pass: true, actual: 4, required: 3, lookback: 8, weekdayName: 'Wednesday' },
+        workdayMatch: { pass: true, regularWorkday: true, workedOnHoliday: false },
+        holidayAttendance: { pass: true, reason: 'No approved leave on the statutory holiday date.' },
+        leaveBeforeAfter: { pass: true, beforeDate: '2026-06-30', afterDate: '2026-07-02', leaveDates: [] },
+        calculatedHours: {
+          pass: true,
+          earningsStart: '2026-05-01',
+          earningsEnd: '2026-06-30',
+          totalHours: 150,
+          workdayCount: 20,
+          averageHours: 7.5
+        }
+      }
+    },
+    ...overrides
+  };
+}
+
+test('buildStatutoryHolidayPrintSummaries mirrors editor calculation steps', () => {
+  const summaries = printService.buildStatutoryHolidayPrintSummaries([sampleStatHolidayEntry()]);
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].holidayName, 'Canada Day');
+  assert.equal(summaries[0].payableHours, 7.5);
+  assert.equal(summaries[0].payStatusLabel, 'Paid');
+  assert.equal(summaries[0].steps.length, 6);
+  assert.match(summaries[0].steps[5].details.join(' '), /Earnings window: May 1, 2026 to Jun 30, 2026/);
+  assert.match(summaries[0].steps[5].details.join(' '), /Average payable hours: 7\.50/);
+});
+
+test('buildStatutoryHolidayPrintSummaries handles missing calculation checks', () => {
+  const summaries = printService.buildStatutoryHolidayPrintSummaries([
+    sampleStatHolidayEntry({
+      payableHours: 0,
+      statHolidayMeta: { qualified: false, calculatedHours: 0 }
+    })
+  ]);
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].calculationAvailable, false);
+  assert.equal(summaries[0].payStatusLabel, 'Not qualified');
 });
 
 function sampleDocument(name, overrides = {}) {
@@ -378,6 +490,12 @@ test('print review type defaults to managerial and financial uses a compact desc
   const viewPath = path.join(ROOT_DIR, 'packages/school/MVC/views/school/timesheet/timesheetPrint.ejs');
   const source = fs.readFileSync(viewPath, 'utf8');
   const document = sampleDocument('Person One');
+  const statHolidaySummaries = printService.buildStatutoryHolidayPrintSummaries([sampleStatHolidayEntry()]);
+  const financialDocument = sampleDocument('Person One', {
+    statutoryHolidaySummaries: statHolidaySummaries,
+    statutoryHolidayPaidCount: statHolidaySummaries.filter((row) => row.payableHours > 0).length,
+    statutoryHolidayPaidHours: statHolidaySummaries.reduce((sum, row) => sum + row.payableHours, 0)
+  });
   const financialHtml = ejs.render(source, {
     title: 'Timesheet Print',
     appBrand: { appName: 'Example Website' },
@@ -388,7 +506,7 @@ test('print review type defaults to managerial and financial uses a compact desc
       printReviewType: 'financial',
       printReviewTitle: 'Financial Review',
       period: { name: '2026-JULY-02', startDateLabel: 'July 15, 2026', endDateLabel: 'July 31, 2026', deadlineLabel: '2026-07-30 23:59' },
-      documents: [document]
+      documents: [financialDocument]
     },
     printSettings: { orientation: 'landscape', density: 'compact' }
   }, { filename: viewPath });
@@ -423,8 +541,13 @@ test('print review type defaults to managerial and financial uses a compact desc
   assert.doesNotMatch(financialHtml, /class="badge status-badge"/);
   assert.doesNotMatch(financialHtml, /08:00 – 09:30/);
   assert.match(financialHtml, /class="comment-text">Printed comment<\/span>/);
+  assert.match(financialHtml, /Statutory Holiday Pay Summary/);
+  assert.match(financialHtml, /paid statutory holiday entry totaling 7\.50 hours/);
+  assert.match(financialHtml, /Step 6: Average-hours formula/);
+  assert.match(financialHtml, /Average payable hours: 7\.50/);
 
   assert.match(managerialHtml, /print-review-managerial/);
+  assert.doesNotMatch(managerialHtml, /Statutory Holiday Pay Summary/);
   assert.match(managerialHtml, /class="session-class-time-line">&lt;script&gt;alert\(1\)&lt;\/script&gt; - 08:00 – 09:30<\/div>/);
   assert.match(managerialHtml, /class="badge role-badge">Teacher<\/span>/);
   assert.match(managerialHtml, /class="badge status-badge">Completed<\/span>/);

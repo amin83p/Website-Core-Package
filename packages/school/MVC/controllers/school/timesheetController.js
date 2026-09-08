@@ -36,6 +36,7 @@ const { filterPeriodsForYear, resolvePeriodStartYearToken } = require('../../ser
 const timesheetImportPolicyModel = require('../../models/school/timesheetImportPolicyModel');
 const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
 const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
+const timesheetPeriodNavigationService = require('../../services/school/timesheetPeriodNavigationService');
 const timesheetImportWorkSessionBuilderService = require('../../services/school/timesheetImportWorkSessionBuilderService');
 const timesheetLegacyImportExecutionService = require('../../services/school/timesheetLegacyImportExecutionService');
 const schoolRepositories = require('../../repositories/school');
@@ -1623,6 +1624,46 @@ exports.deleteMyTimesheetLegacyImport = async (req, res) => {
     }
 };
 
+exports.deleteMyTimesheetLegacyImportsForYear = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const teacherContext = await resolveTargetTeacherContext(req, {
+            requireTeacher: true,
+            operationId: OPERATIONS.DELETE
+        });
+        const personId = teacherContext.targetTeacherId;
+        const year = String(req.query?.year || req.body?.year || '').trim();
+        if (!year) throw new Error('Timesheet year is required.');
+
+        const canAdminDelete = await isTimesheetSectionAdmin(req.user, OPERATIONS.DELETE);
+        const outcome = await timesheetLegacyImportService.deleteLegacyImportsForYear({
+            orgId: activeOrgId,
+            personId,
+            year,
+            reqUser: req.user,
+            scope: timesheetLegacyImportService.IMPORT_SCOPES.MY_TIMESHEETS,
+            skipImportPolicyCheck: canAdminDelete
+        });
+        if (!outcome.deletedCount) {
+            const statusCode = outcome.failures?.length ? 400 : 404;
+            return res.status(statusCode).json({
+                status: 'error',
+                message: timesheetLegacyImportService.buildLegacyImportYearDeleteMessage(outcome),
+                actionStateId: req.actionStateId || null,
+                ...outcome
+            });
+        }
+        return res.json({
+            status: 'success',
+            message: timesheetLegacyImportService.buildLegacyImportYearDeleteMessage(outcome),
+            actionStateId: req.actionStateId || null,
+            ...outcome
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({ status: 'error', message: error.message });
+    }
+};
+
 exports.getTimesheetManagementRoster = async (req, res) => {
     try {
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
@@ -2074,6 +2115,11 @@ exports.listMyTimesheets = async (req, res) => {
         const importFlags = await loadTimesheetImportPageFlags(activeOrgId);
         const canImportMyTimesheets = importFlags.canImportInMyTimesheets;
         const canDeleteMyTimesheetLegacyImport = await isTimesheetSectionAdmin(req.user, OPERATIONS.DELETE);
+        const importedPeriodCountInYear = mappedPeriods.filter((row) => row.hasLegacyImport === true).length;
+        const canDeleteAllImportedTimesheets = Boolean(
+            (canDeleteMyTimesheetLegacyImport || canImportMyTimesheets)
+            && importedPeriodCountInYear > 0
+        );
 
         res.render('school/timesheet/timesheetList', {
             title: viewingOtherTeacher
@@ -2095,6 +2141,8 @@ exports.listMyTimesheets = async (req, res) => {
             selectedTeacherName: teacherContext.selectedTeacherName,
             canImportMyTimesheets,
             canDeleteMyTimesheetLegacyImport,
+            importedPeriodCountInYear,
+            canDeleteAllImportedTimesheets,
             includeModal: true,
             includeModal_Table: true,
             print: true,
@@ -2469,6 +2517,34 @@ exports.viewTimesheet = async (req, res) => {
             && period.status !== 'processed'
         );
 
+        const navYear = String(
+            req.query.year || resolvePeriodStartYearToken(period, resolveOrgYearFromRequest(req))
+        ).trim();
+        const editorTeacherId = teacherContext.isAdmin ? teacherContext.targetTeacherId : '';
+        const allPeriodsForNav = await loadTimesheetManagementPeriods(req, {});
+        const navEligibilityOptions = await buildPeriodEligibilityOptions(req, teacherContext);
+        const { prevPeriod, nextPeriod } = timesheetPeriodNavigationService.resolveAdjacentPeriods({
+            periods: allPeriodsForNav,
+            currentPeriodId: period.id,
+            year: navYear,
+            fallbackYear: navYear
+        });
+        const shapePeriodNav = (adjacentPeriod) => {
+            if (!adjacentPeriod) return null;
+            const eligibility = timesheetPeriodEligibilityService.resolvePeriodEligibility(
+                adjacentPeriod,
+                navEligibilityOptions
+            );
+            return timesheetPeriodNavigationService.shapePeriodNavEntry(adjacentPeriod, {
+                teacherId: editorTeacherId,
+                year: navYear,
+                canOpen: eligibility.canOpen,
+                reason: eligibility.reason || ''
+            });
+        };
+        const prevPeriodNav = shapePeriodNav(prevPeriod);
+        const nextPeriodNav = shapePeriodNav(nextPeriod);
+
         res.render('school/timesheet/timesheetEditor', {
             title: `Timesheet: ${period.name}`,
             period,
@@ -2515,7 +2591,10 @@ exports.viewTimesheet = async (req, res) => {
                 !viewingOtherPerson || canManagerUpdate || canTimesheetsAdminUpdate
             ),
             statHolidayWarnings,
-            canManageStatHolidayOverrides: canManagerUpdate
+            canManageStatHolidayOverrides: canManagerUpdate,
+            navYear,
+            prevPeriodNav,
+            nextPeriodNav
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

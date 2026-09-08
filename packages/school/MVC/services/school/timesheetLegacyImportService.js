@@ -11,6 +11,7 @@ const timesheetImportLifecycleService = require('./timesheetImportLifecycleServi
 const timesheetImportWorkSessionBuilderService = require('./timesheetImportWorkSessionBuilderService');
 const schoolRepositories = require('../../repositories/school');
 const { sanitizeTimesheetPayload } = require('../../models/school/timesheetModel');
+const { resolvePeriodStartYearToken } = require('./timesheetExcel/timesheetPeriodMatchService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -550,16 +551,15 @@ function buildLegacyImportEntries({
 
   return (Array.isArray(compiledRows) ? compiledRows : [])
     .map((row, index) => {
-      const hours = Number(parseFloat(row?.hours) || 0);
+      const hours = timesheetImportWorkSessionBuilderService.resolveImportBillableHours(row);
       const date = cleanId(row?.date);
       const className = String(row?.className || '').trim();
-      if (!date || !Number.isFinite(hours)) return null;
+      if (!date || !Number.isFinite(hours) || hours <= 0) return null;
       const commentParts = [];
       if (row?.comment) commentParts.push(String(row.comment).trim());
       if (row?.studentName) commentParts.push(`Student: ${String(row.studentName).trim()}`);
-      if (row?.optionalHours != null && Number.isFinite(Number(row.optionalHours))) {
-        commentParts.push(`Optional hours: ${Number(row.optionalHours)}`);
-      }
+      const optionalComment = timesheetImportWorkSessionBuilderService.buildImportOptionalHoursComment(row?.optionalHours);
+      if (optionalComment) commentParts.push(optionalComment);
       return {
         sessionId: `legacyimp-${targetPeriodId}-${targetPersonId}-${index + 1}`,
         date,
@@ -1022,6 +1022,146 @@ async function deleteLegacyImport({
   };
 }
 
+async function periodHasDeletableLegacyImport({
+  orgId,
+  personId,
+  period,
+  reqUser,
+  scope = IMPORT_SCOPES.MY_TIMESHEETS,
+  skipImportPolicyCheck = false
+} = {}) {
+  const targetPeriodId = cleanId(period?.id);
+  if (!targetPeriodId) return false;
+
+  const timesheet = await dataService.getTimesheetByPeriodAndTeacher(targetPeriodId, personId, reqUser);
+  if (timesheet?.id) {
+    try {
+      assertLegacyImportDeletable(timesheet);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  let policy;
+  if (skipImportPolicyCheck) {
+    policy = await loadImportPolicy(orgId);
+  } else {
+    try {
+      policy = await assertImportAllowed({ orgId, scope });
+    } catch {
+      return false;
+    }
+  }
+  const importActivityId = cleanId(policy?.importActivityId);
+  if (!importActivityId) return false;
+
+  const orphanSessionCount = await countOrphanImportWorkSessionsForPersonPeriod({
+    orgId,
+    personId,
+    period,
+    reqUser
+  });
+  return orphanSessionCount > 0;
+}
+
+async function deleteLegacyImportsForYear({
+  orgId,
+  personId,
+  year,
+  reqUser,
+  scope = IMPORT_SCOPES.MY_TIMESHEETS,
+  skipImportPolicyCheck = false
+} = {}) {
+  if (!skipImportPolicyCheck) {
+    await assertImportAllowed({ orgId, scope });
+  }
+
+  const yearToken = String(year || '').trim();
+  if (!/^\d{4}$/.test(yearToken)) {
+    const error = new Error('A valid four-digit year is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const periods = await dataService.fetchData('timesheetPeriods', { orgId__eq: orgId }, reqUser);
+  const yearPeriods = (Array.isArray(periods) ? periods : [])
+    .filter((row) => idsEqual(row?.orgId, orgId))
+    .filter((row) => resolvePeriodStartYearToken(row, yearToken) === yearToken)
+    .sort((a, b) => String(a?.startDate || '').localeCompare(String(b?.startDate || '')));
+
+  const results = [];
+  const failures = [];
+  let deletedCount = 0;
+  let skippedCount = 0;
+
+  for (const periodRow of yearPeriods) {
+    const shouldAttempt = await periodHasDeletableLegacyImport({
+      orgId,
+      personId,
+      period: periodRow,
+      reqUser,
+      scope,
+      skipImportPolicyCheck
+    });
+    if (!shouldAttempt) {
+      skippedCount += 1;
+      continue;
+    }
+
+    try {
+      const outcome = await deleteLegacyImport({
+        orgId,
+        personId,
+        periodId: periodRow.id,
+        reqUser,
+        scope,
+        skipImportPolicyCheck
+      });
+      if (!outcome.hadLegacyImport) {
+        skippedCount += 1;
+        continue;
+      }
+      deletedCount += 1;
+      results.push({
+        periodId: cleanId(periodRow.id),
+        periodName: String(periodRow.name || '').trim(),
+        ...outcome
+      });
+    } catch (error) {
+      failures.push({
+        periodId: cleanId(periodRow.id),
+        periodName: String(periodRow.name || '').trim(),
+        message: String(error?.message || error || 'Delete failed.')
+      });
+    }
+  }
+
+  return {
+    year: yearToken,
+    deletedCount,
+    skippedCount,
+    failures,
+    results
+  };
+}
+
+function buildLegacyImportYearDeleteMessage(outcome = {}) {
+  const deletedCount = Number(outcome.deletedCount || 0);
+  const failureCount = Array.isArray(outcome.failures) ? outcome.failures.length : 0;
+  const yearToken = String(outcome.year || '').trim();
+  const parts = [];
+  if (deletedCount) {
+    parts.push(`Removed imported timesheets from ${deletedCount} period${deletedCount === 1 ? '' : 's'} in ${yearToken || 'the selected year'}.`);
+  } else {
+    parts.push(`No imported timesheets were removed for ${yearToken || 'the selected year'}.`);
+  }
+  if (failureCount) {
+    parts.push(`${failureCount} period${failureCount === 1 ? '' : 's'} could not be deleted.`);
+  }
+  return parts.join(' ');
+}
+
 module.exports = {
   IMPORT_SCOPES,
   assertImportAllowed,
@@ -1042,6 +1182,9 @@ module.exports = {
   rollbackAppliedLegacyImports,
   applyLegacyImports,
   deleteLegacyImport,
+  deleteLegacyImportsForYear,
+  buildLegacyImportYearDeleteMessage,
+  periodHasDeletableLegacyImport,
   resolveImportActivity,
   persistTimesheetPayload,
   calculateStoredEntryTotalHours

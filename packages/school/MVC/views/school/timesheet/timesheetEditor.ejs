@@ -273,6 +273,16 @@
     gap: 0.65rem;
     flex-shrink: 0;
   }
+  .ts-page-header__aside-top {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .ts-period-nav {
+    justify-content: flex-end;
+  }
   .ts-deadline-chip {
     display: none;
     align-items: center;
@@ -788,16 +798,46 @@
             </div>
         </div>
         <div class="ts-page-header__aside">
-            <div
-                id="tsDeadlineStatusChip"
-                class="ts-deadline-chip"
-                role="status"
-                aria-live="polite"
-                data-deadline-at="<%= typeof submissionDeadlineAt !== 'undefined' ? String(submissionDeadlineAt || '') : '' %>"
-                data-status="<%= timesheetStatus %>"
-                data-manager-approved="<%= managerReviewApproved ? 'true' : 'false' %>"
-            ></div>
-            <a href="/school/timesheets/my-timesheets" class="btn btn-outline-secondary btn-sm flex-shrink-0"><i class="bi bi-arrow-left"></i> Back</a>
+            <div class="ts-page-header__aside-top">
+                <div
+                    id="tsDeadlineStatusChip"
+                    class="ts-deadline-chip"
+                    role="status"
+                    aria-live="polite"
+                    data-deadline-at="<%= typeof submissionDeadlineAt !== 'undefined' ? String(submissionDeadlineAt || '') : '' %>"
+                    data-status="<%= timesheetStatus %>"
+                    data-manager-approved="<%= managerReviewApproved ? 'true' : 'false' %>"
+                ></div>
+                <a href="/school/timesheets/my-timesheets" class="btn btn-outline-secondary btn-sm flex-shrink-0"><i class="bi bi-arrow-left"></i> Back</a>
+            </div>
+            <div class="btn-group btn-group-sm ts-period-nav" role="group" aria-label="Timesheet period navigation">
+                <% if (typeof prevPeriodNav !== 'undefined' && prevPeriodNav && prevPeriodNav.id) { %>
+                <a
+                    href="<%= prevPeriodNav.canOpen ? prevPeriodNav.href : '#' %>"
+                    class="btn btn-outline-secondary ts-period-nav-link<%= prevPeriodNav.canOpen ? '' : ' disabled' %>"
+                    data-period-nav="prev"
+                    data-period-nav-href="<%= prevPeriodNav.href %>"
+                    title="<%= prevPeriodNav.canOpen ? ('Previous: ' + prevPeriodNav.name) : (prevPeriodNav.reason || 'Previous period is not available.') %>"
+                    aria-label="Previous period<%= prevPeriodNav.name ? (': ' + prevPeriodNav.name) : '' %>"
+                    <%= prevPeriodNav.canOpen ? '' : 'aria-disabled="true" tabindex="-1"' %>
+                ><i class="bi bi-chevron-left"></i> Previous</a>
+                <% } else { %>
+                <button type="button" class="btn btn-outline-secondary" disabled title="No earlier period in this year"><i class="bi bi-chevron-left"></i> Previous</button>
+                <% } %>
+                <% if (typeof nextPeriodNav !== 'undefined' && nextPeriodNav && nextPeriodNav.id) { %>
+                <a
+                    href="<%= nextPeriodNav.canOpen ? nextPeriodNav.href : '#' %>"
+                    class="btn btn-outline-secondary ts-period-nav-link<%= nextPeriodNav.canOpen ? '' : ' disabled' %>"
+                    data-period-nav="next"
+                    data-period-nav-href="<%= nextPeriodNav.href %>"
+                    title="<%= nextPeriodNav.canOpen ? ('Next: ' + nextPeriodNav.name) : (nextPeriodNav.reason || 'Next period is not available.') %>"
+                    aria-label="Next period<%= nextPeriodNav.name ? (': ' + nextPeriodNav.name) : '' %>"
+                    <%= nextPeriodNav.canOpen ? '' : 'aria-disabled="true" tabindex="-1"' %>
+                >Next <i class="bi bi-chevron-right"></i></a>
+                <% } else { %>
+                <button type="button" class="btn btn-outline-secondary" disabled title="No later period in this year">Next <i class="bi bi-chevron-right"></i></button>
+                <% } %>
+            </div>
         </div>
     </div>
 
@@ -2075,6 +2115,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let isEdited = <%= isManuallyEdited %>;
 
     const savedComments = {};
+    const isWorkSessionTimesheetEntry = (entry) => (
+        entry?.isSchoolActivity === true || String(entry?.sessionId || '').startsWith('act-')
+    );
+    const resolveLiveEntryComment = (sessionId, entry) => {
+        const saved = savedComments[sessionId];
+        const savedTrimmed = String(saved ?? '').trim();
+        if (savedTrimmed) return savedTrimmed;
+        if (isWorkSessionTimesheetEntry(entry)) {
+            return String(entry?.comment || entry?.notes || '').trim();
+        }
+        return saved !== undefined ? String(saved || '') : '';
+    };
     const isLegacyImportEntry = (entry) => (
         entry?.isLegacyImport === true || String(entry?.sessionId || '').startsWith('legacyimp-')
     );
@@ -2103,7 +2155,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 activeEntries.push({
                     ...ls,
                     hours: ls.hours ?? ls.timesheetHours ?? ls.durationHours ?? 0,
-                    comment: savedComments[ls.sessionId] || ls.comment || '',
+                    comment: resolveLiveEntryComment(ls.sessionId, ls),
                     isManual: false
                 });
             }
@@ -2111,7 +2163,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         LIVE_SESSIONS.forEach(ls => {
             if (!deletedAutoSessionIds.includes(ls.sessionId)) {
-                activeEntries.push({ ...ls, comment: savedComments[ls.sessionId] || '', isManual: false });
+                activeEntries.push({ ...ls, comment: resolveLiveEntryComment(ls.sessionId, ls), isManual: false });
             }
         });
     }
@@ -2140,6 +2192,37 @@ document.addEventListener('DOMContentLoaded', () => {
     function hasUnsavedTimesheetPrintChanges() {
         return buildTimesheetPrintFingerprint() !== savedTimesheetPrintFingerprint;
     }
+
+    async function navigateToAdjacentTimesheetPeriod(event, link) {
+        if (!link || link.classList.contains('disabled') || link.getAttribute('aria-disabled') === 'true') {
+            event.preventDefault();
+            return;
+        }
+        const href = String(link.getAttribute('data-period-nav-href') || link.getAttribute('href') || '').trim();
+        if (!href || href === '#') {
+            event.preventDefault();
+            return;
+        }
+        if (!isEdited && !hasUnsavedTimesheetPrintChanges()) {
+            return;
+        }
+        event.preventDefault();
+        const confirmed = await confirmAction({
+            title: 'Leave Timesheet?',
+            icon: 'warning',
+            message: 'You have unsaved changes. Leave this timesheet without saving?',
+            confirmText: 'Leave',
+            cancelText: 'Stay',
+            confirmBtnClass: 'btn-warning'
+        });
+        if (confirmed) window.location.href = href;
+    }
+
+    document.querySelectorAll('.ts-period-nav-link').forEach((link) => {
+        link.addEventListener('click', (event) => {
+            void navigateToAdjacentTimesheetPeriod(event, link);
+        });
+    });
 
     function getDatesInRange(startStr, endStr) {
         const dates = [];
