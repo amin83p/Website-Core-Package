@@ -1460,6 +1460,7 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  scroll-margin-top: calc(var(--header-height, 110px) + var(--notice-height, 0px) + 12px);
 }
 
 .schedule-visual-area.schedule-week-grid-host .session-cal-week-grid-vertical {

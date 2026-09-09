@@ -293,16 +293,16 @@
 
   function initPartialModeViewRange() {
     if (!state) return;
-    const startDate = core.normalizeDateOnly(state.startDate || '');
-    const endDate = core.normalizeDateOnly(state.endDate || startDate);
     state.viewPreset = 'custom';
-    state.anchorDate = startDate;
-    state.viewRange = {
-      startDate,
-      endDate,
-      preset: 'custom',
-      anchorDate: startDate
-    };
+    state.viewRange = core.computeStagedSessionsViewRange(state.sessionsToCreate || [], {
+      startDate: state.startDate,
+      endDate: state.endDate,
+      anchorDate: state.anchorDate || state.startDate
+    });
+    state.anchorDate = core.clampAnchorDate(
+      state.viewRange.anchorDate || state.viewRange.startDate,
+      state.startDate
+    );
   }
 
   function syncModalChromeForMode() {
@@ -1652,8 +1652,28 @@
     applyPickerData(pickerData, { preserveViewRange: true });
   }
 
+  function refreshPartialViewRangeFromStagedSessions() {
+    if (!state || !isPartialMode()) return false;
+    const nextRange = core.computeStagedSessionsViewRange(state.sessionsToCreate || [], {
+      startDate: state.startDate,
+      endDate: state.endDate,
+      anchorDate: state.anchorDate || state.startDate
+    });
+    const prevStart = core.normalizeDateOnly(state.viewRange?.startDate);
+    const prevEnd = core.normalizeDateOnly(state.viewRange?.endDate);
+    if (prevStart === nextRange.startDate && prevEnd === nextRange.endDate) return false;
+    state.viewRange = { ...nextRange };
+    state.viewPreset = 'custom';
+    state.anchorDate = core.clampAnchorDate(
+      nextRange.anchorDate || nextRange.startDate,
+      state.startDate
+    );
+    return true;
+  }
+
   function notifyPartialStagedSessionsChange() {
     if (!state || typeof state.onStagedSessionsChange !== 'function') return;
+    refreshPartialViewRangeFromStagedSessions();
     state.onStagedSessionsChange({
       sessionsToCreate: Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate.slice() : [],
       stagingAttempts: Array.isArray(state.stagingAttempts) ? state.stagingAttempts.slice() : [],
@@ -1980,7 +2000,27 @@
     };
   }
 
-  function scrollHostToStagedDate(dateStr) {
+  function resolveFirstStagedSessionDate(sessions = []) {
+    const dates = (Array.isArray(sessions) ? sessions : [])
+      .map((row) => core.normalizeDateOnly(row?.date))
+      .filter(Boolean)
+      .sort();
+    return dates[0] || '';
+  }
+
+  function scrollPartialToFirstStagedSession() {
+    if (!isPartialMode()) return false;
+    const targetDate = resolveFirstStagedSessionDate(state?.sessionsToCreate);
+    if (!targetDate) return false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollHostToStagedDate(targetDate, { align: 'start' });
+      });
+    });
+    return true;
+  }
+
+  function scrollHostToStagedDate(dateStr, options = {}) {
     hostEl = qs('sessionEnrollmentCalendarHost');
     if (!hostEl || !dateStr) return false;
     const date = core.normalizeDateOnly(dateStr);
@@ -1990,33 +2030,20 @@
     if (!scrollEl || !weekRow) return false;
     const scrollRect = scrollEl.getBoundingClientRect();
     const rowRect = weekRow.getBoundingClientRect();
-    const delta = rowRect.top - scrollRect.top - (scrollRect.height / 2) + (rowRect.height / 2);
-    scrollEl.scrollTop += delta;
+    const align = String(options.align || 'start').trim();
+    if (align === 'center') {
+      const delta = rowRect.top - scrollRect.top - (scrollRect.height / 2) + (rowRect.height / 2);
+      scrollEl.scrollTop += delta;
+    } else {
+      scrollEl.scrollTop += rowRect.top - scrollRect.top - 8;
+    }
     return true;
   }
 
   function ensureViewRangeCoversStagedDates(rows = []) {
-    if (!state || !Array.isArray(rows) || !rows.length) return;
-    const dates = rows
-      .map((row) => core.normalizeDateOnly(row?.date))
-      .filter(Boolean)
-      .sort();
-    if (!dates.length) return;
-    const maxDate = dates[dates.length - 1];
-    const minDate = dates[0];
-    const rangeStart = core.normalizeDateOnly(state.viewRange?.startDate);
-    const rangeEnd = core.normalizeDateOnly(state.viewRange?.endDate);
-    if (!rangeStart || !rangeEnd) return;
-    const enrollmentStart = core.normalizeDateOnly(state.startDate || '');
-    const nextStart = minDate < rangeStart ? minDate : rangeStart;
-    const nextEnd = maxDate > rangeEnd ? maxDate : rangeEnd;
-    const clampedStart = enrollmentStart && nextStart < enrollmentStart ? enrollmentStart : nextStart;
-    if (clampedStart === rangeStart && nextEnd === rangeEnd) return;
-    state.viewRange = {
-      ...state.viewRange,
-      startDate: clampedStart,
-      endDate: nextEnd
-    };
+    if (!state || !isPartialMode()) return;
+    void rows;
+    refreshPartialViewRangeFromStagedSessions();
   }
 
   function commitQuickStagedSessions(rows = [], clickedDate = '') {
@@ -2049,7 +2076,7 @@
     );
     ensureViewRangeCoversStagedDates(newRows);
     renderCalendar();
-    const scrolledToDate = scrollTargetDate ? scrollHostToStagedDate(scrollTargetDate) : false;
+    const scrolledToDate = scrollTargetDate ? scrollHostToStagedDate(scrollTargetDate, { align: 'center' }) : false;
     if (!scrolledToDate) restoreScrollPositions(scrollSnapshot);
     updateSummary();
   }
@@ -2642,6 +2669,9 @@
     syncViewModeButtons();
     renderCalendar();
     updateSummary(data.summary);
+    if (isPartialMode() && options.scrollToFirstStaged !== false) {
+      scrollPartialToFirstStagedSession();
+    }
   }
 
   async function refreshPickerViewLocally() {
@@ -3203,6 +3233,9 @@
           .filter((row) => row.sessionId && row.date);
         if (stagedFromEvents.length) sessionsToCreate = stagedFromEvents;
       }
+      if (isPartialMode()) {
+        refreshPartialViewRangeFromStagedSessions();
+      }
       const payload = {
         selectedSessionIds: Array.from(state.selectedSet),
         sessionsToCreate,
@@ -3270,6 +3303,16 @@
       hideMarkModalLayer();
       hideBulkNaModalLayer();
       setStageOverlayLock(false);
+      const onClose = state?.onClose;
+      const firstStagedDate = resolveFirstStagedSessionDate(state?.sessionsToCreate);
+      if (typeof onClose === 'function') {
+        const closeDate = firstStagedDate;
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            try { onClose(closeDate); } catch (err) { console.error(err); }
+          }, 50);
+        });
+      }
       state = null;
       allEvents = [];
       manageSummaryMeta = null;
@@ -3305,18 +3348,22 @@
     const classLabel = String(options.classLabel || '').trim();
     const sessionsToCreate = Array.isArray(options.sessionsToCreate) ? options.sessionsToCreate : [];
     const existingEvents = Array.isArray(options.existingEvents) ? options.existingEvents : [];
-    const dates = sessionsToCreate
-      .map((row) => core.normalizeDateOnly(row?.date))
-      .filter(Boolean)
-      .sort();
-    const startDate = core.normalizeDateOnly(options.startDate || dates[0] || '');
-    const endDate = core.normalizeDateOnly(options.endDate || dates[dates.length - 1] || startDate);
+    const viewRange = core.computeStagedSessionsViewRange(sessionsToCreate, {
+      startDate: options.startDate,
+      endDate: options.endDate,
+      anchorDate: options.anchorDate || options.startDate
+    });
+    const startDate = viewRange.startDate;
+    const endDate = viewRange.endDate;
     const selectedSet = new Set(
       sessionsToCreate.map((row) => String(row?.sessionId || '').trim()).filter(Boolean)
     );
+    const stagedSessionIds = new Set(selectedSet);
     const stagedEvents = sessionsToCreate.map((row) => mapStagedRowToPartialEvent(row, classId, classLabel, selectedSet));
     const persistedEvents = existingEvents
       .filter((ev) => String(ev?.classId || '').trim() === classId)
+      .filter((ev) => ev?.isDraft !== true)
+      .filter((ev) => !stagedSessionIds.has(String(ev?.sessionId || ev?.id || '').trim()))
       .filter((ev) => {
         const date = core.normalizeDateOnly(ev?.date);
         return date && (!startDate || date >= startDate) && (!endDate || date <= endDate);
@@ -3335,12 +3382,6 @@
         isStaged: false
       }));
     const allPickerEvents = [...persistedEvents, ...stagedEvents];
-    const viewRange = {
-      startDate,
-      endDate,
-      preset: 'custom',
-      anchorDate: startDate
-    };
     return {
       events: stagedEvents,
       allEvents: allPickerEvents,
@@ -3426,6 +3467,7 @@
       onSave: options.onSave,
       onSelectionChange: options.onSelectionChange,
       onStagedSessionsChange: options.onStagedSessionsChange,
+      onClose: options.onClose,
       onMarksChanged: options.onMarksChanged,
       requestJson: options.requestJson,
       pendingMarkChanges: new Map(),

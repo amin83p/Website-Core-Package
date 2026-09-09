@@ -1859,6 +1859,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('sch_endDate').value = end.toISOString().split('T')[0];
     };
 
+    function setDateRangeFromIso(startDate, endDate) {
+        const startEl = document.getElementById('sch_startDate');
+        const endEl = document.getElementById('sch_endDate');
+        if (startEl) startEl.value = String(startDate || '').trim();
+        if (endEl) endEl.value = String(endDate || '').trim();
+    }
+
     function applyDefaultWeekRange() {
         const today = new Date();
         const day = today.getDay() || 7;
@@ -2608,6 +2615,8 @@ document.addEventListener('DOMContentLoaded', () => {
         remoteUpdateFingerprint: '',
         remoteUpdateModalDismissed: false,
         remoteUpdateModalOpen: false,
+        focusStagedSessionOnNextLayout: false,
+        pendingStagedScrollDate: '',
         viewMode: readScheduleViewMode(),
         hideEmptyDays: false,
         isAdminViewer: canSelectAnyPerson,
@@ -2703,6 +2712,114 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!drafts.length) return base;
         const withoutDrafts = base.filter((ev) => ev?.isDraft !== true);
         return [...withoutDrafts, ...drafts];
+    }
+
+    function activePersonHasDraftStagedSessions() {
+        const person = activeSchedulePerson();
+        const drafts = scheduleState.draftEventsByPersonId?.[person?.id];
+        return Array.isArray(drafts) && drafts.some((ev) => ev?.isDraft === true);
+    }
+
+    function getFirstDraftStagedSessionDate(personId) {
+        const drafts = Array.isArray(scheduleState.draftEventsByPersonId?.[personId])
+            ? scheduleState.draftEventsByPersonId[personId]
+            : [];
+        const dates = drafts
+            .filter((ev) => ev?.isDraft === true)
+            .map((ev) => scheduleCalendarCore?.normalizeDateOnly?.(ev?.date) || String(ev?.date || '').trim())
+            .filter(Boolean)
+            .sort();
+        return dates[0] || '';
+    }
+
+    function getSchedulePageScrollOffset() {
+        const header = document.getElementById('main-header');
+        const headerBottom = header ? header.getBoundingClientRect().bottom : 80;
+        return Math.max(16, Math.round(headerBottom + 8));
+    }
+
+    function isScheduleElementVerticallyScrollable(el) {
+        if (!el) return false;
+        const style = window.getComputedStyle(el);
+        const overflowY = style.overflowY;
+        if (overflowY !== 'auto' && overflowY !== 'scroll' && overflowY !== 'overlay') return false;
+        return el.scrollHeight > el.clientHeight + 1;
+    }
+
+    function findScheduleWeekRowForDate(container, date) {
+        if (!container || !date) return null;
+        const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(date) : date.replace(/"/g, '\\"');
+        const cell = container.querySelector(`[data-cal-date="${escaped}"]`);
+        if (cell) return cell.closest('.session-cal-week-row');
+        const rows = container.querySelectorAll('.session-cal-week-row');
+        for (const row of rows) {
+            if (row.querySelector(`[data-cal-date="${escaped}"]`)) return row;
+        }
+        return null;
+    }
+
+    function scrollSchedulePageToWeekRow(weekRow) {
+        if (!weekRow) return false;
+        const offset = getSchedulePageScrollOffset();
+        const targetTop = Math.max(0, window.pageYOffset + weekRow.getBoundingClientRect().top - offset);
+        window.scrollTo({ top: targetTop, left: 0, behavior: 'auto' });
+        document.documentElement.scrollTop = targetTop;
+        document.body.scrollTop = targetTop;
+        return true;
+    }
+
+    function scrollScheduleTimelineToStagedDate(dateStr) {
+        const date = scheduleCalendarCore?.normalizeDateOnly?.(dateStr) || String(dateStr || '').trim();
+        if (!date) return false;
+        const container = document.getElementById('visualDisplayArea');
+        if (!container || !container.classList.contains('schedule-week-grid-host')) return false;
+        const weekRow = findScheduleWeekRowForDate(container, date);
+        if (!weekRow) return false;
+        const cell = container.querySelector(`[data-cal-date="${typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(date) : date}"]`);
+        const scrollEl = container.querySelector('.session-cal-vertical-scroll');
+
+        if (isScheduleElementVerticallyScrollable(scrollEl)) {
+            const scrollRect = scrollEl.getBoundingClientRect();
+            const rowRect = weekRow.getBoundingClientRect();
+            scrollEl.scrollTop += rowRect.top - scrollRect.top - 8;
+            return true;
+        }
+
+        const timelineShell = weekRow.querySelector('.session-cal-timeline-hover-shell');
+        if (isScheduleElementVerticallyScrollable(timelineShell)) {
+            const shellRect = timelineShell.getBoundingClientRect();
+            const targetRect = (cell || weekRow).getBoundingClientRect();
+            timelineShell.scrollTop += targetRect.top - shellRect.top - 8;
+            return true;
+        }
+
+        return scrollSchedulePageToWeekRow(weekRow);
+    }
+
+    function focusScheduleTimelineOnFirstStagedSession(firstStagedDate) {
+        const person = activeSchedulePerson();
+        const date = scheduleCalendarCore?.normalizeDateOnly?.(firstStagedDate)
+            || scheduleCalendarCore?.normalizeDateOnly?.(scheduleState.pendingStagedScrollDate)
+            || getFirstDraftStagedSessionDate(person?.id)
+            || '';
+        if (!date) return;
+        scheduleState.pendingStagedScrollDate = date;
+        const attemptScroll = () => scrollScheduleTimelineToStagedDate(date);
+        const scheduleAttempts = (extraDelay = 0) => {
+            [0, 120, 350, 650, 1000].forEach((delay) => {
+                setTimeout(attemptScroll, extraDelay + delay);
+            });
+        };
+        scheduleAttempts(0);
+        if (document.body.classList.contains('modal-open')) {
+            const observer = new MutationObserver(() => {
+                if (!document.body.classList.contains('modal-open')) {
+                    observer.disconnect();
+                    scheduleAttempts(80);
+                }
+            });
+            observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        }
     }
 
     function buildScheduleDraftBadge(event) {
@@ -3291,12 +3408,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         scheduleState.draftBatchesByPersonId[person.id] = [...keptBatches, ...Array.from(payloadBatchById.values())];
         recomputeDraftOverlaps(person.id);
-        const viewRange = payload.viewRange || {};
+        const viewRange = sessions.length
+            ? scheduleCalendarCore.computeStagedSessionsViewRange(sessions, payload.viewRange || {})
+            : (payload.viewRange || {});
         const start = String(viewRange.startDate || '').trim();
         const end = String(viewRange.endDate || '').trim();
         if (start && end) {
-            setDateRange(new Date(`${start}T00:00:00`), new Date(`${end}T00:00:00`));
+            setDateRangeFromIso(start, end);
+            setActiveRangeChip('');
         }
+        const stagedDates = sessions
+            .map((row) => scheduleCalendarCore?.normalizeDateOnly?.(row?.date) || String(row?.date || '').trim())
+            .filter(Boolean)
+            .sort();
+        scheduleState.pendingStagedScrollDate = stagedDates[0] || scheduleState.pendingStagedScrollDate || '';
+        scheduleState.focusStagedSessionOnNextLayout = true;
         scheduleState.remoteUpdatePending = true;
         refreshScheduleActiveView();
     }
@@ -3467,9 +3593,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return;
             }
-            const dates = result.sessions.map((row) => row.date).filter(Boolean).sort();
-            const startDate = dates[0] || scheduleStageContext.date;
-            const endDate = dates[dates.length - 1] || startDate;
+            const paddedRange = scheduleCalendarCore.computeStagedSessionsViewRange(result.sessions, {
+                anchorDate: scheduleStageContext.date
+            });
+            const startDate = paddedRange.startDate;
+            const endDate = paddedRange.endDate;
             const stageParams = {
                 durationHours: form.durationHours,
                 weekdays: form.weekdays,
@@ -3494,8 +3622,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeof uiAlert === 'function') uiAlert('Calendar modal is not available on this page.', 'Stage Sessions');
                 return;
             }
+            applyDraftStagedSessionsToSchedule({
+                sessionsToCreate: sessionsWithAttempt,
+                stagingAttempts,
+                viewRange: paddedRange
+            });
             const existingEvents = getScheduleEventsForPerson(person?.id || '')
-                .filter((ev) => String(ev?.classId || '') === scheduleStageClassContext.classId);
+                .filter((ev) => String(ev?.classId || '') === scheduleStageClassContext.classId)
+                .filter((ev) => ev?.isDraft !== true);
             const conflictScheduleEvents = collectScheduleConflictSessionsForPerson(person?.id || '');
             const prefetchedPickerData = window.SessionEnrollmentCalendarModal.buildPartialPickerData({
                 classId: scheduleStageClassContext.classId,
@@ -3517,7 +3651,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 conflictScheduleEvents,
                 prefetchedPickerData,
                 onSave: (payload) => applyDraftStagedSessionsToSchedule(payload),
-                onStagedSessionsChange: syncTimelineFromPartialModalDrafts
+                onStagedSessionsChange: syncTimelineFromPartialModalDrafts,
+                onClose: (firstStagedDate) => focusScheduleTimelineOnFirstStagedSession(firstStagedDate)
             });
         } finally {
             if (createBtn) {
@@ -6476,6 +6611,11 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 applyScheduleWeekGridLayout(mode);
+                if (!scheduleState.focusStagedSessionOnNextLayout || !activePersonHasDraftStagedSessions()) return;
+                scheduleState.focusStagedSessionOnNextLayout = false;
+                const person = activeSchedulePerson();
+                const date = scheduleState.pendingStagedScrollDate || getFirstDraftStagedSessionDate(person?.id);
+                if (date) focusScheduleTimelineOnFirstStagedSession(date);
             });
         });
     }
@@ -7862,7 +8002,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 anchorDate: range.startDate
             },
             dayWidth: readScheduleVerticalDayWidth(),
-            filterEmptyDays: scheduleState.hideEmptyDays === true,
+            filterEmptyDays: scheduleState.hideEmptyDays === true && !activePersonHasDraftStagedSessions(),
             enableTimeHover: canDragCreateSessions === true,
             buildPositionedBlockHtml: buildSchedulePositionedBlockHtml,
             buildDayHeaderBadgeHtml: (day, dayEvents, inRange) => {

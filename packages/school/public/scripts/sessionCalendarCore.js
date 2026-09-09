@@ -297,6 +297,24 @@
     return { startDate: start, endDate: safeEnd, preset: 'wholeCycle', anchorDate: start };
   }
 
+  function computeStagedSessionsViewRange(sessions = [], options = {}) {
+    const paddingWeeks = Number(options.paddingWeeks ?? 2);
+    const dates = (Array.isArray(sessions) ? sessions : [])
+      .map((row) => normalizeDateOnly(row?.date))
+      .filter(Boolean)
+      .sort();
+    const fallbackStart = normalizeDateOnly(options.startDate || options.anchorDate || '');
+    const fallbackEnd = normalizeDateOnly(options.endDate || fallbackStart);
+    if (!dates.length) {
+      return computeCustomViewRange(fallbackStart, fallbackEnd);
+    }
+    const firstWeekMonday = mondayOfWeek(dates[0]);
+    const lastWeekMonday = mondayOfWeek(dates[dates.length - 1]);
+    const startDate = addDaysIso(firstWeekMonday, -(paddingWeeks * 7));
+    const endDate = addDaysIso(lastWeekMonday, 6 + (paddingWeeks * 7));
+    return { startDate, endDate, preset: 'custom', anchorDate: dates[0] };
+  }
+
   function clampViewRangeToBounds(viewRange = {}, { minDate = '', maxDate = '' } = {}) {
     const min = normalizeDateOnly(minDate);
     const max = normalizeDateOnly(maxDate);
@@ -2726,6 +2744,7 @@
     mondayOfWeek,
     computeViewRange,
     computeCustomViewRange,
+    computeStagedSessionsViewRange,
     computeWholeCycleViewRange,
     clampViewRangeToBounds,
     viewRangeDayCount,
