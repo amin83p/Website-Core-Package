@@ -43,6 +43,12 @@ function seedWeekdayHistory(history, weekday, beforeDate, count, hours = 8) {
   }
 }
 
+function seedAfterHolidayBoundary(history, holidayDate, days = 7, hours = 8) {
+  for (let i = 1; i <= days; i += 1) {
+    history.hoursByDate.set(addDays(holidayDate, i), hours);
+  }
+}
+
 test('statutory holiday policy defaults and validation are wired in settings', () => {
   const view = read('packages/school/MVC/views/school/settings/index.ejs');
   const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
@@ -112,6 +118,7 @@ test('30 workday threshold and 5-of-9 weekday rule pass and fail', () => {
 
   history.hoursByDate.set(addDays('2026-03-02', -30), 8);
   seedWeekdayHistory(history, 1, '2026-03-02', 5, 8);
+  seedAfterHolidayBoundary(history, '2026-03-02');
   const pass = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
     holiday,
     policy,
@@ -159,6 +166,7 @@ test('holiday attendance passes without payable hours when no leave on holiday d
     history.hoursByDate.set(addDays('2026-02-16', -i), 8);
   }
   seedWeekdayHistory(history, 1, '2026-02-16', 6, 8);
+  seedAfterHolidayBoundary(history, '2026-02-16');
 
   const evaluation = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
     holiday,
@@ -181,6 +189,7 @@ test('mid-week leave does not disqualify when holiday-week rule is off by defaul
     history.hoursByDate.set(addDays('2026-09-07', -i), 8);
   }
   seedWeekdayHistory(history, 1, '2026-09-07', 6, 8);
+  seedAfterHolidayBoundary(history, '2026-09-07');
 
   const leaveDuringWeek = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
     holiday,
@@ -225,6 +234,7 @@ test('4-week average hours calculation and auto row generation', () => {
     history.hoursByDate.set(addDays('2026-12-25', -i), i % 2 === 0 ? 8 : 6);
   }
   seedWeekdayHistory(history, 5, '2026-12-25', 6, 8);
+  seedAfterHolidayBoundary(history, '2026-12-25');
 
   const evaluation = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
     holiday,
@@ -343,6 +353,65 @@ test('per-holiday statutoryHolidayPayable flag overrides type-based payability',
     ),
     false
   );
+});
+
+test('Step 5 resolves after-boundary workday when post-holiday payable days are in workday history', () => {
+  const policy = timesheetParametersPolicyService.resolvePolicy({});
+  const holiday = { id: 'HOL-VIC', date: '2026-05-18', title: 'Victoria Day', type: 'National Holiday' };
+  const history = buildHistoryFromDates([]);
+  for (let i = 1; i <= 40; i += 1) {
+    history.hoursByDate.set(addDays('2026-05-18', -i), 8);
+  }
+  history.hoursByDate.set('2026-05-19', 8);
+  seedWeekdayHistory(history, 1, '2026-05-18', 6, 8);
+
+  const evaluation = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
+    holiday,
+    policy,
+    workdayHistory: history,
+    leaveDates: new Set()
+  });
+  assert.ok(evaluation.checks.leaveBeforeAfter.beforeDate);
+  assert.equal(evaluation.checks.leaveBeforeAfter.afterDate, '2026-05-19');
+  assert.equal(evaluation.checks.leaveBeforeAfter.boundariesResolved, true);
+  assert.equal(evaluation.checks.leaveBeforeAfter.pass, true);
+});
+
+test('Step 5 fails when after-boundary workday cannot be resolved and rule is enabled', () => {
+  const policy = timesheetParametersPolicyService.resolvePolicy({});
+  const holiday = { id: 'HOL-VIC-2', date: '2026-05-18', title: 'Victoria Day', type: 'National Holiday' };
+  const history = buildHistoryFromDates([]);
+  for (let i = 1; i <= 40; i += 1) {
+    history.hoursByDate.set(addDays('2026-05-18', -i), 8);
+  }
+  seedWeekdayHistory(history, 1, '2026-05-18', 6, 8);
+
+  const evaluation = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
+    holiday,
+    policy,
+    workdayHistory: history,
+    leaveDates: new Set()
+  });
+  assert.equal(evaluation.checks.leaveBeforeAfter.afterDate, '');
+  assert.equal(evaluation.checks.leaveBeforeAfter.missingAfterBoundary, true);
+  assert.equal(evaluation.checks.leaveBeforeAfter.boundariesResolved, false);
+  assert.equal(evaluation.checks.leaveBeforeAfter.pass, false);
+});
+
+test('assemblePeriodWorkdayEntries includes manual rows and live sessions minus deleted auto', () => {
+  const liveSessions = [
+    { sessionId: 'SES-1', date: '2026-05-15', hours: 8 },
+    { sessionId: 'SES-2', date: '2026-05-19', hours: 8 }
+  ];
+  const existingEntries = [
+    { sessionId: 'SES-0', date: '2026-05-14', hours: 4, isManual: true },
+    { sessionId: 'SES-1', isDeleted: true }
+  ];
+  const assembled = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(existingEntries, liveSessions);
+  assert.equal(assembled.length, 2);
+  assert.ok(assembled.some((row) => row.sessionId === 'SES-0'));
+  assert.ok(assembled.some((row) => row.sessionId === 'SES-2'));
+  assert.ok(!assembled.some((row) => row.sessionId === 'SES-1'));
 });
 
 test('observance paid holiday type is supported in holiday management UI', () => {

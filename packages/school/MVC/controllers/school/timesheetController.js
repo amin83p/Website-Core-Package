@@ -2429,6 +2429,10 @@ exports.viewTimesheet = async (req, res) => {
         let statHolidayWarnings = [];
         let liveSessionsWithStatHolidays = mergedLiveSessions;
         if (!useFrozenSnapshot) {
+            const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
+                timesheet.entries,
+                mergedLiveSessions
+            );
             const statHolidayContext = await statutoryHolidayEligibilityService.buildStatutoryHolidayTimesheetContext({
                 orgId: activeOrgId,
                 personId: teacherContext.targetTeacherId,
@@ -2436,7 +2440,7 @@ exports.viewTimesheet = async (req, res) => {
                 periodEndDate: period.endDate,
                 policy: timesheetParametersPolicy,
                 holidays: allHolidays,
-                supplementalEntries: mergedLiveSessions,
+                periodEntries: periodWorkdayEntries,
                 existingEntries: timesheet.entries,
                 reqUser: req.user,
                 allowManagerOverride: canManagerUpdate
@@ -2904,6 +2908,10 @@ exports.saveTimesheet = async (req, res) => {
             ...trustedLiveSessions,
             ...(Array.isArray(activityLiveSessions) ? activityLiveSessions : [])
         ];
+        const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
+            entryRows.filter((entry) => entry && entry.isDeleted !== true),
+            supplementalLiveSessions
+        );
         const allHolidays = await dataService.fetchAllData('holidays', {}, req.user);
         const allowStatHolidayOverride = Boolean(canReviewerEdit);
         const statHolidayContext = await statutoryHolidayEligibilityService.buildStatutoryHolidayTimesheetContext({
@@ -2913,7 +2921,7 @@ exports.saveTimesheet = async (req, res) => {
             periodEndDate: period.endDate,
             policy: timesheetParametersPolicy,
             holidays: allHolidays,
-            supplementalEntries: supplementalLiveSessions,
+            periodEntries: periodWorkdayEntries,
             existingEntries: existingEntriesList,
             reqUser: req.user,
             allowManagerOverride: allowStatHolidayOverride

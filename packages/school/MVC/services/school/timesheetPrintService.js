@@ -358,6 +358,21 @@ function buildStatHolidayPrintSteps(entry = {}) {
   const leaveBeforeAfterDates = Array.isArray(leaveBeforeAfter.leaveDates)
     ? leaveBeforeAfter.leaveDates.filter(Boolean)
     : [];
+  const leaveBeforeAfterDetails = [
+    `Nearest workday before holiday: ${beforeDateLabel}`,
+    `Nearest workday after holiday: ${afterDateLabel}`
+  ];
+  if (leaveBeforeAfter.missingBeforeBoundary) {
+    leaveBeforeAfterDetails.push('Could not resolve the before-boundary workday within the search window.');
+  }
+  if (leaveBeforeAfter.missingAfterBoundary) {
+    leaveBeforeAfterDetails.push('Could not resolve the after-boundary workday within the search window.');
+  }
+  if (leaveBeforeAfterDates.length) {
+    leaveBeforeAfterDetails.push(`Approved leave on these boundary days: ${leaveBeforeAfterDates.map((date) => formatStatHolidayDateLabel(date)).join(', ')}`);
+  } else if (leaveBeforeAfter.boundariesResolved !== false) {
+    leaveBeforeAfterDetails.push('No boundary leave conflicts.');
+  }
   const holidayAttendanceDetails = holidayAttendance.pass === true
     ? [cleanText(holidayAttendance.reason) || 'No approved leave on the statutory holiday date.']
     : [cleanText(holidayAttendance.reason) || 'Approved leave on statutory holiday.'];
@@ -396,13 +411,7 @@ function buildStatHolidayPrintSteps(entry = {}) {
     {
       title: 'Step 5: Before and after — no approved leave on boundary workdays',
       pass: leaveBeforeAfter.pass === true,
-      details: [
-        `Nearest workday before holiday: ${beforeDateLabel}`,
-        `Nearest workday after holiday: ${afterDateLabel}`,
-        leaveBeforeAfterDates.length
-          ? `Approved leave on these boundary days: ${leaveBeforeAfterDates.map((date) => formatStatHolidayDateLabel(date)).join(', ')}`
-          : 'No boundary leave conflicts.'
-      ]
+      details: leaveBeforeAfterDetails
     },
     {
       title: 'Step 6: Average-hours formula',

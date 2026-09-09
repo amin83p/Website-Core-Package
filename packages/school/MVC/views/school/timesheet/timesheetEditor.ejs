@@ -2842,6 +2842,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const weekdayName = String(weekdayRule.weekdayName || '').trim() || 'Target weekday';
         const beforeDateLabel = leaveBeforeAfter.beforeDate ? formatTimesheetDateLabel(leaveBeforeAfter.beforeDate) : 'Not found';
         const afterDateLabel = leaveBeforeAfter.afterDate ? formatTimesheetDateLabel(leaveBeforeAfter.afterDate) : 'Not found';
+        const leaveBeforeAfterDetails = [
+            `Nearest workday before holiday: ${beforeDateLabel}`,
+            `Nearest workday after holiday: ${afterDateLabel}`
+        ];
+        if (leaveBeforeAfter.missingBeforeBoundary) {
+            leaveBeforeAfterDetails.push('Could not resolve the before-boundary workday within the search window.');
+        }
+        if (leaveBeforeAfter.missingAfterBoundary) {
+            leaveBeforeAfterDetails.push('Could not resolve the after-boundary workday within the search window.');
+        }
+        if (leaveBeforeAfterDates.length) {
+            leaveBeforeAfterDetails.push(`Approved leave on these boundary days: ${leaveBeforeAfterDates.map((date) => formatTimesheetDateLabel(date)).join(', ')}`);
+        } else if (leaveBeforeAfter.boundariesResolved !== false) {
+            leaveBeforeAfterDetails.push('No boundary leave conflicts.');
+        }
         const holidayAttendanceDetails = holidayAttendance.pass
             ? [String(holidayAttendance.reason || 'No approved leave on the statutory holiday date.')]
             : [String(holidayAttendance.reason || 'Approved leave on statutory holiday.')];
@@ -2861,13 +2876,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `Worked on holiday: ${workdayMatch.workedOnHoliday ? 'Yes' : 'No'}`
             ]),
             statHolidayStepItemHtml('Step 4: Attendance — no approved leave on holiday date', holidayAttendance.pass, holidayAttendanceDetails),
-            statHolidayStepItemHtml('Step 5: Before and after — no approved leave on boundary workdays', leaveBeforeAfter.pass, [
-                `Nearest workday before holiday: ${beforeDateLabel}`,
-                `Nearest workday after holiday: ${afterDateLabel}`,
-                leaveBeforeAfterDates.length
-                    ? `Approved leave on these boundary days: ${leaveBeforeAfterDates.map((date) => formatTimesheetDateLabel(date)).join(', ')}`
-                    : 'No boundary leave conflicts.'
-            ]),
+            statHolidayStepItemHtml('Step 5: Before and after — no approved leave on boundary workdays', leaveBeforeAfter.pass, leaveBeforeAfterDetails),
             statHolidayStepItemHtml('Step 6: Average-hours formula', calculated.pass, [
                 `Earnings window: ${calculated.earningsStart ? formatTimesheetDateLabel(calculated.earningsStart) : '-'} to ${calculated.earningsEnd ? formatTimesheetDateLabel(calculated.earningsEnd) : '-'}`,
                 `Total hours in window: ${Number(calculated.totalHours || 0).toFixed(2)}`,

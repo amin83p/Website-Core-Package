@@ -9,6 +9,7 @@ const {
   isPayableWorkdayEntry
 } = require('./timesheetWorkdayHistoryService');
 const timesheetPrintService = require('./timesheetPrintService');
+const timesheetLegacyImportService = require('./timesheetLegacyImportService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -63,7 +64,18 @@ function summarizeDisqualifyReasons(checks = {}) {
     reasons.push('Approved leave overlaps the calendar week of the holiday.');
   }
   if (checks.leaveBeforeAfter?.pass === false) {
-    reasons.push('Approved leave on the last or first adjacent payable workday.');
+    if (checks.leaveBeforeAfter?.boundariesResolved === false) {
+      const missing = [];
+      if (checks.leaveBeforeAfter?.missingBeforeBoundary) missing.push('before');
+      if (checks.leaveBeforeAfter?.missingAfterBoundary) missing.push('after');
+      if (missing.length) {
+        reasons.push(`Could not resolve ${missing.join(' and ')} boundary workday within the search window.`);
+      } else {
+        reasons.push('Approved leave on the last or first adjacent payable workday.');
+      }
+    } else {
+      reasons.push('Approved leave on the last or first adjacent payable workday.');
+    }
   }
   if (checks.calculatedHours?.pass === false) {
     reasons.push('No payable workdays in the earnings lookback window.');
@@ -126,7 +138,9 @@ function evaluateHolidayEligibility({
   const leaveBeforeAfterIds = [];
   if (beforeDate && hasLeaveOnDate(beforeDate)) leaveBeforeAfterIds.push(beforeDate);
   if (afterDate && hasLeaveOnDate(afterDate)) leaveBeforeAfterIds.push(afterDate);
-  const leaveBeforeAfterPass = !statPolicy.disqualifyOnLeaveBeforeAfter || leaveBeforeAfterIds.length === 0;
+  const boundariesResolved = Boolean(beforeDate) && Boolean(afterDate);
+  const leaveBeforeAfterPass = !statPolicy.disqualifyOnLeaveBeforeAfter
+    || (boundariesResolved && leaveBeforeAfterIds.length === 0);
 
   const earningsEnd = addDays(date, -1);
   const earningsStart = addDays(earningsEnd, -(statPolicy.earningsLookbackWeeks * 7 - 1));
@@ -168,7 +182,10 @@ function evaluateHolidayEligibility({
       pass: leaveBeforeAfterPass,
       beforeDate,
       afterDate,
-      leaveDates: leaveBeforeAfterIds
+      leaveDates: leaveBeforeAfterIds,
+      boundariesResolved,
+      missingBeforeBoundary: !beforeDate,
+      missingAfterBoundary: !afterDate
     },
     calculatedHours: {
       pass: calculatedHoursPass,
@@ -311,6 +328,43 @@ function buildStatHolidayRow({
   return row;
 }
 
+function mergeWorkdaySourceEntries(periodEntries = [], supplementalEntries = []) {
+  const merged = [];
+  const seenSessionIds = new Set();
+  [...(Array.isArray(periodEntries) ? periodEntries : []), ...(Array.isArray(supplementalEntries) ? supplementalEntries : [])]
+    .forEach((entry) => {
+      if (!entry || entry.isDeleted === true || entry.isStatutoryHoliday === true) return;
+      const sessionId = String(entry?.sessionId || '').trim();
+      if (sessionId) {
+        if (seenSessionIds.has(sessionId)) return;
+        seenSessionIds.add(sessionId);
+      }
+      merged.push(entry);
+    });
+  return merged;
+}
+
+function assemblePeriodWorkdayEntries(existingEntries = [], liveSessions = []) {
+  const entries = Array.isArray(existingEntries) ? existingEntries : [];
+  const live = Array.isArray(liveSessions) ? liveSessions : [];
+  const deletedAutoSessionIds = new Set(
+    entries
+      .filter((entry) => entry?.isDeleted === true)
+      .map((entry) => String(entry?.sessionId || '').trim())
+      .filter(Boolean)
+  );
+  const savedRows = entries.filter((entry) => {
+    if (!entry || entry.isDeleted === true || entry.isStatutoryHoliday === true) return false;
+    if (entry.isManual === true) return true;
+    return timesheetLegacyImportService.isLegacyImportEntry(entry);
+  });
+  const autoRows = live.filter((entry) => {
+    const sessionId = String(entry?.sessionId || '').trim();
+    return sessionId && !deletedAutoSessionIds.has(sessionId);
+  });
+  return [...savedRows, ...autoRows];
+}
+
 async function buildStatutoryHolidayTimesheetContext({
   orgId,
   personId,
@@ -318,6 +372,7 @@ async function buildStatutoryHolidayTimesheetContext({
   periodEndDate,
   policy,
   holidays = [],
+  periodEntries = [],
   supplementalEntries = [],
   supplementalEntryFilter = null,
   existingEntries = [],
@@ -369,17 +424,24 @@ async function buildStatutoryHolidayTimesheetContext({
 
   const filteredSupplementalEntries = (Array.isArray(supplementalEntries) ? supplementalEntries : [])
     .filter((entry) => typeof supplementalEntryFilter !== 'function' || supplementalEntryFilter(entry));
+  const filteredPeriodEntries = (Array.isArray(periodEntries) ? periodEntries : [])
+    .filter((entry) => typeof supplementalEntryFilter !== 'function' || supplementalEntryFilter(entry));
+  const workdaySourceEntries = mergeWorkdaySourceEntries(filteredPeriodEntries, filteredSupplementalEntries);
+  const historyEndDate = addDays(
+    [String(periodEndDate || '').trim(), maxHolidayDate].filter(Boolean).sort().pop(),
+    statPolicy.beforeAfterSearchDays + 7
+  );
 
   const workdayHistory = await buildWorkdayHistory({
     orgId,
     personId,
-    endDate: maxHolidayDate,
+    endDate: historyEndDate,
     lookbackDays,
     reqUser,
-    supplementalEntries: filteredSupplementalEntries
+    supplementalEntries: workdaySourceEntries
   });
 
-  const supplementalHoursByDate = buildSupplementalHoursByDate(filteredSupplementalEntries);
+  const supplementalHoursByDate = buildSupplementalHoursByDate(workdaySourceEntries);
   const existingBySessionId = new Map(
     (Array.isArray(existingEntries) ? existingEntries : [])
       .filter((entry) => entry && entry.isDeleted !== true)
@@ -494,6 +556,7 @@ function buildTrustedStatHolidayEntry({
 
 module.exports = {
   PAYABLE_HOLIDAY_TYPES: timesheetParametersPolicyService.PAYABLE_HOLIDAY_TYPES,
+  assemblePeriodWorkdayEntries,
   buildStatHolidaySessionId,
   buildStatHolidayRow,
   evaluateHolidayEligibility,

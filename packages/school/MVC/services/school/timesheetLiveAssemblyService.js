@@ -166,7 +166,7 @@ async function buildImportedTimesheetEntries({
     periodEndDate: period.endDate,
     policy: timesheetParametersPolicy,
     holidays: allHolidays,
-    supplementalEntries: filteredLiveEntries,
+    periodEntries: effective.entries,
     supplementalEntryFilter,
     existingEntries: [],
     reqUser,
