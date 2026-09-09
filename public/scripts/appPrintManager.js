@@ -346,6 +346,7 @@
     target.set('printIncludeHeaderNote', next.includeHeaderNote ? 'true' : 'false');
     target.set('printHeaderNote', next.headerNote);
     target.set('printRequestedByLabel', next.requestedByLabel);
+    target.set('printLogoUrl', next.logoUrl);
     if (settings && typeof settings === 'object' && settings.printReviewType) {
       target.set('printReviewType', normalizeReviewType(settings.printReviewType));
     }

@@ -4,6 +4,7 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
+const appBrandingService = requireCoreModule('MVC/services/appBrandingService');
 const accessUiService = requireCoreModule('MVC/services/security/accessUiService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
 const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
@@ -761,7 +762,10 @@ function parseTimesheetPrintSettings(body = {}) {
         ? 'normal'
         : 'compact';
     const printReviewType = timesheetPrintService.parsePrintReviewType(body.printReviewType);
-    return {
+    const logoUrlFromBody = cleanPrintSettingText(body.printLogoUrl || body.logoUrl, 1200);
+    const defaultLogoUrl = cleanPrintSettingText(appBrandingService.getBrand()?.logoUrl, 1200)
+        || '/uploads/GLOBAL/logo/Logo1.png';
+    const parsed = {
         orientation,
         density,
         includeOrg: parsePrintSettingBoolean(body.printIncludeOrg, true),
@@ -769,8 +773,10 @@ function parseTimesheetPrintSettings(body = {}) {
         includeHeaderNote: parsePrintSettingBoolean(body.printIncludeHeaderNote, false),
         headerNote: cleanPrintSettingText(body.printHeaderNote, 3000),
         requestedByLabel: cleanPrintSettingText(body.printRequestedByLabel, 240),
+        logoUrl: logoUrlFromBody || defaultLogoUrl,
         printReviewType
     };
+    return parsed;
 }
 
 function setTimesheetPrintResponseHeaders(res) {

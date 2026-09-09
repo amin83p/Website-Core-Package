@@ -543,8 +543,33 @@ test('print review type defaults to managerial and financial uses a compact desc
   assert.match(financialHtml, /class="comment-text">Printed comment<\/span>/);
   assert.match(financialHtml, /Statutory Holiday Pay Summary/);
   assert.match(financialHtml, /paid statutory holiday entry totaling 7\.50 hours/);
+  assert.match(financialHtml, /class="stat-holiday-summary-layout"/);
+  assert.match(financialHtml, /class="stat-holiday-summary-table"/);
+  assert.match(financialHtml, /<th scope="row">Holiday<\/th>/);
   assert.match(financialHtml, /Step 6: Average-hours formula/);
   assert.match(financialHtml, /Average payable hours: 7\.50/);
+  assert.doesNotMatch(financialHtml, /stat-holiday-summary-meta/);
+
+  const emptyStatHolidayHtml = ejs.render(source, {
+    title: 'Timesheet Print',
+    appBrand: { appName: 'Example Website' },
+    printContext: {
+      organizationName: 'Example School',
+      printedByName: 'Printer User',
+      printedAtLabel: 'Jul 15, 2026, 09:00 a.m.',
+      printReviewType: 'financial',
+      printReviewTitle: 'Financial Review',
+      period: { name: '2026-JULY-02', startDateLabel: 'July 15, 2026', endDateLabel: 'July 31, 2026', deadlineLabel: '2026-07-30 23:59' },
+      documents: [sampleDocument('Person One', {
+        statutoryHolidaySummaries: [],
+        statutoryHolidayPaidCount: 0,
+        statutoryHolidayPaidHours: 0
+      })]
+    },
+    printSettings: { orientation: 'landscape', density: 'compact' }
+  }, { filename: viewPath });
+  assert.doesNotMatch(emptyStatHolidayHtml, /Statutory Holiday Pay Summary/);
+  assert.doesNotMatch(emptyStatHolidayHtml, /No statutory holiday pay entries in this period/);
 
   assert.match(managerialHtml, /print-review-managerial/);
   assert.doesNotMatch(managerialHtml, /Statutory Holiday Pay Summary/);
@@ -656,7 +681,8 @@ test('standalone print view renders safe single and batch documents with print C
       orgName: 'Printed School Name',
       includeHeaderNote: true,
       headerNote: 'Payroll copy',
-      requestedByLabel: 'Print Clerk'
+      requestedByLabel: 'Print Clerk',
+      logoUrl: '/uploads/GLOBAL/logo/example-logo.png'
     }
   }, { filename: viewPath });
 
@@ -681,7 +707,8 @@ test('standalone print view renders safe single and batch documents with print C
   assert.match(html, /Requested by: Print Clerk/);
   assert.match(html, />Managerial Review</);
   assert.doesNotMatch(html, /Printed School Name/);
-  assert.doesNotMatch(html, /class="print-logo"/);
+  assert.match(html, /class="print-logo"/);
+  assert.match(html, /example-logo\.png/);
   assert.doesNotMatch(html, /2026-JULY-02/);
   assert.match(html, /Hours\/Time \(Hrs\)/);
   assert.match(html, />Regular</);
