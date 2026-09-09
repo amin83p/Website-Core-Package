@@ -1258,6 +1258,12 @@
     });
   }
 
+  function resolveResizeHandleEdge(handle) {
+    const explicit = String(handle?.getAttribute?.('data-resize-edge') || '').trim().toLowerCase();
+    if (explicit === 'top' || explicit === 'bottom') return explicit;
+    return handle?.classList?.contains?.('session-cal-draft-resize-handle-top') ? 'top' : 'bottom';
+  }
+
   function bindCalendarDragResize(container, options = {}) {
     if (!container) return;
     container._calendarDragResizeOptions = options;
@@ -1423,7 +1429,7 @@
       const timelineStartMin = TIMELINE_START_HOUR * 60;
       const anchorStartOffset = startMin - timelineStartMin;
       const anchorEndOffset = endMin - timelineStartMin;
-      const edge = String(handle.getAttribute('data-resize-edge') || handle.classList.contains('session-cal-draft-resize-handle-top') ? 'top' : 'bottom').trim();
+      const edge = resolveResizeHandleEdge(handle);
 
       event.preventDefault();
       event.stopPropagation();
@@ -2778,6 +2784,7 @@
     bindCalendarDragCreate,
     bindCalendarDragMove,
     bindCalendarDragResize,
+    resolveResizeHandleEdge,
     checkScheduleTimeConflict,
     getSessionDate,
     clearDragOverlays,

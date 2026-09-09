@@ -3646,8 +3646,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (block) {
             const event = resolveScheduleContextEventFromTarget(block);
             if (event) {
-                void applySavedSessionScheduleUpdate({
-                    event,
+                commitSavedSessionScheduleUpdate(event, {
                     date: update.date,
                     startTime: update.startTime,
                     endTime: update.endTime,
@@ -3666,8 +3665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (block) {
             const event = resolveScheduleContextEventFromTarget(block);
             if (event) {
-                void applySavedSessionScheduleUpdate({
-                    event,
+                commitSavedSessionScheduleUpdate(event, {
                     date: update.date,
                     startTime: update.startTime,
                     endTime: update.endTime,
@@ -3731,6 +3729,56 @@ document.addEventListener('DOMContentLoaded', () => {
     let scheduleSessionEditOverlayMode = 'draft';
     let scheduleSavedSessionEditEvent = null;
     let scheduleDraftMenuBound = false;
+    const scheduleSessionMutationTokens = new Map();
+
+    function beginScheduleSessionMutation(sessionId) {
+        const id = String(sessionId || '').trim();
+        if (!id) return 0;
+        const next = (scheduleSessionMutationTokens.get(id) || 0) + 1;
+        scheduleSessionMutationTokens.set(id, next);
+        return next;
+    }
+
+    function isLatestScheduleSessionMutation(sessionId, mutationToken) {
+        const id = String(sessionId || '').trim();
+        if (!id || mutationToken == null) return true;
+        return scheduleSessionMutationTokens.get(id) === mutationToken;
+    }
+
+    function commitSavedSessionScheduleUpdate(event, {
+        date,
+        startTime,
+        endTime,
+        durationHours
+    } = {}) {
+        if (!event) return;
+        const sessionId = String(event.sessionId || '').trim();
+        if (!sessionId) return;
+        const mutationToken = beginScheduleSessionMutation(sessionId);
+        const lookupSessionDate = String(event.date || '').trim();
+        const resolvedEnd = endTime || (scheduleCalendarCore?.addDurationToTime
+            ? scheduleCalendarCore.addDurationToTime(startTime, durationHours || event.duration || 1)
+            : startTime);
+        patchSavedClassSessionEventInState(
+            { ...event, date: lookupSessionDate },
+            {
+                date,
+                start: startTime,
+                end: resolvedEnd,
+                duration: durationHours
+            }
+        );
+        refreshScheduleActiveView();
+        void applySavedSessionScheduleUpdate({
+            event,
+            lookupSessionDate,
+            date,
+            startTime,
+            endTime: resolvedEnd,
+            durationHours,
+            mutationToken
+        });
+    }
 
     function buildScheduleDraftResizeHandlesHtml() {
         return '<span class="session-cal-draft-resize-handle session-cal-draft-resize-handle-top" data-resize-edge="top" aria-hidden="true"></span>'
@@ -4126,8 +4174,7 @@ document.addEventListener('DOMContentLoaded', () => {
             durationHours
         };
         if (scheduleSessionEditOverlayMode === 'saved' && scheduleSavedSessionEditEvent) {
-            void applySavedSessionScheduleUpdate({
-                event: scheduleSavedSessionEditEvent,
+            commitSavedSessionScheduleUpdate(scheduleSavedSessionEditEvent, {
                 date: values.date,
                 startTime: values.startTime,
                 endTime,
@@ -4177,8 +4224,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const endTime = scheduleCalendarCore?.addDurationToTime
                 ? scheduleCalendarCore.addDurationToTime(values.startTime, values.durationHours)
                 : values.startTime;
-            void applySavedSessionScheduleUpdate({
-                event: scheduleSavedSessionEditEvent,
+            commitSavedSessionScheduleUpdate(scheduleSavedSessionEditEvent, {
                 date: values.date,
                 startTime: values.startTime,
                 endTime,
@@ -4959,13 +5005,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function applySavedSessionScheduleUpdate({
         event,
+        lookupSessionDate,
         date,
         startTime,
         endTime,
         durationHours,
-        forceConflicts = false
+        forceConflicts = false,
+        mutationToken = null
     } = {}) {
         if (!canDragCreateSessions || !event) return false;
+        const sessionId = String(event.sessionId || '').trim();
+        const sessionLookupDate = String(lookupSessionDate || event.date || '').trim();
         const resolvedEnd = endTime || (scheduleCalendarCore?.addDurationToTime
             ? scheduleCalendarCore.addDurationToTime(startTime, durationHours || event.duration || 1)
             : startTime);
@@ -4983,7 +5033,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     classId: event.classId,
                     sessionId: event.sessionId,
-                    sessionDate: event.date,
+                    sessionDate: sessionLookupDate,
                     date,
                     startTime,
                     endTime: resolvedEnd,
@@ -5004,7 +5054,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     : false;
                 if (confirmed) {
                     return applySavedSessionScheduleUpdate({
-                        event, date, startTime, endTime: resolvedEnd, durationHours, forceConflicts: true
+                        event,
+                        lookupSessionDate: sessionLookupDate,
+                        date,
+                        startTime,
+                        endTime: resolvedEnd,
+                        durationHours,
+                        forceConflicts: true,
+                        mutationToken
                     });
                 }
                 return false;
@@ -5019,13 +5076,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return false;
             }
+            if (!isLatestScheduleSessionMutation(sessionId, mutationToken)) {
+                return false;
+            }
             const session = result.session || {};
-            patchSavedClassSessionEventInState(event, {
-                date: session.date || date,
-                start: session.startTime || startTime,
-                end: session.endTime || resolvedEnd,
-                duration: session.durationHours || durationHours
-            });
+            patchSavedClassSessionEventInState(
+                { ...event, date: sessionLookupDate },
+                {
+                    date: session.date || date,
+                    start: session.startTime || startTime,
+                    end: session.endTime || resolvedEnd,
+                    duration: session.durationHours || durationHours
+                }
+            );
             hideScheduleDraftEditOverlay();
             hideScheduleDraftMoveOverlay();
             refreshScheduleActiveView();
