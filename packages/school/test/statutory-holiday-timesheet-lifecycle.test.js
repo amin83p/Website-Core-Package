@@ -52,6 +52,35 @@ test('mergeStatHolidayRowsIntoEntries replaces stale statutory holiday rows', ()
   assert.equal(statRow.statHolidayMeta.holidayId, 'H1');
 });
 
+test('mergeStatHolidayRowsIntoEntries prefers incoming client override over stale DB snapshot', () => {
+  const merged = statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries({
+    entries: [
+      { sessionId: 'act-1' },
+      {
+        sessionId: 'stathol-H1-P1',
+        isStatutoryHoliday: true,
+        statHolidayOverride: { hours: 8, reason: 'Manager adjusted' }
+      }
+    ],
+    statHolidayRows: [{
+      sessionId: 'stathol-H1-P1',
+      isStatutoryHoliday: true,
+      hours: 6,
+      statHolidayMeta: { holidayId: 'H1', calculatedHours: 6 }
+    }],
+    usesActivityMode: false,
+    existingEntriesBySessionId: new Map([
+      ['stathol-H1-P1', {
+        sessionId: 'stathol-H1-P1',
+        statHolidayOverride: { hours: 6, reason: 'Old override' }
+      }]
+    ])
+  });
+  const statRow = merged.find((row) => row.sessionId === 'stathol-H1-P1');
+  assert.equal(statRow.statHolidayOverride.hours, 8);
+  assert.equal(statRow.statHolidayOverride.reason, 'Manager adjusted');
+});
+
 test('assertStatHolidayPayConfigured rejects missing activity id', async () => {
   await assert.rejects(
     () => statutoryHolidayTimesheetLifecycleService.assertStatHolidayPayConfigured({
@@ -65,10 +94,16 @@ test('assertStatHolidayPayConfigured rejects missing activity id', async () => {
 
 test('clearStatHolidayForReturnedTimesheet strips rows and removes activity assignees', async () => {
   const originalRemove = statutoryHolidayWorkSessionService.removeStatHolidayWorkSessionsForTarget;
+  const originalClearAttendees = statutoryHolidayWorkSessionService.clearStatHolidayActivityLevelAttendees;
   let removeCalls = 0;
+  let clearAttendeeCalls = 0;
   statutoryHolidayWorkSessionService.removeStatHolidayWorkSessionsForTarget = async () => {
     removeCalls += 1;
     return { removedAssignees: 2, removedEntries: 0 };
+  };
+  statutoryHolidayWorkSessionService.clearStatHolidayActivityLevelAttendees = async () => {
+    clearAttendeeCalls += 1;
+    return { cleared: true };
   };
   try {
     const outcome = await statutoryHolidayTimesheetLifecycleService.clearStatHolidayForReturnedTimesheet({
@@ -83,10 +118,12 @@ test('clearStatHolidayForReturnedTimesheet strips rows and removes activity assi
       ]
     });
     assert.equal(removeCalls, 1);
+    assert.equal(clearAttendeeCalls, 1);
     assert.equal(outcome.entries.length, 1);
     assert.equal(outcome.removedAssignees, 2);
   } finally {
     statutoryHolidayWorkSessionService.removeStatHolidayWorkSessionsForTarget = originalRemove;
+    statutoryHolidayWorkSessionService.clearStatHolidayActivityLevelAttendees = originalClearAttendees;
   }
 });
 
@@ -96,6 +133,88 @@ test('import assembly no longer materializes statutory holiday rows', () => {
     'utf8'
   );
   assert.doesNotMatch(source, /materializeStatHolidayForPersonPeriod/);
+});
+
+test('timesheet editor save payload includes statutory holiday override fields', () => {
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editorSource, /if \(e\.statHolidayOverride\) \{[\s\S]*row\.statHolidayOverride = e\.statHolidayOverride/);
+  assert.match(editorSource, /if \(e\.statHolidayMeta\) row\.statHolidayMeta = e\.statHolidayMeta/);
+  assert.match(editorSource, /btnStatHolidayCalcAdjust/);
+});
+
+test('timesheet editor restores saved statutory holiday overrides and linked activity rows', () => {
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editorSource, /savedStatHolidayBySessionId/);
+  assert.match(editorSource, /rehydrateSavedStatHolidayEntries/);
+  assert.match(editorSource, /resolveStatHolidayOverrideHours/);
+  assert.match(editorSource, /ensureLinkedActivityStatHolidayEntry/);
+  assert.match(editorSource, /statHolidayOverrideModal\?\.hide\(\)/);
+  assert.match(editorSource, /statHolidaySavedStateHydrated/);
+});
+
+test('timesheet editor supports manager edits for unqualified statutory holidays', () => {
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editorSource, /function resolveOrEnsureStatHolidayActiveEntry/);
+  assert.match(editorSource, /resolveOrEnsureStatHolidayActiveEntry\(sessionId\)/);
+  assert.match(editorSource, /buildStatHolidayManagerActionButtonsHtml/);
+  assert.match(editorSource, /holidayOnlyActBtns[\s\S]*buildStatHolidayManagerActionButtonsHtml/);
+  assert.match(editorSource, /Set hours/);
+  assert.match(editorSource, /openStatHolidayOverrideModal\('stathol-\$\{escapeHtml\(warning\.holidayId\)\}-\$\{TARGET_TEACHER_ID\}'\)/);
+});
+
+test('timesheet editor department totals skip activity-mode statutory holiday metadata rows', () => {
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editorSource, /renderDepartmentTotals[\s\S]*isStatHolidayMetadataOnlyEntry\(entry\)/);
+  assert.match(editorSource, /renderDepartmentTotals[\s\S]*resolveTimesheetRowHours\(entry\)/);
+  assert.match(editorSource, /applyStatHolidayOverrideToEntry[\s\S]*STATUTORY_HOLIDAY_USES_ACTIVITY[\s\S]*metadataEntry\.hours = 0/);
+});
+
+test('timesheet editor skips statutory holiday preview for draft timesheets', () => {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/timesheetController.js'),
+    'utf8'
+  );
+  assert.match(controllerSource, /isDraftTimesheet/);
+  assert.match(controllerSource, /!useFrozenSnapshot && !isDraftTimesheet/);
+  assert.match(controllerSource, /statHolidayPreviewOnly:\s*status === 'draft'/);
+
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editorSource, /STAT_HOLIDAY_PREVIEW_ONLY[\s\S]*renderStatHolidayWarningsPanel/);
+  assert.match(editorSource, /if \(STAT_HOLIDAY_PREVIEW_ONLY\) \{\s*panel\.classList\.add\('d-none'\)/);
+  assert.match(editorSource, /STAT_HOLIDAY_PREVIEW_ONLY && isStatHolidayRelatedEntry\(ls\)/);
+  assert.match(editorSource, /openStatHolidayCalculationModal[\s\S]*if \(STAT_HOLIDAY_PREVIEW_ONLY\) return/);
+});
+
+test('saveTimesheet applies statutory holiday override hours to activity rows', () => {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/timesheetController.js'),
+    'utf8'
+  );
+  assert.match(controllerSource, /statHolidayOverrideByHolidayId/);
+  assert.match(controllerSource, /allowStatHolidayOverride && statHolidayOverride/);
+});
+
+test('saveTimesheet skips prior-period reconciliation gate on reviewer edits', () => {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/timesheetController.js'),
+    'utf8'
+  );
+  assert.match(controllerSource, /if \(nextStatus === 'submitted' && !reviewerEdit\) \{[\s\S]*resolvePriorReconciliationContext/);
 });
 
 test('previewStatHolidayForTimesheet does not persist to activity', async () => {

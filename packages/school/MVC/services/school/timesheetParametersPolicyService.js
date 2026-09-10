@@ -22,7 +22,9 @@ const DEFAULT_STATUTORY_HOLIDAY_PAY = Object.freeze({
   beforeAfterSearchDays: 14,
   disqualifyOnLeaveDuringHolidayWeek: false,
   disqualifyOnLeaveBeforeAfter: true,
-  payableHolidayTypes: [...PAYABLE_HOLIDAY_TYPES]
+  payableHolidayTypes: [...PAYABLE_HOLIDAY_TYPES],
+  mappingYear: '',
+  mappingActivityId: ''
 });
 
 const DEFAULT_POLICY = Object.freeze({
@@ -101,7 +103,9 @@ function normalizeStatutoryHolidayPay(input = {}, { strict = false } = {}) {
       source.disqualifyOnLeaveBeforeAfter,
       defaults.disqualifyOnLeaveBeforeAfter
     ),
-    payableHolidayTypes: normalizePayableHolidayTypes(source.payableHolidayTypes, { strict })
+    payableHolidayTypes: normalizePayableHolidayTypes(source.payableHolidayTypes, { strict }),
+    mappingYear: String(source.mappingYear ?? '').trim(),
+    mappingActivityId: String(source.mappingActivityId ?? '').trim()
   };
 }
 
@@ -170,7 +174,15 @@ function normalizePolicyFromForm(input = {}) {
         ?? nestedStat.disqualifyOnLeaveBeforeAfter,
       payableHolidayTypes: hasExplicitHolidayTypeInput
         ? payableHolidayTypes
-        : (nestedStat.payableHolidayTypes ?? DEFAULT_STATUTORY_HOLIDAY_PAY.payableHolidayTypes)
+        : (nestedStat.payableHolidayTypes ?? DEFAULT_STATUTORY_HOLIDAY_PAY.payableHolidayTypes),
+      mappingYear: input.statutoryHolidayMappingYear
+        ?? input['statutoryHolidayPay.mappingYear']
+        ?? nestedStat.mappingYear
+        ?? '',
+      mappingActivityId: input.statutoryHolidayMappingActivityId
+        ?? input['statutoryHolidayPay.mappingActivityId']
+        ?? nestedStat.mappingActivityId
+        ?? ''
     }, { strict: hasExplicitHolidayTypeInput })
   };
 }

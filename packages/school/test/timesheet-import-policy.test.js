@@ -198,3 +198,84 @@ test('summarizeImportClassMappingIssues counts distinct classes and rows', () =>
   assert.equal(summary.unmappedRowCount, 3);
   assert.deepEqual(summary.unmappedClasses.sort(), ['Math', 'Science']);
 });
+
+test('finalizeImportTargetAfterSave locks statutory holiday assignees when processed', async () => {
+  const schoolDependencyService = require('../MVC/services/school/schoolDependencyService');
+  const timesheetManualMaterializationService = require('../MVC/services/school/timesheetManualMaterializationService');
+  const timesheetParametersPolicyModel = require('../MVC/models/school/timesheetParametersPolicyModel');
+  const statutoryHolidayTimesheetLifecycleService = require('../MVC/services/school/statutoryHolidayTimesheetLifecycleService');
+  const taskService = require('../MVC/services/school/taskService');
+
+  const originals = {
+    materialize: timesheetManualMaterializationService.materializeApprovedTimesheetManualEntries,
+    lockSources: schoolDependencyService.lockSourcesForApprovedTimesheet,
+    dedupe: schoolDependencyService.dedupeSourceRefs,
+    getPolicy: timesheetParametersPolicyModel.getPolicyForOrg,
+    lockStatHoliday: statutoryHolidayTimesheetLifecycleService.lockStatHolidayAssigneesForTimesheet,
+    resolveTask: taskService.resolveTimesheetTask
+  };
+
+  const lockStatHolidayCalls = [];
+  const updates = [];
+  const dataService = {
+    updateData: async (_entityType, id, payload) => {
+      updates.push({ id, payload });
+      return { id, ...payload };
+    }
+  };
+
+  timesheetManualMaterializationService.materializeApprovedTimesheetManualEntries = async ({ timesheet }) => ({
+    timesheet,
+    summary: null
+  });
+  schoolDependencyService.lockSourcesForApprovedTimesheet = async () => ({
+    lockedSourceRefs: [{ type: 'activity', activityId: 'ACT_IMPORT', activityEntryId: 'ENT-1', personId: 'PERSON_1' }]
+  });
+  schoolDependencyService.dedupeSourceRefs = (refs) => refs;
+  timesheetParametersPolicyModel.getPolicyForOrg = async () => ({
+    statutoryHolidayPay: { enabled: true, activityId: 'ACT_STAT' }
+  });
+  statutoryHolidayTimesheetLifecycleService.lockStatHolidayAssigneesForTimesheet = async (args) => {
+    lockStatHolidayCalls.push(args);
+    return {
+      lockedSourceRefs: [{
+        type: 'activity',
+        activityId: 'ACT_STAT',
+        activityEntryId: 'ENT-STAT-1',
+        personId: 'PERSON_1'
+      }]
+    };
+  };
+  taskService.resolveTimesheetTask = async () => null;
+
+  try {
+    const saved = await timesheetImportLifecycleService.finalizeImportTargetAfterSave({
+      savedTimesheet: {
+        id: 'TS_1',
+        orgId: 'ORG_1',
+        teacherId: 'PERSON_1',
+        entries: [{ sessionId: 'act-1', hours: 2 }],
+        reviewVersion: 1,
+        reviewHistory: []
+      },
+      period: { id: 'PER_A', name: 'PER_A', startDate: '2026-03-01', endDate: '2026-03-15' },
+      targetStatus: 'processed',
+      reqUser: { id: 'USER_1', displayName: 'Admin' },
+      dataService
+    });
+
+    assert.equal(lockStatHolidayCalls.length, 1);
+    assert.equal(lockStatHolidayCalls[0].timesheetId, 'TS_1');
+    assert.equal(lockStatHolidayCalls[0].personId, 'PERSON_1');
+    assert.equal(saved.status, 'processed');
+    assert.equal(saved.lockedSourceRefs.length, 2);
+    assert.equal(saved.lockedSourceRefs[1].activityId, 'ACT_STAT');
+  } finally {
+    timesheetManualMaterializationService.materializeApprovedTimesheetManualEntries = originals.materialize;
+    schoolDependencyService.lockSourcesForApprovedTimesheet = originals.lockSources;
+    schoolDependencyService.dedupeSourceRefs = originals.dedupe;
+    timesheetParametersPolicyModel.getPolicyForOrg = originals.getPolicy;
+    statutoryHolidayTimesheetLifecycleService.lockStatHolidayAssigneesForTimesheet = originals.lockStatHoliday;
+    taskService.resolveTimesheetTask = originals.resolveTask;
+  }
+});

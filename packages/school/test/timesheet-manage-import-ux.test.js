@@ -98,6 +98,13 @@ test('timesheet manage view uses split bulk and row import entry points', () => 
   assert.match(viewSource, /buildImportExecutionConfirmMessage/);
   assert.match(viewSource, /renderImportExecutionTimesheetCell/);
   assert.match(viewSource, /data-import-exec-open-draft/);
+  assert.match(viewSource, /data-import-exec-status/);
+  assert.match(viewSource, /renderImportExecutionStatusCell/);
+  assert.match(viewSource, /targetStatus:/);
+  assert.match(viewSource, /defaultImportTargetStatus/);
+  assert.match(viewSource, /statHolidayPreview/);
+  assert.match(viewSource, /Stat holiday/);
+  assert.match(viewSource, /Choose Draft to review and edit them in the timesheet editor/);
   assert.doesNotMatch(viewSource, /Stat holiday manual hours/);
   assert.doesNotMatch(viewSource, /js-import-stat-holiday-hours/);
   assert.doesNotMatch(viewSource, /statHolidayOverrides/);
@@ -120,4 +127,5 @@ test('timesheet controller exposes import execution endpoints', () => {
   assert.match(controllerSource, /timesheetLegacyImportExecutionService/);
   assert.match(controllerSource, /expectedPeriodId/);
   assert.match(controllerSource, /Single-period import accepts exactly one Excel file/);
+  assert.match(controllerSource, /targetStatus/);
 });

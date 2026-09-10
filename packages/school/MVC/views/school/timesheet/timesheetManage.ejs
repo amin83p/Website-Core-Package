@@ -558,7 +558,7 @@
       <div class="modal-header">
         <div class="w-100">
           <h5 class="modal-title fw-bold mb-0"><i class="bi bi-play-circle me-2 text-success"></i> Import Execution</h5>
-          <div class="small text-muted mt-1">Create activity work sessions, assemble the full timesheet, then mark it processed.</div>
+          <div class="small text-muted mt-1" id="importExecutionModalSubtitle">Create activity work sessions, assemble the full timesheet, then apply the selected status.</div>
         </div>
         <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -570,6 +570,7 @@
               <tr>
                 <th>File</th>
                 <th>Period</th>
+                <th>Status</th>
                 <th>Work Sessions</th>
                 <th>Timesheet</th>
                 <th class="text-end">Action</th>
@@ -2201,7 +2202,21 @@
         parts.push(renderImportExecutionStepCell(steps.processed));
       }
     }
-    if (String(row?.existingTimesheetStatus || '').toLowerCase() === 'draft' && cleanId(row?.existingTimesheetId)) {
+    const statHolidayWarnings = Array.isArray(steps.timesheet?.statHolidayWarnings) ? steps.timesheet.statHolidayWarnings : [];
+    const blockingWarnings = statHolidayWarnings.filter((warning) => warning?.blocking === true
+      || (Array.isArray(warning?.reasons) && warning.reasons.some((reason) => /missing pre-mapped/i.test(String(reason)))));
+    if (blockingWarnings.length) {
+      const lines = blockingWarnings.flatMap((warning) => (
+        Array.isArray(warning?.reasons) ? warning.reasons : [String(warning?.message || warning || '')]
+      )).filter(Boolean).map((reason) => (
+        '<div class="small text-danger mt-1"><i class="bi bi-exclamation-octagon me-1"></i>' + escapeHtml(reason) + '</div>'
+      )).join('');
+      parts.push(lines);
+    }
+    const appliedStatus = String(row?.appliedStatus || steps.timesheet?.appliedStatus || '').toLowerCase();
+    const showDraftLink = (appliedStatus === 'draft' && cleanId(row?.timesheetId))
+      || (String(row?.existingTimesheetStatus || '').toLowerCase() === 'draft' && cleanId(row?.existingTimesheetId));
+    if (showDraftLink) {
       parts.push(
         '<a class="btn btn-link btn-sm p-0 mt-1" data-import-exec-open-draft href="'
         + escapeHtml(buildTimesheetEditorUrl(row.periodId, row.personId))
@@ -2226,7 +2241,15 @@
         + resolvedBlockedCount + ' file(s) are blocked by existing timesheets and will appear in the execution table with Perform disabled. Continue?';
     }
     if (resolvedReadyCount) {
-      return 'Run the 3-step import execution for ' + resolvedReadyCount + ' matched period file(s)?';
+      const defaultStatus = String(planPayload.defaultImportTargetStatus || 'draft');
+      const statusLabel = IMPORT_TARGET_STATUS_LABELS[defaultStatus] || defaultStatus;
+      const statHolidayCount = rows.filter((row) => String(row.eligibility || '') === 'ready' && row?.statHolidayPreview?.hasStatHolidays).length;
+      let message = 'Run import execution for ' + resolvedReadyCount + ' matched period file(s)? Each row defaults to '
+        + statusLabel + ', and you can change the status before performing.';
+      if (statHolidayCount) {
+        message += ' ' + statHolidayCount + ' file(s) include statutory holidays.';
+      }
+      return message;
     }
     if (resolvedBlockedCount) {
       return 'All ' + resolvedBlockedCount + ' matched file(s) are blocked by existing timesheets. Open the execution review to see why Perform is disabled?';
@@ -2252,22 +2275,159 @@
     return Boolean(resolveImportExecutionPersonRole(targetPersonId));
   }
 
+  const IMPORT_TARGET_STATUS_LABELS = {
+    draft: 'Draft',
+    submitted: 'Submitted',
+    manager_approved: 'Manager approved',
+    processed: 'Processed'
+  };
+
+  function resolveImportTargetStatusOptions() {
+    const options = Array.isArray(importExecutionPlan?.importTargetStatusOptions)
+      ? importExecutionPlan.importTargetStatusOptions
+      : ['draft', 'submitted', 'manager_approved', 'processed'];
+    return options;
+  }
+
+  function importExecutionStatHolidayPreviewHasSignal(preview) {
+    if (!preview || typeof preview !== 'object') return false;
+    return preview.hasStatHolidays === true
+      || preview.hasBlockingIssues === true
+      || (Array.isArray(preview.missingDayEntries) && preview.missingDayEntries.length > 0)
+      || (Array.isArray(preview.blockingErrors) && preview.blockingErrors.length > 0)
+      || (Array.isArray(preview.configurationWarnings) && preview.configurationWarnings.length > 0);
+  }
+
+  function renderImportExecutionStatHolidayBadge(row) {
+    const preview = row?.statHolidayPreview || {};
+    if (!importExecutionStatHolidayPreviewHasSignal(preview)) return '';
+    const hasBlocking = preview.hasBlockingIssues === true
+      || (Array.isArray(preview.missingDayEntries) && preview.missingDayEntries.length > 0)
+      || (Array.isArray(preview.blockingErrors) && preview.blockingErrors.length > 0);
+    const warningCount = Array.isArray(preview.warnings) ? preview.warnings.length : 0;
+    const holidayLabel = Array.isArray(preview.holidayNames) && preview.holidayNames.length
+      ? preview.holidayNames.join(', ')
+      : 'Statutory holiday';
+    const activityLabel = String(preview.activityTitle || preview.activityId || '').trim();
+    const badgeClass = hasBlocking ? 'bg-danger' : (warningCount ? 'bg-warning text-dark' : 'bg-info text-dark');
+    const icon = hasBlocking ? 'bi-exclamation-octagon' : (warningCount ? 'bi-exclamation-triangle' : 'bi-balloon-fill');
+    const suffix = hasBlocking
+      ? (activityLabel ? ' — map work sessions on ' + activityLabel : ' — map work sessions in Settings')
+      : '';
+    const countSuffix = Number(preview.count || 0) > 1 ? ' (' + preview.count + ')' : '';
+    const label = hasBlocking && !preview.hasStatHolidays
+      ? 'Stat holiday setup issue' + (activityLabel ? ' (' + activityLabel + ')' : '')
+      : 'Stat holiday' + countSuffix + ': ' + holidayLabel + suffix;
+    return '<div class="mt-1"><span class="badge ' + badgeClass + '"><i class="bi ' + icon + ' me-1"></i>'
+      + escapeHtml(label)
+      + '</span></div>';
+  }
+
+  function renderImportExecutionStatusCell(row, index, isBlocked) {
+    if (isBlocked) return '<span class="text-muted">—</span>';
+    const options = resolveImportTargetStatusOptions();
+    const value = String(row.targetStatus || importExecutionPlan?.defaultImportTargetStatus || 'draft').toLowerCase();
+    const disabled = importExecutionInProgress || String(row.overallStatus || 'pending') !== 'pending';
+    let html = '<select class="form-select form-select-sm" data-import-exec-status="' + index + '"' + (disabled ? ' disabled' : '') + '>';
+    options.forEach((option) => {
+      html += '<option value="' + escapeHtml(option) + '"' + (option === value ? ' selected' : '') + '>'
+        + escapeHtml(IMPORT_TARGET_STATUS_LABELS[option] || option) + '</option>';
+    });
+    html += '</select>';
+    html += renderImportExecutionStatHolidayBadge(row);
+    return html;
+  }
+
+  function updateImportExecutionModalSubtitle() {
+    const subtitleEl = document.getElementById('importExecutionModalSubtitle');
+    if (!subtitleEl) return;
+    const rows = Array.isArray(importExecutionRows) ? importExecutionRows : [];
+    const statHolidayRows = rows.filter((row) => importExecutionStatHolidayPreviewHasSignal(row?.statHolidayPreview));
+    let text = 'Create activity work sessions, assemble the full timesheet, then apply the selected status.';
+    if (statHolidayRows.length) {
+      text += ' Some periods include statutory holidays or require holiday day work sessions. Choose Draft to review and edit them in the timesheet editor before submitting.';
+    }
+    subtitleEl.textContent = text;
+  }
+
   function renderImportExecutionAlerts() {
     if (!importExecutionAlerts) return;
+    updateImportExecutionModalSubtitle();
+    const alerts = [];
     const needs = Array.isArray(importExecutionPlan?.needsRoleSelection) ? importExecutionPlan.needsRoleSelection : [];
-    if (!needs.length) {
-      importExecutionAlerts.innerHTML = '';
-      return;
+    const pendingRoles = needs.filter((row) => !importExecutionRoleReady(row.personId));
+    if (pendingRoles.length) {
+      const lines = pendingRoles.map((row) => (
+        '<li><b>' + escapeHtml(row.personName || row.personId) + '</b> needs a payroll role before Perform.</li>'
+      )).join('');
+      alerts.push('<div class="alert alert-warning border-0 shadow-sm py-2"><div class="fw-semibold mb-1">Role selection required</div><ul class="mb-0 ps-3 small">' + lines + '</ul></div>');
+    } else if (needs.length) {
+      alerts.push('<div class="alert alert-success border-0 shadow-sm py-2">Payroll roles are set for all people in this import.</div>');
     }
-    const pending = needs.filter((row) => !importExecutionRoleReady(row.personId));
-    if (!pending.length) {
-      importExecutionAlerts.innerHTML = '<div class="alert alert-success border-0 shadow-sm py-2">Payroll roles are set for all people in this import.</div>';
-      return;
+
+    const statHolidayRows = (Array.isArray(importExecutionRows) ? importExecutionRows : [])
+      .filter((row) => String(row.eligibility || '') === 'ready'
+        && importExecutionStatHolidayPreviewHasSignal(row?.statHolidayPreview));
+    const blockingStatHolidayRows = statHolidayRows.filter((row) => (
+      row?.statHolidayPreview?.hasBlockingIssues === true
+      || (Array.isArray(row?.statHolidayPreview?.missingDayEntries) && row.statHolidayPreview.missingDayEntries.length > 0)
+      || (Array.isArray(row?.statHolidayPreview?.blockingErrors) && row.statHolidayPreview.blockingErrors.length > 0)
+    ));
+    if (blockingStatHolidayRows.length) {
+      const lines = blockingStatHolidayRows.map((row) => {
+        const preview = row.statHolidayPreview || {};
+        const blockingMessages = Array.isArray(preview.blockingErrors) && preview.blockingErrors.length
+          ? preview.blockingErrors
+          : (Array.isArray(preview.missingDayEntries) ? preview.missingDayEntries : []).map((entry) => (
+            'Missing work session for ' + String(entry?.title || entry?.holidayId || 'statutory holiday')
+            + (entry?.date ? ' (' + entry.date + ')' : '')
+            + (preview.activityTitle ? ' on ' + preview.activityTitle : '')
+          ));
+        const configWarnings = Array.isArray(preview.configurationWarnings) ? preview.configurationWarnings : [];
+        const detail = [...blockingMessages, ...configWarnings].join('; ')
+          || 'Map holiday day work sessions in Settings.';
+        return '<li><b>' + escapeHtml(row.fileName || row.periodName || row.periodId) + ':</b> '
+          + escapeHtml(detail + ' Non-draft imports will be saved as draft until this is fixed.')
+          + '</li>';
+      }).join('');
+      alerts.push('<div class="alert alert-danger border-0 shadow-sm py-2"><div class="fw-semibold mb-1">Statutory holiday work sessions missing</div><ul class="mb-0 ps-3 small">' + lines + '</ul></div>');
     }
-    const lines = pending.map((row) => (
-      '<li><b>' + escapeHtml(row.personName || row.personId) + '</b> needs a payroll role before Perform.</li>'
-    )).join('');
-    importExecutionAlerts.innerHTML = '<div class="alert alert-warning border-0 shadow-sm py-2"><div class="fw-semibold mb-1">Role selection required</div><ul class="mb-0 ps-3 small">' + lines + '</ul></div>';
+    const mismatchStatHolidayRows = statHolidayRows.filter((row) => {
+      const preview = row?.statHolidayPreview || {};
+      const configWarnings = Array.isArray(preview.configurationWarnings) ? preview.configurationWarnings : [];
+      return configWarnings.length > 0 && !blockingStatHolidayRows.includes(row);
+    });
+    if (mismatchStatHolidayRows.length) {
+      const lines = mismatchStatHolidayRows.map((row) => {
+        const preview = row.statHolidayPreview || {};
+        const configWarnings = Array.isArray(preview.configurationWarnings) ? preview.configurationWarnings : [];
+        const detail = configWarnings.join('; ');
+        return '<li><b>' + escapeHtml(row.fileName || row.periodName || row.periodId) + ':</b> '
+          + escapeHtml(detail)
+          + '</li>';
+      }).join('');
+      alerts.push('<div class="alert alert-danger border-0 shadow-sm py-2"><div class="fw-semibold mb-1">Statutory holiday activity mismatch</div><ul class="mb-0 ps-3 small">' + lines + '</ul></div>');
+    }
+    const infoStatHolidayRows = statHolidayRows.filter((row) => (
+      !blockingStatHolidayRows.includes(row) && !mismatchStatHolidayRows.includes(row)
+    ));
+    if (infoStatHolidayRows.length) {
+      const lines = infoStatHolidayRows.map((row) => {
+        const preview = row.statHolidayPreview || {};
+        const holidayLabel = Array.isArray(preview.holidayNames) && preview.holidayNames.length
+          ? preview.holidayNames.join(', ')
+          : 'statutory holiday pay';
+        const warningSuffix = Array.isArray(preview.warnings) && preview.warnings.length
+          ? ' (review warnings in editor)'
+          : '';
+        return '<li><b>' + escapeHtml(row.fileName || row.periodName || row.periodId) + ':</b> '
+          + escapeHtml(Number(preview.count || 0) + ' statutory holiday row(s) expected — ' + holidayLabel + warningSuffix)
+          + '</li>';
+      }).join('');
+      alerts.push('<div class="alert alert-info border-0 shadow-sm py-2"><div class="fw-semibold mb-1">Statutory holidays detected</div><ul class="mb-0 ps-3 small">' + lines + '</ul></div>');
+    }
+
+    importExecutionAlerts.innerHTML = alerts.join('');
   }
 
   function renderImportExecutionTable() {
@@ -2283,6 +2443,7 @@
         + '<tr data-import-exec-index="' + index + '"' + (isBlocked ? ' class="table-warning"' : '') + '>'
         + '<td>' + escapeHtml(row.fileName || '—') + '</td>'
         + '<td>' + escapeHtml(row.periodName || row.periodId || '—') + '</td>'
+        + '<td>' + renderImportExecutionStatusCell(row, index, isBlocked) + '</td>'
         + '<td>' + renderImportExecutionStepCell(steps.workSessions) + '</td>'
         + '<td>' + renderImportExecutionTimesheetCell(row) + '</td>'
         + '<td class="text-end">'
@@ -2370,6 +2531,7 @@
           personId: row.personId,
           periodId: row.periodId,
           personRole,
+          targetStatus: row.targetStatus || importExecutionPlan?.defaultImportTargetStatus || 'draft',
           batchId: row.batchId,
           compileResult: row.compileResult,
           actionStateId
@@ -2390,6 +2552,8 @@
       row.steps = payload.steps || row.steps;
       row.overallStatus = 'success';
       row.timesheetId = payload.timesheetId || '';
+      row.appliedStatus = payload.appliedStatus || row.targetStatus || '';
+      row.statHolidayBlocked = payload.statHolidayBlocked === true;
       return payload;
     } catch (error) {
       if (String(row.overallStatus || '') !== 'success') row.overallStatus = 'error';
@@ -2515,8 +2679,10 @@
 
       importExecutionRows = planRows.map((row) => {
         const isBlocked = String(row.eligibility || '') === 'blocked';
+        const defaultStatus = String(payload.defaultImportTargetStatus || row.targetStatus || 'draft').toLowerCase();
         return {
           ...row,
+          targetStatus: String(row.targetStatus || defaultStatus).toLowerCase(),
           overallStatus: isBlocked ? 'blocked' : 'pending',
           steps: isBlocked
             ? {
@@ -2741,6 +2907,15 @@
   btnOpenTimesheetBulkImport?.addEventListener('click', () => openBulkImportSetupModal());
   btnConfirmTimesheetImport?.addEventListener('click', () => { void openImportExecutionModal(); });
   btnPerformAllImportExecutions?.addEventListener('click', () => { void performAllImportExecutions(); });
+  importExecutionTableBody?.addEventListener('change', (event) => {
+    const select = event.target.closest('[data-import-exec-status]');
+    if (!select || importExecutionInProgress) return;
+    const rowIndex = Number(select.getAttribute('data-import-exec-status'));
+    const row = importExecutionRows[rowIndex];
+    if (!row) return;
+    row.targetStatus = String(select.value || importExecutionPlan?.defaultImportTargetStatus || 'draft').toLowerCase();
+    renderImportExecutionAlerts();
+  });
   importExecutionTableBody?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-import-exec-perform]');
     if (!btn || btn.disabled || importExecutionInProgress) return;

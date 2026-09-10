@@ -166,11 +166,31 @@ async function mapHolidayDaysToActivity({
       title: row.title
     }))
     .filter(Boolean);
+  const stampByEntryId = new Map();
+  preview.rows
+    .filter((row) => row.action === 'skip')
+    .forEach((row) => {
+      const holidayId = cleanId(row.holidayId);
+      const date = cleanId(row.date);
+      if (!holidayId || !date) return;
+      const existing = existingEntries.find((entry) => cleanId(entry?.date) === date);
+      const entryId = cleanId(existing?.entryId);
+      if (!existing || !entryId || cleanId(existing.statHolidayId) === holidayId) return;
+      stampByEntryId.set(entryId, {
+        ...existing,
+        statHolidayId: holidayId,
+        notes: String(existing.notes || 'Statutory holiday').trim() || 'Statutory holiday'
+      });
+    });
 
   let createdEntryIds = [];
-  if (drafts.length) {
+  const hasEntryChanges = drafts.length > 0 || stampByEntryId.size > 0;
+  if (hasEntryChanges) {
     const entriesWithIds = assignEntryIds(activity.id, existingEntries, drafts);
-    const combinedEntries = [...existingEntries, ...entriesWithIds];
+    const combinedEntries = [...existingEntries, ...entriesWithIds].map((entry) => {
+      const entryId = cleanId(entry?.entryId);
+      return entryId && stampByEntryId.has(entryId) ? stampByEntryId.get(entryId) : entry;
+    });
     await timesheetImportWorkSessionBuilderService.persistImportActivityEntryUpdates(
       activity,
       combinedEntries,
@@ -182,19 +202,19 @@ async function mapHolidayDaysToActivity({
   if (persistActivityId) {
     const currentPolicy = timesheetParametersPolicyService.resolvePolicy(policy);
     const currentActivityId = cleanId(currentPolicy?.statutoryHolidayPay?.activityId);
-    if (!currentActivityId) {
-      await timesheetParametersPolicyModel.savePolicyForOrg(
-        orgId,
-        {
-          ...currentPolicy,
-          statutoryHolidayPay: {
-            ...(currentPolicy.statutoryHolidayPay || {}),
-            activityId: preview.activityId
-          }
-        },
-        reqUser?.id
-      );
-    }
+    await timesheetParametersPolicyModel.savePolicyForOrg(
+      orgId,
+      {
+        ...currentPolicy,
+        statutoryHolidayPay: {
+          ...(currentPolicy.statutoryHolidayPay || {}),
+          mappingYear: String(preview.year || '').trim(),
+          mappingActivityId: preview.activityId,
+          ...(!currentActivityId ? { activityId: preview.activityId } : {})
+        }
+      },
+      reqUser?.id
+    );
   }
 
   return {

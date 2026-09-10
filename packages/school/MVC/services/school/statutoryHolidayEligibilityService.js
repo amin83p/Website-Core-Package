@@ -46,8 +46,64 @@ function buildStatHolidaySessionId(holidayId, personId) {
   return `stathol-${String(holidayId || '').trim()}-${String(personId || '').trim()}`;
 }
 
+function parseStatHolidaySessionHolidayId(sessionId = '', personId = '') {
+  const normalized = String(sessionId || '').trim();
+  if (!normalized.toLowerCase().startsWith('stathol-')) return '';
+  const suffix = String(personId || '').trim();
+  const withoutPrefix = normalized.slice('stathol-'.length);
+  if (suffix && withoutPrefix.endsWith(`-${suffix}`)) {
+    return cleanId(withoutPrefix.slice(0, -(suffix.length + 1)));
+  }
+  const parts = withoutPrefix.split('-');
+  if (parts.length < 2) return '';
+  return cleanId(parts.slice(0, -1).join('-'));
+}
+
 function cleanId(value) {
   return String(value ?? '').trim();
+}
+
+function entryHasStatHolidayOverride(entry = null) {
+  return Boolean(entry?.statHolidayOverride && typeof entry.statHolidayOverride === 'object');
+}
+
+function mergeStatHolidayOverrideEntries(prior = null, next = null) {
+  if (!next) return prior;
+  if (!prior) return next;
+  const priorOverride = entryHasStatHolidayOverride(prior) ? prior.statHolidayOverride : null;
+  const nextOverride = entryHasStatHolidayOverride(next) ? next.statHolidayOverride : null;
+  if (!priorOverride) return next;
+  if (!nextOverride) return prior;
+  return {
+    ...prior,
+    ...next,
+    statHolidayOverride: {
+      ...priorOverride,
+      ...nextOverride
+    }
+  };
+}
+
+function resolveStatHolidayEntryHolidayId(entry = {}, existingEntries = [], personId = '') {
+  const sessionId = String(entry?.sessionId || '').trim();
+  const direct = cleanId(entry?.statHolidayMeta?.holidayId || entry?.statHolidayId)
+    || parseStatHolidaySessionHolidayId(sessionId, personId);
+  if (direct) return direct;
+
+  const date = cleanId(entry?.date);
+  if (!date) return '';
+
+  const peer = (Array.isArray(existingEntries) ? existingEntries : []).find((row) => {
+    if (cleanId(row?.date) !== date) return false;
+    return Boolean(
+      cleanId(row?.statHolidayMeta?.holidayId || row?.statHolidayId)
+      || parseStatHolidaySessionHolidayId(String(row?.sessionId || '').trim(), personId)
+    );
+  });
+  if (!peer) return '';
+
+  return cleanId(peer?.statHolidayMeta?.holidayId || peer?.statHolidayId)
+    || parseStatHolidaySessionHolidayId(String(peer?.sessionId || '').trim(), personId);
 }
 
 function summarizeDisqualifyReasons(checks = {}) {
@@ -348,18 +404,19 @@ function normalizeOverrideInput(override = null) {
   return { ...override };
 }
 
-function buildOverrideLookup(existingEntries = [], overrideMap = null) {
+function buildOverrideLookup(existingEntries = [], overrideMap = null, options = {}) {
   const lookup = new Map();
-  (Array.isArray(existingEntries) ? existingEntries : []).forEach((entry) => {
-    const sessionId = String(entry?.sessionId || '').trim();
-    const holidayId = cleanId(entry?.statHolidayMeta?.holidayId);
+  const personId = cleanId(options?.personId);
+  const remember = (holidayId, entry) => {
+    const key = cleanId(holidayId);
+    if (!key || !entry) return;
+    lookup.set(key, mergeStatHolidayOverrideEntries(lookup.get(key), entry));
+  };
+  const entries = Array.isArray(existingEntries) ? existingEntries : [];
+  entries.forEach((entry) => {
+    const holidayId = resolveStatHolidayEntryHolidayId(entry, entries, personId);
     if (holidayId) {
-      lookup.set(holidayId, entry);
-      return;
-    }
-    if (sessionId.startsWith('stathol-')) {
-      const parts = sessionId.split('-');
-      if (parts.length >= 3) lookup.set(parts[1], entry);
+      remember(holidayId, entry);
     }
   });
   if (overrideMap && typeof overrideMap === 'object' && !Array.isArray(overrideMap)) {
@@ -528,7 +585,7 @@ async function buildStatutoryHolidayTimesheetContext({
       .map((entry) => [String(entry?.sessionId || '').trim(), entry])
       .filter(([sessionId]) => Boolean(sessionId))
   );
-  const existingByHolidayId = buildOverrideLookup(existingEntries, overrideMap);
+  const existingByHolidayId = buildOverrideLookup(existingEntries, overrideMap, { personId });
 
   const rows = [];
   const warnings = [];
@@ -659,6 +716,8 @@ module.exports = {
   isStatHolidayActivitySupplementalEntry,
   assemblePeriodWorkdayEntries,
   buildStatHolidaySessionId,
+  parseStatHolidaySessionHolidayId,
+  resolveStatHolidayEntryHolidayId,
   buildStatHolidayRow,
   buildStatHolidayWarning,
   buildStatHolidayPayItems,

@@ -5,7 +5,6 @@ const schoolAdminAccessService = require('./schoolAdminAccessService');
 const schoolDependencyService = require('./schoolDependencyService');
 const statutoryHolidayEligibilityService = require('./statutoryHolidayEligibilityService');
 const statutoryHolidayWorkSessionService = require('./statutoryHolidayWorkSessionService');
-const timesheetLegacyImportService = require('./timesheetLegacyImportService');
 const timesheetParametersPolicyService = require('./timesheetParametersPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -35,14 +34,22 @@ function mergeStatHolidayRowsIntoEntries({
   usesActivityMode = false,
   existingEntriesBySessionId = new Map()
 } = {}) {
+  const incomingStatHolidayBySessionId = new Map();
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    const sessionId = cleanId(entry?.sessionId);
+    if (!sessionId || !isStatHolidayEntry(entry)) return;
+    incomingStatHolidayBySessionId.set(sessionId, entry);
+  });
   const baseRows = stripStatHolidayEntries(entries);
   const mergedStatRows = (Array.isArray(statHolidayRows) ? statHolidayRows : []).map((row) => {
     const sessionId = cleanId(row?.sessionId);
-    const clientRow = sessionId ? existingEntriesBySessionId.get(sessionId) : null;
+    const incomingRow = sessionId ? incomingStatHolidayBySessionId.get(sessionId) : null;
+    const existingRow = sessionId ? existingEntriesBySessionId.get(sessionId) : null;
+    const sourceRow = incomingRow || existingRow;
     const nextRow = {
       ...row,
-      ...(clientRow?.statHolidayOverride ? { statHolidayOverride: clientRow.statHolidayOverride } : {}),
-      ...(clientRow?.comment ? { comment: clientRow.comment } : {})
+      ...(sourceRow?.statHolidayOverride ? { statHolidayOverride: sourceRow.statHolidayOverride } : {}),
+      ...(sourceRow?.comment ? { comment: sourceRow.comment } : {})
     };
     if (!usesActivityMode) return nextRow;
     return {
@@ -73,6 +80,7 @@ async function assertStatHolidayPayConfigured({ orgId, policy, reqUser } = {}) {
     error.statusCode = 400;
     throw error;
   }
+  const timesheetLegacyImportService = require('./timesheetLegacyImportService');
   await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
     orgId,
     reqUser,
@@ -168,6 +176,10 @@ async function clearStatHolidayForReturnedTimesheet({
     periodId: period.id,
     periodStartDate: period.startDate,
     periodEndDate: period.endDate,
+    reqUser
+  });
+  await statutoryHolidayWorkSessionService.clearStatHolidayActivityLevelAttendees({
+    activityId,
     reqUser
   });
   return {

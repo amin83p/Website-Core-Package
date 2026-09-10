@@ -1516,6 +1516,7 @@ exports.performTimesheetImportExecution = async (req, res) => {
         const personId = String(req.body?.personId || '').trim();
         const periodId = String(req.body?.periodId || '').trim();
         const personRole = String(req.body?.personRole || '').trim();
+        const targetStatus = String(req.body?.targetStatus || '').trim();
         const batchId = String(req.body?.batchId || '').trim();
         const compileResult = req.body?.compileResult && typeof req.body.compileResult === 'object'
             ? req.body.compileResult
@@ -1548,13 +1549,17 @@ exports.performTimesheetImportExecution = async (req, res) => {
             personId,
             periodId,
             personRole,
+            targetStatus,
             compileResult,
             batchId,
             reqUser: req.user
         });
+        const appliedStatus = String(outcome?.appliedStatus || 'draft').toLowerCase();
         const payloadOut = {
             status: 'success',
-            message: 'Imported timesheet was created, assembled, and processed.',
+            message: appliedStatus === 'draft'
+                ? 'Imported timesheet was created and saved as draft.'
+                : `Imported timesheet was created, assembled, and marked ${appliedStatus}.`,
             actionStateId: req.actionStateId || null,
             editorLinks: buildTimesheetEditorLinks(personId, [{ periodId: outcome.periodId }]),
             ...outcome
@@ -2438,6 +2443,8 @@ exports.viewTimesheet = async (req, res) => {
 
         let statHolidayWarnings = [];
         let liveSessionsWithStatHolidays = mergedLiveSessions;
+        const timesheetStatus = String(timesheet.status || 'draft').toLowerCase();
+        const isDraftTimesheet = timesheetStatus === 'draft';
         const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
             orgId: activeOrgId,
             personId: teacherContext.targetTeacherId,
@@ -2446,7 +2453,7 @@ exports.viewTimesheet = async (req, res) => {
         const statutoryHolidayUsesActivity = statutoryHolidayEligibilityService.usesStatHolidayActivityMode(
             timesheetParametersPolicy
         );
-        if (!useFrozenSnapshot) {
+        if (!useFrozenSnapshot && !isDraftTimesheet) {
             const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
                 timesheet.entries,
                 mergedLiveSessions
@@ -2504,7 +2511,7 @@ exports.viewTimesheet = async (req, res) => {
             reqUser: req.user
         });
         const manualActivities = shapeManualActivityRows(eligibleManualActivities);
-        const status = String(timesheet.status || 'draft').toLowerCase();
+        const status = timesheetStatus;
         const managerApproved = isManagerApproved(timesheet);
         const canReviewerEdit = canManagerUpdate && status === 'submitted' && period.status !== 'processed';
         const canManagerApprove = canManagerUpdate && status === 'submitted' && !managerApproved && period.status !== 'processed';
@@ -2995,6 +3002,14 @@ exports.saveTimesheet = async (req, res) => {
                     allowManagerOverride: allowStatHolidayOverride
                 });
             }
+            const statHolidayBlockingErrors = Array.isArray(statHolidayMaterialization?.blockingErrors)
+                ? statHolidayMaterialization.blockingErrors.filter(Boolean)
+                : [];
+            if (statHolidayBlockingErrors.length) {
+                const error = new Error(statHolidayBlockingErrors.join(' '));
+                error.statusCode = 400;
+                throw error;
+            }
             entryRows = statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries({
                 entries: entryRows,
                 statHolidayRows: statHolidayMaterialization?.rows || [],
@@ -3019,6 +3034,17 @@ exports.saveTimesheet = async (req, res) => {
                 .map((row) => [String(row?.sessionId || '').trim(), row])
                 .filter(([sessionId]) => Boolean(sessionId))
         );
+        const statHolidayOverrideByHolidayId = new Map();
+        entryRows.forEach((row) => {
+            if (!row || row.isDeleted === true || !row.statHolidayOverride) return;
+            const holidayId = String(row.statHolidayMeta?.holidayId || row.statHolidayId || '').trim();
+            if (holidayId) statHolidayOverrideByHolidayId.set(holidayId, row.statHolidayOverride);
+        });
+        (Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : []).forEach((row) => {
+            const holidayId = String(row?.statHolidayMeta?.holidayId || '').trim();
+            if (!holidayId || !row?.statHolidayOverride) return;
+            statHolidayOverrideByHolidayId.set(holidayId, row.statHolidayOverride);
+        });
 
         const hasManualRows = entryRows.some((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
         let activityById = new Map();
@@ -3279,8 +3305,19 @@ exports.saveTimesheet = async (req, res) => {
                         ignoredReason: 'ineligible_or_missing_activity_session'
                     };
                 }
-                const hours = Number(parseFloat(entry.hours ?? entry.timesheetHours ?? entry.durationHours ?? activityRef.timesheetHours) || 0);
-                return {
+                let hours = Number(parseFloat(entry.hours ?? entry.timesheetHours ?? entry.durationHours ?? activityRef.timesheetHours) || 0);
+                const statHolidayId = String(entry.statHolidayId || activityRef.statHolidayId || '').trim();
+                const statHolidayOverride = entry.statHolidayOverride
+                    || (statHolidayId ? statHolidayOverrideByHolidayId.get(statHolidayId) : null);
+                if (allowStatHolidayOverride && statHolidayOverride && typeof statHolidayOverride === 'object') {
+                    const overrideHours = Number(statHolidayOverride.hours);
+                    if (statHolidayOverride.forcePay === true && Number.isFinite(overrideHours) && overrideHours >= 0) {
+                        hours = Number(overrideHours.toFixed(2));
+                    } else if (Number.isFinite(overrideHours) && overrideHours > 0) {
+                        hours = Number(overrideHours.toFixed(2));
+                    }
+                }
+                const normalizedActivityEntry = {
                     ...entry,
                     sessionId,
                     classId: entry.classId || null,
@@ -3297,6 +3334,9 @@ exports.saveTimesheet = async (req, res) => {
                     isSchoolActivity: true,
                     compensationLookup: entry.compensationLookup || activityRef.compensationLookup
                 };
+                if (statHolidayId) normalizedActivityEntry.statHolidayId = statHolidayId;
+                if (statHolidayOverride) normalizedActivityEntry.statHolidayOverride = statHolidayOverride;
+                return normalizedActivityEntry;
             }
 
             const sessionRef = liveSessionById.get(sessionId);
@@ -3557,7 +3597,7 @@ exports.saveTimesheet = async (req, res) => {
         let priorReconciliationContext = null;
         let priorReconciliationReceipt = existing?.priorPeriodReconciliation || null;
         let reconciliationLockRefs = [];
-        if (nextStatus === 'submitted') {
+        if (nextStatus === 'submitted' && !reviewerEdit) {
             priorReconciliationContext = await resolvePriorReconciliationContext({
                 period,
                 teacherId: teacherContext.targetTeacherId,

@@ -252,6 +252,23 @@ async function finalizeImportTargetAfterSave({
     });
     const timesheetForLock = materialized?.timesheet || savedRow;
     const lockSummary = await schoolDependencyService.lockSourcesForApprovedTimesheet(timesheetForLock, reqUser);
+    const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+    const statutoryHolidayTimesheetLifecycleService = require('./statutoryHolidayTimesheetLifecycleService');
+    const timesheetParametersPolicy = await timesheetParametersPolicyModel.getPolicyForOrg(
+      String(timesheetForLock?.orgId || savedRow?.orgId || '').trim()
+    );
+    const statHolidayLockSummary = await statutoryHolidayTimesheetLifecycleService.lockStatHolidayAssigneesForTimesheet({
+      orgId: String(timesheetForLock?.orgId || savedRow?.orgId || '').trim(),
+      policy: timesheetParametersPolicy,
+      personId: String(timesheetForLock?.teacherId || savedRow?.teacherId || '').trim(),
+      period,
+      timesheetId: savedRow.id,
+      reqUser
+    });
+    const lockedSourceRefs = schoolDependencyService.dedupeSourceRefs([
+      ...(Array.isArray(lockSummary?.lockedSourceRefs) ? lockSummary.lockedSourceRefs : []),
+      ...(statHolidayLockSummary?.lockedSourceRefs || [])
+    ]);
     const nowIso = new Date().toISOString();
     const totalHours = calculateTimesheetTotal(timesheetForLock.entries);
     const submissionSnapshot = buildSubmissionSnapshot({
@@ -269,7 +286,7 @@ async function finalizeImportTargetAfterSave({
       processedAt: nowIso,
       processedBy: resolveActorId(reqUser),
       processedByName: resolveActorName(reqUser),
-      lockedSourceRefs: lockSummary.lockedSourceRefs || [],
+      lockedSourceRefs,
       materializationSummary: materialized?.summary || null,
       reviewHistory: appendReviewHistory(timesheetForLock, buildReviewHistoryEntry({
         event: 'processed',

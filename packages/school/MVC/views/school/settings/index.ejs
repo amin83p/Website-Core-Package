@@ -44,6 +44,9 @@
     };
   const statutoryHolidayPayEnabled = statutoryHolidayPayPolicy.enabled !== false;
   const statutoryHolidayActivityIdValue = String(statutoryHolidayPayPolicy.activityId || '').trim();
+  const statutoryHolidayMappingActivityIdValue = String(
+    statutoryHolidayPayPolicy.mappingActivityId || statutoryHolidayPayPolicy.activityId || ''
+  ).trim();
   const payableHolidayTypesSelected = Array.isArray(statutoryHolidayPayPolicy.payableHolidayTypes)
     ? statutoryHolidayPayPolicy.payableHolidayTypes
     : ['National Holiday', 'Observance Paid'];
@@ -56,7 +59,8 @@
     ? statutoryHolidayMappingYearOptions
     : [];
   const statutoryHolidayMappingDefaultYearValue = String(
-    typeof statutoryHolidayMappingDefaultYear !== 'undefined' ? statutoryHolidayMappingDefaultYear : ''
+    statutoryHolidayPayPolicy.mappingYear
+      || (typeof statutoryHolidayMappingDefaultYear !== 'undefined' ? statutoryHolidayMappingDefaultYear : '')
   ).trim() || String(new Date().getFullYear());
   const timesheetImportActivityOptionsJson = JSON.stringify(timesheetImportActivityOptionsList).replace(/</g, '\\u003c');
   const timesheetImportActivityIdValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importActivityId) || '').trim();
@@ -1343,7 +1347,7 @@
                     <select class="form-select" id="statutoryHolidayMappingActivityId" <%= canUpdateFlag ? '' : 'disabled' %>>
                       <option value="">Select public activity...</option>
                       <% statutoryHolidayPublicActivityOptionsList.forEach((activity) => { %>
-                        <option value="<%= activity.id %>" <%= activity.id === statutoryHolidayActivityIdValue ? 'selected' : '' %>><%= activity.title %><%= activity.departmentName ? ' (' + activity.departmentName + ')' : '' %></option>
+                        <option value="<%= activity.id %>" <%= activity.id === statutoryHolidayMappingActivityIdValue ? 'selected' : '' %>><%= activity.title %><%= activity.departmentName ? ' (' + activity.departmentName + ')' : '' %></option>
                       <% }); %>
                     </select>
                   </div>
@@ -2578,6 +2582,8 @@
       return;
     }
     const selected = document.querySelector('input[name="emptyEnrollmentSessions"]:checked');
+    const mappingYear = String(document.getElementById('statutoryHolidayMappingYear')?.value || '').trim();
+    const mappingActivityId = String(document.getElementById('statutoryHolidayMappingActivityId')?.value || '').trim();
     const result = await postSettings('/school/settings/timesheet-parameters', {
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
       emptyEnrollmentSessions: selected?.value || 'hide',
@@ -2591,11 +2597,24 @@
       statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek: document.getElementById('statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek')?.checked ? 'true' : 'false',
       statutoryHolidayDisqualifyOnLeaveBeforeAfter: document.getElementById('statutoryHolidayDisqualifyOnLeaveBeforeAfter')?.checked ? 'true' : 'false',
       payableHolidayType_National_Holiday: document.getElementById('payableHolidayType_National_Holiday')?.checked ? 'true' : 'false',
-      payableHolidayType_Observance_Paid: document.getElementById('payableHolidayType_Observance_Paid')?.checked ? 'true' : 'false'
+      payableHolidayType_Observance_Paid: document.getElementById('payableHolidayType_Observance_Paid')?.checked ? 'true' : 'false',
+      statutoryHolidayMappingYear: mappingYear,
+      statutoryHolidayMappingActivityId: mappingActivityId
     }, button, 'timesheetParametersSettingsError');
     if (!result) return;
     timesheetParametersPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetParametersPolicy;
-    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+    const savedMappingYear = String(timesheetParametersPolicy?.statutoryHolidayPay?.mappingYear || '').trim();
+    const savedMappingActivityId = String(timesheetParametersPolicy?.statutoryHolidayPay?.mappingActivityId || '').trim();
+    const savedPayActivityId = String(timesheetParametersPolicy?.statutoryHolidayPay?.activityId || '').trim();
+    const mappingYearSelect = document.getElementById('statutoryHolidayMappingYear');
+    const mappingActivitySelect = document.getElementById('statutoryHolidayMappingActivityId');
+    if (mappingYearSelect && savedMappingYear) mappingYearSelect.value = savedMappingYear;
+    if (mappingActivitySelect && savedMappingActivityId) mappingActivitySelect.value = savedMappingActivityId;
+    let saveMessage = result.message;
+    if (statHolidayEnabled && savedPayActivityId && savedMappingActivityId && savedPayActivityId !== savedMappingActivityId) {
+      saveMessage += ' Holiday day mapping is on a different public activity than statutory holiday pay. Map holiday day work sessions on the statutory holiday activity for import and submit to succeed.';
+    }
+    await showSettingsMessage({ title: 'Settings Saved', message: saveMessage, icon: 'success' });
   });
 
   function readStatHolidayDayMappingInputs() {
@@ -2795,6 +2814,12 @@
       const activityId = String(result.policy?.statutoryHolidayPay?.activityId || inputs.activityId || '').trim();
       const activitySelect = document.getElementById('statutoryHolidayActivityId');
       if (activitySelect && activityId) activitySelect.value = activityId;
+      const mappingYearSelect = document.getElementById('statutoryHolidayMappingYear');
+      const mappingActivitySelect = document.getElementById('statutoryHolidayMappingActivityId');
+      const savedMappingYear = String(result.policy?.statutoryHolidayPay?.mappingYear || inputs.year || '').trim();
+      const savedMappingActivityId = String(result.policy?.statutoryHolidayPay?.mappingActivityId || inputs.activityId || '').trim();
+      if (mappingYearSelect && savedMappingYear) mappingYearSelect.value = savedMappingYear;
+      if (mappingActivitySelect && savedMappingActivityId) mappingActivitySelect.value = savedMappingActivityId;
     }
     const refreshedPreview = {
       year: result.outcome?.year || preview.year,

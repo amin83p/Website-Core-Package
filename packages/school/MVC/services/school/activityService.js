@@ -55,6 +55,36 @@ function activityHasLockedAssigneeRows(activity = {}) {
   return false;
 }
 
+function dedupeStatHolidayActivitySessionsForPerson(sessions = []) {
+  const byKey = new Map();
+  const nonStat = [];
+  (Array.isArray(sessions) ? sessions : []).forEach((row) => {
+    const statHolidayId = normalizeId(row?.statHolidayId);
+    if (!statHolidayId) {
+      nonStat.push(row);
+      return;
+    }
+    const key = `${statHolidayId}|${normalizeId(row?.date)}`;
+    const prior = byKey.get(key);
+    const rowHours = Number(row?.timesheetHours ?? row?.hours ?? 0);
+    const priorHours = Number(prior?.timesheetHours ?? prior?.hours ?? 0);
+    if (!prior || rowHours > priorHours) {
+      byKey.set(key, row);
+    }
+  });
+  return [...nonStat, ...byKey.values()];
+}
+
+function resolveActivityTimesheetEntryHours(activity = {}, assignee = {}, entry = {}) {
+  const statHolidayId = normalizeId(assignee?.statHolidayId || entry?.statHolidayId);
+  const statHolidayPersonId = normalizeId(assignee?.statHolidayPersonId || entry?.statHolidayPersonId);
+  if (statHolidayId || statHolidayPersonId) {
+    const paidHours = Number(assignee?.paidHours);
+    return Number.isFinite(paidHours) && paidHours >= 0 ? Number(paidHours.toFixed(2)) : 0;
+  }
+  return Number(assignee?.paidHours || entry?.durationHours || 0);
+}
+
 function isAssigneeEligibleForTimesheet(activity = {}, assignee = {}) {
   if (assignee.paid !== false && normalizeStatus(assignee.status, 'attended') !== 'attended') return false;
   const type = normalizeEvaluationType(activity.evaluationType);
@@ -311,7 +341,9 @@ function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
     excludedPersonIds: normalizePersonIdList(entry.excludedPersonIds || entry.excludedPersons || []),
     assignees: assignees.length
       ? assignees
-      : (fallbackAssignees.length ? fallbackAssignees : normalizeActivityAssigneeRows(parseJsonArray(activity.attendees)))
+      : (normalizeId(entry.statHolidayId)
+        ? []
+        : (fallbackAssignees.length ? fallbackAssignees : normalizeActivityAssigneeRows(parseJsonArray(activity.attendees))))
   });
 }
 
@@ -1017,7 +1049,7 @@ async function listManualEntryWorkSessionsForPerson({
 async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, periodEndDate, reqUser } = {}) {
   const activities = await listActivities({ orgId, reqUser });
   const targetPersonId = normalizeId(personId);
-  return activities.flatMap((activity) => {
+  const rows = activities.flatMap((activity) => {
     if (normalizeStatus(activity.status) !== 'posted' || activity.paid !== true) return [];
     return getActivityEntries(activity).flatMap((entry) => {
       if (normalizeStatus(entry.status, 'posted') !== 'posted') return [];
@@ -1029,7 +1061,7 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
         .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
         .filter((attendee) => isAssigneeEligibleForTimesheet(activity, attendee))
         .map((attendee) => {
-          const hours = Number(attendee.paidHours || entry.durationHours || 0);
+          const hours = resolveActivityTimesheetEntryHours(activity, attendee, entry);
           return {
             sessionId: `act-${activity.id}-${entry.entryId}-${targetPersonId}`,
             activityId: activity.id,
@@ -1067,6 +1099,7 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
         });
     });
   });
+  return dedupeStatHolidayActivitySessionsForPerson(rows);
 }
 
 async function listOrphanActivityTimesheetLocks({
@@ -1183,6 +1216,8 @@ module.exports = {
   isAssigneeTimesheetLocked,
   isWorkSessionAssigneeLocked,
   activityHasLockedAssigneeRows,
+  resolveActivityTimesheetEntryHours,
+  dedupeStatHolidayActivitySessionsForPerson,
   isAssigneeEligibleForTimesheet,
   enforceActivityLockRules,
   listOrphanActivityTimesheetLocks,

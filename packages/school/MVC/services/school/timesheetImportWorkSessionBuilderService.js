@@ -23,7 +23,7 @@ function entryHasTimesheetLock(entry = {}) {
   ));
 }
 
-function recomputeActivityLockedFromEntries(activity = {}, entries = []) {
+function recomputeActivityLockedFromEntries(activity = {}, entries = [], options = {}) {
   const normalizedEntries = Array.isArray(entries) ? entries : [];
   const stillLocked = normalizedEntries.some(entryHasTimesheetLock);
   const firstEntry = normalizedEntries[0] || {};
@@ -33,7 +33,9 @@ function recomputeActivityLockedFromEntries(activity = {}, entries = []) {
   const next = {
     ...activity,
     entries: normalizedEntries,
-    attendees: activityService.flattenActivityAssignees(normalizedEntries),
+    attendees: options.preserveActivityAttendees === true
+      ? []
+      : activityService.flattenActivityAssignees(normalizedEntries),
     locked: stillLocked,
     date: firstEntry.date || '',
     startTime: firstEntry.startTime || '',
@@ -48,10 +50,10 @@ function recomputeActivityLockedFromEntries(activity = {}, entries = []) {
   return next;
 }
 
-async function persistImportActivityEntryUpdates(activity, entries, reqUser) {
+async function persistImportActivityEntryUpdates(activity, entries, reqUser, options = {}) {
   const activityId = cleanId(activity?.id);
   if (!activityId) throw new Error('Import activity is required.');
-  const payload = recomputeActivityLockedFromEntries(activity, entries);
+  const payload = recomputeActivityLockedFromEntries(activity, entries, options);
   await dataService.updateData('activities', activityId, payload, reqUser, {
     maintenanceActivityEntries: true
   });

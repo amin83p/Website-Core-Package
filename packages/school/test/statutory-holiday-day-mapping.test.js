@@ -91,6 +91,78 @@ test('previewHolidayDayMapping marks holidays as skip when activity already has 
   }
 });
 
+test('mapHolidayDaysToActivity stamps statHolidayId on existing date-only work sessions', async () => {
+  const originalFetch = schoolDataService.fetchAllData;
+  const originalResolve = timesheetLegacyImportService.resolvePublicStatHolidayActivity;
+  const originalPersist = require('../MVC/services/school/timesheetImportWorkSessionBuilderService').persistImportActivityEntryUpdates;
+  const originalSavePolicy = timesheetParametersPolicyModel.savePolicyForOrg;
+  let maintenanceArgs = null;
+
+  schoolDataService.fetchAllData = async () => ([
+    {
+      id: 'H-WINTER',
+      orgId: 'ORG_1',
+      date: '2026-01-01',
+      title: 'WINTER BREAK',
+      type: 'School Break'
+    },
+    {
+      id: 'H2',
+      orgId: 'ORG_1',
+      date: '2026-12-25',
+      title: 'Christmas Day',
+      type: 'National Holiday'
+    }
+  ]);
+  timesheetLegacyImportService.resolvePublicStatHolidayActivity = async () => ({
+    id: 'ACT_STAT',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    visibilityScope: 'school',
+    title: 'STATUTORY HOLIDAY',
+    entries: [{
+      entryId: 'ENT-1',
+      date: '2026-01-01',
+      startTime: '08:00',
+      endTime: '20:00',
+      durationHours: 12
+    }]
+  });
+  require('../MVC/services/school/timesheetImportWorkSessionBuilderService').persistImportActivityEntryUpdates =
+    async (activity, entries, reqUser) => {
+      maintenanceArgs = { activity, entries, reqUser };
+      return activity;
+    };
+  timesheetParametersPolicyModel.savePolicyForOrg = async () => ({});
+
+  try {
+    const outcome = await statutoryHolidayDayMappingService.mapHolidayDaysToActivity({
+      orgId: 'ORG_1',
+      year: '2026',
+      activityId: 'ACT_STAT',
+      policy: {
+        statutoryHolidayPay: {
+          activityId: 'ACT_STAT',
+          payableHolidayTypes: ['National Holiday', 'School Break']
+        }
+      },
+      reqUser: { id: 'USER_1' }
+    });
+
+    assert.equal(outcome.createdCount, 1);
+    assert.equal(maintenanceArgs?.entries?.length, 2);
+    const stamped = maintenanceArgs.entries.find((entry) => entry.entryId === 'ENT-1');
+    assert.equal(stamped?.statHolidayId, 'H-WINTER');
+    assert.equal(stamped?.date, '2026-01-01');
+  } finally {
+    schoolDataService.fetchAllData = originalFetch;
+    timesheetLegacyImportService.resolvePublicStatHolidayActivity = originalResolve;
+    require('../MVC/services/school/timesheetImportWorkSessionBuilderService').persistImportActivityEntryUpdates = originalPersist;
+    timesheetParametersPolicyModel.savePolicyForOrg = originalSavePolicy;
+  }
+});
+
 test('mapHolidayDaysToActivity creates 08:00-20:00 shells without assignees', async () => {
   const originalFetch = schoolDataService.fetchAllData;
   const originalResolve = timesheetLegacyImportService.resolvePublicStatHolidayActivity;

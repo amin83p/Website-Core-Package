@@ -1287,7 +1287,24 @@ async function periodHasDeletableLegacyImport({
     period,
     reqUser
   });
-  return orphanSessionCount > 0;
+  if (orphanSessionCount > 0) return true;
+
+  try {
+    const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+    const statutoryHolidayWorkSessionService = require('./statutoryHolidayWorkSessionService');
+    const parametersPolicy = await timesheetParametersPolicyModel.getPolicyForOrg(orgId);
+    const statHolidayAssigneeCount = await statutoryHolidayWorkSessionService.countStatHolidayAssigneesForPersonPeriodRemote({
+      orgId,
+      personId,
+      period,
+      policy: parametersPolicy,
+      reqUser
+    });
+    return statHolidayAssigneeCount > 0;
+  } catch (error) {
+    console.warn(`Legacy import delete stat holiday orphan scan skipped: ${error.message}`);
+    return false;
+  }
 }
 
 async function deleteLegacyImportsForYear({
