@@ -205,6 +205,11 @@ test('School activities attendee picker and save path preserve selected attendee
   assert.match(form, /Individual \/ Assigned people only/);
   assert.match(form, /activityEntriesTable/);
   assert.match(form, /activityEntriesTbody/);
+  assert.match(form, /activity-entry-sortable/);
+  assert.match(form, /sortActivityEntries/);
+  assert.match(form, /compareActivityEntries/);
+  assert.match(form, /bindActivityEntrySortHeaders/);
+  assert.match(form, /entrySortState/);
   assert.match(form, /data-floating-row-actions="true"/);
   assert.match(form, /btn-row-actions-toggle/);
   assert.match(form, /row-actions-menu/);

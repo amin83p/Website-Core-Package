@@ -31,9 +31,46 @@ function normalizeStatus(value) {
   return String(value ?? '').trim().toLowerCase();
 }
 
-async function purgeImportedTimesheetRecord(timesheetId, reqUser) {
+async function cleanupStatHolidayForTimesheetTarget({
+  orgId,
+  personId,
+  period,
+  reqUser
+} = {}) {
+  return cleanupStatHolidayOnImportDelete({
+    orgId,
+    personId,
+    period,
+    reqUser
+  });
+}
+
+async function purgeImportedTimesheetRecord(timesheetId, reqUser, options = {}) {
   const normalizedId = cleanId(timesheetId);
   if (!normalizedId) return;
+
+  let timesheet = options.timesheet && typeof options.timesheet === 'object' ? options.timesheet : null;
+  if (!timesheet && reqUser) {
+    timesheet = await dataService.getDataById('timesheets', normalizedId, reqUser);
+  }
+
+  const targetOrgId = cleanId(options.orgId || timesheet?.orgId);
+  const targetPersonId = cleanId(options.personId || timesheet?.teacherId);
+  const targetPeriodId = cleanId(options.periodId || timesheet?.periodId);
+  let period = options.period && typeof options.period === 'object' ? options.period : null;
+  if (!period && targetPeriodId && reqUser) {
+    period = await dataService.getDataById('timesheetPeriods', targetPeriodId, reqUser);
+  }
+
+  if (!options.skipStatHolidayCleanup && targetOrgId && targetPersonId && period) {
+    await cleanupStatHolidayForTimesheetTarget({
+      orgId: targetOrgId,
+      personId: targetPersonId,
+      period,
+      reqUser
+    });
+  }
+
   await schoolRepositories.timesheets.maintenancePurgeById(normalizedId, {
     scope: { canViewAll: true },
     requestingUser: reqUser
@@ -890,9 +927,19 @@ async function rollbackAppliedLegacyImports(rollbackStack = [], reqUser) {
           console.warn(`Import rollback task sync skipped for timesheet ${timesheetId}: ${error.message}`);
         }
       }
-      await purgeImportedTimesheetRecord(timesheetId, reqUser);
+      const periodId = cleanId(entry?.periodId || timesheet?.periodId);
+      const period = periodId && reqUser
+        ? await dataService.getDataById('timesheetPeriods', periodId, reqUser)
+        : null;
+      await purgeImportedTimesheetRecord(timesheetId, reqUser, {
+        timesheet,
+        orgId: cleanId(timesheet?.orgId),
+        personId: cleanId(timesheet?.teacherId),
+        periodId,
+        period
+      });
       rolledBack.push({
-        periodId: cleanId(entry?.periodId),
+        periodId,
         timesheetId
       });
     } catch (error) {
@@ -1052,15 +1099,37 @@ async function deleteLegacyImport({
       period,
       reqUser
     });
+    const statHolidayCleanup = await cleanupStatHolidayOnImportDelete({
+      orgId,
+      personId,
+      period,
+      reqUser
+    });
     if (!orphanSessionCount) {
+      const statHolidayRemoved = Number(statHolidayCleanup?.removedAssignees || 0)
+        + Number(statHolidayCleanup?.removedEntries || 0);
+      if (!statHolidayRemoved) {
+        return {
+          removedRows: 0,
+          hadLegacyImport: false,
+          periodId: targetPeriodId,
+          tsStatus: 'not_started',
+          totalHours: 0,
+          hasLegacyImport: false,
+          timesheetId: ''
+        };
+      }
       return {
         removedRows: 0,
-        hadLegacyImport: false,
+        hadLegacyImport: true,
+        timesheetAlreadyRemoved: true,
+        sourceFileName: '',
         periodId: targetPeriodId,
         tsStatus: 'not_started',
         totalHours: 0,
         hasLegacyImport: false,
-        timesheetId: ''
+        timesheetId: '',
+        statHolidayCleanup
       };
     }
 
@@ -1074,12 +1143,6 @@ async function deleteLegacyImport({
       period,
       reqUser,
       forceOrphanRecovery: true
-    });
-    const statHolidayCleanup = await cleanupStatHolidayOnImportDelete({
-      orgId,
-      personId,
-      period,
-      reqUser
     });
     if (!importWorkSessionCleanup?.removedEntries && !importWorkSessionCleanup?.removedAssignees) {
       return {
@@ -1122,7 +1185,14 @@ async function deleteLegacyImport({
   if (activityFirst) {
     const timesheetId = cleanId(timesheet?.id);
     if (timesheetId) {
-      await purgeImportedTimesheetRecord(timesheetId, reqUser);
+      await purgeImportedTimesheetRecord(timesheetId, reqUser, {
+        timesheet,
+        orgId,
+        personId: cleanId(personId) || cleanId(timesheet?.teacherId),
+        periodId: targetPeriodId,
+        period,
+        skipStatHolidayCleanup: true
+      });
     }
     return {
       removedRows: Array.isArray(timesheet.entries) ? timesheet.entries.length : 0,
@@ -1333,6 +1403,7 @@ module.exports = {
   isLegacyImportEntry,
   isActivityFirstLegacyImport,
   purgeImportedTimesheetRecord,
+  cleanupStatHolidayForTimesheetTarget,
   resolveImportOutcomeStatus,
   rollbackAppliedLegacyImports,
   applyLegacyImports,

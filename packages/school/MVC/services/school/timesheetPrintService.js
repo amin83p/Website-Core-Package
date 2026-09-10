@@ -321,7 +321,7 @@ function resolveStatHolidayPayStatusLabel(entry = {}) {
   if (forceDisqualify) return 'Disqualified by manager';
   if (payableHours > 0 && forcePay) return 'Manager override';
   if (payableHours > 0 && qualified) return 'Paid';
-  if (payableHours > 0) return 'Manager override';
+  if (payableHours > 0) return 'Activity hours without auto-qualification';
   return 'Not qualified';
 }
 
@@ -420,7 +420,13 @@ function buildStatHolidayPrintSteps(entry = {}) {
         `Earnings window: ${calculated.earningsStart ? formatStatHolidayDateLabel(calculated.earningsStart) : '-'} to ${calculated.earningsEnd ? formatStatHolidayDateLabel(calculated.earningsEnd) : '-'}`,
         `Total hours in window: ${Number(calculated.totalHours || 0).toFixed(2)}`,
         `Payable workdays in window: ${Number(calculated.workdayCount || 0)}`,
-        `Average payable hours: ${Number(calculated.averageHours || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2)}`
+        `Average payable hours: ${Number(
+          Number.isFinite(Number(calculated.averageHours))
+            ? calculated.averageHours
+            : (Number.isFinite(Number(entry?.statHolidayMeta?.calculatedHours))
+              ? entry.statHolidayMeta.calculatedHours
+              : 0)
+        ).toFixed(2)}`
       ]
     }
   ];
@@ -469,7 +475,9 @@ function buildStatutoryHolidayPrintSummaries(entries = []) {
         ? entry.statHolidayMeta
         : {};
       const payableHours = roundHours(Number(entry.payableHours || 0));
-      const calculatedHours = roundHours(Number(meta.calculatedHours ?? payableHours ?? 0));
+      const calculatedHours = roundHours(
+        Number.isFinite(Number(meta.calculatedHours)) ? Number(meta.calculatedHours) : 0
+      );
       const steps = buildStatHolidayPrintSteps(entry);
       const disqualifyReasons = Array.isArray(meta.disqualifyReasons)
         ? meta.disqualifyReasons.filter(Boolean)

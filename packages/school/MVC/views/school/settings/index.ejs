@@ -47,7 +47,7 @@
   const payableHolidayTypesSelected = Array.isArray(statutoryHolidayPayPolicy.payableHolidayTypes)
     ? statutoryHolidayPayPolicy.payableHolidayTypes
     : ['National Holiday', 'Observance Paid'];
-  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
+  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', importBaseStartTime: '00:00', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
   const timesheetImportActivityOptionsList = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
   const statutoryHolidayPublicActivityOptionsList = Array.isArray(statutoryHolidayPublicActivityOptions)
     ? statutoryHolidayPublicActivityOptions
@@ -63,6 +63,7 @@
   const allowImportInTimesheetManagementValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.allowImportInTimesheetManagement === true;
   const allowImportInMyTimesheetsValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.allowImportInMyTimesheets === true;
   const timesheetImportTargetStatusValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importTargetStatus) || 'draft').trim().toLowerCase();
+  const timesheetImportBaseStartTimeValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importBaseStartTime) || '00:00').trim();
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
     : attendanceThresholdsEnabled !== false;
@@ -1317,13 +1318,13 @@
               <p class="small text-muted mb-3">When eligible, auto-add statutory holiday pay using payable workday history, approved leave checks, and a rolling average-hours formula. When an activity is selected, payable hours are written as work sessions on that activity (department and category come from the activity).</p>
               <div class="mb-3">
                 <label class="form-label small fw-semibold" for="statutoryHolidayActivityId">Statutory holiday activity</label>
-                <select class="form-select" id="statutoryHolidayActivityId" name="statutoryHolidayActivityId" <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <option value="">Use synthetic timesheet rows (legacy)</option>
+                <select class="form-select" id="statutoryHolidayActivityId" name="statutoryHolidayActivityId" <%= canUpdateFlag ? 'required' : 'disabled' %>>
+                  <option value="" <%= statutoryHolidayActivityIdValue ? '' : 'selected' %>>Select public activity...</option>
                   <% statutoryHolidayPublicActivityOptionsList.forEach((activity) => { %>
                     <option value="<%= activity.id %>" <%= activity.id === statutoryHolidayActivityIdValue ? 'selected' : '' %>><%= activity.title %><%= activity.departmentName ? ' (' + activity.departmentName + ')' : '' %></option>
                   <% }); %>
                 </select>
-                <div class="form-text">Optional. Public, posted, paid activity used to record statutory holiday work sessions for payroll grouping.</div>
+                <div class="form-text">Required when statutory holiday pay is enabled. Must be a posted, paid, public (school) activity. Payable hours are calculated on timesheet submission and written as assignees on this activity.</div>
               </div>
               <div class="border rounded p-3 mt-3 bg-light-subtle">
                 <div class="fw-semibold small mb-2">Holiday day mapping</div>
@@ -1463,6 +1464,12 @@
                 </table>
               </div>
               <div class="small text-muted mt-2" id="timesheetImportClassMappingEmptyHint">No class name mappings configured.</div>
+            </div>
+            <div class="rollup-feature-card mt-4">
+              <div class="fw-semibold mb-1">Import time stacking</div>
+              <p class="small text-muted mb-3">When Excel rows have no clock times, the importer stacks classes on each day sequentially. The first class starts at this time; each following class starts when the previous one ends.</p>
+              <label class="form-label small fw-semibold" for="timesheetImportBaseStartTime">Base start time</label>
+              <input class="form-control" type="time" id="timesheetImportBaseStartTime" name="importBaseStartTime" value="<%= timesheetImportBaseStartTimeValue %>" <%= canUpdateFlag ? '' : 'disabled' %>>
             </div>
             <div class="rollup-feature-card mt-4">
               <div class="fw-semibold mb-1">Import availability</div>
@@ -2560,6 +2567,16 @@
     event.preventDefault();
     const button = document.getElementById('btnSaveTimesheetParametersSettings');
     if (!button) return;
+    const statHolidayEnabled = document.getElementById('statutoryHolidayPayEnabled')?.checked;
+    const statHolidayActivityId = String(document.getElementById('statutoryHolidayActivityId')?.value || '').trim();
+    if (statHolidayEnabled && !statHolidayActivityId) {
+      await showSettingsMessage({
+        title: 'Statutory Holiday Activity Required',
+        message: 'Select a public statutory holiday activity when statutory holiday pay is enabled.',
+        icon: 'warning'
+      });
+      return;
+    }
     const selected = document.querySelector('input[name="emptyEnrollmentSessions"]:checked');
     const result = await postSettings('/school/settings/timesheet-parameters', {
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
@@ -2814,6 +2831,7 @@
       allowImportInTimesheetManagement: document.getElementById('allowImportInTimesheetManagement')?.checked ? 'true' : 'false',
       allowImportInMyTimesheets: document.getElementById('allowImportInMyTimesheets')?.checked ? 'true' : 'false',
       importTargetStatus: document.getElementById('timesheetImportTargetStatus')?.value || 'draft',
+      importBaseStartTime: document.getElementById('timesheetImportBaseStartTime')?.value || '00:00',
       classNameActivityMappings: JSON.stringify(readTimesheetImportClassMappings())
     }, button, 'timesheetImportSettingsError');
     if (!result) return;

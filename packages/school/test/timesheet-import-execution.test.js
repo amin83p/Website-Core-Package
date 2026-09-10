@@ -467,6 +467,136 @@ test('performImportExecution creates work sessions across mapped and default act
   }
 });
 
+test('performImportExecution pre-cleans statutory holiday assignees before work sessions', async () => {
+  const statHolidayCleanups = [];
+  const stub = stubExecutionDeps();
+  const originalCleanup = timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget;
+  timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget = async (args) => {
+    statHolidayCleanups.push(args);
+    return { removedAssignees: 1, removedEntries: 0 };
+  };
+
+  try {
+    await executionService.performImportExecution({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      personRole: 'teacher',
+      compileResult: compileOkResult('PER_A'),
+      batchId: 'BATCH_STAT_CLEAN',
+      reqUser: REQ_USER
+    });
+    assert.equal(statHolidayCleanups.length, 1);
+    assert.equal(statHolidayCleanups[0].personId, 'PERSON_1');
+    assert.equal(statHolidayCleanups[0].period?.id, 'PER_A');
+  } finally {
+    timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget = originalCleanup;
+    stub.restore();
+  }
+});
+
+test('performImportExecution chains same-day times across mapped activities', async () => {
+  const mappedPolicy = {
+    ...POLICY,
+    importBaseStartTime: '08:00',
+    classNameActivityMappings: [
+      { className: 'LINC', activityId: 'ACT_LINC' },
+      { className: 'Math', activityId: 'ACT_MATH' }
+    ]
+  };
+  const sessionCreates = [];
+  const originals = {
+    getPolicy: timesheetImportPolicyModel.getPolicyForOrg,
+    resolveActivity: timesheetLegacyImportService.resolveImportActivity,
+    createSessions: timesheetImportWorkSessionBuilderService.createImportWorkSessions,
+    assemble: timesheetLiveAssemblyService.buildImportedTimesheetEntries
+  };
+
+  const stub = stubExecutionDeps();
+  timesheetImportPolicyModel.getPolicyForOrg = async () => mappedPolicy;
+  timesheetLegacyImportService.resolveImportActivity = async ({ activityId }) => ({
+    ...ACTIVITY,
+    id: activityId,
+    title: `Activity ${activityId}`,
+    entries: []
+  });
+  timesheetImportWorkSessionBuilderService.createImportWorkSessions = async (args) => {
+    sessionCreates.push({
+      activityId: args.activity.id,
+      skipStacking: args.skipStacking,
+      rows: args.compiledRows.map((row) => ({
+        className: row.className,
+        startTime: row.startTime,
+        endTime: row.endTime
+      }))
+    });
+    const prefix = args.activity.id;
+    return {
+      activityId: prefix,
+      batchId: args.batchId,
+      createdEntryIds: args.compiledRows.map((_row, index) => `ENT-${prefix}-${index + 1}`),
+      rowCount: args.compiledRows.length
+    };
+  };
+  timesheetLiveAssemblyService.buildImportedTimesheetEntries = async () => ({
+    entries: [{
+      sessionId: 'act-ACT_LINC-ENT-ACT_LINC-1-PERSON_1',
+      date: '2026-03-01',
+      hours: 6,
+      timesheetHours: 6,
+      isManual: false,
+      isSchoolActivity: true
+    }, {
+      sessionId: 'act-ACT_MATH-ENT-ACT_MATH-1-PERSON_1',
+      date: '2026-03-01',
+      hours: 2,
+      timesheetHours: 2,
+      isManual: false,
+      isSchoolActivity: true
+    }],
+    totalHours: 8,
+    statHolidayWarnings: [],
+    payrollContext: { defaultRole: 'teacher', roles: ['teacher'] },
+    personRole: 'teacher'
+  });
+
+  try {
+    await executionService.performImportExecution({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      personRole: 'teacher',
+      compileResult: {
+        status: 'ok',
+        fileName: 'march.xlsx',
+        matchedPeriod: { id: 'PER_A', name: 'PER_A' },
+        rows: [
+          { date: '2026-03-01', className: 'LINC', hours: 6, sourceRowNumber: 1 },
+          { date: '2026-03-01', className: 'Math', hours: 2, sourceRowNumber: 2 }
+        ]
+      },
+      batchId: 'BATCH_CHAIN',
+      reqUser: REQ_USER
+    });
+
+    assert.equal(sessionCreates.length, 2);
+    assert.equal(sessionCreates.every((row) => row.skipStacking === true), true);
+
+    const lincRows = sessionCreates.find((row) => row.activityId === 'ACT_LINC')?.rows || [];
+    const mathRows = sessionCreates.find((row) => row.activityId === 'ACT_MATH')?.rows || [];
+    assert.equal(lincRows[0].startTime, '08:00');
+    assert.equal(lincRows[0].endTime, '14:00');
+    assert.equal(mathRows[0].startTime, '14:00');
+    assert.equal(mathRows[0].endTime, '16:00');
+  } finally {
+    stub.restore();
+    timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
+    timesheetLegacyImportService.resolveImportActivity = originals.resolveActivity;
+    timesheetImportWorkSessionBuilderService.createImportWorkSessions = originals.createSessions;
+    timesheetLiveAssemblyService.buildImportedTimesheetEntries = originals.assemble;
+  }
+});
+
 test('normalizeStatHolidayOverrideMap treats zero hours as auto-calculate', () => {
   const map = statutoryHolidayWorkSessionService.normalizeStatHolidayOverrideMap([
     { holidayId: 'H1', hours: 0, forcePay: true },

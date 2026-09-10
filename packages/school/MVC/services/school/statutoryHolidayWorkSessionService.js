@@ -137,6 +137,41 @@ function upsertStatHolidayAssigneeOnEntry(entry = {}, assignee = {}) {
   };
 }
 
+function assigneeHasStatHolidayStamp(assignee = {}) {
+  return Boolean(cleanId(assignee?.statHolidayId) || cleanId(assignee?.statHolidayPersonId));
+}
+
+function stripStatHolidayAssigneesFromEntries(entries = [], {
+  personId = '',
+  stripAllActivityAssignees = false
+} = {}) {
+  const targetPersonId = cleanId(personId);
+  let removedAssignees = 0;
+  const nextEntries = (Array.isArray(entries) ? entries : []).map((entry) => {
+    const entryHasStamp = Boolean(cleanId(entry?.statHolidayId) || cleanId(entry?.statHolidayPersonId));
+    const assignees = activityService.normalizeActivityAssigneeRows(entry.assignees);
+    const nextAssignees = assignees.filter((assignee) => {
+      const hasStatStamp = assigneeHasStatHolidayStamp(assignee) || entryHasStamp;
+      const shouldConsider = stripAllActivityAssignees || hasStatStamp;
+      if (!shouldConsider) return true;
+      if (targetPersonId) {
+        const matchesPerson = idsEqual(assignee?.statHolidayPersonId, targetPersonId)
+          || idsEqual(assignee?.personId, targetPersonId);
+        if (!matchesPerson) return true;
+      }
+      removedAssignees += 1;
+      return false;
+    });
+    const nextEntry = { ...entry, assignees: nextAssignees };
+    if (targetPersonId && idsEqual(entry?.statHolidayPersonId, targetPersonId)) {
+      const { statHolidayPersonId, ...rest } = nextEntry;
+      return rest;
+    }
+    return nextEntry;
+  });
+  return { entries: nextEntries, removedEntries: 0, removedAssignees };
+}
+
 function removeStatHolidayTargetFromEntries(entries = [], options = {}) {
   const targetPersonId = cleanId(options.personId);
   const targetPeriodId = cleanId(options.periodId);
@@ -229,6 +264,50 @@ async function cleanupStatHolidayWorkSessionsOnImportDelete({
     console.warn(`Stat holiday assignee cleanup failed for period ${targetPeriodId}: ${error.message}`);
     return { removedEntries: 0, removedAssignees: 0, error: error.message };
   }
+}
+
+async function cleanupStatHolidayActivityAssignees({
+  orgId,
+  activityId,
+  personId = '',
+  reqUser
+} = {}) {
+  const targetActivityId = cleanId(activityId);
+  if (!targetActivityId) {
+    return { removedEntries: 0, removedAssignees: 0, skipped: true, reason: 'missing_activity' };
+  }
+
+  const activity = await activityService.getActivity(targetActivityId, reqUser);
+  if (!activity) throw new Error('Statutory holiday activity was not found.');
+  if (!idsEqual(activity.orgId, orgId)) {
+    throw new Error('Statutory holiday activity is not in the active organization.');
+  }
+
+  const existingEntries = activityService.getActivityEntries(activity);
+  const cleanup = stripStatHolidayAssigneesFromEntries(existingEntries, {
+    personId,
+    stripAllActivityAssignees: true
+  });
+  if (!cleanup.removedAssignees) {
+    return {
+      activityId: targetActivityId,
+      removedEntries: 0,
+      removedAssignees: 0,
+      skipped: true,
+      reason: 'no_assignees'
+    };
+  }
+
+  await timesheetImportWorkSessionBuilderService.persistImportActivityEntryUpdates(
+    activity,
+    cleanup.entries,
+    reqUser
+  );
+  return {
+    activityId: targetActivityId,
+    removedEntries: cleanup.removedEntries,
+    removedAssignees: cleanup.removedAssignees
+  };
 }
 
 async function removeStatHolidayWorkSessionsForTarget({
@@ -468,8 +547,11 @@ module.exports = {
   entryHasStatHolidayStamp,
   isStatHolidayWorkSessionEntryForTarget,
   findStatHolidayDayEntry,
+  assigneeHasStatHolidayStamp,
+  stripStatHolidayAssigneesFromEntries,
   removeStatHolidayTargetFromEntries,
   shouldPersistStatHolidayToSharedActivity,
+  cleanupStatHolidayActivityAssignees,
   cleanupStatHolidayWorkSessionsOnImportDelete,
   removeStatHolidayWorkSessionsForTarget,
   syncStatHolidayWorkSessionsForPersonPeriod,

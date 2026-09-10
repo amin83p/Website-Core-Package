@@ -46,6 +46,26 @@
       }];
 %>
 
+<style>
+  #activityEntriesTable th.activity-entry-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  #activityEntriesTable th.activity-entry-sortable:hover {
+    background-color: rgba(13, 110, 253, 0.08);
+  }
+  #activityEntriesTable th.activity-entry-sortable .activity-entry-sort-icon {
+    margin-left: 0.35rem;
+    font-size: 0.75rem;
+    opacity: 0.65;
+  }
+  #activityEntriesTable th.activity-entry-sortable.sort-asc .activity-entry-sort-icon,
+  #activityEntriesTable th.activity-entry-sortable.sort-desc .activity-entry-sort-icon {
+    opacity: 1;
+  }
+</style>
+
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
     <h1 class="page-heading size-md m-0"><i class="bi bi-calendar-event me-2"></i><%= title %></h1>
@@ -224,13 +244,34 @@
             <table class="table table-hover table-sm mb-0 align-middle" id="activityEntriesTable">
               <thead class="table-light text-nowrap position-sticky top-0" style="z-index: 1;">
                 <tr>
-                  <th style="width: 150px;">Date</th>
-                  <th style="width: 150px;">Time</th>
-                  <th style="width: 80px;">Hrs</th>
-                  <th>Work Session</th>
-                  <th style="width: 170px;">Assigned</th>
-                  <th style="width: 120px;">Status</th>
-                  <th style="width: 150px;">Location</th>
+                  <th class="activity-entry-sortable" data-column="date" style="width: 150px;" aria-sort="ascending" title="Sort by date and start time">
+                    <span class="activity-entry-sort-label">Date</span>
+                    <i class="bi bi-sort-down activity-entry-sort-icon" aria-hidden="true"></i>
+                  </th>
+                  <th class="activity-entry-sortable" data-column="startTime" style="width: 150px;" aria-sort="none" title="Sort by start time">
+                    <span class="activity-entry-sort-label">Time</span>
+                    <i class="bi bi-arrow-down-up activity-entry-sort-icon" aria-hidden="true"></i>
+                  </th>
+                  <th class="activity-entry-sortable" data-column="durationHours" style="width: 80px;" aria-sort="none" title="Sort by hours">
+                    <span class="activity-entry-sort-label">Hrs</span>
+                    <i class="bi bi-arrow-down-up activity-entry-sort-icon" aria-hidden="true"></i>
+                  </th>
+                  <th class="activity-entry-sortable" data-column="title" aria-sort="none" title="Sort by work session title">
+                    <span class="activity-entry-sort-label">Work Session</span>
+                    <i class="bi bi-arrow-down-up activity-entry-sort-icon" aria-hidden="true"></i>
+                  </th>
+                  <th class="activity-entry-sortable" data-column="assignees" style="width: 170px;" aria-sort="none" title="Sort by assigned people">
+                    <span class="activity-entry-sort-label">Assigned</span>
+                    <i class="bi bi-arrow-down-up activity-entry-sort-icon" aria-hidden="true"></i>
+                  </th>
+                  <th class="activity-entry-sortable" data-column="status" style="width: 120px;" aria-sort="none" title="Sort by status">
+                    <span class="activity-entry-sort-label">Status</span>
+                    <i class="bi bi-arrow-down-up activity-entry-sort-icon" aria-hidden="true"></i>
+                  </th>
+                  <th class="activity-entry-sortable" data-column="location" style="width: 150px;" aria-sort="none" title="Sort by location">
+                    <span class="activity-entry-sort-label">Location</span>
+                    <i class="bi bi-arrow-down-up activity-entry-sort-icon" aria-hidden="true"></i>
+                  </th>
                   <th style="width: 64px;" class="text-end pe-3">Action</th>
                 </tr>
               </thead>
@@ -442,6 +483,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let entryModalInstance = null;
   const eligiblePersonMap = new Map();
   let eligiblePersonsLoaded = false;
+  const entrySortState = { column: 'date', direction: 'asc' };
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, function (character) {
@@ -1003,6 +1045,118 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  function timeToSortMinutes(value) {
+    const parts = String(value || '').split(':').map(Number);
+    if (parts.length < 2 || !parts.every(Number.isFinite)) return -1;
+    return (parts[0] * 60) + parts[1];
+  }
+
+  function dateToSortValue(value) {
+    const date = parseLocalDateToken(value);
+    return date ? date.getTime() : Number.MAX_SAFE_INTEGER;
+  }
+
+  function getEntryAssigneeSortLabel(entry) {
+    const assignees = Array.isArray(entry?.assignees) ? entry.assignees : [];
+    return assignees.map(function (assignee) {
+      return resolvePersonLabel(assignee.personId, assignee.personName);
+    }).join(', ').toLowerCase();
+  }
+
+  function compareActivityEntries(left, right) {
+    const column = entrySortState.column || 'date';
+    const direction = entrySortState.direction === 'desc' ? -1 : 1;
+    let comparison = 0;
+
+    if (column === 'date') {
+      comparison = dateToSortValue(left?.date) - dateToSortValue(right?.date);
+      if (!comparison) comparison = timeToSortMinutes(left?.startTime) - timeToSortMinutes(right?.startTime);
+    } else if (column === 'startTime') {
+      comparison = timeToSortMinutes(left?.startTime) - timeToSortMinutes(right?.startTime);
+      if (!comparison) comparison = dateToSortValue(left?.date) - dateToSortValue(right?.date);
+    } else if (column === 'durationHours') {
+      comparison = (Number(left?.durationHours) || 0) - (Number(right?.durationHours) || 0);
+    } else if (column === 'title') {
+      comparison = String(left?.title || '').localeCompare(String(right?.title || ''), undefined, {
+        sensitivity: 'base',
+        numeric: true
+      });
+    } else if (column === 'assignees') {
+      const leftAssignees = Array.isArray(left?.assignees) ? left.assignees.length : 0;
+      const rightAssignees = Array.isArray(right?.assignees) ? right.assignees.length : 0;
+      comparison = leftAssignees - rightAssignees;
+      if (!comparison) comparison = getEntryAssigneeSortLabel(left).localeCompare(getEntryAssigneeSortLabel(right));
+    } else if (column === 'status') {
+      comparison = String(left?.status || '').localeCompare(String(right?.status || ''));
+    } else if (column === 'location') {
+      comparison = String(left?.location || '').localeCompare(String(right?.location || ''), undefined, {
+        sensitivity: 'base',
+        numeric: true
+      });
+    }
+
+    if (!comparison) {
+      comparison = dateToSortValue(left?.date) - dateToSortValue(right?.date);
+      if (!comparison) comparison = timeToSortMinutes(left?.startTime) - timeToSortMinutes(right?.startTime);
+      if (!comparison) comparison = String(left?.entryId || '').localeCompare(String(right?.entryId || ''));
+    }
+
+    return comparison * direction;
+  }
+
+  function sortActivityEntries() {
+    if (!Array.isArray(entries) || entries.length < 2) return;
+    const selectedEntry = Number.isInteger(selectedEntryIndex) ? entries[selectedEntryIndex] : null;
+    const selectedEntryId = selectedEntry ? String(selectedEntry.entryId || '').trim() : '';
+    entries.sort(compareActivityEntries);
+    if (selectedEntryId) {
+      const nextIndex = entries.findIndex(function (entry) {
+        return String(entry?.entryId || '').trim() === selectedEntryId;
+      });
+      selectedEntryIndex = nextIndex >= 0 ? nextIndex : null;
+    }
+  }
+
+  function updateActivityEntrySortHeaders() {
+    const table = document.getElementById('activityEntriesTable');
+    if (!table) return;
+    table.querySelectorAll('th.activity-entry-sortable').forEach(function (header) {
+      const column = String(header.dataset.column || '').trim();
+      const isActive = column === entrySortState.column;
+      header.classList.toggle('sort-asc', isActive && entrySortState.direction === 'asc');
+      header.classList.toggle('sort-desc', isActive && entrySortState.direction === 'desc');
+      header.setAttribute('aria-sort', isActive
+        ? (entrySortState.direction === 'asc' ? 'ascending' : 'descending')
+        : 'none');
+      const icon = header.querySelector('.activity-entry-sort-icon');
+      if (!icon) return;
+      icon.className = 'bi activity-entry-sort-icon ' + (
+        isActive
+          ? (entrySortState.direction === 'asc' ? 'bi-sort-down' : 'bi-sort-up')
+          : 'bi-arrow-down-up'
+      );
+    });
+  }
+
+  function bindActivityEntrySortHeaders() {
+    const table = document.getElementById('activityEntriesTable');
+    if (!table || table.dataset.sortBound === '1') return;
+    table.dataset.sortBound = '1';
+    table.querySelectorAll('th.activity-entry-sortable').forEach(function (header) {
+      header.addEventListener('click', function () {
+        const column = String(header.dataset.column || '').trim();
+        if (!column) return;
+        if (entrySortState.column === column) {
+          entrySortState.direction = entrySortState.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+          entrySortState.column = column;
+          entrySortState.direction = 'asc';
+        }
+        renderEntries();
+      });
+    });
+  }
+
   function isEntryTimesheetLocked(entry) {
     if (!entry) return false;
     if ((entry.locked === true || String(entry.locked) === 'true')
@@ -1034,15 +1188,17 @@ document.addEventListener('DOMContentLoaded', function () {
       const unlockBtn = (canForceUnlock && locked)
         ? '<button type="button" class="btn btn-outline-danger btn-sm js-entry-force-unlock" data-index="' + entryIndex + '" data-entry-id="' + escapeHtml(entry.entryId || '') + '"><i class="bi bi-unlock me-2"></i>Force unlock</button>'
         : '';
+      const titleLabel = entry.title || ('Work Session ' + (entryIndex + 1));
+      const assigneeLabel = assigneeNames.join(', ') || 'No people';
       return [
         '<tr class="' + rowClass + '" data-entry-index="' + entryIndex + '">',
-        '<td><div class="fw-bold text-dark">' + escapeHtml(entry.date || '-') + '</div></td>',
-        '<td><div class="small text-dark">' + escapeHtml(entry.startTime || '-') + ' - ' + escapeHtml(entry.endTime || '-') + '</div></td>',
-        '<td><span class="badge bg-light text-dark border">' + escapeHtml(Number(entry.durationHours || 0).toFixed(2)) + '</span></td>',
-        '<td><div class="fw-bold text-dark">' + escapeHtml(entry.title || 'Work Session ' + (entryIndex + 1)) + '</div><div class="x-small text-muted">' + escapeHtml(entry.notes || 'No notes') + '</div>' + lockBadge + '</td>',
-        '<td><div class="small text-dark">' + escapeHtml(assigneeNames.join(', ') || 'No people') + escapeHtml(extraAssignees) + '</div><div class="x-small text-muted">' + assignees.length + ' assigned</div></td>',
-        '<td><span class="badge ' + statusClass + ' text-capitalize">' + escapeHtml(status) + '</span></td>',
-        '<td><div class="small text-muted">' + escapeHtml(entry.location || '-') + '</div></td>',
+        '<td data-sort-value="' + escapeHtml(entry.date || '') + '"><div class="fw-bold text-dark">' + escapeHtml(entry.date || '-') + '</div></td>',
+        '<td data-sort-value="' + escapeHtml(entry.startTime || '') + '"><div class="small text-dark">' + escapeHtml(entry.startTime || '-') + ' - ' + escapeHtml(entry.endTime || '-') + '</div></td>',
+        '<td data-sort-value="' + escapeHtml(Number(entry.durationHours || 0).toFixed(2)) + '"><span class="badge bg-light text-dark border">' + escapeHtml(Number(entry.durationHours || 0).toFixed(2)) + '</span></td>',
+        '<td data-sort-value="' + escapeHtml(titleLabel) + '"><div class="fw-bold text-dark">' + escapeHtml(titleLabel) + '</div><div class="x-small text-muted">' + escapeHtml(entry.notes || 'No notes') + '</div>' + lockBadge + '</td>',
+        '<td data-sort-value="' + escapeHtml(assigneeLabel) + '"><div class="small text-dark">' + escapeHtml(assigneeLabel) + escapeHtml(extraAssignees) + '</div><div class="x-small text-muted">' + assignees.length + ' assigned</div></td>',
+        '<td data-sort-value="' + escapeHtml(status) + '"><span class="badge ' + statusClass + ' text-capitalize">' + escapeHtml(status) + '</span></td>',
+        '<td data-sort-value="' + escapeHtml(entry.location || '') + '"><div class="small text-muted">' + escapeHtml(entry.location || '-') + '</div></td>',
         '<td class="table-actions text-end pe-3">',
         '<div class="row-actions-wrap">',
         '<button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="' + rowActionId + '" title="Work session actions"><i class="bi bi-three-dots-vertical"></i></button>',
@@ -1062,14 +1218,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function renderEntries() {
     syncEntries();
+    sortActivityEntries();
     if (selectedEntryIndex !== null && (!entries[selectedEntryIndex] || selectedEntryIndex < 0)) selectedEntryIndex = null;
     if (!entries.length) {
       entriesTbody.innerHTML = '';
       noEntriesMsg.classList.remove('d-none');
+      updateActivityEntrySortHeaders();
       return;
     }
     noEntriesMsg.classList.add('d-none');
     entriesTbody.innerHTML = buildEntryRowsHtml();
+    updateActivityEntrySortHeaders();
   }
 
   function getEntryModalInstance() {
@@ -1191,7 +1350,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function renderEntryRowsOnly() {
     syncEntries();
+    sortActivityEntries();
     entriesTbody.innerHTML = buildEntryRowsHtml();
+    updateActivityEntrySortHeaders();
   }
 
   function getBatchModalInstance() {
@@ -1923,6 +2084,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   syncActivityScopePersonControlInputs();
   renderScopePersonControls();
+  bindActivityEntrySortHeaders();
   renderEntries();
   // Warm eligible-person lookup on load so allowed-person chips render names (not raw IDs) without requiring picker open.
   ensureEligiblePersonsLoaded()

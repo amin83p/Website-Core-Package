@@ -101,11 +101,20 @@ function resolveSourceRowNumber(row = {}, fallbackIndex = 0) {
   return fallbackIndex + 1;
 }
 
+function parseClockTimeToMinutes(value, fallback = 0) {
+  const token = String(value ?? '').trim();
+  if (!/^\d{2}:\d{2}$/.test(token)) return fallback;
+  const [h, m] = token.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return fallback;
+  return (h * 60) + m;
+}
+
 function clockTimeFromDayOffsetMinutes(minutesFromMidnight) {
   return sessionStatusPolicyService.addMinutesToClockTime('00:00', minutesFromMidnight) || '00:00';
 }
 
-function stackCompiledRowsByDate(compiledRows = []) {
+function stackCompiledRowsByDate(compiledRows = [], { baseStartTime = '00:00' } = {}) {
+  const baseStartMinutes = parseClockTimeToMinutes(baseStartTime, 0);
   const prepared = (Array.isArray(compiledRows) ? compiledRows : [])
     .map((row, index) => {
       const date = normalizeImportRowDate(row?.date);
@@ -134,7 +143,7 @@ function stackCompiledRowsByDate(compiledRows = []) {
     const dayKey = row.date;
     const startMinutes = dayStackCursorMinutes.has(dayKey)
       ? dayStackCursorMinutes.get(dayKey)
-      : 0;
+      : baseStartMinutes;
     const endMinutes = startMinutes + (row.hours * 60);
     if (endMinutes > MINUTES_PER_DAY) {
       const dayTotalHours = Number((endMinutes / 60).toFixed(2));
@@ -203,7 +212,9 @@ function buildImportWorkSessionEntryDrafts({
   personRole = '',
   periodId = '',
   batchId = '',
-  sourceFileName = ''
+  sourceFileName = '',
+  baseStartTime = '00:00',
+  skipStacking = false
 }) {
   const targetPersonId = cleanId(personId);
   const targetPeriodId = cleanId(periodId);
@@ -214,7 +225,11 @@ function buildImportWorkSessionEntryDrafts({
     legacyImportPersonId: targetPersonId
   };
 
-  return stackCompiledRowsByDate(compiledRows).map((row, index) => {
+  const stackedRows = skipStacking
+    ? (Array.isArray(compiledRows) ? compiledRows : [])
+    : stackCompiledRowsByDate(compiledRows, { baseStartTime });
+
+  return stackedRows.map((row, index) => {
     const title = String(row?.className || '').trim();
     const notes = buildImportRowNotes(row);
     return {
@@ -267,6 +282,8 @@ async function createImportWorkSessions({
   periodId = '',
   batchId = '',
   sourceFileName = '',
+  baseStartTime = '00:00',
+  skipStacking = false,
   reqUser
 }) {
   const targetPersonId = cleanId(personId);
@@ -285,7 +302,9 @@ async function createImportWorkSessions({
     personRole,
     periodId,
     batchId,
-    sourceFileName
+    sourceFileName,
+    baseStartTime,
+    skipStacking
   });
   if (!drafts.length) {
     throw new Error('No import rows were available to create work sessions.');

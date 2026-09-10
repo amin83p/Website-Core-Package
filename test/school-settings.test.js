@@ -153,6 +153,8 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.match(view, /\/school\/settings\/timesheet-parameters/);
   assert.match(view, /\/school\/settings\/timesheet-import/);
   assert.match(view, /id="timesheetImportTargetStatus"/);
+  assert.match(view, /id="timesheetImportBaseStartTime"/);
+  assert.match(view, /importBaseStartTime/);
   assert.match(view, /importTargetStatus/);
   assert.match(view, /My Timesheets import always saves as Draft/);
   assert.match(view, /emptyEnrollmentSessions/);

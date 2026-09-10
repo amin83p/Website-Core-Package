@@ -319,6 +319,75 @@ test('removeStatHolidayTargetFromEntries preserves day entry when assignee is re
   assert.deepEqual(cleanup.entries[0].assignees, []);
 });
 
+test('stripStatHolidayAssigneesFromEntries removes all stat-holiday assignees from activity day entries', () => {
+  const entries = [{
+    entryId: 'ENT-1',
+    date: '2026-02-16',
+    statHolidayId: 'H1',
+    assignees: [{
+      personId: 'PERSON_1',
+      personName: 'Amin Paknejad',
+      statHolidayId: 'H1',
+      statHolidayPersonId: 'PERSON_1',
+      paidHours: 6
+    }]
+  }, {
+    entryId: 'ENT-2',
+    date: '2026-03-01',
+    assignees: [{ personId: 'PERSON_2', paidHours: 8 }]
+  }];
+  const cleanup = statutoryHolidayWorkSessionService.stripStatHolidayAssigneesFromEntries(entries);
+  assert.equal(cleanup.removedAssignees, 1);
+  assert.equal(cleanup.entries.length, 2);
+  assert.deepEqual(cleanup.entries[0].assignees, []);
+  assert.equal(cleanup.entries[1].assignees.length, 1);
+});
+
+test('stripStatHolidayAssigneesFromEntries strips unstamped assignees when stripAllActivityAssignees is set', () => {
+  const entries = [{
+    entryId: 'ENT-1',
+    date: '2026-02-16',
+    assignees: [{
+      personId: 'PERSON_1',
+      personName: 'Amin Paknejad',
+      paidHours: 6
+    }]
+  }];
+  const cleanup = statutoryHolidayWorkSessionService.stripStatHolidayAssigneesFromEntries(entries, {
+    stripAllActivityAssignees: true
+  });
+  assert.equal(cleanup.removedAssignees, 1);
+  assert.deepEqual(cleanup.entries[0].assignees, []);
+});
+
+test('stripStatHolidayAssigneesFromEntries can target one person only', () => {
+  const entries = [{
+    entryId: 'ENT-1',
+    date: '2026-02-16',
+    statHolidayId: 'H1',
+    assignees: [
+      {
+        personId: 'PERSON_1',
+        statHolidayId: 'H1',
+        statHolidayPersonId: 'PERSON_1',
+        paidHours: 6
+      },
+      {
+        personId: 'PERSON_2',
+        statHolidayId: 'H1',
+        statHolidayPersonId: 'PERSON_2',
+        paidHours: 4
+      }
+    ]
+  }];
+  const cleanup = statutoryHolidayWorkSessionService.stripStatHolidayAssigneesFromEntries(entries, {
+    personId: 'PERSON_1'
+  });
+  assert.equal(cleanup.removedAssignees, 1);
+  assert.equal(cleanup.entries[0].assignees.length, 1);
+  assert.equal(cleanup.entries[0].assignees[0].personId, 'PERSON_2');
+});
+
 test('cleanupStatHolidayWorkSessionsOnImportDelete removes assignee from statutory holiday activity', async () => {
   const activity = {
     id: 'ACT_STAT',

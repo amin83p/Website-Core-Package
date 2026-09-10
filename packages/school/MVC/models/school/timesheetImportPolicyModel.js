@@ -25,6 +25,7 @@ function pickStoredPolicyFields(row) {
     allowImportInTimesheetManagement: row.allowImportInTimesheetManagement,
     allowImportInMyTimesheets: row.allowImportInMyTimesheets,
     importTargetStatus: row.importTargetStatus,
+    importBaseStartTime: row.importBaseStartTime,
     classNameActivityMappings: row.classNameActivityMappings
   };
 }

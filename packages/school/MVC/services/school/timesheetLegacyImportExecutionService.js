@@ -252,6 +252,10 @@ async function performImportExecution({
   });
   const sourceFileName = String(compileResult?.fileName || 'imported.xlsx').trim();
   const compiledRows = Array.isArray(compileResult?.rows) ? compileResult.rows : [];
+  const stackedRows = timesheetImportWorkSessionBuilderService.stackCompiledRowsByDate(
+    compiledRows,
+    { baseStartTime: policy.importBaseStartTime }
+  );
   const {
     defaultActivity,
     buckets,
@@ -261,7 +265,7 @@ async function performImportExecution({
     orgId,
     reqUser,
     policy,
-    compiledRows
+    compiledRows: stackedRows
   });
   const usedActivityIds = [...buckets.keys()];
 
@@ -326,6 +330,12 @@ async function performImportExecution({
 
   try {
     steps.workSessions.status = 'running';
+    await timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget({
+      orgId,
+      personId: targetPersonId,
+      period,
+      reqUser
+    });
     for (const activityId of usedActivityIds) {
       await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget({
         activityId,
@@ -359,6 +369,8 @@ async function performImportExecution({
         periodId: targetPeriodId,
         batchId: resolvedBatchId,
         sourceFileName,
+        baseStartTime: policy.importBaseStartTime,
+        skipStacking: true,
         reqUser
       });
       workSessionOutcomes.push({

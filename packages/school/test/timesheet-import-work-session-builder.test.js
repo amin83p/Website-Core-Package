@@ -109,6 +109,40 @@ test('stackCompiledRowsByDate sums regular and optional hours on the same row', 
   assert.equal(stacked[0].endTime, '03:00');
 });
 
+test('stackCompiledRowsByDate uses configurable base start time', () => {
+  const stacked = builder.stackCompiledRowsByDate([
+    { date: '2026-01-09', hours: 3, className: 'ELA', sourceRowNumber: 10 },
+    { date: '2026-01-09', hours: 4, className: 'LINC', sourceRowNumber: 11 }
+  ], { baseStartTime: '08:00' });
+
+  assert.equal(stacked[0].startTime, '08:00');
+  assert.equal(stacked[0].endTime, '11:00');
+  assert.equal(stacked[1].startTime, '11:00');
+  assert.equal(stacked[1].endTime, '15:00');
+});
+
+test('buildImportWorkSessionEntryDrafts with skipStacking preserves pre-assigned times', () => {
+  const drafts = builder.buildImportWorkSessionEntryDrafts({
+    compiledRows: [{
+      date: '2026-03-01',
+      className: 'LINC',
+      hours: 3,
+      startTime: '09:00',
+      endTime: '12:00',
+      durationHours: 3
+    }],
+    activity: ACTIVITY,
+    personId: 'PERSON_1',
+    personName: 'Teacher One',
+    personRole: 'teacher',
+    skipStacking: true
+  });
+
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].startTime, '09:00');
+  assert.equal(drafts[0].endTime, '12:00');
+});
+
 test('buildImportRowNotes mentions optional hours in comment', () => {
   const notes = builder.buildImportRowNotes({
     comment: 'Cancelled session',

@@ -180,7 +180,14 @@ function resolvePolicy(input = {}) {
 }
 
 function validatePolicyInput(input = {}) {
-  return normalizePolicyFromForm(input);
+  const normalized = normalizePolicyFromForm(input);
+  if (normalized.statutoryHolidayPay?.enabled !== false
+    && !String(normalized.statutoryHolidayPay?.activityId || '').trim()) {
+    const error = new Error('Select a public statutory holiday activity when statutory holiday pay is enabled.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return normalized;
 }
 
 function isClassTimesheetRow(row = {}) {

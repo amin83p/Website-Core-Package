@@ -1396,6 +1396,66 @@ test('deleteLegacyImportsForYear deletes imported periods in year and skips non-
   }
 });
 
+test('purgeImportedTimesheetRecord removes statutory holiday assignees before purge', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_PURGE',
+        orgId: 'ORG_1',
+        teacherId: 'PERSON_1',
+        periodId: 'PER_A',
+        status: 'processed',
+        entries: [],
+        legacyImport: { sourceFileName: 'feb.xlsx', activityId: 'ACT_IMPORT' }
+      }
+    }
+  });
+
+  try {
+    await timesheetLegacyImportService.purgeImportedTimesheetRecord('TS_PURGE', REQ_USER, {
+      timesheet: stub.getStore().PER_A,
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      period: {
+        id: 'PER_A',
+        orgId: 'ORG_1',
+        startDate: '2026-02-01',
+        endDate: '2026-02-28'
+      }
+    });
+    assert.equal(stub.getStatHolidayRemovals().length, 1);
+    assert.equal(stub.getStatHolidayRemovals()[0].personId, 'PERSON_1');
+    assert.equal(stub.getStore().PER_A, undefined);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('deleteLegacyImport cleans stat-holiday-only orphans when import work sessions are already gone', async () => {
+  const stub = stubLegacyImportDeleteDeps();
+  const originals = {
+    countOrphans: timesheetLegacyImportService.countOrphanImportWorkSessionsForPersonPeriod
+  };
+  timesheetLegacyImportService.countOrphanImportWorkSessionsForPersonPeriod = async () => 0;
+
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.hadLegacyImport, true);
+    assert.equal(outcome.timesheetAlreadyRemoved, true);
+    assert.equal(stub.getStatHolidayRemovals().length, 1);
+  } finally {
+    timesheetLegacyImportService.countOrphanImportWorkSessionsForPersonPeriod = originals.countOrphans;
+    stub.restore();
+  }
+});
+
 test('my timesheets list and routes expose bulk year legacy delete', () => {
   const controller = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/controllers/school/timesheetController.js'), 'utf8');
   const listView = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/timesheet/timesheetList.ejs'), 'utf8');

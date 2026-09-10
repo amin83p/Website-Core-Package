@@ -12,6 +12,7 @@ const DEFAULT_POLICY = Object.freeze({
   allowImportInTimesheetManagement: false,
   allowImportInMyTimesheets: false,
   importTargetStatus: 'draft',
+  importBaseStartTime: '00:00',
   classNameActivityMappings: []
 });
 
@@ -29,6 +30,15 @@ function normalizeImportTargetStatus(value, fallback = 'draft') {
   const token = String(value ?? '').trim().toLowerCase();
   if (!token) return fallback;
   return IMPORT_TARGET_STATUSES.includes(token) ? token : fallback;
+}
+
+function normalizeImportBaseStartTime(value, fallback = '00:00') {
+  const token = String(value ?? '').trim();
+  if (!token) return fallback;
+  if (!/^\d{2}:\d{2}$/.test(token)) return fallback;
+  const [h, m] = token.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return fallback;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function normalizeClassNameKey(value) {
@@ -89,6 +99,7 @@ function normalizePolicyFromStored(input = {}) {
     allowImportInTimesheetManagement: cleanBoolean(input.allowImportInTimesheetManagement, false),
     allowImportInMyTimesheets: cleanBoolean(input.allowImportInMyTimesheets, false),
     importTargetStatus: normalizeImportTargetStatus(input.importTargetStatus, 'draft'),
+    importBaseStartTime: normalizeImportBaseStartTime(input.importBaseStartTime, '00:00'),
     classNameActivityMappings: normalizeClassNameActivityMappings(input.classNameActivityMappings)
   };
 }
@@ -99,6 +110,7 @@ function normalizePolicyFromForm(input = {}) {
     allowImportInTimesheetManagement: cleanBoolean(input.allowImportInTimesheetManagement, false),
     allowImportInMyTimesheets: cleanBoolean(input.allowImportInMyTimesheets, false),
     importTargetStatus: normalizeImportTargetStatus(input.importTargetStatus, 'draft'),
+    importBaseStartTime: normalizeImportBaseStartTime(input.importBaseStartTime, '00:00'),
     classNameActivityMappings: normalizeClassNameActivityMappings(
       input.classNameActivityMappings,
       { enforceUnique: true }
@@ -124,6 +136,20 @@ function validatePolicyInput(input = {}) {
     const error = new Error('Invalid imported timesheet status.');
     error.statusCode = 400;
     throw error;
+  }
+  const rawBaseStartTime = String(input?.importBaseStartTime ?? '').trim();
+  if (rawBaseStartTime && !/^\d{2}:\d{2}$/.test(rawBaseStartTime)) {
+    const error = new Error('Invalid import base start time.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (rawBaseStartTime) {
+    const [h, m] = rawBaseStartTime.split(':').map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+      const error = new Error('Invalid import base start time.');
+      error.statusCode = 400;
+      throw error;
+    }
   }
   const normalized = normalizePolicyFromForm(input);
   const requiresActivity = normalized.allowImportInTimesheetManagement || normalized.allowImportInMyTimesheets;
@@ -253,6 +279,7 @@ module.exports = {
   normalizeClassNameKey,
   normalizeClassNameActivityMappings,
   normalizeImportTargetStatus,
+  normalizeImportBaseStartTime,
   normalizePolicyFromStored,
   normalizePolicyFromForm,
   resolvePolicy,

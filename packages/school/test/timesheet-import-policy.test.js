@@ -24,6 +24,29 @@ test('validatePolicyInput accepts disabled import without activity', () => {
   });
   assert.equal(policy.importActivityId, '');
   assert.equal(policy.importTargetStatus, 'draft');
+  assert.equal(policy.importBaseStartTime, '00:00');
+});
+
+test('validatePolicyInput accepts valid import base start time', () => {
+  const policy = timesheetImportPolicyService.validatePolicyInput({
+    importBaseStartTime: '08:30'
+  });
+  assert.equal(policy.importBaseStartTime, '08:30');
+});
+
+test('validatePolicyInput rejects invalid import base start time', () => {
+  assert.throws(
+    () => timesheetImportPolicyService.validatePolicyInput({
+      importBaseStartTime: '25:00'
+    }),
+    /invalid import base start time/i
+  );
+  assert.throws(
+    () => timesheetImportPolicyService.validatePolicyInput({
+      importBaseStartTime: 'not-a-time'
+    }),
+    /invalid import base start time/i
+  );
 });
 
 test('validatePolicyInput rejects unknown import target status', () => {

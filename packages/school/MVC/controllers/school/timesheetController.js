@@ -29,6 +29,7 @@ const timesheetParametersPolicyModel = require('../../models/school/timesheetPar
 const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
 const statutoryHolidayEligibilityService = require('../../services/school/statutoryHolidayEligibilityService');
 const statutoryHolidayWorkSessionService = require('../../services/school/statutoryHolidayWorkSessionService');
+const statutoryHolidayTimesheetLifecycleService = require('../../services/school/statutoryHolidayTimesheetLifecycleService');
 const timesheetEffectiveEntryService = require('../../services/school/timesheetEffectiveEntryService');
 const timesheetPrintService = require('../../services/school/timesheetPrintService');
 const deadlineReconciliationService = require('../../services/school/timesheetDeadlineReconciliationService');
@@ -2450,7 +2451,7 @@ exports.viewTimesheet = async (req, res) => {
                 timesheet.entries,
                 mergedLiveSessions
             );
-            const statHolidayMaterialization = await statutoryHolidayWorkSessionService.materializeStatHolidayForPersonPeriod({
+            const statHolidayMaterialization = await statutoryHolidayTimesheetLifecycleService.previewStatHolidayForTimesheet({
                 orgId: activeOrgId,
                 personId: teacherContext.targetTeacherId,
                 personName: payrollContext.personName,
@@ -2460,8 +2461,7 @@ exports.viewTimesheet = async (req, res) => {
                 periodEntries: periodWorkdayEntries,
                 existingEntries: timesheet.entries,
                 reqUser: req.user,
-                allowManagerOverride: canManagerUpdate,
-                persistToActivity: false
+                allowManagerOverride: canManagerUpdate
             });
             statHolidayWarnings = statHolidayMaterialization.warnings;
             if (statHolidayMaterialization?.syncOutcome?.rowCount) {
@@ -2643,7 +2643,8 @@ exports.viewTimesheet = async (req, res) => {
                 !viewingOtherPerson || canManagerUpdate || canTimesheetsAdminUpdate
             ),
             statHolidayWarnings,
-            canManageStatHolidayOverrides: canManagerUpdate,
+            canManageStatHolidayOverrides: canReviewerEdit && canManagerUpdate,
+            statHolidayPreviewOnly: status === 'draft',
             statutoryHolidayUsesActivity,
             navYear,
             prevPeriodNav,
@@ -2714,8 +2715,12 @@ exports.resetTimesheet = async (req, res) => {
         const orgId = existing.orgId || period.orgId || activeOrgId;
         const teacherId = String(teacherContext.targetTeacherId);
 
-        await schoolRepositories.timesheets.maintenancePurgeById(existing.id, {
-            scope: { canViewAll: true }
+        await timesheetLegacyImportService.purgeImportedTimesheetRecord(existing.id, req.user, {
+            timesheet: existing,
+            orgId,
+            personId: teacherId,
+            periodId: String(periodId),
+            period
         });
 
         if (preserveLateSubmission) {
@@ -2815,7 +2820,12 @@ exports.saveTimesheet = async (req, res) => {
         if (reviewerEdit) nextStatus = 'submitted';
 
         const parsedEntries = typeof entries === 'string' ? JSON.parse(entries) : entries;
-        const entryRows = Array.isArray(parsedEntries) ? parsedEntries : [];
+        let entryRows = Array.isArray(parsedEntries) ? parsedEntries : [];
+        const isAuthorDraftSave = nextStatus === 'draft' && !reviewerEdit;
+        const shouldPersistStatHoliday = nextStatus === 'submitted' || reviewerEdit;
+        if (isAuthorDraftSave) {
+            entryRows = statutoryHolidayTimesheetLifecycleService.stripStatHolidayEntries(entryRows);
+        }
 
         if (!teacherContext.isAdmin) {
             const blockedAutoDeletes = entryRows.filter((entry) => (
@@ -2956,45 +2966,56 @@ exports.saveTimesheet = async (req, res) => {
             supplementalLiveSessions
         );
         const allHolidays = await dataService.fetchAllData('holidays', {}, req.user);
-        const allowStatHolidayOverride = Boolean(canReviewerEdit);
-        await statutoryHolidayWorkSessionService.materializeStatHolidayForPersonPeriod({
-            orgId: activeOrgId,
-            personId: teacherContext.targetTeacherId,
-            personName: payrollContext.personName,
+        const allowStatHolidayOverride = await statutoryHolidayTimesheetLifecycleService.resolveStatHolidayOverridePermission({
+            reqUser: req.user,
+            timesheet: existing,
             period,
-            policy: timesheetParametersPolicy,
-            holidays: allHolidays,
-            periodEntries: periodWorkdayEntries,
-            existingEntries: entryRows.filter((entry) => entry && entry.isDeleted !== true),
-            reqUser: req.user,
-            allowManagerOverride: allowStatHolidayOverride
+            reviewerEdit
         });
-        const refreshedActivityLiveSessions = await activityService.getTimesheetEntriesForPerson({
-            orgId: activeOrgId,
-            personId: teacherContext.targetTeacherId,
-            periodStartDate: period.startDate,
-            periodEndDate: period.endDate,
-            reqUser: req.user
-        });
-        activityLiveById.clear();
-        (Array.isArray(refreshedActivityLiveSessions) ? refreshedActivityLiveSessions : []).forEach((row) => {
-            const key = String(row?.sessionId || '').trim();
-            if (key) activityLiveById.set(key, row);
-        });
-        const statHolidayContext = await statutoryHolidayEligibilityService.buildStatutoryHolidayTimesheetContext({
-            orgId: activeOrgId,
-            personId: teacherContext.targetTeacherId,
-            periodStartDate: period.startDate,
-            periodEndDate: period.endDate,
-            policy: timesheetParametersPolicy,
-            holidays: allHolidays,
-            periodEntries: periodWorkdayEntries,
-            existingEntries: existingEntriesList,
-            reqUser: req.user,
-            allowManagerOverride: allowStatHolidayOverride
-        });
+        let statHolidayMaterialization = null;
+        if (shouldPersistStatHoliday
+            && statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled(timesheetParametersPolicy)) {
+            const materializeContext = {
+                orgId: activeOrgId,
+                personId: teacherContext.targetTeacherId,
+                personName: payrollContext.personName,
+                period,
+                policy: timesheetParametersPolicy,
+                holidays: allHolidays,
+                periodEntries: periodWorkdayEntries,
+                existingEntries: entryRows.filter((entry) => entry && entry.isDeleted !== true),
+                reqUser: req.user,
+                allowManagerOverride: allowStatHolidayOverride
+            };
+            if (nextStatus === 'submitted' && !reviewerEdit) {
+                statHolidayMaterialization = await statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit(materializeContext);
+            } else {
+                statHolidayMaterialization = await statutoryHolidayTimesheetLifecycleService.updateStatHolidayOnReviewerSave({
+                    ...materializeContext,
+                    allowManagerOverride: allowStatHolidayOverride
+                });
+            }
+            entryRows = statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries({
+                entries: entryRows,
+                statHolidayRows: statHolidayMaterialization?.rows || [],
+                usesActivityMode: statHolidayMaterialization?.usesActivityMode === true,
+                existingEntriesBySessionId
+            });
+            const refreshedActivityLiveSessions = await activityService.getTimesheetEntriesForPerson({
+                orgId: activeOrgId,
+                personId: teacherContext.targetTeacherId,
+                periodStartDate: period.startDate,
+                periodEndDate: period.endDate,
+                reqUser: req.user
+            });
+            activityLiveById.clear();
+            (Array.isArray(refreshedActivityLiveSessions) ? refreshedActivityLiveSessions : []).forEach((row) => {
+                const key = String(row?.sessionId || '').trim();
+                if (key) activityLiveById.set(key, row);
+            });
+        }
         const statHolidayById = new Map(
-            (Array.isArray(statHolidayContext.rows) ? statHolidayContext.rows : [])
+            (Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : [])
                 .map((row) => [String(row?.sessionId || '').trim(), row])
                 .filter(([sessionId]) => Boolean(sessionId))
         );
@@ -3712,6 +3733,14 @@ exports.saveTimesheet = async (req, res) => {
         if (nextStatus === 'submitted') {
             const savedRow = saved && typeof saved === 'object' ? saved : { ...payload, id: existing?.id || saved };
             const lockSummary = await schoolDependencyService.lockSourcesForApprovedTimesheet(savedRow, req.user);
+            const statHolidayLockSummary = await statutoryHolidayTimesheetLifecycleService.lockStatHolidayAssigneesForTimesheet({
+                orgId: activeOrgId,
+                policy: timesheetParametersPolicy,
+                personId: teacherContext.targetTeacherId,
+                period,
+                timesheetId: savedRow.id,
+                reqUser: req.user
+            });
             let reconciliationRefs = [];
             if (reconciliationLockRefs.length > 0) {
                 const reconciliationSummary = await schoolDependencyService.lockReconciliationSourceRefs({
@@ -3725,7 +3754,8 @@ exports.saveTimesheet = async (req, res) => {
             }
             const lockedSourceRefs = schoolDependencyService.dedupeSourceRefs([
                 ...(Array.isArray(lockSummary?.lockedSourceRefs) ? lockSummary.lockedSourceRefs : []),
-                ...reconciliationRefs
+                ...reconciliationRefs,
+                ...(statHolidayLockSummary?.lockedSourceRefs || [])
             ]);
             saved = await dataService.updateData('timesheets', savedRow.id, {
                 ...savedRow,
@@ -4747,7 +4777,18 @@ exports.returnTimesheet = async (req, res) => {
             reqUser: req.user
         });
         await schoolDependencyService.unlockSourcesForTimesheet(existing, req.user);
-        const restoredEntries = restoreRevertedManualEntryIds(existing.entries, revertSummary).map((entry) => {
+        const [timesheetParametersPolicy] = await Promise.all([
+            timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId)
+        ]);
+        const clearedStatHoliday = await statutoryHolidayTimesheetLifecycleService.clearStatHolidayForReturnedTimesheet({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            period,
+            policy: timesheetParametersPolicy,
+            reqUser: req.user,
+            entries: existing.entries
+        });
+        const restoredEntries = restoreRevertedManualEntryIds(clearedStatHoliday.entries, revertSummary).map((entry) => {
             if (!entry || entry.isManual !== true || entry.activityPaid !== true) return entry;
             const requestedHours = Number(parseFloat(entry.requestedHours ?? entry.durationHours ?? 0) || 0);
             return {

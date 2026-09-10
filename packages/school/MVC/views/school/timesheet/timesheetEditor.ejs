@@ -1381,6 +1381,7 @@
     const INCOMPLETE_SESSIONS = <%- JSON.stringify(incompleteSessions || []) %>;
     const STAT_HOLIDAY_WARNINGS = <%- JSON.stringify(typeof statHolidayWarnings !== 'undefined' ? statHolidayWarnings : []) %>;
     const CAN_MANAGE_STAT_HOLIDAY_OVERRIDES = <%= (typeof canManageStatHolidayOverrides !== 'undefined' && canManageStatHolidayOverrides) ? 'true' : 'false' %>;
+    const STAT_HOLIDAY_PREVIEW_ONLY = <%= (typeof statHolidayPreviewOnly !== 'undefined' && statHolidayPreviewOnly) ? 'true' : 'false' %>;
     const STATUTORY_HOLIDAY_USES_ACTIVITY = <%= (typeof statutoryHolidayUsesActivity !== 'undefined' && statutoryHolidayUsesActivity) ? 'true' : 'false' %>;
     const SESSION_STATUS_META = <%- JSON.stringify(sessionStatusMeta || []) %>;
     const IS_READONLY = <%= isEditorLocked %>;
@@ -2977,7 +2978,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 `Earnings window: ${calculated.earningsStart ? formatTimesheetDateLabel(calculated.earningsStart) : '-'} to ${calculated.earningsEnd ? formatTimesheetDateLabel(calculated.earningsEnd) : '-'}`,
                 `Total hours in window: ${Number(calculated.totalHours || 0).toFixed(2)}`,
                 `Payable workdays in window: ${Number(calculated.workdayCount || 0)}`,
-                `Average payable hours: ${Number(calculated.averageHours || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2)}`
+                `Average payable hours: ${Number(
+                    Number.isFinite(Number(calculated.averageHours))
+                        ? calculated.averageHours
+                        : (Number.isFinite(Number(entry?.statHolidayMeta?.calculatedHours))
+                            ? entry.statHolidayMeta.calculatedHours
+                            : 0)
+                ).toFixed(2)}`
             ])
         ].join('');
     }
@@ -2993,10 +3000,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const holidayLabel = String(entry?.className || entry?.description || 'Statutory holiday').trim();
         const dateLabel = entry?.date ? formatTimesheetDateLabel(entry.date) : '-';
-        const payableHours = Number(resolveEntryHours(entry) || entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2);
-        const calculatedHours = Number(entry?.statHolidayMeta?.calculatedHours || payableHours || 0).toFixed(2);
+        const payableHours = Number(resolveEntryHours(entry) || 0).toFixed(2);
+        const metaCalculatedHours = entry?.statHolidayMeta?.calculatedHours;
+        const calculatedHours = Number.isFinite(Number(metaCalculatedHours))
+            ? Number(metaCalculatedHours).toFixed(2)
+            : payableHours;
         const qualified = entry?.statHolidayMeta?.qualified === true;
         const payBlockedReason = String(entry?.statHolidayMeta?.payBlockedReason || '').trim();
+        const override = (entry?.statHolidayOverride && typeof entry.statHolidayOverride === 'object')
+            ? entry.statHolidayOverride
+            : null;
+        const hasManagerForcePay = override?.forcePay === true;
         const disqualifyReasons = Array.isArray(entry?.statHolidayMeta?.disqualifyReasons)
             ? entry.statHolidayMeta.disqualifyReasons.filter(Boolean)
             : [];
@@ -3013,8 +3027,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let resultLabel = qualified ? 'Qualified for statutory pay' : 'Not qualified automatically';
         if (payBlockedReason === 'exceeds_max_payable_hours') {
             resultLabel = 'Calculated hours exceed the maximum payable per day (24 hrs)';
-        } else if (!qualified && Number(payableHours) > 0) {
+        } else if (!qualified && hasManagerForcePay && Number(payableHours) > 0) {
             resultLabel = 'Statutory pay applied by manager override';
+        } else if (!qualified && Number(payableHours) > 0) {
+            resultLabel = 'Activity session has payable hours but person is not auto-qualified';
         }
         const reasonsHtml = disqualifyReasons.length
             ? `<ul class="mb-0 mt-2 ps-3">${disqualifyReasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>`
@@ -3037,9 +3053,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fallbackEl.classList.toggle('d-none', hasSteps);
         stepsEl.classList.toggle('d-none', !hasSteps);
 
-        const override = (entry?.statHolidayOverride && typeof entry.statHolidayOverride === 'object')
-            ? entry.statHolidayOverride
-            : null;
         if (!override) {
             overrideEl.classList.add('d-none');
             overrideEl.textContent = '';
@@ -3740,7 +3753,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             actBtns = `${saveFirstHint}${reviewBtns}<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit" onclick="openManualModal('${dateStr}', '${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
                                        ${copyBtn}
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" title="Remove" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
-                        } else if (isStatutoryHolidayEntry(ses) && CAN_MANAGE_STAT_HOLIDAY_OVERRIDES) {
+                        } else if (isStatutoryHolidayEntry(ses) && CAN_MANAGE_STAT_HOLIDAY_OVERRIDES && !STAT_HOLIDAY_PREVIEW_ONLY) {
                             actBtns = `<button class="btn btn-sm btn-outline-primary py-0 px-1 me-1" title="Adjust statutory holiday hours" onclick="openStatHolidayOverrideModal('${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Disqualify statutory holiday pay" onclick="disqualifyStatHolidayEntry('${ses.sessionId}')"><i class="bi bi-x-lg"></i></button>`;
                         } else if (isAutoPulledTimesheetEntry(ses) && !IS_ADMIN) {
@@ -5922,12 +5935,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         panel.classList.remove('d-none');
         if (countEl) countEl.textContent = String(rows.length);
-        body.innerHTML = rows.map((warning) => {
+        const previewNote = STAT_HOLIDAY_PREVIEW_ONLY
+            ? '<div class="alert alert-info py-2 small mb-3">Statutory holiday pay is previewed here only. Hours and activity assignees are calculated when the timesheet is submitted.</div>'
+            : '';
+        body.innerHTML = previewNote + rows.map((warning) => {
             const reasons = Array.isArray(warning?.reasons) ? warning.reasons : [];
             const reasonHtml = reasons.length
                 ? `<ul class="small mb-2 ps-3">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>`
                 : '<p class="small text-muted mb-2">This holiday did not meet statutory pay requirements.</p>';
-            const forcePayBtn = CAN_MANAGE_STAT_HOLIDAY_OVERRIDES
+            const forcePayBtn = CAN_MANAGE_STAT_HOLIDAY_OVERRIDES && !STAT_HOLIDAY_PREVIEW_ONLY
                 ? `<button type="button" class="btn btn-sm btn-outline-success" onclick="forcePayStatHolidayWarning('${escapeHtml(warning.holidayId)}', '${escapeHtml(warning.date)}', '${escapeHtml(warning.title || 'Statutory holiday')}')"><i class="bi bi-plus-circle me-1"></i>Force pay</button>`
                 : '';
             const viewCalcBtn = warning?.checks

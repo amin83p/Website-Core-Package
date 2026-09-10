@@ -413,6 +413,10 @@ function mergeWorkdaySourceEntries(periodEntries = [], supplementalEntries = [])
   return merged;
 }
 
+function isStatHolidayActivitySupplementalEntry(entry = {}) {
+  return Boolean(cleanId(entry?.statHolidayId) && cleanId(entry?.statHolidayPersonId));
+}
+
 function assemblePeriodWorkdayEntries(existingEntries = [], liveSessions = []) {
   const entries = Array.isArray(existingEntries) ? existingEntries : [];
   const live = Array.isArray(liveSessions) ? liveSessions : [];
@@ -424,12 +428,15 @@ function assemblePeriodWorkdayEntries(existingEntries = [], liveSessions = []) {
   );
   const savedRows = entries.filter((entry) => {
     if (!entry || entry.isDeleted === true || entry.isStatutoryHoliday === true) return false;
+    if (isStatHolidayActivitySupplementalEntry(entry)) return false;
     if (entry.isManual === true) return true;
     return timesheetLegacyImportService.isLegacyImportEntry(entry);
   });
   const autoRows = live.filter((entry) => {
     const sessionId = String(entry?.sessionId || '').trim();
-    return sessionId && !deletedAutoSessionIds.has(sessionId);
+    if (!sessionId || deletedAutoSessionIds.has(sessionId)) return false;
+    if (isStatHolidayActivitySupplementalEntry(entry)) return false;
+    return true;
   });
   return [...savedRows, ...autoRows];
 }
@@ -649,6 +656,7 @@ function buildTrustedStatHolidayEntry({
 module.exports = {
   PAYABLE_HOLIDAY_TYPES: timesheetParametersPolicyService.PAYABLE_HOLIDAY_TYPES,
   MAX_STAT_HOLIDAY_PAY_HOURS,
+  isStatHolidayActivitySupplementalEntry,
   assemblePeriodWorkdayEntries,
   buildStatHolidaySessionId,
   buildStatHolidayRow,

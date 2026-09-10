@@ -60,13 +60,18 @@ test('timesheet parameters policy defaults to hide and rejects invalid form valu
     'hide'
   );
 
-  const saved = validatePolicyInput({ emptyEnrollmentSessions: 'show_without_hours' });
+  const saved = validatePolicyInput({
+    emptyEnrollmentSessions: 'show_without_hours',
+    statutoryHolidayPayEnabled: 'false'
+  });
   assert.equal(saved.emptyEnrollmentSessions, 'show_without_hours');
-  assert.equal(saved.statutoryHolidayPay.enabled, true);
-  assert.equal(saved.statutoryHolidayPay.minWorkdays, 30);
+  assert.equal(saved.statutoryHolidayPay.enabled, false);
 
   assert.throws(
-    () => validatePolicyInput({ emptyEnrollmentSessions: 'not-a-mode' }),
+    () => validatePolicyInput({
+      emptyEnrollmentSessions: 'not-a-mode',
+      statutoryHolidayPayEnabled: 'false'
+    }),
     /no student enrollment/i
   );
 });

@@ -58,8 +58,14 @@ test('statutory holiday policy defaults and validation are wired in settings', (
   assert.match(view, /statutoryHolidayPayEnabled/);
   assert.match(view, /counted across all saved timesheet history/);
   assert.match(view, /payableHolidayType_Observance_Paid/);
+  assert.doesNotMatch(view, /Use synthetic timesheet rows \(legacy\)/);
+  assert.match(view, /Select public activity/);
   assert.match(controller, /statutoryHolidayEligibilityService/);
+  assert.match(controller, /statutoryHolidayTimesheetLifecycleService/);
   assert.match(controller, /statHolidayWarnings/);
+  assert.match(controller, /previewStatHolidayForTimesheet/);
+  assert.match(controller, /applyStatHolidayOnTimesheetSubmit/);
+  assert.match(controller, /clearStatHolidayForReturnedTimesheet/);
 
   const policy = timesheetParametersPolicyService.resolvePolicy({});
   assert.equal(policy.emptyEnrollmentSessions, 'hide');
@@ -71,6 +77,7 @@ test('statutory holiday policy defaults and validation are wired in settings', (
   const saved = timesheetParametersPolicyService.validatePolicyInput({
     emptyEnrollmentSessions: 'hide',
     statutoryHolidayPayEnabled: 'true',
+    statutoryHolidayActivityId: 'ACT_STAT',
     statutoryHolidayMinWorkdays: '25',
     payableHolidayType_National_Holiday: 'true',
     payableHolidayType_Observance_Paid: 'true'
@@ -462,6 +469,44 @@ test('Step 1 minWorkdays counts payable workdays more than 90 days before the ho
   assert.equal(evaluation.checks.minWorkdays.pass, true);
 });
 
+test('assemblePeriodWorkdayEntries excludes stat-holiday-stamped activity supplemental rows', () => {
+  const liveSessions = [
+    { sessionId: 'act-STAT-ENT-1-PERSON_1', date: '2026-02-16', hours: 6, statHolidayId: 'H1', statHolidayPersonId: 'PERSON_1' },
+    { sessionId: 'act-WORK-ENT-2-PERSON_1', date: '2026-02-10', hours: 8 }
+  ];
+  const assembled = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries([], liveSessions);
+  assert.equal(assembled.length, 1);
+  assert.equal(assembled[0].sessionId, 'act-WORK-ENT-2-PERSON_1');
+});
+
+test('excluding stat-holiday activity supplemental rows prevents worked-on-holiday contamination', () => {
+  const policy = timesheetParametersPolicyService.resolvePolicy({});
+  const holiday = { id: 'HOL-FAMILY', date: '2026-02-16', title: 'Family Day', type: 'National Holiday' };
+  const history = buildHistoryFromDates([]);
+  for (let i = 1; i <= 28; i += 1) {
+    history.hoursByDate.set(addDays('2026-02-16', -i), 8);
+  }
+  const staleActivityRow = {
+    sessionId: 'act-STAT-ENT-1-PERSON_1',
+    date: '2026-02-16',
+    hours: 6,
+    statHolidayId: 'HOL-FAMILY',
+    statHolidayPersonId: 'PERSON_1'
+  };
+  const assembled = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries([], [staleActivityRow]);
+  assert.equal(assembled.length, 0);
+
+  const excludedSupplemental = new Map();
+  const evaluation = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
+    holiday,
+    policy,
+    workdayHistory: history,
+    leaveDates: new Set(),
+    supplementalHoursByDate: excludedSupplemental
+  });
+  assert.equal(evaluation.checks.workdayMatch.workedOnHoliday, false);
+});
+
 test('assemblePeriodWorkdayEntries includes manual rows and live sessions minus deleted auto', () => {
   const liveSessions = [
     { sessionId: 'SES-1', date: '2026-05-15', hours: 8 },
@@ -476,6 +521,34 @@ test('assemblePeriodWorkdayEntries includes manual rows and live sessions minus 
   assert.ok(assembled.some((row) => row.sessionId === 'SES-0'));
   assert.ok(assembled.some((row) => row.sessionId === 'SES-2'));
   assert.ok(!assembled.some((row) => row.sessionId === 'SES-1'));
+});
+
+test('print summaries distinguish manager override from stale activity hours and keep zero calculated hours', () => {
+  const timesheetPrintService = require('../packages/school/MVC/services/school/timesheetPrintService');
+  const [overrideSummary] = timesheetPrintService.buildStatutoryHolidayPrintSummaries([{
+    sessionId: 'stathol-H1-PERSON_1',
+    date: '2026-02-16',
+    className: 'Family Day',
+    payableHours: 6,
+    statHolidayOverride: { forcePay: true, hours: 6 },
+    statHolidayMeta: { qualified: false, calculatedHours: 0 }
+  }]);
+  const [staleSummary] = timesheetPrintService.buildStatutoryHolidayPrintSummaries([{
+    sessionId: 'stathol-H1-PERSON_1',
+    date: '2026-02-16',
+    className: 'Family Day',
+    payableHours: 6,
+    statHolidayMeta: {
+      qualified: false,
+      calculatedHours: 0,
+      checks: {
+        calculatedHours: { pass: false, averageHours: 0, totalHours: 0, workdayCount: 0 }
+      }
+    }
+  }]);
+  assert.equal(overrideSummary.payStatusLabel, 'Manager override');
+  assert.equal(staleSummary.payStatusLabel, 'Activity hours without auto-qualification');
+  assert.equal(staleSummary.calculatedHours, 0);
 });
 
 test('observance paid holiday type is supported in holiday management UI', () => {
