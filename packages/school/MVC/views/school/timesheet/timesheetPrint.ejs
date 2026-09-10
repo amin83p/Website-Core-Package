@@ -134,21 +134,19 @@
     .reconciliation-badge { margin-left: 4px; color: #084298; background: #cfe2ff; }
     .provisional-row td { box-shadow: inset 3px 0 0 #0d6efd; }
     .reconciliation-summary { margin-top: 4px; padding: 4px 6px; color: #084298; background: #eef5ff; border: 1px solid #b6d4fe; font-size: 11px; }
-    .stat-holiday-summary-section { margin-top: 10px; padding: 8px 10px; border: 1px solid #f1c2c7; background: #fff8f8; font-size: 11.5px; }
+    .stat-holiday-summary-section { margin-top: 10px; padding: 6px 8px; border: 1px solid #f1c2c7; background: #fff8f8; font-size: 11.5px; }
     .stat-holiday-summary-heading { margin: 0 0 6px; font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; color: #9f1239; }
     .stat-holiday-summary-lead { margin: 0 0 8px; color: #334155; }
     .stat-holiday-summary-item { margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1c2c7; break-inside: avoid; page-break-inside: avoid; }
     .stat-holiday-summary-item:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
-    .stat-holiday-summary-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(180px, 0.9fr); gap: 12px; align-items: start; }
-    .stat-holiday-summary-steps-col { min-width: 0; }
-    .stat-holiday-summary-table-col { min-width: 0; }
-    .stat-holiday-summary-steps { margin: 0; padding-left: 18px; }
-    .stat-holiday-summary-steps > li { margin-bottom: 4px; }
-    .stat-holiday-step-title { font-weight: 700; }
+    .stat-holiday-summary-meta { margin: 0 0 4px; font-weight: 600; color: #172033; }
+    .stat-holiday-step-lines { margin: 0; padding: 0; }
+    .stat-holiday-step-line { margin: 0 0 2px; line-height: 1.3; font-size: 11px; }
+    .stat-holiday-step-label { font-weight: 600; }
     .stat-holiday-step-pass { color: #166534; }
     .stat-holiday-step-fail { color: #b91c1c; }
-    .stat-holiday-step-details { margin: 2px 0 0; padding-left: 14px; color: #475569; }
-    .stat-holiday-summary-note { margin: 6px 0 0; color: #7c2d12; }
+    .stat-holiday-step-details { color: #475569; }
+    .stat-holiday-summary-note { margin: 4px 0 0; color: #7c2d12; }
     .stat-holiday-summary-fallback { margin: 0; color: #64748b; font-style: italic; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     thead { display: table-header-group; }
@@ -156,11 +154,6 @@
     thead tr, tfoot tr { break-inside: avoid; page-break-inside: avoid; }
     th, td { border: 1px solid var(--line); padding: 10px 9px; vertical-align: middle; overflow-wrap: anywhere; word-break: break-word; }
     th { background: #eaf0f7; font-size: 12.5px; letter-spacing: .035em; text-align: left; text-transform: uppercase; }
-    .stat-holiday-summary-table { width: 100%; border-collapse: collapse; table-layout: auto; }
-    .stat-holiday-summary-table th,
-    .stat-holiday-summary-table td { border: 1px solid #f1c2c7; padding: 4px 6px; vertical-align: top; font-size: 11.5px; background: #fff; text-transform: none; letter-spacing: normal; overflow-wrap: anywhere; word-break: break-word; }
-    .stat-holiday-summary-table th { width: 42%; font-weight: 700; color: #475569; text-align: left; background: #fef2f2; }
-    .stat-holiday-summary-table td { color: #172033; }
     tbody tr:nth-child(even) > td { background: #fafbfd; }
     .timesheet-table { width: 100%; max-width: 100%; }
     .timesheet-table th,
@@ -544,57 +537,19 @@
           <% } %>
           <% statSummaries.forEach((summary) => { %>
             <article class="stat-holiday-summary-item">
-              <div class="stat-holiday-summary-layout">
-                <div class="stat-holiday-summary-steps-col">
-                  <% if (!summary.calculationAvailable) { %>
-                    <p class="stat-holiday-summary-fallback">Calculation details are not available for this statutory holiday entry.</p>
-                  <% } else { %>
-                    <ol class="stat-holiday-summary-steps">
-                      <% (Array.isArray(summary.steps) ? summary.steps : []).forEach((step) => { %>
-                        <li>
-                          <div class="stat-holiday-step-title">
-                            <%= step.title %>
-                            <span class="<%= step.pass ? 'stat-holiday-step-pass' : 'stat-holiday-step-fail' %>">(<%= step.pass ? 'Pass' : 'Fail' %>)</span>
-                          </div>
-                          <% if (Array.isArray(step.details) && step.details.length) { %>
-                            <ul class="stat-holiday-step-details">
-                              <% step.details.forEach((detail) => { %>
-                                <li><%= detail %></li>
-                              <% }); %>
-                            </ul>
-                          <% } %>
-                        </li>
-                      <% }); %>
-                    </ol>
-                  <% } %>
+              <p class="stat-holiday-summary-meta"><%= summary.metaLine %></p>
+              <% if (!summary.calculationAvailable) { %>
+                <p class="stat-holiday-summary-fallback">Calculation details are not available for this statutory holiday entry.</p>
+              <% } else { %>
+                <div class="stat-holiday-step-lines">
+                  <% (Array.isArray(summary.stepLines) ? summary.stepLines : []).forEach((stepLine) => { %>
+                    <p class="stat-holiday-step-line">
+                      <span class="stat-holiday-step-label"><%= stepLine.title %></span>
+                      <span class="stat-holiday-step-result <%= stepLine.pass ? 'stat-holiday-step-pass' : 'stat-holiday-step-fail' %>">(<%= stepLine.passLabel %>)</span><% if (stepLine.bracketText) { %>: <span class="stat-holiday-step-details"><%= stepLine.bracketText %></span><% } %>
+                    </p>
+                  <% }); %>
                 </div>
-                <div class="stat-holiday-summary-table-col">
-                  <table class="stat-holiday-summary-table">
-                    <tbody>
-                      <tr>
-                        <th scope="row">Holiday</th>
-                        <td><%= summary.holidayName %></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Date</th>
-                        <td><%= summary.dateLabel %></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Calculated hours</th>
-                        <td><%= Number(summary.calculatedHours || 0).toFixed(2) %></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Payable hours</th>
-                        <td><%= Number(summary.payableHours || 0).toFixed(2) %></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Status</th>
-                        <td><%= summary.payStatusLabel %></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <% } %>
               <% if (Array.isArray(summary.disqualifyReasons) && summary.disqualifyReasons.length) { %>
                 <p class="stat-holiday-summary-note"><strong>Disqualify reasons:</strong> <%= summary.disqualifyReasons.join(' ') %></p>
               <% } %>

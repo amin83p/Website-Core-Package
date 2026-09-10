@@ -14,6 +14,8 @@ const schoolDependencyService = require('../MVC/services/school/schoolDependency
 const timesheetManualMaterializationService = require('../MVC/services/school/timesheetManualMaterializationService');
 const taskService = require('../MVC/services/school/taskService');
 const timesheetImportWorkSessionBuilderService = require('../MVC/services/school/timesheetImportWorkSessionBuilderService');
+const timesheetParametersPolicyModel = require('../MVC/models/school/timesheetParametersPolicyModel');
+const statutoryHolidayWorkSessionService = require('../MVC/services/school/statutoryHolidayWorkSessionService');
 const schoolRepositories = require('../MVC/repositories/school');
 const { sanitizeLegacyImport, sanitizeTimesheetPayload } = require('../MVC/models/school/timesheetModel');
 
@@ -144,11 +146,14 @@ function stubLegacyImportApplyDeps({
 function stubLegacyImportDeleteDeps({
   existingByPeriod = {},
   policy = POLICY,
+  timesheetParametersPolicy = null,
   periods = {},
   activity = ACTIVITY
 } = {}) {
   const originals = {
     getPolicy: timesheetImportPolicyModel.getPolicyForOrg,
+    getTimesheetParametersPolicy: timesheetParametersPolicyModel.getPolicyForOrg,
+    cleanupStatHoliday: statutoryHolidayWorkSessionService.cleanupStatHolidayWorkSessionsOnImportDelete,
     getById: dataService.getDataById,
     getTimesheet: dataService.getTimesheetByPeriodAndTeacher,
     updateData: dataService.updateData,
@@ -169,8 +174,16 @@ function stubLegacyImportDeleteDeps({
   const entryIdRemovals = [];
   const targetRemovals = [];
   const trackedRemovals = [];
+  const statHolidayRemovals = [];
 
   timesheetImportPolicyModel.getPolicyForOrg = async () => policy;
+  timesheetParametersPolicyModel.getPolicyForOrg = async () => timesheetParametersPolicy || {
+    statutoryHolidayPay: { enabled: true, activityId: 'ACT_STAT' }
+  };
+  statutoryHolidayWorkSessionService.cleanupStatHolidayWorkSessionsOnImportDelete = async (args) => {
+    statHolidayRemovals.push(args);
+    return { removedEntries: 0, removedAssignees: 1, activityId: 'ACT_STAT' };
+  };
   dataService.getDataById = async (entityType, id) => {
     if (entityType === 'timesheetPeriods') {
       return periods[id] || {
@@ -254,8 +267,11 @@ function stubLegacyImportDeleteDeps({
     getEntryIdRemovals: () => [...entryIdRemovals],
     getTargetRemovals: () => [...targetRemovals],
     getTrackedRemovals: () => [...trackedRemovals],
+    getStatHolidayRemovals: () => [...statHolidayRemovals],
     restore: () => {
       timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
+      timesheetParametersPolicyModel.getPolicyForOrg = originals.getTimesheetParametersPolicy;
+      statutoryHolidayWorkSessionService.cleanupStatHolidayWorkSessionsOnImportDelete = originals.cleanupStatHoliday;
       dataService.getDataById = originals.getById;
       dataService.getTimesheetByPeriodAndTeacher = originals.getTimesheet;
       dataService.updateData = originals.updateData;
@@ -297,6 +313,73 @@ test('sanitizeLegacyImport persists activity-first import trace metadata', () =>
   });
   assert.equal(payload.legacyImport.legacyImportBatchId, 'BATCH_1');
   assert.deepEqual(payload.legacyImport.workSessionEntryIds, ['ENT-ACT_IMPORT-0001', 'ENT-ACT_IMPORT-0002']);
+});
+
+test('sanitizeLegacyImport persists mapped workSessionActivities metadata', () => {
+  const sanitized = sanitizeLegacyImport({
+    activityId: 'ACT_IMPORT',
+    sourceFileName: 'august.xlsx',
+    importedAt: '2026-08-01T00:00:00.000Z',
+    importedBy: 'USER_1',
+    rowCount: 2,
+    matchedPeriodId: 'PER_A',
+    executionMode: 'activity_first',
+    legacyImportBatchId: 'BATCH_MULTI',
+    workSessionEntryIds: ['ENT-ACT_LINC-0001', 'ENT-ACT_IMPORT-0002'],
+    workSessionActivities: [
+      { activityId: 'ACT_LINC', entryIds: ['ENT-ACT_LINC-0001'], rowCount: 1 },
+      { activityId: 'ACT_IMPORT', entryIds: ['ENT-ACT_IMPORT-0002'], rowCount: 1 }
+    ]
+  });
+  assert.deepEqual(sanitized.workSessionActivities, [
+    { activityId: 'ACT_LINC', entryIds: ['ENT-ACT_LINC-0001'], rowCount: 1 },
+    { activityId: 'ACT_IMPORT', entryIds: ['ENT-ACT_IMPORT-0002'], rowCount: 1 }
+  ]);
+});
+
+test('deleteLegacyImport removes mapped activity work sessions when workSessionActivities metadata was stripped', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_STRIPPED_META',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'processed',
+        entries: [
+          { sessionId: 'act-ACT_LINC-ENT-ACT_LINC-0001-PERSON_1', hours: 6, activityId: 'ACT_LINC' },
+          { sessionId: 'act-ACT_IMPORT-ENT-ACT_IMPORT-0002-PERSON_1', hours: 1, activityId: 'ACT_IMPORT' }
+        ],
+        legacyImport: {
+          sourceFileName: 'august.xlsx',
+          importedAt: '2026-08-01',
+          activityId: 'ACT_IMPORT',
+          executionMode: 'activity_first',
+          legacyImportBatchId: 'BATCH_STRIPPED',
+          workSessionEntryIds: ['ENT-ACT_LINC-0001', 'ENT-ACT_IMPORT-0002']
+        },
+        totalHours: 7
+      }
+    }
+  });
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.deletedTimesheet, true);
+    assert.equal(stub.getBatchRemovals().length, 2);
+    assert.deepEqual(
+      stub.getBatchRemovals().map((row) => row.activityId).sort(),
+      ['ACT_IMPORT', 'ACT_LINC']
+    );
+  } finally {
+    stub.restore();
+  }
 });
 
 test('buildExistingTimesheetSkipDescriptor includes status and legacy filename', () => {
@@ -754,6 +837,10 @@ test('deleteLegacyImport removes activity-first imported timesheet and work sess
       batchId: 'BATCH_1',
       reqUser: REQ_USER
     });
+    assert.equal(stub.getStatHolidayRemovals().length, 1);
+    assert.equal(stub.getStatHolidayRemovals()[0]?.personId, 'PERSON_1');
+    assert.equal(stub.getStatHolidayRemovals()[0]?.period?.id, 'PER_A');
+    assert.equal(outcome.statHolidayCleanup?.removedAssignees, 1);
     assert.equal(stub.getStore().PER_A, undefined);
   } finally {
     stub.restore();
@@ -850,6 +937,55 @@ test('deleteLegacyImport removes activity-first work sessions by stored entry id
       entryIds: ['ENT-1', 'ENT-2'],
       reqUser: REQ_USER
     });
+  } finally {
+    stub.restore();
+  }
+});
+
+test('deleteLegacyImport removes activity-first work sessions across mapped activities', async () => {
+  const stub = stubLegacyImportDeleteDeps({
+    existingByPeriod: {
+      PER_A: {
+        id: 'TS_IMPORTED_MULTI',
+        orgId: 'ORG_1',
+        periodId: 'PER_A',
+        personId: 'PERSON_1',
+        teacherId: 'PERSON_1',
+        status: 'processed',
+        entries: [
+          { sessionId: 'act-ACT_LINC-ENT-1-PERSON_1', hours: 6 },
+          { sessionId: 'act-ACT_IMPORT-ENT-1-PERSON_1', hours: 1 }
+        ],
+        legacyImport: {
+          sourceFileName: 'august.xlsx',
+          importedAt: '2026-08-01',
+          activityId: 'ACT_IMPORT',
+          executionMode: 'activity_first',
+          legacyImportBatchId: 'BATCH_MULTI',
+          workSessionActivities: [
+            { activityId: 'ACT_LINC', entryIds: ['ENT-1'] },
+            { activityId: 'ACT_IMPORT', entryIds: ['ENT-2'] }
+          ]
+        },
+        totalHours: 7
+      }
+    }
+  });
+  try {
+    const outcome = await timesheetLegacyImportService.deleteLegacyImport({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(outcome.deletedTimesheet, true);
+    assert.equal(stub.getBatchRemovals().length, 2);
+    assert.deepEqual(
+      stub.getBatchRemovals().map((row) => row.activityId).sort(),
+      ['ACT_IMPORT', 'ACT_LINC']
+    );
+    assert.equal(stub.getEntryIdRemovals().length, 2);
   } finally {
     stub.restore();
   }

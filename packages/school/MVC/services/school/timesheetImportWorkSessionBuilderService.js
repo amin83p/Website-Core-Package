@@ -293,11 +293,9 @@ async function createImportWorkSessions({
 
   const existingEntries = activityService.getActivityEntries(activity);
   const entriesWithIds = assignImportEntryIds(activity.id, existingEntries, drafts);
+  const combinedEntries = [...existingEntries, ...entriesWithIds];
 
-  const saved = await activityService.saveActivity({
-    ...activity,
-    entries: [...existingEntries, ...entriesWithIds]
-  }, reqUser);
+  const saved = await persistImportActivityEntryUpdates(activity, combinedEntries, reqUser);
 
   const createdEntryIds = entriesWithIds.map((row) => cleanId(row.entryId)).filter(Boolean);
   return {
@@ -695,6 +693,7 @@ module.exports = {
   extractActivityEntryIdsFromTimesheetEntries,
   mergeImportWorkSessionCleanupTotals,
   recomputeActivityLockedFromEntries,
+  persistImportActivityEntryUpdates,
   createImportWorkSessions,
   removeImportWorkSessionsForTarget,
   removeTrackedImportWorkSessionsForPersonPeriod,

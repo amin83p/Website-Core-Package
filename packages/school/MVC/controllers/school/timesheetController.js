@@ -28,6 +28,7 @@ const timesheetSessionStudentLabelService = require('../../services/school/times
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
 const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
 const statutoryHolidayEligibilityService = require('../../services/school/statutoryHolidayEligibilityService');
+const statutoryHolidayWorkSessionService = require('../../services/school/statutoryHolidayWorkSessionService');
 const timesheetEffectiveEntryService = require('../../services/school/timesheetEffectiveEntryService');
 const timesheetPrintService = require('../../services/school/timesheetPrintService');
 const deadlineReconciliationService = require('../../services/school/timesheetDeadlineReconciliationService');
@@ -1266,6 +1267,14 @@ async function compileTimesheetExcelImportsForScope(req, res, scope) {
         }
     }
 
+    const importPolicy = await timesheetImportPolicyModel.getPolicyForOrg(activeOrgId);
+    results.forEach((result) => {
+        if (String(result?.status || '').toLowerCase() !== 'ok') return;
+        const rows = Array.isArray(result.rows) ? result.rows : [];
+        result.rows = timesheetImportPolicyService.annotateImportCompileRows(rows, importPolicy);
+        result.classMappingSummary = timesheetImportPolicyService.summarizeImportClassMappingIssues(result.rows);
+    });
+
     return {
         personId,
         personName: personRow.name || buildPersonName(personRow.person),
@@ -2428,32 +2437,65 @@ exports.viewTimesheet = async (req, res) => {
 
         let statHolidayWarnings = [];
         let liveSessionsWithStatHolidays = mergedLiveSessions;
-        if (!useFrozenSnapshot) {
-            const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
-                timesheet.entries,
-                mergedLiveSessions
-            );
-            const statHolidayContext = await statutoryHolidayEligibilityService.buildStatutoryHolidayTimesheetContext({
-                orgId: activeOrgId,
-                personId: teacherContext.targetTeacherId,
-                periodStartDate: period.startDate,
-                periodEndDate: period.endDate,
-                policy: timesheetParametersPolicy,
-                holidays: allHolidays,
-                periodEntries: periodWorkdayEntries,
-                existingEntries: timesheet.entries,
-                reqUser: req.user,
-                allowManagerOverride: canManagerUpdate
-            });
-            statHolidayWarnings = statHolidayContext.warnings;
-            liveSessionsWithStatHolidays = [...mergedLiveSessions, ...statHolidayContext.rows];
-        }
-
         const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
             orgId: activeOrgId,
             personId: teacherContext.targetTeacherId,
             reqUser: req.user
         });
+        const statutoryHolidayUsesActivity = statutoryHolidayEligibilityService.usesStatHolidayActivityMode(
+            timesheetParametersPolicy
+        );
+        if (!useFrozenSnapshot) {
+            const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
+                timesheet.entries,
+                mergedLiveSessions
+            );
+            const statHolidayMaterialization = await statutoryHolidayWorkSessionService.materializeStatHolidayForPersonPeriod({
+                orgId: activeOrgId,
+                personId: teacherContext.targetTeacherId,
+                personName: payrollContext.personName,
+                period,
+                policy: timesheetParametersPolicy,
+                holidays: allHolidays,
+                periodEntries: periodWorkdayEntries,
+                existingEntries: timesheet.entries,
+                reqUser: req.user,
+                allowManagerOverride: canManagerUpdate,
+                persistToActivity: false
+            });
+            statHolidayWarnings = statHolidayMaterialization.warnings;
+            if (statHolidayMaterialization?.syncOutcome?.rowCount) {
+                const refreshedActivitySessions = await activityService.getTimesheetEntriesForPerson({
+                    orgId: activeOrgId,
+                    personId: teacherContext.targetTeacherId,
+                    periodStartDate: period.startDate,
+                    periodEndDate: period.endDate,
+                    reqUser: req.user
+                });
+                liveSessionsWithStatHolidays = [
+                    ...filteredLiveSessions,
+                    ...reportReflectionSessions,
+                    ...(Array.isArray(refreshedActivitySessions) ? refreshedActivitySessions : [])
+                ];
+            }
+            if (statutoryHolidayUsesActivity) {
+                liveSessionsWithStatHolidays = [
+                    ...liveSessionsWithStatHolidays,
+                    ...(Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : []).map((row) => ({
+                        ...row,
+                        hours: 0,
+                        timesheetHours: 0,
+                        durationHours: 0
+                    }))
+                ];
+            } else {
+                liveSessionsWithStatHolidays = [
+                    ...liveSessionsWithStatHolidays,
+                    ...(Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : [])
+                ];
+            }
+        }
+
         const payrollEditor = shapePayrollContextForEditor(payrollContext);
         const stampedLiveSessions = liveSessionsWithStatHolidays.map((row) => withPayrollStamp(row, payrollContext, period));
         const eligibleManualActivities = await activityService.listManualEntryActivitiesForPerson({
@@ -2602,6 +2644,7 @@ exports.viewTimesheet = async (req, res) => {
             ),
             statHolidayWarnings,
             canManageStatHolidayOverrides: canManagerUpdate,
+            statutoryHolidayUsesActivity,
             navYear,
             prevPeriodNav,
             nextPeriodNav
@@ -2914,6 +2957,30 @@ exports.saveTimesheet = async (req, res) => {
         );
         const allHolidays = await dataService.fetchAllData('holidays', {}, req.user);
         const allowStatHolidayOverride = Boolean(canReviewerEdit);
+        await statutoryHolidayWorkSessionService.materializeStatHolidayForPersonPeriod({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            personName: payrollContext.personName,
+            period,
+            policy: timesheetParametersPolicy,
+            holidays: allHolidays,
+            periodEntries: periodWorkdayEntries,
+            existingEntries: entryRows.filter((entry) => entry && entry.isDeleted !== true),
+            reqUser: req.user,
+            allowManagerOverride: allowStatHolidayOverride
+        });
+        const refreshedActivityLiveSessions = await activityService.getTimesheetEntriesForPerson({
+            orgId: activeOrgId,
+            personId: teacherContext.targetTeacherId,
+            periodStartDate: period.startDate,
+            periodEndDate: period.endDate,
+            reqUser: req.user
+        });
+        activityLiveById.clear();
+        (Array.isArray(refreshedActivityLiveSessions) ? refreshedActivityLiveSessions : []).forEach((row) => {
+            const key = String(row?.sessionId || '').trim();
+            if (key) activityLiveById.set(key, row);
+        });
         const statHolidayContext = await statutoryHolidayEligibilityService.buildStatutoryHolidayTimesheetContext({
             orgId: activeOrgId,
             personId: teacherContext.targetTeacherId,
@@ -3161,7 +3228,7 @@ exports.saveTimesheet = async (req, res) => {
 
             if (entry.isStatutoryHoliday === true || sessionId.startsWith('stathol-')) {
                 const trustedRow = statHolidayById.get(sessionId);
-                return statutoryHolidayEligibilityService.buildTrustedStatHolidayEntry({
+                const saved = statutoryHolidayEligibilityService.buildTrustedStatHolidayEntry({
                     entry,
                     trustedRow,
                     existingEntry: existingEntriesBySessionId.get(sessionId) || null,
@@ -3171,6 +3238,15 @@ exports.saveTimesheet = async (req, res) => {
                         name: req.user?.displayName || req.user?.name || ''
                     }
                 });
+                if (statutoryHolidayEligibilityService.usesStatHolidayActivityMode(timesheetParametersPolicy)) {
+                    return {
+                        ...saved,
+                        hours: 0,
+                        timesheetHours: 0,
+                        durationHours: 0
+                    };
+                }
+                return saved;
             }
 
             if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) {

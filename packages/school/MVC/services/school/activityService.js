@@ -277,7 +277,10 @@ function pickLegacyImportTraceFields(entry = {}) {
     'legacyImportPersonId',
     'legacyImportPeriodId',
     'legacyImportSourceFileName',
-    'legacyImportRowIndex'
+    'legacyImportRowIndex',
+    'statHolidayId',
+    'statHolidayPeriodId',
+    'statHolidayPersonId'
   ];
   const out = {};
   fields.forEach((field) => {
@@ -1047,6 +1050,9 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             timesheetHours: hours,
             status: 'activity',
             comment: entry.notes || activity.notes || '',
+            statHolidayId: normalizeId(entry?.statHolidayId || attendee?.statHolidayId),
+            statHolidayPeriodId: normalizeId(entry?.statHolidayPeriodId || attendee?.statHolidayPeriodId),
+            statHolidayPersonId: normalizeId(entry?.statHolidayPersonId || attendee?.statHolidayPersonId),
             isManual: false,
             isSchoolActivity: true,
             isFinalStatus: true,

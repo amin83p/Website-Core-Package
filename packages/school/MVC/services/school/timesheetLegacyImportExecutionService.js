@@ -5,6 +5,7 @@ const schoolPersonAccessService = require('./schoolPersonAccessService');
 const timesheetLegacyImportService = require('./timesheetLegacyImportService');
 const timesheetImportLifecycleService = require('./timesheetImportLifecycleService');
 const timesheetImportWorkSessionBuilderService = require('./timesheetImportWorkSessionBuilderService');
+const timesheetImportPolicyService = require('./timesheetImportPolicyService');
 const timesheetLiveAssemblyService = require('./timesheetLiveAssemblyService');
 const timesheetPayrollContextService = require('./timesheetPayrollContextService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -142,6 +143,7 @@ async function buildImportExecutionPlan({
 async function rollbackImportExecution({
   batchId,
   activityId,
+  activityIds = [],
   timesheetId,
   reqUser
 }) {
@@ -150,16 +152,28 @@ async function rollbackImportExecution({
     timesheet: null
   };
 
-  if (batchId && activityId) {
-    try {
-      rolledBack.workSessions = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId({
-        activityId,
-        batchId,
-        reqUser
-      });
-    } catch (error) {
-      console.warn(`Import execution rollback work-session cleanup failed for batch ${batchId}: ${error.message}`);
+  const targetActivityIds = [...new Set(
+    (Array.isArray(activityIds) ? activityIds : [])
+      .map((value) => cleanId(value))
+      .filter(Boolean)
+      .concat(cleanId(activityId) ? [cleanId(activityId)] : [])
+  )];
+
+  if (batchId && targetActivityIds.length) {
+    const cleanupResults = [];
+    for (const targetActivityId of targetActivityIds) {
+      try {
+        const cleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId({
+          activityId: targetActivityId,
+          batchId,
+          reqUser
+        });
+        cleanupResults.push({ activityId: targetActivityId, ...cleanup });
+      } catch (error) {
+        console.warn(`Import execution rollback work-session cleanup failed for batch ${batchId} on activity ${targetActivityId}: ${error.message}`);
+      }
     }
+    rolledBack.workSessions = cleanupResults;
   }
 
   const targetTimesheetId = cleanId(timesheetId);
@@ -185,6 +199,36 @@ async function rollbackImportExecution({
   return rolledBack;
 }
 
+async function resolveImportActivitiesForExecution({
+  orgId,
+  reqUser,
+  policy,
+  compiledRows = []
+}) {
+  const defaultActivity = await timesheetLegacyImportService.resolveImportActivity({
+    orgId,
+    reqUser,
+    activityId: policy.importActivityId
+  });
+  const buckets = timesheetImportPolicyService.partitionCompiledRowsByImportActivity(compiledRows, policy);
+  const activityCache = new Map([[cleanId(defaultActivity.id), defaultActivity]]);
+
+  for (const activityId of buckets.keys()) {
+    if (activityCache.has(activityId)) continue;
+    activityCache.set(
+      activityId,
+      await timesheetLegacyImportService.resolveImportActivity({ orgId, reqUser, activityId })
+    );
+  }
+
+  return {
+    defaultActivity,
+    buckets,
+    activityCache,
+    protectedActivityIds: timesheetImportPolicyService.listDistinctImportActivityIds(policy)
+  };
+}
+
 async function performImportExecution({
   orgId,
   personId,
@@ -198,11 +242,6 @@ async function performImportExecution({
     orgId,
     scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
   });
-  const activity = await timesheetLegacyImportService.resolveImportActivity({
-    orgId,
-    reqUser,
-    activityId: policy.importActivityId
-  });
 
   const targetPersonId = cleanId(personId);
   const targetPeriodId = cleanId(periodId);
@@ -213,6 +252,18 @@ async function performImportExecution({
   });
   const sourceFileName = String(compileResult?.fileName || 'imported.xlsx').trim();
   const compiledRows = Array.isArray(compileResult?.rows) ? compileResult.rows : [];
+  const {
+    defaultActivity,
+    buckets,
+    activityCache,
+    protectedActivityIds
+  } = await resolveImportActivitiesForExecution({
+    orgId,
+    reqUser,
+    policy,
+    compiledRows
+  });
+  const usedActivityIds = [...buckets.keys()];
 
   const period = await dataService.getDataById('timesheetPeriods', targetPeriodId, reqUser);
   if (!period) throw new Error('Timesheet period not found.');
@@ -275,59 +326,86 @@ async function performImportExecution({
 
   try {
     steps.workSessions.status = 'running';
-    await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget({
-      activityId: cleanId(activity.id),
-      personId: targetPersonId,
-      periodStartDate: period.startDate,
-      periodEndDate: period.endDate,
-      reqUser
-    });
-    await timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod({
-      orgId,
-      personId: targetPersonId,
-      periodStartDate: period.startDate,
-      periodEndDate: period.endDate,
-      importActivityId: cleanId(activity.id),
-      reqUser
-    });
-    const workSessionOutcome = await timesheetImportWorkSessionBuilderService.createImportWorkSessions({
-      orgId,
-      activity,
-      compiledRows,
-      personId: targetPersonId,
-      personName,
-      personRole: resolvedPersonRole || payrollContext.defaultRole,
-      periodId: targetPeriodId,
-      batchId: resolvedBatchId,
-      sourceFileName,
-      reqUser
-    });
+    for (const activityId of usedActivityIds) {
+      await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget({
+        activityId,
+        personId: targetPersonId,
+        periodId: targetPeriodId,
+        periodStartDate: period.startDate,
+        periodEndDate: period.endDate,
+        reqUser
+      });
+      await timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod({
+        orgId,
+        personId: targetPersonId,
+        periodStartDate: period.startDate,
+        periodEndDate: period.endDate,
+        importActivityId: activityId,
+        reqUser
+      });
+    }
+
+    const workSessionOutcomes = [];
+    for (const [activityId, rows] of buckets.entries()) {
+      const activity = activityCache.get(activityId);
+      if (!activity || !rows.length) continue;
+      const outcome = await timesheetImportWorkSessionBuilderService.createImportWorkSessions({
+        orgId,
+        activity,
+        compiledRows: rows,
+        personId: targetPersonId,
+        personName,
+        personRole: resolvedPersonRole || payrollContext.defaultRole,
+        periodId: targetPeriodId,
+        batchId: resolvedBatchId,
+        sourceFileName,
+        reqUser
+      });
+      workSessionOutcomes.push({
+        activityId: cleanId(outcome.activityId),
+        createdEntryIds: outcome.createdEntryIds,
+        rowCount: outcome.rowCount
+      });
+    }
+
+    const totalWorkSessionCount = workSessionOutcomes.reduce((sum, row) => sum + Number(row.rowCount || 0), 0);
+    const createdEntryIds = workSessionOutcomes.flatMap((row) => row.createdEntryIds || []);
+    const activityCount = workSessionOutcomes.length;
     steps.workSessions = {
       status: 'success',
-      summary: `Created ${workSessionOutcome.rowCount} work session(s).`,
+      summary: activityCount > 1
+        ? `Created ${totalWorkSessionCount} work session(s) across ${activityCount} activities.`
+        : `Created ${totalWorkSessionCount} work session(s).`,
       error: '',
-      createdEntryIds: workSessionOutcome.createdEntryIds
+      createdEntryIds,
+      workSessionActivities: workSessionOutcomes
     };
 
     steps.timesheet.status = 'running';
-    const allowedImportSessionIds = timesheetImportWorkSessionBuilderService.buildImportActivitySessionIds({
-      activityId: activity.id,
-      personId: targetPersonId,
-      entryIds: workSessionOutcome.createdEntryIds
+    const allowedImportSessionIds = new Set();
+    workSessionOutcomes.forEach((outcome) => {
+      timesheetImportWorkSessionBuilderService.buildImportActivitySessionIds({
+        activityId: outcome.activityId,
+        personId: targetPersonId,
+        entryIds: outcome.createdEntryIds
+      }).forEach((sessionId) => allowedImportSessionIds.add(sessionId));
     });
+    const importActivitySessionGuard = {
+      activityId: cleanId(defaultActivity.id),
+      protectedActivityIds,
+      personId: targetPersonId,
+      allowedSessionIds: allowedImportSessionIds
+    };
     const assembly = await timesheetLiveAssemblyService.buildImportedTimesheetEntries({
       orgId,
       personId: targetPersonId,
       period,
       reqUser,
+      personName,
       personRole: resolvedPersonRole || payrollContext.defaultRole,
-      allowManagerOverride: true,
+      allowManagerOverride: false,
       supplementalEntryFilter: buildImportSupplementalEntryFilter(resolvedBatchId),
-      importActivitySessionGuard: {
-        activityId: cleanId(activity.id),
-        personId: targetPersonId,
-        allowedSessionIds: allowedImportSessionIds
-      }
+      importActivitySessionGuard
     });
     if (!assembly.entries.length) {
       throw new Error('No timesheet entries were assembled for the selected period.');
@@ -342,15 +420,20 @@ async function performImportExecution({
       entries: assembly.entries,
       totalHours: assembly.totalHours,
       legacyImport: {
-        activityId: cleanId(activity.id),
+        activityId: cleanId(defaultActivity.id),
         sourceFileName,
         importedAt: nowIso,
         importedBy: cleanId(reqUser?.id),
-        rowCount: workSessionOutcome.rowCount,
+        rowCount: totalWorkSessionCount,
         matchedPeriodId: targetPeriodId,
         legacyImportBatchId: resolvedBatchId,
         executionMode: 'activity_first',
-        workSessionEntryIds: workSessionOutcome.createdEntryIds
+        workSessionEntryIds: createdEntryIds,
+        workSessionActivities: workSessionOutcomes.map((outcome) => ({
+          activityId: outcome.activityId,
+          entryIds: outcome.createdEntryIds,
+          rowCount: outcome.rowCount
+        }))
       }
     };
     if (priorTimesheet?.id) {
@@ -413,7 +496,8 @@ async function performImportExecution({
 
     const rolledBack = await rollbackImportExecution({
       batchId: resolvedBatchId,
-      activityId: cleanId(activity.id),
+      activityId: cleanId(defaultActivity.id),
+      activityIds: usedActivityIds,
       timesheetId: createdTimesheetId,
       reqUser
     });
@@ -430,5 +514,6 @@ module.exports = {
   buildImportExecutionPlan,
   performImportExecution,
   rollbackImportExecution,
+  resolveImportActivitiesForExecution,
   isPerformableCompileResult
 };

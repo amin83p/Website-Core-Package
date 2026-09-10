@@ -1267,6 +1267,32 @@
   </div>
 </div>
 
+<div class="modal fade" id="statHolidayOverrideModal" tabindex="-1" aria-hidden="true" aria-labelledby="statHolidayOverrideModalTitle">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger-subtle border-0">
+        <h5 class="modal-title fw-bold" id="statHolidayOverrideModalTitle"><i class="bi bi-pencil-square me-2 text-danger"></i>Set Statutory Holiday Hours</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3" id="statHolidayOverrideLead">Enter payable hours when automatic calculation is unavailable or incorrect.</p>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="statHolidayOverrideHours">Payable hours</label>
+          <input type="number" min="0" max="24" step="0.25" class="form-control" id="statHolidayOverrideHours">
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-semibold" for="statHolidayOverrideReason">Reason (optional)</label>
+          <input type="text" class="form-control" id="statHolidayOverrideReason" maxlength="200" placeholder="Manager adjusted statutory holiday hours">
+        </div>
+      </div>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnSaveStatHolidayOverride">Save hours</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="timesheetGuidanceModal" tabindex="-1" aria-hidden="true" aria-labelledby="timesheetGuidanceModalTitle" data-bs-focus="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
     <div class="modal-content border-0 shadow">
@@ -1355,6 +1381,7 @@
     const INCOMPLETE_SESSIONS = <%- JSON.stringify(incompleteSessions || []) %>;
     const STAT_HOLIDAY_WARNINGS = <%- JSON.stringify(typeof statHolidayWarnings !== 'undefined' ? statHolidayWarnings : []) %>;
     const CAN_MANAGE_STAT_HOLIDAY_OVERRIDES = <%= (typeof canManageStatHolidayOverrides !== 'undefined' && canManageStatHolidayOverrides) ? 'true' : 'false' %>;
+    const STATUTORY_HOLIDAY_USES_ACTIVITY = <%= (typeof statutoryHolidayUsesActivity !== 'undefined' && statutoryHolidayUsesActivity) ? 'true' : 'false' %>;
     const SESSION_STATUS_META = <%- JSON.stringify(sessionStatusMeta || []) %>;
     const IS_READONLY = <%= isEditorLocked %>;
     const IS_ADMIN = <%= isAdmin %>;
@@ -1934,11 +1961,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 colorBorder: '#adb5bd'
             });
         }
-        if (isStatutoryHolidayEntry(entry)) {
+        if (isStatHolidayPayTimesheetRow(entry)) {
             const hours = Number(resolveEntryHours(entry) || 0);
-            const calculatedHours = Number(entry?.statHolidayMeta?.calculatedHours || 0);
-            const payBlockedReason = String(entry?.statHolidayMeta?.payBlockedReason || '').trim();
-            const hasChecks = entry?.statHolidayMeta?.checks && typeof entry.statHolidayMeta.checks === 'object';
+            const calculationEntry = resolveStatHolidayCalculationEntry(entry);
+            const calculatedHours = Number(calculationEntry?.statHolidayMeta?.calculatedHours || entry?.statHolidayMeta?.calculatedHours || 0);
+            const payBlockedReason = String(calculationEntry?.statHolidayMeta?.payBlockedReason || entry?.statHolidayMeta?.payBlockedReason || '').trim();
+            const hasChecks = hasStatHolidayCalculationDetails(entry);
             const isPaying = hours > 0;
             let tip = '';
             let colorBg = '#f8d7da';
@@ -2725,6 +2753,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let timesheetCommentModal = null;
     let statHolidayCalcModal = null;
+    let statHolidayOverrideModal = null;
+    let statHolidayOverrideTarget = null;
+
+    function applyStatHolidayOverrideToEntry(entry, hours, reason) {
+        if (!entry) return;
+        const safeHours = Number(Number(hours || 0).toFixed(2));
+        entry.hours = safeHours;
+        entry.timesheetHours = safeHours;
+        entry.durationHours = safeHours;
+        entry.statHolidayOverride = {
+            ...(entry.statHolidayOverride || {}),
+            forcePay: true,
+            hours: safeHours,
+            reason: String(reason || entry.statHolidayOverride?.reason || 'Manager adjusted statutory holiday hours').trim()
+        };
+        if (entry.statHolidayMeta && typeof entry.statHolidayMeta === 'object') {
+            entry.statHolidayMeta.payBlockedReason = '';
+        }
+        entry.status = safeHours > 0 ? 'stat_holiday' : 'stat_holiday_not_qualified';
+    }
+
+    function openStatHolidayOverrideDialog(options = {}) {
+        const modalEl = document.getElementById('statHolidayOverrideModal');
+        const hoursInput = document.getElementById('statHolidayOverrideHours');
+        const reasonInput = document.getElementById('statHolidayOverrideReason');
+        const titleEl = document.getElementById('statHolidayOverrideModalTitle');
+        const leadEl = document.getElementById('statHolidayOverrideLead');
+        if (!modalEl || !hoursInput || !reasonInput) return Promise.resolve(null);
+        statHolidayOverrideTarget = options;
+        if (titleEl) {
+            titleEl.innerHTML = '<i class="bi bi-pencil-square me-2 text-danger"></i>'
+                + escapeHtml(options.title || 'Set Statutory Holiday Hours');
+        }
+        if (leadEl) {
+            leadEl.textContent = String(options.lead || 'Enter payable hours when automatic calculation is unavailable or incorrect.');
+        }
+        hoursInput.value = Number(options.defaultHours || 0).toFixed(2);
+        reasonInput.value = String(options.defaultReason || 'Manager adjusted statutory holiday hours');
+        if (!statHolidayOverrideModal) {
+            statHolidayOverrideModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: true });
+        }
+        return new Promise((resolve) => {
+            const saveBtn = document.getElementById('btnSaveStatHolidayOverride');
+            const onSave = async () => {
+                const parsed = Number.parseFloat(hoursInput.value);
+                if (!Number.isFinite(parsed) || parsed < 0 || parsed > MAX_DAILY_HOURS) {
+                    await messageBox({ title: 'Invalid Hours', icon: 'warning', message: 'Enter a valid number of hours between 0 and 24.' });
+                    return;
+                }
+                cleanup();
+                resolve({
+                    hours: Number(parsed.toFixed(2)),
+                    reason: String(reasonInput.value || '').trim()
+                });
+            };
+            const onHidden = () => {
+                cleanup();
+                resolve(null);
+            };
+            const cleanup = () => {
+                saveBtn?.removeEventListener('click', onSave);
+                modalEl.removeEventListener('hidden.bs.modal', onHidden);
+            };
+            saveBtn?.addEventListener('click', onSave);
+            modalEl.addEventListener('hidden.bs.modal', onHidden, { once: true });
+            statHolidayOverrideModal.show();
+        });
+    }
     let activeCommentSessionId = '';
 
     function updateCommentTriggerCell(sessionId, commentValue) {
@@ -2956,8 +3052,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.openStatHolidayCalculationModal = function(sessionId) {
-        const entry = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
-        if (!entry || !isStatutoryHolidayEntry(entry)) return;
+        const sourceEntry = resolveStatHolidayStatusEntryForSessionId(sessionId);
+        if (!sourceEntry) return;
+        const entry = resolveStatHolidayCalculationEntry(sourceEntry);
+        if (!entry?.statHolidayMeta?.checks || !isStatHolidayPayTimesheetRow(sourceEntry)) return;
         const modalEl = document.getElementById('statHolidayCalcModal');
         if (!modalEl || !window.bootstrap) return;
         renderStatHolidayCalculationModal(entry);
@@ -3033,7 +3131,138 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function isStatutoryHolidayEntry(entry) {
         const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
-        return entry?.isStatutoryHoliday === true || sessionId.startsWith('stathol-');
+        return entry?.isStatutoryHoliday === true
+            || sessionId.startsWith('stathol-')
+            || Boolean(String(entry?.statHolidayId || '').trim());
+    }
+
+    function isStatHolidayMetadataOnlyEntry(entry) {
+        if (!STATUTORY_HOLIDAY_USES_ACTIVITY || !entry) return false;
+        const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
+        return (entry?.isStatutoryHoliday === true || sessionId.startsWith('stathol-'))
+            && Number(resolveEntryHours(entry) || 0) === 0;
+    }
+
+    function resolveStatHolidayHolidayId(entry) {
+        return String(entry?.statHolidayMeta?.holidayId || entry?.statHolidayId || '').trim();
+    }
+
+    function findStatHolidayMetadataEntryByDate(dateStr) {
+        const date = String(dateStr || '').trim();
+        if (!date) return null;
+        return activeEntries.find((row) => {
+            const rowSessionId = String(row?.sessionId || '').trim().toLowerCase();
+            return rowSessionId.startsWith('stathol-') && String(row?.date || '').trim() === date;
+        }) || null;
+    }
+
+    function buildStatHolidayStatusEntryFromWarning(warning) {
+        if (!warning?.checks || typeof warning.checks !== 'object') return null;
+        const holidayId = String(warning.holidayId || '').trim();
+        if (!holidayId) return null;
+        return {
+            sessionId: `stathol-${holidayId}-${TARGET_TEACHER_ID}`,
+            date: warning.date,
+            className: warning.title || 'Statutory holiday',
+            description: 'Statutory holiday pay',
+            hours: 0,
+            timesheetHours: 0,
+            durationHours: 0,
+            isStatutoryHoliday: true,
+            isManual: false,
+            isFinalStatus: true,
+            status: 'stat_holiday_not_qualified',
+            statHolidayMeta: {
+                holidayId,
+                qualified: false,
+                calculatedHours: Number(warning.calculatedHours || 0),
+                checks: warning.checks,
+                disqualifyReasons: Array.isArray(warning.reasons) ? warning.reasons : [],
+                payBlockedReason: 'not_qualified'
+            }
+        };
+    }
+
+    function resolveStatHolidayStatusEntryForDate(dateStr) {
+        const metadataEntry = findStatHolidayMetadataEntryByDate(dateStr);
+        if (metadataEntry?.statHolidayMeta?.checks) return metadataEntry;
+        const warning = (Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [])
+            .find((row) => String(row?.date || '').trim() === String(dateStr || '').trim());
+        return buildStatHolidayStatusEntryFromWarning(warning);
+    }
+
+    function resolveStatHolidayStatusEntryForSessionId(sessionId) {
+        const normalized = String(sessionId || '').trim();
+        const rawEntry = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
+        if (rawEntry) return resolveDisplayEntry(rawEntry);
+        const holidayId = normalized.replace(/^stathol-/i, '').replace(new RegExp(`-${TARGET_TEACHER_ID}$`), '');
+        if (!holidayId || holidayId === normalized) return null;
+        const metadataEntry = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
+        if (metadataEntry?.statHolidayMeta?.checks) return metadataEntry;
+        const warning = (Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [])
+            .find((row) => String(row?.holidayId || '').trim() === holidayId);
+        return buildStatHolidayStatusEntryFromWarning(warning);
+    }
+
+    function buildStatHolidayHolidayOnlyStatusHtml(dateStr) {
+        const entry = resolveStatHolidayStatusEntryForDate(dateStr);
+        if (!entry?.statHolidayMeta?.checks) return '';
+        return buildStatusBadgeHtml(entry);
+    }
+
+    function findStatHolidayMetadataEntryForRow(entry) {
+        if (!entry) return null;
+        const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
+        if (sessionId.startsWith('stathol-')) return entry;
+
+        const holidayId = resolveStatHolidayHolidayId(entry);
+        if (holidayId) {
+            const metadataSessionId = `stathol-${holidayId}-${TARGET_TEACHER_ID}`;
+            const byHolidayId = activeEntries.find((row) => String(row?.sessionId || '') === metadataSessionId);
+            if (byHolidayId) return byHolidayId;
+        }
+
+        return findStatHolidayMetadataEntryByDate(entry?.date);
+    }
+
+    function isStatHolidayPayTimesheetRow(entry) {
+        if (!entry) return false;
+        if (isStatutoryHolidayEntry(entry)) return true;
+        if (!STATUTORY_HOLIDAY_USES_ACTIVITY || !isTimesheetActivityEntry(entry)) return false;
+        if (Number(resolveEntryHours(entry) || 0) <= 0) return false;
+        const metadataEntry = findStatHolidayMetadataEntryForRow(entry);
+        return Boolean(
+            metadataEntry?.statHolidayMeta?.checks
+            && typeof metadataEntry.statHolidayMeta.checks === 'object'
+        );
+    }
+
+    function resolveStatHolidayCalculationEntry(entry) {
+        if (!entry) return null;
+        if (entry?.statHolidayMeta?.checks && typeof entry.statHolidayMeta.checks === 'object') {
+            return entry;
+        }
+        const metadataEntry = findStatHolidayMetadataEntryForRow(entry);
+        if (!metadataEntry?.statHolidayMeta?.checks) {
+            return isStatHolidayPayTimesheetRow(entry) ? entry : null;
+        }
+        const payableHours = Number(resolveEntryHours(entry) || 0);
+        return {
+            ...metadataEntry,
+            className: entry.className || metadataEntry.className,
+            hours: payableHours,
+            timesheetHours: payableHours,
+            durationHours: payableHours,
+            statHolidayOverride: entry.statHolidayOverride || metadataEntry.statHolidayOverride
+        };
+    }
+
+    function hasStatHolidayCalculationDetails(entry) {
+        const metadataEntry = findStatHolidayMetadataEntryForRow(entry);
+        return Boolean(
+            metadataEntry?.statHolidayMeta?.checks
+            && typeof metadataEntry.statHolidayMeta.checks === 'object'
+        );
     }
 
     function isTimesheetActivityEntry(entry) {
@@ -3424,7 +3653,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const bgClass = resolveBgClass(isHoliday, isWeekend, dateStr);
 
             const dayEntries = sortTimesheetEntriesBySchedule(
-                activeEntries.filter(e => e.date === dateStr)
+                activeEntries.filter(e => e.date === dateStr && !isStatHolidayMetadataOnlyEntry(e))
             );
             const dayRowSpan = Math.max(1, dayEntries.length);
 
@@ -3432,11 +3661,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateCell = buildDateCellHtml(dateStr, dayName, isHoliday, hol);
                 const zeroHoursCells = `${buildEmptyRegularHoursCellHtml()}${buildEmptyOptionalHoursCellHtml()}`;
                 if (isHoliday) {
+                    const statHolidayStatus = buildStatHolidayHolidayOnlyStatusHtml(dateStr);
                     tbodyHtml += `<tr class="${bgClass} row-hover ts-day-group-end">
                         <td class="ps-4 ts-day-date-cell border-end border-2" rowspan="${dayRowSpan}">${dateCell}</td>
                         <td colspan="2" class="align-middle text-danger fw-bold"><i class="bi bi-calendar-x-fill me-1"></i> Holiday: ${holidayName(hol)}</td>
                         ${zeroHoursCells}
-                        <td class="ts-col-status"></td>
+                        <td class="ts-col-status">${statHolidayStatus ? `<div class="ts-status-stack">${statHolidayStatus}</div>` : ''}</td>
                         <td></td>
                         ${IS_READONLY ? '' : '<td class="ts-col-actions"></td>'}
                     </tr>`;
@@ -5700,11 +5930,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const forcePayBtn = CAN_MANAGE_STAT_HOLIDAY_OVERRIDES
                 ? `<button type="button" class="btn btn-sm btn-outline-success" onclick="forcePayStatHolidayWarning('${escapeHtml(warning.holidayId)}', '${escapeHtml(warning.date)}', '${escapeHtml(warning.title || 'Statutory holiday')}')"><i class="bi bi-plus-circle me-1"></i>Force pay</button>`
                 : '';
+            const viewCalcBtn = warning?.checks
+                ? `<button type="button" class="btn btn-sm btn-outline-primary" onclick="openStatHolidayCalculationModal('stathol-${escapeHtml(warning.holidayId)}-${TARGET_TEACHER_ID}')"><i class="bi bi-balloon-fill me-1"></i>View calculation steps</button>`
+                : '';
             return `<div class="border rounded p-3 mb-3 bg-white">
                 <div class="fw-bold">${escapeHtml(warning.title || 'Statutory holiday')} <span class="text-muted fw-normal">(${escapeHtml(formatTimesheetDateLabel(warning.date))})</span></div>
                 ${reasonHtml}
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge text-bg-light border">Calculated hours: ${Number(warning?.calculatedHours || 0).toFixed(2)}</span>
+                    ${viewCalcBtn}
                     ${forcePayBtn}
                 </div>
             </div>`;
@@ -5712,25 +5946,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.openStatHolidayOverrideModal = async function(sessionId) {
-        const entry = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
+        let entry = activeEntries.find((row) => String(row?.sessionId || '') === String(sessionId || ''));
         if (!entry || !isStatutoryHolidayEntry(entry)) return;
-        const currentHours = Number(resolveEntryHours(entry) || entry?.statHolidayMeta?.calculatedHours || 0);
-        const nextHours = window.prompt('Statutory holiday pay hours', currentHours.toFixed(2));
-        if (nextHours === null) return;
-        const parsed = Number.parseFloat(nextHours);
-        if (!Number.isFinite(parsed) || parsed < 0) {
-            await messageBox({ title: 'Invalid Hours', icon: 'warning', message: 'Enter a valid number of hours.' });
-            return;
+        if (STATUTORY_HOLIDAY_USES_ACTIVITY && entry?.statHolidayId && !String(entry?.sessionId || '').startsWith('stathol-')) {
+            const holidayId = resolveStatHolidayHolidayId(entry);
+            const metadataSessionId = holidayId ? `stathol-${holidayId}-${TARGET_TEACHER_ID}` : '';
+            let metadataEntry = metadataSessionId
+                ? activeEntries.find((row) => String(row?.sessionId || '') === metadataSessionId)
+                : findStatHolidayMetadataEntryForRow(entry);
+            if (!metadataEntry) {
+                metadataEntry = {
+                    sessionId: metadataSessionId,
+                    date: entry.date,
+                    className: entry.className,
+                    description: 'Statutory holiday pay',
+                    hours: 0,
+                    timesheetHours: 0,
+                    durationHours: 0,
+                    isStatutoryHoliday: true,
+                    isManual: false,
+                    isFinalStatus: true,
+                    status: 'stat_holiday',
+                    statHolidayMeta: {
+                        holidayId: entry.statHolidayId,
+                        qualified: false,
+                        calculatedHours: Number(resolveEntryHours(entry) || 0)
+                    }
+                };
+                activeEntries.push(metadataEntry);
+            }
+            entry = metadataEntry;
         }
-        entry.hours = Number(parsed.toFixed(2));
-        entry.timesheetHours = entry.hours;
-        entry.durationHours = entry.hours;
-        entry.statHolidayOverride = {
-            ...(entry.statHolidayOverride || {}),
-            forcePay: true,
-            hours: entry.hours,
-            reason: String(entry.statHolidayOverride?.reason || 'Manager adjusted statutory holiday hours').trim()
-        };
+        const currentHours = Number(
+            resolveEntryHours(entry)
+            || entry?.statHolidayOverride?.hours
+            || entry?.statHolidayMeta?.calculatedHours
+            || 0
+        );
+        const result = await openStatHolidayOverrideDialog({
+            title: entry.className || 'Set Statutory Holiday Hours',
+            defaultHours: currentHours,
+            defaultReason: entry?.statHolidayOverride?.reason || 'Manager adjusted statutory holiday hours'
+        });
+        if (!result) return;
+        applyStatHolidayOverrideToEntry(entry, result.hours, result.reason);
         renderTable();
     };
 
@@ -5764,45 +6023,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.forcePayStatHolidayWarning = async function(holidayId, date, title) {
         const sessionId = `stathol-${holidayId}-${TARGET_TEACHER_ID}`;
-        if (activeEntries.some((row) => String(row?.sessionId || '') === sessionId)) {
-            await messageBox({ title: 'Already Present', icon: 'info', message: 'This statutory holiday row is already on the timesheet.' });
-            return;
-        }
+        let entry = activeEntries.find((row) => String(row?.sessionId || '') === sessionId);
         const warning = (Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [])
             .find((row) => String(row?.holidayId || '') === String(holidayId || ''));
-        const hours = Number(warning?.calculatedHours || 0);
-        const nextHours = window.prompt('Statutory holiday pay hours', hours.toFixed(2));
-        if (nextHours === null) return;
-        const parsed = Number.parseFloat(nextHours);
-        if (!Number.isFinite(parsed) || parsed < 0) {
-            await messageBox({ title: 'Invalid Hours', icon: 'warning', message: 'Enter a valid number of hours.' });
-            return;
-        }
-        activeEntries.push({
-            sessionId,
-            date,
-            className: title || 'Statutory holiday',
-            description: 'Statutory holiday pay',
-            hours: Number(parsed.toFixed(2)),
-            timesheetHours: Number(parsed.toFixed(2)),
-            durationHours: Number(parsed.toFixed(2)),
-            isStatutoryHoliday: true,
-            isManual: false,
-            isFinalStatus: true,
-            status: 'stat_holiday',
-            statHolidayMeta: {
-                holidayId,
-                qualified: false,
-                calculatedHours: hours,
-                disqualifyReasons: warning?.reasons || [],
-                checks: warning?.checks || {}
-            },
-            statHolidayOverride: {
-                forcePay: true,
-                hours: Number(parsed.toFixed(2)),
-                reason: 'Manager forced statutory holiday pay'
-            }
+        const result = await openStatHolidayOverrideDialog({
+            title: title || warning?.title || 'Statutory holiday',
+            lead: 'Automatic statutory holiday calculation is unavailable. Enter payable hours to add this holiday.',
+            defaultHours: Number(warning?.calculatedHours || 0),
+            defaultReason: 'Manager forced statutory holiday pay'
         });
+        if (!result) return;
+        if (!entry) {
+            entry = {
+                sessionId,
+                date,
+                className: title || 'Statutory holiday',
+                description: 'Statutory holiday pay',
+                hours: result.hours,
+                timesheetHours: result.hours,
+                durationHours: result.hours,
+                isStatutoryHoliday: true,
+                isManual: false,
+                isFinalStatus: true,
+                status: 'stat_holiday',
+                statHolidayMeta: {
+                    holidayId,
+                    qualified: false,
+                    calculatedHours: Number(warning?.calculatedHours || 0),
+                    disqualifyReasons: warning?.reasons || [],
+                    checks: warning?.checks || {}
+                }
+            };
+            activeEntries.push(entry);
+        }
+        applyStatHolidayOverrideToEntry(entry, result.hours, result.reason);
         renderTable();
         renderStatHolidayWarningsPanel();
     };

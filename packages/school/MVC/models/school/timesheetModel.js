@@ -639,6 +639,21 @@ function sanitizeLegacyImport(input) {
     if (executionMode) result.executionMode = executionMode;
     if (legacyImportBatchId) result.legacyImportBatchId = legacyImportBatchId;
     if (workSessionEntryIds.length) result.workSessionEntryIds = workSessionEntryIds;
+    const workSessionActivities = (Array.isArray(input.workSessionActivities) ? input.workSessionActivities : [])
+        .map((row) => {
+            if (!row || typeof row !== 'object') return null;
+            const activityId = cleanString(row.activityId, { max: 80, allowEmpty: true });
+            if (!activityId) return null;
+            const entryIds = (Array.isArray(row.entryIds) ? row.entryIds : [])
+                .map((value) => cleanString(value, { max: 120, allowEmpty: true }))
+                .filter(Boolean)
+                .slice(0, 200);
+            const rowCount = cleanNonNegativeInteger(row.rowCount, entryIds.length);
+            return { activityId, entryIds, rowCount };
+        })
+        .filter(Boolean)
+        .slice(0, 50);
+    if (workSessionActivities.length) result.workSessionActivities = workSessionActivities;
     return result;
 }
 

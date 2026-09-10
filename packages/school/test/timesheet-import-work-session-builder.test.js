@@ -320,6 +320,21 @@ test('passesImportActivitySessionGuard excludes orphan import activity sessions'
   }), true);
 });
 
+test('passesImportActivitySessionGuard honors protectedActivityIds for mapped import activities', () => {
+  const liveAssembly = require('../MVC/services/school/timesheetLiveAssemblyService');
+  const allowed = new Set(['act-ACT_LINC-ENT-1-PERSON_1']);
+  assert.equal(liveAssembly.passesImportActivitySessionGuard({
+    sessionId: 'act-ACT_LINC-ENT-2-PERSON_1',
+    className: 'LINC',
+    hours: 6
+  }, {
+    activityId: 'ACT_DEFAULT',
+    protectedActivityIds: ['ACT_DEFAULT', 'ACT_LINC'],
+    personId: 'PERSON_1',
+    allowedSessionIds: allowed
+  }), false);
+});
+
 test('parseActivityEntryIdFromSessionId extracts entry id from act session id', () => {
   assert.equal(builder.parseActivityEntryIdFromSessionId(
     'act-566641-ENT-566641-0007-526625',
@@ -388,4 +403,82 @@ test('recomputeActivityLockedFromEntries clears legacy summary fields when impor
   assert.equal(payload.totalDurationHours, 0);
   assert.equal(payload.date, '');
   assert.deepEqual(activityService.getActivityEntries(payload), []);
+});
+
+test('createImportWorkSessions appends via maintenance entry update without resanitizing existing rows', async () => {
+  const activityService = require('../MVC/services/school/activityService');
+  const dataService = require('../MVC/services/school/schoolDataService');
+  const activityModel = require('../MVC/models/school/activityModel');
+
+  const legacyEntry = {
+    entryId: 'ENT-LEGACY-1',
+    title: 'LINC',
+    date: '2025-11-10',
+    startTime: '00:00',
+    endTime: '06:00',
+    durationHours: 30,
+    status: 'posted',
+    assignees: [{ personId: 'PERSON_1', personName: 'Teacher', paid: true, paidHours: 30, status: 'attended', role: 'teacher', roles: ['teacher'] }],
+    excludedPersonIds: []
+  };
+  assert.throws(
+    () => activityModel.sanitizeActivityPayload({
+      orgId: 'ORG_1',
+      title: 'LINC Activity',
+      categoryId: 'CAT_1',
+      departmentId: 'DEPT_1',
+      status: 'posted',
+      paid: true,
+      entries: [legacyEntry]
+    }),
+    /Hours value is out of allowed range/i
+  );
+
+  const activity = {
+    id: 'ACT_LINC',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    categoryId: 'CAT_1',
+    departmentId: 'DEPT_1',
+    title: 'LINC',
+    entries: [legacyEntry]
+  };
+
+  const originalEligible = activityService.isPersonEligibleForActivity;
+  const originalUpdate = dataService.updateData;
+  let maintenanceArgs = null;
+
+  activityService.isPersonEligibleForActivity = () => true;
+  dataService.updateData = async (entityType, id, payload, reqUser, options) => {
+    maintenanceArgs = { entityType, id, payload, options };
+    return payload;
+  };
+
+  try {
+    const outcome = await builder.createImportWorkSessions({
+      orgId: 'ORG_1',
+      activity,
+      compiledRows: [{ date: '2025-11-17', className: 'LINC', hours: 6 }],
+      personId: 'PERSON_1',
+      personName: 'Teacher',
+      personRole: 'teacher',
+      periodId: 'PER_A',
+      batchId: 'BATCH_1',
+      sourceFileName: 'nov.xlsx',
+      reqUser: {}
+    });
+
+    assert.equal(outcome.rowCount, 1);
+    assert.equal(maintenanceArgs?.entityType, 'activities');
+    assert.equal(maintenanceArgs?.id, 'ACT_LINC');
+    assert.equal(maintenanceArgs?.options?.maintenanceActivityEntries, true);
+    assert.equal(maintenanceArgs?.payload?.entries?.length, 2);
+    assert.equal(maintenanceArgs?.payload?.entries?.[0]?.entryId, 'ENT-LEGACY-1');
+    assert.equal(maintenanceArgs?.payload?.entries?.[1]?.durationHours, 6);
+  } finally {
+    activityService.isPersonEligibleForActivity = originalEligible;
+    dataService.updateData = originalUpdate;
+  }
 });

@@ -133,11 +133,14 @@ async function buildWorkdayHistory({
   personId,
   endDate,
   lookbackDays = 120,
+  useFullHistory = false,
   reqUser,
   supplementalEntries = []
 } = {}) {
   const end = String(endDate || '').trim();
-  const start = addDays(end, -Math.max(1, Number(lookbackDays) || 120));
+  const start = useFullHistory
+    ? ''
+    : addDays(end, -Math.max(1, Number(lookbackDays) || 120));
   const hoursByDate = new Map();
 
   function ingestEntry(entry) {

@@ -86,6 +86,16 @@ router.post('/timesheet-parameters',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveTimesheetParametersPolicy);
 
+router.get('/statutory-holiday-day-mapping/preview',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.previewStatutoryHolidayDayMapping);
+
+router.post('/statutory-holiday-day-mapping/map',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
+  ctrl.mapStatutoryHolidayDays);
+
 router.post('/timesheet-import',
   requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),

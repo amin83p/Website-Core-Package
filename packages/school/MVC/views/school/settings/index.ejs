@@ -43,11 +43,22 @@
       payableHolidayTypes: ['National Holiday', 'Observance Paid']
     };
   const statutoryHolidayPayEnabled = statutoryHolidayPayPolicy.enabled !== false;
+  const statutoryHolidayActivityIdValue = String(statutoryHolidayPayPolicy.activityId || '').trim();
   const payableHolidayTypesSelected = Array.isArray(statutoryHolidayPayPolicy.payableHolidayTypes)
     ? statutoryHolidayPayPolicy.payableHolidayTypes
     : ['National Holiday', 'Observance Paid'];
-  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft' }).replace(/</g, '\\u003c');
+  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
   const timesheetImportActivityOptionsList = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
+  const statutoryHolidayPublicActivityOptionsList = Array.isArray(statutoryHolidayPublicActivityOptions)
+    ? statutoryHolidayPublicActivityOptions
+    : timesheetImportActivityOptionsList;
+  const statutoryHolidayMappingYearOptionsList = Array.isArray(statutoryHolidayMappingYearOptions)
+    ? statutoryHolidayMappingYearOptions
+    : [];
+  const statutoryHolidayMappingDefaultYearValue = String(
+    typeof statutoryHolidayMappingDefaultYear !== 'undefined' ? statutoryHolidayMappingDefaultYear : ''
+  ).trim() || String(new Date().getFullYear());
+  const timesheetImportActivityOptionsJson = JSON.stringify(timesheetImportActivityOptionsList).replace(/</g, '\\u003c');
   const timesheetImportActivityIdValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importActivityId) || '').trim();
   const allowImportInTimesheetManagementValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.allowImportInTimesheetManagement === true;
   const allowImportInMyTimesheetsValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.allowImportInMyTimesheets === true;
@@ -1303,12 +1314,50 @@
                   <label class="form-check-label" for="statutoryHolidayPayEnabled">Enabled</label>
                 </div>
               </div>
-              <p class="small text-muted mb-3">When eligible, auto-add a statutory holiday pay row to timesheets using payable workday history, approved leave checks, and a rolling average-hours formula.</p>
+              <p class="small text-muted mb-3">When eligible, auto-add statutory holiday pay using payable workday history, approved leave checks, and a rolling average-hours formula. When an activity is selected, payable hours are written as work sessions on that activity (department and category come from the activity).</p>
+              <div class="mb-3">
+                <label class="form-label small fw-semibold" for="statutoryHolidayActivityId">Statutory holiday activity</label>
+                <select class="form-select" id="statutoryHolidayActivityId" name="statutoryHolidayActivityId" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  <option value="">Use synthetic timesheet rows (legacy)</option>
+                  <% statutoryHolidayPublicActivityOptionsList.forEach((activity) => { %>
+                    <option value="<%= activity.id %>" <%= activity.id === statutoryHolidayActivityIdValue ? 'selected' : '' %>><%= activity.title %><%= activity.departmentName ? ' (' + activity.departmentName + ')' : '' %></option>
+                  <% }); %>
+                </select>
+                <div class="form-text">Optional. Public, posted, paid activity used to record statutory holiday work sessions for payroll grouping.</div>
+              </div>
+              <div class="border rounded p-3 mt-3 bg-light-subtle">
+                <div class="fw-semibold small mb-2">Holiday day mapping</div>
+                <p class="small text-muted mb-3">Create empty 08:00–20:00 work sessions on a public activity for each payable holiday in a calendar year. Dates that already have any work session in the activity are skipped. People are added as assignees with their calculated hours when timesheets are processed.</p>
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-3">
+                    <label class="form-label small fw-semibold" for="statutoryHolidayMappingYear">Year</label>
+                    <select class="form-select" id="statutoryHolidayMappingYear" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <% statutoryHolidayMappingYearOptionsList.forEach((yearOption) => { %>
+                        <option value="<%= yearOption %>" <%= yearOption === statutoryHolidayMappingDefaultYearValue ? 'selected' : '' %>><%= yearOption %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="col-md-5">
+                    <label class="form-label small fw-semibold" for="statutoryHolidayMappingActivityId">Public activity</label>
+                    <select class="form-select" id="statutoryHolidayMappingActivityId" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <option value="">Select public activity...</option>
+                      <% statutoryHolidayPublicActivityOptionsList.forEach((activity) => { %>
+                        <option value="<%= activity.id %>" <%= activity.id === statutoryHolidayActivityIdValue ? 'selected' : '' %>><%= activity.title %><%= activity.departmentName ? ' (' + activity.departmentName + ')' : '' %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold d-block">&nbsp;</label>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPreviewStatHolidayDayMapping" <%= canUpdateFlag ? '' : 'disabled' %>>Preview</button>
+                  </div>
+                </div>
+                <div id="statutoryHolidayDayMappingError" class="alert alert-danger mt-3 d-none" role="alert"></div>
+              </div>
               <div class="row g-3">
                 <div class="col-md-4">
                   <label class="form-label small fw-semibold" for="statutoryHolidayMinWorkdays">Minimum workdays</label>
                   <input class="form-control" type="number" min="1" max="365" id="statutoryHolidayMinWorkdays" name="statutoryHolidayMinWorkdays" value="<%= statutoryHolidayPayPolicy.minWorkdays || 30 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <div class="form-text">Distinct payable workdays required before the holiday.</div>
+                  <div class="form-text">Distinct payable workdays required before the holiday, counted across all saved timesheet history (not limited to a recent window).</div>
                 </div>
                 <div class="col-md-4">
                   <label class="form-label small fw-semibold" for="statutoryHolidayWeekdayOccurrencesRequired">Weekday occurrences required</label>
@@ -1390,6 +1439,32 @@
               </select>
             </div>
             <div class="rollup-feature-card mt-4">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+                <div>
+                  <div class="fw-semibold">Class name to activity mapping</div>
+                  <p class="small text-muted mb-0">Map imported class names to posted activities. Matching is exact and case-insensitive. Unmapped class names use the default legacy import activity above.</p>
+                </div>
+                <% if (canUpdateFlag) { %>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddTimesheetImportClassMapping">
+                    <i class="bi bi-plus-lg me-1"></i>Add mapping
+                  </button>
+                <% } %>
+              </div>
+              <div class="table-responsive mt-3">
+                <table class="table table-sm table-bordered mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 38%;">Class name</th>
+                      <th>Activity</th>
+                      <% if (canUpdateFlag) { %><th style="width: 72px;"></th><% } %>
+                    </tr>
+                  </thead>
+                  <tbody id="timesheetImportClassMappingBody"></tbody>
+                </table>
+              </div>
+              <div class="small text-muted mt-2" id="timesheetImportClassMappingEmptyHint">No class name mappings configured.</div>
+            </div>
+            <div class="rollup-feature-card mt-4">
               <div class="fw-semibold mb-1">Import availability</div>
               <p class="small text-muted mb-3">Turn import on only where staff should upload legacy Equilibrium Excel timesheets.</p>
               <div class="form-check form-switch mb-2">
@@ -1436,6 +1511,58 @@
   sessionNotificationEmailContextSources: typeof sessionNotificationEmailContextSources !== 'undefined' ? sessionNotificationEmailContextSources : []
 }) %>
 <%- include('school/settings/partials/sessionNotificationTestEmailModal') %>
+
+<style>
+  #statutoryHolidayDayMappingPreviewModal .modal-dialog {
+    width: min(920px, 96vw);
+    max-width: min(920px, 96vw);
+  }
+  #statutoryHolidayDayMappingPreviewModal .modal-body {
+    max-height: min(60vh, 520px);
+    overflow: auto;
+  }
+  #statutoryHolidayDayMappingPreviewModal tr.stat-holiday-mapping-row-skip > td {
+    background-color: #ffca28 !important;
+    color: #212529;
+    border-color: #ffb300 !important;
+  }
+</style>
+<div class="modal fade" id="statutoryHolidayDayMappingPreviewModal" tabindex="-1" aria-labelledby="statutoryHolidayDayMappingPreviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0" id="statutoryHolidayDayMappingPreviewModalLabel">Statutory holiday day mapping preview</h5>
+          <div class="small text-muted" id="statutoryHolidayDayMappingPreviewSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="statutoryHolidayDayMappingModalError" class="alert alert-danger d-none" role="alert"></div>
+        <div id="statutoryHolidayDayMappingPreviewSummary" class="small text-muted mb-3"></div>
+        <div id="statutoryHolidayDayMappingPreviewEmpty" class="small text-muted d-none">No payable statutory holidays were found for the selected year.</div>
+        <div class="table-responsive" id="statutoryHolidayDayMappingPreviewTableWrap">
+          <table class="table table-sm table-bordered mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Holiday</th>
+                <th>Action</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="statutoryHolidayDayMappingPreviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="btnMapStatHolidayDays" <%= canUpdateFlag ? '' : 'disabled' %>>Map holiday days</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/scripts/htmlTemplateEditor.js"></script>
 <script src="/scripts/sessionNotificationEmailBodyModal.js"></script>
 
@@ -1454,6 +1581,7 @@
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
   let timesheetParametersPolicy = <%- timesheetParametersPolicyJson %>;
   let timesheetImportPolicy = <%- timesheetImportPolicyJson %>;
+  const timesheetImportActivityOptions = <%- timesheetImportActivityOptionsJson %>;
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
   let sarReportTemplateCapabilities = <%- studentAttendanceReportTemplateCapabilitiesJson %>;
   let sarOverallTemplates = [];
@@ -2437,6 +2565,7 @@
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
       emptyEnrollmentSessions: selected?.value || 'hide',
       statutoryHolidayPayEnabled: document.getElementById('statutoryHolidayPayEnabled')?.checked ? 'true' : 'false',
+      statutoryHolidayActivityId: document.getElementById('statutoryHolidayActivityId')?.value || '',
       statutoryHolidayMinWorkdays: document.getElementById('statutoryHolidayMinWorkdays')?.value || '30',
       statutoryHolidayWeekdayOccurrencesRequired: document.getElementById('statutoryHolidayWeekdayOccurrencesRequired')?.value || '5',
       statutoryHolidayWeekdayOccurrencesLookback: document.getElementById('statutoryHolidayWeekdayOccurrencesLookback')?.value || '9',
@@ -2452,6 +2581,229 @@
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
+  function readStatHolidayDayMappingInputs() {
+    return {
+      year: String(document.getElementById('statutoryHolidayMappingYear')?.value || '').trim(),
+      activityId: String(document.getElementById('statutoryHolidayMappingActivityId')?.value || '').trim()
+    };
+  }
+
+  let lastStatHolidayDayMappingPreview = null;
+
+  async function notifyStatHolidayDayMapping({
+    title = 'Holiday day mapping',
+    message = '',
+    icon = 'warning',
+    buttonClass = 'btn-primary'
+  } = {}) {
+    await showSettingsMessage({
+      title,
+      message,
+      icon,
+      buttonClass: icon === 'error' ? 'btn-danger' : buttonClass
+    });
+  }
+
+  async function confirmStatHolidayDayMapping(preview) {
+    const createCount = Number(preview?.createCount || 0);
+    const skipCount = Number(preview?.skipCount || 0);
+    const message = `Create ${createCount} holiday day work session(s) and skip ${skipCount} existing date(s)?`;
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      return (await window.showMessageModal({
+        title: 'Map holiday days?',
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Map holiday days', class: 'btn-primary' }
+        ]
+      })) === 'Map holiday days';
+    }
+    return window.confirm(message);
+  }
+
+  function showStatHolidayDayMappingError(message) {
+    const box = document.getElementById('statutoryHolidayDayMappingError');
+    if (!box) return;
+    if (!message) {
+      box.classList.add('d-none');
+      box.textContent = '';
+      return;
+    }
+    box.textContent = message;
+    box.classList.remove('d-none');
+  }
+
+  function showStatHolidayDayMappingModalError(message) {
+    const box = document.getElementById('statutoryHolidayDayMappingModalError');
+    if (!box) return;
+    if (!message) {
+      box.classList.add('d-none');
+      box.textContent = '';
+      return;
+    }
+    box.textContent = message;
+    box.classList.remove('d-none');
+  }
+
+  function updateStatHolidayDayMappingMapButton(preview) {
+    const button = document.getElementById('btnMapStatHolidayDays');
+    if (!button) return;
+    const createCount = Number(preview?.createCount || 0);
+    button.disabled = !canUpdate || createCount <= 0;
+  }
+
+  function renderStatHolidayDayMappingPreview(preview) {
+    const body = document.getElementById('statutoryHolidayDayMappingPreviewBody');
+    const summary = document.getElementById('statutoryHolidayDayMappingPreviewSummary');
+    const subtitle = document.getElementById('statutoryHolidayDayMappingPreviewSubtitle');
+    const emptyState = document.getElementById('statutoryHolidayDayMappingPreviewEmpty');
+    const tableWrap = document.getElementById('statutoryHolidayDayMappingPreviewTableWrap');
+    if (!body || !summary || !subtitle) return;
+
+    const rows = Array.isArray(preview?.rows) ? preview.rows : [];
+    body.innerHTML = rows.map(row => {
+      const isSkip = row?.action === 'skip';
+      return `
+      <tr class="${isSkip ? 'stat-holiday-mapping-row-skip table-warning' : ''}">
+        <td>${escapeHtml(String(row?.date || ''))}</td>
+        <td>${escapeHtml(String(row?.title || ''))}</td>
+        <td>${isSkip ? 'Skip' : 'Create'}</td>
+        <td>${escapeHtml(String(row?.reason || ''))}</td>
+      </tr>
+    `;
+    }).join('');
+
+    const activityLabel = escapeHtml(String(preview?.activityTitle || preview?.activityId || ''));
+    const yearLabel = escapeHtml(String(preview?.year || ''));
+    subtitle.textContent = activityLabel && yearLabel ? `${activityLabel} · ${yearLabel}` : '';
+    summary.textContent = `${preview?.createCount || 0} to create, ${preview?.skipCount || 0} to skip.`;
+    emptyState?.classList.toggle('d-none', rows.length > 0);
+    tableWrap?.classList.toggle('d-none', !rows.length);
+    updateStatHolidayDayMappingMapButton(preview);
+    lastStatHolidayDayMappingPreview = preview;
+  }
+
+  function openStatHolidayDayMappingPreviewModal() {
+    const modalEl = document.getElementById('statutoryHolidayDayMappingPreviewModal');
+    if (!modalEl || !window.bootstrap?.Modal) return;
+    window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+
+  async function fetchStatHolidayDayMappingPreview(button, { openModal = false } = {}) {
+    showStatHolidayDayMappingError('');
+    showStatHolidayDayMappingModalError('');
+    const inputs = readStatHolidayDayMappingInputs();
+    if (!inputs.year || !inputs.activityId) {
+      await notifyStatHolidayDayMapping({
+        title: 'Preview unavailable',
+        message: 'Select a year and public activity before previewing.',
+        icon: 'warning'
+      });
+      return null;
+    }
+    if (button) button.disabled = true;
+    try {
+      const params = new URLSearchParams({ year: inputs.year, activityId: inputs.activityId });
+      const response = await fetch(`/school/settings/statutory-holiday-day-mapping/preview?${params.toString()}`, {
+        headers: { Accept: 'application/json' }
+      });
+      const result = await response.json();
+      if (!response.ok || result?.status !== 'success') {
+        await notifyStatHolidayDayMapping({
+          title: 'Preview failed',
+          message: result?.message || 'Failed to preview holiday day mapping.',
+          icon: 'error'
+        });
+        return null;
+      }
+      renderStatHolidayDayMappingPreview(result.preview);
+      if (openModal) openStatHolidayDayMappingPreviewModal();
+      return result.preview;
+    } catch (error) {
+      await notifyStatHolidayDayMapping({
+        title: 'Preview failed',
+        message: error?.message || 'Failed to preview holiday day mapping.',
+        icon: 'error'
+      });
+      return null;
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  document.getElementById('btnPreviewStatHolidayDayMapping')?.addEventListener('click', async () => {
+    await fetchStatHolidayDayMappingPreview(
+      document.getElementById('btnPreviewStatHolidayDayMapping'),
+      { openModal: true }
+    );
+  });
+
+  document.getElementById('btnMapStatHolidayDays')?.addEventListener('click', async () => {
+    showStatHolidayDayMappingModalError('');
+    const button = document.getElementById('btnMapStatHolidayDays');
+    const inputs = readStatHolidayDayMappingInputs();
+    if (!inputs.year || !inputs.activityId) {
+      await notifyStatHolidayDayMapping({
+        title: 'Mapping unavailable',
+        message: 'Select a year and public activity before mapping.',
+        icon: 'warning'
+      });
+      return;
+    }
+    let preview = lastStatHolidayDayMappingPreview;
+    if (!preview) {
+      preview = await fetchStatHolidayDayMappingPreview(null, { openModal: false });
+    }
+    if (!preview || !Number(preview.createCount || 0)) {
+      await notifyStatHolidayDayMapping({
+        title: 'Nothing to map',
+        message: 'No new holiday days to map for the selected year and activity.',
+        icon: 'info'
+      });
+      updateStatHolidayDayMappingMapButton(preview);
+      return;
+    }
+    const confirmed = await confirmStatHolidayDayMapping(preview);
+    if (!confirmed) return;
+    const form = document.getElementById('timesheetParametersSettingsForm');
+    const result = await postSettings('/school/settings/statutory-holiday-day-mapping/map', {
+      actionStateId: form?.elements?.actionStateId?.value || '',
+      year: inputs.year,
+      activityId: inputs.activityId
+    }, button, 'statutoryHolidayDayMappingModalError');
+    if (!result) return;
+    if (result.policy && typeof result.policy === 'object') {
+      timesheetParametersPolicy = result.policy;
+      const activityId = String(result.policy?.statutoryHolidayPay?.activityId || inputs.activityId || '').trim();
+      const activitySelect = document.getElementById('statutoryHolidayActivityId');
+      if (activitySelect && activityId) activitySelect.value = activityId;
+    }
+    const refreshedPreview = {
+      year: result.outcome?.year || preview.year,
+      activityId: result.outcome?.activityId || preview.activityId,
+      activityTitle: preview.activityTitle,
+      createCount: 0,
+      skipCount: Number(preview.skipCount || 0) + Number(result.outcome?.createdCount || 0),
+      rows: (preview.rows || []).map(row => (row.action === 'create'
+        ? { ...row, action: 'skip', reason: 'Holiday day work session already mapped.' }
+        : row))
+    };
+    renderStatHolidayDayMappingPreview(refreshedPreview);
+    await showSettingsMessage({ title: 'Holiday Days Mapped', message: result.message, icon: 'success' });
+  });
+
+  document.getElementById('statutoryHolidayDayMappingPreviewModal')?.addEventListener('hidden.bs.modal', () => {
+    showStatHolidayDayMappingModalError('');
+  });
+
+  document.getElementById('statutoryHolidayActivityId')?.addEventListener('change', event => {
+    const mappingSelect = document.getElementById('statutoryHolidayMappingActivityId');
+    if (mappingSelect && !String(mappingSelect.value || '').trim()) {
+      mappingSelect.value = String(event.target?.value || '').trim();
+    }
+  });
+
   document.getElementById('timesheetImportSettingsForm')?.addEventListener('submit', async event => {
     event.preventDefault();
     const button = document.getElementById('btnSaveTimesheetImportSettings');
@@ -2461,12 +2813,93 @@
       importActivityId: document.getElementById('timesheetImportActivityId')?.value || '',
       allowImportInTimesheetManagement: document.getElementById('allowImportInTimesheetManagement')?.checked ? 'true' : 'false',
       allowImportInMyTimesheets: document.getElementById('allowImportInMyTimesheets')?.checked ? 'true' : 'false',
-      importTargetStatus: document.getElementById('timesheetImportTargetStatus')?.value || 'draft'
+      importTargetStatus: document.getElementById('timesheetImportTargetStatus')?.value || 'draft',
+      classNameActivityMappings: JSON.stringify(readTimesheetImportClassMappings())
     }, button, 'timesheetImportSettingsError');
     if (!result) return;
     timesheetImportPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetImportPolicy;
+    syncTimesheetImportClassMappingsFromPolicy();
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
+
+  function renderTimesheetImportClassMappingRows(mappings = []) {
+    const body = document.getElementById('timesheetImportClassMappingBody');
+    const emptyHint = document.getElementById('timesheetImportClassMappingEmptyHint');
+    if (!body) return;
+    const rows = Array.isArray(mappings) ? mappings : [];
+    const activityOptions = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
+    const buildActivityOptions = selectedId => {
+      const selected = String(selectedId || '').trim();
+      return ['<option value="">Select activity...</option>']
+        .concat(activityOptions.map(activity => {
+          const id = String(activity?.id || '').trim();
+          const title = escapeHtml(String(activity?.title || id).trim());
+          const dept = String(activity?.departmentName || '').trim();
+          const label = dept ? `${title} (${escapeHtml(dept)})` : title;
+          return `<option value="${escapeHtml(id)}"${id && id === selected ? ' selected' : ''}>${label}</option>`;
+        }))
+        .join('');
+    };
+
+    if (!rows.length) {
+      body.innerHTML = '';
+      if (emptyHint) emptyHint.classList.remove('d-none');
+      return;
+    }
+
+    body.innerHTML = rows.map((row, index) => `
+      <tr data-class-mapping-index="${index}">
+        <td>
+          <input type="text" class="form-control form-control-sm js-timesheet-import-class-name" value="${escapeHtml(row?.className || '')}" placeholder="e.g. LINC" ${canUpdate ? '' : 'disabled'}>
+        </td>
+        <td>
+          <select class="form-select form-select-sm js-timesheet-import-class-activity" ${canUpdate ? '' : 'disabled'}>
+            ${buildActivityOptions(row?.activityId)}
+          </select>
+        </td>
+        ${canUpdate ? `<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm js-remove-timesheet-import-class-mapping" title="Remove mapping"><i class="bi bi-trash"></i></button></td>` : ''}
+      </tr>
+    `).join('');
+    if (emptyHint) emptyHint.classList.add('d-none');
+  }
+
+  function readTimesheetImportClassMappings() {
+    const body = document.getElementById('timesheetImportClassMappingBody');
+    if (!body) return [];
+    return [...body.querySelectorAll('tr[data-class-mapping-index]')].map(row => ({
+      className: String(row.querySelector('.js-timesheet-import-class-name')?.value || '').trim(),
+      activityId: String(row.querySelector('.js-timesheet-import-class-activity')?.value || '').trim()
+    })).filter(row => row.className || row.activityId);
+  }
+
+  function syncTimesheetImportClassMappingsFromPolicy() {
+    const mappings = Array.isArray(timesheetImportPolicy?.classNameActivityMappings)
+      ? timesheetImportPolicy.classNameActivityMappings
+      : [];
+    renderTimesheetImportClassMappingRows(mappings);
+  }
+
+  document.getElementById('btnAddTimesheetImportClassMapping')?.addEventListener('click', () => {
+    if (!canUpdate) return;
+    const next = readTimesheetImportClassMappings();
+    next.push({ className: '', activityId: '' });
+    renderTimesheetImportClassMappingRows(next);
+    const body = document.getElementById('timesheetImportClassMappingBody');
+    const lastInput = body?.querySelector('tr:last-child .js-timesheet-import-class-name');
+    lastInput?.focus();
+  });
+
+  document.getElementById('timesheetImportClassMappingBody')?.addEventListener('click', event => {
+    const button = event.target.closest('.js-remove-timesheet-import-class-mapping');
+    if (!button || !canUpdate) return;
+    const row = button.closest('tr[data-class-mapping-index]');
+    if (!row) return;
+    const index = Number(row.getAttribute('data-class-mapping-index'));
+    const next = readTimesheetImportClassMappings().filter((_, rowIndex) => rowIndex !== index);
+    renderTimesheetImportClassMappingRows(next);
+  });
+
+  syncTimesheetImportClassMappingsFromPolicy();
 
   function resolveChannelSendWhen(channelPrefix) {
     const selected = document.querySelector(`input[name="sessionNotification${channelPrefix}SendWhen"]:checked`);

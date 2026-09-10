@@ -46,6 +46,10 @@ function buildStatHolidaySessionId(holidayId, personId) {
   return `stathol-${String(holidayId || '').trim()}-${String(personId || '').trim()}`;
 }
 
+function cleanId(value) {
+  return String(value ?? '').trim();
+}
+
 function summarizeDisqualifyReasons(checks = {}) {
   const reasons = [];
   if (checks.minWorkdays?.pass === false) {
@@ -265,16 +269,18 @@ function resolveStatHolidayPayHours({
 function buildStatHolidayWarning({
   evaluation,
   existingEntry = null,
-  allowManagerOverride = false,
-  row = null
-}) {
-  if (row) return null;
-  const reasons = [...(Array.isArray(evaluation?.disqualifyReasons) ? evaluation.disqualifyReasons : [])];
+  allowManagerOverride = false
+} = {}) {
   const payResolution = resolveStatHolidayPayHours({ evaluation, existingEntry, allowManagerOverride });
+  if (payResolution.shouldPay) return null;
+  const reasons = [...(Array.isArray(evaluation?.disqualifyReasons) ? evaluation.disqualifyReasons : [])];
   if (payResolution.blockReason === 'exceeds_max_payable_hours') {
     reasons.push(
       `Calculated statutory holiday hours (${payResolution.hours}) exceed the maximum payable per day (${MAX_STAT_HOLIDAY_PAY_HOURS}).`
     );
+  }
+  if (!reasons.length) {
+    reasons.push('Statutory holiday pay could not be calculated automatically.');
   }
   return {
     holidayId: evaluation.holidayId,
@@ -328,6 +334,69 @@ function buildStatHolidayRow({
   return row;
 }
 
+function resolveStatHolidayActivityId(policy = {}) {
+  const resolved = timesheetParametersPolicyService.resolvePolicy(policy);
+  return String(resolved?.statutoryHolidayPay?.activityId || '').trim();
+}
+
+function usesStatHolidayActivityMode(policy = {}) {
+  return Boolean(resolveStatHolidayActivityId(policy));
+}
+
+function normalizeOverrideInput(override = null) {
+  if (!override || typeof override !== 'object') return null;
+  return { ...override };
+}
+
+function buildOverrideLookup(existingEntries = [], overrideMap = null) {
+  const lookup = new Map();
+  (Array.isArray(existingEntries) ? existingEntries : []).forEach((entry) => {
+    const sessionId = String(entry?.sessionId || '').trim();
+    const holidayId = cleanId(entry?.statHolidayMeta?.holidayId);
+    if (holidayId) {
+      lookup.set(holidayId, entry);
+      return;
+    }
+    if (sessionId.startsWith('stathol-')) {
+      const parts = sessionId.split('-');
+      if (parts.length >= 3) lookup.set(parts[1], entry);
+    }
+  });
+  if (overrideMap && typeof overrideMap === 'object' && !Array.isArray(overrideMap)) {
+    Object.entries(overrideMap).forEach(([holidayId, override]) => {
+      const key = cleanId(holidayId);
+      if (!key) return;
+      const prior = lookup.get(key) || {};
+      lookup.set(key, {
+        ...prior,
+        statHolidayOverride: normalizeOverrideInput(override)
+      });
+    });
+  }
+  return lookup;
+}
+
+function buildStatHolidayPayItems({
+  evaluations = [],
+  existingByHolidayId = new Map(),
+  allowManagerOverride = false
+} = {}) {
+  return (Array.isArray(evaluations) ? evaluations : []).map((evaluation) => {
+    const existingEntry = existingByHolidayId.get(cleanId(evaluation?.holidayId)) || null;
+    const payResolution = resolveStatHolidayPayHours({
+      evaluation,
+      existingEntry,
+      allowManagerOverride
+    });
+    return {
+      evaluation,
+      existingEntry,
+      payResolution,
+      hours: payResolution.shouldPay ? payResolution.hours : 0
+    };
+  });
+}
+
 function mergeWorkdaySourceEntries(periodEntries = [], supplementalEntries = []) {
   const merged = [];
   const seenSessionIds = new Set();
@@ -377,13 +446,16 @@ async function buildStatutoryHolidayTimesheetContext({
   supplementalEntryFilter = null,
   existingEntries = [],
   reqUser,
-  allowManagerOverride = false
+  allowManagerOverride = false,
+  overrideMap = null
 } = {}) {
   const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(policy);
   const statPolicy = resolvedPolicy.statutoryHolidayPay;
   if (!statPolicy?.enabled) {
-    return { rows: [], warnings: [] };
+    return { rows: [], warnings: [], evaluations: [], usesActivityMode: false, activityId: '' };
   }
+
+  const activityId = resolveStatHolidayActivityId(resolvedPolicy);
 
   const payableHolidays = (Array.isArray(holidays) ? holidays : [])
     .filter((holiday) => {
@@ -395,7 +467,7 @@ async function buildStatutoryHolidayTimesheetContext({
     });
 
   if (!payableHolidays.length) {
-    return { rows: [], warnings: [] };
+    return { rows: [], warnings: [], evaluations: [], usesActivityMode: Boolean(activityId), activityId };
   }
 
   const maxHolidayDate = payableHolidays
@@ -437,6 +509,7 @@ async function buildStatutoryHolidayTimesheetContext({
     personId,
     endDate: historyEndDate,
     lookbackDays,
+    useFullHistory: true,
     reqUser,
     supplementalEntries: workdaySourceEntries
   });
@@ -448,9 +521,11 @@ async function buildStatutoryHolidayTimesheetContext({
       .map((entry) => [String(entry?.sessionId || '').trim(), entry])
       .filter(([sessionId]) => Boolean(sessionId))
   );
+  const existingByHolidayId = buildOverrideLookup(existingEntries, overrideMap);
 
   const rows = [];
   const warnings = [];
+  const evaluations = [];
 
   payableHolidays.forEach((holiday) => {
     const evaluation = evaluateHolidayEligibility({
@@ -460,8 +535,11 @@ async function buildStatutoryHolidayTimesheetContext({
       leaveDates,
       supplementalHoursByDate
     });
+    evaluations.push(evaluation);
     const sessionId = buildStatHolidaySessionId(evaluation.holidayId, personId);
-    const existingEntry = existingBySessionId.get(sessionId) || null;
+    const existingEntry = existingByHolidayId.get(cleanId(evaluation.holidayId))
+      || existingBySessionId.get(sessionId)
+      || null;
     const row = buildStatHolidayRow({
       evaluation,
       personId,
@@ -469,9 +547,21 @@ async function buildStatutoryHolidayTimesheetContext({
       allowManagerOverride
     });
     rows.push(row);
+    const warning = buildStatHolidayWarning({
+      evaluation,
+      existingEntry,
+      allowManagerOverride
+    });
+    if (warning) warnings.push(warning);
   });
 
-  return { rows, warnings };
+  return {
+    rows,
+    warnings,
+    evaluations,
+    usesActivityMode: Boolean(activityId),
+    activityId
+  };
 }
 
 function buildTrustedStatHolidayEntry({
@@ -544,6 +634,8 @@ function buildTrustedStatHolidayEntry({
     isFinalStatus: true,
     status: hours > 0 ? 'stat_holiday' : 'stat_holiday_not_qualified',
     comment: String(entry?.comment || trustedRow.comment || '').trim(),
+    deliveryDepartmentId: String(entry?.deliveryDepartmentId || trustedRow.deliveryDepartmentId || '').trim(),
+    deliveryDepartmentName: String(entry?.deliveryDepartmentName || trustedRow.deliveryDepartmentName || '').trim(),
     statHolidayMeta: {
       ...(trustedRow.statHolidayMeta || {}),
       payBlockedReason
@@ -556,12 +648,19 @@ function buildTrustedStatHolidayEntry({
 
 module.exports = {
   PAYABLE_HOLIDAY_TYPES: timesheetParametersPolicyService.PAYABLE_HOLIDAY_TYPES,
+  MAX_STAT_HOLIDAY_PAY_HOURS,
   assemblePeriodWorkdayEntries,
   buildStatHolidaySessionId,
   buildStatHolidayRow,
+  buildStatHolidayWarning,
+  buildStatHolidayPayItems,
+  buildOverrideLookup,
   evaluateHolidayEligibility,
   buildStatutoryHolidayTimesheetContext,
   buildTrustedStatHolidayEntry,
+  resolveStatHolidayActivityId,
+  usesStatHolidayActivityMode,
+  resolveStatHolidayPayHours,
   isPayableHoliday,
   resolveHolidayDate,
   resolveHolidayTitle

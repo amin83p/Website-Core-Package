@@ -279,6 +279,21 @@
     font-weight: 600;
     color: #0f172a;
   }
+  .ts-import-class-footnote {
+    margin-top: .2rem;
+    font-size: .72rem;
+    font-weight: 400;
+    line-height: 1.25;
+    white-space: normal;
+  }
+  .ts-import-ledger-table tbody tr.ts-import-row-no-class-mapping > td {
+    background-color: #ffca28 !important;
+  }
+  .ts-import-class-mapping-legend {
+    margin-top: .5rem;
+    font-size: .78rem;
+    color: #475569;
+  }
   .ts-import-ledger-table .hours-cell {
     font-weight: 700;
     color: #0f766e;
@@ -1871,6 +1886,14 @@
       const dayLabel = escapeHtml(group.dayOfWeek || '—');
 
       const dataRows = group.rows.map((row, rowIndex) => {
+        const mapping = row?.importClassMapping || {};
+        const isNoClassMapping = mapping.mappingStatus && mapping.mappingStatus !== 'explicit';
+        const rowClass = bandClass
+          + (rowIndex === 0 ? ' ts-import-day-start' : '')
+          + (isNoClassMapping ? ' ts-import-row-no-class-mapping' : '');
+        const classFootnote = mapping.mappingNote
+          ? '<div class="ts-import-class-footnote text-dark opacity-75">' + escapeHtml(mapping.mappingNote) + '</div>'
+          : '';
         const dateCells = rowIndex === 0
           ? '<td class="date-cell" rowspan="' + rowSpan + '">' + dateMain
             + '<span class="date-sub">' + dateLong + '</span></td>'
@@ -1880,9 +1903,9 @@
           : '';
 
         return ''
-          + '<tr class="' + bandClass + (rowIndex === 0 ? ' ts-import-day-start' : '') + '">'
+          + '<tr class="' + rowClass + '">'
           + dateCells
-          + '<td class="class-cell">' + escapeHtml(row.className || '—') + '</td>'
+          + '<td class="class-cell"><div>' + escapeHtml(row.className || '—') + '</div>' + classFootnote + '</td>'
           + '<td class="text-end hours-cell">' + formatImportHours(row.hours) + '</td>'
           + '<td>' + (row.studentName ? escapeHtml(row.studentName) : '<span class="text-muted">—</span>') + '</td>'
           + '<td class="text-end">' + (row.optionalHours == null ? '<span class="text-muted">—</span>' : formatImportHours(row.optionalHours)) + '</td>'
@@ -1905,6 +1928,13 @@
     }).join('');
 
     const dayHeader = hasDayColumn ? '<th>Day</th>' : '';
+    const hasNoClassMappingRows = groups.some((group) => group.rows.some((row) => {
+      const status = row?.importClassMapping?.mappingStatus;
+      return status && status !== 'explicit';
+    }));
+    const legendHtml = hasNoClassMappingRows
+      ? '<div class="ts-import-class-mapping-legend">Amber rows have no class-to-activity mapping in Settings.</div>'
+      : '';
 
     return ''
       + '<div class="table-responsive ts-import-ledger-wrap">'
@@ -1913,6 +1943,7 @@
       + '<th>Date</th>' + dayHeader
       + '<th>Class</th><th class="text-end">Hours</th><th>Student</th><th class="text-end">Optional</th><th>Comment</th>'
       + '</tr></thead><tbody>' + bodyHtml + '</tbody></table>'
+      + legendHtml
       + '</div>';
   }
 
@@ -2012,10 +2043,37 @@
       + '</div></li>';
   }
 
+  function renderImportClassMappingWarningSummary(summary) {
+    if (!summary || typeof summary !== 'object') return '';
+    const defaultClassCount = Number(summary.defaultFallbackClassCount || 0);
+    const unmappedClassCount = Number(summary.unmappedClassCount || 0);
+    if (defaultClassCount <= 0 && unmappedClassCount <= 0) return '';
+
+    const parts = [];
+    if (defaultClassCount > 0) {
+      parts.push(defaultClassCount + ' class' + (defaultClassCount === 1 ? '' : 'es')
+        + ' use' + (defaultClassCount === 1 ? 's' : '') + ' the default import activity');
+    }
+    if (unmappedClassCount > 0) {
+      parts.push(unmappedClassCount + ' class' + (unmappedClassCount === 1 ? '' : 'es')
+        + ' ha' + (unmappedClassCount === 1 ? 's' : 've') + ' no mapped activity and will be skipped on import');
+    }
+    return '<li>' + escapeHtml(parts.join('; ') + '.') + '</li>';
+  }
+
+  function hasImportClassMappingIssues(result) {
+    const summary = result?.classMappingSummary;
+    if (!summary || typeof summary !== 'object') return false;
+    return Number(summary.defaultFallbackClassCount || 0) > 0
+      || Number(summary.unmappedClassCount || 0) > 0;
+  }
+
   function renderImportReviewWarnings(result) {
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
     const matchNote = String(result?.matchNote || '').trim();
     const parts = [];
+    const classMappingWarning = renderImportClassMappingWarningSummary(result?.classMappingSummary);
+    if (classMappingWarning) parts.push(classMappingWarning);
     if (result?.matchDetails) {
       parts.push(renderImportPeriodMatchWarningDetails(result));
     }
@@ -2043,7 +2101,12 @@
 
     const isError = String(result?.status || '').toLowerCase() === 'error';
     if (importReviewErrorPanel) importReviewErrorPanel.classList.toggle('d-none', !isError);
-    if (importReviewWarningsPanel) importReviewWarningsPanel.classList.toggle('d-none', isError || !(result?.warnings || []).length);
+    if (importReviewWarningsPanel) {
+      const hasWarnings = (Array.isArray(result?.warnings) && result.warnings.length > 0)
+        || hasImportClassMappingIssues(result)
+        || Boolean(result?.matchDetails);
+      importReviewWarningsPanel.classList.toggle('d-none', isError || !hasWarnings);
+    }
     if (importReviewTableWrap) importReviewTableWrap.classList.toggle('d-none', isError);
     if (importReviewStats) importReviewStats.classList.toggle('d-none', isError);
 

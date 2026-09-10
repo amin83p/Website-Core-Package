@@ -426,6 +426,36 @@ function buildStatHolidayPrintSteps(entry = {}) {
   ];
 }
 
+function formatStatHolidayStepInlineLine(step = {}) {
+  const title = cleanText(step.title);
+  const pass = step.pass === true;
+  const passLabel = pass ? 'Pass' : 'Fail';
+  const details = (Array.isArray(step.details) ? step.details : [])
+    .map((detail) => cleanText(detail))
+    .filter(Boolean);
+  const detailsText = details.join(', ');
+  const bracketText = details.length ? `[ ${detailsText} ]` : '';
+  return {
+    title,
+    pass,
+    passLabel,
+    detailsText,
+    bracketText,
+    inlineLine: bracketText
+      ? `${title} (${passLabel}): ${bracketText}`
+      : `${title} (${passLabel})`
+  };
+}
+
+function buildStatHolidayEntryMetaLine(summary = {}) {
+  const holidayName = cleanText(summary.holidayName) || 'Statutory holiday';
+  const dateLabel = cleanText(summary.dateLabel) || '-';
+  const calculatedHours = Number(summary.calculatedHours || 0).toFixed(2);
+  const payableHours = Number(summary.payableHours || 0).toFixed(2);
+  const payStatusLabel = cleanText(summary.payStatusLabel) || 'Not qualified';
+  return `${holidayName} — ${dateLabel} — Calculated: ${calculatedHours} — Payable: ${payableHours} — ${payStatusLabel}`;
+}
+
 function buildStatutoryHolidayPrintSummaries(entries = []) {
   return (Array.isArray(entries) ? entries : [])
     .filter(isStatutoryHolidayEntry)
@@ -445,7 +475,7 @@ function buildStatutoryHolidayPrintSummaries(entries = []) {
         ? meta.disqualifyReasons.filter(Boolean)
         : [];
       const date = cleanText(entry.date);
-      return {
+      const summary = {
         holidayName: cleanText(entry.className || entry.description || entry.secondaryLabel || 'Statutory holiday'),
         date,
         dateLabel: formatStatHolidayDateLabel(date),
@@ -458,6 +488,9 @@ function buildStatutoryHolidayPrintSummaries(entries = []) {
         calculationAvailable: steps.length > 0,
         steps
       };
+      summary.metaLine = buildStatHolidayEntryMetaLine(summary);
+      summary.stepLines = steps.map((step) => formatStatHolidayStepInlineLine(step));
+      return summary;
     });
 }
 
@@ -830,6 +863,8 @@ module.exports = {
   buildDepartmentTotalsFromEffective,
   buildShapedPrintEntriesFromEffective,
   buildStatutoryHolidayPrintSummaries,
+  buildStatHolidayEntryMetaLine,
+  formatStatHolidayStepInlineLine,
   buildDateKeys,
   calculateHoursFromRange,
   fillLegacyDisplayMetadata,

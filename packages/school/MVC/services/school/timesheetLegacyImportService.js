@@ -2,6 +2,7 @@
 
 const dataService = require('./schoolDataService');
 const activityService = require('./activityService');
+const activityEntryIdService = require('./activityEntryIdService');
 const schoolDependencyService = require('./schoolDependencyService');
 const timesheetManualMaterializationService = require('./timesheetManualMaterializationService');
 const taskService = require('./taskService');
@@ -72,6 +73,19 @@ async function resolveImportActivity({ orgId, reqUser, activityId }) {
   }
   if (activity.paid !== true) {
     const error = new Error('The configured legacy import activity must be marked as paid.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return activity;
+}
+
+async function resolvePublicStatHolidayActivity({ orgId, reqUser, activityId }) {
+  const activity = await resolveImportActivity({ orgId, reqUser, activityId });
+  const visibilityScope = activityService.normalizeActivityVisibilityScope(
+    activity.visibilityScope || activity.calendarScope || activity.scope
+  );
+  if (visibilityScope !== 'school') {
+    const error = new Error('The configured statutory holiday activity must be a public (school) activity.');
     error.statusCode = 400;
     throw error;
   }
@@ -178,18 +192,96 @@ async function removeLegacyImportRowsFromActivity({ activityId, timesheet, legac
 }
 
 function collectImportWorkSessionEntryIds(timesheet = {}, personId = '') {
-  const activityId = cleanId(timesheet?.legacyImport?.activityId);
+  const targets = collectImportWorkSessionTargets(timesheet, personId);
+  const entryIds = new Set();
+  targets.forEach((target) => {
+    (Array.isArray(target.entryIds) ? target.entryIds : []).forEach((entryId) => {
+      const normalized = cleanId(entryId);
+      if (normalized) entryIds.add(normalized);
+    });
+  });
+  return [...entryIds];
+}
+
+function collectImportWorkSessionTargetsFromEntries(timesheet = {}, personId = '') {
+  const targetPersonId = cleanId(personId) || cleanId(timesheet?.teacherId);
+  const groups = new Map();
+  (Array.isArray(timesheet?.entries) ? timesheet.entries : []).forEach((entry) => {
+    if (!entry || entry.isDeleted === true) return;
+    const activityId = cleanId(entry?.activityId);
+    const entryId = timesheetImportWorkSessionBuilderService.parseActivityEntryIdFromSessionId(
+      entry?.sessionId,
+      { activityId, personId: targetPersonId }
+    );
+    if (!activityId || !entryId) return;
+    const bucket = groups.get(activityId) || [];
+    bucket.push(entryId);
+    groups.set(activityId, bucket);
+  });
+  return [...groups.entries()]
+    .map(([activityId, entryIds]) => ({
+      activityId,
+      entryIds: [...new Set(entryIds.map((entryId) => cleanId(entryId)).filter(Boolean))]
+    }))
+    .filter((row) => row.activityId && row.entryIds.length);
+}
+
+function collectImportWorkSessionTargetsFromStoredEntryIds(storedEntryIds = []) {
+  const groups = new Map();
+  (Array.isArray(storedEntryIds) ? storedEntryIds : []).forEach((rawEntryId) => {
+    const parsed = activityEntryIdService.parseEntryId(rawEntryId);
+    const activityId = cleanId(parsed?.activityId);
+    const entryId = cleanId(rawEntryId);
+    if (!activityId || !entryId) return;
+    const bucket = groups.get(activityId) || [];
+    bucket.push(entryId);
+    groups.set(activityId, bucket);
+  });
+  return [...groups.entries()]
+    .map(([activityId, entryIds]) => ({
+      activityId,
+      entryIds: [...new Set(entryIds)]
+    }))
+    .filter((row) => row.activityId && row.entryIds.length);
+}
+
+function collectImportWorkSessionTargets(timesheet = {}, personId = '') {
+  const workSessionActivities = Array.isArray(timesheet?.legacyImport?.workSessionActivities)
+    ? timesheet.legacyImport.workSessionActivities
+    : [];
+  if (workSessionActivities.length) {
+    return workSessionActivities
+      .map((row) => ({
+        activityId: cleanId(row?.activityId),
+        entryIds: (Array.isArray(row?.entryIds) ? row.entryIds : [])
+          .map((entryId) => cleanId(entryId))
+          .filter(Boolean)
+      }))
+      .filter((row) => row.activityId);
+  }
+
   const targetPersonId = cleanId(personId) || cleanId(timesheet?.teacherId);
   const storedIds = (Array.isArray(timesheet?.legacyImport?.workSessionEntryIds)
     ? timesheet.legacyImport.workSessionEntryIds
     : [])
     .map((entryId) => cleanId(entryId))
     .filter(Boolean);
-  if (storedIds.length) return [...new Set(storedIds)];
-  return timesheetImportWorkSessionBuilderService.extractActivityEntryIdsFromTimesheetEntries(
-    timesheet?.entries,
-    { activityId, personId: targetPersonId }
-  );
+
+  const groupedFromStoredIds = collectImportWorkSessionTargetsFromStoredEntryIds(storedIds);
+  if (groupedFromStoredIds.length) return groupedFromStoredIds;
+
+  const groupedFromEntries = collectImportWorkSessionTargetsFromEntries(timesheet, targetPersonId);
+  if (groupedFromEntries.length) return groupedFromEntries;
+
+  const activityId = cleanId(timesheet?.legacyImport?.activityId);
+  const entryIds = storedIds.length
+    ? [...new Set(storedIds)]
+    : timesheetImportWorkSessionBuilderService.extractActivityEntryIdsFromTimesheetEntries(
+      timesheet?.entries,
+      { activityId, personId: targetPersonId }
+    );
+  if (!activityId) return [];
+  return [{ activityId, entryIds }];
 }
 
 async function cleanupImportWorkSessionsOnDelete({
@@ -226,29 +318,41 @@ async function cleanupImportWorkSessionsOnDelete({
     cleanup.errors.push({ strategy, message: String(error?.message || error || 'Unknown error') });
   };
 
-  if (activityId && batchId) {
-    try {
-      const batchCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId({
-        activityId,
-        batchId,
-        reqUser
-      });
-      cleanup = {
-        ...mergeImportWorkSessionCleanupTotals(cleanup, batchCleanup),
-        strategies: [...cleanup.strategies, 'batchId'],
-        errors: cleanup.errors
-      };
-    } catch (error) {
-      recordCleanupError('batchId', error);
-      throw error;
+  const workSessionTargets = collectImportWorkSessionTargets(timesheet, targetPersonId);
+  const cleanupActivityIds = [...new Set(
+    workSessionTargets.map((target) => cleanId(target.activityId)).filter(Boolean)
+  )];
+  const primaryActivityId = cleanId(activityId) || cleanupActivityIds[0] || '';
+
+  if (batchId && cleanupActivityIds.length) {
+    for (const targetActivityId of cleanupActivityIds) {
+      try {
+        const batchCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId({
+          activityId: targetActivityId,
+          batchId,
+          reqUser
+        });
+        cleanup = {
+          ...mergeImportWorkSessionCleanupTotals(cleanup, batchCleanup),
+          strategies: [...cleanup.strategies, 'batchId'],
+          errors: cleanup.errors
+        };
+      } catch (error) {
+        recordCleanupError('batchId', error);
+        throw error;
+      }
     }
   }
 
-  const entryIds = collectImportWorkSessionEntryIds(timesheet, targetPersonId);
-  if (activityId && entryIds.length) {
+  for (const target of workSessionTargets) {
+    const targetActivityId = cleanId(target.activityId);
+    const entryIds = (Array.isArray(target.entryIds) ? target.entryIds : [])
+      .map((entryId) => cleanId(entryId))
+      .filter(Boolean);
+    if (!targetActivityId || !entryIds.length) continue;
     try {
       const entryCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds({
-        activityId,
+        activityId: targetActivityId,
         entryIds,
         reqUser
       });
@@ -265,10 +369,12 @@ async function cleanupImportWorkSessionsOnDelete({
     }
   }
 
-  if (activityId && targetPersonId && periodStartDate && periodEndDate) {
+  for (const targetActivityId of cleanupActivityIds) {
+    if (!targetActivityId || !targetPersonId || !periodStartDate || !periodEndDate) continue;
     try {
       const targetCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget({
-        activityId,
+        activityId: targetActivityId,
+        periodId,
         ...targetOptions,
         reqUser
       });
@@ -286,24 +392,29 @@ async function cleanupImportWorkSessionsOnDelete({
   }
 
   if (cleanId(orgId) && targetPersonId && periodStartDate && periodEndDate) {
-    try {
-      const trackedCleanup = await timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod({
-        orgId,
-        ...targetOptions,
-        importActivityId: activityId,
-        reqUser
-      });
-      if (trackedCleanup.removedEntries) {
-        cleanup = {
-          ...mergeImportWorkSessionCleanupTotals(cleanup, trackedCleanup),
-          strategies: [...cleanup.strategies, 'trackedImportActivities'],
-          cleanedActivities: trackedCleanup.cleanedActivities,
-          errors: cleanup.errors
-        };
+    for (const trackedActivityId of cleanupActivityIds.length ? cleanupActivityIds : [primaryActivityId].filter(Boolean)) {
+      try {
+        const trackedCleanup = await timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod({
+          orgId,
+          ...targetOptions,
+          importActivityId: trackedActivityId,
+          reqUser
+        });
+        if (trackedCleanup.removedEntries) {
+          cleanup = {
+            ...mergeImportWorkSessionCleanupTotals(cleanup, trackedCleanup),
+            strategies: [...cleanup.strategies, 'trackedImportActivities'],
+            cleanedActivities: [
+              ...(Array.isArray(cleanup.cleanedActivities) ? cleanup.cleanedActivities : []),
+              ...(Array.isArray(trackedCleanup.cleanedActivities) ? trackedCleanup.cleanedActivities : [])
+            ],
+            errors: cleanup.errors
+          };
+        }
+      } catch (error) {
+        recordCleanupError('trackedImportActivities', error);
+        throw error;
       }
-    } catch (error) {
-      recordCleanupError('trackedImportActivities', error);
-      throw error;
     }
   }
 
@@ -360,6 +471,29 @@ async function countOrphanImportWorkSessionsForPersonPeriod({
 
 function mergeImportWorkSessionCleanupTotals(left = {}, right = {}) {
   return timesheetImportWorkSessionBuilderService.mergeImportWorkSessionCleanupTotals(left, right);
+}
+
+async function cleanupStatHolidayOnImportDelete({
+  orgId,
+  personId,
+  period,
+  reqUser
+}) {
+  try {
+    const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+    const statutoryHolidayWorkSessionService = require('./statutoryHolidayWorkSessionService');
+    const policy = await timesheetParametersPolicyModel.getPolicyForOrg(orgId);
+    return await statutoryHolidayWorkSessionService.cleanupStatHolidayWorkSessionsOnImportDelete({
+      orgId,
+      personId,
+      period,
+      policy,
+      reqUser
+    });
+  } catch (error) {
+    console.warn(`Legacy import delete stat holiday cleanup skipped: ${error.message}`);
+    return null;
+  }
 }
 
 async function purgeLegacyImportSideEffects({
@@ -421,11 +555,23 @@ async function purgeLegacyImportSideEffects({
     period,
     reqUser
   });
+  const statHolidayCleanup = await cleanupStatHolidayOnImportDelete({
+    orgId,
+    personId: cleanId(personId) || cleanId(timesheet?.teacherId),
+    period,
+    reqUser
+  });
   const activityCleanup = activityId && legacyEntries.length
     ? await removeLegacyImportRowsFromActivity({ activityId, timesheet, legacyEntries, reqUser })
     : null;
 
-  return { revertedMaterialization, unlockedSources, activityCleanup, importWorkSessionCleanup };
+  return {
+    revertedMaterialization,
+    unlockedSources,
+    activityCleanup,
+    importWorkSessionCleanup,
+    statHolidayCleanup
+  };
 }
 
 function buildTimesheetPayloadAfterLegacyDelete(timesheet, nextEntries) {
@@ -929,6 +1075,12 @@ async function deleteLegacyImport({
       reqUser,
       forceOrphanRecovery: true
     });
+    const statHolidayCleanup = await cleanupStatHolidayOnImportDelete({
+      orgId,
+      personId,
+      period,
+      reqUser
+    });
     if (!importWorkSessionCleanup?.removedEntries && !importWorkSessionCleanup?.removedAssignees) {
       return {
         removedRows: 0,
@@ -951,7 +1103,8 @@ async function deleteLegacyImport({
       totalHours: 0,
       hasLegacyImport: false,
       timesheetId: '',
-      importWorkSessionCleanup
+      importWorkSessionCleanup,
+      statHolidayCleanup
     };
   }
   assertLegacyImportDeletable(timesheet);
@@ -982,7 +1135,8 @@ async function deleteLegacyImport({
       timesheetId: '',
       deletedTimesheet: true,
       activityCleanup: sideEffects?.activityCleanup || null,
-      importWorkSessionCleanup: sideEffects?.importWorkSessionCleanup || null
+      importWorkSessionCleanup: sideEffects?.importWorkSessionCleanup || null,
+      statHolidayCleanup: sideEffects?.statHolidayCleanup || null
     };
   }
 
@@ -1018,7 +1172,8 @@ async function deleteLegacyImport({
     hasLegacyImport: false,
     timesheetId: cleanId(saved?.id || timesheet?.id),
     activityCleanup: sideEffects?.activityCleanup || null,
-    importWorkSessionCleanup: sideEffects?.importWorkSessionCleanup || null
+    importWorkSessionCleanup: sideEffects?.importWorkSessionCleanup || null,
+    statHolidayCleanup: sideEffects?.statHolidayCleanup || null
   };
 }
 
@@ -1186,6 +1341,7 @@ module.exports = {
   buildLegacyImportYearDeleteMessage,
   periodHasDeletableLegacyImport,
   resolveImportActivity,
+  resolvePublicStatHolidayActivity,
   persistTimesheetPayload,
   calculateStoredEntryTotalHours
 };

@@ -12,6 +12,7 @@ const activityService = require('../MVC/services/school/activityService');
 const dataService = require('../MVC/services/school/schoolDataService');
 const timesheetPayrollContextService = require('../MVC/services/school/timesheetPayrollContextService');
 const timesheetImportLifecycleService = require('../MVC/services/school/timesheetImportLifecycleService');
+const statutoryHolidayWorkSessionService = require('../MVC/services/school/statutoryHolidayWorkSessionService');
 const schoolRepositories = require('../MVC/repositories/school');
 
 const REQ_USER = { id: 'USER_1', activeOrgId: 'ORG_1' };
@@ -351,6 +352,170 @@ test('performImportExecution requires role when person has teacher and staff rol
       }),
       /Select a payroll role/
     );
+  } finally {
+    stub.restore();
+  }
+});
+
+test('performImportExecution creates work sessions across mapped and default activities', async () => {
+  const mappedPolicy = {
+    ...POLICY,
+    classNameActivityMappings: [
+      { className: 'LINC', activityId: 'ACT_LINC' },
+      { className: 'Math', activityId: 'ACT_MATH' }
+    ]
+  };
+  const sessionCreates = [];
+  const assembleCalls = [];
+  const originals = {
+    getPolicy: timesheetImportPolicyModel.getPolicyForOrg,
+    resolveActivity: timesheetLegacyImportService.resolveImportActivity,
+    createSessions: timesheetImportWorkSessionBuilderService.createImportWorkSessions,
+    assemble: timesheetLiveAssemblyService.buildImportedTimesheetEntries
+  };
+
+  const stub = stubExecutionDeps();
+  timesheetImportPolicyModel.getPolicyForOrg = async () => mappedPolicy;
+  timesheetLegacyImportService.resolveImportActivity = async ({ activityId }) => ({
+    ...ACTIVITY,
+    id: activityId,
+    title: `Activity ${activityId}`,
+    entries: []
+  });
+  timesheetImportWorkSessionBuilderService.createImportWorkSessions = async (args) => {
+    sessionCreates.push({
+      activityId: args.activity.id,
+      rowCount: args.compiledRows.length,
+      classNames: args.compiledRows.map((row) => row.className)
+    });
+    const prefix = args.activity.id;
+    return {
+      activityId: prefix,
+      batchId: args.batchId,
+      createdEntryIds: args.compiledRows.map((_row, index) => `ENT-${prefix}-${index + 1}`),
+      rowCount: args.compiledRows.length
+    };
+  };
+  timesheetLiveAssemblyService.buildImportedTimesheetEntries = async (args) => {
+    assembleCalls.push(args.importActivitySessionGuard);
+    return {
+      entries: [{
+        sessionId: 'act-ACT_LINC-ENT-ACT_LINC-1-PERSON_1',
+        date: '2026-03-01',
+        hours: 6,
+        timesheetHours: 6,
+        isManual: false,
+        isSchoolActivity: true
+      }, {
+        sessionId: 'act-ACT_MATH-ENT-ACT_MATH-1-PERSON_1',
+        date: '2026-03-01',
+        hours: 2,
+        timesheetHours: 2,
+        isManual: false,
+        isSchoolActivity: true
+      }],
+      totalHours: 8,
+      statHolidayWarnings: [],
+      payrollContext: { defaultRole: 'teacher', roles: ['teacher'] },
+      personRole: 'teacher'
+    };
+  };
+
+  try {
+    const outcome = await executionService.performImportExecution({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      personRole: 'teacher',
+      compileResult: {
+        status: 'ok',
+        fileName: 'march.xlsx',
+        matchedPeriod: { id: 'PER_A', name: 'PER_A' },
+        rows: [
+          { date: '2026-03-01', className: 'LINC', hours: 6 },
+          { date: '2026-03-01', className: 'Math', hours: 2 },
+          { date: '2026-03-02', className: 'Office Admin', hours: 1 }
+        ]
+      },
+      batchId: 'BATCH_MULTI',
+      reqUser: REQ_USER
+    });
+
+    assert.equal(sessionCreates.length, 3);
+    assert.deepEqual(
+      sessionCreates.map((row) => row.activityId).sort(),
+      ['ACT_IMPORT', 'ACT_LINC', 'ACT_MATH']
+    );
+    assert.equal(outcome.steps.workSessions.summary, 'Created 3 work session(s) across 3 activities.');
+    const saved = stub.getCreatedTimesheets()[0];
+    assert.deepEqual(saved.legacyImport.workSessionActivities.map((row) => row.activityId).sort(), [
+      'ACT_IMPORT',
+      'ACT_LINC',
+      'ACT_MATH'
+    ]);
+    assert.equal(assembleCalls.length, 1);
+    assert.deepEqual(
+      [...assembleCalls[0].protectedActivityIds].sort(),
+      ['ACT_IMPORT', 'ACT_LINC', 'ACT_MATH']
+    );
+  } finally {
+    stub.restore();
+    timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
+    timesheetLegacyImportService.resolveImportActivity = originals.resolveActivity;
+    timesheetImportWorkSessionBuilderService.createImportWorkSessions = originals.createSessions;
+    timesheetLiveAssemblyService.buildImportedTimesheetEntries = originals.assemble;
+  }
+});
+
+test('normalizeStatHolidayOverrideMap treats zero hours as auto-calculate', () => {
+  const map = statutoryHolidayWorkSessionService.normalizeStatHolidayOverrideMap([
+    { holidayId: 'H1', hours: 0, forcePay: true },
+    { holidayId: 'H2', hours: 6, forcePay: true }
+  ]);
+  assert.equal(map.H1?.forcePay, true);
+  assert.equal(map.H1?.hours, undefined);
+  assert.equal(map.H2?.hours, 6);
+});
+
+test('performImportExecution assembles timesheets without manager stat holiday overrides', async () => {
+  const assembleCalls = [];
+  const stub = stubExecutionDeps();
+  const originalAssemble = timesheetLiveAssemblyService.buildImportedTimesheetEntries;
+
+  timesheetLiveAssemblyService.buildImportedTimesheetEntries = async (args) => {
+    assembleCalls.push(args);
+    return originalAssemble
+      ? await originalAssemble(args)
+      : {
+        entries: [{
+          sessionId: 'act-ACT_IMPORT-ENT-ACT_IMPORT-0001-PERSON_1',
+          date: '2026-03-01',
+          hours: 8,
+          timesheetHours: 8,
+          isManual: false,
+          isSchoolActivity: true
+        }],
+        totalHours: 8,
+        statHolidayWarnings: [],
+        payrollContext: { defaultRole: 'teacher', roles: ['teacher'] },
+        personRole: 'teacher'
+      };
+  };
+
+  try {
+    await executionService.performImportExecution({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      personRole: 'teacher',
+      compileResult: compileOkResult('PER_A'),
+      batchId: 'BATCH_STAT',
+      reqUser: REQ_USER
+    });
+
+    assert.equal(assembleCalls.length, 1);
+    assert.equal(assembleCalls[0].allowManagerOverride, false);
+    assert.equal(assembleCalls[0].statHolidayOverrideMap, undefined);
   } finally {
     stub.restore();
   }

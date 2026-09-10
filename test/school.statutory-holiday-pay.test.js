@@ -9,8 +9,10 @@ const timesheetParametersPolicyService = require('../packages/school/MVC/service
 const {
   WorkdayHistory,
   addDays,
-  isPayableWorkdayEntry
+  isPayableWorkdayEntry,
+  buildWorkdayHistory
 } = require('../packages/school/MVC/services/school/timesheetWorkdayHistoryService');
+const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
 const statutoryHolidayEligibilityService = require('../packages/school/MVC/services/school/statutoryHolidayEligibilityService');
 const holidayModel = require('../packages/school/MVC/models/school/holidayModel');
 
@@ -54,6 +56,7 @@ test('statutory holiday policy defaults and validation are wired in settings', (
   const controller = read('packages/school/MVC/controllers/school/timesheetController.js');
 
   assert.match(view, /statutoryHolidayPayEnabled/);
+  assert.match(view, /counted across all saved timesheet history/);
   assert.match(view, /payableHolidayType_Observance_Paid/);
   assert.match(controller, /statutoryHolidayEligibilityService/);
   assert.match(controller, /statHolidayWarnings/);
@@ -396,6 +399,67 @@ test('Step 5 fails when after-boundary workday cannot be resolved and rule is en
   assert.equal(evaluation.checks.leaveBeforeAfter.missingAfterBoundary, true);
   assert.equal(evaluation.checks.leaveBeforeAfter.boundariesResolved, false);
   assert.equal(evaluation.checks.leaveBeforeAfter.pass, false);
+});
+
+test('buildWorkdayHistory useFullHistory counts payable workdays before the old lookback window', async () => {
+  const originalFetch = schoolDataService.fetchData;
+
+  schoolDataService.fetchData = async () => [{
+    orgId: 'ORG_1',
+    teacherId: 'PERSON_1',
+    status: 'processed',
+    entries: [
+      { date: '2025-11-05', timesheetHours: 8 },
+      { date: '2026-01-10', timesheetHours: 8 }
+    ]
+  }];
+
+  try {
+    const windowed = await buildWorkdayHistory({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      endDate: '2026-03-21',
+      lookbackDays: 90,
+      useFullHistory: false,
+      reqUser: {}
+    });
+    const full = await buildWorkdayHistory({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      endDate: '2026-03-21',
+      lookbackDays: 90,
+      useFullHistory: true,
+      reqUser: {}
+    });
+
+    const holidayDate = '2026-02-16';
+    assert.equal(windowed.countWorkdaysBefore(holidayDate), 1);
+    assert.equal(full.countWorkdaysBefore(holidayDate), 2);
+  } finally {
+    schoolDataService.fetchData = originalFetch;
+  }
+});
+
+test('Step 1 minWorkdays counts payable workdays more than 90 days before the holiday', () => {
+  const policy = timesheetParametersPolicyService.resolvePolicy({});
+  const holiday = { id: 'HOL-HIST', date: '2026-02-16', title: 'Family Day', type: 'National Holiday' };
+  const history = buildHistoryFromDates([]);
+  for (let i = 1; i <= 25; i += 1) {
+    history.hoursByDate.set(addDays('2026-02-16', -i), 8);
+  }
+  for (let i = 91; i <= 100; i += 1) {
+    history.hoursByDate.set(addDays('2026-02-16', -i), 8);
+  }
+
+  const evaluation = statutoryHolidayEligibilityService.evaluateHolidayEligibility({
+    holiday,
+    policy,
+    workdayHistory: history,
+    leaveDates: new Set()
+  });
+
+  assert.equal(evaluation.checks.minWorkdays.actual, 35);
+  assert.equal(evaluation.checks.minWorkdays.pass, true);
 });
 
 test('assemblePeriodWorkdayEntries includes manual rows and live sessions minus deleted auto', () => {

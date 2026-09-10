@@ -395,8 +395,19 @@ test('buildStatutoryHolidayPrintSummaries mirrors editor calculation steps', () 
   assert.equal(summaries[0].payableHours, 7.5);
   assert.equal(summaries[0].payStatusLabel, 'Paid');
   assert.equal(summaries[0].steps.length, 6);
+  assert.equal(summaries[0].stepLines.length, 6);
+  assert.match(summaries[0].metaLine, /Canada Day — Jul 1, 2026 — Calculated: 7\.50 — Payable: 7\.50 — Paid/);
   assert.match(summaries[0].steps[5].details.join(' '), /Earnings window: May 1, 2026 to Jun 30, 2026/);
   assert.match(summaries[0].steps[5].details.join(' '), /Average payable hours: 7\.50/);
+  summaries[0].steps.forEach((step, index) => {
+    const stepLine = summaries[0].stepLines[index];
+    assert.equal(stepLine.title, step.title);
+    assert.equal(stepLine.pass, step.pass);
+    step.details.forEach((detail) => {
+      assert.match(stepLine.detailsText, new RegExp(detail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.match(stepLine.inlineLine, new RegExp(detail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    });
+  });
 });
 
 test('buildStatutoryHolidayPrintSummaries handles missing calculation checks', () => {
@@ -543,12 +554,14 @@ test('print review type defaults to managerial and financial uses a compact desc
   assert.match(financialHtml, /class="comment-text">Printed comment<\/span>/);
   assert.match(financialHtml, /Statutory Holiday Pay Summary/);
   assert.match(financialHtml, /paid statutory holiday entry totaling 7\.50 hours/);
-  assert.match(financialHtml, /class="stat-holiday-summary-layout"/);
-  assert.match(financialHtml, /class="stat-holiday-summary-table"/);
-  assert.match(financialHtml, /<th scope="row">Holiday<\/th>/);
+  assert.match(financialHtml, /class="stat-holiday-summary-meta"/);
+  assert.match(financialHtml, /class="stat-holiday-step-line"/);
+  assert.match(financialHtml, /Canada Day — Jul 1, 2026 — Calculated: 7\.50 — Payable: 7\.50 — Paid/);
+  assert.doesNotMatch(financialHtml, /class="stat-holiday-summary-layout"/);
+  assert.doesNotMatch(financialHtml, /class="stat-holiday-summary-table"/);
+  assert.doesNotMatch(financialHtml, /<th scope="row">Holiday<\/th>/);
   assert.match(financialHtml, /Step 6: Average-hours formula/);
   assert.match(financialHtml, /Average payable hours: 7\.50/);
-  assert.doesNotMatch(financialHtml, /stat-holiday-summary-meta/);
 
   const emptyStatHolidayHtml = ejs.render(source, {
     title: 'Timesheet Print',

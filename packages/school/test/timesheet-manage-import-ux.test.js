@@ -98,6 +98,9 @@ test('timesheet manage view uses split bulk and row import entry points', () => 
   assert.match(viewSource, /buildImportExecutionConfirmMessage/);
   assert.match(viewSource, /renderImportExecutionTimesheetCell/);
   assert.match(viewSource, /data-import-exec-open-draft/);
+  assert.doesNotMatch(viewSource, /Stat holiday manual hours/);
+  assert.doesNotMatch(viewSource, /js-import-stat-holiday-hours/);
+  assert.doesNotMatch(viewSource, /statHolidayOverrides/);
   assert.doesNotMatch(viewSource, /No files are ready to execute/);
   assert.doesNotMatch(viewSource, /\/manage\/api\/import\/apply/);
 });

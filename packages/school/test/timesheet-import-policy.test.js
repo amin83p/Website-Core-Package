@@ -56,3 +56,122 @@ test('isImportAllowedForScope respects page toggles', () => {
   assert.equal(timesheetImportPolicyService.isImportAllowedForScope(policy, 'management'), true);
   assert.equal(timesheetImportPolicyService.isImportAllowedForScope(policy, 'my_timesheets'), false);
 });
+
+test('normalizeClassNameActivityMappings trims rows and rejects duplicates', () => {
+  const normalized = timesheetImportPolicyService.normalizeClassNameActivityMappings([
+    { className: ' LINC ', activityId: 'ACT_LINC' },
+    { className: 'ELA One on One', activityId: 'ACT_ELA' },
+    { className: '', activityId: 'ACT_SKIP' }
+  ]);
+  assert.deepEqual(normalized, [
+    { className: 'LINC', activityId: 'ACT_LINC' },
+    { className: 'ELA One on One', activityId: 'ACT_ELA' }
+  ]);
+  assert.throws(
+    () => timesheetImportPolicyService.normalizeClassNameActivityMappings([
+      { className: 'LINC', activityId: 'ACT_1' },
+      { className: ' linc ', activityId: 'ACT_2' }
+    ], { enforceUnique: true }),
+    /duplicate class name mapping/i
+  );
+});
+
+test('resolveImportActivityIdForClassName uses exact case-insensitive mapping with fallback', () => {
+  const policy = {
+    importActivityId: 'ACT_DEFAULT',
+    classNameActivityMappings: [
+      { className: 'LINC', activityId: 'ACT_LINC' },
+      { className: 'ELA One on One', activityId: 'ACT_ELA' }
+    ]
+  };
+  assert.equal(timesheetImportPolicyService.resolveImportActivityIdForClassName('LINC', policy), 'ACT_LINC');
+  assert.equal(timesheetImportPolicyService.resolveImportActivityIdForClassName(' linc ', policy), 'ACT_LINC');
+  assert.equal(timesheetImportPolicyService.resolveImportActivityIdForClassName('Math', policy), 'ACT_DEFAULT');
+});
+
+test('partitionCompiledRowsByImportActivity groups rows by mapped activity', () => {
+  const policy = {
+    importActivityId: 'ACT_DEFAULT',
+    classNameActivityMappings: [
+      { className: 'LINC', activityId: 'ACT_LINC' },
+      { className: 'ELA One on One', activityId: 'ACT_ELA' }
+    ]
+  };
+  const buckets = timesheetImportPolicyService.partitionCompiledRowsByImportActivity([
+    { className: 'LINC', hours: 6 },
+    { className: 'Math', hours: 2 },
+    { className: 'ELA One on One', hours: 1.5 }
+  ], policy);
+
+  assert.equal(buckets.get('ACT_LINC')?.length, 1);
+  assert.equal(buckets.get('ACT_ELA')?.length, 1);
+  assert.equal(buckets.get('ACT_DEFAULT')?.length, 1);
+  assert.equal(buckets.get('ACT_DEFAULT')?.[0]?.className, 'Math');
+});
+
+const samplePolicy = {
+  importActivityId: 'ACT_DEFAULT',
+  classNameActivityMappings: [
+    { className: 'LINC', activityId: 'ACT_LINC' },
+    { className: 'ELA One on One', activityId: 'ACT_ELA' }
+  ]
+};
+
+test('resolveImportClassActivityMapping marks explicit, default, and unmapped classes', () => {
+  const explicit = timesheetImportPolicyService.resolveImportClassActivityMapping('LINC', samplePolicy);
+  assert.equal(explicit.mappingStatus, 'explicit');
+  assert.equal(explicit.hasExplicitMapping, true);
+  assert.equal(explicit.resolvedActivityId, 'ACT_LINC');
+  assert.equal(explicit.mappingNote, '');
+
+  const defaultFallback = timesheetImportPolicyService.resolveImportClassActivityMapping('Math', samplePolicy);
+  assert.equal(defaultFallback.mappingStatus, 'default');
+  assert.equal(defaultFallback.hasExplicitMapping, false);
+  assert.equal(defaultFallback.resolvedActivityId, 'ACT_DEFAULT');
+  assert.match(defaultFallback.mappingNote, /default import activity/i);
+
+  const caseInsensitive = timesheetImportPolicyService.resolveImportClassActivityMapping(' linc ', samplePolicy);
+  assert.equal(caseInsensitive.mappingStatus, 'explicit');
+  assert.equal(caseInsensitive.resolvedActivityId, 'ACT_LINC');
+
+  const unmapped = timesheetImportPolicyService.resolveImportClassActivityMapping('Math', {
+    importActivityId: '',
+    classNameActivityMappings: samplePolicy.classNameActivityMappings
+  });
+  assert.equal(unmapped.mappingStatus, 'unmapped');
+  assert.equal(unmapped.resolvedActivityId, '');
+  assert.match(unmapped.mappingNote, /skipped on import/i);
+});
+
+test('annotateImportCompileRows preserves row fields and adds importClassMapping', () => {
+  const rows = [
+    { className: 'LINC', hours: 6, studentName: 'Alice' },
+    { className: 'Math', hours: 2 }
+  ];
+  const annotated = timesheetImportPolicyService.annotateImportCompileRows(rows, samplePolicy);
+
+  assert.equal(annotated.length, 2);
+  assert.equal(annotated[0].hours, 6);
+  assert.equal(annotated[0].studentName, 'Alice');
+  assert.equal(annotated[0].importClassMapping.mappingStatus, 'explicit');
+  assert.equal(annotated[1].importClassMapping.mappingStatus, 'default');
+});
+
+test('summarizeImportClassMappingIssues counts distinct classes and rows', () => {
+  const rows = timesheetImportPolicyService.annotateImportCompileRows([
+    { className: 'LINC', hours: 6 },
+    { className: 'Math', hours: 2 },
+    { className: 'Math', hours: 1 },
+    { className: 'Science', hours: 3 }
+  ], {
+    importActivityId: '',
+    classNameActivityMappings: samplePolicy.classNameActivityMappings
+  });
+
+  const summary = timesheetImportPolicyService.summarizeImportClassMappingIssues(rows);
+  assert.equal(summary.defaultFallbackClassCount, 0);
+  assert.equal(summary.defaultFallbackRowCount, 0);
+  assert.equal(summary.unmappedClassCount, 2);
+  assert.equal(summary.unmappedRowCount, 3);
+  assert.deepEqual(summary.unmappedClasses.sort(), ['Math', 'Science']);
+});

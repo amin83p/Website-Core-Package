@@ -33,6 +33,8 @@ const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
 const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
+const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
+const statutoryHolidayDayMappingService = require('../../services/school/statutoryHolidayDayMappingService');
 const activityService = require('../../services/school/activityService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
@@ -394,6 +396,24 @@ async function loadSettingsPageData(req) {
     }))
     .filter((row) => row.id)
     .sort((a, b) => a.title.localeCompare(b.title));
+  const statutoryHolidayPublicActivityOptions = (Array.isArray(postedActivities) ? postedActivities : [])
+    .filter((row) => String(row?.status || '').trim().toLowerCase() === 'posted')
+    .filter((row) => activityService.normalizeActivityVisibilityScope(
+      row.visibilityScope || row.calendarScope || row.scope
+    ) === 'school')
+    .map((row) => ({
+      id: String(row?.id || '').trim(),
+      title: String(row?.title || row?.id || '').trim(),
+      departmentName: String(row?.departmentName || '').trim()
+    }))
+    .filter((row) => row.id)
+    .sort((a, b) => a.title.localeCompare(b.title));
+  const todayKey = getTodayDateKeyInTimezone(resolveDefaultTimezone(req.user));
+  const currentYear = Number(String(todayKey || '').slice(0, 4)) || new Date().getFullYear();
+  const statutoryHolidayMappingYearOptions = [];
+  for (let offset = -2; offset <= 3; offset += 1) {
+    statutoryHolidayMappingYearOptions.push(String(currentYear + offset));
+  }
 
   return {
     activeOrgId,
@@ -420,6 +440,9 @@ async function loadSettingsPageData(req) {
     timesheetParametersPolicy,
     timesheetImportPolicy,
     timesheetImportActivityOptions,
+    statutoryHolidayPublicActivityOptions,
+    statutoryHolidayMappingYearOptions,
+    statutoryHolidayMappingDefaultYear: String(currentYear),
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
     studentAttendanceReportTemplateCapabilities: studentAttendanceReportLabels.reportTemplateCapabilities,
     studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel,
@@ -852,13 +875,18 @@ async function saveTimesheetImportPolicy(req, res) {
     const activeOrgId = activeOrgIdOrThrow(req.user);
     const normalized = timesheetImportPolicyService.validatePolicyInput(req.body || {});
     if (normalized.importActivityId) {
-      const activity = await activityService.getActivity(normalized.importActivityId, req.user);
-      if (!activity || String(activity.orgId || '').trim() !== activeOrgId) {
-        throw new Error('The selected legacy import activity was not found in the active organization.');
-      }
-      if (String(activity.status || '').trim().toLowerCase() !== 'posted') {
-        throw new Error('The legacy import activity must be posted.');
-      }
+      await timesheetLegacyImportService.resolveImportActivity({
+        orgId: activeOrgId,
+        reqUser: req.user,
+        activityId: normalized.importActivityId
+      });
+    }
+    for (const mapping of normalized.classNameActivityMappings) {
+      await timesheetLegacyImportService.resolveImportActivity({
+        orgId: activeOrgId,
+        reqUser: req.user,
+        activityId: mapping.activityId
+      });
     }
     const policy = await timesheetImportPolicyModel.savePolicyForOrg(
       activeOrgId,
@@ -882,6 +910,14 @@ async function saveTimesheetParametersPolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
     const normalized = timesheetParametersPolicyService.validatePolicyInput(req.body || {});
+    const statActivityId = String(normalized?.statutoryHolidayPay?.activityId || '').trim();
+    if (statActivityId) {
+      await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
+        orgId: activeOrgId,
+        reqUser: req.user,
+        activityId: statActivityId
+      });
+    }
     const policy = await timesheetParametersPolicyModel.savePolicyForOrg(
       activeOrgId,
       normalized,
@@ -896,6 +932,57 @@ async function saveTimesheetParametersPolicy(req, res) {
     return res.status(Number(error?.statusCode) || 500).json({
       status: 'error',
       message: error?.message || 'Failed to save Timesheet Parameters settings.'
+    });
+  }
+}
+
+async function previewStatutoryHolidayDayMapping(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const year = String(req.query?.year || '').trim();
+    const activityId = String(req.query?.activityId || '').trim();
+    const policy = await timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId);
+    const preview = await statutoryHolidayDayMappingService.previewHolidayDayMapping({
+      orgId: activeOrgId,
+      year,
+      activityId,
+      policy,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', preview });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to preview statutory holiday day mapping.'
+    });
+  }
+}
+
+async function mapStatutoryHolidayDays(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const year = String(req.body?.year || '').trim();
+    const activityId = String(req.body?.activityId || '').trim();
+    const policy = await timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId);
+    const outcome = await statutoryHolidayDayMappingService.mapHolidayDaysToActivity({
+      orgId: activeOrgId,
+      year,
+      activityId,
+      policy,
+      reqUser: req.user,
+      persistActivityId: true
+    });
+    const updatedPolicy = await timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId);
+    return res.json({
+      status: 'success',
+      message: `Mapped ${outcome.createdCount} holiday day(s); skipped ${outcome.skippedCount} existing date(s).`,
+      outcome,
+      policy: updatedPolicy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to map statutory holiday days.'
     });
   }
 }
@@ -943,6 +1030,8 @@ module.exports = {
   saveAttendanceRollupFormula,
   saveStudentAttendanceReportSettings,
   saveTimesheetParametersPolicy,
+  previewStatutoryHolidayDayMapping,
+  mapStatutoryHolidayDays,
   saveTimesheetImportPolicy,
   saveAutosavePolicy,
   saveSessionAccessPolicy,

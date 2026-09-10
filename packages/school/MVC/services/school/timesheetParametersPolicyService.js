@@ -14,6 +14,7 @@ const PAYABLE_HOLIDAY_TYPES = Object.freeze(['National Holiday', 'Observance Pai
 
 const DEFAULT_STATUTORY_HOLIDAY_PAY = Object.freeze({
   enabled: true,
+  activityId: '',
   minWorkdays: 30,
   weekdayOccurrencesRequired: 5,
   weekdayOccurrencesLookback: 9,
@@ -70,6 +71,7 @@ function normalizeStatutoryHolidayPay(input = {}, { strict = false } = {}) {
   const defaults = DEFAULT_STATUTORY_HOLIDAY_PAY;
   return {
     enabled: cleanBoolean(source.enabled, defaults.enabled),
+    activityId: String(source.activityId ?? '').trim(),
     minWorkdays: cleanPositiveInteger(source.minWorkdays, defaults.minWorkdays, { min: 1, max: 365 }),
     weekdayOccurrencesRequired: cleanPositiveInteger(
       source.weekdayOccurrencesRequired,
@@ -124,6 +126,9 @@ function normalizePolicyFromStored(input = {}) {
 }
 
 function normalizePolicyFromForm(input = {}) {
+  const nestedStat = input.statutoryHolidayPay && typeof input.statutoryHolidayPay === 'object'
+    ? input.statutoryHolidayPay
+    : {};
   const payableHolidayTypes = [];
   if (Array.isArray(input.payableHolidayTypes)) {
     payableHolidayTypes.push(...input.payableHolidayTypes);
@@ -142,21 +147,30 @@ function normalizePolicyFromForm(input = {}) {
   return {
     emptyEnrollmentSessions: normalizeEmptyEnrollmentSessions(input.emptyEnrollmentSessions, { strict: true }),
     statutoryHolidayPay: normalizeStatutoryHolidayPay({
-      enabled: input.statutoryHolidayPayEnabled ?? input['statutoryHolidayPay.enabled'],
-      minWorkdays: input.statutoryHolidayMinWorkdays ?? input['statutoryHolidayPay.minWorkdays'],
+      enabled: input.statutoryHolidayPayEnabled ?? input['statutoryHolidayPay.enabled'] ?? nestedStat.enabled,
+      activityId: input.statutoryHolidayActivityId ?? input['statutoryHolidayPay.activityId'] ?? nestedStat.activityId,
+      minWorkdays: input.statutoryHolidayMinWorkdays ?? input['statutoryHolidayPay.minWorkdays'] ?? nestedStat.minWorkdays,
       weekdayOccurrencesRequired: input.statutoryHolidayWeekdayOccurrencesRequired
-        ?? input['statutoryHolidayPay.weekdayOccurrencesRequired'],
+        ?? input['statutoryHolidayPay.weekdayOccurrencesRequired']
+        ?? nestedStat.weekdayOccurrencesRequired,
       weekdayOccurrencesLookback: input.statutoryHolidayWeekdayOccurrencesLookback
-        ?? input['statutoryHolidayPay.weekdayOccurrencesLookback'],
+        ?? input['statutoryHolidayPay.weekdayOccurrencesLookback']
+        ?? nestedStat.weekdayOccurrencesLookback,
       earningsLookbackWeeks: input.statutoryHolidayEarningsLookbackWeeks
-        ?? input['statutoryHolidayPay.earningsLookbackWeeks'],
+        ?? input['statutoryHolidayPay.earningsLookbackWeeks']
+        ?? nestedStat.earningsLookbackWeeks,
       beforeAfterSearchDays: input.statutoryHolidayBeforeAfterSearchDays
-        ?? input['statutoryHolidayPay.beforeAfterSearchDays'],
+        ?? input['statutoryHolidayPay.beforeAfterSearchDays']
+        ?? nestedStat.beforeAfterSearchDays,
       disqualifyOnLeaveDuringHolidayWeek: input.statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek
-        ?? input['statutoryHolidayPay.disqualifyOnLeaveDuringHolidayWeek'],
+        ?? input['statutoryHolidayPay.disqualifyOnLeaveDuringHolidayWeek']
+        ?? nestedStat.disqualifyOnLeaveDuringHolidayWeek,
       disqualifyOnLeaveBeforeAfter: input.statutoryHolidayDisqualifyOnLeaveBeforeAfter
-        ?? input['statutoryHolidayPay.disqualifyOnLeaveBeforeAfter'],
-      payableHolidayTypes: hasExplicitHolidayTypeInput ? payableHolidayTypes : DEFAULT_STATUTORY_HOLIDAY_PAY.payableHolidayTypes
+        ?? input['statutoryHolidayPay.disqualifyOnLeaveBeforeAfter']
+        ?? nestedStat.disqualifyOnLeaveBeforeAfter,
+      payableHolidayTypes: hasExplicitHolidayTypeInput
+        ? payableHolidayTypes
+        : (nestedStat.payableHolidayTypes ?? DEFAULT_STATUTORY_HOLIDAY_PAY.payableHolidayTypes)
     }, { strict: hasExplicitHolidayTypeInput })
   };
 }

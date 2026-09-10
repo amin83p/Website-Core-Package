@@ -4,6 +4,7 @@ const dataService = require('./schoolDataService');
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
 const timesheetParametersPolicyService = require('./timesheetParametersPolicyService');
 const statutoryHolidayEligibilityService = require('./statutoryHolidayEligibilityService');
+const statutoryHolidayWorkSessionService = require('./statutoryHolidayWorkSessionService');
 const timesheetPayrollContextService = require('./timesheetPayrollContextService');
 const timesheetPayRateService = require('./timesheetPayRateService');
 const timesheetEffectiveEntryService = require('./timesheetEffectiveEntryService');
@@ -49,23 +50,36 @@ function buildAssemblyHourLimitError(offenders = []) {
   return new Error(`Timesheet assembly includes hour value(s) above ${MAX_ASSEMBLY_ENTRY_HOURS}: ${details}`);
 }
 
+function resolveProtectedImportActivityIds(guard = {}) {
+  const ids = new Set();
+  const primaryActivityId = cleanId(guard.activityId);
+  if (primaryActivityId) ids.add(primaryActivityId);
+  (Array.isArray(guard.protectedActivityIds) ? guard.protectedActivityIds : [])
+    .map((value) => cleanId(value))
+    .filter(Boolean)
+    .forEach((value) => ids.add(value));
+  return [...ids];
+}
+
 function passesImportActivitySessionGuard(entry, guard = null) {
   if (!guard || !(guard.allowedSessionIds instanceof Set) || !guard.allowedSessionIds.size) return true;
   const sessionId = cleanId(entry?.sessionId);
   if (!sessionId) return true;
   if (guard.allowedSessionIds.has(sessionId)) return true;
 
-  const importActivityId = cleanId(guard.activityId);
+  const protectedActivityIds = resolveProtectedImportActivityIds(guard);
   const entryActivityId = cleanId(entry?.activityId);
-  if (importActivityId && entryActivityId && idsEqual(entryActivityId, importActivityId)) return false;
-  if (importActivityId) {
-    const importPrefix = `act-${importActivityId}-`;
+  for (const protectedActivityId of protectedActivityIds) {
+    if (entryActivityId && idsEqual(entryActivityId, protectedActivityId)) return false;
+    const importPrefix = `act-${protectedActivityId}-`;
     if (sessionId.startsWith(importPrefix)) return false;
   }
 
   if (cleanId(entry?.legacyImportBatchId) || cleanId(entry?.legacyImportPersonId) || cleanId(entry?.legacyImportPeriodId)) {
     return false;
   }
+
+  if (cleanId(entry?.statHolidayId)) return true;
 
   const personId = cleanId(guard.personId);
   const actSuffix = personId ? `-${personId}` : '';
@@ -123,7 +137,9 @@ async function buildImportedTimesheetEntries({
   personRole = '',
   allowManagerOverride = true,
   supplementalEntryFilter = null,
-  importActivitySessionGuard = null
+  importActivitySessionGuard = null,
+  statHolidayOverrideMap = null,
+  personName = ''
 }) {
   const activeOrgId = cleanId(orgId);
   const targetPersonId = cleanId(personId);
@@ -131,14 +147,8 @@ async function buildImportedTimesheetEntries({
     throw new Error('Organization, person, and period are required to assemble imported timesheet entries.');
   }
 
-  const [timesheetParametersPolicy, effective, allHolidays, payrollContext] = await Promise.all([
+  const [timesheetParametersPolicy, allHolidays, payrollContext] = await Promise.all([
     timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId),
-    timesheetEffectiveEntryService.buildEffectiveTimesheetEntries({
-      period,
-      personId: targetPersonId,
-      activeOrgId,
-      reqUser
-    }),
     dataService.fetchAllData('holidays', {}, reqUser),
     timesheetPayrollContextService.resolvePayrollPersonContext({
       orgId: activeOrgId,
@@ -146,6 +156,38 @@ async function buildImportedTimesheetEntries({
       reqUser
     })
   ]);
+
+  let effective = await timesheetEffectiveEntryService.buildEffectiveTimesheetEntries({
+    period,
+    personId: targetPersonId,
+    activeOrgId,
+    reqUser
+  });
+
+  const statHolidayMaterialization = await statutoryHolidayWorkSessionService.materializeStatHolidayForPersonPeriod({
+    orgId: activeOrgId,
+    personId: targetPersonId,
+    personName: personName || payrollContext.personName,
+    personRole,
+    period,
+    policy: timesheetParametersPolicy,
+    holidays: allHolidays,
+    periodEntries: effective.entries,
+    existingEntries: [],
+    reqUser,
+    allowManagerOverride,
+    overrideMap: statHolidayOverrideMap,
+    persistToActivity: false
+  });
+
+  if (statHolidayMaterialization?.syncOutcome?.rowCount) {
+    effective = await timesheetEffectiveEntryService.buildEffectiveTimesheetEntries({
+      period,
+      personId: targetPersonId,
+      activeOrgId,
+      reqUser
+    });
+  }
 
   const liveEntries = Array.isArray(effective?.liveEntries) ? effective.liveEntries : [];
   const filteredLiveEntries = timesheetParametersPolicyService.applyEmptyEnrollmentSessionsPolicy(
@@ -159,25 +201,20 @@ async function buildImportedTimesheetEntries({
     .filter((entry) => !timesheetLegacyImportService.isLegacyImportEntry(entry))
     .filter((entry) => passesImportActivitySessionGuard(entry, importActivitySessionGuard));
 
-  const statHolidayContext = await statutoryHolidayEligibilityService.buildStatutoryHolidayTimesheetContext({
-    orgId: activeOrgId,
-    personId: targetPersonId,
-    periodStartDate: period.startDate,
-    periodEndDate: period.endDate,
-    policy: timesheetParametersPolicy,
-    holidays: allHolidays,
-    periodEntries: effective.entries,
-    supplementalEntryFilter,
-    existingEntries: [],
-    reqUser,
-    allowManagerOverride
-  });
-
   const autoSessionIds = new Set(
     autoEntries.map((entry) => cleanId(entry?.sessionId)).filter(Boolean)
   );
-  const statHolidayRows = (Array.isArray(statHolidayContext?.rows) ? statHolidayContext.rows : [])
-    .filter((row) => !autoSessionIds.has(cleanId(row?.sessionId)));
+  const statHolidayContext = statHolidayMaterialization;
+  const usesActivityMode = statHolidayContext.usesActivityMode === true;
+  const statHolidayRows = usesActivityMode
+    ? (Array.isArray(statHolidayContext?.rows) ? statHolidayContext.rows : []).map((row) => ({
+      ...row,
+      hours: 0,
+      timesheetHours: 0,
+      durationHours: 0
+    }))
+    : (Array.isArray(statHolidayContext?.rows) ? statHolidayContext.rows : [])
+      .filter((row) => !autoSessionIds.has(cleanId(row?.sessionId)));
 
   const mergedEntries = [...autoEntries, ...statHolidayRows];
   const resolvedRole = normalizePayrollRole(personRole) || payrollContext.defaultRole || 'teacher';
@@ -191,6 +228,8 @@ async function buildImportedTimesheetEntries({
     entries: stampedEntries,
     totalHours: calculateTimesheetTotal(stampedEntries),
     statHolidayWarnings: Array.isArray(statHolidayContext?.warnings) ? statHolidayContext.warnings : [],
+    statHolidayUsesActivityMode: usesActivityMode,
+    statHolidaySyncOutcome: statHolidayContext?.syncOutcome || null,
     payrollContext,
     personRole: resolvedRole
   };
