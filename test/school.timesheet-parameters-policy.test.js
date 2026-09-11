@@ -229,3 +229,35 @@ test('live session enrichment stamps enrolledStudentCount from active enrollment
     classEnrollmentReadService.listActiveStudentIdsForClass = original;
   }
 });
+
+test('timesheet parameters policy stores statutory holiday scheme configuration', () => {
+  const saved = validatePolicyInput({
+    emptyEnrollmentSessions: 'hide',
+    statutoryHolidayPayEnabled: 'true',
+    statutoryHolidayActivityId: 'ACT_EQ',
+    statutoryHolidayDefaultSchemeId: 'equilibrium_school',
+    schemeActivityId_equilibrium_school: 'ACT_EQ',
+    schemeActivityId_linc: 'ACT_LINC',
+    schemeHourMode_linc: 'fixed',
+    schemeFixedHours_linc: '6',
+    departmentSchemeAssignment_DEPT_1: 'linc'
+  });
+  assert.equal(saved.statutoryHolidayPay.schemes.equilibrium_school.activityId, 'ACT_EQ');
+  assert.equal(saved.statutoryHolidayPay.schemes.linc.activityId, 'ACT_LINC');
+  assert.equal(saved.statutoryHolidayPay.schemes.linc.hourMode, 'fixed');
+  assert.equal(saved.statutoryHolidayPay.departmentSchemeAssignments.DEPT_1, 'linc');
+
+  const roundTrip = validatePolicyInput(saved);
+  assert.equal(roundTrip.statutoryHolidayPay.schemes.linc.activityId, 'ACT_LINC');
+  assert.equal(roundTrip.statutoryHolidayPay.schemes.linc.hourMode, 'fixed');
+  assert.equal(roundTrip.statutoryHolidayPay.departmentSchemeAssignments.DEPT_1, 'linc');
+
+  const view = read('packages/school/MVC/views/school/settings/index.ejs');
+  assert.match(view, /statHolidaySchemesCollapse/);
+  assert.match(view, /statutoryHolidaySchemeEditorId/);
+  assert.match(view, /statHolidaySchemeParamsEquilibrium/);
+  assert.match(view, /statHolidaySchemeParamsLinc/);
+  assert.match(view, /statHolidaySchemeParamsEquilibrium[\s\S]*statutoryHolidayMinWorkdays/);
+  assert.match(view, /statHolidayDepartmentSchemesCollapse/);
+  assert.match(view, /statHolidaySchemeActivitiesCollapse/);
+});

@@ -1381,9 +1381,45 @@
     const MANUAL_ACTIVITIES = <%- JSON.stringify(manualActivities || []) %>;
     const INCOMPLETE_SESSIONS = <%- JSON.stringify(incompleteSessions || []) %>;
     const STAT_HOLIDAY_WARNINGS = <%- JSON.stringify(typeof statHolidayWarnings !== 'undefined' ? statHolidayWarnings : []) %>;
+    const STAT_HOLIDAY_PREVIEW_ROWS = <%- JSON.stringify(typeof statHolidayPreviewRows !== 'undefined' ? statHolidayPreviewRows : []) %>;
     const CAN_MANAGE_STAT_HOLIDAY_OVERRIDES = <%= (typeof canManageStatHolidayOverrides !== 'undefined' && canManageStatHolidayOverrides) ? 'true' : 'false' %>;
     const STAT_HOLIDAY_PREVIEW_ONLY = <%= (typeof statHolidayPreviewOnly !== 'undefined' && statHolidayPreviewOnly) ? 'true' : 'false' %>;
     const STATUTORY_HOLIDAY_USES_ACTIVITY = <%= (typeof statutoryHolidayUsesActivity !== 'undefined' && statutoryHolidayUsesActivity) ? 'true' : 'false' %>;
+    const STAT_HOLIDAY_SCHEME_EQUILIBRIUM = 'equilibrium_school';
+    const STAT_HOLIDAY_SCHEME_LINC = 'linc';
+    const STAT_HOLIDAY_BUILTIN_SCHEMES = [STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC];
+    function resolveStatHolidaySchemeId(entry) {
+        return String(entry?.statHolidayMeta?.schemeId || entry?.statHolidaySchemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim()
+            || STAT_HOLIDAY_SCHEME_EQUILIBRIUM;
+    }
+    function buildStatHolidayMetadataSessionId(schemeId, holidayId) {
+        const scheme = String(schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim();
+        const holiday = String(holidayId || '').trim();
+        if (!holiday) return '';
+        if (scheme && scheme !== STAT_HOLIDAY_SCHEME_EQUILIBRIUM) {
+            return `stathol-${scheme}-${holiday}-${TARGET_TEACHER_ID}`;
+        }
+        return `stathol-${holiday}-${TARGET_TEACHER_ID}`;
+    }
+    function parseStatHolidayMetadataSessionId(sessionId) {
+        const normalized = String(sessionId || '').trim();
+        if (!normalized.toLowerCase().startsWith('stathol-')) {
+            return { schemeId: STAT_HOLIDAY_SCHEME_EQUILIBRIUM, holidayId: '' };
+        }
+        let body = normalized.slice('stathol-'.length);
+        if (body.endsWith(`-${TARGET_TEACHER_ID}`)) {
+            body = body.slice(0, -(TARGET_TEACHER_ID.length + 1));
+        }
+        const parts = body.split('-');
+        if (STAT_HOLIDAY_BUILTIN_SCHEMES.includes(parts[0])) {
+            return { schemeId: parts[0], holidayId: parts.slice(1).join('-') };
+        }
+        return { schemeId: STAT_HOLIDAY_SCHEME_EQUILIBRIUM, holidayId: body };
+    }
+    function buildStatHolidaySavedKey(holidayId, date, schemeId) {
+        const scheme = resolveStatHolidaySchemeId({ statHolidayMeta: { schemeId } });
+        return `${scheme}|${String(holidayId || '').trim()}|${String(date || '').trim()}`;
+    }
     function isStatHolidayRelatedEntry(entry) {
         if (!entry) return false;
         const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
@@ -1974,7 +2010,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const calculationEntry = resolveStatHolidayCalculationEntry(entry);
             const calculatedHours = Number(calculationEntry?.statHolidayMeta?.calculatedHours || entry?.statHolidayMeta?.calculatedHours || 0);
             const payBlockedReason = String(calculationEntry?.statHolidayMeta?.payBlockedReason || entry?.statHolidayMeta?.payBlockedReason || '').trim();
-            const hasChecks = true;
+            const chipSessionId = resolveStatHolidayChipSessionId(entry);
+            const hasChecks = Boolean(chipSessionId);
             const isPaying = hours > 0;
             let tip = '';
             let colorBg = '#f8d7da';
@@ -2005,7 +2042,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 colorText,
                 colorBorder,
                 interactive: hasChecks,
-                sessionId: String(entry?.sessionId || '')
+                sessionId: chipSessionId
             });
         }
         const normalized = normalizeStatusCode(entry?.status);
@@ -2153,6 +2190,55 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedComments = {};
     const savedStatHolidayBySessionId = new Map();
     const savedStatHolidayByHolidayDate = new Map();
+
+    function rememberPreviewStatHolidayRows() {
+        const previewRows = Array.isArray(STAT_HOLIDAY_PREVIEW_ROWS) ? STAT_HOLIDAY_PREVIEW_ROWS : [];
+        previewRows.forEach((row) => {
+            const sessionId = String(row?.sessionId || '').trim();
+            if (!sessionId || !row?.statHolidayMeta?.checks) return;
+            savedStatHolidayBySessionId.set(sessionId, row);
+            const holidayId = String(row?.statHolidayMeta?.holidayId || row?.statHolidayId || '').trim();
+            const date = String(row?.date || '').trim();
+            if (holidayId && date) {
+                savedStatHolidayByHolidayDate.set(
+                    buildStatHolidaySavedKey(holidayId, date, row?.statHolidayMeta?.schemeId),
+                    row
+                );
+            }
+        });
+    }
+
+    function attachPreviewStatHolidayMetadataToActiveEntries() {
+        const previewRows = Array.isArray(STAT_HOLIDAY_PREVIEW_ROWS) ? STAT_HOLIDAY_PREVIEW_ROWS : [];
+        const metaByAssigneeKey = new Map();
+        previewRows.forEach((row) => {
+            const holidayId = String(row?.statHolidayMeta?.holidayId || row?.statHolidayId || '').trim();
+            const date = String(row?.date || '').trim();
+            const schemeId = resolveStatHolidaySchemeId(row);
+            if (!holidayId || !date || !row?.statHolidayMeta?.checks) return;
+            metaByAssigneeKey.set(`${schemeId}|${holidayId}|${date}`, row);
+            metaByAssigneeKey.set(`${holidayId}|${date}`, row);
+        });
+        activeEntries.forEach((entry) => {
+            if (entry?.statHolidayMeta?.checks) return;
+            const holidayId = String(entry?.statHolidayId || entry?.statHolidayMeta?.holidayId || '').trim();
+            const date = String(entry?.date || '').trim();
+            if (!holidayId || !date) return;
+            const schemeId = resolveStatHolidaySchemeId(entry);
+            const preview = metaByAssigneeKey.get(`${schemeId}|${holidayId}|${date}`)
+                || metaByAssigneeKey.get(`${holidayId}|${date}`);
+            if (!preview?.statHolidayMeta?.checks) return;
+            entry.statHolidayMeta = { ...(entry.statHolidayMeta || {}), ...preview.statHolidayMeta };
+            if (!entry.statHolidaySchemeId && preview.statHolidayMeta?.schemeId) {
+                entry.statHolidaySchemeId = preview.statHolidayMeta.schemeId;
+            }
+            if (!entry.statHolidayId && preview.statHolidayMeta?.holidayId) {
+                entry.statHolidayId = preview.statHolidayMeta.holidayId;
+            }
+        });
+    }
+
+    rememberPreviewStatHolidayRows();
     const isWorkSessionTimesheetEntry = (entry) => (
         entry?.isSchoolActivity === true || String(entry?.sessionId || '').startsWith('act-')
     );
@@ -2188,7 +2274,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (sessionId) savedStatHolidayBySessionId.set(sessionId, e);
                 const holidayId = String(e.statHolidayMeta?.holidayId || e.statHolidayId || '').trim();
                 const date = String(e.date || '').trim();
-                if (holidayId && date) savedStatHolidayByHolidayDate.set(`${holidayId}|${date}`, e);
+                if (holidayId && date) {
+                    savedStatHolidayByHolidayDate.set(
+                        buildStatHolidaySavedKey(holidayId, date, e?.statHolidayMeta?.schemeId),
+                        e
+                    );
+                }
             }
         }
     });
@@ -2791,7 +2882,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const holidayId = String(entry.statHolidayMeta?.holidayId || entry.statHolidayId || '').trim();
         const date = String(entry.date || '').trim();
-        const savedByHolidayDate = (holidayId && date) ? savedStatHolidayByHolidayDate.get(`${holidayId}|${date}`) : null;
+        const savedByHolidayDate = (holidayId && date)
+            ? savedStatHolidayByHolidayDate.get(buildStatHolidaySavedKey(holidayId, date, entry?.statHolidayMeta?.schemeId))
+            : null;
         if (savedByHolidayDate?.statHolidayOverride) {
             entry.statHolidayOverride = {
                 ...(entry.statHolidayOverride || {}),
@@ -2820,8 +2913,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const holidayId = String(entry?.statHolidayMeta?.holidayId || entry?.statHolidayId || '').trim();
         const date = String(entry?.date || '').trim();
         if (holidayId && date) {
-            savedStatHolidayByHolidayDate.set(`${holidayId}|${date}`, {
-                ...(savedStatHolidayByHolidayDate.get(`${holidayId}|${date}`) || {}),
+            savedStatHolidayByHolidayDate.set(buildStatHolidaySavedKey(holidayId, date, entry?.statHolidayMeta?.schemeId), {
+                ...(savedStatHolidayByHolidayDate.get(buildStatHolidaySavedKey(holidayId, date, entry?.statHolidayMeta?.schemeId)) || {}),
                 ...entry,
                 statHolidayOverride: entry.statHolidayOverride
             });
@@ -2833,12 +2926,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const existing = findLinkedActivityStatHolidayEntry(metadataEntry);
         if (existing) return existing;
         const holidayId = String(metadataEntry?.statHolidayMeta?.holidayId || metadataEntry?.statHolidayId || '').trim();
+        const schemeId = resolveStatHolidaySchemeId(metadataEntry);
         const date = String(metadataEntry?.date || '').trim();
         if (!holidayId || !date) return null;
         const liveAct = (Array.isArray(LIVE_SESSIONS) ? LIVE_SESSIONS : []).find((row) => {
             if (String(row?.date || '').trim() !== date) return false;
             const rowHolidayId = String(row?.statHolidayMeta?.holidayId || row?.statHolidayId || '').trim();
-            return rowHolidayId === holidayId && !String(row?.sessionId || '').startsWith('stathol-');
+            const rowSchemeId = resolveStatHolidaySchemeId(row);
+            return rowHolidayId === holidayId
+                && rowSchemeId === schemeId
+                && !String(row?.sessionId || '').startsWith('stathol-');
         });
         if (!liveAct) return null;
         const liveSessionId = String(liveAct.sessionId || '').trim();
@@ -2853,7 +2950,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ...liveAct,
             comment: resolveLiveEntryComment(liveAct.sessionId, liveAct),
             isManual: false,
-            statHolidayId: holidayId
+            statHolidayId: holidayId,
+            statHolidaySchemeId: schemeId
         };
         activeEntries.push(nextEntry);
         return nextEntry;
@@ -2874,6 +2972,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!linked.statHolidayId) {
             linked.statHolidayId = String(metadataEntry?.statHolidayMeta?.holidayId || metadataEntry?.statHolidayId || '').trim();
         }
+        if (!linked.statHolidaySchemeId) {
+            linked.statHolidaySchemeId = resolveStatHolidaySchemeId(metadataEntry);
+        }
         if (metadataEntry?.statHolidayOverride) {
             linked.statHolidayOverride = {
                 ...(linked.statHolidayOverride || {}),
@@ -2882,9 +2983,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function hydrateSavedStatHolidayMetadataIntoActiveEntries() {
+        const seenSessionIds = new Set(
+            activeEntries.map((row) => String(row?.sessionId || '').trim()).filter(Boolean)
+        );
+        savedStatHolidayBySessionId.forEach((saved, sessionId) => {
+            const key = String(sessionId || '').trim();
+            if (!key || seenSessionIds.has(key)) return;
+            if (!saved?.statHolidayMeta?.checks) return;
+            activeEntries.push({
+                ...saved,
+                isManual: false,
+                isFinalStatus: saved.isFinalStatus !== false
+            });
+            seenSessionIds.add(key);
+        });
+    }
+
     function rehydrateSavedStatHolidayEntries() {
         if (statHolidaySavedStateHydrated) return;
         statHolidaySavedStateHydrated = true;
+        hydrateSavedStatHolidayMetadataIntoActiveEntries();
         activeEntries.forEach((entry) => mergeSavedStatHolidayEntryState(entry));
         activeEntries.forEach((entry) => {
             const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
@@ -2901,7 +3020,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const peerMetadata = findStatHolidayMetadataEntryForRow(entry) || findStatHolidayMetadataEntryByDate(entry?.date);
         const holidayId = resolveStatHolidayHolidayId(entry) || resolveStatHolidayHolidayId(peerMetadata);
-        const metadataSessionId = holidayId ? `stathol-${holidayId}-${TARGET_TEACHER_ID}` : '';
+        const metadataSessionId = holidayId
+            ? buildStatHolidayMetadataSessionId(resolveStatHolidaySchemeId(entry), holidayId)
+            : '';
         let metadataEntry = metadataSessionId
             ? activeEntries.find((row) => String(row?.sessionId || '') === metadataSessionId)
             : peerMetadata;
@@ -3249,7 +3370,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ? entry.statHolidayMeta.disqualifyReasons.filter(Boolean)
             : [];
         const holidayId = resolveStatHolidayHolidayId(entry);
-        titleEl.innerHTML = `<i class="bi bi-balloon-fill me-2 text-danger"></i>Statutory Holiday Calculation`;
+        const schemeName = String(entry?.statHolidayMeta?.schemeName || '').trim();
+        const schemeTitle = schemeName ? `${schemeName} — Statutory Holiday Calculation` : 'Statutory Holiday Calculation';
+        titleEl.innerHTML = `<i class="bi bi-balloon-fill me-2 text-danger"></i>${escapeHtml(schemeTitle)}`;
         summaryEl.innerHTML = `
             <div class="ts-stat-calc-summary-item"><span class="label">Holiday</span><span class="value">${escapeHtml(holidayLabel)}</span></div>
             <div class="ts-stat-calc-summary-item"><span class="label">Payable Hours</span><span class="value">${escapeHtml(payableHours)} hrs</span></div>
@@ -3304,13 +3427,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.openStatHolidayCalculationModal = function(sessionId) {
         if (STAT_HOLIDAY_PREVIEW_ONLY) return;
-        const sourceEntry = resolveStatHolidayStatusEntryForSessionId(sessionId);
-        if (!sourceEntry) return;
-        const entry = resolveStatHolidayCalculationEntry(sourceEntry, sourceEntry);
-        if (!entry?.statHolidayMeta?.checks) return;
+        const normalizedSessionId = String(sessionId || '').trim();
+        const entry = resolveStatHolidayCalculationModalEntry(normalizedSessionId);
+        if (!entryHasStatHolidayChecks(entry)) return;
         const modalEl = document.getElementById('statHolidayCalcModal');
         if (!modalEl || !window.bootstrap) return;
-        statHolidayCalcSessionId = String(sessionId || '');
+        statHolidayCalcSessionId = String(entry?.sessionId || sessionId || '');
         const adjustBtn = document.getElementById('btnStatHolidayCalcAdjust');
         if (adjustBtn) {
             adjustBtn.classList.toggle('d-none', !(CAN_MANAGE_STAT_HOLIDAY_OVERRIDES && !STAT_HOLIDAY_PREVIEW_ONLY));
@@ -3406,13 +3528,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function findLinkedActivityStatHolidayEntry(entry) {
         const holidayId = resolveStatHolidayHolidayId(entry);
+        const schemeId = resolveStatHolidaySchemeId(entry);
         const date = String(entry?.date || '').trim();
         if (!date) return null;
         const liveAct = (holidayId && Array.isArray(LIVE_SESSIONS))
             ? LIVE_SESSIONS.find((row) => {
                 if (String(row?.date || '').trim() !== date) return false;
                 const rowHolidayId = String(row?.statHolidayMeta?.holidayId || row?.statHolidayId || '').trim();
-                return rowHolidayId === holidayId && !String(row?.sessionId || '').startsWith('stathol-');
+                const rowSchemeId = resolveStatHolidaySchemeId(row);
+                return rowHolidayId === holidayId
+                    && rowSchemeId === schemeId
+                    && !String(row?.sessionId || '').startsWith('stathol-');
             })
             : null;
         const liveSessionId = String(liveAct?.sessionId || '').trim();
@@ -3423,7 +3549,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!holidayId) return null;
         return activeEntries.find((row) => {
             const rowHolidayId = String(row?.statHolidayMeta?.holidayId || row?.statHolidayId || '').trim();
+            const rowSchemeId = resolveStatHolidaySchemeId(row);
             return rowHolidayId === holidayId
+                && rowSchemeId === schemeId
                 && String(row?.date || '').trim() === date
                 && !String(row?.sessionId || '').startsWith('stathol-');
         }) || null;
@@ -3484,21 +3612,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return 0;
     }
 
-    function findStatHolidayMetadataEntryByDate(dateStr) {
+    function findStatHolidayMetadataEntryByDate(dateStr, schemeId = '') {
         const date = String(dateStr || '').trim();
         if (!date) return null;
-        return activeEntries.find((row) => {
+        const matches = activeEntries.filter((row) => {
             const rowSessionId = String(row?.sessionId || '').trim().toLowerCase();
             return rowSessionId.startsWith('stathol-') && String(row?.date || '').trim() === date;
-        }) || null;
+        });
+        if (!matches.length) return null;
+        const targetScheme = String(schemeId || '').trim();
+        if (targetScheme) {
+            const schemeMatch = matches.find((row) => resolveStatHolidaySchemeId(row) === targetScheme);
+            if (schemeMatch) return schemeMatch;
+        }
+        return matches[0];
     }
 
     function buildStatHolidayStatusEntryFromWarning(warning) {
         if (!warning?.checks || typeof warning.checks !== 'object') return null;
         const holidayId = String(warning.holidayId || '').trim();
         if (!holidayId) return null;
+        const schemeId = String(warning?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim();
         return {
-            sessionId: `stathol-${holidayId}-${TARGET_TEACHER_ID}`,
+            sessionId: buildStatHolidayMetadataSessionId(schemeId, holidayId),
             date: warning.date,
             className: warning.title || 'Statutory holiday',
             description: 'Statutory holiday pay',
@@ -3511,6 +3647,8 @@ document.addEventListener('DOMContentLoaded', () => {
             status: 'stat_holiday_not_qualified',
             statHolidayMeta: {
                 holidayId,
+                schemeId,
+                schemeName: String(warning?.schemeName || '').trim(),
                 qualified: false,
                 calculatedHours: Number(warning.calculatedHours || 0),
                 checks: warning.checks,
@@ -3520,25 +3658,191 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function resolveStatHolidayStatusEntryForDate(dateStr) {
-        const metadataEntry = findStatHolidayMetadataEntryByDate(dateStr);
+    function findStatHolidayWarningForContext({ holidayId = '', date = '', schemeId = '' } = {}) {
+        const rows = Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [];
+        const targetHolidayId = String(holidayId || '').trim();
+        const targetDate = String(date || '').trim();
+        const targetSchemeId = String(schemeId || '').trim() || STAT_HOLIDAY_SCHEME_EQUILIBRIUM;
+        if (targetHolidayId) {
+            const exact = rows.find((row) => String(row?.holidayId || '').trim() === targetHolidayId
+                && String(row?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim() === targetSchemeId);
+            if (exact) return exact;
+            const byHoliday = rows.find((row) => String(row?.holidayId || '').trim() === targetHolidayId);
+            if (byHoliday) return byHoliday;
+        }
+        if (targetDate) {
+            const byDateAndScheme = rows.find((row) => String(row?.date || '').trim() === targetDate
+                && String(row?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim() === targetSchemeId);
+            if (byDateAndScheme) return byDateAndScheme;
+            return rows.find((row) => String(row?.date || '').trim() === targetDate) || null;
+        }
+        return null;
+    }
+
+    function resolveStatHolidayStatusEntryForDate(dateStr, schemeId = '') {
+        const metadataEntry = findStatHolidayMetadataEntryByDate(dateStr, schemeId);
         if (metadataEntry?.statHolidayMeta?.checks) return metadataEntry;
-        const warning = (Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [])
-            .find((row) => String(row?.date || '').trim() === String(dateStr || '').trim());
+        const warning = findStatHolidayWarningForContext({ date: dateStr, schemeId });
         return buildStatHolidayStatusEntryFromWarning(warning);
+    }
+
+    function entryHasStatHolidayChecks(entry) {
+        return Boolean(entry?.statHolidayMeta?.checks && typeof entry.statHolidayMeta.checks === 'object');
+    }
+
+    function resolveStatHolidayStoredEntry({ sessionId = '', holidayId = '', schemeId = '', date = '' } = {}) {
+        const normalizedSessionId = String(sessionId || '').trim();
+        const targetHolidayId = String(holidayId || '').trim();
+        const targetSchemeId = String(schemeId || '').trim();
+        const targetDate = String(date || '').trim();
+
+        const tryStored = (candidate) => {
+            if (!candidate) return null;
+            if (entryHasStatHolidayChecks(candidate)) return candidate;
+            const calculationEntry = resolveStatHolidayCalculationEntry(candidate);
+            return entryHasStatHolidayChecks(calculationEntry) ? calculationEntry : null;
+        };
+
+        if (normalizedSessionId) {
+            const fromActive = activeEntries.find((row) => String(row?.sessionId || '') === normalizedSessionId);
+            const fromSaved = savedStatHolidayBySessionId.get(normalizedSessionId);
+            const hit = tryStored(fromActive) || tryStored(fromSaved);
+            if (hit) return hit;
+        }
+
+        if (targetHolidayId && targetDate) {
+            const schemeCandidates = targetSchemeId
+                ? [targetSchemeId, STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC]
+                : [STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC];
+            for (const scheme of [...new Set(schemeCandidates.filter(Boolean))]) {
+                const byKey = savedStatHolidayByHolidayDate.get(
+                    buildStatHolidaySavedKey(targetHolidayId, targetDate, scheme)
+                );
+                const hit = tryStored(byKey);
+                if (hit) return hit;
+            }
+        }
+
+        if (targetHolidayId) {
+            const schemeCandidates = targetSchemeId
+                ? [targetSchemeId, STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC]
+                : [STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC];
+            for (const scheme of [...new Set(schemeCandidates.filter(Boolean))]) {
+                const metadataSessionId = buildStatHolidayMetadataSessionId(scheme, targetHolidayId);
+                const hit = tryStored(savedStatHolidayBySessionId.get(metadataSessionId))
+                    || tryStored(activeEntries.find((row) => String(row?.sessionId || '') === metadataSessionId));
+                if (hit) return hit;
+            }
+
+            const byHolidayMeta = activeEntries.find((row) => {
+                if (resolveStatHolidayHolidayId(row) !== targetHolidayId) return false;
+                if (targetSchemeId && resolveStatHolidaySchemeId(row) !== targetSchemeId) return false;
+                return entryHasStatHolidayChecks(row)
+                    || entryHasStatHolidayChecks(resolveStatHolidayCalculationEntry(row));
+            });
+            const hit = tryStored(byHolidayMeta);
+            if (hit) return hit;
+
+            if (targetDate) {
+                const byDate = findStatHolidayMetadataEntryByDate(targetDate, targetSchemeId);
+                const fromDate = tryStored(byDate);
+                if (fromDate) return fromDate;
+            }
+
+            for (const saved of savedStatHolidayBySessionId.values()) {
+                if (resolveStatHolidayHolidayId(saved) !== targetHolidayId) continue;
+                if (targetSchemeId && resolveStatHolidaySchemeId(saved) !== targetSchemeId) continue;
+                const fromSaved = tryStored(saved);
+                if (fromSaved) return fromSaved;
+            }
+        }
+
+        return null;
     }
 
     function resolveStatHolidayStatusEntryForSessionId(sessionId) {
         const normalized = String(sessionId || '').trim();
+        if (!normalized) return null;
+        const stored = resolveStatHolidayStoredEntry({ sessionId: normalized });
+        if (stored) return stored;
         const rawEntry = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
-        if (rawEntry) return resolveDisplayEntry(rawEntry);
-        const holidayId = normalized.replace(/^stathol-/i, '').replace(new RegExp(`-${TARGET_TEACHER_ID}$`), '');
-        if (!holidayId || holidayId === normalized) return null;
-        const metadataEntry = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
-        if (metadataEntry?.statHolidayMeta?.checks) return metadataEntry;
-        const warning = (Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [])
-            .find((row) => String(row?.holidayId || '').trim() === holidayId);
+        if (rawEntry) {
+            const fromHoliday = resolveStatHolidayStoredEntry({
+                sessionId: normalized,
+                holidayId: resolveStatHolidayHolidayId(rawEntry),
+                schemeId: resolveStatHolidaySchemeId(rawEntry),
+                date: String(rawEntry?.date || '').trim()
+            });
+            if (fromHoliday) return fromHoliday;
+        }
+        const parsed = parseStatHolidayMetadataSessionId(normalized);
+        if (!parsed.holidayId) return null;
+        const fromHoliday = resolveStatHolidayStoredEntry({
+            sessionId: normalized,
+            holidayId: parsed.holidayId,
+            schemeId: parsed.schemeId
+        });
+        if (fromHoliday) return fromHoliday;
+        const warning = findStatHolidayWarningForContext({
+            holidayId: parsed.holidayId,
+            schemeId: parsed.schemeId
+        });
         return buildStatHolidayStatusEntryFromWarning(warning);
+    }
+
+    function resolveStatHolidayCalculationModalEntry(sessionId) {
+        const normalized = String(sessionId || '').trim();
+        if (!normalized) return null;
+        const stored = resolveStatHolidayStoredEntry({ sessionId: normalized });
+        if (stored) return stored;
+        const rawEntry = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
+        if (rawEntry) {
+            const fromHoliday = resolveStatHolidayStoredEntry({
+                sessionId: normalized,
+                holidayId: resolveStatHolidayHolidayId(rawEntry),
+                schemeId: resolveStatHolidaySchemeId(rawEntry),
+                date: String(rawEntry?.date || '').trim()
+            });
+            if (fromHoliday) return fromHoliday;
+        }
+        const fromModal = resolveStatHolidayModalEntry(normalized);
+        if (entryHasStatHolidayChecks(fromModal)) return fromModal;
+        const parsed = parseStatHolidayMetadataSessionId(normalized);
+        if (parsed.holidayId) {
+            const fromHoliday = resolveStatHolidayStoredEntry({
+                holidayId: parsed.holidayId,
+                schemeId: parsed.schemeId
+            });
+            if (fromHoliday) return fromHoliday;
+        }
+        const fromStatus = resolveStatHolidayStatusEntryForSessionId(normalized);
+        if (entryHasStatHolidayChecks(fromStatus)) return fromStatus;
+        const ensured = resolveOrEnsureStatHolidayActiveEntry(normalized);
+        return entryHasStatHolidayChecks(ensured) ? ensured : null;
+    }
+
+    function resolveStatHolidayChipSessionId(entry) {
+        if (!entry || !hasStatHolidayCalculationDetails(entry)) return '';
+        const stored = resolveStatHolidayStoredEntry({
+            sessionId: String(entry?.sessionId || '').trim(),
+            holidayId: resolveStatHolidayHolidayId(entry),
+            schemeId: resolveStatHolidaySchemeId(entry),
+            date: String(entry?.date || '').trim()
+        });
+        if (stored) {
+            const storedSessionId = String(stored?.sessionId || '').trim();
+            if (storedSessionId) return storedSessionId;
+        }
+        const holidayId = resolveStatHolidayHolidayId(entry);
+        const schemeId = resolveStatHolidaySchemeId(entry);
+        if (holidayId) {
+            const metadataSessionId = buildStatHolidayMetadataSessionId(schemeId, holidayId);
+            if (metadataSessionId && resolveStatHolidayCalculationModalEntry(metadataSessionId)) {
+                return metadataSessionId;
+            }
+        }
+        const fallbackSessionId = String(entry?.sessionId || '').trim();
+        return resolveStatHolidayCalculationModalEntry(fallbackSessionId) ? fallbackSessionId : '';
     }
 
     function resolveOrEnsureStatHolidayActiveEntry(sessionId) {
@@ -3595,6 +3899,8 @@ document.addEventListener('DOMContentLoaded', () => {
             colorBorder = '#ffc107';
             icon = 'bi-exclamation-triangle-fill';
         }
+        const chipSessionId = resolveStatHolidayChipSessionId(entry);
+        if (!chipSessionId) return '';
         return buildStatusChipHtml({
             icon,
             label: tip,
@@ -3602,7 +3908,7 @@ document.addEventListener('DOMContentLoaded', () => {
             colorText,
             colorBorder,
             interactive: true,
-            sessionId: String(calculationEntry?.sessionId || entry?.sessionId || '')
+            sessionId: chipSessionId
         });
     }
 
@@ -3610,15 +3916,61 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!entry) return null;
         const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
         if (sessionId.startsWith('stathol-')) return entry;
+        if (entry?.statHolidayMeta?.checks && typeof entry.statHolidayMeta.checks === 'object') {
+            return entry;
+        }
 
         const holidayId = resolveStatHolidayHolidayId(entry);
+        const schemeId = resolveStatHolidaySchemeId(entry);
         if (holidayId) {
-            const metadataSessionId = `stathol-${holidayId}-${TARGET_TEACHER_ID}`;
+            const metadataSessionId = buildStatHolidayMetadataSessionId(schemeId, holidayId);
             const byHolidayId = activeEntries.find((row) => String(row?.sessionId || '') === metadataSessionId);
             if (byHolidayId) return byHolidayId;
         }
 
-        return findStatHolidayMetadataEntryByDate(entry?.date);
+        return findStatHolidayMetadataEntryByDate(entry?.date, schemeId);
+    }
+
+    function resolveStatHolidayModalEntry(sessionId) {
+        const normalized = String(sessionId || '').trim();
+        if (!normalized) return null;
+
+        const tryEntry = (source) => {
+            if (!source) return null;
+            const calculationEntry = resolveStatHolidayCalculationEntry(source, source);
+            if (calculationEntry?.statHolidayMeta?.checks) return calculationEntry;
+            if (source?.statHolidayMeta?.checks) return source;
+            return null;
+        };
+
+        const rawEntry = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
+        if (rawEntry) {
+            const fromRaw = tryEntry(resolveDisplayEntry(rawEntry));
+            if (fromRaw) return fromRaw;
+            const holidayId = resolveStatHolidayHolidayId(rawEntry);
+            const schemeId = resolveStatHolidaySchemeId(rawEntry);
+            if (holidayId) {
+                const metadataSessionId = buildStatHolidayMetadataSessionId(schemeId, holidayId);
+                const metadataRow = activeEntries.find((row) => String(row?.sessionId || '') === metadataSessionId);
+                const fromMetadata = tryEntry(metadataRow ? resolveDisplayEntry(metadataRow) : null);
+                if (fromMetadata) return fromMetadata;
+            }
+            const fromDate = tryEntry(resolveStatHolidayStatusEntryForDate(String(rawEntry?.date || '').trim()));
+            if (fromDate) return fromDate;
+        }
+
+        const parsed = parseStatHolidayMetadataSessionId(normalized);
+        if (!parsed.holidayId) return null;
+        const metadataRow = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
+        const fromSession = tryEntry(metadataRow ? resolveDisplayEntry(metadataRow) : null);
+        if (fromSession) return fromSession;
+        const warning = findStatHolidayWarningForContext({
+            holidayId: parsed.holidayId,
+            schemeId: parsed.schemeId
+        });
+        const fromWarning = tryEntry(buildStatHolidayStatusEntryFromWarning(warning));
+        if (fromWarning) return fromWarning;
+        return resolveStatHolidayStatusEntryForSessionId(normalized);
     }
 
     function isStatHolidayPayTimesheetRow(entry) {
@@ -3658,6 +4010,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function hasStatHolidayCalculationDetails(entry) {
+        if (entry?.statHolidayMeta?.checks && typeof entry.statHolidayMeta.checks === 'object') {
+            return true;
+        }
         const metadataEntry = findStatHolidayMetadataEntryForRow(entry);
         return Boolean(
             metadataEntry?.statHolidayMeta?.checks
@@ -4243,6 +4598,8 @@ document.addEventListener('DOMContentLoaded', () => {
     tbody.addEventListener('click', (event) => {
         const statTrigger = event.target.closest('.ts-stat-holiday-status-trigger');
         if (statTrigger && tbody.contains(statTrigger)) {
+            event.preventDefault();
+            hideEntryTip();
             const sessionId = String(statTrigger.dataset.sesid || '').trim();
             if (sessionId) openStatHolidayCalculationModal(sessionId);
             return;
@@ -6373,14 +6730,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const reasonHtml = reasons.length
                 ? `<ul class="small mb-2 ps-3">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>`
                 : '<p class="small text-muted mb-2">This holiday did not meet statutory pay requirements.</p>';
+            const schemeId = String(warning?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim();
+            const sessionId = buildStatHolidayMetadataSessionId(schemeId, warning.holidayId);
+            const schemeLabel = String(warning?.schemeName || '').trim();
             const setHoursBtn = CAN_MANAGE_STAT_HOLIDAY_OVERRIDES && !STAT_HOLIDAY_PREVIEW_ONLY
-                ? `<button type="button" class="btn btn-sm btn-outline-success" onclick="openStatHolidayOverrideModal('stathol-${escapeHtml(warning.holidayId)}-${TARGET_TEACHER_ID}')"><i class="bi bi-pencil-square me-1"></i>Set hours</button>`
+                ? `<button type="button" class="btn btn-sm btn-outline-success" onclick="openStatHolidayOverrideModal('${escapeHtml(sessionId)}')"><i class="bi bi-pencil-square me-1"></i>Set hours</button>`
                 : '';
             const viewCalcBtn = warning?.checks
-                ? `<button type="button" class="btn btn-sm btn-outline-primary" onclick="openStatHolidayCalculationModal('stathol-${escapeHtml(warning.holidayId)}-${TARGET_TEACHER_ID}')"><i class="bi bi-balloon-fill me-1"></i>View calculation steps</button>`
+                ? `<button type="button" class="btn btn-sm btn-outline-primary" onclick="openStatHolidayCalculationModal('${escapeHtml(sessionId)}')"><i class="bi bi-balloon-fill me-1"></i>View calculation steps</button>`
                 : '';
             return `<div class="border rounded p-3 mb-3 bg-white">
-                <div class="fw-bold">${escapeHtml(warning.title || 'Statutory holiday')} <span class="text-muted fw-normal">(${escapeHtml(formatTimesheetDateLabel(warning.date))})</span></div>
+                <div class="fw-bold">${escapeHtml(warning.title || 'Statutory holiday')} <span class="text-muted fw-normal">(${escapeHtml(formatTimesheetDateLabel(warning.date))})</span>${schemeLabel ? ` <span class="badge text-bg-light border ms-1">${escapeHtml(schemeLabel)}</span>` : ''}</div>
                 ${reasonHtml}
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge text-bg-light border">Calculated hours: ${Number(warning?.calculatedHours || 0).toFixed(2)}</span>
@@ -6448,8 +6808,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderStatHolidayWarningsPanel();
     };
 
-    window.forcePayStatHolidayWarning = async function(holidayId) {
-        const sessionId = `stathol-${holidayId}-${TARGET_TEACHER_ID}`;
+    window.forcePayStatHolidayWarning = async function(holidayId, schemeId) {
+        const sessionId = buildStatHolidayMetadataSessionId(schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM, holidayId);
         await window.openStatHolidayOverrideModal(sessionId);
     };
 
@@ -6487,6 +6847,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     bindTimesheetGuidanceControls();
+    attachPreviewStatHolidayMetadataToActiveEntries();
     rehydrateSavedStatHolidayEntries();
     renderStatHolidayWarningsPanel();
     renderIncompleteSessionsPanel();

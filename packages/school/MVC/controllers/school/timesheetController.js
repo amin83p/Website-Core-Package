@@ -63,6 +63,62 @@ function getActiveOrgIdOrThrow(reqUser) {
     return activeOrgId;
 }
 
+function supplementHolidaysFromActivitySessions(holidays = [], sessions = [], period = {}) {
+    const periodStart = String(period?.startDate || '').trim();
+    const periodEnd = String(period?.endDate || '').trim();
+    const holidayById = new Map();
+    (Array.isArray(holidays) ? holidays : []).forEach((holiday) => {
+        const holidayId = String(holiday?.id || '').trim();
+        if (holidayId) holidayById.set(holidayId, { ...holiday });
+    });
+    (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+        const holidayId = String(session?.statHolidayId || session?.statHolidayMeta?.holidayId || '').trim();
+        const date = String(session?.date || '').trim();
+        if (!holidayId || !date) return;
+        if (periodStart && date < periodStart) return;
+        if (periodEnd && date > periodEnd) return;
+        const existing = holidayById.get(holidayId) || {};
+        holidayById.set(holidayId, {
+            ...existing,
+            id: holidayId,
+            date,
+            title: String(session?.className || session?.description || existing?.title || 'Statutory holiday').trim()
+                || 'Statutory holiday',
+            type: 'National Holiday'
+        });
+    });
+    return [...holidayById.values()];
+}
+
+function enrichLiveSessionsWithStatHolidayMeta(sessions = [], statHolidayRows = []) {
+    const metaByAssigneeKey = new Map();
+    (Array.isArray(statHolidayRows) ? statHolidayRows : []).forEach((row) => {
+        const holidayId = String(row?.statHolidayMeta?.holidayId || row?.statHolidayId || '').trim();
+        const date = String(row?.date || '').trim();
+        const schemeId = String(row?.statHolidayMeta?.schemeId || row?.statHolidaySchemeId || 'equilibrium_school').trim()
+            || 'equilibrium_school';
+        if (!holidayId || !date || !row?.statHolidayMeta?.checks) return;
+        metaByAssigneeKey.set(`${schemeId}|${holidayId}|${date}`, row.statHolidayMeta);
+        metaByAssigneeKey.set(`${holidayId}|${date}`, row.statHolidayMeta);
+    });
+    return (Array.isArray(sessions) ? sessions : []).map((session) => {
+        if (session?.statHolidayMeta?.checks) return session;
+        const holidayId = String(session?.statHolidayId || session?.statHolidayMeta?.holidayId || '').trim();
+        const date = String(session?.date || '').trim();
+        if (!holidayId || !date) return session;
+        const schemeId = String(session?.statHolidaySchemeId || session?.statHolidayMeta?.schemeId || 'equilibrium_school').trim()
+            || 'equilibrium_school';
+        const meta = metaByAssigneeKey.get(`${schemeId}|${holidayId}|${date}`)
+            || metaByAssigneeKey.get(`${holidayId}|${date}`);
+        if (!meta?.checks) return session;
+        return {
+            ...session,
+            statHolidaySchemeId: schemeId,
+            statHolidayMeta: { ...(session.statHolidayMeta || {}), ...meta }
+        };
+    });
+}
+
 function assertPeriodOrgAccess(period, activeOrgId, reqUser) {
     assertOrgAccess(period, activeOrgId, reqUser, { orgField: 'orgId', allowSystemBypass: true });
 }
@@ -2442,6 +2498,7 @@ exports.viewTimesheet = async (req, res) => {
         ]);
 
         let statHolidayWarnings = [];
+        let statHolidayPreviewRows = [];
         let liveSessionsWithStatHolidays = mergedLiveSessions;
         const timesheetStatus = String(timesheet.status || 'draft').toLowerCase();
         const isDraftTimesheet = timesheetStatus === 'draft';
@@ -2453,10 +2510,15 @@ exports.viewTimesheet = async (req, res) => {
         const statutoryHolidayUsesActivity = statutoryHolidayEligibilityService.usesStatHolidayActivityMode(
             timesheetParametersPolicy
         );
-        if (!useFrozenSnapshot && !isDraftTimesheet) {
+        if (!isDraftTimesheet) {
             const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
                 timesheet.entries,
                 mergedLiveSessions
+            );
+            const holidaysForStatHolidayPreview = supplementHolidaysFromActivitySessions(
+                allHolidays,
+                mergedLiveSessions,
+                period
             );
             const statHolidayMaterialization = await statutoryHolidayTimesheetLifecycleService.previewStatHolidayForTimesheet({
                 orgId: activeOrgId,
@@ -2464,13 +2526,37 @@ exports.viewTimesheet = async (req, res) => {
                 personName: payrollContext.personName,
                 period,
                 policy: timesheetParametersPolicy,
-                holidays: allHolidays,
+                holidays: holidaysForStatHolidayPreview,
                 periodEntries: periodWorkdayEntries,
                 existingEntries: timesheet.entries,
                 reqUser: req.user,
                 allowManagerOverride: canManagerUpdate
             });
             statHolidayWarnings = statHolidayMaterialization.warnings;
+            statHolidayPreviewRows = Array.isArray(statHolidayMaterialization?.rows)
+                ? statHolidayMaterialization.rows
+                : [];
+            if (!statHolidayPreviewRows.length) {
+                statHolidayPreviewRows = statutoryHolidayEligibilityService.buildStatHolidayMetadataRowsFromEvaluations({
+                    evaluations: statHolidayMaterialization?.evaluations || [],
+                    personId: teacherContext.targetTeacherId,
+                    activitySessions: mergedLiveSessions,
+                    policy: timesheetParametersPolicy
+                });
+            }
+            if (!statHolidayPreviewRows.length) {
+                statHolidayPreviewRows = await statutoryHolidayEligibilityService.buildStatHolidayMetadataRowsForActivitySessions({
+                    orgId: activeOrgId,
+                    personId: teacherContext.targetTeacherId,
+                    period,
+                    policy: timesheetParametersPolicy,
+                    periodEntries: periodWorkdayEntries,
+                    existingEntries: timesheet.entries,
+                    reqUser: req.user,
+                    allowManagerOverride: canManagerUpdate,
+                    activitySessions: mergedLiveSessions
+                });
+            }
             if (statHolidayMaterialization?.syncOutcome?.rowCount) {
                 const refreshedActivitySessions = await activityService.getTimesheetEntriesForPerson({
                     orgId: activeOrgId,
@@ -2488,7 +2574,7 @@ exports.viewTimesheet = async (req, res) => {
             if (statutoryHolidayUsesActivity) {
                 liveSessionsWithStatHolidays = [
                     ...liveSessionsWithStatHolidays,
-                    ...(Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : []).map((row) => ({
+                    ...statHolidayPreviewRows.map((row) => ({
                         ...row,
                         hours: 0,
                         timesheetHours: 0,
@@ -2498,9 +2584,13 @@ exports.viewTimesheet = async (req, res) => {
             } else {
                 liveSessionsWithStatHolidays = [
                     ...liveSessionsWithStatHolidays,
-                    ...(Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : [])
+                    ...statHolidayPreviewRows
                 ];
             }
+            liveSessionsWithStatHolidays = enrichLiveSessionsWithStatHolidayMeta(
+                liveSessionsWithStatHolidays,
+                statHolidayPreviewRows
+            );
         }
 
         const payrollEditor = shapePayrollContextForEditor(payrollContext);
@@ -2650,6 +2740,7 @@ exports.viewTimesheet = async (req, res) => {
                 !viewingOtherPerson || canManagerUpdate || canTimesheetsAdminUpdate
             ),
             statHolidayWarnings,
+            statHolidayPreviewRows,
             canManageStatHolidayOverrides: canReviewerEdit && canManagerUpdate,
             statHolidayPreviewOnly: status === 'draft',
             statutoryHolidayUsesActivity,
@@ -3034,17 +3125,17 @@ exports.saveTimesheet = async (req, res) => {
                 .map((row) => [String(row?.sessionId || '').trim(), row])
                 .filter(([sessionId]) => Boolean(sessionId))
         );
-        const statHolidayOverrideByHolidayId = new Map();
-        entryRows.forEach((row) => {
+        const statHolidayOverrideBySchemeHoliday = new Map();
+        const rememberStatHolidayOverride = (row) => {
             if (!row || row.isDeleted === true || !row.statHolidayOverride) return;
             const holidayId = String(row.statHolidayMeta?.holidayId || row.statHolidayId || '').trim();
-            if (holidayId) statHolidayOverrideByHolidayId.set(holidayId, row.statHolidayOverride);
-        });
-        (Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : []).forEach((row) => {
-            const holidayId = String(row?.statHolidayMeta?.holidayId || '').trim();
-            if (!holidayId || !row?.statHolidayOverride) return;
-            statHolidayOverrideByHolidayId.set(holidayId, row.statHolidayOverride);
-        });
+            if (!holidayId) return;
+            const schemeId = String(row.statHolidayMeta?.schemeId || 'equilibrium_school').trim() || 'equilibrium_school';
+            const key = `${schemeId}|${holidayId}`;
+            statHolidayOverrideBySchemeHoliday.set(key, row.statHolidayOverride);
+        };
+        entryRows.forEach(rememberStatHolidayOverride);
+        (Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : []).forEach(rememberStatHolidayOverride);
 
         const hasManualRows = entryRows.some((entry) => entry && entry.isDeleted !== true && entry.isManual === true);
         let activityById = new Map();
@@ -3310,8 +3401,12 @@ exports.saveTimesheet = async (req, res) => {
                 }
                 let hours = Number(parseFloat(entry.hours ?? entry.timesheetHours ?? entry.durationHours ?? activityRef.timesheetHours) || 0);
                 const statHolidayId = String(entry.statHolidayId || activityRef.statHolidayId || '').trim();
+                const statHolidaySchemeId = String(
+                    entry.statHolidaySchemeId || activityRef.statHolidaySchemeId || 'equilibrium_school'
+                ).trim() || 'equilibrium_school';
+                const overrideKey = statHolidayId ? `${statHolidaySchemeId}|${statHolidayId}` : '';
                 const statHolidayOverride = entry.statHolidayOverride
-                    || (statHolidayId ? statHolidayOverrideByHolidayId.get(statHolidayId) : null);
+                    || (overrideKey ? statHolidayOverrideBySchemeHoliday.get(overrideKey) : null);
                 if (allowStatHolidayOverride && statHolidayOverride && typeof statHolidayOverride === 'object') {
                     const overrideHours = Number(statHolidayOverride.hours);
                     if (statHolidayOverride.forcePay === true && Number.isFinite(overrideHours) && overrideHours >= 0) {

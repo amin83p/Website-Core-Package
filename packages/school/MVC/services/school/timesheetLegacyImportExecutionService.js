@@ -11,6 +11,7 @@ const timesheetPayrollContextService = require('./timesheetPayrollContextService
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
 const timesheetParametersPolicyService = require('./timesheetParametersPolicyService');
 const statutoryHolidayEligibilityService = require('./statutoryHolidayEligibilityService');
+const statutoryHolidaySchemeService = require('./statutoryHolidaySchemeService');
 const statutoryHolidayTimesheetLifecycleService = require('./statutoryHolidayTimesheetLifecycleService');
 const statutoryHolidayWorkSessionService = require('./statutoryHolidayWorkSessionService');
 const activityService = require('./activityService');
@@ -74,11 +75,14 @@ function emptyStatHolidayPreview() {
   return {
     hasStatHolidays: false,
     count: 0,
+    evaluationCount: 0,
+    payableHolidayCount: 0,
     holidayNames: [],
     warnings: [],
     configurationWarnings: [],
     missingDayEntries: [],
     blockingErrors: [],
+    schemeOutcomes: [],
     hasBlockingIssues: false,
     activityId: '',
     activityTitle: ''
@@ -88,22 +92,34 @@ function emptyStatHolidayPreview() {
 async function buildStatHolidayConfigurationMismatchWarnings({
   policy,
   missingDayEntries = [],
+  schemeOutcomes = [],
   reqUser
 } = {}) {
-  if (!Array.isArray(missingDayEntries) || !missingDayEntries.length) return [];
-  const resolved = timesheetParametersPolicyService.resolvePolicy(policy);
-  const activityId = cleanId(resolved?.statutoryHolidayPay?.activityId);
-  const mappingActivityId = cleanId(resolved?.statutoryHolidayPay?.mappingActivityId);
-  if (!activityId || !mappingActivityId || idsEqual(activityId, mappingActivityId)) {
+  if ((!Array.isArray(missingDayEntries) || !missingDayEntries.length)
+    && (!Array.isArray(schemeOutcomes) || !schemeOutcomes.length)) {
     return [];
   }
-  const [payActivity, mappingActivity] = await Promise.all([
-    activityService.getActivity(activityId, reqUser).catch(() => null),
-    activityService.getActivity(mappingActivityId, reqUser).catch(() => null)
-  ]);
-  const payLabel = String(payActivity?.title || activityId).trim();
-  const mappingLabel = String(mappingActivity?.title || mappingActivityId).trim();
-  return [`Holiday day mapping is configured on "${mappingLabel}" but statutory holiday pay uses "${payLabel}". Map holiday day work sessions on the statutory holiday activity or align both settings.`];
+  const resolved = timesheetParametersPolicyService.resolvePolicy(policy);
+  const mappingActivityId = cleanId(resolved?.statutoryHolidayPay?.mappingActivityId);
+  if (!mappingActivityId) return [];
+
+  const schemesInUse = statutoryHolidaySchemeService.resolveSchemesWithAssignedDepartments(resolved);
+  const warnings = [];
+  for (const { schemeId, config } of schemesInUse) {
+    const payActivityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(resolved, schemeId);
+    if (!payActivityId || idsEqual(payActivityId, mappingActivityId)) continue;
+    const [payActivity, mappingActivity] = await Promise.all([
+      activityService.getActivity(payActivityId, reqUser).catch(() => null),
+      activityService.getActivity(mappingActivityId, reqUser).catch(() => null)
+    ]);
+    const schemeName = String(config?.name || schemeId).trim();
+    const payLabel = String(payActivity?.title || payActivityId).trim();
+    const mappingLabel = String(mappingActivity?.title || mappingActivityId).trim();
+    warnings.push(
+      `Holiday day mapping is configured on "${mappingLabel}" but ${schemeName} statutory holiday pay uses "${payLabel}". Map holiday day work sessions on the scheme activity or align both settings.`
+    );
+  }
+  return warnings;
 }
 
 async function previewImportExecutionStatHolidayForRow({
@@ -125,18 +141,21 @@ async function previewImportExecutionStatHolidayForRow({
     return emptyStatHolidayPreview();
   }
 
-  const configuredActivityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(
-    timesheetParametersPolicy
-  );
-  if (!configuredActivityId) {
+  const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(timesheetParametersPolicy);
+  const schemesInUse = statutoryHolidaySchemeService.resolveSchemesWithAssignedDepartments(resolvedPolicy);
+  const unconfiguredSchemes = schemesInUse.filter(({ config }) => !cleanId(config?.activityId));
+  if (unconfiguredSchemes.length) {
+    const blockingErrors = unconfiguredSchemes.map(({ schemeId, config }) => {
+      const schemeName = String(config?.name || schemeId).trim();
+      return `Statutory holiday scheme "${schemeName}" has no public activity configured. Assign an activity in School Settings before importing.`;
+    });
     return {
       ...emptyStatHolidayPreview(),
       hasBlockingIssues: true,
-      blockingErrors: [
-        'Statutory holiday pay is enabled but no statutory holiday activity is configured.'
-      ]
+      blockingErrors
     };
   }
+  const configuredActivityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(resolvedPolicy);
 
   const proxyEntries = buildProxyWorkdayEntriesFromCompiledRows(compiledRows);
   const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
@@ -157,11 +176,16 @@ async function previewImportExecutionStatHolidayForRow({
       reqUser
     });
     const statRows = Array.isArray(materialization?.rows) ? materialization.rows : [];
-    const holidayNames = [...new Set(statRows
-      .map((row) => String(row?.className || row?.statHolidayMeta?.holidayName || '').trim())
-      .filter(Boolean))];
+    const evaluations = Array.isArray(materialization?.evaluations) ? materialization.evaluations : [];
+    const holidayNames = [...new Set([
+      ...statRows.map((row) => String(row?.className || row?.statHolidayMeta?.holidayName || '').trim()),
+      ...evaluations.map((row) => String(row?.title || row?.holidayName || '').trim())
+    ].filter(Boolean))];
     const missingDayEntries = Array.isArray(materialization?.syncOutcome?.missingDayEntries)
       ? materialization.syncOutcome.missingDayEntries
+      : [];
+    const schemeOutcomes = Array.isArray(materialization?.syncOutcome?.schemeOutcomes)
+      ? materialization.syncOutcome.schemeOutcomes
       : [];
     const activityId = cleanId(materialization?.syncOutcome?.activityId) || configuredActivityId;
     let activityTitle = '';
@@ -175,19 +199,23 @@ async function previewImportExecutionStatHolidayForRow({
     const configurationWarnings = await buildStatHolidayConfigurationMismatchWarnings({
       policy: timesheetParametersPolicy,
       missingDayEntries,
+      schemeOutcomes,
       reqUser
     });
     const eligibilityWarnings = Array.isArray(materialization?.warnings) ? materialization.warnings : [];
     const warnings = [...eligibilityWarnings, ...configurationWarnings];
     const hasBlockingIssues = missingDayEntries.length > 0 || blockingErrors.length > 0;
     return {
-      hasStatHolidays: statRows.length > 0 || missingDayEntries.length > 0,
+      hasStatHolidays: statRows.length > 0 || missingDayEntries.length > 0 || evaluations.length > 0,
       count: statRows.length,
+      evaluationCount: evaluations.length,
+      payableHolidayCount: holidayNames.length,
       holidayNames,
       warnings,
       configurationWarnings,
       missingDayEntries,
       blockingErrors,
+      schemeOutcomes,
       hasBlockingIssues,
       activityId,
       activityTitle

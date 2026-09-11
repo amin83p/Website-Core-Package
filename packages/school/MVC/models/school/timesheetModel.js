@@ -241,6 +241,8 @@ function sanitizeStatHolidayOverride(input) {
 function sanitizeStatHolidayMeta(input) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
     const holidayId = cleanString(input.holidayId, { max: 80, allowEmpty: true });
+    const schemeId = cleanString(input.schemeId, { max: 80, allowEmpty: true });
+    const schemeName = cleanString(input.schemeName, { max: 120, allowEmpty: true });
     const calculatedHours = Number(input.calculatedHours);
     const row = {
         qualified: input.qualified === true,
@@ -251,6 +253,17 @@ function sanitizeStatHolidayMeta(input) {
             .slice(0, 20)
     };
     if (holidayId) row.holidayId = holidayId;
+    if (schemeId) row.schemeId = schemeId;
+    if (schemeName) row.schemeName = schemeName;
+    if (Array.isArray(input.departmentIds)) {
+        row.departmentIds = input.departmentIds
+            .map((value) => cleanString(value, { max: 80, allowEmpty: true }))
+            .filter(Boolean)
+            .slice(0, 50);
+    }
+    if (input.calculatedHoursByDepartment && typeof input.calculatedHoursByDepartment === 'object' && !Array.isArray(input.calculatedHoursByDepartment)) {
+        row.calculatedHoursByDepartment = input.calculatedHoursByDepartment;
+    }
     if (input.checks && typeof input.checks === 'object' && !Array.isArray(input.checks)) {
         row.checks = input.checks;
     }

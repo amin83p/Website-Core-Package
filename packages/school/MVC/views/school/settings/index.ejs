@@ -43,6 +43,28 @@
       payableHolidayTypes: ['National Holiday', 'Observance Paid']
     };
   const statutoryHolidayPayEnabled = statutoryHolidayPayPolicy.enabled !== false;
+  const statutoryHolidaySchemesConfig = (typeof statutoryHolidaySchemes !== 'undefined' && statutoryHolidaySchemes?.schemes)
+    ? statutoryHolidaySchemes
+    : {
+      defaultSchemeId: 'equilibrium_school',
+      schemes: {
+        equilibrium_school: { id: 'equilibrium_school', name: 'Equilibrium School Scheme', activityId: statutoryHolidayPayPolicy.activityId || '' },
+        linc: { id: 'linc', name: 'LINC Scheme', activityId: '', hourMode: 'most_recent', fixedHours: 0, averageWeeks: 4 }
+      },
+      departmentSchemeAssignments: statutoryHolidayPayPolicy.departmentSchemeAssignments || {}
+    };
+  const statutoryHolidayDefaultSchemeId = String(
+    statutoryHolidaySchemesConfig.defaultSchemeId || statutoryHolidayPayPolicy.defaultSchemeId || 'equilibrium_school'
+  ).trim();
+  const statutoryHolidaySchemeRows = [
+    statutoryHolidaySchemesConfig.schemes?.equilibrium_school || { id: 'equilibrium_school', name: 'Equilibrium School Scheme' },
+    statutoryHolidaySchemesConfig.schemes?.linc || { id: 'linc', name: 'LINC Scheme', hourMode: 'most_recent' }
+  ];
+  const departmentOptionsList = Array.isArray(departmentOptions) ? departmentOptions : [];
+  const departmentSchemeAssignmentsMap = statutoryHolidaySchemesConfig.departmentSchemeAssignments
+    && typeof statutoryHolidaySchemesConfig.departmentSchemeAssignments === 'object'
+    ? statutoryHolidaySchemesConfig.departmentSchemeAssignments
+    : {};
   const statutoryHolidayActivityIdValue = String(statutoryHolidayPayPolicy.activityId || '').trim();
   const statutoryHolidayMappingActivityIdValue = String(
     statutoryHolidayPayPolicy.mappingActivityId || statutoryHolidayPayPolicy.activityId || ''
@@ -252,6 +274,29 @@
   }
   .session-notification-section-toggle .bi-chevron-down {
     transition: transform 0.2s ease;
+  }
+  .linc-hour-mode-help-btn {
+    border: 0;
+    background: transparent;
+    color: var(--bs-secondary-color);
+    padding: 0;
+    line-height: 1;
+    vertical-align: -0.1em;
+  }
+  .linc-hour-mode-help-btn:hover,
+  .linc-hour-mode-help-btn:focus-visible {
+    color: var(--bs-primary);
+  }
+  .linc-hour-mode-help-popover {
+    max-width: 22rem;
+    font-size: 0.875rem;
+  }
+  .linc-hour-mode-help-popover ul {
+    margin-bottom: 0;
+    padding-left: 1.1rem;
+  }
+  .linc-hour-mode-help-popover li + li {
+    margin-top: 0.35rem;
   }
   .session-notification-section-toggle[aria-expanded="false"] .bi-chevron-down {
     transform: rotate(-90deg);
@@ -1319,17 +1364,7 @@
                   <label class="form-check-label" for="statutoryHolidayPayEnabled">Enabled</label>
                 </div>
               </div>
-              <p class="small text-muted mb-3">When eligible, auto-add statutory holiday pay using payable workday history, approved leave checks, and a rolling average-hours formula. When an activity is selected, payable hours are written as work sessions on that activity (department and category come from the activity).</p>
-              <div class="mb-3">
-                <label class="form-label small fw-semibold" for="statutoryHolidayActivityId">Statutory holiday activity</label>
-                <select class="form-select" id="statutoryHolidayActivityId" name="statutoryHolidayActivityId" <%= canUpdateFlag ? 'required' : 'disabled' %>>
-                  <option value="" <%= statutoryHolidayActivityIdValue ? '' : 'selected' %>>Select public activity...</option>
-                  <% statutoryHolidayPublicActivityOptionsList.forEach((activity) => { %>
-                    <option value="<%= activity.id %>" <%= activity.id === statutoryHolidayActivityIdValue ? 'selected' : '' %>><%= activity.title %><%= activity.departmentName ? ' (' + activity.departmentName + ')' : '' %></option>
-                  <% }); %>
-                </select>
-                <div class="form-text">Required when statutory holiday pay is enabled. Must be a posted, paid, public (school) activity. Payable hours are calculated on timesheet submission and written as assignees on this activity.</div>
-              </div>
+              <p class="small text-muted mb-3">When eligible, auto-add statutory holiday pay using payable workday history, approved leave checks, and a rolling average-hours formula. Payable hours are written as assignees on each scheme's public activity (see Scheme activity assignments).</p>
               <div class="border rounded p-3 mt-3 bg-light-subtle">
                 <div class="fw-semibold small mb-2">Holiday day mapping</div>
                 <p class="small text-muted mb-3">Create empty 08:00–20:00 work sessions on a public activity for each payable holiday in a calendar year. Dates that already have any work session in the activity are skipped. People are added as assignees with their calculated hours when timesheets are processed.</p>
@@ -1358,33 +1393,6 @@
                 </div>
                 <div id="statutoryHolidayDayMappingError" class="alert alert-danger mt-3 d-none" role="alert"></div>
               </div>
-              <div class="row g-3">
-                <div class="col-md-4">
-                  <label class="form-label small fw-semibold" for="statutoryHolidayMinWorkdays">Minimum workdays</label>
-                  <input class="form-control" type="number" min="1" max="365" id="statutoryHolidayMinWorkdays" name="statutoryHolidayMinWorkdays" value="<%= statutoryHolidayPayPolicy.minWorkdays || 30 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <div class="form-text">Distinct payable workdays required before the holiday, counted across all saved timesheet history (not limited to a recent window).</div>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label small fw-semibold" for="statutoryHolidayWeekdayOccurrencesRequired">Weekday occurrences required</label>
-                  <input class="form-control" type="number" min="1" max="9" id="statutoryHolidayWeekdayOccurrencesRequired" name="statutoryHolidayWeekdayOccurrencesRequired" value="<%= statutoryHolidayPayPolicy.weekdayOccurrencesRequired || 5 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <div class="form-text">Payable hours on at least this many of the previous same weekdays.</div>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label small fw-semibold" for="statutoryHolidayWeekdayOccurrencesLookback">Weekday lookback count</label>
-                  <input class="form-control" type="number" min="1" max="52" id="statutoryHolidayWeekdayOccurrencesLookback" name="statutoryHolidayWeekdayOccurrencesLookback" value="<%= statutoryHolidayPayPolicy.weekdayOccurrencesLookback || 9 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <div class="form-text">How many prior same-weekday occurrences to review.</div>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label small fw-semibold" for="statutoryHolidayEarningsLookbackWeeks">Earnings lookback (weeks)</label>
-                  <input class="form-control" type="number" min="1" max="12" id="statutoryHolidayEarningsLookbackWeeks" name="statutoryHolidayEarningsLookbackWeeks" value="<%= statutoryHolidayPayPolicy.earningsLookbackWeeks || 4 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <div class="form-text">Average payable hours are calculated over this window.</div>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label small fw-semibold" for="statutoryHolidayBeforeAfterSearchDays">Before/after search days</label>
-                  <input class="form-control" type="number" min="1" max="60" id="statutoryHolidayBeforeAfterSearchDays" name="statutoryHolidayBeforeAfterSearchDays" value="<%= statutoryHolidayPayPolicy.beforeAfterSearchDays || 14 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <div class="form-text">How far to search for adjacent payable workdays.</div>
-                </div>
-              </div>
               <div class="mt-3">
                 <div class="fw-semibold small mb-2">Paid holiday types</div>
                 <div class="form-check">
@@ -1396,14 +1404,209 @@
                   <label class="form-check-label" for="payableHolidayType_Observance_Paid">Observance Paid</label>
                 </div>
               </div>
-              <div class="mt-3">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek" name="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek" value="true" <%= statutoryHolidayPayPolicy.disqualifyOnLeaveDuringHolidayWeek !== false ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <label class="form-check-label" for="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek">Disqualify when approved leave overlaps the holiday week (Mon–Sun) — off by default; enable only for strict HR policy</label>
+              <div class="border rounded rollup-feature-card p-0 mt-4">
+                <div class="p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#statHolidaySchemesCollapse" aria-expanded="false" aria-controls="statHolidaySchemesCollapse">
+                    <i class="bi bi-chevron-down"></i>
+                    <span>Statutory holiday schemes</span>
+                  </button>
                 </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="statutoryHolidayDisqualifyOnLeaveBeforeAfter" name="statutoryHolidayDisqualifyOnLeaveBeforeAfter" value="true" <%= statutoryHolidayPayPolicy.disqualifyOnLeaveBeforeAfter !== false ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
-                  <label class="form-check-label" for="statutoryHolidayDisqualifyOnLeaveBeforeAfter">Disqualify when approved leave falls on the last or first adjacent payable workday</label>
+                <div class="collapse p-3" id="statHolidaySchemesCollapse">
+                  <p class="small text-muted mb-3">Configure built-in calculation schemes. Select a scheme below to edit its parameters.</p>
+                  <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                      <label class="form-label small fw-semibold" for="statutoryHolidaySchemeEditorId">Scheme to configure</label>
+                      <select class="form-select" id="statutoryHolidaySchemeEditorId" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <% statutoryHolidaySchemeRows.forEach((scheme) => { %>
+                          <option value="<%= scheme.id %>" <%= scheme.id === 'equilibrium_school' ? 'selected' : '' %>><%= scheme.name %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-semibold" for="statutoryHolidayDefaultSchemeId">Default scheme for unassigned departments</label>
+                      <select class="form-select" id="statutoryHolidayDefaultSchemeId" name="statutoryHolidayDefaultSchemeId" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <% statutoryHolidaySchemeRows.forEach((scheme) => { %>
+                          <option value="<%= scheme.id %>" <%= scheme.id === statutoryHolidayDefaultSchemeId ? 'selected' : '' %>><%= scheme.name %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                  </div>
+                  <div id="statHolidaySchemeParamsEquilibrium" class="border rounded p-3 bg-light-subtle mb-3">
+                    <div class="fw-semibold small mb-3">Equilibrium School Scheme parameters</div>
+                    <div class="row g-3">
+                      <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="statutoryHolidayMinWorkdays">Minimum workdays</label>
+                        <input class="form-control" type="number" min="1" max="365" id="statutoryHolidayMinWorkdays" name="statutoryHolidayMinWorkdays" value="<%= statutoryHolidayPayPolicy.minWorkdays || 30 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <div class="form-text">Distinct payable workdays required before the holiday, counted across all saved timesheet history (not limited to a recent window).</div>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="statutoryHolidayWeekdayOccurrencesRequired">Weekday occurrences required</label>
+                        <input class="form-control" type="number" min="1" max="9" id="statutoryHolidayWeekdayOccurrencesRequired" name="statutoryHolidayWeekdayOccurrencesRequired" value="<%= statutoryHolidayPayPolicy.weekdayOccurrencesRequired || 5 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <div class="form-text">Payable hours on at least this many of the previous same weekdays.</div>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="statutoryHolidayWeekdayOccurrencesLookback">Weekday lookback count</label>
+                        <input class="form-control" type="number" min="1" max="52" id="statutoryHolidayWeekdayOccurrencesLookback" name="statutoryHolidayWeekdayOccurrencesLookback" value="<%= statutoryHolidayPayPolicy.weekdayOccurrencesLookback || 9 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <div class="form-text">How many prior same-weekday occurrences to review.</div>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="statutoryHolidayEarningsLookbackWeeks">Earnings lookback (weeks)</label>
+                        <input class="form-control" type="number" min="1" max="12" id="statutoryHolidayEarningsLookbackWeeks" name="statutoryHolidayEarningsLookbackWeeks" value="<%= statutoryHolidayPayPolicy.earningsLookbackWeeks || 4 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <div class="form-text">Average payable hours are calculated over this window.</div>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="statutoryHolidayBeforeAfterSearchDays">Before/after search days</label>
+                        <input class="form-control" type="number" min="1" max="60" id="statutoryHolidayBeforeAfterSearchDays" name="statutoryHolidayBeforeAfterSearchDays" value="<%= statutoryHolidayPayPolicy.beforeAfterSearchDays || 14 %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <div class="form-text">How far to search for adjacent payable workdays.</div>
+                      </div>
+                    </div>
+                    <div class="mt-3">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek" name="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek" value="true" <%= statutoryHolidayPayPolicy.disqualifyOnLeaveDuringHolidayWeek === true ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <label class="form-check-label" for="statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek">Disqualify when approved leave overlaps the holiday week (Mon–Sun) — off by default; enable only for strict HR policy</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="statutoryHolidayDisqualifyOnLeaveBeforeAfter" name="statutoryHolidayDisqualifyOnLeaveBeforeAfter" value="true" <%= statutoryHolidayPayPolicy.disqualifyOnLeaveBeforeAfter !== false ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <label class="form-check-label" for="statutoryHolidayDisqualifyOnLeaveBeforeAfter">Disqualify when approved leave falls on the last or first adjacent payable workday</label>
+                      </div>
+                    </div>
+                  </div>
+                  <% const lincScheme = statutoryHolidaySchemesConfig.schemes?.linc || {}; %>
+                  <% const lincHourMode = String(lincScheme.hourMode || 'most_recent').trim(); %>
+                  <div id="statHolidaySchemeParamsLinc" class="border rounded p-3 bg-light-subtle d-none">
+                    <div class="fw-semibold small mb-2">LINC Scheme parameters</div>
+                    <div class="d-flex flex-column gap-2">
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="schemeHourMode_linc" id="schemeHourMode_linc_most_recent" value="most_recent" <%= lincHourMode === 'most_recent' ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <label class="form-check-label d-inline-flex align-items-center gap-1 flex-wrap" for="schemeHourMode_linc_most_recent">
+                          <span>Most recent same-weekday hours in each department</span>
+                          <button type="button" class="linc-hour-mode-help-btn" data-linc-hour-mode-help="lincHourModeHelpMostRecent" data-bs-title="Most recent same-weekday hours" aria-label="How most recent same-weekday hours are calculated"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                        </label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="schemeHourMode_linc" id="schemeHourMode_linc_fixed" value="fixed" <%= lincHourMode === 'fixed' ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <label class="form-check-label d-inline-flex align-items-center gap-1 flex-wrap" for="schemeHourMode_linc_fixed">
+                          <span>Fixed hours for users who work that weekday in the department</span>
+                          <button type="button" class="linc-hour-mode-help-btn" data-linc-hour-mode-help="lincHourModeHelpFixed" data-bs-title="Fixed weekday hours" aria-label="How fixed weekday hours are calculated"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                        </label>
+                      </div>
+                      <div class="ms-4 mb-2">
+                        <label class="form-label small" for="schemeFixedHours_linc">Fixed hours</label>
+                        <input class="form-control form-control-sm" type="number" min="0" max="24" step="0.25" id="schemeFixedHours_linc" name="schemeFixedHours_linc" value="<%= Number(lincScheme.fixedHours || 0) %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="schemeHourMode_linc" id="schemeHourMode_linc_average_weeks" value="average_weeks" <%= lincHourMode === 'average_weeks' ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <label class="form-check-label d-inline-flex align-items-center gap-1 flex-wrap" for="schemeHourMode_linc_average_weeks">
+                          <span>Average same-weekday hours over prior weeks</span>
+                          <button type="button" class="linc-hour-mode-help-btn" data-linc-hour-mode-help="lincHourModeHelpAverageWeeks" data-bs-title="Average same-weekday hours" aria-label="How average same-weekday hours are calculated"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                        </label>
+                      </div>
+                      <div class="ms-4">
+                        <label class="form-label small" for="schemeAverageWeeks_linc">Weeks to average</label>
+                        <input class="form-control form-control-sm" type="number" min="1" max="52" id="schemeAverageWeeks_linc" name="schemeAverageWeeks_linc" value="<%= Number(lincScheme.averageWeeks || 4) %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      </div>
+                    </div>
+                    <div class="d-none" id="lincHourModeHelpMostRecent">
+                      <p class="mb-2">Uses payable work sessions on the timesheet being processed. Only departments assigned to the LINC scheme are included.</p>
+                      <ul>
+                        <li>Group payable hours by department and date (approved or paid sessions; statutory holiday rows are excluded).</li>
+                        <li>For each LINC department, walk backward from the day before the holiday.</li>
+                        <li>When a date matches the holiday weekday and that department has payable hours, use that date&rsquo;s total for the department.</li>
+                        <li>Stop at the first (most recent) matching date with hours.</li>
+                        <li>Add department totals together for the statutory holiday row.</li>
+                      </ul>
+                      <p class="mb-0 mt-2">If the employee never worked that weekday in a department, that department contributes 0 hours.</p>
+                    </div>
+                    <div class="d-none" id="lincHourModeHelpFixed">
+                      <p class="mb-2">Uses payable work sessions on the timesheet being processed. Only departments assigned to the LINC scheme are included.</p>
+                      <ul>
+                        <li>For each LINC department, check whether the employee worked the same weekday in that department before the holiday.</li>
+                        <li>If yes, pay the configured <strong>Fixed hours</strong> value for that department (not the employee&rsquo;s actual hours from that day).</li>
+                        <li>If no, that department contributes 0 hours.</li>
+                        <li>Add department amounts together for the statutory holiday row.</li>
+                      </ul>
+                      <p class="mb-0 mt-2">Set the fixed amount in the <strong>Fixed hours</strong> field below this option.</p>
+                    </div>
+                    <div class="d-none" id="lincHourModeHelpAverageWeeks">
+                      <p class="mb-2">Uses payable work sessions on the timesheet being processed. Only departments assigned to the LINC scheme are included.</p>
+                      <ul>
+                        <li>For each LINC department, walk backward from the day before the holiday.</li>
+                        <li>Collect up to the configured number of prior same-weekday dates where the department has payable hours (see <strong>Weeks to average</strong>).</li>
+                        <li>Weekdays with zero hours are skipped; only dates with payable hours count toward the limit.</li>
+                        <li>Average the daily totals across those dates for the department.</li>
+                        <li>Add department averages together for the statutory holiday row.</li>
+                      </ul>
+                      <p class="mb-0 mt-2">If no matching dates are found in a department, that department contributes 0 hours.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="border rounded rollup-feature-card p-0 mt-4">
+                <div class="p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#statHolidayDepartmentSchemesCollapse" aria-expanded="false" aria-controls="statHolidayDepartmentSchemesCollapse">
+                    <i class="bi bi-chevron-down"></i>
+                    <span>Department scheme assignments</span>
+                  </button>
+                </div>
+                <div class="collapse p-3" id="statHolidayDepartmentSchemesCollapse">
+                  <p class="small text-muted mb-3">Each department can be assigned to one scheme. Departments without an assignment use the default scheme.</p>
+                  <% if (!departmentOptionsList.length) { %>
+                    <div class="alert alert-light border small mb-0">No departments found. Create departments in data maintenance before assigning schemes.</div>
+                  <% } else { %>
+                    <div class="table-responsive">
+                      <table class="table table-sm align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>Department</th>
+                            <th>Scheme</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <% departmentOptionsList.forEach((department) => { %>
+                            <% const assignedScheme = String(departmentSchemeAssignmentsMap[department.id] || '').trim(); %>
+                            <tr>
+                              <td><%= department.name %></td>
+                              <td>
+                                <select class="form-select form-select-sm" name="departmentSchemeAssignment_<%= department.id %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                                  <option value="" <%= !assignedScheme ? 'selected' : '' %>>Use default scheme</option>
+                                  <% statutoryHolidaySchemeRows.forEach((scheme) => { %>
+                                    <option value="<%= scheme.id %>" <%= assignedScheme === scheme.id ? 'selected' : '' %>><%= scheme.name %></option>
+                                  <% }); %>
+                                </select>
+                              </td>
+                            </tr>
+                          <% }); %>
+                        </tbody>
+                      </table>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+              <div class="border rounded rollup-feature-card p-0 mt-4">
+                <div class="p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#statHolidaySchemeActivitiesCollapse" aria-expanded="false" aria-controls="statHolidaySchemeActivitiesCollapse">
+                    <i class="bi bi-chevron-down"></i>
+                    <span>Scheme activity assignments</span>
+                  </button>
+                </div>
+                <div class="collapse p-3" id="statHolidaySchemeActivitiesCollapse">
+                  <p class="small text-muted mb-3">Each scheme posts calculated statutory holiday hours to its own posted, paid, public (school) activity. Payable hours are calculated on timesheet submission and written as assignees on the selected activity. The default scheme's activity is required when statutory holiday pay is enabled.</p>
+                  <% statutoryHolidaySchemeRows.forEach((scheme) => { %>
+                    <% const schemeActivityId = String(statutoryHolidaySchemesConfig.schemes?.[scheme.id]?.activityId || (scheme.id === 'equilibrium_school' ? statutoryHolidayActivityIdValue : '')).trim(); %>
+                    <% const isDefaultSchemeActivity = scheme.id === statutoryHolidayDefaultSchemeId; %>
+                    <div class="mb-3">
+                      <label class="form-label small fw-semibold" for="schemeActivityId_<%= scheme.id %>"><%= scheme.name %> activity</label>
+                      <select class="form-select" id="schemeActivityId_<%= scheme.id %>" name="schemeActivityId_<%= scheme.id %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <option value="" <%= schemeActivityId ? '' : 'selected' %>>Select public activity...</option>
+                        <% statutoryHolidayPublicActivityOptionsList.forEach((activity) => { %>
+                          <option value="<%= activity.id %>" <%= activity.id === schemeActivityId ? 'selected' : '' %>><%= activity.title %><%= activity.departmentName ? ' (' + activity.departmentName + ')' : '' %></option>
+                        <% }); %>
+                      </select>
+                      <% if (isDefaultSchemeActivity) { %>
+                        <div class="form-text">Required when statutory holiday pay is enabled. Must be a posted, paid, public (school) activity.</div>
+                      <% } %>
+                    </div>
+                  <% }); %>
                 </div>
               </div>
             </div>
@@ -2567,16 +2770,71 @@
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
+  function updateStatHolidaySchemeParamsVisibility() {
+    const selected = String(document.getElementById('statutoryHolidaySchemeEditorId')?.value || 'equilibrium_school').trim();
+    const equilibriumPanel = document.getElementById('statHolidaySchemeParamsEquilibrium');
+    const lincPanel = document.getElementById('statHolidaySchemeParamsLinc');
+    if (equilibriumPanel) equilibriumPanel.classList.toggle('d-none', selected !== 'equilibrium_school');
+    if (lincPanel) lincPanel.classList.toggle('d-none', selected !== 'linc');
+  }
+  function initLincHourModeHelpPopovers() {
+    if (!window.bootstrap?.Popover) return;
+    document.querySelectorAll('[data-linc-hour-mode-help]').forEach((button) => {
+      const contentId = button.getAttribute('data-linc-hour-mode-help');
+      const contentEl = contentId ? document.getElementById(contentId) : null;
+      if (!contentEl) return;
+      const existing = window.bootstrap.Popover.getInstance(button);
+      if (existing) existing.dispose();
+      button.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+      });
+      new window.bootstrap.Popover(button, {
+        container: 'body',
+        customClass: 'linc-hour-mode-help-popover',
+        html: true,
+        sanitize: false,
+        trigger: 'click',
+        placement: 'right',
+        title: button.getAttribute('data-bs-title') || 'How hours are calculated',
+        content: contentEl.innerHTML
+      });
+    });
+  }
+  document.getElementById('statutoryHolidaySchemeEditorId')?.addEventListener('change', updateStatHolidaySchemeParamsVisibility);
+  updateStatHolidaySchemeParamsVisibility();
+  initLincHourModeHelpPopovers();
+
+  function getStatHolidayDefaultSchemeId() {
+    return String(document.getElementById('statutoryHolidayDefaultSchemeId')?.value || 'equilibrium_school').trim();
+  }
+
+  function getStatHolidayDefaultSchemeActivityId() {
+    const defaultSchemeId = getStatHolidayDefaultSchemeId();
+    return String(document.getElementById(`schemeActivityId_${defaultSchemeId}`)?.value || '').trim();
+  }
+
+  function syncStatHolidayMappingActivityFromSchemeActivity() {
+    const mappingSelect = document.getElementById('statutoryHolidayMappingActivityId');
+    if (!mappingSelect || String(mappingSelect.value || '').trim()) return;
+    const payActivityId = getStatHolidayDefaultSchemeActivityId();
+    if (payActivityId) mappingSelect.value = payActivityId;
+  }
+
+  document.querySelectorAll('[id^="schemeActivityId_"]').forEach((selectEl) => {
+    selectEl.addEventListener('change', syncStatHolidayMappingActivityFromSchemeActivity);
+  });
+  document.getElementById('statutoryHolidayDefaultSchemeId')?.addEventListener('change', syncStatHolidayMappingActivityFromSchemeActivity);
+
   document.getElementById('timesheetParametersSettingsForm')?.addEventListener('submit', async event => {
     event.preventDefault();
     const button = document.getElementById('btnSaveTimesheetParametersSettings');
     if (!button) return;
     const statHolidayEnabled = document.getElementById('statutoryHolidayPayEnabled')?.checked;
-    const statHolidayActivityId = String(document.getElementById('statutoryHolidayActivityId')?.value || '').trim();
-    if (statHolidayEnabled && !statHolidayActivityId) {
+    const defaultSchemeActivityId = getStatHolidayDefaultSchemeActivityId();
+    if (statHolidayEnabled && !defaultSchemeActivityId) {
       await showSettingsMessage({
         title: 'Statutory Holiday Activity Required',
-        message: 'Select a public statutory holiday activity when statutory holiday pay is enabled.',
+        message: 'Select a public activity for the default scheme in Scheme activity assignments when statutory holiday pay is enabled.',
         icon: 'warning'
       });
       return;
@@ -2584,11 +2842,26 @@
     const selected = document.querySelector('input[name="emptyEnrollmentSessions"]:checked');
     const mappingYear = String(document.getElementById('statutoryHolidayMappingYear')?.value || '').trim();
     const mappingActivityId = String(document.getElementById('statutoryHolidayMappingActivityId')?.value || '').trim();
+    const equilibriumSchemeActivityId = String(document.getElementById('schemeActivityId_equilibrium_school')?.value || '').trim();
+    const schemePayload = {
+      statutoryHolidayDefaultSchemeId: document.getElementById('statutoryHolidayDefaultSchemeId')?.value || 'equilibrium_school',
+      schemeActivityId_equilibrium_school: equilibriumSchemeActivityId,
+      schemeActivityId_linc: document.getElementById('schemeActivityId_linc')?.value || '',
+      schemeHourMode_linc: document.querySelector('input[name="schemeHourMode_linc"]:checked')?.value || 'most_recent',
+      schemeFixedHours_linc: document.getElementById('schemeFixedHours_linc')?.value || '0',
+      schemeAverageWeeks_linc: document.getElementById('schemeAverageWeeks_linc')?.value || '4'
+    };
+    document.querySelectorAll('select[name^="departmentSchemeAssignment_"]').forEach((selectEl) => {
+      const match = /^departmentSchemeAssignment_(.+)$/.exec(String(selectEl.name || ''));
+      if (!match) return;
+      schemePayload[`departmentSchemeAssignment_${match[1]}`] = selectEl.value || '';
+    });
     const result = await postSettings('/school/settings/timesheet-parameters', {
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
       emptyEnrollmentSessions: selected?.value || 'hide',
       statutoryHolidayPayEnabled: document.getElementById('statutoryHolidayPayEnabled')?.checked ? 'true' : 'false',
-      statutoryHolidayActivityId: document.getElementById('statutoryHolidayActivityId')?.value || '',
+      statutoryHolidayActivityId: equilibriumSchemeActivityId,
+      ...schemePayload,
       statutoryHolidayMinWorkdays: document.getElementById('statutoryHolidayMinWorkdays')?.value || '30',
       statutoryHolidayWeekdayOccurrencesRequired: document.getElementById('statutoryHolidayWeekdayOccurrencesRequired')?.value || '5',
       statutoryHolidayWeekdayOccurrencesLookback: document.getElementById('statutoryHolidayWeekdayOccurrencesLookback')?.value || '9',
@@ -2603,6 +2876,29 @@
     }, button, 'timesheetParametersSettingsError');
     if (!result) return;
     timesheetParametersPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetParametersPolicy;
+    const savedStatPay = timesheetParametersPolicy?.statutoryHolidayPay || {};
+    const savedDefaultSchemeId = String(savedStatPay.defaultSchemeId || 'equilibrium_school').trim();
+    const defaultSchemeSelect = document.getElementById('statutoryHolidayDefaultSchemeId');
+    if (defaultSchemeSelect) defaultSchemeSelect.value = savedDefaultSchemeId;
+    Object.entries(savedStatPay.schemes || {}).forEach(([schemeId, schemeConfig]) => {
+      const activitySelect = document.getElementById(`schemeActivityId_${schemeId}`);
+      if (activitySelect) activitySelect.value = String(schemeConfig?.activityId || '').trim();
+    });
+    const savedLincScheme = savedStatPay.schemes?.linc || {};
+    const savedLincHourMode = String(savedLincScheme.hourMode || 'most_recent').trim();
+    document.querySelectorAll('input[name="schemeHourMode_linc"]').forEach((radioEl) => {
+      radioEl.checked = String(radioEl.value || '') === savedLincHourMode;
+    });
+    const fixedHoursInput = document.getElementById('schemeFixedHours_linc');
+    const averageWeeksInput = document.getElementById('schemeAverageWeeks_linc');
+    if (fixedHoursInput) fixedHoursInput.value = String(savedLincScheme.fixedHours ?? '0');
+    if (averageWeeksInput) averageWeeksInput.value = String(savedLincScheme.averageWeeks ?? '4');
+    document.querySelectorAll('select[name^="departmentSchemeAssignment_"]').forEach((selectEl) => {
+      const match = /^departmentSchemeAssignment_(.+)$/.exec(String(selectEl.name || ''));
+      if (!match) return;
+      const assignedScheme = String(savedStatPay.departmentSchemeAssignments?.[match[1]] || '').trim();
+      selectEl.value = assignedScheme;
+    });
     const savedMappingYear = String(timesheetParametersPolicy?.statutoryHolidayPay?.mappingYear || '').trim();
     const savedMappingActivityId = String(timesheetParametersPolicy?.statutoryHolidayPay?.mappingActivityId || '').trim();
     const savedPayActivityId = String(timesheetParametersPolicy?.statutoryHolidayPay?.activityId || '').trim();
@@ -2811,9 +3107,15 @@
     if (!result) return;
     if (result.policy && typeof result.policy === 'object') {
       timesheetParametersPolicy = result.policy;
-      const activityId = String(result.policy?.statutoryHolidayPay?.activityId || inputs.activityId || '').trim();
-      const activitySelect = document.getElementById('statutoryHolidayActivityId');
-      if (activitySelect && activityId) activitySelect.value = activityId;
+      const defaultSchemeId = String(result.policy?.statutoryHolidayPay?.defaultSchemeId || 'equilibrium_school').trim();
+      const schemeActivityId = String(
+        result.policy?.statutoryHolidayPay?.schemes?.[defaultSchemeId]?.activityId
+        || result.policy?.statutoryHolidayPay?.activityId
+        || inputs.activityId
+        || ''
+      ).trim();
+      const activitySelect = document.getElementById(`schemeActivityId_${defaultSchemeId}`);
+      if (activitySelect && schemeActivityId) activitySelect.value = schemeActivityId;
       const mappingYearSelect = document.getElementById('statutoryHolidayMappingYear');
       const mappingActivitySelect = document.getElementById('statutoryHolidayMappingActivityId');
       const savedMappingYear = String(result.policy?.statutoryHolidayPay?.mappingYear || inputs.year || '').trim();
@@ -2837,13 +3139,6 @@
 
   document.getElementById('statutoryHolidayDayMappingPreviewModal')?.addEventListener('hidden.bs.modal', () => {
     showStatHolidayDayMappingModalError('');
-  });
-
-  document.getElementById('statutoryHolidayActivityId')?.addEventListener('change', event => {
-    const mappingSelect = document.getElementById('statutoryHolidayMappingActivityId');
-    if (mappingSelect && !String(mappingSelect.value || '').trim()) {
-      mappingSelect.value = String(event.target?.value || '').trim();
-    }
   });
 
   document.getElementById('timesheetImportSettingsForm')?.addEventListener('submit', async event => {

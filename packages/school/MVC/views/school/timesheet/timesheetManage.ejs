@@ -2298,6 +2298,33 @@
       || (Array.isArray(preview.configurationWarnings) && preview.configurationWarnings.length > 0);
   }
 
+  function resolveImportExecutionPayableHolidayCount(preview = {}) {
+    return Math.max(
+      Number(preview.payableHolidayCount || 0),
+      Number(preview.evaluationCount || 0),
+      Array.isArray(preview.holidayNames) ? preview.holidayNames.length : 0
+    );
+  }
+
+  function summarizeImportExecutionStatHolidayPreview(preview = {}) {
+    const holidayLabel = Array.isArray(preview.holidayNames) && preview.holidayNames.length
+      ? preview.holidayNames.join(', ')
+      : 'statutory holiday pay';
+    const warningSuffix = Array.isArray(preview.warnings) && preview.warnings.length
+      ? ' (review warnings in editor)'
+      : '';
+    const rowCount = Number(preview.count || 0);
+    const payableCount = resolveImportExecutionPayableHolidayCount(preview);
+    if (rowCount > 0) {
+      return rowCount + ' statutory holiday row(s) expected — ' + holidayLabel + warningSuffix;
+    }
+    if (payableCount > 0) {
+      const holidayWord = payableCount === 1 ? 'holiday' : 'holidays';
+      return payableCount + ' payable ' + holidayWord + ' in period — ' + holidayLabel + warningSuffix;
+    }
+    return 'Statutory holiday — ' + holidayLabel + warningSuffix;
+  }
+
   function renderImportExecutionStatHolidayBadge(row) {
     const preview = row?.statHolidayPreview || {};
     if (!importExecutionStatHolidayPreviewHasSignal(preview)) return '';
@@ -2381,6 +2408,7 @@
           : (Array.isArray(preview.missingDayEntries) ? preview.missingDayEntries : []).map((entry) => (
             'Missing work session for ' + String(entry?.title || entry?.holidayId || 'statutory holiday')
             + (entry?.date ? ' (' + entry.date + ')' : '')
+            + (entry?.schemeName ? ' [' + entry.schemeName + ']' : '')
             + (preview.activityTitle ? ' on ' + preview.activityTitle : '')
           ));
         const configWarnings = Array.isArray(preview.configurationWarnings) ? preview.configurationWarnings : [];
@@ -2414,14 +2442,8 @@
     if (infoStatHolidayRows.length) {
       const lines = infoStatHolidayRows.map((row) => {
         const preview = row.statHolidayPreview || {};
-        const holidayLabel = Array.isArray(preview.holidayNames) && preview.holidayNames.length
-          ? preview.holidayNames.join(', ')
-          : 'statutory holiday pay';
-        const warningSuffix = Array.isArray(preview.warnings) && preview.warnings.length
-          ? ' (review warnings in editor)'
-          : '';
         return '<li><b>' + escapeHtml(row.fileName || row.periodName || row.periodId) + ':</b> '
-          + escapeHtml(Number(preview.count || 0) + ' statutory holiday row(s) expected — ' + holidayLabel + warningSuffix)
+          + escapeHtml(summarizeImportExecutionStatHolidayPreview(preview))
           + '</li>';
       }).join('');
       alerts.push('<div class="alert alert-info border-0 shadow-sm py-2"><div class="fw-semibold mb-1">Statutory holidays detected</div><ul class="mb-0 ps-3 small">' + lines + '</ul></div>');

@@ -80,7 +80,8 @@ function dedupeStatHolidayActivitySessionsForPerson(sessions = []) {
       nonStat.push(row);
       return;
     }
-    const key = `${statHolidayId}|${normalizeId(row?.date)}`;
+    const schemeId = normalizeId(row?.statHolidaySchemeId) || 'equilibrium_school';
+    const key = `${schemeId}|${statHolidayId}|${normalizeId(row?.date)}`;
     const prior = byKey.get(key);
     const rowHours = Number(row?.timesheetHours ?? row?.hours ?? 0);
     const priorHours = Number(prior?.timesheetHours ?? prior?.hours ?? 0);
@@ -1177,6 +1178,7 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             status: 'activity',
             comment: entry.notes || activity.notes || '',
             statHolidayId: normalizeId(entry?.statHolidayId || attendee?.statHolidayId),
+            statHolidaySchemeId: normalizeId(entry?.statHolidaySchemeId || attendee?.statHolidaySchemeId) || 'equilibrium_school',
             statHolidayPeriodId: normalizeId(entry?.statHolidayPeriodId || attendee?.statHolidayPeriodId),
             statHolidayPersonId: normalizeId(entry?.statHolidayPersonId || attendee?.statHolidayPersonId),
             isManual: false,

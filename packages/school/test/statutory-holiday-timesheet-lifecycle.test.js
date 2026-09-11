@@ -8,6 +8,7 @@ const path = require('node:path');
 const timesheetParametersPolicyService = require('../MVC/services/school/timesheetParametersPolicyService');
 const statutoryHolidayTimesheetLifecycleService = require('../MVC/services/school/statutoryHolidayTimesheetLifecycleService');
 const statutoryHolidayWorkSessionService = require('../MVC/services/school/statutoryHolidayWorkSessionService');
+const statutoryHolidayEligibilityService = require('../MVC/services/school/statutoryHolidayEligibilityService');
 
 test('validatePolicyInput requires public activity when statutory holiday pay is enabled', () => {
   assert.throws(() => {
@@ -168,7 +169,8 @@ test('timesheet editor supports manager edits for unqualified statutory holidays
   assert.match(editorSource, /buildStatHolidayManagerActionButtonsHtml/);
   assert.match(editorSource, /holidayOnlyActBtns[\s\S]*buildStatHolidayManagerActionButtonsHtml/);
   assert.match(editorSource, /Set hours/);
-  assert.match(editorSource, /openStatHolidayOverrideModal\('stathol-\$\{escapeHtml\(warning\.holidayId\)\}-\$\{TARGET_TEACHER_ID\}'\)/);
+  assert.match(editorSource, /buildStatHolidayMetadataSessionId/);
+  assert.match(editorSource, /openStatHolidayOverrideModal\('\$\{escapeHtml\(sessionId\)\}'\)/);
 });
 
 test('timesheet editor calculation modal supports compact reasons-only view and override copy', () => {
@@ -188,6 +190,26 @@ test('timesheet editor calculation modal supports compact reasons-only view and 
   assert.doesNotMatch(editorSource, /forced\/adjusted statutory pay/);
 });
 
+test('timesheet editor status chip resolves metadata session for calculation modal', () => {
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editorSource, /function resolveStatHolidayModalEntry/);
+  assert.match(editorSource, /function resolveStatHolidayCalculationModalEntry/);
+  assert.match(editorSource, /const entry = resolveStatHolidayCalculationModalEntry\(normalizedSessionId\)/);
+  assert.match(editorSource, /function resolveStatHolidayChipSessionId/);
+  assert.match(editorSource, /chipSessionId = resolveStatHolidayChipSessionId\(entry\)/);
+  assert.match(editorSource, /findStatHolidayMetadataEntryByDate\(entry\?\.date, schemeId\)/);
+  assert.match(editorSource, /hydrateSavedStatHolidayMetadataIntoActiveEntries/);
+  assert.match(editorSource, /const STAT_HOLIDAY_PREVIEW_ROWS/);
+  assert.match(editorSource, /function rememberPreviewStatHolidayRows/);
+  assert.match(editorSource, /function attachPreviewStatHolidayMetadataToActiveEntries/);
+  assert.match(editorSource, /function resolveStatHolidayStoredEntry/);
+  assert.match(editorSource, /resolveStatHolidayStoredEntry\(\{ sessionId: normalized \}\)/);
+  assert.match(editorSource, /findStatHolidayWarningForContext/);
+});
+
 test('timesheet editor department totals skip activity-mode statutory holiday metadata rows', () => {
   const editorSource = fs.readFileSync(
     path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
@@ -198,13 +220,51 @@ test('timesheet editor department totals skip activity-mode statutory holiday me
   assert.match(editorSource, /applyStatHolidayOverrideToEntry[\s\S]*STATUTORY_HOLIDAY_USES_ACTIVITY[\s\S]*metadataEntry\.hours = 0/);
 });
 
+test('timesheet editor enriches activity rows with preview statutory holiday metadata', () => {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/timesheetController.js'),
+    'utf8'
+  );
+  assert.match(controllerSource, /function supplementHolidaysFromActivitySessions/);
+  assert.match(controllerSource, /function enrichLiveSessionsWithStatHolidayMeta/);
+  assert.match(controllerSource, /statHolidayPreviewRows/);
+  assert.match(controllerSource, /holidaysForStatHolidayPreview/);
+  assert.match(controllerSource, /buildStatHolidayMetadataRowsForActivitySessions/);
+});
+
+test('buildStatHolidayMetadataRowsFromEvaluations builds metadata rows for activity sessions', () => {
+  const rows = statutoryHolidayEligibilityService.buildStatHolidayMetadataRowsFromEvaluations({
+    evaluations: [{
+      holidayId: '797275',
+      date: '2026-01-01',
+      title: "New Year's Day",
+      qualified: true,
+      calculatedHours: 7.5,
+      checks: { minWorkdays: { pass: true, actual: 40, required: 30 } },
+      disqualifyReasons: []
+    }],
+    personId: '526625',
+    activitySessions: [{
+      sessionId: 'act-353390-ENT-353390-0010-526625',
+      date: '2026-01-01',
+      statHolidayId: '797275',
+      className: "New Year's Day"
+    }]
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].sessionId, 'stathol-797275-526625');
+  assert.equal(rows[0].statHolidayMeta.holidayId, '797275');
+  assert.ok(rows[0].statHolidayMeta.checks);
+});
+
 test('timesheet editor skips statutory holiday preview for draft timesheets', () => {
   const controllerSource = fs.readFileSync(
     path.join(__dirname, '../MVC/controllers/school/timesheetController.js'),
     'utf8'
   );
   assert.match(controllerSource, /isDraftTimesheet/);
-  assert.match(controllerSource, /!useFrozenSnapshot && !isDraftTimesheet/);
+  assert.match(controllerSource, /if \(!isDraftTimesheet\) \{[\s\S]*previewStatHolidayForTimesheet/);
+  assert.doesNotMatch(controllerSource, /!useFrozenSnapshot && !isDraftTimesheet/);
   assert.match(controllerSource, /statHolidayPreviewOnly:\s*status === 'draft'/);
 
   const editorSource = fs.readFileSync(
@@ -222,7 +282,7 @@ test('saveTimesheet applies statutory holiday override hours to activity rows', 
     path.join(__dirname, '../MVC/controllers/school/timesheetController.js'),
     'utf8'
   );
-  assert.match(controllerSource, /statHolidayOverrideByHolidayId/);
+  assert.match(controllerSource, /statHolidayOverrideBySchemeHoliday/);
   assert.match(controllerSource, /allowStatHolidayOverride && statHolidayOverride/);
 });
 

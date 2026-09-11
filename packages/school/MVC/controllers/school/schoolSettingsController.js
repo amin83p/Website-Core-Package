@@ -36,6 +36,8 @@ const timesheetImportPolicyService = require('../../services/school/timesheetImp
 const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
 const statutoryHolidayDayMappingService = require('../../services/school/statutoryHolidayDayMappingService');
 const activityService = require('../../services/school/activityService');
+const departmentModel = require('../../models/school/departmentModel');
+const statutoryHolidaySchemeService = require('../../services/school/statutoryHolidaySchemeService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
 const overallReportService = require('../../services/school/overallReportService');
@@ -414,6 +416,15 @@ async function loadSettingsPageData(req) {
   for (let offset = -2; offset <= 3; offset += 1) {
     statutoryHolidayMappingYearOptions.push(String(currentYear + offset));
   }
+  const departmentRows = await departmentModel.getAllDepartments(req.user);
+  const departmentOptions = (Array.isArray(departmentRows) ? departmentRows : [])
+    .map((row) => ({
+      id: String(row?.id || '').trim(),
+      name: String(row?.name || row?.title || row?.id || '').trim()
+    }))
+    .filter((row) => row.id)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const statutoryHolidaySchemes = statutoryHolidaySchemeService.resolveSchemes(timesheetParametersPolicy);
 
   return {
     activeOrgId,
@@ -443,6 +454,8 @@ async function loadSettingsPageData(req) {
     statutoryHolidayPublicActivityOptions,
     statutoryHolidayMappingYearOptions,
     statutoryHolidayMappingDefaultYear: String(currentYear),
+    departmentOptions,
+    statutoryHolidaySchemes,
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
     studentAttendanceReportTemplateCapabilities: studentAttendanceReportLabels.reportTemplateCapabilities,
     studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel,

@@ -104,6 +104,8 @@ test('timesheet manage view uses split bulk and row import entry points', () => 
   assert.match(viewSource, /defaultImportTargetStatus/);
   assert.match(viewSource, /statHolidayPreview/);
   assert.match(viewSource, /Stat holiday/);
+  assert.match(viewSource, /summarizeImportExecutionStatHolidayPreview/);
+  assert.match(viewSource, /payable .* in period/);
   assert.match(viewSource, /Choose Draft to review and edit them in the timesheet editor/);
   assert.doesNotMatch(viewSource, /Stat holiday manual hours/);
   assert.doesNotMatch(viewSource, /js-import-stat-holiday-hours/);

@@ -15,6 +15,25 @@ const PAYABLE_HOLIDAY_TYPES = Object.freeze(['National Holiday', 'Observance Pai
 const DEFAULT_STATUTORY_HOLIDAY_PAY = Object.freeze({
   enabled: true,
   activityId: '',
+  defaultSchemeId: 'equilibrium_school',
+  schemes: {
+    equilibrium_school: {
+      id: 'equilibrium_school',
+      name: 'Equilibrium School Scheme',
+      builtIn: true,
+      activityId: ''
+    },
+    linc: {
+      id: 'linc',
+      name: 'LINC Scheme',
+      builtIn: true,
+      activityId: '',
+      hourMode: 'most_recent',
+      fixedHours: 0,
+      averageWeeks: 4
+    }
+  },
+  departmentSchemeAssignments: {},
   minWorkdays: 30,
   weekdayOccurrencesRequired: 5,
   weekdayOccurrencesLookback: 9,
@@ -68,12 +87,58 @@ function normalizePayableHolidayTypes(value, { strict = false } = {}) {
   return normalized;
 }
 
+function schemeService() {
+  return require('./statutoryHolidaySchemeService');
+}
+
 function normalizeStatutoryHolidayPay(input = {}, { strict = false } = {}) {
+  const statutoryHolidaySchemeService = schemeService();
   const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   const defaults = DEFAULT_STATUTORY_HOLIDAY_PAY;
+  const migrated = statutoryHolidaySchemeService.migrateStatutoryHolidayPaySchemes({
+    ...defaults,
+    ...source
+  });
+  const defaultSchemeId = statutoryHolidaySchemeService.BUILTIN_SCHEME_IDS.includes(
+    cleanId(migrated.defaultSchemeId)
+  )
+    ? cleanId(migrated.defaultSchemeId)
+    : statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM;
+  const schemes = statutoryHolidaySchemeService.normalizeSchemesBlock(
+    migrated.schemes,
+    cleanId(migrated.activityId)
+  );
+  const defaultActivityId = cleanId(schemes[defaultSchemeId]?.activityId)
+    || cleanId(schemes[statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM]?.activityId)
+    || cleanId(migrated.activityId);
+  if (!cleanId(schemes[statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM].activityId) && defaultActivityId) {
+    schemes[statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM].activityId = defaultActivityId;
+  }
+  const lincScheme = schemes[statutoryHolidaySchemeService.SCHEME_LINC];
+  if (lincScheme) {
+    const hourMode = statutoryHolidaySchemeService.normalizeLincHourMode(lincScheme.hourMode);
+    lincScheme.hourMode = hourMode;
+    if (strict && hourMode === statutoryHolidaySchemeService.LINC_HOUR_MODES.FIXED
+      && !(Number(lincScheme.fixedHours) > 0)) {
+      const error = new Error('Enter fixed hours greater than zero for the LINC scheme.');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (strict && hourMode === statutoryHolidaySchemeService.LINC_HOUR_MODES.AVERAGE_WEEKS
+      && !(Number(lincScheme.averageWeeks) >= 1)) {
+      const error = new Error('Enter the number of weeks to average for the LINC scheme.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
   return {
     enabled: cleanBoolean(source.enabled, defaults.enabled),
-    activityId: String(source.activityId ?? '').trim(),
+    activityId: defaultActivityId,
+    defaultSchemeId,
+    schemes,
+    departmentSchemeAssignments: statutoryHolidaySchemeService.normalizeDepartmentSchemeAssignments(
+      migrated.departmentSchemeAssignments
+    ),
     minWorkdays: cleanPositiveInteger(source.minWorkdays, defaults.minWorkdays, { min: 1, max: 365 }),
     weekdayOccurrencesRequired: cleanPositiveInteger(
       source.weekdayOccurrencesRequired,
@@ -129,6 +194,73 @@ function normalizePolicyFromStored(input = {}) {
   };
 }
 
+function parseDepartmentSchemeAssignmentsFromForm(input = {}) {
+  const statutoryHolidaySchemeService = schemeService();
+  const statPayNested = input.statutoryHolidayPay && typeof input.statutoryHolidayPay === 'object'
+    ? input.statutoryHolidayPay
+    : null;
+  const nested = input.departmentSchemeAssignments
+    || statPayNested?.departmentSchemeAssignments;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return statutoryHolidaySchemeService.normalizeDepartmentSchemeAssignments(nested);
+  }
+  const assignments = {};
+  Object.entries(input || {}).forEach(([key, value]) => {
+    const match = /^departmentSchemeAssignment_(.+)$/.exec(String(key || ''));
+    if (!match) return;
+    const schemeId = cleanId(value);
+    if (!schemeId) return;
+    assignments[match[1]] = schemeId;
+  });
+  return statutoryHolidaySchemeService.normalizeDepartmentSchemeAssignments(assignments);
+}
+
+function parseSchemesFromForm(input = {}) {
+  const statutoryHolidaySchemeService = schemeService();
+  const statPayNested = input.statutoryHolidayPay && typeof input.statutoryHolidayPay === 'object'
+    ? input.statutoryHolidayPay
+    : null;
+  const legacyActivityId = cleanId(input.statutoryHolidayActivityId)
+    || cleanId(statPayNested?.activityId);
+  const nested = input.statutoryHolidaySchemes
+    || (statPayNested?.schemes && typeof statPayNested.schemes === 'object' ? statPayNested.schemes : null);
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return statutoryHolidaySchemeService.normalizeSchemesBlock(
+      nested,
+      legacyActivityId
+    );
+  }
+  const schemes = {};
+  statutoryHolidaySchemeService.BUILTIN_SCHEME_IDS.forEach((schemeId) => {
+    const activityKey = `schemeActivityId_${schemeId}`;
+    const hourModeKey = `schemeHourMode_${schemeId}`;
+    const fixedHoursKey = `schemeFixedHours_${schemeId}`;
+    const averageWeeksKey = `schemeAverageWeeks_${schemeId}`;
+    const patch = {};
+    if (Object.prototype.hasOwnProperty.call(input, activityKey)) {
+      patch.activityId = input[activityKey];
+    }
+    if (schemeId === statutoryHolidaySchemeService.SCHEME_LINC) {
+      if (Object.prototype.hasOwnProperty.call(input, hourModeKey)) {
+        patch.hourMode = input[hourModeKey];
+      }
+      if (Object.prototype.hasOwnProperty.call(input, fixedHoursKey)) {
+        patch.fixedHours = input[fixedHoursKey];
+      }
+      if (Object.prototype.hasOwnProperty.call(input, averageWeeksKey)) {
+        patch.averageWeeks = input[averageWeeksKey];
+      }
+    }
+    if (Object.keys(patch).length) {
+      schemes[schemeId] = patch;
+    }
+  });
+  return statutoryHolidaySchemeService.normalizeSchemesBlock(
+    schemes,
+    legacyActivityId
+  );
+}
+
 function normalizePolicyFromForm(input = {}) {
   const nestedStat = input.statutoryHolidayPay && typeof input.statutoryHolidayPay === 'object'
     ? input.statutoryHolidayPay
@@ -153,6 +285,11 @@ function normalizePolicyFromForm(input = {}) {
     statutoryHolidayPay: normalizeStatutoryHolidayPay({
       enabled: input.statutoryHolidayPayEnabled ?? input['statutoryHolidayPay.enabled'] ?? nestedStat.enabled,
       activityId: input.statutoryHolidayActivityId ?? input['statutoryHolidayPay.activityId'] ?? nestedStat.activityId,
+      defaultSchemeId: input.statutoryHolidayDefaultSchemeId
+        ?? input['statutoryHolidayPay.defaultSchemeId']
+        ?? nestedStat.defaultSchemeId,
+      schemes: parseSchemesFromForm(input),
+      departmentSchemeAssignments: parseDepartmentSchemeAssignmentsFromForm(input),
       minWorkdays: input.statutoryHolidayMinWorkdays ?? input['statutoryHolidayPay.minWorkdays'] ?? nestedStat.minWorkdays,
       weekdayOccurrencesRequired: input.statutoryHolidayWeekdayOccurrencesRequired
         ?? input['statutoryHolidayPay.weekdayOccurrencesRequired']
@@ -192,14 +329,37 @@ function resolvePolicy(input = {}) {
 }
 
 function validatePolicyInput(input = {}) {
+  const statutoryHolidaySchemeService = schemeService();
   const normalized = normalizePolicyFromForm(input);
-  if (normalized.statutoryHolidayPay?.enabled !== false
-    && !String(normalized.statutoryHolidayPay?.activityId || '').trim()) {
-    const error = new Error('Select a public statutory holiday activity when statutory holiday pay is enabled.');
+  const statPay = normalized.statutoryHolidayPay || {};
+  if (statPay.enabled === false) return normalized;
+
+  const defaultSchemeId = cleanId(statPay.defaultSchemeId)
+    || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM;
+  const defaultActivityId = statutoryHolidaySchemeService.resolveSchemeActivityId(
+    normalized,
+    defaultSchemeId
+  );
+  if (!defaultActivityId) {
+    const error = new Error('Select a public statutory holiday activity for the default scheme when statutory holiday pay is enabled.');
     error.statusCode = 400;
     throw error;
   }
+
+  const schemesInUse = statutoryHolidaySchemeService.resolveSchemesWithAssignedDepartments(normalized);
+  schemesInUse.forEach(({ schemeId, config }) => {
+    if (!cleanId(config?.activityId)) {
+      const schemeName = String(config?.name || schemeId).trim();
+      const error = new Error(`Select a public activity for the ${schemeName} statutory holiday scheme.`);
+      error.statusCode = 400;
+      throw error;
+    }
+  });
   return normalized;
+}
+
+function cleanId(value) {
+  return String(value ?? '').trim();
 }
 
 function isClassTimesheetRow(row = {}) {

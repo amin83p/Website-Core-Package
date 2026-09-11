@@ -4,6 +4,7 @@ const activityService = require('./activityService');
 const activityEntryIdService = require('./activityEntryIdService');
 const timesheetImportWorkSessionBuilderService = require('./timesheetImportWorkSessionBuilderService');
 const statutoryHolidayEligibilityService = require('./statutoryHolidayEligibilityService');
+const statutoryHolidaySchemeService = require('./statutoryHolidaySchemeService');
 const statutoryHolidayDayMappingService = require('./statutoryHolidayDayMappingService');
 const timesheetLegacyImportService = require('./timesheetLegacyImportService');
 const timesheetPayrollContextService = require('./timesheetPayrollContextService');
@@ -160,9 +161,20 @@ function buildStatHolidayBlockingErrors(missingDayEntries = [], activityLabel = 
   });
 }
 
+function groupPayItemsByScheme(payItems = []) {
+  const grouped = new Map();
+  (Array.isArray(payItems) ? payItems : []).forEach((item) => {
+    const schemeId = cleanId(item?.schemeId) || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM;
+    if (!grouped.has(schemeId)) grouped.set(schemeId, []);
+    grouped.get(schemeId).push(item);
+  });
+  return grouped;
+}
+
 async function resolveStatHolidayMissingDayEntries({
   policy,
   evaluations = [],
+  rows = [],
   existingEntries = [],
   overrideMap = null,
   allowManagerOverride = false,
@@ -170,65 +182,110 @@ async function resolveStatHolidayMissingDayEntries({
   orgId,
   reqUser
 } = {}) {
-  const activityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(policy);
   const evaluationRows = Array.isArray(evaluations) ? evaluations : [];
-  if (!cleanId(activityId) || !evaluationRows.length) {
+  if (!evaluationRows.length) {
     return {
-      activityId: cleanId(activityId),
+      activityId: '',
       activityTitle: '',
       activity: null,
       missingDayEntries: [],
-      blockingErrors: []
+      blockingErrors: [],
+      schemeOutcomes: []
     };
   }
 
-  const existingByHolidayId = statutoryHolidayEligibilityService.buildOverrideLookup(
-    existingEntries,
-    overrideMap,
-    { personId }
-  );
-  const payItems = statutoryHolidayEligibilityService.buildStatHolidayPayItems({
-    evaluations: evaluationRows,
-    existingByHolidayId,
-    allowManagerOverride
-  });
+  const schemesInUse = statutoryHolidaySchemeService.resolveSchemesWithAssignedDepartments(policy);
+  const schemeOutcomes = [];
+  const missingDayEntries = [];
+  const blockingErrors = [];
+  let primaryActivity = null;
+  let primaryActivityId = '';
 
-  try {
-    const activity = await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
-      orgId,
-      reqUser,
-      activityId
-    });
-    const activityTitle = String(activity?.title || '').trim();
-    const missingDayEntries = collectMissingStatHolidayDayEntries(
-      activityService.getActivityEntries(activity),
-      payItems
-    );
-    return {
-      activityId: cleanId(activity.id),
-      activityTitle,
-      activity,
-      missingDayEntries,
-      blockingErrors: buildStatHolidayBlockingErrors(missingDayEntries, activityTitle)
-    };
-  } catch (error) {
-    const missingDayEntries = evaluationRows.map((evaluation) => ({
-      holidayId: cleanId(evaluation?.holidayId),
-      date: cleanId(evaluation?.date),
-      title: String(evaluation?.title || evaluation?.holidayId || 'Statutory holiday').trim()
-    })).filter((row) => row.holidayId && row.date);
-    const blockingErrors = missingDayEntries.length
-      ? buildStatHolidayBlockingErrors(missingDayEntries)
-      : [String(error?.message || 'Unable to resolve statutory holiday activity.')];
-    return {
-      activityId: cleanId(activityId),
-      activityTitle: '',
-      activity: null,
-      missingDayEntries,
-      blockingErrors,
-      error
-    };
+  for (const { schemeId, config } of schemesInUse) {
+    const schemeConfig = statutoryHolidaySchemeService.resolveSchemeConfig(schemeId, policy) || config || {};
+    const schemeName = String(schemeConfig?.name || schemeId).trim();
+    const activityId = cleanId(schemeConfig?.activityId);
+    if (!activityId) {
+      const error = `Statutory holiday scheme "${schemeName}" has no public activity configured. Assign an activity in School Settings before importing.`;
+      schemeOutcomes.push({
+        schemeId,
+        schemeName,
+        activityId: '',
+        activityTitle: '',
+        activity: null,
+        missingDayEntries: [],
+        configurationError: error
+      });
+      blockingErrors.push(error);
+      continue;
+    }
+    try {
+      const activity = await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
+        orgId,
+        reqUser,
+        activityId
+      });
+      const activityTitle = String(activity?.title || '').trim();
+      const schemePayItems = evaluationRows.map((evaluation) => ({
+        evaluation,
+        schemeId
+      }));
+      const schemeMissing = collectMissingStatHolidayDayEntries(
+        activityService.getActivityEntries(activity),
+        schemePayItems
+      ).map((row) => ({
+        ...row,
+        schemeId,
+        schemeName
+      }));
+      schemeOutcomes.push({
+        schemeId,
+        schemeName,
+        activityId: cleanId(activity.id),
+        activityTitle,
+        activity,
+        missingDayEntries: schemeMissing
+      });
+      if (!primaryActivity) {
+        primaryActivity = activity;
+        primaryActivityId = cleanId(activity.id);
+      }
+      if (schemeMissing.length) {
+        missingDayEntries.push(...schemeMissing);
+        blockingErrors.push(
+          ...buildStatHolidayBlockingErrors(
+            schemeMissing,
+            `${activityTitle} (${schemeName})`
+          )
+        );
+      }
+    } catch (error) {
+      const fallbackMissing = evaluationRows.map((evaluation) => ({
+        holidayId: cleanId(evaluation?.holidayId),
+        date: cleanId(evaluation?.date),
+        title: String(evaluation?.title || evaluation?.holidayId || 'Statutory holiday').trim(),
+        schemeId,
+        schemeName
+      })).filter((row) => row.holidayId && row.date);
+      missingDayEntries.push(...fallbackMissing);
+      if (fallbackMissing.length) {
+        blockingErrors.push(
+          ...buildStatHolidayBlockingErrors(fallbackMissing, schemeName)
+        );
+      } else {
+        blockingErrors.push(String(error?.message || 'Unable to resolve statutory holiday activity.'));
+      }
+    }
   }
+
+  return {
+    activityId: primaryActivityId,
+    activityTitle: String(primaryActivity?.title || '').trim(),
+    activity: primaryActivity,
+    missingDayEntries,
+    blockingErrors,
+    schemeOutcomes
+  };
 }
 
 function normalizeStatHolidayDayEntryShape(entry = {}, holidayId = '') {
@@ -244,7 +301,8 @@ function normalizeStatHolidayDayEntryShape(entry = {}, holidayId = '') {
 function assigneeMatchesStatHolidayTarget(assignee = {}, {
   personId = '',
   periodId = '',
-  holidayId = ''
+  holidayId = '',
+  schemeId = ''
 } = {}) {
   if (!assigneeHasStatHolidayStamp(assignee)) return false;
   if (!idsEqual(assignee?.personId, personId)) return false;
@@ -252,6 +310,10 @@ function assigneeMatchesStatHolidayTarget(assignee = {}, {
     return false;
   }
   if (holidayId && cleanId(assignee?.statHolidayId) && !idsEqual(assignee.statHolidayId, holidayId)) {
+    return false;
+  }
+  if (schemeId && cleanId(assignee?.statHolidaySchemeId)
+    && cleanId(assignee.statHolidaySchemeId) !== cleanId(schemeId)) {
     return false;
   }
   return true;
@@ -269,6 +331,7 @@ function buildStatHolidayWorkSessionAssignee({
   personRole = '',
   hours = 0,
   holidayId = '',
+  schemeId = '',
   periodId = '',
   notes = ''
 }) {
@@ -277,6 +340,7 @@ function buildStatHolidayWorkSessionAssignee({
   const roleFields = buildAssigneeRoleFields(personRole);
   const trace = {
     statHolidayId: cleanId(holidayId),
+    statHolidaySchemeId: cleanId(schemeId) || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM,
     statHolidayPeriodId: cleanId(periodId),
     statHolidayPersonId: cleanId(personId)
   };
@@ -311,11 +375,13 @@ function upsertStatHolidayAssigneeOnEntry(entry = {}, assignee = {}) {
   const targetPersonId = cleanId(assignee?.personId);
   const targetPeriodId = cleanId(assignee?.statHolidayPeriodId);
   const targetHolidayId = cleanId(assignee?.statHolidayId);
+  const targetSchemeId = cleanId(assignee?.statHolidaySchemeId);
   const assignees = activityService.normalizeActivityAssigneeRows(entry.assignees);
   const nextAssignees = assignees.filter((row) => !assigneeMatchesStatHolidayTarget(row, {
     personId: targetPersonId,
     periodId: targetPeriodId,
-    holidayId: targetHolidayId
+    holidayId: targetHolidayId,
+    schemeId: targetSchemeId
   }));
   nextAssignees.push(assignee);
   return {
@@ -437,25 +503,47 @@ async function cleanupStatHolidayWorkSessionsOnImportDelete({
     return { removedEntries: 0, removedAssignees: 0, skipped: true, reason: 'activity_mode_disabled' };
   }
 
-  const activityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(policy);
-  if (!activityId || !targetPersonId || !targetPeriodId) {
+  const activityIds = statutoryHolidaySchemeService.resolveAllSchemeActivityIds(policy);
+  if (!activityIds.length || !targetPersonId || !targetPeriodId) {
     return { removedEntries: 0, removedAssignees: 0, skipped: true, reason: 'missing_target' };
   }
 
-  try {
-    const outcome = await removeStatHolidayWorkSessionsForTarget({
-      activityId,
-      personId: targetPersonId,
-      periodId: targetPeriodId,
-      periodStartDate: period?.startDate,
-      periodEndDate: period?.endDate,
-      reqUser
-    });
-    return { ...outcome, activityId };
-  } catch (error) {
-    console.warn(`Stat holiday assignee cleanup failed for period ${targetPeriodId}: ${error.message}`);
-    return { removedEntries: 0, removedAssignees: 0, error: error.message };
+  let removedEntries = 0;
+  let removedAssignees = 0;
+  const cleanedActivityIds = [];
+  const errors = [];
+
+  for (const activityId of activityIds) {
+    try {
+      const outcome = await removeStatHolidayWorkSessionsForTarget({
+        activityId,
+        personId: targetPersonId,
+        periodId: targetPeriodId,
+        periodStartDate: period?.startDate,
+        periodEndDate: period?.endDate,
+        reqUser
+      });
+      removedEntries += Number(outcome.removedEntries || 0);
+      removedAssignees += Number(outcome.removedAssignees || 0);
+      if (outcome.removedEntries || outcome.removedAssignees) {
+        cleanedActivityIds.push(activityId);
+      }
+    } catch (error) {
+      errors.push({ activityId, message: String(error?.message || error) });
+      console.warn(`Stat holiday assignee cleanup failed for activity ${activityId}: ${error.message}`);
+    }
   }
+
+  if (errors.length && !removedEntries && !removedAssignees) {
+    return { removedEntries: 0, removedAssignees: 0, error: errors.map((row) => row.message).join('; ') };
+  }
+
+  return {
+    removedEntries,
+    removedAssignees,
+    activityIds: cleanedActivityIds,
+    activityId: cleanedActivityIds[0] || activityIds[0] || ''
+  };
 }
 
 async function countStatHolidayAssigneesForPersonPeriodRemote({
@@ -650,6 +738,7 @@ async function syncStatHolidayWorkSessionsForPersonPeriod({
       personRole,
       hours,
       holidayId,
+      schemeId: cleanId(item?.schemeId),
       periodId: targetPeriodId,
       notes: hours > 0 ? 'Statutory holiday pay' : 'Statutory holiday pay (not qualified)'
     });
@@ -721,13 +810,14 @@ async function materializeStatHolidayForPersonPeriod({
     overrideMap
   });
 
-  if (!context.usesActivityMode || !cleanId(context.activityId)) {
-    return { ...context, syncOutcome: null };
+  if (!context.usesActivityMode) {
+    return { ...context, syncOutcome: null, syncOutcomes: [] };
   }
 
   const missingDayOutcome = await resolveStatHolidayMissingDayEntries({
     policy,
     evaluations: context.evaluations,
+    rows: context.rows,
     existingEntries,
     overrideMap,
     allowManagerOverride,
@@ -735,56 +825,68 @@ async function materializeStatHolidayForPersonPeriod({
     orgId,
     reqUser
   });
-  if (missingDayOutcome.missingDayEntries.length) {
+  if (missingDayOutcome.missingDayEntries.length || missingDayOutcome.blockingErrors.length) {
     return {
       ...context,
       syncOutcome: {
         blocked: true,
         missingDayEntries: missingDayOutcome.missingDayEntries,
+        schemeOutcomes: missingDayOutcome.schemeOutcomes,
         activityId: missingDayOutcome.activityId,
         createdEntryIds: [],
         rowCount: 0
       },
+      syncOutcomes: [],
       blockingErrors: missingDayOutcome.blockingErrors
     };
   }
 
   const canPersistToActivity = shouldPersistStatHolidayToSharedActivity(period, persistToActivity);
   if (!canPersistToActivity) {
-    return { ...context, syncOutcome: null, blockingErrors: [] };
+    return { ...context, syncOutcome: null, syncOutcomes: [], blockingErrors: [] };
   }
 
-  const activity = missingDayOutcome.activity
-    || await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
-      orgId,
-      reqUser,
-      activityId: context.activityId
-    });
-  const existingByHolidayId = statutoryHolidayEligibilityService.buildOverrideLookup(
+  const existingBySchemeHoliday = statutoryHolidayEligibilityService.buildOverrideLookup(
     existingEntries,
     overrideMap,
     { personId }
   );
   const payItems = statutoryHolidayEligibilityService.buildStatHolidayPayItems({
+    rows: context.rows,
     evaluations: context.evaluations,
-    existingByHolidayId,
+    existingBySchemeHoliday,
     allowManagerOverride
   });
-  const syncOutcome = await syncStatHolidayWorkSessionsForPersonPeriod({
-    orgId,
-    personId,
-    personName,
-    personRole,
-    period,
-    activity,
-    payItems,
-    reqUser
-  });
-  if (syncOutcome?.blocked) {
-    const blockingErrors = buildStatHolidayBlockingErrors(syncOutcome.missingDayEntries || []);
-    return { ...context, syncOutcome, blockingErrors };
+  const grouped = groupPayItemsByScheme(payItems);
+  const syncOutcomes = [];
+  for (const [schemeId, schemePayItems] of grouped.entries()) {
+    const activityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(policy, schemeId);
+    if (!cleanId(activityId) || !schemePayItems.length) continue;
+    const schemeOutcome = missingDayOutcome.schemeOutcomes?.find((row) => row.schemeId === schemeId);
+    const activity = schemeOutcome?.activity
+      || await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
+        orgId,
+        reqUser,
+        activityId
+      });
+    const syncOutcome = await syncStatHolidayWorkSessionsForPersonPeriod({
+      orgId,
+      personId,
+      personName,
+      personRole,
+      period,
+      activity,
+      payItems: schemePayItems,
+      reqUser
+    });
+    syncOutcomes.push({ schemeId, ...syncOutcome });
+    if (syncOutcome?.blocked) {
+      const blockingErrors = buildStatHolidayBlockingErrors(syncOutcome.missingDayEntries || []);
+      return { ...context, syncOutcome, syncOutcomes, blockingErrors };
+    }
   }
-  return { ...context, syncOutcome, blockingErrors: [] };
+  const primarySync = syncOutcomes[0] || null;
+  return { ...context, syncOutcome: primarySync, syncOutcomes, blockingErrors: [] };
 }
 
 function normalizeStatHolidayOverrideMap(overrides = []) {
@@ -792,7 +894,9 @@ function normalizeStatHolidayOverrideMap(overrides = []) {
   (Array.isArray(overrides) ? overrides : []).forEach((row) => {
     const holidayId = cleanId(row?.holidayId);
     if (!holidayId) return;
-    map[holidayId] = {
+    const schemeId = cleanId(row?.schemeId) || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM;
+    const key = statutoryHolidaySchemeService.buildStatHolidayOverrideKey(schemeId, holidayId);
+    map[key] = {
       forcePay: row?.forcePay !== false,
       hours: Number.isFinite(Number(row?.hours)) && Number(row.hours) > 0
         ? Number(Number(row.hours).toFixed(2))

@@ -899,9 +899,10 @@ test('normalizeStatHolidayOverrideMap converts import payload rows', () => {
   const map = statutoryHolidayWorkSessionService.normalizeStatHolidayOverrideMap([
     { holidayId: 'H1', hours: 5.5, reason: 'Manual import override' }
   ]);
-  assert.equal(map.H1.forcePay, true);
-  assert.equal(map.H1.hours, 5.5);
-  assert.match(map.H1.reason, /Manual import override/);
+  const key = 'equilibrium_school|H1';
+  assert.equal(map[key].forcePay, true);
+  assert.equal(map[key].hours, 5.5);
+  assert.match(map[key].reason, /Manual import override/);
 });
 
 test('getTimesheetEntriesForPerson returns one stat-holiday row when only one day entry has assignee', async () => {
