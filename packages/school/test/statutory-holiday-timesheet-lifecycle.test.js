@@ -171,6 +171,23 @@ test('timesheet editor supports manager edits for unqualified statutory holidays
   assert.match(editorSource, /openStatHolidayOverrideModal\('stathol-\$\{escapeHtml\(warning\.holidayId\)\}-\$\{TARGET_TEACHER_ID\}'\)/);
 });
 
+test('timesheet editor calculation modal supports compact reasons-only view and override copy', () => {
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editorSource, /function shouldShowStatHolidayCalculationSteps/);
+  assert.match(editorSource, /function hasStatHolidayManagerOverrideEffect/);
+  assert.match(editorSource, /function buildStatHolidayOverrideNoticeHtml/);
+  assert.match(editorSource, /payBlockedReason === 'exceeds_max_payable_hours'/);
+  assert.match(editorSource, /if \(!showCalculationSteps && !qualified\)/);
+  assert.match(editorSource, /stepsEl\.classList\.add\('d-none'\)/);
+  assert.match(editorSource, /buildStatHolidayOverrideNoticeHtml\(override, payableHoursNum\)/);
+  assert.match(editorSource, /Manager adjustment:<\/strong> Payable hours set to/);
+  assert.match(editorSource, /Manager decision:<\/strong> Statutory holiday pay was disqualified/);
+  assert.doesNotMatch(editorSource, /forced\/adjusted statutory pay/);
+});
+
 test('timesheet editor department totals skip activity-mode statutory holiday metadata rows', () => {
   const editorSource = fs.readFileSync(
     path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),

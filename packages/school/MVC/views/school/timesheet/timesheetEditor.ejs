@@ -3177,6 +3177,45 @@ document.addEventListener('DOMContentLoaded', () => {
         ].join('');
     }
 
+    const STAT_HOLIDAY_DEFAULT_OVERRIDE_REASON = 'Manager adjusted statutory holiday hours';
+
+    function hasStatHolidayManagerOverrideEffect(override) {
+        if (!override || typeof override !== 'object') return false;
+        if (override.forcePay === false) return true;
+        if (override.forcePay === true) return true;
+        const hours = Number(override.hours);
+        return Number.isFinite(hours) && hours > 0;
+    }
+
+    function shouldShowStatHolidayCalculationSteps(entry, {
+        qualified = false,
+        calculatedHoursNum = 0,
+        payableHoursNum = 0,
+        override = null,
+        payBlockedReason = ''
+    } = {}) {
+        if (hasStatHolidayManagerOverrideEffect(override)) return true;
+        if (resolveStatHolidayOverrideHours(entry) != null) return true;
+        if (Number(payableHoursNum) > 0) return true;
+        if (qualified === true) return true;
+        if (payBlockedReason === 'exceeds_max_payable_hours' && Number(calculatedHoursNum) > 0) return true;
+        return false;
+    }
+
+    function buildStatHolidayOverrideNoticeHtml(override, payableHours) {
+        if (!override || typeof override !== 'object') return '';
+        const reason = String(override.reason || '').trim();
+        const showReason = Boolean(reason && reason !== STAT_HOLIDAY_DEFAULT_OVERRIDE_REASON);
+        const reasonHtml = showReason
+            ? `<div class="small text-muted mt-1 mb-0">${escapeHtml(reason)}</div>`
+            : '';
+        if (override.forcePay === false) {
+            return `<strong>Manager decision:</strong> Statutory holiday pay was disqualified.${reasonHtml}`;
+        }
+        const hours = Number(override.hours ?? payableHours ?? 0).toFixed(2);
+        return `<strong>Manager adjustment:</strong> Payable hours set to <strong>${escapeHtml(hours)}</strong>.${reasonHtml}`;
+    }
+
     function renderStatHolidayCalculationModal(entry) {
         const summaryEl = document.getElementById('statHolidayCalcSummary');
         const resultEl = document.getElementById('statHolidayCalcResult');
@@ -3187,17 +3226,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!summaryEl || !resultEl || !fallbackEl || !stepsEl || !overrideEl || !titleEl) return;
 
         const holidayLabel = String(entry?.className || entry?.description || 'Statutory holiday').trim();
-        const dateLabel = entry?.date ? formatTimesheetDateLabel(entry.date) : '-';
         const metaCalculatedHours = entry?.statHolidayMeta?.calculatedHours;
-        const calculatedHours = Number.isFinite(Number(metaCalculatedHours))
-            ? Number(metaCalculatedHours).toFixed(2)
-            : Number(resolveStatHolidayEffectivePayableHours(entry) || 0).toFixed(2);
-        const payableHours = Number(resolveStatHolidayEffectivePayableHours(entry) || 0).toFixed(2);
+        const calculatedHoursNum = Number.isFinite(Number(metaCalculatedHours))
+            ? Number(metaCalculatedHours)
+            : Number(resolveStatHolidayEffectivePayableHours(entry) || 0);
+        const payableHoursNum = Number(resolveStatHolidayEffectivePayableHours(entry) || 0);
+        const payableHours = payableHoursNum.toFixed(2);
         const qualified = entry?.statHolidayMeta?.qualified === true;
         const payBlockedReason = String(entry?.statHolidayMeta?.payBlockedReason || '').trim();
         const override = (entry?.statHolidayOverride && typeof entry.statHolidayOverride === 'object')
             ? entry.statHolidayOverride
             : null;
+        const showCalculationSteps = shouldShowStatHolidayCalculationSteps(entry, {
+            qualified,
+            calculatedHoursNum,
+            payableHoursNum,
+            override,
+            payBlockedReason
+        });
         const hasManagerForcePay = override?.forcePay === true;
         const disqualifyReasons = Array.isArray(entry?.statHolidayMeta?.disqualifyReasons)
             ? entry.statHolidayMeta.disqualifyReasons.filter(Boolean)
@@ -3206,14 +3252,14 @@ document.addEventListener('DOMContentLoaded', () => {
         titleEl.innerHTML = `<i class="bi bi-balloon-fill me-2 text-danger"></i>Statutory Holiday Calculation`;
         summaryEl.innerHTML = `
             <div class="ts-stat-calc-summary-item"><span class="label">Holiday</span><span class="value">${escapeHtml(holidayLabel)}</span></div>
-            <div class="ts-stat-calc-summary-item"><span class="label">Date</span><span class="value">${escapeHtml(dateLabel)}</span></div>
-            <div class="ts-stat-calc-summary-item"><span class="label">Calculated Hours</span><span class="value">${escapeHtml(calculatedHours)} hrs</span></div>
             <div class="ts-stat-calc-summary-item"><span class="label">Payable Hours</span><span class="value">${escapeHtml(payableHours)} hrs</span></div>
         `;
 
-        const resultBadgeClass = qualified && Number(payableHours) > 0 ? 'text-bg-success' : 'text-bg-warning';
+        const resultBadgeClass = qualified && payableHoursNum > 0 ? 'text-bg-success' : 'text-bg-warning';
         let resultLabel = qualified ? 'Qualified for statutory pay' : 'Not qualified automatically';
-        if (payBlockedReason === 'exceeds_max_payable_hours') {
+        if (!showCalculationSteps && !qualified) {
+            resultLabel = 'Not qualified for statutory pay';
+        } else if (payBlockedReason === 'exceeds_max_payable_hours') {
             resultLabel = 'Calculated hours exceed the maximum payable per day (24 hrs)';
         } else if (!qualified && hasManagerForcePay && Number(payableHours) > 0) {
             resultLabel = 'Statutory pay applied by manager override';
@@ -3229,26 +3275,30 @@ document.addEventListener('DOMContentLoaded', () => {
         resultEl.innerHTML = `<div class="alert alert-light border mb-0">
             <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                 <strong>${escapeHtml(resultLabel)}</strong>
-                <span class="badge ${resultBadgeClass}">${qualified && Number(payableHours) > 0 ? 'Qualified' : 'Not Qualified'}</span>
+                <span class="badge ${resultBadgeClass}">${qualified && payableHoursNum > 0 ? 'Qualified' : 'Not Qualified'}</span>
             </div>
             ${reasonsHtml}
             ${blockedReasonHtml}
         </div>`;
 
-        const stepsHtml = buildStatHolidayCalculationStepsHtml(entry);
-        const hasSteps = Boolean(stepsHtml.trim());
-        stepsEl.innerHTML = stepsHtml;
-        fallbackEl.classList.toggle('d-none', hasSteps);
-        stepsEl.classList.toggle('d-none', !hasSteps);
+        if (showCalculationSteps) {
+            const stepsHtml = buildStatHolidayCalculationStepsHtml(entry);
+            const hasSteps = Boolean(stepsHtml.trim());
+            stepsEl.innerHTML = stepsHtml;
+            fallbackEl.classList.toggle('d-none', hasSteps);
+            stepsEl.classList.toggle('d-none', !hasSteps);
+        } else {
+            stepsEl.innerHTML = '';
+            stepsEl.classList.add('d-none');
+            fallbackEl.classList.add('d-none');
+        }
 
         if (!override) {
             overrideEl.classList.add('d-none');
             overrideEl.textContent = '';
         } else {
-            const overrideHours = Number(override.hours || payableHours || 0).toFixed(2);
-            const overrideAction = override.forcePay === false ? 'disqualified this statutory pay row' : 'forced/adjusted statutory pay';
             overrideEl.classList.remove('d-none');
-            overrideEl.innerHTML = `<strong>Manager override applied:</strong> A manager ${escapeHtml(overrideAction)} (${escapeHtml(overrideHours)} hrs). ${escapeHtml(String(override.reason || '').trim() || 'No reason recorded.')}`;
+            overrideEl.innerHTML = buildStatHolidayOverrideNoticeHtml(override, payableHoursNum);
         }
     }
 
