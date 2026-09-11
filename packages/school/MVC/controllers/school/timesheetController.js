@@ -3113,6 +3113,9 @@ exports.saveTimesheet = async (req, res) => {
                 if (activityId && !activityRow) {
                     throw new Error('Selected activity is not active or no longer available. Please reselect the activity.');
                 }
+                if (activityRow && activityService.isPersonHiddenFromTimesheetSelection(activityRow, teacherContext.targetTeacherId)) {
+                    throw new Error('This activity is hidden from your timesheet selection. Please choose another activity.');
+                }
                 if (activityRow && !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
                     throw new Error('You are not eligible for the selected activity. Please choose another activity.');
                 }
@@ -4192,6 +4195,9 @@ exports.validateManualTimesheetRow = async (req, res) => {
 
         if (String(proposed?.activityId || '').trim()) {
             const activityRow = await activityService.getActivity(proposed.activityId, req.user);
+            if (!activityRow || activityService.isPersonHiddenFromTimesheetSelection(activityRow, teacherContext.targetTeacherId)) {
+                throw new Error('This activity is hidden from your timesheet selection.');
+            }
             if (!activityRow || !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
                 throw new Error('You are not eligible for the selected activity.');
             }
@@ -4295,6 +4301,9 @@ exports.validateManualTimesheetRowsBatch = async (req, res) => {
                     // eslint-disable-next-line no-await-in-loop
                     activityRow = await activityService.getActivity(activityId, req.user);
                     activityCache.set(activityId, activityRow || null);
+                }
+                if (!activityRow || activityService.isPersonHiddenFromTimesheetSelection(activityRow, teacherContext.targetTeacherId)) {
+                    throw new Error('One or more selected activities are hidden from your timesheet selection.');
                 }
                 if (!activityRow || !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
                     throw new Error('You are not eligible for one or more selected activities.');

@@ -146,7 +146,8 @@
         <% const status = String(item.status || 'draft').toLowerCase(); %>
         <% const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark'); %>
         <% const hasTimesheetLock = (item.locked === true || String(item.locked) === 'true') && String(item.lockReason || '') === 'timesheet_approved'
-          || entries.some((entry) => (entry.locked === true || String(entry.locked) === 'true') && String(entry.lockReason || '') === 'timesheet_approved'); %>
+          || entries.some((entry) => (entry.locked === true || String(entry.locked) === 'true') && String(entry.lockReason || '') === 'timesheet_approved'
+            || (Array.isArray(entry.assignees) ? entry.assignees : []).some((assignee) => (assignee.locked === true || String(assignee.locked) === 'true') && String(assignee.lockReason || '') === 'timesheet_approved')); %>
         <% const itemVisibilityScope = String(item.visibilityScope || 'school').toLowerCase() === 'individual' ? 'individual' : 'school'; %>
         <tr>
           <td class="ps-4">

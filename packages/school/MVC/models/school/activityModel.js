@@ -333,6 +333,9 @@ function sanitizeActivityPayload(input = {}) {
     input.allowedPersonIds || input.allowedPersons || [],
     input.excludedPersonIds || input.excludedPersons || []
   );
+  const allowedSet = new Set(allowedPersonIds);
+  const hiddenPersonIds = parsePersonIdArray(input.hiddenPersonIds || input.hiddenPersons || [], 'Hidden persons')
+    .filter((personId) => allowedSet.has(personId) && !excludedPersonIds.includes(personId));
   if (!orgId) throw new Error('Organization is required.');
   if (!title) throw new Error('Activity title is required.');
   if (!categoryId) throw new Error('Activity category is required.');
@@ -373,6 +376,7 @@ function sanitizeActivityPayload(input = {}) {
     visibilityScope,
     allowedPersonIds,
     excludedPersonIds,
+    hiddenPersonIds,
     location: cleanString(input.location, { max: 180, allowEmpty: true }),
     notes: cleanString(input.notes, { max: 1200, allowEmpty: true }),
     attendees,

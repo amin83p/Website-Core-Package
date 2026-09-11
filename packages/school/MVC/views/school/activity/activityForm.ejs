@@ -29,6 +29,9 @@
   })();
   const initialAllowedPersonIds = normalizePersonIdListServer(row.allowedPersonIds || []);
   const initialExcludedPersonIds = normalizePersonIdListServer(row.excludedPersonIds || []);
+  const initialHiddenPersonIds = normalizePersonIdListServer(row.hiddenPersonIds || []);
+  const persistedEntryCount = Array.isArray(row.entries) ? row.entries.length : 0;
+  const visibilityScopeLocked = persistedEntryCount > 0;
   const initialEntries = Array.isArray(row.entries) && row.entries.length
     ? row.entries
     : [{
@@ -84,7 +87,7 @@
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
         <div>
           <i class="bi bi-lock-fill me-2"></i>
-          <strong>Timesheet locked.</strong> One or more work sessions on this activity are locked by an approved timesheet. Reopen the timesheet before making structural changes.
+          <strong>Timesheet locked.</strong> Some work sessions have assignees linked to a submitted timesheet. Date, time, status, and locked assignee rows cannot be changed. Title, location, notes, and adding assignees are still allowed.
           <% if (canForceUnlockTimesheetLocksFlag) { %>
             <div class="small mt-1">As a super user you can force unlock orphaned locks when the timesheet is already gone.</div>
           <% } %>
@@ -105,6 +108,7 @@
       <input type="hidden" name="attendees" id="activityAttendeesInput" value="[]">
       <input type="hidden" name="allowedPersonIds" id="activityAllowedPersonIdsInput" value="[]">
       <input type="hidden" name="excludedPersonIds" id="activityExcludedPersonIdsInput" value="[]">
+      <input type="hidden" name="hiddenPersonIds" id="activityHiddenPersonIdsInput" value="[]">
       <input type="hidden" name="date" id="activityLegacyDate" value="<%= row.date || '' %>">
       <input type="hidden" name="startTime" id="activityLegacyStartTime" value="<%= row.startTime || '' %>">
       <input type="hidden" name="endTime" id="activityLegacyEndTime" value="<%= row.endTime || '' %>">
@@ -114,6 +118,7 @@
       <script type="application/json" id="activityInitialAttendees"><%- JSON.stringify(legacyAttendees) %></script>
       <script type="application/json" id="activityInitialAllowedPersonIds"><%- JSON.stringify(initialAllowedPersonIds) %></script>
       <script type="application/json" id="activityInitialExcludedPersonIds"><%- JSON.stringify(initialExcludedPersonIds) %></script>
+      <script type="application/json" id="activityInitialHiddenPersonIds"><%- JSON.stringify(initialHiddenPersonIds) %></script>
       <script type="application/json" id="activityCategoriesData"><%- JSON.stringify(categories || []) %></script>
 
       <div class="card border-0 shadow-sm mb-4">
@@ -134,11 +139,15 @@
             </div>
             <div class="col-md-4">
               <label class="form-label fw-bold">Calendar Scope *</label>
-              <select name="visibilityScope" id="activityVisibilityScope" class="form-select size-md" required>
+              <select name="visibilityScope" id="activityVisibilityScope" class="form-select size-md" required<%= visibilityScopeLocked ? ' disabled' : '' %>>
                 <option value="school" <%= visibilityScope === 'school' ? 'selected' : '' %>>School / Public</option>
                 <option value="individual" <%= visibilityScope === 'individual' ? 'selected' : '' %>>Individual / Assigned people only</option>
               </select>
+              <% if (visibilityScopeLocked) { %>
+                <input type="hidden" name="visibilityScope" id="activityVisibilityScopeHidden" value="<%= visibilityScope %>">
+              <% } %>
               <div class="form-text small">Public activities appear on the School Calendar; individual activities only appear in assigned schedules.</div>
+              <div id="activityVisibilityScopeLockHint" class="form-text small text-warning<%= visibilityScopeLocked ? '' : ' d-none' %>">Calendar scope cannot be changed after work sessions have been added.</div>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-bold">Category *</label>
@@ -205,11 +214,24 @@
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                   <div>
                     <div class="fw-bold">Allowed persons (Individual scope)</div>
-                    <div class="small text-muted">Only selected people can be assigned when scope is individual.</div>
+                    <div class="small text-muted">Only selected people can be assigned when scope is individual. Work session assignees cannot be removed; hide them to block timesheet activity selection instead.</div>
                   </div>
                   <button type="button" class="btn btn-outline-primary btn-sm" id="activityAllowedPersonsSelectBtn"><i class="bi bi-person-plus me-1"></i>Select allowed persons</button>
                 </div>
-                <div id="activityAllowedPersonsChips" class="d-flex flex-wrap gap-2"></div>
+                <div class="table-responsive border rounded bg-white">
+                  <table class="table table-sm table-hover align-middle mb-0" id="activityAllowedPersonsTable">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Name</th>
+                        <th>Person ID</th>
+                        <th>Assignee</th>
+                        <th>Hidden</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="activityAllowedPersonsTbody"></tbody>
+                  </table>
+                </div>
                 <div class="small text-muted mt-2" id="activityAllowedPersonsEmptyHint">No allowed persons selected yet.</div>
               </div>
             </div>
@@ -219,11 +241,23 @@
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                   <div>
                     <div class="fw-bold">Excluded persons</div>
-                    <div class="small text-muted">Excluded people cannot be assigned, shown in schedule, or extracted to timesheets for this activity.</div>
+                    <div class="small text-muted">Excluded people cannot be assigned, shown in schedule, or extracted to timesheets for this activity. Work session assignees cannot be excluded.</div>
                   </div>
                   <button type="button" class="btn btn-outline-primary btn-sm" id="activityExcludedPersonsSelectBtn"><i class="bi bi-person-dash me-1"></i>Select exclusions</button>
                 </div>
-                <div id="activityExcludedPersonsChips" class="d-flex flex-wrap gap-2"></div>
+                <div class="table-responsive border rounded bg-white">
+                  <table class="table table-sm table-hover align-middle mb-0" id="activityExcludedPersonsTable">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Name</th>
+                        <th>Person ID</th>
+                        <th>Assignee</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="activityExcludedPersonsTbody"></tbody>
+                  </table>
+                </div>
                 <div class="small text-muted mt-2" id="activityExcludedPersonsEmptyHint">No excluded persons configured.</div>
               </div>
             </div>
@@ -423,6 +457,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const attendeesInput = document.getElementById('activityAttendeesInput');
   const allowedPersonIdsInput = document.getElementById('activityAllowedPersonIdsInput');
   const excludedPersonIdsInput = document.getElementById('activityExcludedPersonIdsInput');
+  const hiddenPersonIdsInput = document.getElementById('activityHiddenPersonIdsInput');
   const entriesTbody = document.getElementById('activityEntriesTbody');
   const noEntriesMsg = document.getElementById('activityNoEntriesMsg');
   const batchModalEl = document.getElementById('activityBatchModal');
@@ -434,10 +469,10 @@ document.addEventListener('DOMContentLoaded', function () {
   const activityTitleInput = document.getElementById('activityTitle');
   const activityLocationInput = document.getElementById('activityLocation');
   const allowedPersonsGroup = document.getElementById('activityAllowedPersonsGroup');
-  const allowedPersonsChips = document.getElementById('activityAllowedPersonsChips');
+  const allowedPersonsTbody = document.getElementById('activityAllowedPersonsTbody');
   const allowedPersonsEmptyHint = document.getElementById('activityAllowedPersonsEmptyHint');
   const excludedPersonsGroup = document.getElementById('activityExcludedPersonsGroup');
-  const excludedPersonsChips = document.getElementById('activityExcludedPersonsChips');
+  const excludedPersonsTbody = document.getElementById('activityExcludedPersonsTbody');
   const excludedPersonsEmptyHint = document.getElementById('activityExcludedPersonsEmptyHint');
   const legacyDateInput = document.getElementById('activityLegacyDate');
   const legacyStartInput = document.getElementById('activityLegacyStartTime');
@@ -474,9 +509,12 @@ document.addEventListener('DOMContentLoaded', function () {
   const initialAttendees = parseInitialJson('activityInitialAttendees', []);
   const initialAllowedPersonIds = parseInitialJson('activityInitialAllowedPersonIds', []);
   const initialExcludedPersonIds = parseInitialJson('activityInitialExcludedPersonIds', []);
+  const initialHiddenPersonIds = parseInitialJson('activityInitialHiddenPersonIds', []);
+  const initialPersistedEntryCount = <%= persistedEntryCount %>;
   let entries = parseInitialJson('activityInitialEntries', []);
   let activityAllowedPersonIds = Array.isArray(initialAllowedPersonIds) ? initialAllowedPersonIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
   let activityExcludedPersonIds = Array.isArray(initialExcludedPersonIds) ? initialExcludedPersonIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
+  let activityHiddenPersonIds = Array.isArray(initialHiddenPersonIds) ? initialHiddenPersonIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
   let selectedEntryIndex = null;
   let batchModalInstance = null;
   let batchAssignees = [];
@@ -628,8 +666,50 @@ document.addEventListener('DOMContentLoaded', function () {
       return !activityExcludedPersonIds.includes(personId);
     });
     activityExcludedPersonIds = normalizePersonIdList(activityExcludedPersonIds);
+    const allowedSet = new Set(activityAllowedPersonIds);
+    const excludedSet = new Set(activityExcludedPersonIds);
+    activityHiddenPersonIds = normalizePersonIdList(activityHiddenPersonIds).filter(function (personId) {
+      return allowedSet.has(personId) && !excludedSet.has(personId);
+    });
     if (allowedPersonIdsInput) allowedPersonIdsInput.value = JSON.stringify(activityAllowedPersonIds);
     if (excludedPersonIdsInput) excludedPersonIdsInput.value = JSON.stringify(activityExcludedPersonIds);
+    if (hiddenPersonIdsInput) hiddenPersonIdsInput.value = JSON.stringify(activityHiddenPersonIds);
+  }
+
+  function isScopePersonAssignee(personId) {
+    return getActivityScopeAssigneeFallbackSet().has(String(personId || '').trim());
+  }
+
+  function isScopePersonHidden(personId) {
+    return activityHiddenPersonIds.includes(String(personId || '').trim());
+  }
+
+  function setScopePersonHidden(personId, hidden) {
+    const token = String(personId || '').trim();
+    if (!token) return;
+    activityHiddenPersonIds = activityHiddenPersonIds.filter(function (id) { return id !== token; });
+    if (hidden) activityHiddenPersonIds.push(token);
+    syncActivityScopePersonControlInputs();
+    renderScopePersonTables();
+  }
+
+  function removeAllowedScopePerson(personId) {
+    const token = String(personId || '').trim();
+    if (!token || isScopePersonAssignee(token)) return;
+    activityAllowedPersonIds = activityAllowedPersonIds.filter(function (id) { return id !== token; });
+    activityHiddenPersonIds = activityHiddenPersonIds.filter(function (id) { return id !== token; });
+    syncActivityScopePersonControlInputs();
+    renderScopePersonTables();
+    if (selectedEntryIndex !== null && entryModalEl?.classList.contains('show')) renderEntryModal();
+  }
+
+  function removeExcludedScopePerson(personId) {
+    const token = String(personId || '').trim();
+    if (!token || isScopePersonAssignee(token)) return;
+    activityExcludedPersonIds = activityExcludedPersonIds.filter(function (id) { return id !== token; });
+    syncActivityScopePersonControlInputs();
+    renderScopePersonTables();
+    if (selectedEntryIndex !== null && entryModalEl?.classList.contains('show')) renderEntryModal();
   }
 
   function ensurePersonRecord(item) {
@@ -671,6 +751,9 @@ document.addEventListener('DOMContentLoaded', function () {
       ensurePersonRecord({ personId, displayName: personChipLabel(personId) });
     });
     normalizePersonIdList(activityExcludedPersonIds).forEach(function (personId) {
+      ensurePersonRecord({ personId, displayName: personChipLabel(personId) });
+    });
+    normalizePersonIdList(activityHiddenPersonIds).forEach(function (personId) {
       ensurePersonRecord({ personId, displayName: personChipLabel(personId) });
     });
     entries.forEach(function (entry) {
@@ -720,34 +803,76 @@ document.addEventListener('DOMContentLoaded', function () {
     return person.displayName || person.personId;
   }
 
-  function renderPersonControlChips(targetNode, emptyNode, rows, type) {
-    if (!targetNode) return;
-    const normalizedRows = normalizePersonIdList(rows);
-    targetNode.innerHTML = normalizedRows.map(function (personId, index) {
-      return [
-        '<span class="badge text-bg-light border d-inline-flex align-items-center gap-2 py-2 px-2" data-chip-type="' + escapeHtml(type) + '" data-chip-index="' + index + '">',
-        '<span>' + escapeHtml(personChipLabel(personId)) + '</span>',
-        '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 js-remove-scope-chip" title="Remove"><i class="bi bi-x"></i></button>',
-        '</span>'
-      ].join('');
-    }).join('');
-    if (emptyNode) {
-      emptyNode.classList.toggle('d-none', normalizedRows.length > 0);
-    }
-    targetNode.querySelectorAll('[data-chip-index]').forEach(function (chipEl) {
-      const chipIndex = Number(chipEl.getAttribute('data-chip-index'));
-      const chipType = String(chipEl.getAttribute('data-chip-type') || '').trim();
-      chipEl.querySelector('.js-remove-scope-chip')?.addEventListener('click', function () {
-        if (chipType === 'allowed') {
-          activityAllowedPersonIds.splice(chipIndex, 1);
+  function renderScopePersonTables() {
+    const allowedRows = normalizePersonIdList(activityAllowedPersonIds);
+    const excludedRows = normalizePersonIdList(activityExcludedPersonIds);
+    if (allowedPersonsTbody) {
+      allowedPersonsTbody.innerHTML = allowedRows.map(function (personId) {
+        const isAssignee = isScopePersonAssignee(personId);
+        const isHidden = isScopePersonHidden(personId);
+        const actionButtons = [];
+        if (isAssignee) {
+          if (isHidden) {
+            actionButtons.push('<button type="button" class="btn btn-outline-secondary btn-sm js-scope-unhide-person" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-eye me-1"></i>Unhide</button>');
+          } else {
+            actionButtons.push('<button type="button" class="btn btn-outline-warning btn-sm js-scope-hide-person" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-eye-slash me-1"></i>Hide</button>');
+          }
         } else {
-          activityExcludedPersonIds.splice(chipIndex, 1);
+          actionButtons.push('<button type="button" class="btn btn-outline-danger btn-sm js-scope-remove-allowed" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-trash me-1"></i>Remove</button>');
         }
-        syncActivityScopePersonControlInputs();
-        renderScopePersonControls();
-        if (selectedEntryIndex !== null && entryModalEl?.classList.contains('show')) renderEntryModal();
+        return [
+          '<tr data-person-id="' + escapeHtml(personId) + '">',
+          '<td class="fw-semibold">' + escapeHtml(personChipLabel(personId)) + '</td>',
+          '<td class="small text-muted font-monospace">' + escapeHtml(personId) + '</td>',
+          '<td>' + (isAssignee ? '<span class="badge bg-info text-dark">Assignee</span>' : '<span class="text-muted">—</span>') + '</td>',
+          '<td>' + (isHidden ? '<span class="badge bg-warning text-dark">Hidden</span>' : '<span class="text-muted">—</span>') + '</td>',
+          '<td class="text-end">' + actionButtons.join(' ') + '</td>',
+          '</tr>'
+        ].join('');
+      }).join('');
+      allowedPersonsTbody.querySelectorAll('.js-scope-remove-allowed').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          removeAllowedScopePerson(btn.getAttribute('data-person-id'));
+        });
       });
-    });
+      allowedPersonsTbody.querySelectorAll('.js-scope-hide-person').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          setScopePersonHidden(btn.getAttribute('data-person-id'), true);
+        });
+      });
+      allowedPersonsTbody.querySelectorAll('.js-scope-unhide-person').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          setScopePersonHidden(btn.getAttribute('data-person-id'), false);
+        });
+      });
+    }
+    if (allowedPersonsEmptyHint) {
+      allowedPersonsEmptyHint.classList.toggle('d-none', allowedRows.length > 0);
+    }
+    if (excludedPersonsTbody) {
+      excludedPersonsTbody.innerHTML = excludedRows.map(function (personId) {
+        const isAssignee = isScopePersonAssignee(personId);
+        const actionButtons = isAssignee
+          ? '<span class="small text-muted">Assigned to work session</span>'
+          : '<button type="button" class="btn btn-outline-danger btn-sm js-scope-remove-excluded" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-trash me-1"></i>Remove</button>';
+        return [
+          '<tr data-person-id="' + escapeHtml(personId) + '">',
+          '<td class="fw-semibold">' + escapeHtml(personChipLabel(personId)) + '</td>',
+          '<td class="small text-muted font-monospace">' + escapeHtml(personId) + '</td>',
+          '<td>' + (isAssignee ? '<span class="badge bg-info text-dark">Assignee</span>' : '<span class="text-muted">—</span>') + '</td>',
+          '<td class="text-end">' + actionButtons + '</td>',
+          '</tr>'
+        ].join('');
+      }).join('');
+      excludedPersonsTbody.querySelectorAll('.js-scope-remove-excluded').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          removeExcludedScopePerson(btn.getAttribute('data-person-id'));
+        });
+      });
+    }
+    if (excludedPersonsEmptyHint) {
+      excludedPersonsEmptyHint.classList.toggle('d-none', excludedRows.length > 0);
+    }
   }
 
   function renderScopePersonControls() {
@@ -755,8 +880,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const scope = getVisibilityScopeValue();
     if (allowedPersonsGroup) allowedPersonsGroup.classList.toggle('d-none', scope !== 'individual');
     if (excludedPersonsGroup) excludedPersonsGroup.classList.remove('d-none');
-    renderPersonControlChips(allowedPersonsChips, allowedPersonsEmptyHint, activityAllowedPersonIds, 'allowed');
-    renderPersonControlChips(excludedPersonsChips, excludedPersonsEmptyHint, activityExcludedPersonIds, 'excluded');
+    renderScopePersonTables();
   }
 
   async function openScopePersonPicker(type) {
@@ -779,8 +903,9 @@ document.addEventListener('DOMContentLoaded', function () {
       placeholder: 'Search students, teachers, or staff...',
       multiselect: true,
       context,
-      onSelect: function (items) {
+      onSelect: async function (items) {
         const selectedRows = Array.isArray(items) ? items : [items];
+        const blockedAssignees = [];
         selectedRows.forEach(function (item) {
           const person = ensurePersonRecord(item);
           if (!person || !person.personId) return;
@@ -788,8 +913,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!activityAllowedPersonIds.includes(person.personId)) activityAllowedPersonIds.push(person.personId);
             activityExcludedPersonIds = activityExcludedPersonIds.filter(function (personId) { return personId !== person.personId; });
           } else {
+            if (isScopePersonAssignee(person.personId)) {
+              blockedAssignees.push(personChipLabel(person.personId));
+              return;
+            }
             if (!activityExcludedPersonIds.includes(person.personId)) activityExcludedPersonIds.push(person.personId);
             activityAllowedPersonIds = activityAllowedPersonIds.filter(function (personId) { return personId !== person.personId; });
+            activityHiddenPersonIds = activityHiddenPersonIds.filter(function (personId) { return personId !== person.personId; });
             entries.forEach(function (entry) {
               entry.assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).filter(function (assignee) {
                 return String(assignee?.personId || '').trim() !== person.personId;
@@ -800,6 +930,13 @@ document.addEventListener('DOMContentLoaded', function () {
             });
           }
         });
+        if (blockedAssignees.length) {
+          await safeShowMessage({
+            title: 'Cannot Exclude Assignee',
+            icon: 'warning',
+            message: 'The following people are assigned to a work session and cannot be excluded: ' + blockedAssignees.join(', ')
+          });
+        }
         syncEntries();
         renderScopePersonControls();
         renderEntries();
@@ -854,12 +991,24 @@ document.addEventListener('DOMContentLoaded', function () {
     return 'ENTRY-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
   }
 
+  function copyLockFields(source, target) {
+    if (!source || !target) return target;
+    if (source.locked === true || String(source.locked) === 'true') {
+      target.locked = true;
+      if (source.lockReason) target.lockReason = source.lockReason;
+      if (source.lockedTimesheetId) target.lockedTimesheetId = source.lockedTimesheetId;
+      if (source.lockedAt) target.lockedAt = source.lockedAt;
+      if (source.lockedBy) target.lockedBy = source.lockedBy;
+    }
+    return target;
+  }
+
   function normalizeAttendee(item, entryDuration) {
     const personId = String(item?.personId || item?.id || '').trim();
     if (!personId) return null;
     const roles = resolveAssigneeRoleList(item, personId);
     const selectedRole = pickDefaultRole(roles, item?.role || item?.matchedRole);
-    return {
+    return copyLockFields(item, {
       personId,
       personName: buildPersonDisplayName(item, personId),
       roles: roles.length ? roles : [selectedRole],
@@ -869,12 +1018,12 @@ document.addEventListener('DOMContentLoaded', function () {
       paid: item?.paid === undefined ? paidInput.checked : normalizeBoolean(item.paid, paidInput.checked),
       paidHours: item?.paidHours ?? entryDuration ?? '',
       notes: item?.notes || ''
-    };
+    });
   }
 
   function getDefaultEntry(overrides) {
     const values = overrides || {};
-    return {
+    return copyLockFields(values, {
       entryId: values.entryId || generateEntryId(),
       title: values.title || '',
       date: values.date || '',
@@ -886,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', function () {
       status: values.status || 'posted',
       excludedPersonIds: normalizePersonIdList(values.excludedPersonIds || values.excludedPersons || []),
       assignees: Array.isArray(values.assignees) ? values.assignees : []
-    };
+    });
   }
 
   function normalizeEntry(item, index) {
@@ -894,7 +1043,7 @@ document.addEventListener('DOMContentLoaded', function () {
       ? item.assignees
       : (Array.isArray(item?.attendees) ? item.attendees : []);
     const durationHours = item?.durationHours ?? '';
-    return {
+    return copyLockFields(item, {
       entryId: String(item?.entryId || item?.id || 'ENTRY-' + (index + 1)).trim(),
       title: String(item?.title || '').trim(),
       date: String(item?.date || '').trim(),
@@ -908,7 +1057,7 @@ document.addEventListener('DOMContentLoaded', function () {
       assignees: sourceAssignees.map(function (itemRow) {
         return normalizeAttendee(itemRow, durationHours);
       }).filter(Boolean)
-    };
+    });
   }
 
   function mergeAssigneesForLegacy() {
@@ -928,9 +1077,39 @@ document.addEventListener('DOMContentLoaded', function () {
         existing.personName = existing.personName || assignee.personName || personId;
         existing.paid = existing.paid !== false || assignee.paid !== false;
         existing.paidHours = Number(((Number(existing.paidHours) || 0) + (Number(assignee.paidHours) || 0)).toFixed(2));
+        if (isAssigneeTimesheetLocked(assignee)) copyLockFields(assignee, existing);
       });
     });
     return Array.from(byPersonId.values());
+  }
+
+  function activityHasWorkSessions() {
+    if (initialPersistedEntryCount > 0) return true;
+    const list = Array.isArray(entries) ? entries : [];
+    if (list.length > 1) return true;
+    return list.some(function (entry) { return !isBlankActivityEntry(entry); });
+  }
+
+  function updateVisibilityScopeLock() {
+    if (!visibilityScopeSelect) return;
+    const locked = activityHasWorkSessions();
+    const hiddenId = 'activityVisibilityScopeHidden';
+    let hidden = document.getElementById(hiddenId);
+    visibilityScopeSelect.disabled = locked;
+    if (locked) {
+      if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'visibilityScope';
+        hidden.id = hiddenId;
+        visibilityScopeSelect.insertAdjacentElement('afterend', hidden);
+      }
+      hidden.value = visibilityScopeSelect.value || 'school';
+    } else if (hidden) {
+      hidden.remove();
+    }
+    const hint = document.getElementById('activityVisibilityScopeLockHint');
+    if (hint) hint.classList.toggle('d-none', !locked);
   }
 
   function syncEntries() {
@@ -952,9 +1131,11 @@ document.addEventListener('DOMContentLoaded', function () {
     legacyStartInput.value = firstEntry.startTime || '';
     legacyEndInput.value = firstEntry.endTime || '';
     legacyDurationInput.value = firstEntry.durationHours || '';
+    updateVisibilityScopeLock();
+    renderScopePersonTables();
   }
 
-  function renderRoleSelect(item, entryIndex, assigneeIndex) {
+  function renderRoleSelect(item, entryIndex, assigneeIndex, disabled) {
     const roles = resolveAssigneeRoleList(item, item?.personId);
     const selectedRole = pickDefaultRole(roles, item.role);
     entries[entryIndex].assignees[assigneeIndex].role = selectedRole;
@@ -962,16 +1143,29 @@ document.addEventListener('DOMContentLoaded', function () {
     const options = entries[entryIndex].assignees[assigneeIndex].roles.map(function (role) {
       return '<option value="' + escapeHtml(role) + '" ' + (role === selectedRole ? 'selected' : '') + '>' + escapeHtml(roleLabel(role)) + '</option>';
     }).join('');
-    return '<select class="form-select form-select-sm js-assignee-role">' + options + '</select>';
+    const disabledAttr = disabled ? ' disabled' : '';
+    return '<select class="form-select form-select-sm js-assignee-role"' + disabledAttr + '>' + options + '</select>';
   }
 
-  function renderAssigneeStatusControl(assignee) {
+  function renderAssigneeStatusControl(assignee, disabled) {
+    const disabledAttr = disabled ? ' disabled' : '';
     if (isCompletionEvaluation()) {
       const completionStatus = normalizeCompletionStatus(assignee.completionStatus);
-      return '<select class="form-select form-select-sm js-assignee-completion-status"><option value="pending" ' + (completionStatus === 'pending' ? 'selected' : '') + '>Pending</option><option value="completed" ' + (completionStatus === 'completed' ? 'selected' : '') + '>Completed</option></select>';
+      return '<select class="form-select form-select-sm js-assignee-completion-status"' + disabledAttr + '><option value="pending" ' + (completionStatus === 'pending' ? 'selected' : '') + '>Pending</option><option value="completed" ' + (completionStatus === 'completed' ? 'selected' : '') + '>Completed</option></select>';
     }
     const status = assignee.status || 'attended';
-    return '<select class="form-select form-select-sm js-assignee-status"><option value="attended" ' + (status === 'attended' ? 'selected' : '') + '>Attended</option><option value="absent" ' + (status === 'absent' ? 'selected' : '') + '>Absent</option><option value="excused" ' + (status === 'excused' ? 'selected' : '') + '>Excused</option></select>';
+    return '<select class="form-select form-select-sm js-assignee-status"' + disabledAttr + '><option value="attended" ' + (status === 'attended' ? 'selected' : '') + '>Attended</option><option value="absent" ' + (status === 'absent' ? 'selected' : '') + '>Absent</option><option value="excused" ' + (status === 'excused' ? 'selected' : '') + '>Excused</option></select>';
+  }
+
+  function isAssigneeTimesheetLocked(assignee) {
+    if (!assignee) return false;
+    return (assignee.locked === true || String(assignee.locked) === 'true')
+      && String(assignee.lockReason || '') === 'timesheet_approved';
+  }
+
+  function entryHasTimesheetLockedAssignee(entry) {
+    if (!entry) return false;
+    return (Array.isArray(entry.assignees) ? entry.assignees : []).some(isAssigneeTimesheetLocked);
   }
 
   function renderAssigneeRows(entry, entryIndex) {
@@ -981,17 +1175,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     return assignees.map(function (assignee, assigneeIndex) {
       const paid = assignee.paid !== false;
+      const assigneeLocked = isAssigneeTimesheetLocked(assignee);
+      const disabledAttr = assigneeLocked ? ' disabled' : '';
+      const lockIcon = assigneeLocked
+        ? '<i class="bi bi-lock-fill text-warning ms-1" title="Locked by submitted timesheet"></i>'
+        : '';
+      const removeBtn = assigneeLocked
+        ? ''
+        : '<div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm js-assignee-remove"><i class="bi bi-trash"></i></button></div>';
       return [
-        '<div class="border rounded p-3 mb-2 bg-white" data-assignee-index="' + assigneeIndex + '">',
+        '<div class="border rounded p-3 mb-2 bg-white' + (assigneeLocked ? ' border-warning-subtle' : '') + '" data-assignee-index="' + assigneeIndex + '" data-assignee-locked="' + (assigneeLocked ? 'true' : 'false') + '">',
         '<div class="row g-2 align-items-end">',
-        '<div class="col-md-3"><div class="fw-bold">' + escapeHtml(resolvePersonLabel(assignee.personId, assignee.personName)) + '</div><div class="small text-muted">' + escapeHtml(assignee.personId || '') + '</div></div>',
-        '<div class="col-md-2"><label class="form-label fw-bold small">Role</label>' + renderRoleSelect(assignee, entryIndex, assigneeIndex) + '</div>',
-        '<div class="col-md-2"><label class="form-label fw-bold small">Status</label>' + renderAssigneeStatusControl(assignee) + '</div>',
-        '<div class="col-md-2"><label class="form-label fw-bold small">Paid Hours</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-assignee-hours" value="' + escapeHtml(assignee.paidHours ?? entry.durationHours ?? '') + '"></div>',
-        '<div class="col-md-2"><div class="form-check form-switch"><input class="form-check-input js-assignee-paid" type="checkbox" ' + (paid ? 'checked' : '') + '><label class="form-check-label small fw-bold">Payable</label></div></div>',
-        '<div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm js-assignee-remove"><i class="bi bi-trash"></i></button></div>',
+        '<div class="col-md-3"><div class="fw-bold">' + escapeHtml(resolvePersonLabel(assignee.personId, assignee.personName)) + lockIcon + '</div><div class="small text-muted">' + escapeHtml(assignee.personId || '') + '</div></div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Role</label>' + renderRoleSelect(assignee, entryIndex, assigneeIndex, assigneeLocked) + '</div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Status</label>' + renderAssigneeStatusControl(assignee, assigneeLocked) + '</div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Paid Hours</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-assignee-hours" value="' + escapeHtml(assignee.paidHours ?? entry.durationHours ?? '') + '"' + disabledAttr + '></div>',
+        '<div class="col-md-2"><div class="form-check form-switch"><input class="form-check-input js-assignee-paid" type="checkbox" ' + (paid ? 'checked' : '') + disabledAttr + '><label class="form-check-label small fw-bold">Payable</label></div></div>',
+        removeBtn,
         '</div>',
-        '<div class="mt-2"><label class="form-label fw-bold small">Assignee Notes</label><input type="text" class="form-control form-control-sm js-assignee-notes" value="' + escapeHtml(assignee.notes || '') + '" placeholder="Optional notes for this person..."></div>',
+        '<div class="mt-2"><label class="form-label fw-bold small">Assignee Notes</label><input type="text" class="form-control form-control-sm js-assignee-notes" value="' + escapeHtml(assignee.notes || '') + '" placeholder="Optional notes for this person..."' + disabledAttr + '></div>',
         '</div>'
       ].join('');
     }).join('');
@@ -1160,13 +1362,10 @@ document.addEventListener('DOMContentLoaded', function () {
   function isEntryTimesheetLocked(entry) {
     if (!entry) return false;
     if ((entry.locked === true || String(entry.locked) === 'true')
-      && (String(entry.lockReason || '') === 'timesheet_approved' || entry.lockedTimesheetId)) {
+      && String(entry.lockReason || '') === 'timesheet_approved') {
       return true;
     }
-    return (Array.isArray(entry.assignees) ? entry.assignees : []).some(function (assignee) {
-      return (assignee.locked === true || String(assignee.locked) === 'true')
-        && (String(assignee.lockReason || '') === 'timesheet_approved' || assignee.lockedTimesheetId);
-    });
+    return entryHasTimesheetLockedAssignee(entry);
   }
 
   function buildEntryRowsHtml() {
@@ -1175,10 +1374,14 @@ document.addEventListener('DOMContentLoaded', function () {
       const status = String(entry.status || 'posted').toLowerCase();
       const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark');
       const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
-      const assigneeNames = assignees.slice(0, 2).map(function (assignee) {
-        return resolvePersonLabel(assignee.personId, assignee.personName);
+      const assigneeNameRows = assignees.slice(0, 2).map(function (assignee) {
+        const label = escapeHtml(resolvePersonLabel(assignee.personId, assignee.personName));
+        const lockHint = isAssigneeTimesheetLocked(assignee)
+          ? ' <i class="bi bi-lock-fill text-warning" title="Timesheet locked"></i>'
+          : '';
+        return label + lockHint;
       }).filter(Boolean);
-      const extraAssignees = assignees.length > assigneeNames.length ? ' +' + (assignees.length - assigneeNames.length) : '';
+      const extraAssignees = assignees.length > assigneeNameRows.length ? ' +' + (assignees.length - assigneeNameRows.length) : '';
       const rowClass = selectedEntryIndex === entryIndex ? 'table-primary' : '';
       const rowActionId = 'activity-entry-' + escapeHtml(entry.entryId || entryIndex);
       const locked = isEntryTimesheetLocked(entry);
@@ -1189,25 +1392,25 @@ document.addEventListener('DOMContentLoaded', function () {
         ? '<button type="button" class="btn btn-outline-danger btn-sm js-entry-force-unlock" data-index="' + entryIndex + '" data-entry-id="' + escapeHtml(entry.entryId || '') + '"><i class="bi bi-unlock me-2"></i>Force unlock</button>'
         : '';
       const titleLabel = entry.title || ('Work Session ' + (entryIndex + 1));
-      const assigneeLabel = assigneeNames.join(', ') || 'No people';
+      const assigneeLabel = assigneeNameRows.length ? assigneeNameRows.join(', ') : 'No people';
       return [
         '<tr class="' + rowClass + '" data-entry-index="' + entryIndex + '">',
         '<td data-sort-value="' + escapeHtml(entry.date || '') + '"><div class="fw-bold text-dark">' + escapeHtml(entry.date || '-') + '</div></td>',
         '<td data-sort-value="' + escapeHtml(entry.startTime || '') + '"><div class="small text-dark">' + escapeHtml(entry.startTime || '-') + ' - ' + escapeHtml(entry.endTime || '-') + '</div></td>',
         '<td data-sort-value="' + escapeHtml(Number(entry.durationHours || 0).toFixed(2)) + '"><span class="badge bg-light text-dark border">' + escapeHtml(Number(entry.durationHours || 0).toFixed(2)) + '</span></td>',
         '<td data-sort-value="' + escapeHtml(titleLabel) + '"><div class="fw-bold text-dark">' + escapeHtml(titleLabel) + '</div><div class="x-small text-muted">' + escapeHtml(entry.notes || 'No notes') + '</div>' + lockBadge + '</td>',
-        '<td data-sort-value="' + escapeHtml(assigneeLabel) + '"><div class="small text-dark">' + escapeHtml(assigneeLabel) + escapeHtml(extraAssignees) + '</div><div class="x-small text-muted">' + assignees.length + ' assigned</div></td>',
+        '<td data-sort-value="' + escapeHtml(getEntryAssigneeSortLabel(entry)) + '"><div class="small text-dark">' + assigneeLabel + escapeHtml(extraAssignees) + '</div><div class="x-small text-muted">' + assignees.length + ' assigned</div></td>',
         '<td data-sort-value="' + escapeHtml(status) + '"><span class="badge ' + statusClass + ' text-capitalize">' + escapeHtml(status) + '</span></td>',
         '<td data-sort-value="' + escapeHtml(entry.location || '') + '"><div class="small text-muted">' + escapeHtml(entry.location || '-') + '</div></td>',
         '<td class="table-actions text-end pe-3">',
         '<div class="row-actions-wrap">',
         '<button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="' + rowActionId + '" title="Work session actions"><i class="bi bi-three-dots-vertical"></i></button>',
         '<div class="row-actions-menu d-none" data-row-actions-id="' + rowActionId + '">',
-        '<button type="button" class="btn btn-outline-primary btn-sm js-entry-edit" data-index="' + entryIndex + '"><i class="bi bi-pencil-square me-2"></i>Edit details</button>',
+        '<button type="button" class="btn btn-outline-primary btn-sm js-entry-edit" data-index="' + entryIndex + '"><i class="bi bi-pencil-square me-2"></i>' + (locked ? 'Edit details' : 'Edit details') + '</button>',
         '<button type="button" class="btn btn-outline-primary btn-sm js-entry-add-person" data-index="' + entryIndex + '"><i class="bi bi-person-plus me-2"></i>Add person</button>',
         '<button type="button" class="btn btn-outline-secondary btn-sm js-entry-duplicate" data-index="' + entryIndex + '"><i class="bi bi-files me-2"></i>Duplicate</button>',
         unlockBtn,
-        '<button type="button" class="btn btn-outline-danger btn-sm js-entry-remove" data-index="' + entryIndex + '" ' + (entries.length <= 1 ? 'disabled' : '') + '><i class="bi bi-trash me-2"></i>Remove</button>',
+        '<button type="button" class="btn btn-outline-danger btn-sm js-entry-remove" data-index="' + entryIndex + '" ' + (entries.length <= 1 || locked ? 'disabled' : '') + '><i class="bi bi-trash me-2"></i>Remove</button>',
         '</div>',
         '</div>',
         '</td>',
@@ -1249,17 +1452,27 @@ document.addEventListener('DOMContentLoaded', function () {
   function renderEntryModal() {
     if (selectedEntryIndex === null || !entries[selectedEntryIndex] || !entryModalBody) return;
     const entry = entries[selectedEntryIndex];
+    const sessionLocked = isEntryTimesheetLocked(entry);
+    const coreDisabled = sessionLocked ? ' disabled' : '';
     const label = document.getElementById('activityEntryModalLabel');
-    if (label) label.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Edit Work Session ' + (selectedEntryIndex + 1);
+    if (label) {
+      label.innerHTML = sessionLocked
+        ? '<i class="bi bi-lock-fill me-2 text-warning"></i>Work Session ' + (selectedEntryIndex + 1)
+        : '<i class="bi bi-pencil-square me-2"></i>Edit Work Session ' + (selectedEntryIndex + 1);
+    }
+    const lockAlert = sessionLocked
+      ? '<div class="alert alert-warning border-warning py-2 mb-3"><i class="bi bi-lock-fill me-2"></i>This work session has timesheet-locked assignees. Title, location, notes, and adding people are still editable. Date, time, status, and locked assignee rows cannot be changed.</div>'
+      : '';
     entryModalBody.innerHTML = [
+      lockAlert,
       '<div class="row g-3">',
       '<div class="col-md-6"><label class="form-label fw-bold">Session Title</label><input type="text" class="form-control form-control-sm js-entry-field" data-field="title" value="' + escapeHtml(entry.title || '') + '" placeholder="Optional task title..."></div>',
-      '<div class="col-md-3"><label class="form-label fw-bold">Status</label><select class="form-select form-select-sm js-entry-field" data-field="status"><option value="posted" ' + (entry.status === 'posted' ? 'selected' : '') + '>Posted</option><option value="draft" ' + (entry.status === 'draft' ? 'selected' : '') + '>Draft</option><option value="cancelled" ' + (entry.status === 'cancelled' ? 'selected' : '') + '>Cancelled</option></select></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Status</label><select class="form-select form-select-sm js-entry-field" data-field="status"' + coreDisabled + '><option value="posted" ' + (entry.status === 'posted' ? 'selected' : '') + '>Posted</option><option value="draft" ' + (entry.status === 'draft' ? 'selected' : '') + '>Draft</option><option value="cancelled" ' + (entry.status === 'cancelled' ? 'selected' : '') + '>Cancelled</option></select></div>',
       '<div class="col-md-3"><label class="form-label fw-bold">Location</label><input type="text" class="form-control form-control-sm js-entry-field" data-field="location" value="' + escapeHtml(entry.location || '') + '"></div>',
-      '<div class="col-md-3"><label class="form-label fw-bold">Date *</label><input type="date" class="form-control form-control-sm js-entry-field" data-field="date" value="' + escapeHtml(entry.date || '') + '"></div>',
-      '<div class="col-md-3"><label class="form-label fw-bold">Start *</label><input type="time" class="form-control form-control-sm js-entry-field" data-field="startTime" value="' + escapeHtml(entry.startTime || '') + '"></div>',
-      '<div class="col-md-3"><label class="form-label fw-bold">End *</label><input type="time" class="form-control form-control-sm js-entry-field" data-field="endTime" value="' + escapeHtml(entry.endTime || '') + '"></div>',
-      '<div class="col-md-3"><label class="form-label fw-bold">Hours *</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-entry-field" data-field="durationHours" value="' + escapeHtml(entry.durationHours || '') + '"></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Date *</label><input type="date" class="form-control form-control-sm js-entry-field" data-field="date" value="' + escapeHtml(entry.date || '') + '"' + coreDisabled + '></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Start *</label><input type="time" class="form-control form-control-sm js-entry-field" data-field="startTime" value="' + escapeHtml(entry.startTime || '') + '"' + coreDisabled + '></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">End *</label><input type="time" class="form-control form-control-sm js-entry-field" data-field="endTime" value="' + escapeHtml(entry.endTime || '') + '"' + coreDisabled + '></div>',
+      '<div class="col-md-3"><label class="form-label fw-bold">Hours *</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-entry-field" data-field="durationHours" value="' + escapeHtml(entry.durationHours || '') + '"' + coreDisabled + '></div>',
       '<div class="col-12"><label class="form-label fw-bold">Session Notes</label><textarea rows="2" class="form-control form-control-sm js-entry-field" data-field="notes" placeholder="Optional notes for this session...">' + escapeHtml(entry.notes || '') + '</textarea></div>',
       '</div>',
       '<div class="mt-3">',
@@ -1284,6 +1497,7 @@ document.addEventListener('DOMContentLoaded', function () {
       openEntryExcludedPersonPicker(entryIndex);
     });
     entryModalBody.querySelectorAll('.js-entry-field').forEach(function (field) {
+      if (field.disabled) return;
       const updateEntryField = function () {
         const fieldName = field.getAttribute('data-field');
         entries[entryIndex][fieldName] = field.value;
@@ -1303,6 +1517,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     entryModalBody.querySelectorAll('[data-assignee-index]').forEach(function (assigneeRow) {
       const assigneeIndex = Number(assigneeRow.getAttribute('data-assignee-index'));
+      if (assigneeRow.getAttribute('data-assignee-locked') === 'true') return;
       assigneeRow.querySelector('.js-assignee-role')?.addEventListener('change', function (event) {
         entries[entryIndex].assignees[assigneeIndex].role = event.target.value;
         syncEntries();
@@ -1679,7 +1894,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (actionButton.classList.contains('js-entry-remove')) {
-      if (entries.length <= 1) return;
+      if (entries.length <= 1 || isEntryTimesheetLocked(entries[entryIndex])) return;
       entries.splice(entryIndex, 1);
       selectedEntryIndex = entries.length ? Math.min(entryIndex, entries.length - 1) : null;
       renderEntries();

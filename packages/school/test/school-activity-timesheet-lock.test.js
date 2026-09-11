@@ -68,3 +68,269 @@ test('isWorkSessionAssigneeLocked ignores entry-level lock for multi-assignee se
   assert.equal(activityService.isWorkSessionAssigneeLocked(entry, entry.assignees[0]), true);
   assert.equal(activityService.isWorkSessionAssigneeLocked(entry, entry.assignees[1]), false);
 });
+
+function buildLockedEntryFixture() {
+  return {
+    entryId: 'ENT/1',
+    title: 'Original',
+    location: 'Room 1',
+    notes: 'Note',
+    date: '2026-07-01',
+    startTime: '09:00',
+    endTime: '10:00',
+    durationHours: 1,
+    status: 'posted',
+    locked: false,
+    assignees: [
+      {
+        personId: 'TEACHER/A',
+        role: 'participant',
+        status: 'attended',
+        paid: true,
+        paidHours: 1,
+        completionStatus: 'pending',
+        locked: true,
+        lockReason: 'timesheet_approved'
+      },
+      {
+        personId: 'TEACHER/B',
+        role: 'participant',
+        status: 'attended',
+        paid: true,
+        paidHours: 1,
+        completionStatus: 'pending',
+        locked: false
+      }
+    ]
+  };
+}
+
+test('entryHasTimesheetLockedAssignee detects locked assignee rows', () => {
+  const entry = buildLockedEntryFixture();
+  assert.equal(activityService.entryHasTimesheetLockedAssignee(entry), true);
+  assert.deepEqual([...activityService.getEntryLockedAssigneeIds(entry)], ['TEACHER/A']);
+});
+
+test('enforceActivityLockRules allows title location and notes when assignee is locked', () => {
+  const existing = {
+    id: 'ACT/1',
+    evaluationType: 'attendance',
+    title: 'Parent',
+    categoryId: 'CAT/1',
+    entries: [buildLockedEntryFixture()]
+  };
+  const nextData = {
+    ...existing,
+    title: 'Parent Updated',
+    categoryId: 'CAT/2',
+    entries: [{
+      ...buildLockedEntryFixture(),
+      title: 'Updated title',
+      location: 'Room 2',
+      notes: 'Updated notes'
+    }]
+  };
+  activityService.enforceActivityLockRules(existing, nextData);
+});
+
+test('enforceActivityLockRules blocks date change when assignee is locked', () => {
+  const existing = {
+    id: 'ACT/1',
+    evaluationType: 'attendance',
+    entries: [buildLockedEntryFixture()]
+  };
+  const nextData = {
+    ...existing,
+    entries: [{
+      ...buildLockedEntryFixture(),
+      date: '2026-07-02'
+    }]
+  };
+  assert.throws(
+    () => activityService.enforceActivityLockRules(existing, nextData),
+    /locked by an approved timesheet/i
+  );
+});
+
+test('enforceActivityLockRules allows adding assignee and removing unlocked assignee', () => {
+  const existing = {
+    id: 'ACT/1',
+    evaluationType: 'attendance',
+    entries: [buildLockedEntryFixture()]
+  };
+  const nextData = {
+    ...existing,
+    entries: [{
+      ...buildLockedEntryFixture(),
+      assignees: [
+        existing.entries[0].assignees[0],
+        { personId: 'TEACHER/C', status: 'attended', paid: true, paidHours: 1 }
+      ]
+    }]
+  };
+  activityService.enforceActivityLockRules(existing, nextData);
+});
+
+test('enforceActivityLockRules blocks removing locked assignee', () => {
+  const existing = {
+    id: 'ACT/1',
+    evaluationType: 'attendance',
+    entries: [buildLockedEntryFixture()]
+  };
+  const nextData = {
+    ...existing,
+    entries: [{
+      ...buildLockedEntryFixture(),
+      assignees: [existing.entries[0].assignees[1]]
+    }]
+  };
+  assert.throws(
+    () => activityService.enforceActivityLockRules(existing, nextData),
+    /cannot be removed/i
+  );
+});
+
+test('enforceActivityLockRules blocks visibilityScope change when work sessions exist', () => {
+  const existing = {
+    id: 'ACT/1',
+    evaluationType: 'attendance',
+    visibilityScope: 'school',
+    entries: [buildLockedEntryFixture()]
+  };
+  const nextData = {
+    ...existing,
+    visibilityScope: 'individual'
+  };
+  assert.throws(
+    () => activityService.enforceActivityLockRules(existing, nextData),
+    /Calendar scope cannot be changed after work sessions have been added/i
+  );
+});
+
+test('enforceActivityLockRules allows visibilityScope unchanged when work sessions exist', () => {
+  const existing = {
+    id: 'ACT/1',
+    evaluationType: 'attendance',
+    visibilityScope: 'individual',
+    entries: [buildLockedEntryFixture()]
+  };
+  const nextData = {
+    ...existing,
+    title: 'Updated parent title'
+  };
+  activityService.enforceActivityLockRules(existing, nextData);
+});
+
+test('parent activity fields remain editable when assignee rows are locked', () => {
+  const existing = {
+    id: 'ACT/1',
+    evaluationType: 'attendance',
+    title: 'Before',
+    categoryId: 'CAT/1',
+    departmentId: 'DEP/1',
+    paid: true,
+    status: 'posted',
+    entries: [buildLockedEntryFixture()]
+  };
+  const nextData = {
+    ...existing,
+    title: 'After',
+    categoryId: 'CAT/2',
+    departmentId: 'DEP/2',
+    paid: false,
+    status: 'draft',
+    notes: 'Parent notes updated'
+  };
+  activityService.enforceActivityLockRules(existing, nextData);
+});
+
+function buildScopePersonActivityFixture() {
+  return {
+    id: 'ACT_SCOPE',
+    visibilityScope: 'individual',
+    allowedPersonIds: ['TEACHER_A', 'TEACHER_B'],
+    excludedPersonIds: [],
+    hiddenPersonIds: [],
+    entries: [{
+      entryId: 'ENT_1',
+      assignees: [{ personId: 'TEACHER_A', status: 'attended' }]
+    }]
+  };
+}
+
+test('collectActivityAssigneePersonIds returns assignees across work sessions', () => {
+  const activity = buildScopePersonActivityFixture();
+  assert.deepEqual(activityService.collectActivityAssigneePersonIds(activity), ['TEACHER_A']);
+  assert.equal(activityService.isActivityWorkSessionAssignee(activity, 'TEACHER_A'), true);
+  assert.equal(activityService.isActivityWorkSessionAssignee(activity, 'TEACHER_B'), false);
+});
+
+test('enforceScopePersonRules blocks removing allowed work session assignee', () => {
+  const existing = buildScopePersonActivityFixture();
+  const nextData = {
+    ...existing,
+    allowedPersonIds: ['TEACHER_B']
+  };
+  assert.throws(
+    () => activityService.enforceScopePersonRules(existing, nextData),
+    /cannot be removed/i
+  );
+});
+
+test('enforceScopePersonRules blocks excluding work session assignee', () => {
+  const existing = buildScopePersonActivityFixture();
+  const nextData = {
+    ...existing,
+    excludedPersonIds: ['TEACHER_A']
+  };
+  assert.throws(
+    () => activityService.enforceScopePersonRules(existing, nextData),
+    /cannot be excluded/i
+  );
+});
+
+test('isPersonHiddenFromTimesheetSelection blocks hidden allowed persons only', () => {
+  const activity = {
+    ...buildScopePersonActivityFixture(),
+    hiddenPersonIds: ['TEACHER_A']
+  };
+  assert.equal(activityService.isPersonHiddenFromTimesheetSelection(activity, 'TEACHER_A'), true);
+  assert.equal(activityService.isPersonHiddenFromTimesheetSelection(activity, 'TEACHER_B'), false);
+  assert.equal(activityService.isPersonEligibleForActivity(activity, 'TEACHER_A'), true);
+});
+
+test('listManualEntryActivitiesForPerson excludes hidden activities for person', async () => {
+  const schoolDataService = require('../MVC/services/school/schoolDataService');
+  const originalFetchData = schoolDataService.fetchData;
+  const originalFetchAllCategories = schoolDataService.fetchAllData;
+  schoolDataService.fetchData = async () => [{
+    id: 'ACT_HIDDEN',
+    orgId: 'ORG_1',
+    status: 'posted',
+    visibilityScope: 'individual',
+    allowedPersonIds: ['TEACHER_A'],
+    hiddenPersonIds: ['TEACHER_A'],
+    entries: []
+  }, {
+    id: 'ACT_VISIBLE',
+    orgId: 'ORG_1',
+    status: 'posted',
+    visibilityScope: 'individual',
+    allowedPersonIds: ['TEACHER_A'],
+    hiddenPersonIds: [],
+    entries: []
+  }];
+  schoolDataService.fetchAllData = async (table) => (table === 'activityCategories' || table === 'departments' ? [] : []);
+  try {
+    const rows = await activityService.listManualEntryActivitiesForPerson({
+      orgId: 'ORG_1',
+      personId: 'TEACHER_A',
+      reqUser: {}
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, 'ACT_VISIBLE');
+  } finally {
+    schoolDataService.fetchData = originalFetchData;
+    schoolDataService.fetchAllData = originalFetchAllCategories;
+  }
+});

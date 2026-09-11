@@ -464,13 +464,22 @@ async function saveWorkSessionMetadata({
   const submittedAssignees = input.assignees === undefined
     ? normalizeAssigneeRows(entry.assignees)
     : parseJsonArray(input.assignees, 'Work session assignees');
+  const priorAssigneeByPerson = new Map(
+    normalizeAssigneeRows(entry.assignees).map((row) => [normalizeId(row.personId), row])
+  );
   const nextAssignees = normalizeAdminAssigneeRows(
     submittedAssignees,
     entry.assignees,
     durationHours,
     evaluationType,
     reqUser
-  );
+  ).map((assignee) => {
+    const prior = priorAssigneeByPerson.get(normalizeId(assignee.personId));
+    if (prior && activityService.isAssigneeTimesheetLocked(prior)) {
+      return prior;
+    }
+    return assignee;
+  });
   const entries = activityService.getActivityEntries(activity).map((row) => {
     if (!idsEqual(row.entryId, entryId)) return row;
     return {

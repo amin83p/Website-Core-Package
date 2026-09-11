@@ -19,11 +19,27 @@ function normalizeCompletionStatus(assignee = {}) {
   return normalizeStatus(assignee.completionStatus, 'pending');
 }
 
+const ENTRY_TIMESHEET_EDITABLE_FIELDS = ['title', 'location', 'notes'];
+const ENTRY_TIMESHEET_CORE_LOCKED_FIELDS = ['date', 'startTime', 'endTime', 'durationHours', 'status'];
+
 function isAssigneeTimesheetLocked(assignee = {}) {
   if (assignee?.locked === true || String(assignee?.locked) === 'true') {
     return String(assignee?.lockReason || '') === 'timesheet_approved';
   }
   return false;
+}
+
+function entryHasTimesheetLockedAssignee(entry = {}) {
+  const assignees = Array.isArray(entry?.assignees) ? entry.assignees : [];
+  return assignees.some(isAssigneeTimesheetLocked);
+}
+
+function getEntryLockedAssigneeIds(entry = {}) {
+  const assignees = Array.isArray(entry?.assignees) ? entry.assignees : [];
+  return new Set(assignees
+    .filter(isAssigneeTimesheetLocked)
+    .map((row) => normalizeId(row.personId))
+    .filter(Boolean));
 }
 
 function isWorkSessionAssigneeLocked(entry = {}, assignee = {}) {
@@ -200,6 +216,38 @@ function listAssigneePersonIds(entries = []) {
     .flatMap((entry) => (Array.isArray(entry?.assignees) ? entry.assignees : []))
     .map((assignee) => normalizeId(assignee?.personId))
     .filter(Boolean))];
+}
+
+function collectActivityAssigneePersonIds(activity = {}) {
+  const entries = getActivityEntries(activity);
+  return [...new Set([
+    ...listAssigneePersonIds(entries),
+    ...listLegacyAttendeePersonIds(activity)
+  ])];
+}
+
+function isActivityWorkSessionAssignee(activity = {}, personId) {
+  const targetPersonId = normalizeId(personId);
+  if (!targetPersonId) return false;
+  return collectActivityAssigneePersonIds(activity).includes(targetPersonId);
+}
+
+function normalizeHiddenPersonIds(activity = {}, allowedPersonIds = [], excludedPersonIds = []) {
+  const allowedSet = new Set(normalizePersonIdList(allowedPersonIds));
+  const excludedSet = new Set(normalizePersonIdList(excludedPersonIds));
+  return normalizePersonIdList(activity?.hiddenPersonIds || activity?.hiddenPersons || [])
+    .filter((personId) => allowedSet.has(personId) && !excludedSet.has(personId));
+}
+
+function isPersonHiddenFromTimesheetSelection(activity = {}, personId) {
+  const targetPersonId = normalizeId(personId);
+  if (!targetPersonId) return false;
+  const hiddenSet = new Set(normalizeHiddenPersonIds(
+    activity,
+    activity?.allowedPersonIds || [],
+    activity?.excludedPersonIds || []
+  ));
+  return hiddenSet.has(targetPersonId);
 }
 
 function listLegacyAttendeePersonIds(activity = {}) {
@@ -412,6 +460,7 @@ function normalizeActivityRecord(activity = {}) {
   }
   const excludedSet = new Set(excludedPersonIds);
   allowedPersonIds = allowedPersonIds.filter((personId) => !excludedSet.has(personId));
+  const hiddenPersonIds = normalizeHiddenPersonIds(activity, allowedPersonIds, excludedPersonIds);
   const computedTotalDurationHours = Number(entries.reduce((sum, entry) => {
     return sum + (Number(entry.durationHours) || 0);
   }, 0).toFixed(2));
@@ -436,9 +485,28 @@ function normalizeActivityRecord(activity = {}) {
     visibilityScope,
     allowedPersonIds,
     excludedPersonIds,
+    hiddenPersonIds,
     attendees,
     entries
   };
+}
+
+function enforceScopePersonRules(existing = {}, nextData = {}) {
+  const assigneeIds = new Set(collectActivityAssigneePersonIds(nextData));
+  const priorAllowed = new Set(normalizePersonIdList(existing.allowedPersonIds || existing.allowedPersons || []));
+  const nextAllowed = new Set(normalizePersonIdList(nextData.allowedPersonIds || nextData.allowedPersons || []));
+  for (const personId of priorAllowed) {
+    if (nextAllowed.has(personId)) continue;
+    if (assigneeIds.has(personId)) {
+      throw new Error(`Allowed person ${personId} is assigned to a work session and cannot be removed. Hide them from timesheet selection instead.`);
+    }
+  }
+  const nextExcluded = normalizePersonIdList(nextData.excludedPersonIds || nextData.excludedPersons || []);
+  for (const personId of nextExcluded) {
+    if (assigneeIds.has(personId)) {
+      throw new Error(`Person ${personId} is assigned to a work session and cannot be excluded.`);
+    }
+  }
 }
 
 function calculateDurationHours(startTime, endTime) {
@@ -557,13 +625,23 @@ function preserveActivityLockMetadata(existing = {}, nextData = {}) {
 }
 
 function enforceActivityLockRules(existing = {}, nextData = {}) {
+  const existingEntryCount = (Array.isArray(existing.entries) ? existing.entries : []).length;
+  if (existingEntryCount > 0) {
+    const beforeScope = normalizeActivityVisibilityScope(existing.visibilityScope);
+    const afterScope = normalizeActivityVisibilityScope(nextData.visibilityScope);
+    if (beforeScope !== afterScope) {
+      throw new Error('Calendar scope cannot be changed after work sessions have been added.');
+    }
+  }
   const existingEntries = new Map(
     (Array.isArray(existing.entries) ? existing.entries : []).map((entry) => [normalizeId(entry.entryId), entry])
   );
   const nextIds = new Set((Array.isArray(nextData.entries) ? nextData.entries : []).map((entry) => normalizeId(entry.entryId)));
   for (const [entryId, prior] of existingEntries.entries()) {
     if (nextIds.has(entryId)) continue;
-    if (schoolDependencyService.isActivityEntryTimesheetLocked(prior) && String(prior.lockReason || '') === 'timesheet_approved') {
+    const entryLocked = schoolDependencyService.isActivityEntryTimesheetLocked(prior)
+      && String(prior.lockReason || '') === 'timesheet_approved';
+    if (entryLocked || entryHasTimesheetLockedAssignee(prior)) {
       throw new Error(`Work session ${entryId} is locked by an approved timesheet and cannot be removed.`);
     }
   }
@@ -616,14 +694,22 @@ function enforceActivityLockRules(existing = {}, nextData = {}) {
         throw new Error(`Assignee row for ${assignee.personName || assignee.personId} is locked by an approved timesheet and cannot be modified.`);
       }
     });
-    if (!schoolDependencyService.isActivityEntryTimesheetLocked(prior)) return;
-    if (String(prior.lockReason || '') !== 'timesheet_approved') return;
+
+    const hasLockedAssignee = entryHasTimesheetLockedAssignee(prior);
+    const entryTimesheetLocked = schoolDependencyService.isActivityEntryTimesheetLocked(prior)
+      && String(prior.lockReason || '') === 'timesheet_approved';
+    if (!hasLockedAssignee && !entryTimesheetLocked) return;
+
     if (structuralChanged) {
       throw new Error(`Work session ${entry.entryId} is locked by an approved timesheet and cannot be modified.`);
     }
-    const assigneeListChanged = JSON.stringify(priorAssignees.map((row) => row.personId)) !== JSON.stringify(nextAssignees.map((row) => row.personId));
-    if (assigneeListChanged) {
-      throw new Error(`Work session ${entry.entryId} is locked by an approved timesheet and cannot be modified.`);
+
+    const lockedAssigneeIds = getEntryLockedAssigneeIds(prior);
+    const nextPersonIds = new Set(nextAssignees.map((row) => normalizeId(row.personId)).filter(Boolean));
+    for (const lockedId of lockedAssigneeIds) {
+      if (!nextPersonIds.has(lockedId)) {
+        throw new Error(`Assignee ${lockedId} is locked by an approved timesheet and cannot be removed from work session ${entry.entryId}.`);
+      }
     }
   });
 }
@@ -706,6 +792,11 @@ async function saveActivity(payload = {}, reqUser) {
     ...normalized,
     allowedPersonIds: persistedAllowedPersonIds,
     excludedPersonIds: [...activityExcludedSet],
+    hiddenPersonIds: normalizeHiddenPersonIds(
+      normalized,
+      persistedAllowedPersonIds,
+      [...activityExcludedSet]
+    ),
     entries: validatedEntries,
     attendees: flattenActivityAssignees(validatedEntries),
     date: firstEntry.date || normalized.date || '',
@@ -722,12 +813,14 @@ async function saveActivity(payload = {}, reqUser) {
   if (payload.id) {
     const existing = await schoolDataService.getDataById('activities', payload.id, reqUser);
     if (existing) {
+      enforceScopePersonRules(existing, normalizedData);
       enforceActivityLockRules(existing, normalizedData);
       const lockedData = preserveActivityLockMetadata(existing, normalizedData);
       return schoolDataService.updateData('activities', payload.id, lockedData, reqUser);
     }
     return schoolDataService.updateData('activities', payload.id, normalizedData, reqUser);
   }
+  enforceScopePersonRules({}, normalizedData);
   const created = await schoolDataService.addData('activities', normalizedData, reqUser);
   const createdId = normalizeId(created?.id);
   if (createdId && Array.isArray(created?.entries) && created.entries.length) {
@@ -951,6 +1044,7 @@ async function listManualEntryActivitiesForPerson({ orgId, personId, reqUser } =
     if (!belongsToOrg(activity, orgId)) return false;
     if (normalizeStatus(activity.status) !== 'posted') return false;
     if (!isActiveManualEntryActivityRow(activity)) return false;
+    if (isPersonHiddenFromTimesheetSelection(activity, targetPersonId)) return false;
     return isPersonEligibleForActivity(activity, targetPersonId);
   });
 }
@@ -1200,6 +1294,11 @@ module.exports = {
   getEffectiveEntryAllowedIds,
   isPersonEligibleForActivity,
   isPersonEligibleForEntry,
+  collectActivityAssigneePersonIds,
+  isActivityWorkSessionAssignee,
+  normalizeHiddenPersonIds,
+  isPersonHiddenFromTimesheetSelection,
+  enforceScopePersonRules,
   getScheduleEventsForPerson,
   buildActivityScheduleCompletionScan,
   listManualEntryActivitiesForPerson,
@@ -1213,7 +1312,11 @@ module.exports = {
   normalizeActivityAssigneeRows,
   normalizeEvaluationType,
   normalizeCompletionStatus,
+  ENTRY_TIMESHEET_EDITABLE_FIELDS,
+  ENTRY_TIMESHEET_CORE_LOCKED_FIELDS,
   isAssigneeTimesheetLocked,
+  entryHasTimesheetLockedAssignee,
+  getEntryLockedAssigneeIds,
   isWorkSessionAssigneeLocked,
   activityHasLockedAssigneeRows,
   resolveActivityTimesheetEntryHours,

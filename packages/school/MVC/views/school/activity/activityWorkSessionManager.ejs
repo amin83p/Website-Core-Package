@@ -13,6 +13,7 @@
     : '/school/activities';
   const visibleRows = assigneeRows.filter((row) => canManageAll || row.isSelf);
   const lockedCount = visibleRows.filter((row) => row.locked).length;
+  const hasAnyTimesheetLock = lockedCount > 0;
   const allVisibleAssigneesLocked = visibleRows.length > 0 && lockedCount === visibleRows.length;
   const readyCount = visibleRows.filter((row) => row.readyForTimesheet).length;
   const completionDoneCount = visibleRows.filter((row) => String(row.completionStatus || '').toLowerCase() === 'completed').length;
@@ -708,6 +709,7 @@
           <form method="POST" action="<%= manageUrl %>/metadata" id="frmWorkSessionMetadata" class="work-session-admin-metadata">
             <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
             <input type="hidden" name="assignees" id="workSessionMetadataAssignees" value="">
+            <% const coreMetadataDisabledAttr = hasAnyTimesheetLock ? 'disabled' : ''; %>
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label fw-bold small" for="workSessionTitleInput">Title</label>
@@ -715,7 +717,7 @@
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold small" for="workSessionStatusInput">Status</label>
-                <select class="form-select" id="workSessionStatusInput" name="status">
+                <select class="form-select" id="workSessionStatusInput" name="status" <%= coreMetadataDisabledAttr %>>
                   <option value="posted" <%= String(entryRow.status || 'posted').toLowerCase() === 'posted' ? 'selected' : '' %>>Posted</option>
                   <option value="cancelled" <%= String(entryRow.status || '').toLowerCase() === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
                 </select>
@@ -726,15 +728,15 @@
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold small" for="workSessionDateInput">Date</label>
-                <input type="date" class="form-control" id="workSessionDateInput" name="date" value="<%= entryRow.date || '' %>">
+                <input type="date" class="form-control" id="workSessionDateInput" name="date" value="<%= entryRow.date || '' %>" <%= coreMetadataDisabledAttr %>>
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold small" for="workSessionStartInput">Start Time</label>
-                <input type="time" class="form-control js-work-session-time-input" id="workSessionStartInput" name="startTime" value="<%= entryRow.startTime || '' %>">
+                <input type="time" class="form-control js-work-session-time-input" id="workSessionStartInput" name="startTime" value="<%= entryRow.startTime || '' %>" <%= coreMetadataDisabledAttr %>>
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold small" for="workSessionEndInput">End Time</label>
-                <input type="time" class="form-control js-work-session-time-input" id="workSessionEndInput" name="endTime" value="<%= entryRow.endTime || '' %>">
+                <input type="time" class="form-control js-work-session-time-input" id="workSessionEndInput" name="endTime" value="<%= entryRow.endTime || '' %>" <%= coreMetadataDisabledAttr %>>
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold small">Hour</label>
@@ -769,7 +771,17 @@
       <div>
         <h6 class="fw-bold mb-1">Work Session Locked</h6>
         <div class="small">
-          This work session is locked because it is linked to an approved timesheet. Reopen the timesheet to unlock it for editing.
+          This work session is locked because it is linked to a submitted timesheet. Title, location, and notes can still be edited. Return the timesheet to draft to unlock date, time, and assignee rows.
+        </div>
+      </div>
+    </div>
+  <% } else if (hasAnyTimesheetLock) { %>
+    <div class="alert alert-warning border-warning shadow-sm d-flex align-items-center mb-3">
+      <i class="bi bi-lock-fill fs-3 me-3 text-warning"></i>
+      <div>
+        <h6 class="fw-bold mb-1">Partial Timesheet Lock</h6>
+        <div class="small">
+          One or more assignees are locked by a submitted timesheet. Locked rows and session date/time cannot be changed. Title, location, notes, and adding assignees are still allowed.
         </div>
       </div>
     </div>
@@ -908,7 +920,7 @@
                           <div class="attendance-order-head">
                             <span class="attendance-order-num"><%= visibleAssigneeIndex %></span>
                             <% if (assignee.locked) { %>
-                              <i class="bi bi-lock-fill text-secondary ws-assignee-lock-icon" aria-hidden="true"></i>
+                              <i class="bi bi-lock-fill text-warning ws-assignee-lock-icon" aria-hidden="true" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= assignee.lockedTimesheetId ? ('Locked — linked to submitted timesheet ' + assignee.lockedTimesheetId) : 'Locked by submitted timesheet' %>"></i>
                             <% } %>
                             <button
                               type="button"

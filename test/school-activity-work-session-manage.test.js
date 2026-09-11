@@ -1242,8 +1242,11 @@ test('Metadata save rejects non-admin scope and unsupported statuses', async () 
 test('Metadata save propagates approved-timesheet lock rejection', async () => {
   const activityWorkSessionService = require('../packages/school/MVC/services/school/activityWorkSessionService');
   const activityService = require('../packages/school/MVC/services/school/activityService');
+  const schoolAdminAccessService = require('../packages/school/MVC/services/school/schoolAdminAccessService');
   const originalGetActivity = activityService.getActivity;
   const originalSaveActivity = activityService.saveActivity;
+  const originalWorkSessionsAdmin = schoolAdminAccessService.isWorkSessionsAdminViewer;
+  const originalActivitiesAdmin = schoolAdminAccessService.isActivitiesAdminViewer;
 
   const activity = {
     id: 'ACT-META-LOCK',
@@ -1278,13 +1281,15 @@ test('Metadata save propagates approved-timesheet lock rejection', async () => {
     activityService.enforceActivityLockRules(activity, payload);
     return payload;
   };
+  schoolAdminAccessService.isWorkSessionsAdminViewer = () => true;
+  schoolAdminAccessService.isActivitiesAdminViewer = () => true;
 
   try {
     await assert.rejects(
       () => activityWorkSessionService.saveWorkSessionMetadata({
         activityId: activity.id,
         entryId: 'ENTRY-1',
-        reqUser: { id: 'ADMIN', activeOrgId: '900000', orgId: '900000' },
+        reqUser: { id: 'ADMIN', personId: 'ADMIN-P', activeOrgId: '900000', orgId: '900000' },
         accessContext: { scopeId: 'SCP_ORG' },
         input: {
           startTime: '09:00',
@@ -1297,7 +1302,51 @@ test('Metadata save propagates approved-timesheet lock rejection', async () => {
   } finally {
     activityService.getActivity = originalGetActivity;
     activityService.saveActivity = originalSaveActivity;
+    schoolAdminAccessService.isWorkSessionsAdminViewer = originalWorkSessionsAdmin;
+    schoolAdminAccessService.isActivitiesAdminViewer = originalActivitiesAdmin;
   }
+});
+
+test('Activity work session manager uses field-level metadata disable for partial locks', () => {
+  const manager = readText('packages/school/MVC/views/school/activity/activityWorkSessionManager.ejs');
+  assert.match(manager, /hasAnyTimesheetLock/);
+  assert.match(manager, /Partial Timesheet Lock/);
+  assert.match(manager, /coreMetadataDisabledAttr/);
+  assert.match(manager, /btnAddWorkSessionAssignee/);
+  assert.doesNotMatch(manager, /hasAnyTimesheetLock && !canEditWorkSessionMetadata/);
+});
+
+test('Activity form keeps parent fields open and uses granular entry lock UX', () => {
+  const form = readText('packages/school/MVC/views/school/activity/activityForm.ejs');
+  assert.match(form, /entryHasTimesheetLockedAssignee/);
+  assert.match(form, /isAssigneeTimesheetLocked/);
+  assert.match(form, /Title, location, notes, and adding people are still editable/i);
+  assert.match(form, /data-assignee-locked/);
+  assert.match(form, /copyLockFields/);
+  assert.match(form, /updateVisibilityScopeLock/);
+  assert.match(form, /activityHasWorkSessions/);
+  assert.match(form, /activityVisibilityScopeLockHint/);
+  assert.match(form, /Calendar scope cannot be changed after work sessions have been added/i);
+  assert.doesNotMatch(form, /activityTimesheetLocked \? 'disabled'/);
+});
+
+test('Activity form uses scope person tables with hide and assignee protection', () => {
+  const form = readText('packages/school/MVC/views/school/activity/activityForm.ejs');
+  assert.match(form, /activityAllowedPersonsTable/);
+  assert.match(form, /activityExcludedPersonsTable/);
+  assert.match(form, /renderScopePersonTables/);
+  assert.match(form, /hiddenPersonIds/);
+  assert.match(form, /activityHiddenPersonIdsInput/);
+  assert.match(form, /js-scope-hide-person/);
+  assert.match(form, /js-scope-unhide-person/);
+  assert.match(form, /isScopePersonAssignee/);
+  assert.match(form, /Cannot Exclude Assignee/i);
+  assert.match(form, /Work session assignees cannot be excluded/i);
+});
+
+test('Activity list badge includes assignee-level timesheet locks', () => {
+  const list = readText('packages/school/MVC/views/school/activity/activityList.ejs');
+  assert.match(list, /entry\.assignees[\s\S]*timesheet_approved/);
 });
 
 test('Activity work session paid-hour save skips malformed blank assignee rows', async () => {
