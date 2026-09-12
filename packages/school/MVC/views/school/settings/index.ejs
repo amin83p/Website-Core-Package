@@ -1550,6 +1550,26 @@
               </div>
               <div class="border rounded rollup-feature-card p-0 mt-4">
                 <div class="p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#statHolidayRoundingCollapse" aria-expanded="false" aria-controls="statHolidayRoundingCollapse">
+                    <i class="bi bi-chevron-down"></i>
+                    <span>Calculated hours rounding</span>
+                  </button>
+                </div>
+                <div class="collapse p-3" id="statHolidayRoundingCollapse">
+                  <p class="small text-muted mb-3">When enabled, statutory holiday calculated and manually entered hours are snapped to the nearest allowed value:</p>
+                  <ul class="small text-muted mb-3">
+                    <li>Decimal less than 0.5 → whole hour (e.g. 3.45 → 3.0)</li>
+                    <li>Decimal equal to 0.5 → half hour (e.g. 3.50 → 3.5)</li>
+                    <li>Decimal greater than 0.5 → next whole hour (e.g. 3.55 → 4.0)</li>
+                  </ul>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="statutoryHolidayRoundCalculatedHours" name="statutoryHolidayRoundCalculatedHours" value="true" <%= statutoryHolidayPayPolicy.roundCalculatedHours === true ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label" for="statutoryHolidayRoundCalculatedHours">Round calculated statutory holiday hours</label>
+                  </div>
+                </div>
+              </div>
+              <div class="border rounded rollup-feature-card p-0 mt-4">
+                <div class="p-3 border-bottom">
                   <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#statHolidayDepartmentSchemesCollapse" aria-expanded="false" aria-controls="statHolidayDepartmentSchemesCollapse">
                     <i class="bi bi-chevron-down"></i>
                     <span>Department scheme assignments</span>
@@ -2877,6 +2897,7 @@
       statutoryHolidayBeforeAfterSearchDays: document.getElementById('statutoryHolidayBeforeAfterSearchDays')?.value || '14',
       statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek: document.getElementById('statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek')?.checked ? 'true' : 'false',
       statutoryHolidayDisqualifyOnLeaveBeforeAfter: document.getElementById('statutoryHolidayDisqualifyOnLeaveBeforeAfter')?.checked ? 'true' : 'false',
+      statutoryHolidayRoundCalculatedHours: document.getElementById('statutoryHolidayRoundCalculatedHours')?.checked ? 'true' : 'false',
       payableHolidayType_National_Holiday: document.getElementById('payableHolidayType_National_Holiday')?.checked ? 'true' : 'false',
       payableHolidayType_Observance_Paid: document.getElementById('payableHolidayType_Observance_Paid')?.checked ? 'true' : 'false',
       statutoryHolidayMappingYear: mappingYear,
@@ -2904,6 +2925,10 @@
     const lincBoundaryLeaveInput = document.getElementById('schemeDisqualifyOnLeaveBeforeAfter_linc');
     if (lincBoundaryLeaveInput) {
       lincBoundaryLeaveInput.checked = savedLincScheme.disqualifyOnLeaveBeforeAfter === true;
+    }
+    const roundCalculatedHoursInput = document.getElementById('statutoryHolidayRoundCalculatedHours');
+    if (roundCalculatedHoursInput) {
+      roundCalculatedHoursInput.checked = savedStatPay.roundCalculatedHours === true;
     }
     document.querySelectorAll('select[name^="departmentSchemeAssignment_"]').forEach((selectEl) => {
       const match = /^departmentSchemeAssignment_(.+)$/.exec(String(selectEl.name || ''));

@@ -941,7 +941,8 @@ async function materializeStatHolidayForPersonPeriod({
     rows: context.rows,
     evaluations: context.evaluations,
     existingBySchemeHoliday,
-    allowManagerOverride
+    allowManagerOverride,
+    policy
   });
   const grouped = groupPayItemsByScheme(payItems);
   const syncOutcomes = [];

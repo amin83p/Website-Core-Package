@@ -43,6 +43,7 @@ const DEFAULT_STATUTORY_HOLIDAY_PAY = Object.freeze({
   disqualifyOnLeaveDuringHolidayWeek: false,
   disqualifyOnLeaveBeforeAfter: true,
   payableHolidayTypes: [...PAYABLE_HOLIDAY_TYPES],
+  roundCalculatedHours: false,
   mappingYear: '',
   mappingActivityId: ''
 });
@@ -170,6 +171,10 @@ function normalizeStatutoryHolidayPay(input = {}, { strict = false } = {}) {
       defaults.disqualifyOnLeaveBeforeAfter
     ),
     payableHolidayTypes: normalizePayableHolidayTypes(source.payableHolidayTypes, { strict }),
+    roundCalculatedHours: cleanBoolean(
+      source.roundCalculatedHours,
+      defaults.roundCalculatedHours
+    ),
     mappingYear: String(source.mappingYear ?? '').trim(),
     mappingActivityId: String(source.mappingActivityId ?? '').trim()
   };
@@ -314,6 +319,9 @@ function normalizePolicyFromForm(input = {}) {
       disqualifyOnLeaveBeforeAfter: input.statutoryHolidayDisqualifyOnLeaveBeforeAfter
         ?? input['statutoryHolidayPay.disqualifyOnLeaveBeforeAfter']
         ?? nestedStat.disqualifyOnLeaveBeforeAfter,
+      roundCalculatedHours: input.statutoryHolidayRoundCalculatedHours
+        ?? input['statutoryHolidayPay.roundCalculatedHours']
+        ?? nestedStat.roundCalculatedHours,
       payableHolidayTypes: hasExplicitHolidayTypeInput
         ? payableHolidayTypes
         : (nestedStat.payableHolidayTypes ?? DEFAULT_STATUTORY_HOLIDAY_PAY.payableHolidayTypes),

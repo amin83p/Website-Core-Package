@@ -33,6 +33,34 @@ function buildPolicy(overrides = {}) {
   });
 }
 
+test('evaluateLincTrack rounds calculated hours when policy rounding is enabled', () => {
+  const policy = buildPolicy({ roundCalculatedHours: true });
+  const evaluation = statutoryHolidayCalculationService.evaluateLincTrack({
+    holiday: { id: 'H1', date: '2026-01-01', title: 'New Year', type: 'National Holiday' },
+    policy,
+    workdayEntries: [
+      { date: '2025-12-25', deliveryDepartmentId: 'DEPT_LINC', hours: 3.64, timesheetHours: 3.64 },
+      { date: '2026-01-02', deliveryDepartmentId: 'DEPT_LINC', hours: 2, timesheetHours: 2 }
+    ]
+  });
+  assert.equal(evaluation.calculatedHours, 4);
+  assert.equal(evaluation.checks.calculatedHours.averageHours, 4);
+});
+
+test('evaluateEquilibriumTrack rounds calculated hours when policy rounding is enabled', () => {
+  const policy = buildPolicy({ roundCalculatedHours: true });
+  const evaluation = statutoryHolidayCalculationService.evaluateEquilibriumTrack({
+    holiday: { id: 'H1', date: '2026-02-02', title: 'Holiday', type: 'National Holiday' },
+    policy,
+    workdayEntries: [
+      { date: '2026-01-26', deliveryDepartmentId: 'DEPT_EQ', hours: 7.55, timesheetHours: 7.55 }
+    ],
+    leaveDates: new Set(),
+    supplementalHoursByDate: new Map()
+  });
+  assert.equal(evaluation.calculatedHours, 8);
+});
+
 test('evaluateLincTrack qualifies independently of equilibrium eligibility gates', () => {
   const policy = buildPolicy();
   const evaluation = statutoryHolidayCalculationService.evaluateLincTrack({

@@ -1408,18 +1408,42 @@
     const CAN_MANAGE_STAT_HOLIDAY_OVERRIDES = <%= (typeof canManageStatHolidayOverrides !== 'undefined' && canManageStatHolidayOverrides) ? 'true' : 'false' %>;
     const STAT_HOLIDAY_PREVIEW_ONLY = <%= (typeof statHolidayPreviewOnly !== 'undefined' && statHolidayPreviewOnly) ? 'true' : 'false' %>;
     const STATUTORY_HOLIDAY_USES_ACTIVITY = <%= (typeof statutoryHolidayUsesActivity !== 'undefined' && statutoryHolidayUsesActivity) ? 'true' : 'false' %>;
+    const STAT_HOLIDAY_ROUND_CALCULATED_HOURS = <%= (typeof statutoryHolidayRoundCalculatedHours !== 'undefined' && statutoryHolidayRoundCalculatedHours) ? 'true' : 'false' %>;
     const STAT_HOLIDAY_SCHEME_EQUILIBRIUM = 'equilibrium_school';
     const STAT_HOLIDAY_SCHEME_LINC = 'linc';
     const STAT_HOLIDAY_BUILTIN_SCHEMES = [STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC];
+    function roundStatutoryHolidayHours(hours) {
+        const n = Number(hours);
+        if (!Number.isFinite(n) || n <= 0) return 0;
+        const whole = Math.floor(n);
+        const frac = Math.round((n - whole) * 100) / 100;
+        if (frac > 0.5) return whole + 1;
+        if (frac === 0.5) return whole + 0.5;
+        return whole;
+    }
+    function applyStatutoryHolidayHoursRounding(hours) {
+        if (!STAT_HOLIDAY_ROUND_CALCULATED_HOURS) {
+            const n = Number(hours);
+            return Number.isFinite(n) && n > 0 ? Number(n.toFixed(2)) : 0;
+        }
+        return roundStatutoryHolidayHours(hours);
+    }
     function resolveStatHolidaySchemeId(entry) {
         const live = resolveLiveStatHolidayEntry(entry);
-        return String(
+        const fromFields = String(
             entry?.statHolidayMeta?.schemeId
             || entry?.statHolidaySchemeId
             || live?.statHolidayMeta?.schemeId
             || live?.statHolidaySchemeId
-            || STAT_HOLIDAY_SCHEME_EQUILIBRIUM
-        ).trim() || STAT_HOLIDAY_SCHEME_EQUILIBRIUM;
+            || ''
+        ).trim();
+        if (fromFields) return fromFields;
+        const sessionId = String(entry?.sessionId || live?.sessionId || '').trim();
+        if (sessionId.toLowerCase().startsWith('stathol-')) {
+            const parsed = parseStatHolidayMetadataSessionId(sessionId);
+            if (parsed.schemeId) return parsed.schemeId;
+        }
+        return STAT_HOLIDAY_SCHEME_EQUILIBRIUM;
     }
     function resolveLiveStatHolidayEntry(entry) {
         const sessionId = String(entry?.sessionId || '').trim();
@@ -1464,8 +1488,10 @@
         }
         return { schemeId: STAT_HOLIDAY_SCHEME_EQUILIBRIUM, holidayId: body };
     }
-    function buildStatHolidaySavedKey(holidayId, date, schemeId) {
-        const scheme = resolveStatHolidaySchemeId({ statHolidayMeta: { schemeId } });
+    function buildStatHolidaySavedKey(holidayId, date, schemeIdOrEntry) {
+        const scheme = (schemeIdOrEntry && typeof schemeIdOrEntry === 'object')
+            ? resolveStatHolidaySchemeId(schemeIdOrEntry)
+            : resolveStatHolidaySchemeId({ statHolidayMeta: { schemeId: schemeIdOrEntry } });
         return `${scheme}|${String(holidayId || '').trim()}|${String(date || '').trim()}`;
     }
     function entryMatchesStatHolidayScheme(entry, schemeId = '') {
@@ -1490,12 +1516,18 @@
         }
         const sessionId = String(entryOrSessionId || '').trim();
         const parsed = parseStatHolidayMetadataSessionId(sessionId);
-        const rawEntry = activeEntries.find((row) => String(row?.sessionId || '') === sessionId);
-        const holidayId = parsed.holidayId || resolveStatHolidayHolidayId(rawEntry);
-        const schemeId = parsed.holidayId ? parsed.schemeId : resolveStatHolidaySchemeId(rawEntry);
-        const date = String(rawEntry?.date || '').trim();
-        const metadataSessionId = holidayId ? buildStatHolidayMetadataSessionId(schemeId, holidayId) : sessionId;
-        return { holidayId, schemeId, date, metadataSessionId, sessionId };
+        const holidayId = String(parsed.holidayId || '').trim();
+        const schemeId = holidayId ? parsed.schemeId : STAT_HOLIDAY_SCHEME_EQUILIBRIUM;
+        const metadataSessionId = holidayId
+            ? buildStatHolidayMetadataSessionId(schemeId, holidayId)
+            : sessionId;
+        return {
+            holidayId,
+            schemeId,
+            date: '',
+            metadataSessionId,
+            sessionId
+        };
     }
     function isStatHolidayRelatedEntry(entry) {
         if (!entry) return false;
@@ -2278,7 +2310,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const date = String(row?.date || '').trim();
             if (holidayId && date) {
                 savedStatHolidayByHolidayDate.set(
-                    buildStatHolidaySavedKey(holidayId, date, row?.statHolidayMeta?.schemeId),
+                    buildStatHolidaySavedKey(holidayId, date, row),
                     row
                 );
             }
@@ -2441,7 +2473,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const date = String(e.date || '').trim();
                 if (holidayId && date) {
                     savedStatHolidayByHolidayDate.set(
-                        buildStatHolidaySavedKey(holidayId, date, e?.statHolidayMeta?.schemeId),
+                        buildStatHolidaySavedKey(holidayId, date, e),
                         e
                     );
                 }
@@ -3048,7 +3080,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const holidayId = String(entry.statHolidayMeta?.holidayId || entry.statHolidayId || '').trim();
         const date = String(entry.date || '').trim();
         const savedByHolidayDate = (holidayId && date)
-            ? savedStatHolidayByHolidayDate.get(buildStatHolidaySavedKey(holidayId, date, entry?.statHolidayMeta?.schemeId))
+            ? savedStatHolidayByHolidayDate.get(buildStatHolidaySavedKey(holidayId, date, entry))
             : null;
         if (savedByHolidayDate?.statHolidayOverride) {
             entry.statHolidayOverride = {
@@ -3078,8 +3110,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const holidayId = String(entry?.statHolidayMeta?.holidayId || entry?.statHolidayId || '').trim();
         const date = String(entry?.date || '').trim();
         if (holidayId && date) {
-            savedStatHolidayByHolidayDate.set(buildStatHolidaySavedKey(holidayId, date, entry?.statHolidayMeta?.schemeId), {
-                ...(savedStatHolidayByHolidayDate.get(buildStatHolidaySavedKey(holidayId, date, entry?.statHolidayMeta?.schemeId)) || {}),
+            const savedKey = buildStatHolidaySavedKey(holidayId, date, entry);
+            savedStatHolidayByHolidayDate.set(savedKey, {
+                ...(savedStatHolidayByHolidayDate.get(savedKey) || {}),
                 ...entry,
                 statHolidayOverride: entry.statHolidayOverride
             });
@@ -3220,7 +3253,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyStatHolidayOverrideToEntry(entry, hours, reason) {
         if (!entry) return;
-        const metadataEntry = resolveStatHolidayMetadataEntryForAction(entry) || entry;
+        const targetSessionId = String(resolveStatHolidayActionSessionId(entry) || entry?.sessionId || '').trim();
+        let metadataEntry = targetSessionId
+            ? activeEntries.find((row) => String(row?.sessionId || '').trim() === targetSessionId)
+            : null;
+        metadataEntry = metadataEntry || resolveStatHolidayMetadataEntryForAction(entry) || entry;
         const safeHours = Number(Number(hours || 0).toFixed(2));
         const wasQualified = metadataEntry?.statHolidayMeta?.qualified === true;
         if (STATUTORY_HOLIDAY_USES_ACTIVITY) {
@@ -3286,7 +3323,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 cleanup();
                 statHolidayOverrideModal?.hide();
                 resolve({
-                    hours: Number(parsed.toFixed(2)),
+                    hours: applyStatutoryHolidayHoursRounding(parsed),
                     reason: String(reasonInput.value || '').trim()
                 });
             };
@@ -3851,10 +3888,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resolveStatHolidayOverrideHours(entry, sourceEntry = null) {
-        const metadataEntry = resolveStatHolidayMetadataEntry(entry) || resolveStatHolidayMetadataEntry(sourceEntry);
-        const override = entry?.statHolidayOverride
-            || sourceEntry?.statHolidayOverride
-            || metadataEntry?.statHolidayOverride;
+        const targetSchemeId = resolveStatHolidaySchemeId(entry || sourceEntry);
+        const pickOverride = (candidate) => {
+            if (!candidate?.statHolidayOverride) return null;
+            if (targetSchemeId && !entryMatchesStatHolidayScheme(candidate, targetSchemeId)) return null;
+            return candidate.statHolidayOverride;
+        };
+        const override = pickOverride(entry)
+            || pickOverride(sourceEntry)
+            || pickOverride(resolveStatHolidayMetadataEntry(entry))
+            || pickOverride(resolveStatHolidayMetadataEntry(sourceEntry));
         if (!override || typeof override !== 'object') return null;
         const overrideHours = Number(override.hours);
         if (!Number.isFinite(overrideHours) || overrideHours < 0) return null;
@@ -3863,7 +3906,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resolveTimesheetRowHours(entry) {
-        if (isStatHolidayPayTimesheetRow(entry)) {
+        if (isStatHolidayPayTimesheetRow(entry) || isStatutoryHolidayEntry(entry)) {
             return Number(resolveStatHolidayEffectivePayableHours(entry) || 0);
         }
         return resolveEntryHours(entry);
@@ -3879,7 +3922,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const calculatedHours = Number(metadataEntry?.statHolidayMeta?.calculatedHours || 0);
         if (metadataEntry?.statHolidayMeta?.checks) {
             if (qualified && calculatedHours > 0 && payBlockedReason !== 'exceeds_max_payable_hours') {
-                return calculatedHours;
+                return applyStatutoryHolidayHoursRounding(calculatedHours);
             }
             return 0;
         }
@@ -4189,29 +4232,66 @@ document.addEventListener('DOMContentLoaded', () => {
         return resolveStatHolidayCalculationModalEntry(fallbackSessionId) ? fallbackSessionId : '';
     }
 
+    function resolveStatHolidayActionSessionId(entry) {
+        if (!entry) return '';
+        const sessionId = String(entry?.sessionId || '').trim();
+        if (sessionId.toLowerCase().startsWith('stathol-')) return sessionId;
+        const holidayId = resolveStatHolidayHolidayId(entry);
+        const schemeId = resolveStatHolidaySchemeId(entry);
+        if (!holidayId) return sessionId;
+        return buildStatHolidayMetadataSessionId(schemeId, holidayId) || sessionId;
+    }
+
     function resolveOrEnsureStatHolidayActiveEntry(sessionId) {
         const normalized = String(sessionId || '').trim();
         if (!normalized) return null;
-        const existing = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
-        if (existing && isStatutoryHolidayEntry(existing)) {
-            return resolveStatHolidayMetadataEntryForAction(existing) || existing;
+        const context = resolveStatHolidaySchemeContext(normalized);
+        const lookupIds = [];
+        if (context.metadataSessionId) lookupIds.push(context.metadataSessionId);
+        if (!lookupIds.includes(normalized)) lookupIds.push(normalized);
+        for (const lookupId of lookupIds) {
+            const existing = activeEntries.find((row) => String(row?.sessionId || '') === lookupId);
+            if (existing && isStatutoryHolidayEntry(existing)) {
+                return resolveStatHolidayMetadataEntryForAction(existing) || existing;
+            }
         }
-        const resolved = resolveStatHolidayStatusEntryForSessionId(normalized);
+        const stored = resolveStatHolidayStoredEntry({
+            sessionId: context.metadataSessionId || normalized,
+            holidayId: context.holidayId,
+            schemeId: context.schemeId,
+            date: context.date
+        });
+        if (stored && isStatutoryHolidayEntry(stored)) {
+            const storedSessionId = String(stored?.sessionId || context.metadataSessionId || normalized).trim();
+            const existingStored = activeEntries.find((row) => String(row?.sessionId || '') === storedSessionId);
+            if (existingStored) {
+                return resolveStatHolidayMetadataEntryForAction(existingStored) || existingStored;
+            }
+            const nextStoredEntry = { ...stored, sessionId: storedSessionId };
+            activeEntries.push(nextStoredEntry);
+            return resolveStatHolidayMetadataEntryForAction(nextStoredEntry) || nextStoredEntry;
+        }
+        const resolved = resolveStatHolidayStatusEntryForSessionId(context.metadataSessionId || normalized);
         if (!resolved || !isStatutoryHolidayEntry(resolved)) return null;
-        if (existing) {
-            return resolveStatHolidayMetadataEntryForAction(existing) || existing;
+        const resolvedSessionId = String(resolved?.sessionId || context.metadataSessionId || normalized).trim();
+        const existingResolved = activeEntries.find((row) => String(row?.sessionId || '') === resolvedSessionId);
+        if (existingResolved) {
+            return resolveStatHolidayMetadataEntryForAction(existingResolved) || existingResolved;
         }
-        const nextEntry = { ...resolved };
+        const nextEntry = { ...resolved, sessionId: resolvedSessionId };
         activeEntries.push(nextEntry);
         return resolveStatHolidayMetadataEntryForAction(nextEntry) || nextEntry;
     }
 
-    function buildStatHolidayManagerActionButtonsHtml(sessionId) {
+    function buildStatHolidayManagerActionButtonsHtml(entryOrSessionId) {
         if (!CAN_MANAGE_STAT_HOLIDAY_OVERRIDES || STAT_HOLIDAY_PREVIEW_ONLY) return '';
-        const safeSessionId = String(sessionId || '').trim();
+        const safeSessionId = (entryOrSessionId && typeof entryOrSessionId === 'object')
+            ? resolveStatHolidayActionSessionId(entryOrSessionId)
+            : String(entryOrSessionId || '').trim();
         if (!safeSessionId) return '';
-        return `<button class="btn btn-sm btn-outline-primary py-0 px-1 me-1" title="Adjust statutory holiday hours" onclick="openStatHolidayOverrideModal('${safeSessionId}')"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Disqualify statutory holiday pay" onclick="disqualifyStatHolidayEntry('${safeSessionId}')"><i class="bi bi-x-lg"></i></button>`;
+        const escapedSessionId = safeSessionId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `<button class="btn btn-sm btn-outline-primary py-0 px-1 me-1" title="Adjust statutory holiday hours" onclick="window.openStatHolidayOverrideModal('${escapedSessionId}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Disqualify statutory holiday pay" onclick="window.disqualifyStatHolidayEntry('${escapedSessionId}')"><i class="bi bi-x-lg"></i></button>`;
     }
 
     function buildStatHolidayHolidayOnlyStatusHtml(dateStr) {
@@ -4781,7 +4861,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ? `<td class="ts-col-hours-regular align-middle">${buildRegularHoursTimeCellHtml(statHolidayEntry, holidayPayableHours, holidayPayableHours)}</td><td class="ts-col-hours-optional align-middle">${buildEmptyOptionalHoursCellHtml()}</td>`
                         : zeroHoursCells;
                     const holidayOnlyActBtns = (!IS_READONLY && statHolidayEntry?.statHolidayMeta?.checks)
-                        ? buildStatHolidayManagerActionButtonsHtml(statHolidayEntry.sessionId)
+                        ? buildStatHolidayManagerActionButtonsHtml(statHolidayEntry)
                         : '';
                     const holidayOnlyActHtml = IS_READONLY
                         ? ''
@@ -4865,7 +4945,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                        ${copyBtn}
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" title="Remove" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
                         } else if (isStatutoryHolidayEntry(ses)) {
-                            actBtns = buildStatHolidayManagerActionButtonsHtml(ses.sessionId);
+                            actBtns = buildStatHolidayManagerActionButtonsHtml(ses);
                         } else if (isAutoPulledTimesheetEntry(ses) && !IS_ADMIN) {
                             actBtns = `<span class="text-muted small ts-tooltip-trigger" data-tip="Auto-pulled sessions are locked and cannot be removed from your timesheet." tabindex="0"><i class="bi bi-lock-fill"></i></span>`;
                         } else {
@@ -7061,6 +7141,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    function buildStatHolidayWarningDisplayTitle(warning) {
+        const schemeName = String(warning?.schemeName || '').trim();
+        let holidayLabel = String(warning?.title || 'Statutory holiday').trim();
+        holidayLabel = holidayLabel.replace(/^STATUTORY HOLIDAY\s*\([^)]+\)\s*:\s*/i, '').trim() || holidayLabel;
+        return schemeName ? `${schemeName}: ${holidayLabel}` : holidayLabel;
+    }
+
     function renderStatHolidayWarningsPanel() {
         const panel = document.getElementById('statHolidayWarningsPanel');
         const body = document.getElementById('statHolidayWarningsBody');
@@ -7091,8 +7178,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const viewCalcBtn = warning?.checks
                 ? `<button type="button" class="btn btn-sm btn-outline-primary" onclick="openStatHolidayCalculationModal('${escapeHtml(sessionId)}')"><i class="bi bi-balloon-fill me-1"></i>View calculation steps</button>`
                 : '';
+            const displayTitle = buildStatHolidayWarningDisplayTitle(warning);
             return `<div class="border rounded p-3 mb-3 bg-white">
-                <div class="fw-bold">${escapeHtml(warning.title || 'Statutory holiday')} <span class="text-muted fw-normal">(${escapeHtml(formatTimesheetDateLabel(warning.date))})</span>${schemeLabel ? ` <span class="badge text-bg-light border ms-1">${escapeHtml(schemeLabel)}</span>` : ''}</div>
+                <div class="fw-bold">${escapeHtml(displayTitle)} <span class="text-muted fw-normal">(${escapeHtml(formatTimesheetDateLabel(warning.date))})</span>${schemeLabel ? ` <span class="badge text-bg-light border ms-1">${escapeHtml(schemeLabel)}</span>` : ''}</div>
                 ${reasonHtml}
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge text-bg-light border">Calculated hours: ${Number(warning?.calculatedHours || 0).toFixed(2)}</span>
@@ -7103,20 +7191,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.openStatHolidayOverrideModal = async function(sessionId) {
-        const entry = resolveOrEnsureStatHolidayActiveEntry(sessionId);
+        const normalized = String(sessionId || '').trim();
+        if (!normalized) return;
+        const entry = resolveStatHolidayCalculationModalEntry(normalized)
+            || resolveOrEnsureStatHolidayActiveEntry(normalized);
         if (!entry) return;
-        const metadataEntry = resolveStatHolidayMetadataEntryForAction(entry) || entry;
+        const targetSessionId = String(resolveStatHolidayActionSessionId(entry) || normalized).trim();
+        const metadataEntry = activeEntries.find((row) => String(row?.sessionId || '').trim() === targetSessionId)
+            || resolveStatHolidayMetadataEntryForAction(entry)
+            || entry;
         const schemeName = String(
             metadataEntry?.statHolidayMeta?.schemeName
             || entry?.statHolidayMeta?.schemeName
             || ''
         ).trim();
+        const overrideHours = resolveStatHolidayOverrideHours(metadataEntry, entry);
+        const calculatedDefault = applyStatutoryHolidayHoursRounding(
+            metadataEntry?.statHolidayMeta?.calculatedHours || 0
+        );
         const currentHours = Number(
-            resolveStatHolidayEffectivePayableHours(metadataEntry, entry)
-            || metadataEntry?.statHolidayOverride?.hours
-            || resolveEntryHours(metadataEntry)
-            || metadataEntry?.statHolidayMeta?.calculatedHours
-            || 0
+            overrideHours != null
+                ? overrideHours
+                : (resolveStatHolidayEffectivePayableHours(metadataEntry, entry)
+                    || resolveEntryHours(metadataEntry)
+                    || calculatedDefault
+                    || 0)
         );
         const result = await openStatHolidayOverrideDialog({
             title: entry.className || 'Set Statutory Holiday Hours',
@@ -7134,7 +7233,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.disqualifyStatHolidayEntry = async function(sessionId) {
-        const entry = resolveOrEnsureStatHolidayActiveEntry(sessionId);
+        const entry = resolveStatHolidayCalculationModalEntry(String(sessionId || '').trim())
+            || resolveOrEnsureStatHolidayActiveEntry(String(sessionId || '').trim());
         if (!entry) return;
         const confirmed = await messageBox({
             title: 'Disqualify Statutory Holiday Pay',

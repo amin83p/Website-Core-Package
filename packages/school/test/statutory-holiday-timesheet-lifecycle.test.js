@@ -168,7 +168,7 @@ test('timesheet editor supports manager edits for unqualified statutory holidays
   assert.match(editorSource, /resolveOrEnsureStatHolidayActiveEntry\(sessionId\)/);
   assert.match(editorSource, /buildStatHolidayManagerActionButtonsHtml/);
   assert.match(editorSource, /holidayOnlyActBtns[\s\S]*buildStatHolidayManagerActionButtonsHtml/);
-  assert.match(editorSource, /onclick="openStatHolidayOverrideModal\('\$\{safeSessionId\}'\)"/);
+  assert.match(editorSource, /onclick="window\.openStatHolidayOverrideModal\('\$\{escapedSessionId\}'\)"/);
   assert.match(editorSource, /buildStatHolidayMetadataSessionId/);
   assert.match(editorSource, /id="statHolidayOverrideHours"/);
 });
@@ -215,6 +215,31 @@ test('timesheet editor status chip resolves metadata session for calculation mod
   assert.match(editorSource, /function resolveStatHolidayStatusEntriesForDate/);
 });
 
+test('timesheet editor supports statutory holiday hours rounding helpers and settings field', () => {
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  const settingsSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/settings/index.ejs'),
+    'utf8'
+  );
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/timesheetController.js'),
+    'utf8'
+  );
+  assert.match(editorSource, /const STAT_HOLIDAY_ROUND_CALCULATED_HOURS/);
+  assert.match(editorSource, /function roundStatutoryHolidayHours/);
+  assert.match(editorSource, /function resolveStatHolidayActionSessionId/);
+  assert.match(editorSource, /function applyStatutoryHolidayHoursRounding/);
+  assert.match(editorSource, /applyStatutoryHolidayHoursRounding\(parsed\)/);
+  assert.match(editorSource, /applyStatutoryHolidayHoursRounding\(calculatedHours\)/);
+  assert.match(settingsSource, /id="statutoryHolidayRoundCalculatedHours"/);
+  assert.match(settingsSource, /statutoryHolidayRoundCalculatedHours:/);
+  assert.match(settingsSource, /savedStatPay\.roundCalculatedHours/);
+  assert.match(controllerSource, /statutoryHolidayRoundCalculatedHours:/);
+});
+
 test('timesheet editor uses scheme-strict stat holiday modals and single-scheme override dialog', () => {
   const editorSource = fs.readFileSync(
     path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
@@ -227,6 +252,8 @@ test('timesheet editor uses scheme-strict stat holiday modals and single-scheme 
   assert.doesNotMatch(editorSource, /metaByAssigneeKey\.get\(`\$\{holidayId\}\|\$\{date\}`/);
   assert.match(editorSource, /id="statHolidayOverrideHours"/);
   assert.match(editorSource, /applyStatHolidayOverrideToEntry\(metadataEntry, result\.hours, result\.reason\)/);
+  assert.match(editorSource, /resolveStatHolidayCalculationModalEntry\(normalized\)/);
+  assert.match(editorSource, /function buildStatHolidayWarningDisplayTitle/);
   assert.doesNotMatch(editorSource, /function listStatHolidaySchemeTargets/);
   assert.doesNotMatch(editorSource, /function applyStatHolidayOverridesForHoliday/);
   assert.doesNotMatch(editorSource, /Set hours/);

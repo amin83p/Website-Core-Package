@@ -11,6 +11,10 @@ const {
 } = require('./timesheetWorkdayHistoryService');
 const timesheetPrintService = require('./timesheetPrintService');
 const timesheetLegacyImportService = require('./timesheetLegacyImportService');
+const {
+  isStatutoryHolidayRoundingEnabled,
+  applyStatutoryHolidayHoursRounding
+} = require('./statutoryHolidayHoursRoundingService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -382,8 +386,12 @@ function resolveStatHolidayPayHours({
   evaluation,
   existingEntry = null,
   allowManagerOverride = false,
-  schemeCalculatedHours = null
+  schemeCalculatedHours = null,
+  policy = null
 } = {}) {
+  const roundingEnabled = isStatutoryHolidayRoundingEnabled(
+    policy ? timesheetParametersPolicyService.resolvePolicy(policy) : {}
+  );
   const override = resolveExistingOverride(existingEntry);
   const forcePay = override?.forcePay === true;
   const forceDisqualify = override?.forcePay === false;
@@ -395,8 +403,12 @@ function resolveStatHolidayPayHours({
   let hours = Number.isFinite(Number(schemeCalculatedHours))
     ? Number(schemeCalculatedHours)
     : evaluation.calculatedHours;
+  hours = applyStatutoryHolidayHoursRounding(hours, { enabled: roundingEnabled });
   if (allowManagerOverride && override && Number.isFinite(Number(override.hours))) {
-    hours = Number(Number(override.hours).toFixed(2));
+    hours = applyStatutoryHolidayHoursRounding(
+      Number(Number(override.hours).toFixed(2)),
+      { enabled: roundingEnabled }
+    );
   }
   if (hours > MAX_STAT_HOLIDAY_PAY_HOURS) {
     return { shouldPay: false, hours, blockReason: 'exceeds_max_payable_hours' };
@@ -409,20 +421,24 @@ function buildStatHolidayWarning({
   existingEntry = null,
   allowManagerOverride = false,
   schemeId = '',
-  schemeResult = null
+  schemeResult = null,
+  policy = null
 } = {}) {
   const resolvedSchemeId = cleanId(schemeId)
     || cleanId(schemeResult?.schemeId)
     || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM;
   const schemeConfig = statutoryHolidaySchemeService.resolveSchemeConfig(resolvedSchemeId);
-  const schemeCalculatedHours = Number.isFinite(Number(schemeResult?.calculatedHours))
-    ? Number(schemeResult.calculatedHours)
-    : evaluation.calculatedHours;
+  const schemeCalculatedHours = Number.isFinite(Number(evaluation?.calculatedHours))
+    ? Number(evaluation.calculatedHours)
+    : (Number.isFinite(Number(schemeResult?.calculatedHours))
+      ? Number(schemeResult.calculatedHours)
+      : 0);
   const payResolution = resolveStatHolidayPayHours({
     evaluation,
     existingEntry,
     allowManagerOverride,
-    schemeCalculatedHours
+    schemeCalculatedHours,
+    policy
   });
   if (payResolution.shouldPay) return null;
   const reasons = [...(Array.isArray(evaluation?.disqualifyReasons) ? evaluation.disqualifyReasons : [])];
@@ -455,22 +471,26 @@ function buildStatHolidayRow({
   existingEntry = null,
   allowManagerOverride = false,
   schemeId = '',
-  schemeResult = null
+  schemeResult = null,
+  policy = null
 }) {
   const override = resolveExistingOverride(existingEntry);
   const resolvedSchemeId = cleanId(schemeId)
     || cleanId(schemeResult?.schemeId)
     || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM;
   const schemeConfig = statutoryHolidaySchemeService.resolveSchemeConfig(resolvedSchemeId);
-  const schemeCalculatedHours = Number.isFinite(Number(schemeResult?.calculatedHours))
-    ? Number(schemeResult.calculatedHours)
-    : evaluation.calculatedHours;
+  const schemeCalculatedHours = Number.isFinite(Number(evaluation?.calculatedHours))
+    ? Number(evaluation.calculatedHours)
+    : (Number.isFinite(Number(schemeResult?.calculatedHours))
+      ? Number(schemeResult.calculatedHours)
+      : 0);
   const sessionId = buildStatHolidaySessionId(evaluation.holidayId, personId, resolvedSchemeId);
   const payResolution = resolveStatHolidayPayHours({
     evaluation,
     existingEntry,
     allowManagerOverride,
-    schemeCalculatedHours
+    schemeCalculatedHours,
+    policy
   });
   const hours = payResolution.shouldPay ? payResolution.hours : 0;
 
@@ -570,7 +590,8 @@ function buildStatHolidayPayItems({
   evaluations = [],
   existingBySchemeHoliday = null,
   existingByHolidayId = null,
-  allowManagerOverride = false
+  allowManagerOverride = false,
+  policy = null
 } = {}) {
   const overrideLookup = existingBySchemeHoliday instanceof Map
     ? existingBySchemeHoliday
@@ -620,7 +641,8 @@ function buildStatHolidayPayItems({
       evaluation,
       existingEntry,
       allowManagerOverride,
-      schemeCalculatedHours
+      schemeCalculatedHours,
+      policy
     });
     const payableHours = payResolution.shouldPay
       ? payResolution.hours
@@ -811,7 +833,8 @@ function buildTrustedStatHolidayEntry({
   trustedRow,
   existingEntry = null,
   allowManagerOverride = false,
-  actor = null
+  actor = null,
+  policy = null
 }) {
   if (!trustedRow) {
     return {
@@ -844,6 +867,9 @@ function buildTrustedStatHolidayEntry({
     override.at = new Date().toISOString();
   }
 
+  const roundingEnabled = isStatutoryHolidayRoundingEnabled(
+    policy ? timesheetParametersPolicyService.resolvePolicy(policy) : {}
+  );
   const forcePay = override?.forcePay === true;
   const forceDisqualify = override?.forcePay === false;
   const shouldPay = (trustedRow.statHolidayMeta?.qualified && !forceDisqualify) || forcePay;
@@ -852,8 +878,12 @@ function buildTrustedStatHolidayEntry({
   let payBlockedReason = trustedRow.statHolidayMeta?.payBlockedReason || '';
   if (shouldPay) {
     hours = trustedRow.hours ?? trustedRow.statHolidayMeta?.calculatedHours ?? 0;
+    hours = applyStatutoryHolidayHoursRounding(hours, { enabled: roundingEnabled });
     if (override && Number.isFinite(Number(override.hours))) {
-      hours = Number(Number(override.hours).toFixed(2));
+      hours = applyStatutoryHolidayHoursRounding(
+        Number(Number(override.hours).toFixed(2)),
+        { enabled: roundingEnabled }
+      );
     }
     if (hours > MAX_STAT_HOLIDAY_PAY_HOURS) {
       hours = 0;

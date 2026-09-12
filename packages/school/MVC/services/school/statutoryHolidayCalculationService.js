@@ -21,6 +21,10 @@ const {
   resolveHolidayDate,
   isPayableHoliday
 } = require('./statutoryHolidayEligibilityService');
+const {
+  isStatutoryHolidayRoundingEnabled,
+  applyStatutoryHolidayHoursRounding
+} = require('./statutoryHolidayHoursRoundingService');
 
 function cleanId(value) {
   return String(value ?? '').trim();
@@ -95,7 +99,11 @@ function evaluateEquilibriumTrack({
     policy: resolvedPolicy
   });
 
-  const calculatedHours = Number(schemeResult.calculatedHours || 0);
+  const roundingEnabled = isStatutoryHolidayRoundingEnabled(resolvedPolicy);
+  const calculatedHours = applyStatutoryHolidayHoursRounding(
+    Number(schemeResult.calculatedHours || 0),
+    { enabled: roundingEnabled }
+  );
   const checks = {
     ...evaluation.checks,
     trackType: statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM,
@@ -144,7 +152,11 @@ function evaluateLincTrack({
     workdayEntries,
     policy: resolvedPolicy
   });
-  const calculatedHours = Number(schemeResult.calculatedHours || 0);
+  const roundingEnabled = isStatutoryHolidayRoundingEnabled(resolvedPolicy);
+  const calculatedHours = applyStatutoryHolidayHoursRounding(
+    Number(schemeResult.calculatedHours || 0),
+    { enabled: roundingEnabled }
+  );
   const enforceBoundaryLeave = schemeConfig?.disqualifyOnLeaveBeforeAfter === true;
   let leaveBeforeAfter;
   if (enforceBoundaryLeave) {
@@ -371,7 +383,8 @@ async function calculateStatutoryHolidayForPeriod({
         existingEntry,
         allowManagerOverride,
         schemeId,
-        schemeResult
+        schemeResult,
+        policy: resolvedPolicy
       });
       const warningKey = lookupKey;
       rows.push(row);
@@ -381,7 +394,8 @@ async function calculateStatutoryHolidayForPeriod({
           existingEntry,
           allowManagerOverride,
           schemeId,
-          schemeResult
+          schemeResult,
+          policy: resolvedPolicy
         });
         if (warning) {
           warnings.push(warning);

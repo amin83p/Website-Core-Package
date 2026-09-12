@@ -2742,6 +2742,7 @@ exports.viewTimesheet = async (req, res) => {
             canManageStatHolidayOverrides: canReviewerEdit && canManagerUpdate,
             statHolidayPreviewOnly: status === 'draft',
             statutoryHolidayUsesActivity,
+            statutoryHolidayRoundCalculatedHours: timesheetParametersPolicy?.statutoryHolidayPay?.roundCalculatedHours === true,
             navYear,
             prevPeriodNav,
             nextPeriodNav
@@ -3372,6 +3373,7 @@ exports.saveTimesheet = async (req, res) => {
                     trustedRow,
                     existingEntry: existingEntriesBySessionId.get(sessionId) || null,
                     allowManagerOverride: allowStatHolidayOverride,
+                    policy: timesheetParametersPolicy,
                     actor: {
                         id: req.user?.id || req.user?.personId || '',
                         name: req.user?.displayName || req.user?.name || ''
