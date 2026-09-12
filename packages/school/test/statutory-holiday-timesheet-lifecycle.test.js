@@ -168,9 +168,9 @@ test('timesheet editor supports manager edits for unqualified statutory holidays
   assert.match(editorSource, /resolveOrEnsureStatHolidayActiveEntry\(sessionId\)/);
   assert.match(editorSource, /buildStatHolidayManagerActionButtonsHtml/);
   assert.match(editorSource, /holidayOnlyActBtns[\s\S]*buildStatHolidayManagerActionButtonsHtml/);
-  assert.match(editorSource, /Set hours/);
+  assert.match(editorSource, /onclick="openStatHolidayOverrideModal\('\$\{safeSessionId\}'\)"/);
   assert.match(editorSource, /buildStatHolidayMetadataSessionId/);
-  assert.match(editorSource, /openStatHolidayOverrideModal\('\$\{escapeHtml\(sessionId\)\}'\)/);
+  assert.match(editorSource, /id="statHolidayOverrideHours"/);
 });
 
 test('timesheet editor calculation modal supports compact reasons-only view and override copy', () => {
@@ -200,7 +200,7 @@ test('timesheet editor status chip resolves metadata session for calculation mod
   assert.match(editorSource, /const entry = resolveStatHolidayCalculationModalEntry\(normalizedSessionId\)/);
   assert.match(editorSource, /function resolveStatHolidayChipSessionId/);
   assert.match(editorSource, /chipSessionId = resolveStatHolidayChipSessionId\(entry\)/);
-  assert.match(editorSource, /findStatHolidayMetadataEntryByDate\(entry\?\.date, schemeId\)/);
+  assert.match(editorSource, /findStatHolidayMetadataEntryByDate\(entry\?\.date, schemeId, holidayId\)/);
   assert.match(editorSource, /hydrateSavedStatHolidayMetadataIntoActiveEntries/);
   assert.match(editorSource, /const STAT_HOLIDAY_PREVIEW_ROWS/);
   assert.match(editorSource, /function rememberPreviewStatHolidayRows/);
@@ -208,6 +208,33 @@ test('timesheet editor status chip resolves metadata session for calculation mod
   assert.match(editorSource, /function resolveStatHolidayStoredEntry/);
   assert.match(editorSource, /resolveStatHolidayStoredEntry\(\{ sessionId: normalized \}\)/);
   assert.match(editorSource, /findStatHolidayWarningForContext/);
+  assert.match(editorSource, /buildLincStatHolidayCalculationStepsHtml/);
+  assert.match(editorSource, /STAT_HOLIDAY_SCHEME_LINC/);
+  assert.match(editorSource, /function shouldSuppressStatHolidayMetadataEntry/);
+  assert.match(editorSource, /!shouldSuppressStatHolidayMetadataEntry\(e\)/);
+  assert.match(editorSource, /function resolveStatHolidayStatusEntriesForDate/);
+});
+
+test('timesheet editor uses scheme-strict stat holiday modals and single-scheme override dialog', () => {
+  const editorSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
+    'utf8'
+  );
+  assert.match(editorSource, /function resolveStatHolidaySchemeContext/);
+  assert.match(editorSource, /function entryMatchesStatHolidayScheme/);
+  assert.match(editorSource, /function resolveStatHolidayHolidayId/);
+  assert.doesNotMatch(editorSource, /metaByAssigneeKey\.set\(`\$\{holidayId\}\|\$\{date\}`/);
+  assert.doesNotMatch(editorSource, /metaByAssigneeKey\.get\(`\$\{holidayId\}\|\$\{date\}`/);
+  assert.match(editorSource, /id="statHolidayOverrideHours"/);
+  assert.match(editorSource, /applyStatHolidayOverrideToEntry\(metadataEntry, result\.hours, result\.reason\)/);
+  assert.doesNotMatch(editorSource, /function listStatHolidaySchemeTargets/);
+  assert.doesNotMatch(editorSource, /function applyStatHolidayOverridesForHoliday/);
+  assert.doesNotMatch(editorSource, /Set hours/);
+  assert.match(editorSource, /if \(targetSchemeId\) \{[\s\S]*return rows\.find/);
+  assert.match(editorSource, /schemeCandidates = targetSchemeId[\s\S]*\? \[targetSchemeId\]/);
+  assert.match(editorSource, /findStatHolidayMetadataEntryByDate\(entry\?\.date, entrySchemeId, resolveStatHolidayHolidayId\(entry\)\)/);
+  assert.match(editorSource, /function hydrateStatHolidayActivityRowsFromPreview/);
+  assert.match(editorSource, /function hydrateStatHolidayFieldsFromLiveSessions/);
 });
 
 test('timesheet editor department totals skip activity-mode statutory holiday metadata rows', () => {
@@ -215,7 +242,7 @@ test('timesheet editor department totals skip activity-mode statutory holiday me
     path.join(__dirname, '../MVC/views/school/timesheet/timesheetEditor.ejs'),
     'utf8'
   );
-  assert.match(editorSource, /renderDepartmentTotals[\s\S]*isStatHolidayMetadataOnlyEntry\(entry\)/);
+  assert.match(editorSource, /renderDepartmentTotals[\s\S]*shouldSuppressStatHolidayMetadataEntry\(entry\)/);
   assert.match(editorSource, /renderDepartmentTotals[\s\S]*resolveTimesheetRowHours\(entry\)/);
   assert.match(editorSource, /applyStatHolidayOverrideToEntry[\s\S]*STATUTORY_HOLIDAY_USES_ACTIVITY[\s\S]*metadataEntry\.hours = 0/);
 });

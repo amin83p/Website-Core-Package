@@ -20,6 +20,32 @@ test('migrates legacy statutory holiday activity into equilibrium scheme', () =>
   assert.equal(normalized.activityId, 'ACT_LEGACY');
 });
 
+test('LINC boundary leave setting round-trips through form parsing', () => {
+  const enabled = timesheetParametersPolicyService.normalizePolicyFromForm({
+    emptyEnrollmentSessions: 'hide',
+    schemeDisqualifyOnLeaveBeforeAfter_linc: 'true'
+  });
+  assert.equal(
+    enabled.statutoryHolidayPay.schemes.linc.disqualifyOnLeaveBeforeAfter,
+    true
+  );
+
+  const disabled = timesheetParametersPolicyService.normalizePolicyFromForm({
+    emptyEnrollmentSessions: 'hide',
+    schemeDisqualifyOnLeaveBeforeAfter_linc: 'false'
+  });
+  assert.equal(
+    disabled.statutoryHolidayPay.schemes.linc.disqualifyOnLeaveBeforeAfter,
+    false
+  );
+
+  const defaultPolicy = timesheetParametersPolicyService.normalizeStatutoryHolidayPay({});
+  assert.equal(
+    defaultPolicy.schemes.linc.disqualifyOnLeaveBeforeAfter,
+    false
+  );
+});
+
 test('LINC hour modes are mutually exclusive in normalization', () => {
   const fixed = timesheetParametersPolicyService.normalizeStatutoryHolidayPay({
     schemes: {
@@ -105,6 +131,58 @@ test('buildStatHolidaySessionId supports scheme-aware and legacy formats', () =>
   const legacy = statutoryHolidayEligibilityService.parseStatHolidaySessionParts('stathol-H1-P1', 'P1');
   assert.equal(legacy.schemeId, 'equilibrium_school');
   assert.equal(legacy.holidayId, 'H1');
+});
+
+test('LINC most_recent finds forward same-weekday hours when holiday is at period start', () => {
+  const policy = timesheetParametersPolicyService.resolvePolicy({
+    statutoryHolidayPay: {
+      departmentSchemeAssignments: { DEPT_LINC: 'linc' },
+      schemes: {
+        equilibrium_school: { id: 'equilibrium_school', activityId: 'ACT_EQ' },
+        linc: { id: 'linc', activityId: 'ACT_LINC', hourMode: 'most_recent' }
+      }
+    }
+  });
+  const result = statutoryHolidaySchemeService.calculateLincSchemeHours({
+    holidayDate: '2026-01-01',
+    workdayEntries: [
+      { date: '2026-01-08', deliveryDepartmentId: 'DEPT_LINC', hours: 6, timesheetHours: 6 }
+    ],
+    policy
+  });
+  assert.equal(result.calculatedHours, 6);
+  assert.equal(result.departmentDetails.DEPT_LINC.matchedDate, '2026-01-08');
+  assert.equal(result.departmentDetails.DEPT_LINC.searchDirection, 'after');
+});
+
+test('LINC most_recent prefers prior same-weekday hours over later ones', () => {
+  const policy = timesheetParametersPolicyService.resolvePolicy({
+    statutoryHolidayPay: {
+      departmentSchemeAssignments: { DEPT_LINC: 'linc' },
+      schemes: {
+        linc: { id: 'linc', activityId: 'ACT_LINC', hourMode: 'most_recent' }
+      }
+    }
+  });
+  const result = statutoryHolidaySchemeService.calculateLincSchemeHours({
+    holidayDate: '2026-01-01',
+    workdayEntries: [
+      { date: '2025-12-25', deliveryDepartmentId: 'DEPT_LINC', hours: 4, timesheetHours: 4 },
+      { date: '2026-01-08', deliveryDepartmentId: 'DEPT_LINC', hours: 6, timesheetHours: 6 }
+    ],
+    policy
+  });
+  assert.equal(result.calculatedHours, 4);
+  assert.equal(result.departmentDetails.DEPT_LINC.matchedDate, '2025-12-25');
+  assert.equal(result.departmentDetails.DEPT_LINC.searchDirection, 'before');
+});
+
+test('resolveActiveSchemesForPerson always returns both built-in schemes', () => {
+  const schemes = statutoryHolidaySchemeService.resolveActiveSchemesForPerson({
+    workdayEntries: [{ date: '2026-01-08', deliveryDepartmentId: 'DEPT_LINC', hours: 4, timesheetHours: 4 }],
+    policy: { statutoryHolidayPay: { enabled: true } }
+  });
+  assert.deepEqual(schemes, ['equilibrium_school', 'linc']);
 });
 
 test('buildOverrideLookup keys overrides by scheme and holiday', () => {

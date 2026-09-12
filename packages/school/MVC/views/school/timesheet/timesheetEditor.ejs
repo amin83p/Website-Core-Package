@@ -550,6 +550,29 @@
     color: #475569;
     margin-top: 0.35rem;
   }
+  .ts-stat-calc-dept-list {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.45rem;
+    background: #f8fafc;
+    padding: 0.35rem 0.65rem;
+  }
+  .ts-stat-calc-dept-list li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px dashed #dbe3ee;
+  }
+  .ts-stat-calc-dept-list li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .ts-stat-calc-dept-hours {
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+  }
   .ts-stat-calc-summary-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -1278,7 +1301,7 @@
       <div class="modal-body">
         <p class="small text-muted mb-3" id="statHolidayOverrideLead">Enter payable hours when automatic calculation is unavailable or incorrect.</p>
         <div class="mb-3">
-          <label class="form-label fw-semibold" for="statHolidayOverrideHours">Payable hours</label>
+          <label class="form-label fw-semibold" for="statHolidayOverrideHours" id="statHolidayOverrideHoursLabel">Payable hours</label>
           <input type="number" min="0" max="24" step="0.25" class="form-control" id="statHolidayOverrideHours">
         </div>
         <div class="mb-0">
@@ -1389,8 +1412,33 @@
     const STAT_HOLIDAY_SCHEME_LINC = 'linc';
     const STAT_HOLIDAY_BUILTIN_SCHEMES = [STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC];
     function resolveStatHolidaySchemeId(entry) {
-        return String(entry?.statHolidayMeta?.schemeId || entry?.statHolidaySchemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim()
-            || STAT_HOLIDAY_SCHEME_EQUILIBRIUM;
+        const live = resolveLiveStatHolidayEntry(entry);
+        return String(
+            entry?.statHolidayMeta?.schemeId
+            || entry?.statHolidaySchemeId
+            || live?.statHolidayMeta?.schemeId
+            || live?.statHolidaySchemeId
+            || STAT_HOLIDAY_SCHEME_EQUILIBRIUM
+        ).trim() || STAT_HOLIDAY_SCHEME_EQUILIBRIUM;
+    }
+    function resolveLiveStatHolidayEntry(entry) {
+        const sessionId = String(entry?.sessionId || '').trim();
+        if (!sessionId) return entry || null;
+        return liveSessionById.get(sessionId) || entry || null;
+    }
+    function isStatHolidayActivityClassName(entry) {
+        const name = String(entry?.className || entry?.description || '').trim().toUpperCase();
+        return name.includes('STATUTORY HOLIDAY');
+    }
+    function resolveStatHolidayHolidayId(entry) {
+        const live = resolveLiveStatHolidayEntry(entry);
+        return String(
+            entry?.statHolidayMeta?.holidayId
+            || entry?.statHolidayId
+            || live?.statHolidayMeta?.holidayId
+            || live?.statHolidayId
+            || ''
+        ).trim();
     }
     function buildStatHolidayMetadataSessionId(schemeId, holidayId) {
         const scheme = String(schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim();
@@ -1419,6 +1467,35 @@
     function buildStatHolidaySavedKey(holidayId, date, schemeId) {
         const scheme = resolveStatHolidaySchemeId({ statHolidayMeta: { schemeId } });
         return `${scheme}|${String(holidayId || '').trim()}|${String(date || '').trim()}`;
+    }
+    function entryMatchesStatHolidayScheme(entry, schemeId = '') {
+        const targetScheme = String(schemeId || '').trim();
+        if (!targetScheme) return true;
+        return resolveStatHolidaySchemeId(entry) === targetScheme;
+    }
+    function resolveStatHolidaySchemeContext(entryOrSessionId) {
+        if (entryOrSessionId && typeof entryOrSessionId === 'object') {
+            const entry = entryOrSessionId;
+            const holidayId = resolveStatHolidayHolidayId(entry);
+            const schemeId = resolveStatHolidaySchemeId(entry);
+            const date = String(entry?.date || '').trim();
+            const metadataSessionId = holidayId ? buildStatHolidayMetadataSessionId(schemeId, holidayId) : '';
+            return {
+                holidayId,
+                schemeId,
+                date,
+                metadataSessionId,
+                sessionId: String(entry?.sessionId || '').trim()
+            };
+        }
+        const sessionId = String(entryOrSessionId || '').trim();
+        const parsed = parseStatHolidayMetadataSessionId(sessionId);
+        const rawEntry = activeEntries.find((row) => String(row?.sessionId || '') === sessionId);
+        const holidayId = parsed.holidayId || resolveStatHolidayHolidayId(rawEntry);
+        const schemeId = parsed.holidayId ? parsed.schemeId : resolveStatHolidaySchemeId(rawEntry);
+        const date = String(rawEntry?.date || '').trim();
+        const metadataSessionId = holidayId ? buildStatHolidayMetadataSessionId(schemeId, holidayId) : sessionId;
+        return { holidayId, schemeId, date, metadataSessionId, sessionId };
     }
     function isStatHolidayRelatedEntry(entry) {
         if (!entry) return false;
@@ -2217,7 +2294,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const schemeId = resolveStatHolidaySchemeId(row);
             if (!holidayId || !date || !row?.statHolidayMeta?.checks) return;
             metaByAssigneeKey.set(`${schemeId}|${holidayId}|${date}`, row);
-            metaByAssigneeKey.set(`${holidayId}|${date}`, row);
         });
         activeEntries.forEach((entry) => {
             if (entry?.statHolidayMeta?.checks) return;
@@ -2225,8 +2301,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const date = String(entry?.date || '').trim();
             if (!holidayId || !date) return;
             const schemeId = resolveStatHolidaySchemeId(entry);
-            const preview = metaByAssigneeKey.get(`${schemeId}|${holidayId}|${date}`)
-                || metaByAssigneeKey.get(`${holidayId}|${date}`);
+            const preview = metaByAssigneeKey.get(`${schemeId}|${holidayId}|${date}`);
             if (!preview?.statHolidayMeta?.checks) return;
             entry.statHolidayMeta = { ...(entry.statHolidayMeta || {}), ...preview.statHolidayMeta };
             if (!entry.statHolidaySchemeId && preview.statHolidayMeta?.schemeId) {
@@ -2234,6 +2309,96 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (!entry.statHolidayId && preview.statHolidayMeta?.holidayId) {
                 entry.statHolidayId = preview.statHolidayMeta.holidayId;
+            }
+        });
+    }
+
+    function hydrateStatHolidayActivityRowsFromPreview() {
+        const previewRows = (Array.isArray(STAT_HOLIDAY_PREVIEW_ROWS) ? STAT_HOLIDAY_PREVIEW_ROWS : [])
+            .filter((row) => row?.statHolidayMeta?.checks);
+        const assignedActSessionIds = new Set();
+
+        previewRows.forEach((previewRow) => {
+            const holidayId = resolveStatHolidayHolidayId(previewRow);
+            const schemeId = resolveStatHolidaySchemeId(previewRow);
+            const date = String(previewRow?.date || '').trim();
+            if (!holidayId || !date) return;
+
+            const metadataSessionId = buildStatHolidayMetadataSessionId(schemeId, holidayId);
+            let metadataEntry = activeEntries.find((row) => String(row?.sessionId || '') === metadataSessionId);
+            if (!metadataEntry) {
+                metadataEntry = { ...previewRow, sessionId: metadataSessionId };
+                activeEntries.push(metadataEntry);
+            } else {
+                metadataEntry.statHolidayMeta = {
+                    ...(metadataEntry.statHolidayMeta || {}),
+                    ...previewRow.statHolidayMeta
+                };
+            }
+
+            let actEntry = activeEntries.find((row) => {
+                const sessionId = String(row?.sessionId || '').trim();
+                if (!sessionId.startsWith('act-') || assignedActSessionIds.has(sessionId)) return false;
+                if (String(row?.date || '').trim() !== date) return false;
+                const live = liveSessionById.get(sessionId);
+                const rowHolidayId = resolveStatHolidayHolidayId(row);
+                const rowSchemeId = resolveStatHolidaySchemeId(row);
+                return rowHolidayId === holidayId && rowSchemeId === schemeId;
+            });
+
+            if (!actEntry) {
+                const candidates = activeEntries
+                    .filter((row) => {
+                        const sessionId = String(row?.sessionId || '').trim();
+                        if (!sessionId.startsWith('act-') || assignedActSessionIds.has(sessionId)) return false;
+                        if (String(row?.date || '').trim() !== date) return false;
+                        const live = liveSessionById.get(sessionId);
+                        return isStatHolidayActivityClassName(row) || isStatHolidayActivityClassName(live);
+                    })
+                    .sort((left, right) => String(left?.sessionId || '').localeCompare(String(right?.sessionId || '')));
+                const previewsOnDate = previewRows
+                    .filter((row) => String(row?.date || '').trim() === date)
+                    .sort((left, right) => {
+                        const leftIndex = STAT_HOLIDAY_BUILTIN_SCHEMES.indexOf(resolveStatHolidaySchemeId(left));
+                        const rightIndex = STAT_HOLIDAY_BUILTIN_SCHEMES.indexOf(resolveStatHolidaySchemeId(right));
+                        return (leftIndex < 0 ? 99 : leftIndex) - (rightIndex < 0 ? 99 : rightIndex);
+                    });
+                const previewIndex = previewsOnDate.findIndex((row) => (
+                    resolveStatHolidaySchemeId(row) === schemeId
+                    && resolveStatHolidayHolidayId(row) === holidayId
+                ));
+                if (previewIndex >= 0 && previewIndex < candidates.length) {
+                    actEntry = candidates[previewIndex];
+                }
+            }
+
+            if (!actEntry) return;
+            assignedActSessionIds.add(String(actEntry.sessionId || '').trim());
+            actEntry.statHolidayId = holidayId;
+            actEntry.statHolidaySchemeId = schemeId;
+            actEntry.statHolidayMeta = {
+                ...(actEntry.statHolidayMeta || {}),
+                ...previewRow.statHolidayMeta
+            };
+        });
+    }
+
+    function hydrateStatHolidayFieldsFromLiveSessions() {
+        activeEntries.forEach((entry) => {
+            const sessionId = String(entry?.sessionId || '').trim();
+            if (!sessionId) return;
+            const live = liveSessionById.get(sessionId);
+            if (!live) return;
+            const holidayId = resolveStatHolidayHolidayId(live);
+            const schemeId = String(
+                live?.statHolidaySchemeId
+                || live?.statHolidayMeta?.schemeId
+                || ''
+            ).trim();
+            if (holidayId && !entry.statHolidayId) entry.statHolidayId = holidayId;
+            if (schemeId && !entry.statHolidaySchemeId) entry.statHolidaySchemeId = schemeId;
+            if (live?.statHolidayMeta?.checks && !entry?.statHolidayMeta?.checks) {
+                entry.statHolidayMeta = { ...(entry.statHolidayMeta || {}), ...live.statHolidayMeta };
             }
         });
     }
@@ -3018,7 +3183,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!STATUTORY_HOLIDAY_USES_ACTIVITY || String(entry?.sessionId || '').startsWith('stathol-')) {
             return entry;
         }
-        const peerMetadata = findStatHolidayMetadataEntryForRow(entry) || findStatHolidayMetadataEntryByDate(entry?.date);
+        const entrySchemeId = resolveStatHolidaySchemeId(entry);
+        const peerMetadata = findStatHolidayMetadataEntryForRow(entry)
+            || findStatHolidayMetadataEntryByDate(entry?.date, entrySchemeId, resolveStatHolidayHolidayId(entry));
         const holidayId = resolveStatHolidayHolidayId(entry) || resolveStatHolidayHolidayId(peerMetadata);
         const metadataSessionId = holidayId
             ? buildStatHolidayMetadataSessionId(resolveStatHolidaySchemeId(entry), holidayId)
@@ -3086,6 +3253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openStatHolidayOverrideDialog(options = {}) {
         const modalEl = document.getElementById('statHolidayOverrideModal');
         const hoursInput = document.getElementById('statHolidayOverrideHours');
+        const hoursLabel = document.getElementById('statHolidayOverrideHoursLabel');
         const reasonInput = document.getElementById('statHolidayOverrideReason');
         const titleEl = document.getElementById('statHolidayOverrideModalTitle');
         const leadEl = document.getElementById('statHolidayOverrideLead');
@@ -3097,6 +3265,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (leadEl) {
             leadEl.textContent = String(options.lead || 'Enter payable hours when automatic calculation is unavailable or incorrect.');
+        }
+        if (hoursLabel) {
+            const schemeName = String(options.schemeName || '').trim();
+            hoursLabel.textContent = schemeName ? `${schemeName} payable hours` : 'Payable hours';
         }
         hoursInput.value = Number(options.defaultHours || 0).toFixed(2);
         reasonInput.value = String(options.defaultReason || 'Manager adjusted statutory holiday hours');
@@ -3215,12 +3387,28 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span class="badge ${badgeClass}">${formatStatHolidayYesNo(passValue)}</span>`;
     }
 
+    function resolveStatHolidayDepartmentLabel(departmentId = '') {
+        const id = String(departmentId || '').trim();
+        if (!id) return 'Department';
+        const fromLive = (Array.isArray(LIVE_SESSIONS) ? LIVE_SESSIONS : []).find((row) => (
+            String(row?.deliveryDepartmentId || row?.departmentId || '').trim() === id
+        ));
+        const name = String(fromLive?.deliveryDepartmentName || fromLive?.departmentName || '').trim();
+        return name || id;
+    }
+
     function statHolidayStepItemHtml(title, passValue, details = []) {
         const detailRows = (Array.isArray(details) ? details : [])
-            .map((line) => String(line || '').trim())
+            .map((line) => {
+                if (line && typeof line === 'object' && line.html) {
+                    return String(line.html || '');
+                }
+                const text = String(line || '').trim();
+                return text ? `<div>${escapeHtml(text)}</div>` : '';
+            })
             .filter(Boolean);
         const detailHtml = detailRows.length
-            ? `<div class="ts-stat-calc-step-detail">${detailRows.map((line) => `<div>${escapeHtml(line)}</div>`).join('')}</div>`
+            ? `<div class="ts-stat-calc-step-detail">${detailRows.join('')}</div>`
             : '<div class="ts-stat-calc-step-detail text-muted">No details provided.</div>';
         return `<li class="list-group-item">
             <div class="d-flex align-items-start justify-content-between gap-2">
@@ -3231,11 +3419,103 @@ document.addEventListener('DOMContentLoaded', () => {
         </li>`;
     }
 
+    function buildLincStatHolidayCalculationStepsHtml(entry, checks) {
+        const departments = Array.isArray(checks.departments) ? checks.departments : [];
+        const hourMode = String(checks.hourMode || 'most_recent').trim();
+        const hourModeLabel = hourMode === 'fixed'
+            ? 'Fixed hours'
+            : (hourMode === 'average_weeks' ? 'Average of recent same weekdays' : 'Most recent same weekday');
+        const matchedDate = String(checks.matchedDate || '').trim();
+        const searchDirection = String(checks.searchDirection || '').trim();
+        const matchedDateDetail = matchedDate
+            ? `Matched same-weekday date: ${formatTimesheetDateLabel(matchedDate)} (${searchDirection === 'after' ? 'after holiday' : 'before holiday'})`
+            : '';
+        const deptListHtml = departments.length
+            ? `<ul class="list-unstyled mb-0 mt-2 ts-stat-calc-dept-list">${departments.map((row) => {
+                const deptLabel = resolveStatHolidayDepartmentLabel(row?.departmentId);
+                const hours = Number(row?.hours || 0).toFixed(2);
+                const rowMatchedDate = String(row?.matchedDate || '').trim();
+                const rowDirection = String(row?.searchDirection || '').trim();
+                const matchHint = rowMatchedDate
+                    ? `${formatTimesheetDateLabel(rowMatchedDate)}${rowDirection === 'after' ? ' (after holiday)' : rowDirection === 'before' ? ' (before holiday)' : ''}`
+                    : '';
+                const matchHtml = matchHint
+                    ? `<span class="small text-muted">${escapeHtml(matchHint)}</span>`
+                    : '';
+                return `<li>
+                    <span>${escapeHtml(deptLabel)}</span>
+                    <span class="text-end">
+                        <span class="ts-stat-calc-dept-hours">${escapeHtml(hours)} hrs</span>
+                        ${matchHtml ? `<div>${matchHtml}</div>` : ''}
+                    </span>
+                </li>`;
+            }).join('')}</ul>`
+            : '<div class="small text-muted mt-1">No payable department hours were found on this weekday.</div>';
+        const calculated = checks.calculatedHours || {};
+        const totalHours = Number.isFinite(Number(calculated.averageHours))
+            ? Number(calculated.averageHours).toFixed(2)
+            : Number(entry?.statHolidayMeta?.calculatedHours || 0).toFixed(2);
+        const leaveBeforeAfter = checks.leaveBeforeAfter || null;
+        const leaveBeforeAfterStep = leaveBeforeAfter ? (() => {
+            const leaveBeforeAfterDates = Array.isArray(leaveBeforeAfter.leaveDates)
+                ? leaveBeforeAfter.leaveDates.filter(Boolean)
+                : [];
+            const beforeDateLabel = leaveBeforeAfter.beforeDate
+                ? formatTimesheetDateLabel(leaveBeforeAfter.beforeDate)
+                : 'Not found';
+            const afterDateLabel = leaveBeforeAfter.afterDate
+                ? formatTimesheetDateLabel(leaveBeforeAfter.afterDate)
+                : 'Not found';
+            const leaveBeforeAfterDetails = [
+                `Nearest workday before holiday: ${beforeDateLabel}`,
+                `Nearest workday after holiday: ${afterDateLabel}`
+            ];
+            if (leaveBeforeAfter.missingBeforeBoundary) {
+                leaveBeforeAfterDetails.push('Could not resolve the before-boundary workday within the search window.');
+            }
+            if (leaveBeforeAfter.missingAfterBoundary) {
+                leaveBeforeAfterDetails.push('Could not resolve the after-boundary workday within the search window.');
+            }
+            if (leaveBeforeAfterDates.length) {
+                leaveBeforeAfterDetails.push(`Approved leave on these boundary days: ${leaveBeforeAfterDates.map((date) => formatTimesheetDateLabel(date)).join(', ')}`);
+            } else if (leaveBeforeAfter.boundariesResolved !== false) {
+                leaveBeforeAfterDetails.push('No boundary leave conflicts.');
+            }
+            return statHolidayStepItemHtml(
+                'Before and after — no approved leave on boundary workdays',
+                leaveBeforeAfter.pass,
+                leaveBeforeAfterDetails
+            );
+        })() : '';
+        const steps = [
+            statHolidayStepItemHtml('LINC hour mode', true, [
+                `Mode: ${hourModeLabel}`,
+                hourMode === 'fixed' ? `Fixed hours: ${Number(checks.fixedHours || 0).toFixed(2)}` : '',
+                hourMode === 'average_weeks' ? `Average weeks: ${Number(checks.averageWeeks || 0)}` : ''
+            ].filter(Boolean)),
+            statHolidayStepItemHtml('Department weekday history', calculated.pass === true, [
+                'Payable hours are based on timesheet history for departments assigned to the LINC scheme.',
+                matchedDateDetail,
+                { html: deptListHtml }
+            ].filter(Boolean))
+        ];
+        if (leaveBeforeAfterStep) steps.push(leaveBeforeAfterStep);
+        steps.push(statHolidayStepItemHtml('Total LINC statutory hours', calculated.pass === true, [
+            `Total payable hours: ${totalHours}`
+        ]));
+        return steps.join('');
+    }
+
     function buildStatHolidayCalculationStepsHtml(entry) {
         const checks = (entry?.statHolidayMeta && typeof entry.statHolidayMeta === 'object' && entry.statHolidayMeta.checks && typeof entry.statHolidayMeta.checks === 'object')
             ? entry.statHolidayMeta.checks
             : null;
         if (!checks || Object.keys(checks).length === 0) return '';
+
+        const schemeId = resolveStatHolidaySchemeId(entry);
+        if (schemeId === STAT_HOLIDAY_SCHEME_LINC || checks.trackType === STAT_HOLIDAY_SCHEME_LINC) {
+            return buildLincStatHolidayCalculationStepsHtml(entry, checks);
+        }
 
         const minWorkdays = checks.minWorkdays || {};
         const weekdayRule = checks.weekdayRule || {};
@@ -3510,9 +3790,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function isStatutoryHolidayEntry(entry) {
         const sessionId = String(entry?.sessionId || '').trim().toLowerCase();
-        return entry?.isStatutoryHoliday === true
-            || sessionId.startsWith('stathol-')
-            || Boolean(String(entry?.statHolidayId || '').trim());
+        if (entry?.isStatutoryHoliday === true || sessionId.startsWith('stathol-')) return true;
+        if (Boolean(resolveStatHolidayHolidayId(entry))) return true;
+        if (STATUTORY_HOLIDAY_USES_ACTIVITY && isTimesheetActivityEntry(entry)) {
+            const live = liveSessionById.get(String(entry?.sessionId || '').trim());
+            if (isStatHolidayActivityClassName(entry) || isStatHolidayActivityClassName(live)) return true;
+        }
+        return false;
     }
 
     function isStatHolidayMetadataOnlyEntry(entry) {
@@ -3522,8 +3806,9 @@ document.addEventListener('DOMContentLoaded', () => {
             || (entry?.isStatutoryHoliday === true && !String(entry?.statHolidayId || '').trim());
     }
 
-    function resolveStatHolidayHolidayId(entry) {
-        return String(entry?.statHolidayMeta?.holidayId || entry?.statHolidayId || '').trim();
+    function shouldSuppressStatHolidayMetadataEntry(entry) {
+        if (!isStatHolidayMetadataOnlyEntry(entry)) return false;
+        return Boolean(findLinkedActivityStatHolidayEntry(entry));
     }
 
     function findLinkedActivityStatHolidayEntry(entry) {
@@ -3612,7 +3897,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return 0;
     }
 
-    function findStatHolidayMetadataEntryByDate(dateStr, schemeId = '') {
+    function findStatHolidayMetadataEntryByDate(dateStr, schemeId = '', holidayId = '') {
         const date = String(dateStr || '').trim();
         if (!date) return null;
         const matches = activeEntries.filter((row) => {
@@ -3620,12 +3905,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return rowSessionId.startsWith('stathol-') && String(row?.date || '').trim() === date;
         });
         if (!matches.length) return null;
+        const targetHolidayId = String(holidayId || '').trim();
+        if (targetHolidayId) {
+            const holidayMatches = matches.filter((row) => resolveStatHolidayHolidayId(row) === targetHolidayId);
+            if (holidayMatches.length === 1) return holidayMatches[0];
+            if (holidayMatches.length > 1) {
+                const targetScheme = String(schemeId || '').trim();
+                if (targetScheme) {
+                    const exact = holidayMatches.find((row) => resolveStatHolidaySchemeId(row) === targetScheme);
+                    if (exact) return exact;
+                }
+                return holidayMatches[0];
+            }
+        }
         const targetScheme = String(schemeId || '').trim();
         if (targetScheme) {
             const schemeMatch = matches.find((row) => resolveStatHolidaySchemeId(row) === targetScheme);
             if (schemeMatch) return schemeMatch;
         }
-        return matches[0];
+        return matches.length === 1 ? matches[0] : null;
     }
 
     function buildStatHolidayStatusEntryFromWarning(warning) {
@@ -3662,18 +3960,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows = Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [];
         const targetHolidayId = String(holidayId || '').trim();
         const targetDate = String(date || '').trim();
-        const targetSchemeId = String(schemeId || '').trim() || STAT_HOLIDAY_SCHEME_EQUILIBRIUM;
+        const targetSchemeId = String(schemeId || '').trim();
+        if (targetSchemeId) {
+            return rows.find((row) => {
+                if (String(row?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim() !== targetSchemeId) return false;
+                if (targetHolidayId && String(row?.holidayId || '').trim() !== targetHolidayId) return false;
+                if (targetDate && String(row?.date || '').trim() !== targetDate) return false;
+                return Boolean(targetHolidayId || targetDate);
+            }) || null;
+        }
         if (targetHolidayId) {
-            const exact = rows.find((row) => String(row?.holidayId || '').trim() === targetHolidayId
-                && String(row?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim() === targetSchemeId);
-            if (exact) return exact;
             const byHoliday = rows.find((row) => String(row?.holidayId || '').trim() === targetHolidayId);
             if (byHoliday) return byHoliday;
         }
         if (targetDate) {
-            const byDateAndScheme = rows.find((row) => String(row?.date || '').trim() === targetDate
-                && String(row?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim() === targetSchemeId);
-            if (byDateAndScheme) return byDateAndScheme;
             return rows.find((row) => String(row?.date || '').trim() === targetDate) || null;
         }
         return null;
@@ -3686,6 +3986,32 @@ document.addEventListener('DOMContentLoaded', () => {
         return buildStatHolidayStatusEntryFromWarning(warning);
     }
 
+    function resolveStatHolidayStatusEntriesForDate(dateStr) {
+        const date = String(dateStr || '').trim();
+        if (!date) return [];
+        const entries = [];
+        const seenSchemes = new Set();
+        STAT_HOLIDAY_BUILTIN_SCHEMES.forEach((schemeId) => {
+            const entry = resolveStatHolidayStatusEntryForDate(date, schemeId);
+            if (!entry?.statHolidayMeta?.checks) return;
+            const key = resolveStatHolidaySchemeId(entry);
+            if (seenSchemes.has(key)) return;
+            seenSchemes.add(key);
+            entries.push(entry);
+        });
+        (Array.isArray(STAT_HOLIDAY_WARNINGS) ? STAT_HOLIDAY_WARNINGS : [])
+            .filter((warning) => String(warning?.date || '').trim() === date)
+            .forEach((warning) => {
+                const schemeId = String(warning?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim();
+                if (!schemeId || seenSchemes.has(schemeId)) return;
+                const entry = buildStatHolidayStatusEntryFromWarning(warning);
+                if (!entry?.statHolidayMeta?.checks) return;
+                seenSchemes.add(schemeId);
+                entries.push(entry);
+            });
+        return entries;
+    }
+
     function entryHasStatHolidayChecks(entry) {
         return Boolean(entry?.statHolidayMeta?.checks && typeof entry.statHolidayMeta.checks === 'object');
     }
@@ -3695,11 +4021,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetHolidayId = String(holidayId || '').trim();
         const targetSchemeId = String(schemeId || '').trim();
         const targetDate = String(date || '').trim();
+        const parsedSession = parseStatHolidayMetadataSessionId(normalizedSessionId);
+        const requiredSchemeId = targetSchemeId || (parsedSession.holidayId ? parsedSession.schemeId : '');
 
-        const tryStored = (candidate) => {
+        const tryStored = (candidate, schemeIdFilter = '') => {
             if (!candidate) return null;
+            const schemeGuard = String(schemeIdFilter || requiredSchemeId || '').trim();
+            if (schemeGuard && !entryMatchesStatHolidayScheme(candidate, schemeGuard)) return null;
             if (entryHasStatHolidayChecks(candidate)) return candidate;
             const calculationEntry = resolveStatHolidayCalculationEntry(candidate);
+            if (!calculationEntry) return null;
+            if (schemeGuard && !entryMatchesStatHolidayScheme(calculationEntry, schemeGuard)) return null;
             return entryHasStatHolidayChecks(calculationEntry) ? calculationEntry : null;
         };
 
@@ -3712,7 +4044,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (targetHolidayId && targetDate) {
             const schemeCandidates = targetSchemeId
-                ? [targetSchemeId, STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC]
+                ? [targetSchemeId]
                 : [STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC];
             for (const scheme of [...new Set(schemeCandidates.filter(Boolean))]) {
                 const byKey = savedStatHolidayByHolidayDate.get(
@@ -3725,7 +4057,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (targetHolidayId) {
             const schemeCandidates = targetSchemeId
-                ? [targetSchemeId, STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC]
+                ? [targetSchemeId]
                 : [STAT_HOLIDAY_SCHEME_EQUILIBRIUM, STAT_HOLIDAY_SCHEME_LINC];
             for (const scheme of [...new Set(schemeCandidates.filter(Boolean))]) {
                 const metadataSessionId = buildStatHolidayMetadataSessionId(scheme, targetHolidayId);
@@ -3793,50 +4125,62 @@ document.addEventListener('DOMContentLoaded', () => {
     function resolveStatHolidayCalculationModalEntry(sessionId) {
         const normalized = String(sessionId || '').trim();
         if (!normalized) return null;
-        const stored = resolveStatHolidayStoredEntry({ sessionId: normalized });
-        if (stored) return stored;
         const rawEntry = activeEntries.find((row) => String(row?.sessionId || '') === normalized);
+        const parsed = parseStatHolidayMetadataSessionId(normalized);
+        const requiredSchemeId = parsed.holidayId
+            ? parsed.schemeId
+            : resolveStatHolidaySchemeId(rawEntry);
+        const acceptEntry = (candidate) => {
+            if (!entryHasStatHolidayChecks(candidate)) return null;
+            if (requiredSchemeId && !entryMatchesStatHolidayScheme(candidate, requiredSchemeId)) return null;
+            return candidate;
+        };
+
+        const stored = acceptEntry(resolveStatHolidayStoredEntry({
+            sessionId: normalized,
+            schemeId: requiredSchemeId
+        }));
+        if (stored) return stored;
         if (rawEntry) {
-            const fromHoliday = resolveStatHolidayStoredEntry({
+            const fromHoliday = acceptEntry(resolveStatHolidayStoredEntry({
                 sessionId: normalized,
                 holidayId: resolveStatHolidayHolidayId(rawEntry),
                 schemeId: resolveStatHolidaySchemeId(rawEntry),
                 date: String(rawEntry?.date || '').trim()
-            });
+            }));
             if (fromHoliday) return fromHoliday;
         }
-        const fromModal = resolveStatHolidayModalEntry(normalized);
-        if (entryHasStatHolidayChecks(fromModal)) return fromModal;
-        const parsed = parseStatHolidayMetadataSessionId(normalized);
+        const fromModal = acceptEntry(resolveStatHolidayModalEntry(normalized));
+        if (fromModal) return fromModal;
         if (parsed.holidayId) {
-            const fromHoliday = resolveStatHolidayStoredEntry({
+            const fromHoliday = acceptEntry(resolveStatHolidayStoredEntry({
                 holidayId: parsed.holidayId,
                 schemeId: parsed.schemeId
-            });
+            }));
             if (fromHoliday) return fromHoliday;
         }
-        const fromStatus = resolveStatHolidayStatusEntryForSessionId(normalized);
-        if (entryHasStatHolidayChecks(fromStatus)) return fromStatus;
-        const ensured = resolveOrEnsureStatHolidayActiveEntry(normalized);
-        return entryHasStatHolidayChecks(ensured) ? ensured : null;
+        const fromStatus = acceptEntry(resolveStatHolidayStatusEntryForSessionId(normalized));
+        if (fromStatus) return fromStatus;
+        const ensured = acceptEntry(resolveOrEnsureStatHolidayActiveEntry(normalized));
+        return ensured || null;
     }
 
     function resolveStatHolidayChipSessionId(entry) {
         if (!entry || !hasStatHolidayCalculationDetails(entry)) return '';
-        const stored = resolveStatHolidayStoredEntry({
-            sessionId: String(entry?.sessionId || '').trim(),
-            holidayId: resolveStatHolidayHolidayId(entry),
-            schemeId: resolveStatHolidaySchemeId(entry),
-            date: String(entry?.date || '').trim()
-        });
-        if (stored) {
-            const storedSessionId = String(stored?.sessionId || '').trim();
-            if (storedSessionId) return storedSessionId;
-        }
         const holidayId = resolveStatHolidayHolidayId(entry);
         const schemeId = resolveStatHolidaySchemeId(entry);
+        const date = String(entry?.date || '').trim();
         if (holidayId) {
             const metadataSessionId = buildStatHolidayMetadataSessionId(schemeId, holidayId);
+            const stored = resolveStatHolidayStoredEntry({
+                holidayId,
+                schemeId,
+                date,
+                sessionId: metadataSessionId
+            });
+            if (stored && entryHasStatHolidayChecks(stored)) {
+                return metadataSessionId;
+            }
             if (metadataSessionId && resolveStatHolidayCalculationModalEntry(metadataSessionId)) {
                 return metadataSessionId;
             }
@@ -3928,7 +4272,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (byHolidayId) return byHolidayId;
         }
 
-        return findStatHolidayMetadataEntryByDate(entry?.date, schemeId);
+        const byDate = findStatHolidayMetadataEntryByDate(entry?.date, schemeId, holidayId);
+        if (!byDate) return null;
+        if (holidayId && resolveStatHolidayHolidayId(byDate) !== holidayId) return null;
+        return byDate;
     }
 
     function resolveStatHolidayModalEntry(sessionId) {
@@ -3955,7 +4302,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fromMetadata = tryEntry(metadataRow ? resolveDisplayEntry(metadataRow) : null);
                 if (fromMetadata) return fromMetadata;
             }
-            const fromDate = tryEntry(resolveStatHolidayStatusEntryForDate(String(rawEntry?.date || '').trim()));
+            const fromDate = tryEntry(resolveStatHolidayStatusEntryForDate(
+                String(rawEntry?.date || '').trim(),
+                resolveStatHolidaySchemeId(rawEntry)
+            ));
             if (fromDate) return fromDate;
         }
 
@@ -4318,7 +4668,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const buckets = new Map();
         activeEntries.forEach((entry) => {
             if (entry?.isDeleted) return;
-            if (STATUTORY_HOLIDAY_USES_ACTIVITY && isStatHolidayMetadataOnlyEntry(entry)) return;
+            if (STATUTORY_HOLIDAY_USES_ACTIVITY && shouldSuppressStatHolidayMetadataEntry(entry)) return;
             const displayEntry = resolveDisplayEntry(entry);
             const sessionHours = Number(resolveTimesheetRowHours(entry) || 0);
             const pendingHours = isPendingApprovalEntry(entry) ? Number(resolveRequestedHours(entry) || 0) : 0;
@@ -4413,7 +4763,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const dayEntries = sortTimesheetEntriesBySchedule(
                 activeEntries.filter((e) => e.date === dateStr
-                    && !isStatHolidayMetadataOnlyEntry(e)
+                    && !shouldSuppressStatHolidayMetadataEntry(e)
                     && !(STAT_HOLIDAY_PREVIEW_ONLY && isStatHolidayRelatedEntry(e)))
             );
             const dayRowSpan = Math.max(1, dayEntries.length);
@@ -4533,11 +4883,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const requestedHours = resolveRequestedHours(ses);
                     const regularHoursHtml = buildRegularHoursTimeCellHtml(displaySes, hrs, requestedHours);
                     const optionalHoursHtml = buildOptionalHoursCellHtml(displaySes);
+                    const statSchemeName = isStatutoryHolidayEntry(ses)
+                        ? String(ses?.statHolidayMeta?.schemeName || '').trim()
+                        : '';
                     const classMeta = displaySes.isManual && displaySes.activityName
                         ? `<div class="small text-muted"><i class="bi bi-list-check me-1"></i>${escapeHtml(displaySes.activityName)}${displaySes.activityPaid ? ' (paid)' : ' (unpaid)'}</div>`
                         : (displaySes.isManual && displaySes.deliveryDepartmentName
                             ? `<div class="small text-muted"><i class="bi bi-building me-1"></i>${escapeHtml(displaySes.deliveryDepartmentName)}</div>`
-                            : '');
+                            : (statSchemeName
+                                ? `<div class="small text-muted"><i class="bi bi-diagram-3 me-1"></i>${escapeHtml(statSchemeName)}</div>`
+                                : ''));
 
                     tbodyHtml += `
                         <tr class="${rowClass}">
@@ -6733,9 +7088,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const schemeId = String(warning?.schemeId || STAT_HOLIDAY_SCHEME_EQUILIBRIUM).trim();
             const sessionId = buildStatHolidayMetadataSessionId(schemeId, warning.holidayId);
             const schemeLabel = String(warning?.schemeName || '').trim();
-            const setHoursBtn = CAN_MANAGE_STAT_HOLIDAY_OVERRIDES && !STAT_HOLIDAY_PREVIEW_ONLY
-                ? `<button type="button" class="btn btn-sm btn-outline-success" onclick="openStatHolidayOverrideModal('${escapeHtml(sessionId)}')"><i class="bi bi-pencil-square me-1"></i>Set hours</button>`
-                : '';
             const viewCalcBtn = warning?.checks
                 ? `<button type="button" class="btn btn-sm btn-outline-primary" onclick="openStatHolidayCalculationModal('${escapeHtml(sessionId)}')"><i class="bi bi-balloon-fill me-1"></i>View calculation steps</button>`
                 : '';
@@ -6745,7 +7097,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge text-bg-light border">Calculated hours: ${Number(warning?.calculatedHours || 0).toFixed(2)}</span>
                     ${viewCalcBtn}
-                    ${setHoursBtn}
                 </div>
             </div>`;
         }).join('');
@@ -6755,6 +7106,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const entry = resolveOrEnsureStatHolidayActiveEntry(sessionId);
         if (!entry) return;
         const metadataEntry = resolveStatHolidayMetadataEntryForAction(entry) || entry;
+        const schemeName = String(
+            metadataEntry?.statHolidayMeta?.schemeName
+            || entry?.statHolidayMeta?.schemeName
+            || ''
+        ).trim();
         const currentHours = Number(
             resolveStatHolidayEffectivePayableHours(metadataEntry, entry)
             || metadataEntry?.statHolidayOverride?.hours
@@ -6764,9 +7120,10 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         const result = await openStatHolidayOverrideDialog({
             title: entry.className || 'Set Statutory Holiday Hours',
-            lead: entry?.statHolidayMeta?.qualified === true
+            lead: metadataEntry?.statHolidayMeta?.qualified === true
                 ? 'Enter payable hours when automatic calculation is unavailable or incorrect.'
                 : 'This person is not automatically qualified. Enter payable hours if you want to pay this statutory holiday.',
+            schemeName,
             defaultHours: currentHours,
             defaultReason: entry?.statHolidayOverride?.reason || 'Manager adjusted statutory holiday hours'
         });
@@ -6847,6 +7204,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     bindTimesheetGuidanceControls();
+    hydrateStatHolidayFieldsFromLiveSessions();
+    hydrateStatHolidayActivityRowsFromPreview();
     attachPreviewStatHolidayMetadataToActiveEntries();
     rehydrateSavedStatHolidayEntries();
     renderStatHolidayWarningsPanel();

@@ -618,7 +618,99 @@ test('performImportExecution runs all steps and saves processed timesheet with s
   }
 });
 
-test('performImportExecution falls back to draft when statutory holiday work sessions are missing', async () => {
+test('performImportExecution merges stat holiday sessions from all scheme activities', async () => {
+  const stub = stubExecutionDeps();
+  const originalApply = statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit;
+  const originalIsEnabled = statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled;
+  const originalGetPolicy = timesheetParametersPolicyModel.getPolicyForOrg;
+  const originalGetEntries = activityService.getTimesheetEntriesForPerson;
+
+  timesheetParametersPolicyModel.getPolicyForOrg = async () => ({
+    statutoryHolidayPay: {
+      enabled: true,
+      schemes: {
+        equilibrium_school: { id: 'equilibrium_school', activityId: 'ACT_EQ' },
+        linc: { id: 'linc', activityId: 'ACT_LINC' }
+      }
+    }
+  });
+  statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled = () => true;
+  statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit = async () => ({
+    rows: [
+      {
+        sessionId: 'stathol-H1-PERSON_1',
+        date: '2026-03-10',
+        hours: 0,
+        timesheetHours: 0,
+        isStatutoryHoliday: true,
+        statHolidayMeta: { holidayId: 'H1', schemeId: 'equilibrium_school', calculatedHours: 0 }
+      },
+      {
+        sessionId: 'stathol-linc-H1-PERSON_1',
+        date: '2026-03-10',
+        hours: 0,
+        timesheetHours: 0,
+        isStatutoryHoliday: true,
+        statHolidayMeta: { holidayId: 'H1', schemeId: 'linc', calculatedHours: 6 }
+      }
+    ],
+    warnings: [],
+    usesActivityMode: true,
+    syncOutcome: { rowCount: 2 },
+    blockingErrors: []
+  });
+  statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries = realMergeStatHolidayRowsIntoEntries;
+  activityService.getTimesheetEntriesForPerson = async () => ([
+    {
+      sessionId: 'act-ACT_EQ-ENT-H1-PERSON_1',
+      activityId: 'ACT_EQ',
+      statHolidaySchemeId: 'equilibrium_school',
+      date: '2026-03-10',
+      statHolidayId: 'H1',
+      hours: 0,
+      timesheetHours: 0,
+      isSchoolActivity: true
+    },
+    {
+      sessionId: 'act-ACT_LINC-ENT-H1-PERSON_1',
+      activityId: 'ACT_LINC',
+      statHolidaySchemeId: 'linc',
+      date: '2026-03-10',
+      statHolidayId: 'H1',
+      hours: 6,
+      timesheetHours: 6,
+      isSchoolActivity: true
+    }
+  ]);
+
+  try {
+    const outcome = await executionService.performImportExecution({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      personRole: 'teacher',
+      compileResult: compileOkResult('PER_A'),
+      batchId: 'BATCH_1',
+      targetStatus: 'submitted',
+      reqUser: REQ_USER
+    });
+    assert.equal(outcome.appliedStatus, 'submitted');
+    assert.equal(outcome.statHolidayBlocked, false);
+    const saved = stub.getCreatedTimesheets()[0];
+    const statHolidayActRows = saved.entries.filter((entry) => entry.statHolidayId === 'H1' && !entry.isStatutoryHoliday);
+    assert.equal(statHolidayActRows.length, 2);
+    assert.ok(statHolidayActRows.some((entry) => entry.activityId === 'ACT_EQ'));
+    assert.ok(statHolidayActRows.some((entry) => entry.activityId === 'ACT_LINC'));
+  } finally {
+    activityService.getTimesheetEntriesForPerson = originalGetEntries;
+    statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit = originalApply;
+    statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled = originalIsEnabled;
+    timesheetParametersPolicyModel.getPolicyForOrg = originalGetPolicy;
+    stub.restore();
+  }
+});
+
+test('performImportExecution falls back to draft when statutory holiday configuration is invalid', async () => {
   const stub = stubExecutionDeps();
   const originalApply = statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit;
   const originalIsEnabled = statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled;
@@ -639,8 +731,8 @@ test('performImportExecution falls back to draft when statutory holiday work ses
     }],
     warnings: [{ holidayId: 'H1', reasons: ['Not qualified'] }],
     usesActivityMode: true,
-    syncOutcome: { blocked: true, missingDayEntries: [{ holidayId: 'H1', date: '2026-01-01', title: "New Year's Day" }] },
-    blockingErrors: ['Missing pre-mapped statutory holiday work session for New Year\'s Day (2026-01-01). Map holiday day work sessions in Settings before submitting.']
+    syncOutcome: { blocked: true, rowCount: 0 },
+    blockingErrors: ['Statutory holiday scheme "LINC Scheme" has no public activity configured. Assign an activity in School Settings before importing.']
   });
   statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries = realMergeStatHolidayRowsIntoEntries;
 
@@ -978,9 +1070,11 @@ test('normalizeStatHolidayOverrideMap treats zero hours as auto-calculate', () =
     { holidayId: 'H1', hours: 0, forcePay: true },
     { holidayId: 'H2', hours: 6, forcePay: true }
   ]);
-  assert.equal(map.H1?.forcePay, true);
-  assert.equal(map.H1?.hours, undefined);
-  assert.equal(map.H2?.hours, 6);
+  const h1Key = 'equilibrium_school|H1';
+  const h2Key = 'equilibrium_school|H2';
+  assert.equal(map[h1Key]?.forcePay, true);
+  assert.equal(map[h1Key]?.hours, undefined);
+  assert.equal(map[h2Key]?.hours, 6);
 });
 
 test('performImportExecution assembles timesheets without manager stat holiday overrides', async () => {
@@ -1027,7 +1121,7 @@ test('performImportExecution assembles timesheets without manager stat holiday o
   }
 });
 
-test('buildImportExecutionPlan blocks when configured statutory activity lacks Jan 1 work sessions', async () => {
+test('buildImportExecutionPlan previews missing Jan 1 shells without blocking import', async () => {
   const stub = stubExecutionDeps();
   const previewStub = stubStatHolidayImportPreviewDeps({
     payActivityId: 'ACT_PAY',
@@ -1041,18 +1135,18 @@ test('buildImportExecutionPlan blocks when configured statutory activity lacks J
       compileResults: [compileJanuaryResult('PER_JAN')],
       reqUser: REQ_USER
     });
-    assert.equal(plan.rows[0].statHolidayPreview.hasBlockingIssues, true);
+    assert.equal(plan.rows[0].statHolidayPreview.hasBlockingIssues, false);
     assert.equal(plan.rows[0].statHolidayPreview.missingDayEntries.length, 1);
     assert.equal(plan.rows[0].statHolidayPreview.missingDayEntries[0].date, '2026-01-01');
     assert.equal(plan.rows[0].statHolidayPreview.activityId, 'ACT_PAY');
-    assert.match(plan.rows[0].statHolidayPreview.blockingErrors[0], /Pay Activity/);
+    assert.equal(plan.rows[0].statHolidayPreview.blockingErrors.length, 0);
   } finally {
     previewStub.restore();
     stub.restore();
   }
 });
 
-test('buildImportExecutionPlan previews blocking statutory holidays when import rows are zero-hour', async () => {
+test('buildImportExecutionPlan previews statutory holidays when import rows are zero-hour without blocking', async () => {
   const stub = stubExecutionDeps();
   const previewStub = stubStatHolidayImportPreviewDeps({
     payActivityId: 'ACT_PAY',
@@ -1065,7 +1159,7 @@ test('buildImportExecutionPlan previews blocking statutory holidays when import 
       compileResults: [compileJanuaryResult('PER_JAN', [{ date: '2026-01-02', className: 'Math', hours: 0 }])],
       reqUser: REQ_USER
     });
-    assert.equal(plan.rows[0].statHolidayPreview.hasBlockingIssues, true);
+    assert.equal(plan.rows[0].statHolidayPreview.hasBlockingIssues, false);
     assert.equal(plan.rows[0].statHolidayPreview.missingDayEntries[0].date, '2026-01-01');
   } finally {
     previewStub.restore();
@@ -1073,7 +1167,7 @@ test('buildImportExecutionPlan previews blocking statutory holidays when import 
   }
 });
 
-test('buildImportExecutionPlan blocks missing work sessions for each configured statutory holiday scheme', async () => {
+test('buildImportExecutionPlan reports missing shells per scheme without blocking import', async () => {
   const stub = stubExecutionDeps();
   const previewStub = stubStatHolidayImportPreviewDeps({
     payActivityId: 'ACT_EQ',
@@ -1099,14 +1193,12 @@ test('buildImportExecutionPlan blocks missing work sessions for each configured 
       reqUser: REQ_USER
     });
     const preview = plan.rows[0].statHolidayPreview;
-    assert.equal(preview.hasBlockingIssues, true);
+    assert.equal(preview.hasBlockingIssues, false);
     assert.equal(preview.hasStatHolidays, true);
-    assert.equal(preview.evaluationCount, 1);
+    assert.equal(preview.evaluationCount, 2);
     assert.equal(preview.payableHolidayCount, 1);
-    assert.equal(preview.missingDayEntries.length, 1);
-    assert.equal(preview.missingDayEntries[0].schemeId, 'linc');
-    assert.match(preview.blockingErrors[0], /LINC Activity/);
-    assert.match(preview.blockingErrors[0], /LINC Scheme/);
+    assert.ok(preview.missingDayEntries.some((row) => row.schemeId === 'linc'));
+    assert.equal(preview.blockingErrors.length, 0);
   } finally {
     previewStub.restore();
     stub.restore();
@@ -1166,6 +1258,59 @@ test('buildImportExecutionPlan warns when mapping activity differs from pay acti
     assert.equal(plan.rows[0].statHolidayPreview.configurationWarnings.length, 1);
     assert.match(plan.rows[0].statHolidayPreview.configurationWarnings[0], /Mapping Activity/);
     assert.match(plan.rows[0].statHolidayPreview.configurationWarnings[0], /Pay Activity/);
+  } finally {
+    previewStub.restore();
+    stub.restore();
+  }
+});
+
+test('buildImportExecutionPlan skips mismatch warning when scheme pay activity already has holiday shells', async () => {
+  const stub = stubExecutionDeps();
+  const previewStub = stubStatHolidayImportPreviewDeps({
+    payActivityId: 'ACT_EQ',
+    mappingActivityId: 'ACT_EQ',
+    payActivityEntries: [{
+      entryId: 'ENT-EQ-0001',
+      date: '2026-01-01',
+      startTime: '08:00',
+      endTime: '20:00',
+      durationHours: 12,
+      status: 'posted',
+      statHolidayId: 'H_NY'
+    }],
+    lincActivityId: 'ACT_LINC',
+    lincActivityEntries: [{
+      entryId: 'ENT-LINC-0001',
+      date: '2026-01-01',
+      startTime: '08:00',
+      endTime: '20:00',
+      durationHours: 12,
+      status: 'posted',
+      statHolidayId: 'H_NY'
+    }],
+    statutoryHolidayPolicy: {
+      statutoryHolidayPay: {
+        enabled: true,
+        activityId: 'ACT_EQ',
+        mappingActivityId: 'ACT_EQ',
+        defaultSchemeId: 'equilibrium_school',
+        schemes: {
+          equilibrium_school: { id: 'equilibrium_school', name: 'Equilibrium School Scheme', activityId: 'ACT_EQ' },
+          linc: { id: 'linc', name: 'LINC Scheme', activityId: 'ACT_LINC', hourMode: 'most_recent' }
+        },
+        departmentSchemeAssignments: {},
+        payableHolidayTypes: ['National Holiday']
+      }
+    }
+  });
+  try {
+    const plan = await executionService.buildImportExecutionPlan({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      compileResults: [compileJanuaryResult('PER_JAN')],
+      reqUser: REQ_USER
+    });
+    assert.equal(plan.rows[0].statHolidayPreview.configurationWarnings.length, 0);
   } finally {
     previewStub.restore();
     stub.restore();

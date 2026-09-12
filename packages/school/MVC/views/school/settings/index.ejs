@@ -1506,6 +1506,13 @@
                         <input class="form-control form-control-sm" type="number" min="1" max="52" id="schemeAverageWeeks_linc" name="schemeAverageWeeks_linc" value="<%= Number(lincScheme.averageWeeks || 4) %>" <%= canUpdateFlag ? '' : 'disabled' %>>
                       </div>
                     </div>
+                    <div class="mt-3">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="schemeDisqualifyOnLeaveBeforeAfter_linc" name="schemeDisqualifyOnLeaveBeforeAfter_linc" value="true" <%= lincScheme.disqualifyOnLeaveBeforeAfter === true ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                        <label class="form-check-label" for="schemeDisqualifyOnLeaveBeforeAfter_linc">Before and after — check approved leave on boundary workdays</label>
+                      </div>
+                      <div class="form-text">When active, disqualifies LINC statutory holiday pay when approved leave falls on the last or first adjacent payable workday.</div>
+                    </div>
                     <div class="d-none" id="lincHourModeHelpMostRecent">
                       <p class="mb-2">Uses payable work sessions on the timesheet being processed. Only departments assigned to the LINC scheme are included.</p>
                       <ul>
@@ -2849,7 +2856,8 @@
       schemeActivityId_linc: document.getElementById('schemeActivityId_linc')?.value || '',
       schemeHourMode_linc: document.querySelector('input[name="schemeHourMode_linc"]:checked')?.value || 'most_recent',
       schemeFixedHours_linc: document.getElementById('schemeFixedHours_linc')?.value || '0',
-      schemeAverageWeeks_linc: document.getElementById('schemeAverageWeeks_linc')?.value || '4'
+      schemeAverageWeeks_linc: document.getElementById('schemeAverageWeeks_linc')?.value || '4',
+      schemeDisqualifyOnLeaveBeforeAfter_linc: document.getElementById('schemeDisqualifyOnLeaveBeforeAfter_linc')?.checked ? 'true' : 'false'
     };
     document.querySelectorAll('select[name^="departmentSchemeAssignment_"]').forEach((selectEl) => {
       const match = /^departmentSchemeAssignment_(.+)$/.exec(String(selectEl.name || ''));
@@ -2893,6 +2901,10 @@
     const averageWeeksInput = document.getElementById('schemeAverageWeeks_linc');
     if (fixedHoursInput) fixedHoursInput.value = String(savedLincScheme.fixedHours ?? '0');
     if (averageWeeksInput) averageWeeksInput.value = String(savedLincScheme.averageWeeks ?? '4');
+    const lincBoundaryLeaveInput = document.getElementById('schemeDisqualifyOnLeaveBeforeAfter_linc');
+    if (lincBoundaryLeaveInput) {
+      lincBoundaryLeaveInput.checked = savedLincScheme.disqualifyOnLeaveBeforeAfter === true;
+    }
     document.querySelectorAll('select[name^="departmentSchemeAssignment_"]').forEach((selectEl) => {
       const match = /^departmentSchemeAssignment_(.+)$/.exec(String(selectEl.name || ''));
       if (!match) return;

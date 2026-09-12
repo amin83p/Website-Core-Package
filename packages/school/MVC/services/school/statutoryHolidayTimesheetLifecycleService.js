@@ -4,6 +4,7 @@ const activityService = require('./activityService');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 const schoolDependencyService = require('./schoolDependencyService');
 const statutoryHolidayEligibilityService = require('./statutoryHolidayEligibilityService');
+const statutoryHolidaySchemeService = require('./statutoryHolidaySchemeService');
 const statutoryHolidayWorkSessionService = require('./statutoryHolidayWorkSessionService');
 const timesheetParametersPolicyService = require('./timesheetParametersPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -65,8 +66,9 @@ function mergeStatHolidayRowsIntoEntries({
 async function assertStatHolidayPayConfigured({ orgId, policy, reqUser } = {}) {
   const resolved = timesheetParametersPolicyService.resolvePolicy(policy);
   if (!isStatHolidayPayEnabled(resolved)) return resolved;
-  const activityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(resolved);
-  if (!activityId) {
+  const activityIds = statutoryHolidaySchemeService.resolveAllSchemeActivityIds(resolved);
+  const defaultActivityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(resolved);
+  if (!activityIds.length && !defaultActivityId) {
     const error = new Error(
       'Statutory holiday pay requires a public statutory holiday activity. Configure one in School Settings before submitting timesheets.'
     );
@@ -81,11 +83,14 @@ async function assertStatHolidayPayConfigured({ orgId, policy, reqUser } = {}) {
     throw error;
   }
   const timesheetLegacyImportService = require('./timesheetLegacyImportService');
-  await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
-    orgId,
-    reqUser,
-    activityId
-  });
+  const idsToValidate = activityIds.length ? activityIds : [defaultActivityId];
+  for (const activityId of idsToValidate) {
+    await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
+      orgId,
+      reqUser,
+      activityId
+    });
+  }
   return resolved;
 }
 
@@ -166,25 +171,29 @@ async function clearStatHolidayForReturnedTimesheet({
   if (!isStatHolidayPayEnabled(resolved)) {
     return { entries: nextEntries, removedAssignees: 0 };
   }
-  const activityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(resolved);
-  if (!activityId || !cleanId(personId) || !cleanId(period?.id)) {
+  if (!cleanId(personId) || !cleanId(period?.id)) {
     return { entries: nextEntries, removedAssignees: 0 };
   }
-  const outcome = await statutoryHolidayWorkSessionService.removeStatHolidayWorkSessionsForTarget({
-    activityId,
-    personId,
-    periodId: period.id,
-    periodStartDate: period.startDate,
-    periodEndDate: period.endDate,
-    reqUser
-  });
-  await statutoryHolidayWorkSessionService.clearStatHolidayActivityLevelAttendees({
-    activityId,
-    reqUser
-  });
+  const activityIds = statutoryHolidaySchemeService.resolveAllSchemeActivityIds(resolved);
+  let removedAssignees = 0;
+  for (const activityId of activityIds) {
+    const outcome = await statutoryHolidayWorkSessionService.removeStatHolidayWorkSessionsForTarget({
+      activityId,
+      personId,
+      periodId: period.id,
+      periodStartDate: period.startDate,
+      periodEndDate: period.endDate,
+      reqUser
+    });
+    removedAssignees += Number(outcome?.removedAssignees || 0);
+    await statutoryHolidayWorkSessionService.clearStatHolidayActivityLevelAttendees({
+      activityId,
+      reqUser
+    });
+  }
   return {
     entries: nextEntries,
-    removedAssignees: Number(outcome?.removedAssignees || 0)
+    removedAssignees
   };
 }
 
@@ -219,31 +228,33 @@ async function collectStatHolidayAssigneeLocks({
   period = {},
   reqUser
 } = {}) {
-  const activityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(policy);
   const targetPersonId = cleanId(personId);
   const targetPeriodId = cleanId(period?.id);
-  if (!activityId || !targetPersonId || !targetPeriodId) {
-    return { activityId: '', locks: [] };
+  if (!targetPersonId || !targetPeriodId) {
+    return { activityIds: [], locks: [] };
   }
 
-  const activity = await activityService.getActivity(activityId, reqUser);
-  if (!activity || !idsEqual(activity.orgId, orgId)) {
-    return { activityId: '', locks: [] };
-  }
-
+  const activityIds = statutoryHolidaySchemeService.resolveAllSchemeActivityIds(policy);
   const locks = [];
-  activityService.getActivityEntries(activity).forEach((entry) => {
-    const entryId = cleanId(entry?.entryId);
-    if (!entryId) return;
-    activityService.normalizeActivityAssigneeRows(entry.assignees).forEach((assignee) => {
-      if (!idsEqual(assignee?.statHolidayPersonId, targetPersonId)) return;
-      if (cleanId(assignee?.statHolidayPeriodId) && !idsEqual(assignee.statHolidayPeriodId, targetPeriodId)) return;
-      if (!cleanId(assignee?.statHolidayId)) return;
-      locks.push({ entryId, personId: targetPersonId });
-    });
-  });
+  const resolvedActivityIds = [];
 
-  return { activityId, locks };
+  for (const activityId of activityIds) {
+    const activity = await activityService.getActivity(activityId, reqUser);
+    if (!activity || !idsEqual(activity.orgId, orgId)) continue;
+    resolvedActivityIds.push(activityId);
+    activityService.getActivityEntries(activity).forEach((entry) => {
+      const entryId = cleanId(entry?.entryId);
+      if (!entryId) return;
+      activityService.normalizeActivityAssigneeRows(entry.assignees).forEach((assignee) => {
+        if (!idsEqual(assignee?.statHolidayPersonId, targetPersonId)) return;
+        if (cleanId(assignee?.statHolidayPeriodId) && !idsEqual(assignee.statHolidayPeriodId, targetPeriodId)) return;
+        if (!cleanId(assignee?.statHolidayId)) return;
+        locks.push({ activityId, entryId, personId: targetPersonId });
+      });
+    });
+  }
+
+  return { activityIds: resolvedActivityIds, locks };
 }
 
 async function lockStatHolidayAssigneesForTimesheet({
@@ -255,27 +266,47 @@ async function lockStatHolidayAssigneesForTimesheet({
   reqUser
 } = {}) {
   if (!isStatHolidayPayEnabled(policy)) return { lockedSourceRefs: [] };
-  const { activityId, locks } = await collectStatHolidayAssigneeLocks({
+  const { locks } = await collectStatHolidayAssigneeLocks({
     orgId,
     policy,
     personId,
     period,
     reqUser
   });
-  if (!activityId || !locks.length || !cleanId(timesheetId)) return { lockedSourceRefs: [] };
-  const summary = await schoolDependencyService.lockActivityAssignees({
-    activityId,
-    locks,
-    timesheetId,
-    reqUser
+  if (!locks.length || !cleanId(timesheetId)) return { lockedSourceRefs: [] };
+
+  const lockedSourceRefs = [];
+  const summaries = [];
+  const locksByActivity = new Map();
+  locks.forEach((lock) => {
+    const activityId = cleanId(lock?.activityId);
+    if (!activityId) return;
+    if (!locksByActivity.has(activityId)) locksByActivity.set(activityId, []);
+    locksByActivity.get(activityId).push({
+      entryId: lock.entryId,
+      personId: lock.personId
+    });
   });
-  const lockedSourceRefs = locks.map((lock) => ({
-    type: 'activity',
-    activityId,
-    activityEntryId: lock.entryId,
-    personId: lock.personId
-  }));
-  return { lockedSourceRefs, summary };
+
+  for (const [activityId, activityLocks] of locksByActivity.entries()) {
+    const summary = await schoolDependencyService.lockActivityAssignees({
+      activityId,
+      locks: activityLocks,
+      timesheetId,
+      reqUser
+    });
+    summaries.push(summary);
+    activityLocks.forEach((lock) => {
+      lockedSourceRefs.push({
+        type: 'activity',
+        activityId,
+        activityEntryId: lock.entryId,
+        personId: lock.personId
+      });
+    });
+  }
+
+  return { lockedSourceRefs, summary: summaries };
 }
 
 module.exports = {

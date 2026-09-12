@@ -180,7 +180,8 @@ async function resolveStatHolidayMissingDayEntries({
   allowManagerOverride = false,
   personId = '',
   orgId,
-  reqUser
+  reqUser,
+  activeSchemes = []
 } = {}) {
   const evaluationRows = Array.isArray(evaluations) ? evaluations : [];
   if (!evaluationRows.length) {
@@ -194,7 +195,11 @@ async function resolveStatHolidayMissingDayEntries({
     };
   }
 
-  const schemesInUse = statutoryHolidaySchemeService.resolveSchemesWithAssignedDepartments(policy);
+  const activeSchemeSet = new Set(
+    (Array.isArray(activeSchemes) ? activeSchemes : []).map((schemeId) => cleanId(schemeId)).filter(Boolean)
+  );
+  const schemesInUse = statutoryHolidaySchemeService.resolveSchemesWithAssignedDepartments(policy)
+    .filter(({ schemeId }) => !activeSchemeSet.size || activeSchemeSet.has(cleanId(schemeId)));
   const schemeOutcomes = [];
   const missingDayEntries = [];
   const blockingErrors = [];
@@ -226,10 +231,12 @@ async function resolveStatHolidayMissingDayEntries({
         activityId
       });
       const activityTitle = String(activity?.title || '').trim();
-      const schemePayItems = evaluationRows.map((evaluation) => ({
-        evaluation,
-        schemeId
-      }));
+      const schemePayItems = evaluationRows
+        .filter((evaluation) => cleanId(evaluation?.schemeId) === cleanId(schemeId))
+        .map((evaluation) => ({
+          evaluation,
+          schemeId
+        }));
       const schemeMissing = collectMissingStatHolidayDayEntries(
         activityService.getActivityEntries(activity),
         schemePayItems
@@ -252,29 +259,9 @@ async function resolveStatHolidayMissingDayEntries({
       }
       if (schemeMissing.length) {
         missingDayEntries.push(...schemeMissing);
-        blockingErrors.push(
-          ...buildStatHolidayBlockingErrors(
-            schemeMissing,
-            `${activityTitle} (${schemeName})`
-          )
-        );
       }
     } catch (error) {
-      const fallbackMissing = evaluationRows.map((evaluation) => ({
-        holidayId: cleanId(evaluation?.holidayId),
-        date: cleanId(evaluation?.date),
-        title: String(evaluation?.title || evaluation?.holidayId || 'Statutory holiday').trim(),
-        schemeId,
-        schemeName
-      })).filter((row) => row.holidayId && row.date);
-      missingDayEntries.push(...fallbackMissing);
-      if (fallbackMissing.length) {
-        blockingErrors.push(
-          ...buildStatHolidayBlockingErrors(fallbackMissing, schemeName)
-        );
-      } else {
-        blockingErrors.push(String(error?.message || 'Unable to resolve statutory holiday activity.'));
-      }
+      blockingErrors.push(String(error?.message || 'Unable to resolve statutory holiday activity.'));
     }
   }
 
@@ -295,6 +282,94 @@ function normalizeStatHolidayDayEntryShape(entry = {}, holidayId = '') {
     startTime: entry.startTime || STAT_HOLIDAY_DAY_START,
     endTime: entry.endTime || STAT_HOLIDAY_DAY_END,
     durationHours: STAT_HOLIDAY_DAY_DURATION_HOURS
+  };
+}
+
+function assignStatHolidayDayEntryIds(activityId, existingEntries = [], drafts = []) {
+  const sequences = (Array.isArray(existingEntries) ? existingEntries : [])
+    .map((row) => activityEntryIdService.parseEntryId(row?.entryId))
+    .filter(Boolean)
+    .map((parsed) => Number(parsed.sequence || 0))
+    .filter((value) => Number.isFinite(value));
+  let nextSequence = sequences.length ? Math.max(...sequences) : 0;
+  return (Array.isArray(drafts) ? drafts : []).map((draft) => {
+    nextSequence += 1;
+    return {
+      ...draft,
+      entryId: activityEntryIdService.buildEntryId(activityId, nextSequence)
+    };
+  });
+}
+
+async function ensureStatHolidayDayEntriesForPayItems({
+  activity,
+  payItems = [],
+  reqUser
+} = {}) {
+  const activityId = cleanId(activity?.id);
+  if (!activityId) {
+    return { activity, createdEntryIds: [], changed: false };
+  }
+
+  let workingEntries = [...activityService.getActivityEntries(activity)];
+  const drafts = [];
+  const stampByEntryId = new Map();
+  const seen = new Set();
+
+  (Array.isArray(payItems) ? payItems : []).forEach((item) => {
+    const evaluation = item?.evaluation || {};
+    const holidayId = cleanId(evaluation?.holidayId);
+    const date = cleanId(evaluation?.date);
+    const title = String(evaluation?.title || evaluation?.holidayId || 'Statutory holiday').trim();
+    if (!holidayId || !date) return;
+    const key = `${holidayId}|${date}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const existing = findStatHolidayDayEntry(workingEntries, { holidayId, date });
+    if (existing) {
+      const entryId = cleanId(existing?.entryId);
+      if (entryId && cleanId(existing.statHolidayId) !== holidayId) {
+        stampByEntryId.set(entryId, {
+          ...existing,
+          statHolidayId: holidayId,
+          notes: String(existing.notes || 'Statutory holiday').trim() || 'Statutory holiday'
+        });
+      }
+      return;
+    }
+
+    const draft = statutoryHolidayDayMappingService.buildStatHolidayDayEntryDraft({
+      id: holidayId,
+      date,
+      title
+    });
+    if (draft) drafts.push(draft);
+  });
+
+  const hasEntryChanges = drafts.length > 0 || stampByEntryId.size > 0;
+  if (!hasEntryChanges) {
+    return { activity, createdEntryIds: [], changed: false };
+  }
+
+  const entriesWithIds = assignStatHolidayDayEntryIds(activityId, workingEntries, drafts);
+  const combinedEntries = [...workingEntries, ...entriesWithIds].map((entry) => {
+    const entryId = cleanId(entry?.entryId);
+    return entryId && stampByEntryId.has(entryId) ? stampByEntryId.get(entryId) : entry;
+  });
+
+  await timesheetImportWorkSessionBuilderService.persistImportActivityEntryUpdates(
+    activity,
+    combinedEntries,
+    reqUser,
+    { preserveActivityAttendees: true }
+  );
+
+  const refreshedActivity = await activityService.getActivity(activityId, reqUser);
+  return {
+    activity: refreshedActivity || activity,
+    createdEntryIds: entriesWithIds.map((row) => cleanId(row.entryId)).filter(Boolean),
+    changed: true
   };
 }
 
@@ -823,9 +898,10 @@ async function materializeStatHolidayForPersonPeriod({
     allowManagerOverride,
     personId,
     orgId,
-    reqUser
+    reqUser,
+    activeSchemes: context.activeSchemes
   });
-  if (missingDayOutcome.missingDayEntries.length || missingDayOutcome.blockingErrors.length) {
+  if (missingDayOutcome.blockingErrors.length) {
     return {
       ...context,
       syncOutcome: {
@@ -843,7 +919,17 @@ async function materializeStatHolidayForPersonPeriod({
 
   const canPersistToActivity = shouldPersistStatHolidayToSharedActivity(period, persistToActivity);
   if (!canPersistToActivity) {
-    return { ...context, syncOutcome: null, syncOutcomes: [], blockingErrors: [] };
+    return {
+      ...context,
+      syncOutcome: {
+        activityId: missingDayOutcome.activityId,
+        missingDayEntries: missingDayOutcome.missingDayEntries,
+        schemeOutcomes: missingDayOutcome.schemeOutcomes,
+        blocked: false
+      },
+      syncOutcomes: missingDayOutcome.schemeOutcomes || [],
+      blockingErrors: missingDayOutcome.blockingErrors
+    };
   }
 
   const existingBySchemeHoliday = statutoryHolidayEligibilityService.buildOverrideLookup(
@@ -869,13 +955,18 @@ async function materializeStatHolidayForPersonPeriod({
         reqUser,
         activityId
       });
+    const ensureOutcome = await ensureStatHolidayDayEntriesForPayItems({
+      activity,
+      payItems: schemePayItems,
+      reqUser
+    });
     const syncOutcome = await syncStatHolidayWorkSessionsForPersonPeriod({
       orgId,
       personId,
       personName,
       personRole,
       period,
-      activity,
+      activity: ensureOutcome.activity || activity,
       payItems: schemePayItems,
       reqUser
     });
@@ -914,6 +1005,7 @@ module.exports = {
   collectMissingStatHolidayDayEntries,
   buildStatHolidayBlockingErrors,
   resolveStatHolidayMissingDayEntries,
+  ensureStatHolidayDayEntriesForPayItems,
   assigneeHasStatHolidayStamp,
   stripStatHolidayAssigneesFromEntries,
   removeStatHolidayTargetFromEntries,

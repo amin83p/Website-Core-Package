@@ -99,7 +99,6 @@ function enrichLiveSessionsWithStatHolidayMeta(sessions = [], statHolidayRows = 
             || 'equilibrium_school';
         if (!holidayId || !date || !row?.statHolidayMeta?.checks) return;
         metaByAssigneeKey.set(`${schemeId}|${holidayId}|${date}`, row.statHolidayMeta);
-        metaByAssigneeKey.set(`${holidayId}|${date}`, row.statHolidayMeta);
     });
     return (Array.isArray(sessions) ? sessions : []).map((session) => {
         if (session?.statHolidayMeta?.checks) return session;
@@ -108,8 +107,7 @@ function enrichLiveSessionsWithStatHolidayMeta(sessions = [], statHolidayRows = 
         if (!holidayId || !date) return session;
         const schemeId = String(session?.statHolidaySchemeId || session?.statHolidayMeta?.schemeId || 'equilibrium_school').trim()
             || 'equilibrium_school';
-        const meta = metaByAssigneeKey.get(`${schemeId}|${holidayId}|${date}`)
-            || metaByAssigneeKey.get(`${holidayId}|${date}`);
+        const meta = metaByAssigneeKey.get(`${schemeId}|${holidayId}|${date}`);
         if (!meta?.checks) return session;
         return {
             ...session,

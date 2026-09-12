@@ -195,6 +195,35 @@ function summarizeDisqualifyReasons(checks = {}) {
 
 const WEEKDAY_NAMES = Object.freeze(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
 
+function buildLeaveBeforeAfterCheck({
+  date,
+  workdayHistory,
+  leaveDates = new Set(),
+  beforeAfterSearchDays = 14,
+  enforce = true
+} = {}) {
+  const hasLeaveOnDate = (targetDate) => {
+    const token = String(targetDate || '').trim();
+    return token ? leaveDates.has(token) : false;
+  };
+  const beforeDate = workdayHistory.lastWorkdayBefore(date, beforeAfterSearchDays);
+  const afterDate = workdayHistory.firstWorkdayAfter(date, beforeAfterSearchDays);
+  const leaveBeforeAfterIds = [];
+  if (beforeDate && hasLeaveOnDate(beforeDate)) leaveBeforeAfterIds.push(beforeDate);
+  if (afterDate && hasLeaveOnDate(afterDate)) leaveBeforeAfterIds.push(afterDate);
+  const boundariesResolved = Boolean(beforeDate) && Boolean(afterDate);
+  const pass = !enforce || (boundariesResolved && leaveBeforeAfterIds.length === 0);
+  return {
+    pass,
+    beforeDate,
+    afterDate,
+    leaveDates: leaveBeforeAfterIds,
+    boundariesResolved,
+    missingBeforeBoundary: !beforeDate,
+    missingAfterBoundary: !afterDate
+  };
+}
+
 function evaluateHolidayEligibility({
   holiday,
   policy,
@@ -243,14 +272,14 @@ function evaluateHolidayEligibility({
   const enforceWeekLeaveRule = statPolicy.disqualifyOnLeaveDuringHolidayWeek === true;
   const leaveDuringHolidayWeekPass = !enforceWeekLeaveRule || leaveDuringWeekIds.length === 0;
 
-  const beforeDate = workdayHistory.lastWorkdayBefore(date, statPolicy.beforeAfterSearchDays);
-  const afterDate = workdayHistory.firstWorkdayAfter(date, statPolicy.beforeAfterSearchDays);
-  const leaveBeforeAfterIds = [];
-  if (beforeDate && hasLeaveOnDate(beforeDate)) leaveBeforeAfterIds.push(beforeDate);
-  if (afterDate && hasLeaveOnDate(afterDate)) leaveBeforeAfterIds.push(afterDate);
-  const boundariesResolved = Boolean(beforeDate) && Boolean(afterDate);
-  const leaveBeforeAfterPass = !statPolicy.disqualifyOnLeaveBeforeAfter
-    || (boundariesResolved && leaveBeforeAfterIds.length === 0);
+  const leaveBeforeAfter = buildLeaveBeforeAfterCheck({
+    date,
+    workdayHistory,
+    leaveDates,
+    beforeAfterSearchDays: statPolicy.beforeAfterSearchDays,
+    enforce: statPolicy.disqualifyOnLeaveBeforeAfter
+  });
+  const leaveBeforeAfterPass = leaveBeforeAfter.pass;
 
   const earningsEnd = addDays(date, -1);
   const earningsStart = addDays(earningsEnd, -(statPolicy.earningsLookbackWeeks * 7 - 1));
@@ -290,12 +319,12 @@ function evaluateHolidayEligibility({
     } : undefined,
     leaveBeforeAfter: {
       pass: leaveBeforeAfterPass,
-      beforeDate,
-      afterDate,
-      leaveDates: leaveBeforeAfterIds,
-      boundariesResolved,
-      missingBeforeBoundary: !beforeDate,
-      missingAfterBoundary: !afterDate
+      beforeDate: leaveBeforeAfter.beforeDate,
+      afterDate: leaveBeforeAfter.afterDate,
+      leaveDates: leaveBeforeAfter.leaveDates,
+      boundariesResolved: leaveBeforeAfter.boundariesResolved,
+      missingBeforeBoundary: leaveBeforeAfter.missingBeforeBoundary,
+      missingAfterBoundary: leaveBeforeAfter.missingAfterBoundary
     },
     calculatedHours: {
       pass: calculatedHoursPass,
@@ -555,11 +584,24 @@ function buildStatHolidayPayItems({
     }));
 
   return sourceRows.map((item) => {
-    const evaluation = item?.evaluation || item;
+    const rawEvaluation = item?.evaluation || item;
     const schemeId = cleanId(item?.schemeId)
       || cleanId(item?.statHolidayMeta?.schemeId)
+      || cleanId(rawEvaluation?.statHolidayMeta?.schemeId)
       || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM;
-    const holidayId = cleanId(evaluation?.holidayId);
+    const holidayId = cleanId(rawEvaluation?.holidayId)
+      || cleanId(rawEvaluation?.statHolidayMeta?.holidayId)
+      || cleanId(item?.statHolidayMeta?.holidayId);
+    const evaluation = {
+      ...rawEvaluation,
+      holidayId,
+      title: String(
+        rawEvaluation?.title
+        || rawEvaluation?.className
+        || rawEvaluation?.statHolidayMeta?.holidayName
+        || holidayId
+      ).trim()
+    };
     const lookupKey = statutoryHolidaySchemeService.buildStatHolidayOverrideKey(schemeId, holidayId);
     const legacyKey = cleanId(holidayId);
     const existingEntry = overrideLookup.get(lookupKey)
@@ -568,19 +610,29 @@ function buildStatHolidayPayItems({
       || null;
     const schemeCalculatedHours = Number.isFinite(Number(item?.calculatedHours))
       ? Number(item.calculatedHours)
-      : Number(item?.statHolidayMeta?.calculatedHours ?? evaluation?.calculatedHours);
+      : Number(
+        item?.statHolidayMeta?.calculatedHours
+        ?? evaluation?.statHolidayMeta?.calculatedHours
+        ?? evaluation?.calculatedHours
+        ?? evaluation?.hours
+      );
     const payResolution = resolveStatHolidayPayHours({
       evaluation,
       existingEntry,
       allowManagerOverride,
       schemeCalculatedHours
     });
+    const payableHours = payResolution.shouldPay
+      ? payResolution.hours
+      : (String(evaluation?.status || '') === 'stat_holiday'
+        ? Number(Number(evaluation?.hours || schemeCalculatedHours || 0).toFixed(2))
+        : 0);
     return {
       evaluation,
       schemeId,
       existingEntry,
       payResolution,
-      hours: payResolution.shouldPay ? payResolution.hours : 0
+      hours: payableHours
     };
   });
 }
@@ -618,193 +670,27 @@ function assemblePeriodWorkdayEntries(existingEntries = [], liveSessions = []) {
     if (!entry || entry.isDeleted === true || entry.isStatutoryHoliday === true) return false;
     if (isStatHolidayActivitySupplementalEntry(entry)) return false;
     if (entry.isManual === true) return true;
-    return timesheetLegacyImportService.isLegacyImportEntry(entry);
+    if (timesheetLegacyImportService.isLegacyImportEntry(entry)) return true;
+    return isPayableWorkdayEntry(entry);
   });
+  const seenSessionIds = new Set(
+    savedRows
+      .map((entry) => String(entry?.sessionId || '').trim())
+      .filter(Boolean)
+  );
   const autoRows = live.filter((entry) => {
     const sessionId = String(entry?.sessionId || '').trim();
     if (!sessionId || deletedAutoSessionIds.has(sessionId)) return false;
+    if (seenSessionIds.has(sessionId)) return false;
     if (isStatHolidayActivitySupplementalEntry(entry)) return false;
     return true;
   });
   return [...savedRows, ...autoRows];
 }
 
-async function buildStatutoryHolidayTimesheetContext({
-  orgId,
-  personId,
-  periodStartDate,
-  periodEndDate,
-  policy,
-  holidays = [],
-  periodEntries = [],
-  supplementalEntries = [],
-  supplementalEntryFilter = null,
-  existingEntries = [],
-  reqUser,
-  allowManagerOverride = false,
-  overrideMap = null
-} = {}) {
-  const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(policy);
-  const statPolicy = resolvedPolicy.statutoryHolidayPay;
-  if (!statPolicy?.enabled) {
-    return { rows: [], warnings: [], evaluations: [], usesActivityMode: false, activityId: '' };
-  }
-
-  const activityId = resolveStatHolidayActivityId(resolvedPolicy);
-
-  const payableHolidays = (Array.isArray(holidays) ? holidays : [])
-    .filter((holiday) => {
-      const date = resolveHolidayDate(holiday);
-      return date
-        && date >= String(periodStartDate || '')
-        && date <= String(periodEndDate || '')
-        && isPayableHoliday(holiday, statPolicy.payableHolidayTypes);
-    });
-
-  if (!payableHolidays.length) {
-    return { rows: [], warnings: [], evaluations: [], usesActivityMode: Boolean(activityId), activityId };
-  }
-
-  const maxHolidayDate = payableHolidays
-    .map((holiday) => resolveHolidayDate(holiday))
-    .sort()
-    .pop();
-  const lookbackDays = Math.max(
-    statPolicy.minWorkdays * 3,
-    statPolicy.beforeAfterSearchDays + 30,
-    statPolicy.earningsLookbackWeeks * 7 + 14,
-    statPolicy.weekdayOccurrencesLookback * 7 + 14
-  );
-
-  const leaveEvents = await leaveRequestService.getApprovedLeaveEventsForPerson({
-    orgId,
-    personId,
-    startDate: addDays(periodStartDate, -lookbackDays),
-    endDate: addDays(periodEndDate, statPolicy.beforeAfterSearchDays + 7),
-    reqUser
-  });
-  const leaveDates = new Set(
-    (Array.isArray(leaveEvents) ? leaveEvents : [])
-      .map((event) => String(event?.date || '').trim())
-      .filter(Boolean)
-  );
-
-  const filteredSupplementalEntries = (Array.isArray(supplementalEntries) ? supplementalEntries : [])
-    .filter((entry) => typeof supplementalEntryFilter !== 'function' || supplementalEntryFilter(entry));
-  const filteredPeriodEntries = (Array.isArray(periodEntries) ? periodEntries : [])
-    .filter((entry) => typeof supplementalEntryFilter !== 'function' || supplementalEntryFilter(entry));
-  const workdaySourceEntries = mergeWorkdaySourceEntries(filteredPeriodEntries, filteredSupplementalEntries);
-  const historyEndDate = addDays(
-    [String(periodEndDate || '').trim(), maxHolidayDate].filter(Boolean).sort().pop(),
-    statPolicy.beforeAfterSearchDays + 7
-  );
-
-  const workdayHistory = await buildWorkdayHistory({
-    orgId,
-    personId,
-    endDate: historyEndDate,
-    lookbackDays,
-    useFullHistory: true,
-    reqUser,
-    supplementalEntries: workdaySourceEntries
-  });
-
-  const supplementalHoursByDate = buildSupplementalHoursByDate(workdaySourceEntries);
-  const existingBySessionId = new Map(
-    (Array.isArray(existingEntries) ? existingEntries : [])
-      .filter((entry) => entry && entry.isDeleted !== true)
-      .map((entry) => [String(entry?.sessionId || '').trim(), entry])
-      .filter(([sessionId]) => Boolean(sessionId))
-  );
-  const existingBySchemeHoliday = buildOverrideLookup(existingEntries, overrideMap, { personId });
-  const activeSchemes = statutoryHolidaySchemeService.resolveActiveSchemesForPerson({
-    workdayEntries: workdaySourceEntries,
-    existingEntries,
-    policy: resolvedPolicy
-  });
-
-  const rows = [];
-  const warnings = [];
-  const evaluations = [];
-  const seenWarningKeys = new Set();
-
-  payableHolidays.forEach((holiday) => {
-    const evaluation = evaluateHolidayEligibility({
-      holiday,
-      policy: resolvedPolicy,
-      workdayHistory,
-      leaveDates,
-      supplementalHoursByDate
-    });
-    evaluations.push(evaluation);
-
-    activeSchemes.forEach((schemeId) => {
-      const schemeResult = statutoryHolidaySchemeService.calculateSchemeHours({
-        schemeId,
-        holidayDate: evaluation.date,
-        workdayEntries: workdaySourceEntries,
-        policy: resolvedPolicy
-      });
-      const lookupKey = statutoryHolidaySchemeService.buildStatHolidayOverrideKey(
-        schemeId,
-        evaluation.holidayId
-      );
-      const sessionId = buildStatHolidaySessionId(evaluation.holidayId, personId, schemeId);
-      const existingEntry = existingBySchemeHoliday.get(lookupKey)
-        || existingBySessionId.get(sessionId)
-        || null;
-      const hasOverride = Boolean(existingEntry?.statHolidayOverride);
-      const row = buildStatHolidayRow({
-        evaluation,
-        personId,
-        existingEntry,
-        allowManagerOverride,
-        schemeId,
-        schemeResult
-      });
-      const warningKey = statutoryHolidaySchemeService.buildStatHolidayOverrideKey(schemeId, evaluation.holidayId);
-      if (Number(schemeResult.calculatedHours) <= 0 && !hasOverride && !existingEntry) {
-        if (!seenWarningKeys.has(warningKey)) {
-          const warning = buildStatHolidayWarning({
-            evaluation,
-            existingEntry,
-            allowManagerOverride,
-            schemeId,
-            schemeResult
-          });
-          if (warning) warnings.push(warning);
-          seenWarningKeys.add(warningKey);
-        }
-        return;
-      }
-      rows.push(row);
-      if (!seenWarningKeys.has(warningKey)) {
-        const warning = buildStatHolidayWarning({
-          evaluation,
-          existingEntry,
-          allowManagerOverride,
-          schemeId,
-          schemeResult
-        });
-        if (warning) {
-          warnings.push(warning);
-          seenWarningKeys.add(warningKey);
-        }
-      }
-    });
-  });
-
-  const schemeActivityIds = statutoryHolidaySchemeService.resolveAllSchemeActivityIds(resolvedPolicy);
-
-  return {
-    rows,
-    warnings,
-    evaluations,
-    usesActivityMode: schemeActivityIds.length > 0 || Boolean(activityId),
-    activityId,
-    schemeActivityIds,
-    activeSchemes
-  };
+async function buildStatutoryHolidayTimesheetContext(ctx = {}) {
+  const statutoryHolidayCalculationService = require('./statutoryHolidayCalculationService');
+  return statutoryHolidayCalculationService.calculateStatutoryHolidayForPeriod(ctx);
 }
 
 function buildStatHolidayMetadataRowsFromEvaluations({
@@ -828,10 +714,16 @@ function buildStatHolidayMetadataRowsFromEvaluations({
     if (!holidayId || !date || seen.has(dedupeKey)) return;
     seen.add(dedupeKey);
 
+    const resolveEvaluationSchemeId = (row = {}) => (
+      cleanId(row?.schemeId) || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM
+    );
     const evaluation = (Array.isArray(evaluations) ? evaluations : []).find((row) => (
-      String(row?.holidayId || '').trim() === holidayId && String(row?.date || '').trim() === date
+      resolveEvaluationSchemeId(row) === schemeId
+      && String(row?.holidayId || '').trim() === holidayId
+      && String(row?.date || '').trim() === date
     )) || (Array.isArray(evaluations) ? evaluations : []).find((row) => (
-      String(row?.holidayId || '').trim() === holidayId
+      resolveEvaluationSchemeId(row) === schemeId
+      && String(row?.holidayId || '').trim() === holidayId
     ));
     if (!evaluation?.checks) return;
 
@@ -1012,6 +904,7 @@ module.exports = {
   buildStatHolidayPayItems,
   buildOverrideLookup,
   evaluateHolidayEligibility,
+  buildLeaveBeforeAfterCheck,
   buildStatutoryHolidayTimesheetContext,
   buildStatHolidayMetadataRowsFromEvaluations,
   buildStatHolidayMetadataRowsForActivitySessions,
@@ -1021,5 +914,7 @@ module.exports = {
   resolveStatHolidayPayHours,
   isPayableHoliday,
   resolveHolidayDate,
-  resolveHolidayTitle
+  resolveHolidayTitle,
+  mergeWorkdaySourceEntries,
+  buildSupplementalHoursByDate
 };

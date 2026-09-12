@@ -181,7 +181,7 @@ test('syncStatHolidayWorkSessionsForPersonPeriod upserts assignee on shared day 
   }
 });
 
-test('materializeStatHolidayForPersonPeriod skips activity sync when persistToActivity is false', async () => {
+test('materializeStatHolidayForPersonPeriod with persistToActivity false does not block on missing day shells', async () => {
   const originalLeave = leaveRequestService.getApprovedLeaveEventsForPerson;
   const originalHistory = timesheetWorkdayHistoryService.buildWorkdayHistory;
   const originalResolveActivity = timesheetLegacyImportService.resolvePublicStatHolidayActivity;
@@ -212,6 +212,10 @@ test('materializeStatHolidayForPersonPeriod skips activity sync when persistToAc
         statutoryHolidayPay: {
           enabled: true,
           activityId: 'ACT_STAT',
+          schemes: {
+            equilibrium_school: { id: 'equilibrium_school', activityId: 'ACT_STAT' },
+            linc: { id: 'linc', activityId: 'ACT_LINC' }
+          },
           minWorkdays: 30,
           weekdayOccurrencesRequired: 5,
           weekdayOccurrencesLookback: 9,
@@ -229,10 +233,11 @@ test('materializeStatHolidayForPersonPeriod skips activity sync when persistToAc
       reqUser: {},
       persistToActivity: false
     });
-    assert.equal(outcome.syncOutcome?.blocked, true);
-    assert.equal(outcome.blockingErrors?.length, 1);
-    assert.match(outcome.blockingErrors[0], /Missing pre-mapped statutory holiday work session/i);
+    assert.equal(outcome.syncOutcome?.blocked, false);
+    assert.equal(outcome.syncOutcome?.missingDayEntries?.length, 2);
+    assert.equal(outcome.blockingErrors?.length || 0, 0);
     assert.equal(updateCalled, false);
+    assert.equal(outcome.rows.length, 2);
   } finally {
     leaveRequestService.getApprovedLeaveEventsForPerson = originalLeave;
     timesheetWorkdayHistoryService.buildWorkdayHistory = originalHistory;
@@ -298,7 +303,8 @@ test('materializeStatHolidayForPersonPeriod with persistToActivity false and map
       reqUser: {},
       persistToActivity: false
     });
-    assert.equal(outcome.syncOutcome, null);
+    assert.equal(outcome.syncOutcome?.blocked, false);
+    assert.equal(outcome.syncOutcome?.missingDayEntries?.length || 0, 0);
     assert.equal(outcome.blockingErrors?.length || 0, 0);
     assert.equal(updateCalled, false);
   } finally {
@@ -366,7 +372,7 @@ test('materializeStatHolidayForPersonPeriod skips activity sync before period st
       reqUser: {},
       persistToActivity: true
     });
-    assert.equal(outcome.syncOutcome, null);
+    assert.equal(outcome.syncOutcome?.blocked, false);
     assert.equal(updateCalled, false);
     assert.equal(
       statutoryHolidayWorkSessionService.shouldPersistStatHolidayToSharedActivity(
@@ -696,10 +702,11 @@ test('buildStatutoryHolidayTimesheetContext populates warnings when pay is block
       reqUser: {}
     });
 
-    assert.equal(context.warnings.length, 1);
+    assert.ok(context.warnings.length >= 1);
+    assert.equal(context.rows.length, 2);
     assert.equal(context.warnings[0].holidayId, 'H1');
     assert.equal(context.usesActivityMode, true);
-    assert.match(context.warnings[0].reasons.join(' '), /No payable workdays/i);
+    assert.match(context.warnings[0].reasons.join(' '), /No payable workdays|No payable LINC/i);
   } finally {
     leaveRequestService.getApprovedLeaveEventsForPerson = originalLeave;
     timesheetWorkdayHistoryService.buildWorkdayHistory = originalHistory;
@@ -1076,6 +1083,144 @@ test('syncStatHolidayWorkSessionsForPersonPeriod upserts 0-hour assignee for unq
     assert.equal(maintenanceArgs?.payload?.entries?.[0]?.assignees?.[0]?.paidHours, 0);
     assert.match(maintenanceArgs?.payload?.entries?.[0]?.assignees?.[0]?.notes || '', /not qualified/i);
   } finally {
+    activityService.isPersonEligibleForActivity = originalEligible;
+    activityService.getActivity = originalGetActivity;
+    dataService.updateData = originalUpdate;
+  }
+});
+
+test('ensureStatHolidayDayEntriesForPayItems creates missing holiday day shells', async () => {
+  const activity = {
+    id: 'ACT_STAT',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    visibilityScope: 'school',
+    title: 'Stat Holiday Pay',
+    entries: []
+  };
+  const originalGetActivity = activityService.getActivity;
+  const originalUpdate = dataService.updateData;
+  let maintenanceArgs = null;
+
+  activityService.getActivity = async () => ({
+    ...activity,
+    entries: maintenanceArgs?.payload?.entries || []
+  });
+  dataService.updateData = async (entityType, id, payload, reqUser, options) => {
+    maintenanceArgs = { entityType, id, payload, options };
+    return payload;
+  };
+
+  try {
+    const outcome = await statutoryHolidayWorkSessionService.ensureStatHolidayDayEntriesForPayItems({
+      activity,
+      payItems: [{
+        evaluation: { holidayId: 'H1', date: '2026-01-01', title: "New Year's Day" },
+        hours: 0
+      }],
+      reqUser: {}
+    });
+    assert.equal(outcome.changed, true);
+    assert.equal(outcome.createdEntryIds.length, 1);
+    const created = maintenanceArgs?.payload?.entries?.find((entry) => entry.date === '2026-01-01');
+    assert.equal(created?.statHolidayId, 'H1');
+    assert.equal(created?.startTime, '08:00');
+    assert.equal(created?.endTime, '20:00');
+    assert.deepEqual(created?.assignees, []);
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    dataService.updateData = originalUpdate;
+  }
+});
+
+test('materializeStatHolidayForPersonPeriod auto-provisions shells and syncs assignees for both schemes', async () => {
+  const originalLeave = leaveRequestService.getApprovedLeaveEventsForPerson;
+  const originalHistory = timesheetWorkdayHistoryService.buildWorkdayHistory;
+  const originalResolveActivity = timesheetLegacyImportService.resolvePublicStatHolidayActivity;
+  const originalEligible = activityService.isPersonEligibleForActivity;
+  const originalGetActivity = activityService.getActivity;
+  const originalUpdate = dataService.updateData;
+  const activityStore = new Map([
+    ['ACT_EQ', { id: 'ACT_EQ', orgId: 'ORG_1', status: 'posted', paid: true, evaluationType: 'attendance', visibilityScope: 'school', title: 'Equilibrium Stat', entries: [] }],
+    ['ACT_LINC', { id: 'ACT_LINC', orgId: 'ORG_1', status: 'posted', paid: true, evaluationType: 'attendance', visibilityScope: 'school', title: 'LINC Stat', entries: [] }]
+  ]);
+  const updateCalls = [];
+
+  leaveRequestService.getApprovedLeaveEventsForPerson = async () => [];
+  timesheetWorkdayHistoryService.buildWorkdayHistory = async () => new timesheetWorkdayHistoryService.WorkdayHistory();
+  timesheetLegacyImportService.resolvePublicStatHolidayActivity = async ({ activityId }) => {
+    const key = String(activityId || '').trim();
+    return activityStore.get(key) || activityStore.get('ACT_EQ');
+  };
+  activityService.isPersonEligibleForActivity = () => true;
+  activityService.getActivity = async (activityId) => {
+    const key = String(activityId || '').trim();
+    const row = activityStore.get(key);
+    return row ? { ...row, entries: [...row.entries] } : null;
+  };
+  dataService.updateData = async (entityType, id, payload) => {
+    updateCalls.push({ entityType, id });
+    const key = String(id || '').trim();
+    if (activityStore.has(key)) {
+      activityStore.set(key, { ...activityStore.get(key), entries: payload.entries || [] });
+    }
+    return payload;
+  };
+
+  try {
+    const outcome = await statutoryHolidayWorkSessionService.materializeStatHolidayForPersonPeriod({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      personName: 'Teacher',
+      personRole: 'teacher',
+      period: { id: 'PER_1', startDate: '2020-01-01', endDate: '2020-01-15' },
+      policy: {
+        statutoryHolidayPay: {
+          enabled: true,
+          schemes: {
+            equilibrium_school: { id: 'equilibrium_school', activityId: 'ACT_EQ' },
+            linc: { id: 'linc', activityId: 'ACT_LINC', hourMode: 'most_recent' }
+          },
+          departmentSchemeAssignments: { DEPT_LINC: 'linc' },
+          minWorkdays: 30,
+          weekdayOccurrencesRequired: 5,
+          weekdayOccurrencesLookback: 9,
+          earningsLookbackWeeks: 4,
+          beforeAfterSearchDays: 14,
+          payableHolidayTypes: ['National Holiday']
+        }
+      },
+      holidays: [{
+        id: 'H1',
+        date: '2020-01-01',
+        title: "New Year's Day",
+        type: 'National Holiday'
+      }],
+      periodEntries: [{
+        date: '2020-01-08',
+        deliveryDepartmentId: 'DEPT_LINC',
+        hours: 6,
+        timesheetHours: 6
+      }],
+      reqUser: {},
+      persistToActivity: true
+    });
+    assert.equal(outcome.blockingErrors?.length || 0, 0);
+    assert.equal(outcome.rows.length, 2);
+    assert.equal(outcome.syncOutcomes?.length, 2);
+    assert.ok(updateCalls.length >= 2);
+    const eqEntry = activityStore.get('ACT_EQ')?.entries?.find((entry) => entry.date === '2020-01-01');
+    const lincEntry = activityStore.get('ACT_LINC')?.entries?.find((entry) => entry.date === '2020-01-01');
+    assert.equal(eqEntry?.assignees?.length, 1);
+    assert.equal(eqEntry?.assignees?.[0]?.paidHours, 0);
+    assert.equal(lincEntry?.assignees?.length, 1);
+    assert.equal(lincEntry?.assignees?.[0]?.paidHours, 6);
+    assert.equal(lincEntry?.assignees?.[0]?.statHolidaySchemeId, 'linc');
+  } finally {
+    leaveRequestService.getApprovedLeaveEventsForPerson = originalLeave;
+    timesheetWorkdayHistoryService.buildWorkdayHistory = originalHistory;
+    timesheetLegacyImportService.resolvePublicStatHolidayActivity = originalResolveActivity;
     activityService.isPersonEligibleForActivity = originalEligible;
     activityService.getActivity = originalGetActivity;
     dataService.updateData = originalUpdate;

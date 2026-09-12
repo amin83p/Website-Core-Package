@@ -2329,7 +2329,6 @@
     const preview = row?.statHolidayPreview || {};
     if (!importExecutionStatHolidayPreviewHasSignal(preview)) return '';
     const hasBlocking = preview.hasBlockingIssues === true
-      || (Array.isArray(preview.missingDayEntries) && preview.missingDayEntries.length > 0)
       || (Array.isArray(preview.blockingErrors) && preview.blockingErrors.length > 0);
     const warningCount = Array.isArray(preview.warnings) ? preview.warnings.length : 0;
     const holidayLabel = Array.isArray(preview.holidayNames) && preview.holidayNames.length
@@ -2397,7 +2396,6 @@
         && importExecutionStatHolidayPreviewHasSignal(row?.statHolidayPreview));
     const blockingStatHolidayRows = statHolidayRows.filter((row) => (
       row?.statHolidayPreview?.hasBlockingIssues === true
-      || (Array.isArray(row?.statHolidayPreview?.missingDayEntries) && row.statHolidayPreview.missingDayEntries.length > 0)
       || (Array.isArray(row?.statHolidayPreview?.blockingErrors) && row.statHolidayPreview.blockingErrors.length > 0)
     ));
     if (blockingStatHolidayRows.length) {

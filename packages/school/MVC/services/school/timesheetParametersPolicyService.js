@@ -30,7 +30,8 @@ const DEFAULT_STATUTORY_HOLIDAY_PAY = Object.freeze({
       activityId: '',
       hourMode: 'most_recent',
       fixedHours: 0,
-      averageWeeks: 4
+      averageWeeks: 4,
+      disqualifyOnLeaveBeforeAfter: false
     }
   },
   departmentSchemeAssignments: {},
@@ -236,6 +237,7 @@ function parseSchemesFromForm(input = {}) {
     const hourModeKey = `schemeHourMode_${schemeId}`;
     const fixedHoursKey = `schemeFixedHours_${schemeId}`;
     const averageWeeksKey = `schemeAverageWeeks_${schemeId}`;
+    const disqualifyBeforeAfterKey = `schemeDisqualifyOnLeaveBeforeAfter_${schemeId}`;
     const patch = {};
     if (Object.prototype.hasOwnProperty.call(input, activityKey)) {
       patch.activityId = input[activityKey];
@@ -249,6 +251,9 @@ function parseSchemesFromForm(input = {}) {
       }
       if (Object.prototype.hasOwnProperty.call(input, averageWeeksKey)) {
         patch.averageWeeks = input[averageWeeksKey];
+      }
+      if (Object.prototype.hasOwnProperty.call(input, disqualifyBeforeAfterKey)) {
+        patch.disqualifyOnLeaveBeforeAfter = input[disqualifyBeforeAfterKey];
       }
     }
     if (Object.keys(patch).length) {

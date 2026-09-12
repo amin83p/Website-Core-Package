@@ -923,12 +923,17 @@ async function saveTimesheetParametersPolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
     const normalized = timesheetParametersPolicyService.validatePolicyInput(req.body || {});
-    const statActivityId = String(normalized?.statutoryHolidayPay?.activityId || '').trim();
-    if (statActivityId) {
+    const schemeActivityIds = statutoryHolidaySchemeService
+      .resolveAllSchemeActivityIds(normalized);
+    const defaultActivityId = String(normalized?.statutoryHolidayPay?.activityId || '').trim();
+    const activityIds = schemeActivityIds.length
+      ? schemeActivityIds
+      : (defaultActivityId ? [defaultActivityId] : []);
+    for (const activityId of activityIds) {
       await timesheetLegacyImportService.resolvePublicStatHolidayActivity({
         orgId: activeOrgId,
         reqUser: req.user,
-        activityId: statActivityId
+        activityId
       });
     }
     const policy = await timesheetParametersPolicyModel.savePolicyForOrg(

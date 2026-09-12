@@ -108,6 +108,12 @@ async function buildStatHolidayConfigurationMismatchWarnings({
   for (const { schemeId, config } of schemesInUse) {
     const payActivityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(resolved, schemeId);
     if (!payActivityId || idsEqual(payActivityId, mappingActivityId)) continue;
+    const schemeOutcome = (Array.isArray(schemeOutcomes) ? schemeOutcomes : [])
+      .find((row) => cleanId(row?.schemeId) === cleanId(schemeId));
+    const schemeMissing = Array.isArray(schemeOutcome?.missingDayEntries) ? schemeOutcome.missingDayEntries : [];
+    const aggregatedMissing = (Array.isArray(missingDayEntries) ? missingDayEntries : [])
+      .filter((row) => cleanId(row?.schemeId) === cleanId(schemeId));
+    if (!schemeMissing.length && !aggregatedMissing.length) continue;
     const [payActivity, mappingActivity] = await Promise.all([
       activityService.getActivity(payActivityId, reqUser).catch(() => null),
       activityService.getActivity(mappingActivityId, reqUser).catch(() => null)
@@ -193,9 +199,9 @@ async function previewImportExecutionStatHolidayForRow({
       const activity = await activityService.getActivity(activityId, reqUser).catch(() => null);
       activityTitle = String(activity?.title || '').trim();
     }
-    const blockingErrors = Array.isArray(materialization?.blockingErrors) && materialization.blockingErrors.length
-      ? materialization.blockingErrors
-      : statutoryHolidayWorkSessionService.buildStatHolidayBlockingErrors(missingDayEntries, activityTitle);
+    const blockingErrors = Array.isArray(materialization?.blockingErrors)
+      ? materialization.blockingErrors.filter(Boolean)
+      : [];
     const configurationWarnings = await buildStatHolidayConfigurationMismatchWarnings({
       policy: timesheetParametersPolicy,
       missingDayEntries,
@@ -204,7 +210,7 @@ async function previewImportExecutionStatHolidayForRow({
     });
     const eligibilityWarnings = Array.isArray(materialization?.warnings) ? materialization.warnings : [];
     const warnings = [...eligibilityWarnings, ...configurationWarnings];
-    const hasBlockingIssues = missingDayEntries.length > 0 || blockingErrors.length > 0;
+    const hasBlockingIssues = blockingErrors.length > 0 || materialization?.syncOutcome?.blocked === true;
     return {
       hasStatHolidays: statRows.length > 0 || missingDayEntries.length > 0 || evaluations.length > 0,
       count: statRows.length,
@@ -712,8 +718,11 @@ async function performImportExecution({
         existingEntriesBySessionId: new Map()
       });
       if (statHolidayMaterialization?.usesActivityMode === true && !statHolidayBlocked) {
-        const statHolidayActivityId = statutoryHolidayEligibilityService.resolveStatHolidayActivityId(
-          timesheetParametersPolicy
+        const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(timesheetParametersPolicy);
+        const schemeActivityIds = new Set(
+          statutoryHolidaySchemeService.resolveAllSchemeActivityIds(resolvedPolicy)
+            .map((activityId) => cleanId(activityId))
+            .filter(Boolean)
         );
         const refreshedActivitySessions = await activityService.getTimesheetEntriesForPerson({
           orgId,
@@ -723,7 +732,7 @@ async function performImportExecution({
           reqUser
         });
         const scopedStatHolidaySessions = (Array.isArray(refreshedActivitySessions) ? refreshedActivitySessions : [])
-          .filter((row) => idsEqual(cleanId(row?.activityId), statHolidayActivityId));
+          .filter((row) => schemeActivityIds.has(cleanId(row?.activityId)));
         importEntries = mergeStatHolidayActivitySessionsIntoEntries(importEntries, scopedStatHolidaySessions);
       }
       importTotalHours = timesheetLiveAssemblyService.calculateTimesheetTotal(importEntries);

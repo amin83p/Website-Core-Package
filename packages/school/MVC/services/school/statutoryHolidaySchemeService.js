@@ -29,7 +29,8 @@ const DEFAULT_BUILTIN_SCHEMES = Object.freeze({
     activityId: '',
     hourMode: LINC_HOUR_MODES.MOST_RECENT,
     fixedHours: 0,
-    averageWeeks: 4
+    averageWeeks: 4,
+    disqualifyOnLeaveBeforeAfter: false
   }
 });
 
@@ -71,6 +72,8 @@ function normalizeSchemeConfig(input = {}, defaults = {}) {
     row.averageWeeks = Number.isFinite(averageWeeks) && averageWeeks >= 1
       ? Math.min(52, averageWeeks)
       : (defaults.averageWeeks || 4);
+    row.disqualifyOnLeaveBeforeAfter = source.disqualifyOnLeaveBeforeAfter === true
+      || source.disqualifyOnLeaveBeforeAfter === 'true';
   }
   return row;
 }
@@ -284,7 +287,53 @@ function listSameWeekdayDatesBefore({
   return matches;
 }
 
-function personWorkedWeekdayInDepartment(deptDateMap = new Map(), holidayDate = '') {
+function listSameWeekdayDatesAfter({
+  holidayDate = '',
+  deptDateMap = new Map(),
+  maxCount = 52
+} = {}) {
+  const targetWeekday = getWeekday(holidayDate);
+  if (targetWeekday < 0) return [];
+  const matches = [];
+  let cursor = addDays(holidayDate, 1);
+  let guard = 0;
+  while (cursor && guard < 400 && matches.length < maxCount) {
+    if (getWeekday(cursor) === targetWeekday) {
+      const hours = Number(deptDateMap.get(cursor) || 0);
+      if (hours > 0) matches.push({ date: cursor, hours });
+    }
+    cursor = addDays(cursor, 1);
+    guard += 1;
+  }
+  return matches;
+}
+
+function resolveMostRecentSameWeekdayMatch(holidayDate = '', deptDateMap = new Map()) {
+  const before = listSameWeekdayDatesBefore({ holidayDate, deptDateMap, maxCount: 1 });
+  if (before.length) {
+    return {
+      date: before[0].date,
+      hours: Number(before[0].hours || 0),
+      searchDirection: 'before'
+    };
+  }
+  const after = listSameWeekdayDatesAfter({ holidayDate, deptDateMap, maxCount: 1 });
+  if (after.length) {
+    return {
+      date: after[0].date,
+      hours: Number(after[0].hours || 0),
+      searchDirection: 'after'
+    };
+  }
+  return { date: '', hours: 0, searchDirection: '' };
+}
+
+function personWorkedWeekdayInDepartment(deptDateMap = new Map(), holidayDate = '', schemeConfig = {}) {
+  const hourMode = normalizeLincHourMode(schemeConfig?.hourMode);
+  if (hourMode === LINC_HOUR_MODES.MOST_RECENT) {
+    const match = resolveMostRecentSameWeekdayMatch(holidayDate, deptDateMap);
+    return match.hours > 0;
+  }
   return listSameWeekdayDatesBefore({ holidayDate, deptDateMap, maxCount: 1 }).length > 0;
 }
 
@@ -295,32 +344,47 @@ function calculateLincDepartmentHours({
   schemeConfig = {}
 } = {}) {
   const hourMode = normalizeLincHourMode(schemeConfig.hourMode);
-  const hasHistory = personWorkedWeekdayInDepartment(deptDateMap, holidayDate);
+  const hasHistory = personWorkedWeekdayInDepartment(deptDateMap, holidayDate, schemeConfig);
   if (!hasHistory && hourMode !== LINC_HOUR_MODES.FIXED) {
-    return 0;
+    return { hours: 0, matchedDate: '', searchDirection: '' };
   }
 
   if (hourMode === LINC_HOUR_MODES.FIXED) {
-    if (!hasHistory) return 0;
+    if (!hasHistory) return { hours: 0, matchedDate: '', searchDirection: '' };
     const fixed = Number(schemeConfig.fixedHours || 0);
-    return fixed > 0 ? Number(fixed.toFixed(2)) : 0;
+    const hours = fixed > 0 ? Number(fixed.toFixed(2)) : 0;
+    const backward = listSameWeekdayDatesBefore({ holidayDate, deptDateMap, maxCount: 1 });
+    return {
+      hours,
+      matchedDate: backward[0]?.date || '',
+      searchDirection: backward.length ? 'before' : ''
+    };
+  }
+
+  if (hourMode === LINC_HOUR_MODES.MOST_RECENT) {
+    const match = resolveMostRecentSameWeekdayMatch(holidayDate, deptDateMap);
+    return {
+      hours: Number(Number(match.hours || 0).toFixed(2)),
+      matchedDate: match.date || '',
+      searchDirection: match.searchDirection || ''
+    };
   }
 
   const occurrences = listSameWeekdayDatesBefore({
     holidayDate,
     deptDateMap,
-    maxCount: hourMode === LINC_HOUR_MODES.AVERAGE_WEEKS
-      ? Math.max(1, Number(schemeConfig.averageWeeks) || 4)
-      : 1
+    maxCount: Math.max(1, Number(schemeConfig.averageWeeks) || 4)
   });
-  if (!occurrences.length) return 0;
-
-  if (hourMode === LINC_HOUR_MODES.AVERAGE_WEEKS) {
-    const total = occurrences.reduce((sum, row) => sum + Number(row.hours || 0), 0);
-    return Number((total / occurrences.length).toFixed(2));
+  if (!occurrences.length) {
+    return { hours: 0, matchedDate: '', searchDirection: '' };
   }
 
-  return Number(Number(occurrences[0].hours || 0).toFixed(2));
+  const total = occurrences.reduce((sum, row) => sum + Number(row.hours || 0), 0);
+  return {
+    hours: Number((total / occurrences.length).toFixed(2)),
+    matchedDate: occurrences[0]?.date || '',
+    searchDirection: 'before'
+  };
 }
 
 function calculateLincSchemeHours({
@@ -344,17 +408,24 @@ function calculateLincSchemeHours({
   }
 
   const calculatedHoursByDepartment = {};
+  const departmentDetails = {};
   let calculatedHours = 0;
   targetDepartments.forEach((deptId) => {
     const deptDateMap = deptIndex.get(deptId) || new Map();
-    const hours = calculateLincDepartmentHours({
+    const deptResult = calculateLincDepartmentHours({
       holidayDate,
       deptId,
       deptDateMap,
       schemeConfig
     });
+    const hours = Number(deptResult?.hours || 0);
     if (hours > 0) {
       calculatedHoursByDepartment[deptId] = hours;
+      departmentDetails[deptId] = {
+        hours,
+        matchedDate: cleanId(deptResult?.matchedDate),
+        searchDirection: cleanId(deptResult?.searchDirection)
+      };
       calculatedHours = Number((calculatedHours + hours).toFixed(2));
     }
   });
@@ -363,7 +434,8 @@ function calculateLincSchemeHours({
     schemeId: SCHEME_LINC,
     calculatedHours,
     departmentIds: Object.keys(calculatedHoursByDepartment),
-    calculatedHoursByDepartment
+    calculatedHoursByDepartment,
+    departmentDetails
   };
 }
 
@@ -391,22 +463,11 @@ function resolveActiveSchemesForPerson({
   existingEntries = [],
   policy = {}
 } = {}) {
-  const schemes = new Set();
-  (Array.isArray(existingEntries) ? existingEntries : []).forEach((entry) => {
-    if (entry?.isStatutoryHoliday !== true) return;
-    schemes.add(resolveSchemeIdFromEntry(entry));
-  });
-
-  (Array.isArray(workdayEntries) ? workdayEntries : []).forEach((entry) => {
-    if (!isPayableWorkdayEntry(entry)) return;
-    const deptId = resolveEntryDepartmentId(entry);
-    schemes.add(resolveSchemeForDepartment(deptId, policy));
-  });
-
-  if (!schemes.size) {
-    schemes.add(resolveSchemes(policy).defaultSchemeId || SCHEME_EQUILIBRIUM);
+  const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(policy);
+  if (resolvedPolicy?.statutoryHolidayPay?.enabled === false) {
+    return [];
   }
-  return BUILTIN_SCHEME_IDS.filter((schemeId) => schemes.has(schemeId));
+  return [...BUILTIN_SCHEME_IDS];
 }
 
 function resolveSchemesWithAssignedDepartments(policy = {}) {
@@ -459,9 +520,13 @@ module.exports = {
   departmentsForScheme,
   buildDepartmentHoursIndex,
   filterEntriesForScheme,
+  buildWorkdayHistoryFromEntries,
   calculateSchemeHours,
   calculateEquilibriumSchemeHours,
   calculateLincSchemeHours,
+  listSameWeekdayDatesBefore,
+  listSameWeekdayDatesAfter,
+  resolveMostRecentSameWeekdayMatch,
   resolveSchemeIdFromEntry,
   resolveActiveSchemesForPerson,
   resolveSchemesWithAssignedDepartments,
