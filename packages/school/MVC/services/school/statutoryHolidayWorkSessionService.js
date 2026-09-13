@@ -8,6 +8,7 @@ const statutoryHolidaySchemeService = require('./statutoryHolidaySchemeService')
 const statutoryHolidayDayMappingService = require('./statutoryHolidayDayMappingService');
 const timesheetLegacyImportService = require('./timesheetLegacyImportService');
 const timesheetPayrollContextService = require('./timesheetPayrollContextService');
+const activityAssigneeTimingService = require('./activityAssigneeTimingService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -401,6 +402,7 @@ function buildAssigneeRoleFields(role) {
 
 function buildStatHolidayWorkSessionAssignee({
   activity = {},
+  entry = {},
   personId = '',
   personName = '',
   personRole = '',
@@ -429,10 +431,14 @@ function buildStatHolidayWorkSessionAssignee({
     ...roleFields,
     ...trace
   };
+  const timedBase = activityAssigneeTimingService.applyAssigneeTiming(base, entry, {
+    startTime: entry?.startTime || STAT_HOLIDAY_DAY_START,
+    paidHours: safeHours
+  });
   if (evaluationType === 'completion') {
     const nowIso = new Date().toISOString();
     return {
-      ...base,
+      ...timedBase,
       status: 'attended',
       completionStatus: 'completed',
       completedAt: nowIso,
@@ -440,7 +446,7 @@ function buildStatHolidayWorkSessionAssignee({
     };
   }
   return {
-    ...base,
+    ...timedBase,
     status: 'attended',
     completionStatus: 'pending'
   };
@@ -806,8 +812,13 @@ async function syncStatHolidayWorkSessionsForPersonPeriod({
     if (!holidayId || !date) return;
     if (!entryDateInPeriod(date, periodStartDate, periodEndDate)) return;
 
+    const dayEntry = findStatHolidayDayEntry(workingEntries, { holidayId, date });
+    if (!dayEntry) return;
+
+    const normalizedDayEntry = normalizeStatHolidayDayEntryShape(dayEntry, holidayId);
     const assignee = buildStatHolidayWorkSessionAssignee({
       activity,
+      entry: normalizedDayEntry,
       personId: targetPersonId,
       personName,
       personRole,
@@ -818,12 +829,9 @@ async function syncStatHolidayWorkSessionsForPersonPeriod({
       notes: hours > 0 ? 'Statutory holiday pay' : 'Statutory holiday pay (not qualified)'
     });
 
-    const dayEntry = findStatHolidayDayEntry(workingEntries, { holidayId, date });
-    if (!dayEntry) return;
-
     const index = workingEntries.findIndex((entry) => entry === dayEntry);
     const nextEntry = upsertStatHolidayAssigneeOnEntry(
-      normalizeStatHolidayDayEntryShape(dayEntry, holidayId),
+      normalizedDayEntry,
       assignee
     );
     workingEntries[index] = nextEntry;

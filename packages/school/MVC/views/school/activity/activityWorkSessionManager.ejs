@@ -52,6 +52,39 @@
     if (normalized === 'absent') return 'bg-danger';
     return 'bg-secondary';
   };
+  const formatTimesheetStatusLabel = (status) => {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (normalized === 'submitted') return 'Submitted';
+    if (normalized === 'processed') return 'Processed';
+    if (normalized === 'draft') return 'Draft';
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
+  const renderAssigneeLockMetaHtml = (lockDisplay) => {
+    if (!lockDisplay || typeof lockDisplay !== 'object') return '';
+    const summaryParts = [];
+    if (lockDisplay.periodLabel) summaryParts.push(String(lockDisplay.periodLabel).trim());
+    const statusLabel = formatTimesheetStatusLabel(lockDisplay.timesheetStatus);
+    if (statusLabel) summaryParts.push(statusLabel);
+    if (Number(lockDisplay.hours) > 0) summaryParts.push(Number(lockDisplay.hours).toFixed(2) + ' h on timesheet');
+    const summaryHtml = summaryParts.length
+      ? '<div class="assignee-lock-meta-line text-muted">' + summaryParts.map((part) => part.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join(' · ') + '</div>'
+      : '';
+    const orphanId = String(lockDisplay.timesheetId || '').trim();
+    const orphanHtml = lockDisplay.isOrphan
+      ? '<div class="assignee-lock-meta-line text-muted">Timesheet ' + (orphanId || 'unknown').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + ' no longer exists.</div>'
+      : (lockDisplay.editorUrl
+        ? '<div class="assignee-lock-meta-line"><a href="' + String(lockDisplay.editorUrl).replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">View timesheet</a></div>'
+        : '');
+    const reason = String(lockDisplay.reasonLabel || 'Locked').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return [
+      '<div class="assignee-lock-meta">',
+      '<div class="assignee-lock-meta-line"><i class="bi bi-lock-fill" aria-hidden="true"></i><span>' + reason + '</span></div>',
+      summaryHtml,
+      orphanHtml,
+      '</div>'
+    ].join('');
+  };
   const buildAssigneeInfoTitle = (assignee = {}) => {
     const parts = [];
     if (assignee.completionLabel) parts.push(String(assignee.completionLabel));
@@ -620,6 +653,115 @@
   .activity-work-session-page .ws-derived-hours {
     font-weight: 700;
   }
+
+  .activity-work-session-page .session-summary-card {
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .activity-work-session-page .session-summary-card:hover {
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+  }
+  .activity-work-session-page .session-summary-card-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+  .activity-work-session-page .session-summary-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    background: #eef4ff;
+    color: #2563eb;
+    flex-shrink: 0;
+  }
+  .activity-work-session-page #workSessionAssigneeTable {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .activity-work-session-page #workSessionAssigneeTable tbody tr.work-session-assignee-form td {
+    border-bottom: none;
+    background: #fff;
+    padding-top: 0.75rem;
+  }
+  .activity-work-session-page #workSessionAssigneeTable tbody tr.ws-assignee-timing-row td {
+    background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.2rem 0.75rem 0.7rem;
+  }
+  .activity-work-session-page #workSessionAssigneeTable tbody tr.work-session-assignee-form.is-locked td,
+  .activity-work-session-page #workSessionAssigneeTable tbody tr.work-session-assignee-form.is-locked + tr.ws-assignee-timing-row td {
+    background: #fffbeb;
+  }
+  .activity-work-session-page .ws-timing-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem 1.25rem;
+    padding-left: 0.15rem;
+  }
+  .activity-work-session-page .ws-timing-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .activity-work-session-page .ws-timing-field-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .activity-work-session-page .ws-timing-field input[type="time"] {
+    width: 7.25rem;
+    font-variant-numeric: tabular-nums;
+    border-color: #cbd5e1;
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .activity-work-session-page .ws-timing-readonly {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #475569;
+    font-variant-numeric: tabular-nums;
+  }
+  .activity-work-session-page tr.work-session-assignee-form.is-not-payable .ws-paid-hours-display {
+    color: #94a3b8;
+    font-style: italic;
+    font-weight: 500;
+  }
+  .activity-work-session-page #workSessionAssigneeStep .card-header {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+  .activity-work-session-page .ws-timing-lock-meta {
+    flex: 1 1 100%;
+    min-width: 14rem;
+  }
+  .activity-work-session-page .assignee-lock-meta {
+    margin-top: 0;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: #b45309;
+  }
+  .activity-work-session-page .assignee-lock-meta .assignee-lock-meta-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.45rem;
+  }
+  .activity-work-session-page .assignee-lock-meta a {
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .activity-work-session-page .assignee-lock-meta a:hover {
+    text-decoration: underline;
+  }
 </style>
 
 <div class="sections-page session-manager-page activity-work-session-page">
@@ -708,6 +850,7 @@
         <% if (canEditWorkSessionMetadata) { %>
           <form method="POST" action="<%= manageUrl %>/metadata" id="frmWorkSessionMetadata" class="work-session-admin-metadata">
             <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <input type="hidden" name="priorSessionStartTime" id="workSessionPriorStartInput" value="<%= entryRow.startTime || '' %>">
             <input type="hidden" name="assignees" id="workSessionMetadataAssignees" value="">
             <% const coreMetadataDisabledAttr = hasAnyTimesheetLock ? 'disabled' : ''; %>
             <div class="row g-3">
@@ -815,27 +958,47 @@
         <div class="row g-2 mb-3">
           <div class="col-6 col-md">
             <div class="session-summary-card h-100">
-              <div class="session-summary-label">Assignees</div>
-              <div class="session-summary-value"><%= visibleRows.length %></div>
+              <div class="session-summary-card-inner">
+                <span class="session-summary-icon"><i class="bi bi-people-fill" aria-hidden="true"></i></span>
+                <div>
+                  <div class="session-summary-label">Assignees</div>
+                  <div class="session-summary-value"><%= visibleRows.length %></div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="col-6 col-md">
             <div class="session-summary-card h-100">
-              <div class="session-summary-label">Ready for timesheet</div>
-              <div class="session-summary-value text-success"><%= readyCount %></div>
+              <div class="session-summary-card-inner">
+                <span class="session-summary-icon" style="background:#ecfdf5;color:#059669;"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
+                <div>
+                  <div class="session-summary-label">Ready for timesheet</div>
+                  <div class="session-summary-value text-success"><%= readyCount %></div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="col-6 col-md">
             <div class="session-summary-card h-100">
-              <div class="session-summary-label"><%= isCompletion ? 'Completed' : 'Attended' %></div>
-              <div class="session-summary-value <%= isCompletion ? 'text-primary' : 'text-success' %>"><%= isCompletion ? completionDoneCount : attendanceAttendedCount %></div>
+              <div class="session-summary-card-inner">
+                <span class="session-summary-icon" style="background:<%= isCompletion ? '#eef2ff' : '#ecfdf5' %>;color:<%= isCompletion ? '#4f46e5' : '#059669' %>;"><i class="bi <%= isCompletion ? 'bi-check2-circle' : 'bi-person-check' %>" aria-hidden="true"></i></span>
+                <div>
+                  <div class="session-summary-label"><%= isCompletion ? 'Completed' : 'Attended' %></div>
+                  <div class="session-summary-value <%= isCompletion ? 'text-primary' : 'text-success' %>"><%= isCompletion ? completionDoneCount : attendanceAttendedCount %></div>
+                </div>
+              </div>
             </div>
           </div>
           <% if (lockedCount > 0) { %>
             <div class="col-6 col-md">
               <div class="session-summary-card h-100">
-                <div class="session-summary-label">Locked</div>
-                <div class="session-summary-value text-secondary"><%= lockedCount %></div>
+                <div class="session-summary-card-inner">
+                  <span class="session-summary-icon" style="background:#fff7ed;color:#d97706;"><i class="bi bi-lock-fill" aria-hidden="true"></i></span>
+                  <div>
+                    <div class="session-summary-label">Locked</div>
+                    <div class="session-summary-value text-secondary"><%= lockedCount %></div>
+                  </div>
+                </div>
               </div>
             </div>
           <% } %>
@@ -885,6 +1048,8 @@
                   </tr>
                 </thead>
                 <tbody id="workSessionAssigneeTableBody">
+                  <% const assigneeTableCols = (canEditWorkSessionMetadata && activityRow.paid) ? 7 : 6;
+                  const assigneeTimingColSpan = assigneeTableCols - 1; %>
                   <% let visibleAssigneeIndex = 0;
                   assigneeRows.forEach((assignee, idx) => {
                     const rowVisible = canManageAll || assignee.isSelf;
@@ -900,9 +1065,12 @@
                     const rowKey = String(assignee.personId || ('row_' + idx)).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + String(idx);
                     const rowDisabled = !rowEditable || assignee.locked;
                     const assigneeInfoTitle = buildAssigneeInfoTitle(assignee);
+                    const assigneePaidHours = Number(assignee.paidHours ?? entryRow.durationHours ?? 0);
+                    const assigneeStartTime = String(assignee.startTime || entryRow.startTime || '').trim();
+                    const assigneeEndTime = String(assignee.endTime || entryRow.endTime || '').trim();
                   %>
                     <tr
-                      class="roster-row work-session-assignee-form<%= assignee.locked ? ' is-locked' : '' %>"
+                      class="roster-row work-session-assignee-form<%= assignee.locked ? ' is-locked' : '' %><%= assignee.paid === false ? ' is-not-payable' : '' %>"
                       data-personid="<%= assignee.personId %>"
                       data-person-id="<%= assignee.personId %>"
                       data-person-name="<%= assignee.personName || assignee.personId %>"
@@ -914,7 +1082,10 @@
                       data-notes="<%= assignee.notes || '' %>"
                       data-completion-status="<%= String(assignee.completionStatus || 'pending').toLowerCase() %>"
                       data-completed-at="<%= assignee.completedAt || '' %>"
-                      data-ready-for-timesheet="<%= assignee.readyForTimesheet ? 'true' : 'false' %>">
+                      data-ready-for-timesheet="<%= assignee.readyForTimesheet ? 'true' : 'false' %>"
+                      data-assignee-start-time="<%= assigneeStartTime %>"
+                      data-assignee-end-time="<%= assigneeEndTime %>"
+                      data-paid-hours="<%= assigneePaidHours.toFixed(2) %>">
                       <td class="attendance-order-cell text-muted small ps-3 align-middle">
                         <div class="attendance-order-stack">
                           <div class="attendance-order-head">
@@ -966,8 +1137,8 @@
                           <% } %>
                         </td>
                       <% } %>
-                      <td class="text-end align-middle">
-                        <span class="fw-semibold ws-derived-hours" data-person-id="<%= assignee.personId %>"><%= Number(entryRow.durationHours || 0).toFixed(2) %> h</span>
+                      <td class="text-end align-middle ws-paid-hours-cell">
+                        <span class="fw-semibold ws-paid-hours-display" data-person-id="<%= assignee.personId %>"><%= assignee.paid === false ? '—' : (assigneePaidHours.toFixed(2) + ' h') %></span>
                       </td>
                       <td class="ws-status-col align-middle pe-2">
                         <% if (!isCompletion && rowEditable && !assignee.locked) { %>
@@ -999,9 +1170,31 @@
                         <% } %>
                       </td>
                     </tr>
+                    <tr class="ws-assignee-timing-row" data-person-id="<%= assignee.personId %>">
+                      <td class="ws-timing-spacer"></td>
+                      <td colspan="<%= assigneeTimingColSpan %>">
+                        <div class="ws-timing-bar">
+                          <% if (assignee.lockDisplay) { %>
+                            <div class="ws-timing-lock-meta"><%- renderAssigneeLockMetaHtml(assignee.lockDisplay) %></div>
+                          <% } %>
+                          <% if (rowEditable && !assignee.locked) { %>
+                            <div class="ws-timing-field">
+                              <span class="ws-timing-field-label">Start</span>
+                              <input type="time" class="form-control form-control-sm ws-assignee-start-input" data-person-id="<%= assignee.personId %>" value="<%= assigneeStartTime %>" aria-label="Start time for <%= assignee.personName || assignee.personId %>">
+                            </div>
+                            <div class="ws-timing-field">
+                              <span class="ws-timing-field-label">End</span>
+                              <input type="time" class="form-control form-control-sm ws-assignee-end-input" data-person-id="<%= assignee.personId %>" value="<%= assigneeEndTime %>" aria-label="End time for <%= assignee.personName || assignee.personId %>">
+                            </div>
+                          <% } else { %>
+                            <span class="ws-timing-readonly"><i class="bi bi-clock me-1 text-primary" aria-hidden="true"></i><%= assigneeStartTime && assigneeEndTime ? (assigneeStartTime + ' – ' + assigneeEndTime) : '—' %></span>
+                          <% } %>
+                        </div>
+                      </td>
+                    </tr>
                   <% }) %>
                   <% if (!assigneeRows.length || visibleAssigneeIndex === 0) { %>
-                    <tr><td colspan="<%= (canEditWorkSessionMetadata && activityRow.paid) ? 7 : 6 %>" class="text-center py-4 text-muted">No assignees on this work session.</td></tr>
+                    <tr><td colspan="<%= assigneeTableCols %>" class="text-center py-4 text-muted">No assignees on this work session.</td></tr>
                   <% } %>
                 </tbody>
               </table>
@@ -1015,6 +1208,8 @@
             if (!rowVisible && !canManageAll) return;
             const rowEditable = assignee.editable && (canManageAll || assignee.isSelf);
             const rowKey = String(assignee.personId || ('row_' + idx)).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + String(idx);
+            const hiddenAssigneeStartTime = String(assignee.startTime || entryRow.startTime || '').trim();
+            const hiddenAssigneeEndTime = String(assignee.endTime || entryRow.endTime || '').trim();
           %>
             <% if (activityRow.paid) { %>
               <input type="hidden" class="ws-paid-hours-input" id="paidHours_<%= rowKey %>" data-person-id="<%= assignee.personId %>" value="<%= Number(entryRow.durationHours || 0).toFixed(2) %>">
@@ -1025,6 +1220,8 @@
                 <input type="hidden" name="personId" value="<%= assignee.personId %>">
                 <input type="hidden" name="status" value="<%= assignee.status || 'attended' %>" class="ws-status-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
                 <input type="hidden" name="paidHours" value="<%= Number(assignee.paidHours || entryRow.durationHours || 0).toFixed(2) %>" class="ws-paid-hours-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                <input type="hidden" name="startTime" value="<%= hiddenAssigneeStartTime %>" class="ws-start-time-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
+                <input type="hidden" name="endTime" value="<%= hiddenAssigneeEndTime %>" class="ws-end-time-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
                 <input type="hidden" name="notes" value="<%= assignee.notes || '' %>" class="ws-notes-<%= assignee.personId %>" data-person-id="<%= assignee.personId %>">
               </form>
             <% } %>
@@ -1097,6 +1294,34 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    const initialSessionStartTime = '<%= entryRow.startTime || '' %>';
+
+    function addMinutesToClockTimeClient(startTime, minutesToAdd) {
+      const start = String(startTime || '').trim();
+      if (!/^\d{2}:\d{2}$/.test(start)) return '';
+      const [h, m] = start.split(':').map(Number);
+      const totalMinutes = (h * 60) + m + Number(minutesToAdd || 0);
+      if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+      const endH = Math.floor(totalMinutes / 60) % 24;
+      const endM = totalMinutes % 60;
+      return String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0');
+    }
+
+    function deriveAssigneeEndTimeClient(startTime, paidHours) {
+      const hours = Number(paidHours);
+      if (!Number.isFinite(hours) || hours <= 0) return startTime || '';
+      return addMinutesToClockTimeClient(startTime, Math.round(hours * 60));
+    }
+
+    function resolveAssigneeStartAfterSessionChange(row, priorSessionStart, newSessionStart) {
+      const prior = String(priorSessionStart || '').trim();
+      const next = String(newSessionStart || '').trim();
+      const assigneeStart = String(row?.getAttribute('data-assignee-start-time') || '').trim();
+      if (!prior || !next || prior === next) return assigneeStart || next || prior;
+      if (!assigneeStart || assigneeStart === prior) return next;
+      return assigneeStart;
     }
 
     function calculateDurationHours(startTime, endTime) {
@@ -1262,6 +1487,44 @@
       tbody.innerHTML = '<tr><td colspan="' + colSpan + '" class="text-center py-4 text-muted">No assignees on this work session.</td></tr>';
     }
 
+    function getAssigneeTimingRow(personId) {
+      const safePersonId = escapeSelectorValue(personId);
+      return document.querySelector('#workSessionAssigneeTableBody tr.ws-assignee-timing-row[data-person-id="' + safePersonId + '"]');
+    }
+
+    function syncRowPayableState(row) {
+      if (!row) return;
+      const paidInput = row.querySelector('.ws-paid-input');
+      const isPaid = paidInput ? paidInput.checked : String(row.getAttribute('data-paid') || 'true').toLowerCase() !== 'false';
+      row.classList.toggle('is-not-payable', !isPaid);
+      const hoursNode = row.querySelector('.ws-paid-hours-display');
+      const sessionHours = currentDerivedHours();
+      if (!isPaid) {
+        if (!row.hasAttribute('data-paid-hours-stored')) {
+          row.setAttribute('data-paid-hours-stored', row.getAttribute('data-paid-hours') || sessionHours.toFixed(2));
+        }
+        row.setAttribute('data-paid-hours', '0.00');
+        if (hoursNode) hoursNode.textContent = '—';
+        const personId = row.getAttribute('data-person-id');
+        if (personId) {
+          document.querySelectorAll('input[name="paidHours"][data-person-id="' + escapeSelectorValue(personId) + '"]').forEach((input) => {
+            input.value = '0.00';
+          });
+        }
+        return;
+      }
+      const restored = Number(row.getAttribute('data-paid-hours-stored') || row.getAttribute('data-paid-hours') || sessionHours || 0).toFixed(2);
+      row.setAttribute('data-paid-hours', restored);
+      row.removeAttribute('data-paid-hours-stored');
+      if (hoursNode) hoursNode.textContent = restored + ' h';
+      const personId = row.getAttribute('data-person-id');
+      if (personId) syncRowFields(personId);
+    }
+
+    function initAllRowPayableStates() {
+      document.querySelectorAll('#workSessionAssigneeTableBody tr.work-session-assignee-form').forEach(syncRowPayableState);
+    }
+
     function applyBulkWsAttendance(value) {
       document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row:not(.is-locked) input.ws-att-radio').forEach((radio) => {
         if (radio.disabled || radio.value !== value) return;
@@ -1277,17 +1540,59 @@
       return calculateDurationHours(start, end) || Number('<%= Number(entryRow.durationHours || 0).toFixed(2) %>') || 0;
     }
 
+    function getRowAssigneeStart(row) {
+      const personId = row?.getAttribute('data-person-id');
+      const timingRow = personId ? getAssigneeTimingRow(personId) : null;
+      const input = timingRow?.querySelector('.ws-assignee-start-input');
+      if (input) return String(input.value || '').trim();
+      return String(row?.getAttribute('data-assignee-start-time') || '').trim();
+    }
+
+    function getRowAssigneeEnd(row) {
+      const personId = row?.getAttribute('data-person-id');
+      const timingRow = personId ? getAssigneeTimingRow(personId) : null;
+      const input = timingRow?.querySelector('.ws-assignee-end-input');
+      if (input) return String(input.value || '').trim();
+      return String(row?.getAttribute('data-assignee-end-time') || '').trim();
+    }
+
+    function setRowAssigneeStart(row, value) {
+      const next = String(value || '').trim();
+      const personId = row?.getAttribute('data-person-id');
+      const timingRow = personId ? getAssigneeTimingRow(personId) : null;
+      const input = timingRow?.querySelector('.ws-assignee-start-input');
+      if (input) input.value = next;
+      row?.setAttribute('data-assignee-start-time', next);
+    }
+
+    function refreshAssigneeTimingDisplays() {
+      const priorStart = document.getElementById('workSessionPriorStartInput')?.value || initialSessionStartTime;
+      const sessionStart = document.getElementById('workSessionStartInput')?.value || initialSessionStartTime;
+      const sessionHours = currentDerivedHours();
+      document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row').forEach((row) => {
+        const isPaid = String(row.getAttribute('data-paid') || 'true').toLowerCase() !== 'false';
+        const paidHours = isPaid ? Number(row.getAttribute('data-paid-hours') || sessionHours || 0) : 0;
+        row.setAttribute('data-assignee-start-time', getRowAssigneeStart(row));
+        const nextStart = resolveAssigneeStartAfterSessionChange(row, priorStart, sessionStart);
+        setRowAssigneeStart(row, nextStart);
+        row.setAttribute('data-assignee-end-time', getRowAssigneeEnd(row));
+        syncRowPayableState(row);
+      });
+    }
+
     function refreshDerivedHours() {
       const hours = currentDerivedHours();
       const label = hours.toFixed(2) + ' h';
       const sessionHours = document.getElementById('workSessionDerivedHours');
       if (sessionHours) sessionHours.textContent = label;
-      document.querySelectorAll('.ws-derived-hours').forEach((node) => {
-        node.textContent = label;
-      });
       document.querySelectorAll('.ws-paid-hours-input').forEach((input) => {
         input.value = hours.toFixed(2);
       });
+      document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row').forEach((row) => {
+        if (String(row.getAttribute('data-paid') || 'true').toLowerCase() === 'false') return;
+        row.setAttribute('data-paid-hours', hours.toFixed(2));
+      });
+      refreshAssigneeTimingDisplays();
     }
 
     async function showUiConfirm(options) {
@@ -1326,6 +1631,8 @@
       const personSelector = '[data-person-id="' + safePersonId + '"]';
       const status = document.querySelector('input.ws-att-radio' + personSelector + ':checked');
       const paidHours = document.querySelector('.ws-paid-hours-input' + personSelector);
+      const startTime = document.querySelector('.ws-assignee-start-input' + personSelector);
+      const endTime = document.querySelector('.ws-assignee-end-input' + personSelector);
       const notes = document.querySelector('.ws-notes-input' + personSelector);
       document.querySelectorAll('input[name="status"]' + personSelector).forEach((input) => {
         if (status) input.value = status.value;
@@ -1333,6 +1640,12 @@
       });
       document.querySelectorAll('input[name="paidHours"]' + personSelector).forEach((input) => {
         if (paidHours) input.value = paidHours.value;
+      });
+      document.querySelectorAll('input[name="startTime"]' + personSelector).forEach((input) => {
+        if (startTime) input.value = startTime.value;
+      });
+      document.querySelectorAll('input[name="endTime"]' + personSelector).forEach((input) => {
+        if (endTime) input.value = endTime.value;
       });
       document.querySelectorAll('input[name="notes"]' + personSelector).forEach((input) => {
         if (notes) input.value = notes.value;
@@ -1356,14 +1669,26 @@
           const roleList = normalizeRoleList(roleGroup?.getAttribute('data-roles') || row.getAttribute('data-roles') || row.getAttribute('data-role') || 'participant');
           const role = pickDefaultRole(roleList, roleRadio?.value || row.getAttribute('data-role') || 'participant');
           const paidFallback = String(row.getAttribute('data-paid') || 'true').toLowerCase() !== 'false';
+          const isPaid = paidInput ? paidInput.checked : paidFallback;
+          const timingRow = getAssigneeTimingRow(personId);
+          const startInput = timingRow?.querySelector('.ws-assignee-start-input') || row.querySelector('.ws-assignee-start-input' + personSelector);
+          const endInput = timingRow?.querySelector('.ws-assignee-end-input') || row.querySelector('.ws-assignee-end-input' + personSelector);
+          const assigneeStart = startInput
+            ? String(startInput.value || '').trim()
+            : String(row.getAttribute('data-assignee-start-time') || '').trim();
+          const assigneeEnd = endInput
+            ? String(endInput.value || '').trim()
+            : String(row.getAttribute('data-assignee-end-time') || '').trim();
           return {
             personId,
             personName: row.getAttribute('data-person-name') || personId,
             role,
             roles: roleList.includes(role) ? roleList : [role].concat(roleList),
             status: statusInput ? statusInput.value : (row.getAttribute('data-status') || 'attended'),
-            paid: paidInput ? paidInput.checked : paidFallback,
-            paidHours: Number(hours.toFixed(2)),
+            paid: isPaid,
+            paidHours: isPaid ? Number(hours.toFixed(2)) : 0,
+            startTime: assigneeStart,
+            endTime: assigneeEnd,
             notes: notesInput ? notesInput.value : (row.getAttribute('data-notes') || ''),
             completionStatus: completionRadio ? completionRadio.value : (row.getAttribute('data-completion-status') || 'pending')
           };
@@ -1380,6 +1705,20 @@
       return { personId, personName, role, roles: roles.length ? roles : [role] };
     }
 
+    function buildAssigneeTimingRowHtml(personId, startTime, endTime, editable) {
+      const safePersonId = escapeHtml(personId);
+      const safeStart = escapeHtml(startTime);
+      const safeEnd = escapeHtml(endTime);
+      const timingColSpan = (canManageAllWorkSession && activityPaid) ? 6 : 5;
+      const fields = editable
+        ? [
+          '<div class="ws-timing-field"><span class="ws-timing-field-label">Start</span><input type="time" class="form-control form-control-sm ws-assignee-start-input" data-person-id="' + safePersonId + '" value="' + safeStart + '" aria-label="Start time for ' + safePersonId + '"></div>',
+          '<div class="ws-timing-field"><span class="ws-timing-field-label">End</span><input type="time" class="form-control form-control-sm ws-assignee-end-input" data-person-id="' + safePersonId + '" value="' + safeEnd + '" aria-label="End time for ' + safePersonId + '"></div>'
+        ].join('')
+        : '<span class="ws-timing-readonly"><i class="bi bi-clock me-1 text-primary" aria-hidden="true"></i>' + safeStart + ' – ' + safeEnd + '</span>';
+      return '<tr class="ws-assignee-timing-row" data-person-id="' + safePersonId + '"><td class="ws-timing-spacer"></td><td colspan="' + timingColSpan + '"><div class="ws-timing-bar">' + fields + '</div></td></tr>';
+    }
+
     function buildAdminAssigneeRow(person) {
       const safePersonId = escapeHtml(person.personId);
       const safePersonName = escapeHtml(person.personName || person.personId);
@@ -1388,6 +1727,9 @@
       const safeRoleList = escapeHtml(roleList.join(','));
       const rowKey = 'dynamic_' + (++dynamicAssigneeIndex);
       const hours = currentDerivedHours().toFixed(2);
+      const sessionStart = document.getElementById('workSessionStartInput')?.value || initialSessionStartTime || '';
+      const sessionEnd = document.getElementById('workSessionEndInput')?.value || '<%= entryRow.endTime || '' %>';
+      const defaultEnd = sessionEnd || deriveAssigneeEndTimeClient(sessionStart, hours);
       const roleRadios = buildRoleRadios(rowKey, person.personId, roleList, person.role);
       const statusControls = isCompletionMode
         ? '<div class="btn-group-vertical btn-group-sm ws-completion-radio-group" role="group">' + buildCompletionRadios(rowKey, person.personId, 'pending') + '</div>'
@@ -1412,7 +1754,7 @@
         if (hiddenContainer) hiddenContainer.insertAdjacentHTML('beforeend', paidHoursHidden);
       }
       return [
-        '<tr class="roster-row work-session-assignee-form" data-personid="' + safePersonId + '" data-person-id="' + safePersonId + '" data-person-name="' + safePersonName + '" data-locked="false" data-role="' + safeRole + '" data-roles="' + safeRoleList + '" data-status="attended" data-paid="' + (activityPaid ? 'true' : 'false') + '" data-notes="" data-completion-status="pending" data-completed-at="" data-ready-for-timesheet="false">',
+        '<tr class="roster-row work-session-assignee-form" data-personid="' + safePersonId + '" data-person-id="' + safePersonId + '" data-person-name="' + safePersonName + '" data-locked="false" data-role="' + safeRole + '" data-roles="' + safeRoleList + '" data-status="attended" data-paid="' + (activityPaid ? 'true' : 'false') + '" data-notes="" data-completion-status="pending" data-completed-at="" data-ready-for-timesheet="false" data-assignee-start-time="' + escapeHtml(sessionStart) + '" data-assignee-end-time="' + escapeHtml(defaultEnd) + '" data-paid-hours="' + hours + '">',
         '<td class="attendance-order-cell text-muted small ps-3 align-middle">',
         '<div class="attendance-order-stack">',
         '<div class="attendance-order-head">',
@@ -1430,10 +1772,11 @@
         '</td>',
         '<td class="ws-role-col align-middle"><div class="btn-group-vertical btn-group-sm ws-role-radio-group" role="group" data-roles="' + safeRoleList + '">' + roleRadios + '</div></td>',
         payableCell,
-        '<td class="text-end align-middle"><span class="fw-semibold ws-derived-hours" data-person-id="' + safePersonId + '">' + hours + ' h</span></td>',
+        '<td class="text-end align-middle ws-paid-hours-cell"><span class="fw-semibold ws-paid-hours-display" data-person-id="' + safePersonId + '">' + hours + ' h</span></td>',
         '<td class="ws-status-col align-middle pe-2">' + statusControls + '</td>',
         '<td class="ws-notes-col align-middle"><textarea class="form-control form-control-sm ws-notes-input" id="notes_' + rowKey + '" data-person-id="' + safePersonId + '" rows="2" maxlength="500" placeholder="Notes"></textarea></td>',
-        '</tr>'
+        '</tr>',
+        buildAssigneeTimingRowHtml(person.personId, sessionStart, defaultEnd, true)
       ].join('');
     }
 
@@ -1462,6 +1805,17 @@
           const metadataForm = document.getElementById('frmWorkSessionMetadata');
           if (!metadataForm) return;
           refreshDerivedHours();
+          const priorStart = document.getElementById('workSessionPriorStartInput')?.value || initialSessionStartTime;
+          const nextStart = document.getElementById('workSessionStartInput')?.value || initialSessionStartTime;
+          if (priorStart && nextStart && priorStart !== nextStart) {
+            const confirmed = await showUiConfirm({
+              title: 'Update assignee start times?',
+              message: 'Changing the work session start time will move assignees whose start time matches the current session start to the new start time. Assignees with a different start time will not be changed.',
+              okText: 'Continue',
+              cancelText: 'Cancel'
+            });
+            if (!confirmed) return;
+          }
           const assigneesInput = document.getElementById('workSessionMetadataAssignees');
           if (assigneesInput) assigneesInput.value = JSON.stringify(collectAdminAssignees());
           if (typeof window.showLoading === 'function') window.showLoading('Saving session...');
@@ -1515,16 +1869,27 @@
       input.addEventListener('input', refreshDerivedHours);
     });
     refreshDerivedHours();
+    initAllRowPayableStates();
 
     document.getElementById('btnWsAllAttended')?.addEventListener('click', () => applyBulkWsAttendance('attended'));
     document.getElementById('btnWsAllExcused')?.addEventListener('click', () => applyBulkWsAttendance('excused'));
     document.getElementById('btnWsAllAbsent')?.addEventListener('click', () => applyBulkWsAttendance('absent'));
     document.getElementById('btnWsResetAttendance')?.addEventListener('click', () => applyBulkWsAttendance('attended'));
 
+    function resolveAssigneeMainRow(target) {
+      const mainRow = target?.closest('.work-session-assignee-form');
+      if (mainRow) return mainRow;
+      const timingRow = target?.closest('.ws-assignee-timing-row');
+      if (!timingRow) return null;
+      const personId = timingRow.getAttribute('data-person-id');
+      if (!personId) return null;
+      return document.querySelector('.work-session-assignee-form[data-person-id="' + escapeSelectorValue(personId) + '"]');
+    }
+
     document.getElementById('workSessionAssigneeTableBody')?.addEventListener('change', function (event) {
       const target = event.target;
       if (!target || !target.classList) return;
-      const row = target.closest('.work-session-assignee-form');
+      const row = resolveAssigneeMainRow(target);
       if (!row) return;
       const personId = target.getAttribute('data-person-id') || row.getAttribute('data-person-id');
       if (target.classList.contains('ws-att-radio') && target.checked) {
@@ -1543,6 +1908,15 @@
       }
       if (target.classList.contains('ws-paid-input')) {
         row.setAttribute('data-paid', target.checked ? 'true' : 'false');
+        syncRowPayableState(row);
+      }
+      if (target.classList.contains('ws-assignee-start-input')) {
+        row.setAttribute('data-assignee-start-time', target.value || '');
+        if (personId) syncRowFields(personId);
+      }
+      if (target.classList.contains('ws-assignee-end-input')) {
+        row.setAttribute('data-assignee-end-time', target.value || '');
+        if (personId) syncRowFields(personId);
       }
       refreshAssigneeRowInfoIcons();
     });
@@ -1565,6 +1939,7 @@
       if (!confirmed) return;
       if (personId) {
         document.querySelectorAll('.ws-paid-hours-input[data-person-id="' + escapeSelectorValue(personId) + '"]').forEach((node) => node.remove());
+        getAssigneeTimingRow(personId)?.remove();
       }
       row?.remove();
       refreshAssigneeRowNumbers();

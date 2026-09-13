@@ -1,6 +1,8 @@
 const schoolDataService = require('./schoolDataService');
+const activityAssigneeTimingService = require('./activityAssigneeTimingService');
 const activityEntryIdService = require('./activityEntryIdService');
 const schoolDependencyService = require('./schoolDependencyService');
+const timesheetPeriodNavigationService = require('./timesheetPeriodNavigationService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const activityModel = require('../../models/school/activityModel');
@@ -933,6 +935,7 @@ async function getScheduleEventsForPerson({ orgId, personId, startDate, endDate,
           const status = evaluationType === 'completion'
             ? (completionScan.isComplete ? 'completed' : 'pending_completion')
             : 'attended';
+          const timing = activityAssigneeTimingService.resolveAssigneeTiming({ assignee: attendee, entry });
           return {
             id: `ACT-${activity.id}-${entry.entryId}-${targetPersonId}`,
             activityId: activity.id,
@@ -940,8 +943,8 @@ async function getScheduleEventsForPerson({ orgId, personId, startDate, endDate,
             targetType: 'activity',
             personId: targetPersonId,
             date: entry.date,
-            start: entry.startTime,
-            end: entry.endTime,
+            start: timing.startTime || entry.startTime,
+            end: timing.endTime || entry.endTime,
             title: entryTitle,
             className: entryTitle,
             categoryName: activity.categoryName,
@@ -1157,13 +1160,14 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
         .filter((attendee) => isAssigneeEligibleForTimesheet(activity, attendee))
         .map((attendee) => {
           const hours = resolveActivityTimesheetEntryHours(activity, attendee, entry);
+          const timing = activityAssigneeTimingService.resolveAssigneeTiming({ assignee: attendee, entry });
           return {
             sessionId: `act-${activity.id}-${entry.entryId}-${targetPersonId}`,
             activityId: activity.id,
             activityEntryId: entry.entryId,
             date: entry.date,
-            startTime: entry.startTime,
-            endTime: entry.endTime,
+            startTime: timing.startTime || entry.startTime,
+            endTime: timing.endTime || entry.endTime,
             className: entryTitle,
             classId: null,
             deliveryDepartmentId: activity.departmentId,
@@ -1196,6 +1200,108 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
     });
   });
   return dedupeStatHolidayActivitySessionsForPerson(rows);
+}
+
+function buildAssigneeLockDisplayKey(entryId, personId) {
+  return `${normalizeId(entryId)}::${normalizeId(personId)}`;
+}
+
+function mapAssigneeLockReasonLabel(lockReason) {
+  const reason = String(lockReason || '').trim();
+  if (reason === 'timesheet_approved') return 'Locked — linked to submitted timesheet';
+  if (reason) return `Locked — ${reason}`;
+  return 'Locked';
+}
+
+function sumAssigneeHoursOnTimesheet(timesheet, {
+  activityId = '',
+  entryId = '',
+  personId = ''
+} = {}) {
+  const entries = Array.isArray(timesheet?.entries) ? timesheet.entries : [];
+  const teacherId = normalizeId(timesheet?.teacherId);
+  const targetPersonId = normalizeId(personId);
+  const total = entries
+    .filter((row) => row && !row.isDeleted)
+    .filter((row) => !activityId || idsEqual(row.activityId, activityId))
+    .filter((row) => !entryId || idsEqual(row.activityEntryId, entryId))
+    .filter((row) => {
+      const rowPersonId = normalizeId(row.personId);
+      if (rowPersonId) return idsEqual(rowPersonId, targetPersonId);
+      return !targetPersonId || idsEqual(teacherId, targetPersonId);
+    })
+    .reduce((sum, row) => sum + (Number(row.hours) || 0), 0);
+  return Number(total.toFixed(2));
+}
+
+async function buildActivityAssigneeLockDisplays(activity, reqUser) {
+  if (!activity || typeof activity !== 'object') return {};
+  const orgId = String(activity.orgId || getActiveOrgId(reqUser) || '').trim();
+  const activityId = normalizeId(activity.id);
+  const existingTimesheetIds = await schoolDependencyService.listExistingTimesheetIds(reqUser, orgId);
+
+  const lockedTargets = [];
+  const timesheetIdsNeeded = new Set();
+  getActivityEntries(activity).forEach((entry) => {
+    const entryId = normalizeId(entry.entryId);
+    normalizeActivityAssigneeRows(entry.assignees).forEach((assignee) => {
+      if (!isAssigneeTimesheetLocked(assignee)) return;
+      const personId = normalizeId(assignee.personId);
+      if (!entryId || !personId) return;
+      const timesheetId = normalizeId(assignee.lockedTimesheetId);
+      lockedTargets.push({ entryId, assignee, personId, timesheetId });
+      if (timesheetId) timesheetIdsNeeded.add(timesheetId);
+    });
+  });
+  if (!lockedTargets.length) return {};
+
+  const allTimesheets = await schoolDataService.fetchAllData('timesheets', {}, reqUser);
+  const timesheetById = new Map();
+  (Array.isArray(allTimesheets) ? allTimesheets : [])
+    .filter((row) => belongsToOrg(row, orgId))
+    .forEach((row) => {
+      const id = normalizeId(row?.id);
+      if (id && timesheetIdsNeeded.has(id)) timesheetById.set(id, row);
+    });
+
+  const periodIds = new Set();
+  timesheetById.forEach((timesheet) => {
+    const periodId = normalizeId(timesheet.periodId);
+    if (periodId) periodIds.add(periodId);
+  });
+  const periodById = new Map();
+  await Promise.all([...periodIds].map(async (periodId) => {
+    try {
+      const period = await schoolDataService.getDataById('timesheetPeriods', periodId, reqUser);
+      if (period) periodById.set(periodId, period);
+    } catch (_error) {
+      /* ignore missing period */
+    }
+  }));
+
+  const displays = {};
+  lockedTargets.forEach(({ entryId, assignee, personId, timesheetId }) => {
+    const isOrphan = schoolDependencyService.isOrphanTimesheetLock(assignee, existingTimesheetIds);
+    const timesheet = timesheetId ? timesheetById.get(timesheetId) : null;
+    const periodId = timesheet ? normalizeId(timesheet.periodId) : '';
+    const period = periodId ? periodById.get(periodId) : null;
+    const teacherId = timesheet ? (normalizeId(timesheet.teacherId) || personId) : personId;
+    const hours = timesheet
+      ? sumAssigneeHoursOnTimesheet(timesheet, { activityId, entryId, personId })
+      : 0;
+    displays[buildAssigneeLockDisplayKey(entryId, personId)] = {
+      reasonLabel: mapAssigneeLockReasonLabel(assignee.lockReason),
+      isOrphan,
+      timesheetId: timesheetId || '',
+      timesheetStatus: timesheet ? String(timesheet.status || '').trim() : '',
+      periodLabel: period ? String(period.name || period.label || '').trim() : '',
+      hours,
+      editorUrl: (!isOrphan && timesheet && periodId)
+        ? timesheetPeriodNavigationService.buildTimesheetEditorHref({ periodId, teacherId })
+        : ''
+    };
+  });
+  return displays;
 }
 
 async function listOrphanActivityTimesheetLocks({
@@ -1326,7 +1432,10 @@ module.exports = {
   isAssigneeEligibleForTimesheet,
   enforceActivityLockRules,
   listOrphanActivityTimesheetLocks,
-  forceUnlockActivityWorkSessionTimesheetLocks
+  forceUnlockActivityWorkSessionTimesheetLocks,
+  buildAssigneeLockDisplayKey,
+  sumAssigneeHoursOnTimesheet,
+  buildActivityAssigneeLockDisplays
 };
 
 

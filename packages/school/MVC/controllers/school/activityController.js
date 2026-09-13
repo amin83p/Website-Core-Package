@@ -108,6 +108,7 @@ exports.showCreateForm = async (req, res) => {
       isEdit: false,
       canForceUnlockTimesheetLocks: false,
       orphanTimesheetLockedWorkSessions: [],
+      assigneeLockDisplays: {},
       ...lookups,
       user: req.user,
       actionStateId: req.actionStateId
@@ -133,12 +134,14 @@ exports.showEditForm = async (req, res) => {
         orgId
       });
     }
+    const assigneeLockDisplays = await activityService.buildActivityAssigneeLockDisplays(activity, req.user);
     res.render('school/activity/activityForm', {
       title: 'Edit School Activity',
       activity,
       isEdit: true,
       canForceUnlockTimesheetLocks,
       orphanTimesheetLockedWorkSessions,
+      assigneeLockDisplays,
       ...lookups,
       user: req.user,
       actionStateId: req.actionStateId

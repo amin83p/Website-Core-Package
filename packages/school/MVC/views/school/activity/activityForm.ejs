@@ -47,6 +47,9 @@
         excludedPersonIds: [],
         assignees: legacyAttendees
       }];
+  const assigneeLockDisplaysForView = (typeof assigneeLockDisplays !== 'undefined' && assigneeLockDisplays && typeof assigneeLockDisplays === 'object')
+    ? assigneeLockDisplays
+    : {};
 %>
 
 <style>
@@ -66,6 +69,25 @@
   #activityEntriesTable th.activity-entry-sortable.sort-asc .activity-entry-sort-icon,
   #activityEntriesTable th.activity-entry-sortable.sort-desc .activity-entry-sort-icon {
     opacity: 1;
+  }
+  .assignee-lock-meta {
+    margin-top: 0;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: #b45309;
+  }
+  .assignee-lock-meta .assignee-lock-meta-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.45rem;
+  }
+  .assignee-lock-meta a {
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .assignee-lock-meta a:hover {
+    text-decoration: underline;
   }
 </style>
 
@@ -120,6 +142,7 @@
       <script type="application/json" id="activityInitialExcludedPersonIds"><%- JSON.stringify(initialExcludedPersonIds) %></script>
       <script type="application/json" id="activityInitialHiddenPersonIds"><%- JSON.stringify(initialHiddenPersonIds) %></script>
       <script type="application/json" id="activityCategoriesData"><%- JSON.stringify(categories || []) %></script>
+      <script type="application/json" id="activityAssigneeLockDisplays"><%- JSON.stringify(assigneeLockDisplaysForView) %></script>
 
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-4">
@@ -512,10 +535,20 @@ document.addEventListener('DOMContentLoaded', function () {
   const initialHiddenPersonIds = parseInitialJson('activityInitialHiddenPersonIds', []);
   const initialPersistedEntryCount = <%= persistedEntryCount %>;
   let entries = parseInitialJson('activityInitialEntries', []);
+  const assigneeLockDisplays = (function () {
+    try {
+      const node = document.getElementById('activityAssigneeLockDisplays');
+      const parsed = JSON.parse(node?.textContent || '{}');
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  })();
   let activityAllowedPersonIds = Array.isArray(initialAllowedPersonIds) ? initialAllowedPersonIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
   let activityExcludedPersonIds = Array.isArray(initialExcludedPersonIds) ? initialExcludedPersonIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
   let activityHiddenPersonIds = Array.isArray(initialHiddenPersonIds) ? initialHiddenPersonIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
   let selectedEntryIndex = null;
+  let entryModalPriorStartTime = '';
   let batchModalInstance = null;
   let batchAssignees = [];
   let entryModalInstance = null;
@@ -967,6 +1000,28 @@ document.addEventListener('DOMContentLoaded', function () {
     return minutes > 0 ? Number((minutes / 60).toFixed(2)) : 0;
   }
 
+  function normalizeClockTime(value) {
+    const text = String(value || '').trim();
+    return /^\d{2}:\d{2}$/.test(text) ? text : '';
+  }
+
+  function addMinutesToClockTime(startTime, minutesToAdd) {
+    const start = normalizeClockTime(startTime);
+    if (!start) return '';
+    const parts = start.split(':').map(Number);
+    const totalMinutes = (parts[0] * 60) + parts[1] + Number(minutesToAdd || 0);
+    if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+    const endH = Math.floor(totalMinutes / 60) % 24;
+    const endM = totalMinutes % 60;
+    return String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0');
+  }
+
+  function deriveAssigneeEndTime(startTime, paidHours) {
+    const hours = Number(paidHours);
+    if (!Number.isFinite(hours) || hours <= 0) return normalizeClockTime(startTime);
+    return addMinutesToClockTime(startTime, Math.round(hours * 60));
+  }
+
   function parseLocalDateToken(token) {
     const parts = String(token || '').split('-').map(Number);
     if (parts.length !== 3 || !parts.every(Number.isFinite)) return null;
@@ -1003,11 +1058,19 @@ document.addEventListener('DOMContentLoaded', function () {
     return target;
   }
 
-  function normalizeAttendee(item, entryDuration) {
+  function normalizeAttendee(item, entryDuration, entry) {
     const personId = String(item?.personId || item?.id || '').trim();
     if (!personId) return null;
     const roles = resolveAssigneeRoleList(item, personId);
     const selectedRole = pickDefaultRole(roles, item?.role || item?.matchedRole);
+    const entryStart = normalizeClockTime(entry?.startTime);
+    const entryEnd = normalizeClockTime(entry?.endTime);
+    const paidHours = item?.paidHours ?? entryDuration ?? '';
+    const startTime = normalizeClockTime(item?.startTime) || entryStart;
+    let endTime = normalizeClockTime(item?.endTime);
+    if (!endTime) {
+      endTime = entryEnd || deriveAssigneeEndTime(startTime, paidHours);
+    }
     return copyLockFields(item, {
       personId,
       personName: buildPersonDisplayName(item, personId),
@@ -1016,7 +1079,9 @@ document.addEventListener('DOMContentLoaded', function () {
       status: item?.status || 'attended',
       completionStatus: normalizeCompletionStatus(item?.completionStatus),
       paid: item?.paid === undefined ? paidInput.checked : normalizeBoolean(item.paid, paidInput.checked),
-      paidHours: item?.paidHours ?? entryDuration ?? '',
+      paidHours,
+      startTime,
+      endTime,
       notes: item?.notes || ''
     });
   }
@@ -1043,19 +1108,24 @@ document.addEventListener('DOMContentLoaded', function () {
       ? item.assignees
       : (Array.isArray(item?.attendees) ? item.attendees : []);
     const durationHours = item?.durationHours ?? '';
+    const entryTiming = {
+      startTime: String(item?.startTime || '').trim(),
+      endTime: String(item?.endTime || '').trim(),
+      durationHours
+    };
     return copyLockFields(item, {
       entryId: String(item?.entryId || item?.id || 'ENTRY-' + (index + 1)).trim(),
       title: String(item?.title || '').trim(),
       date: String(item?.date || '').trim(),
-      startTime: String(item?.startTime || '').trim(),
-      endTime: String(item?.endTime || '').trim(),
+      startTime: entryTiming.startTime,
+      endTime: entryTiming.endTime,
       durationHours,
       location: String(item?.location || activityLocationInput.value || '').trim(),
       notes: String(item?.notes || '').trim(),
       status: String(item?.status || 'posted').trim().toLowerCase(),
       excludedPersonIds: normalizePersonIdList(item?.excludedPersonIds || item?.excludedPersons || []),
       assignees: sourceAssignees.map(function (itemRow) {
-        return normalizeAttendee(itemRow, durationHours);
+        return normalizeAttendee(itemRow, durationHours, entryTiming);
       }).filter(Boolean)
     });
   }
@@ -1168,6 +1238,70 @@ document.addEventListener('DOMContentLoaded', function () {
     return (Array.isArray(entry.assignees) ? entry.assignees : []).some(isAssigneeTimesheetLocked);
   }
 
+  function buildAssigneeLockDisplayKey(entryId, personId) {
+    return String(entryId || '').trim() + '::' + String(personId || '').trim();
+  }
+
+  function resolveAssigneeLockDisplay(entryId, personId) {
+    const key = buildAssigneeLockDisplayKey(entryId, personId);
+    return key ? (assigneeLockDisplays[key] || null) : null;
+  }
+
+  function formatTimesheetStatusLabel(status) {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (normalized === 'submitted') return 'Submitted';
+    if (normalized === 'processed') return 'Processed';
+    if (normalized === 'draft') return 'Draft';
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  }
+
+  function renderAssigneeLockMeta(entryId, assignee) {
+    const display = resolveAssigneeLockDisplay(entryId, assignee?.personId);
+    if (!display) return '';
+    const parts = [];
+    parts.push('<div class="assignee-lock-meta">');
+    parts.push('<div class="assignee-lock-meta-line"><i class="bi bi-lock-fill" aria-hidden="true"></i><span>' + escapeHtml(display.reasonLabel || 'Locked') + '</span></div>');
+    const summaryParts = [];
+    if (display.periodLabel) summaryParts.push(escapeHtml(display.periodLabel));
+    const statusLabel = formatTimesheetStatusLabel(display.timesheetStatus);
+    if (statusLabel) summaryParts.push(escapeHtml(statusLabel));
+    if (Number(display.hours) > 0) summaryParts.push(escapeHtml(Number(display.hours).toFixed(2) + ' h on timesheet'));
+    if (summaryParts.length) {
+      parts.push('<div class="assignee-lock-meta-line text-muted">' + summaryParts.join(' · ') + '</div>');
+    }
+    if (display.isOrphan) {
+      const orphanId = String(display.timesheetId || '').trim();
+      parts.push('<div class="assignee-lock-meta-line text-muted">Timesheet ' + escapeHtml(orphanId || 'unknown') + ' no longer exists.</div>');
+    } else if (display.editorUrl) {
+      parts.push('<div class="assignee-lock-meta-line"><a href="' + escapeHtml(display.editorUrl) + '" target="_blank" rel="noopener">View timesheet</a></div>');
+    }
+    parts.push('</div>');
+    return parts.join('');
+  }
+
+  function syncAssigneePayableUi(assigneeCard, assigneeIndex, entryIndex) {
+    if (!assigneeCard) return;
+    const paidCheckbox = assigneeCard.querySelector('.js-assignee-paid');
+    const hoursInput = assigneeCard.querySelector('.js-assignee-hours');
+    if (!paidCheckbox || !hoursInput) return;
+    const locked = assigneeCard.getAttribute('data-assignee-locked') === 'true';
+    const isPaid = paidCheckbox.checked;
+    hoursInput.disabled = locked || !isPaid;
+    hoursInput.classList.toggle('bg-light', !isPaid && !locked);
+    assigneeCard.classList.toggle('is-not-payable', !isPaid);
+    if (!isPaid && entries[entryIndex] && entries[entryIndex].assignees[assigneeIndex]) {
+      entries[entryIndex].assignees[assigneeIndex].paidHours = 0;
+      hoursInput.value = '0';
+      return;
+    }
+    if (isPaid && entries[entryIndex] && entries[entryIndex].assignees[assigneeIndex]) {
+      const restored = entries[entryIndex].assignees[assigneeIndex].paidHours || entries[entryIndex].durationHours || '';
+      hoursInput.value = restored;
+      entries[entryIndex].assignees[assigneeIndex].paidHours = restored;
+    }
+  }
+
   function renderAssigneeRows(entry, entryIndex) {
     const assignees = Array.isArray(entry.assignees) ? entry.assignees : [];
     if (!assignees.length) {
@@ -1177,21 +1311,32 @@ document.addEventListener('DOMContentLoaded', function () {
       const paid = assignee.paid !== false;
       const assigneeLocked = isAssigneeTimesheetLocked(assignee);
       const disabledAttr = assigneeLocked ? ' disabled' : '';
+      const hoursDisabledAttr = (assigneeLocked || !paid) ? ' disabled' : '';
       const lockIcon = assigneeLocked
         ? '<i class="bi bi-lock-fill text-warning ms-1" title="Locked by submitted timesheet"></i>'
         : '';
       const removeBtn = assigneeLocked
         ? ''
         : '<div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm js-assignee-remove"><i class="bi bi-trash"></i></button></div>';
+      const assigneeStartTime = normalizeClockTime(assignee.startTime) || normalizeClockTime(entry.startTime);
+      const assigneeEndTime = normalizeClockTime(assignee.endTime)
+        || deriveAssigneeEndTime(assigneeStartTime, assignee.paidHours ?? entry.durationHours)
+        || normalizeClockTime(entry.endTime);
+      const paidHoursValue = paid ? (assignee.paidHours ?? entry.durationHours ?? '') : '0';
       return [
-        '<div class="border rounded p-3 mb-2 bg-white' + (assigneeLocked ? ' border-warning-subtle' : '') + '" data-assignee-index="' + assigneeIndex + '" data-assignee-locked="' + (assigneeLocked ? 'true' : 'false') + '">',
+        '<div class="border rounded p-3 mb-2 bg-white assignee-card' + (assigneeLocked ? ' border-warning-subtle' : '') + (paid ? '' : ' is-not-payable') + '" data-assignee-index="' + assigneeIndex + '" data-assignee-locked="' + (assigneeLocked ? 'true' : 'false') + '">',
         '<div class="row g-2 align-items-end">',
-        '<div class="col-md-3"><div class="fw-bold">' + escapeHtml(resolvePersonLabel(assignee.personId, assignee.personName)) + lockIcon + '</div><div class="small text-muted">' + escapeHtml(assignee.personId || '') + '</div></div>',
+        '<div class="col-md-4"><div class="fw-bold">' + escapeHtml(resolvePersonLabel(assignee.personId, assignee.personName)) + lockIcon + '</div><div class="small text-muted">' + escapeHtml(assignee.personId || '') + '</div></div>',
         '<div class="col-md-2"><label class="form-label fw-bold small">Role</label>' + renderRoleSelect(assignee, entryIndex, assigneeIndex, assigneeLocked) + '</div>',
         '<div class="col-md-2"><label class="form-label fw-bold small">Status</label>' + renderAssigneeStatusControl(assignee, assigneeLocked) + '</div>',
-        '<div class="col-md-2"><label class="form-label fw-bold small">Paid Hours</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-assignee-hours" value="' + escapeHtml(assignee.paidHours ?? entry.durationHours ?? '') + '"' + disabledAttr + '></div>',
         '<div class="col-md-2"><div class="form-check form-switch"><input class="form-check-input js-assignee-paid" type="checkbox" ' + (paid ? 'checked' : '') + disabledAttr + '><label class="form-check-label small fw-bold">Payable</label></div></div>',
         removeBtn,
+        '</div>',
+        '<div class="row g-2 align-items-end mt-2 pt-2 border-top border-light-subtle">',
+        '<div class="col-md-4">' + renderAssigneeLockMeta(entry.entryId || entry.id, assignee) + '</div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Start Time</label><input type="time" class="form-control form-control-sm js-assignee-start" value="' + escapeHtml(assigneeStartTime) + '"' + disabledAttr + '></div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">End Time</label><input type="time" class="form-control form-control-sm js-assignee-end" value="' + escapeHtml(assigneeEndTime) + '"' + disabledAttr + '></div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Paid Hours</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-assignee-hours' + (!paid ? ' bg-light' : '') + '" value="' + escapeHtml(paidHoursValue) + '"' + hoursDisabledAttr + '></div>',
         '</div>',
         '<div class="mt-2"><label class="form-label fw-bold small">Assignee Notes</label><input type="text" class="form-control form-control-sm js-assignee-notes" value="' + escapeHtml(assignee.notes || '') + '" placeholder="Optional notes for this person..."' + disabledAttr + '></div>',
         '</div>'
@@ -1443,6 +1588,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function openEntryModal(entryIndex) {
     if (!Number.isInteger(entryIndex) || !entries[entryIndex]) return;
     selectedEntryIndex = entryIndex;
+    entryModalPriorStartTime = entries[entryIndex].startTime || '';
     renderEntryRowsOnly();
     renderEntryModal();
     const modal = getEntryModalInstance();
@@ -1501,6 +1647,18 @@ document.addEventListener('DOMContentLoaded', function () {
       const updateEntryField = function () {
         const fieldName = field.getAttribute('data-field');
         entries[entryIndex][fieldName] = field.value;
+        if (fieldName === 'startTime') {
+          const priorStart = entryModalPriorStartTime;
+          const newStart = field.value;
+          (entries[entryIndex].assignees || []).forEach(function (assignee) {
+            const assigneeStart = normalizeClockTime(assignee.startTime) || normalizeClockTime(priorStart);
+            if (!priorStart || !newStart || priorStart === newStart) return;
+            if (!assigneeStart || assigneeStart === normalizeClockTime(priorStart)) {
+              assignee.startTime = newStart;
+            }
+          });
+          entryModalPriorStartTime = newStart;
+        }
         if (fieldName === 'startTime' || fieldName === 'endTime') {
           const calculatedHours = calculateDurationHours(entries[entryIndex].startTime, entries[entryIndex].endTime);
           if (calculatedHours > 0) {
@@ -1508,6 +1666,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const durationField = entryModalBody.querySelector('[data-field="durationHours"]');
             if (durationField) durationField.value = entries[entryIndex].durationHours;
           }
+        }
+        if (fieldName === 'startTime' && selectedEntryIndex === entryIndex) {
+          syncEntries();
+          renderEntryModal();
+          return;
         }
         syncEntries();
         renderEntryRowsOnly();
@@ -1535,10 +1698,25 @@ document.addEventListener('DOMContentLoaded', function () {
         entries[entryIndex].assignees[assigneeIndex].paidHours = event.target.value;
         syncEntries();
       });
-      assigneeRow.querySelector('.js-assignee-paid')?.addEventListener('change', function (event) {
-        entries[entryIndex].assignees[assigneeIndex].paid = event.target.checked;
+      assigneeRow.querySelector('.js-assignee-start')?.addEventListener('change', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].startTime = event.target.value;
         syncEntries();
       });
+      assigneeRow.querySelector('.js-assignee-end')?.addEventListener('change', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].endTime = event.target.value;
+        syncEntries();
+      });
+      assigneeRow.querySelector('.js-assignee-paid')?.addEventListener('change', function (event) {
+        entries[entryIndex].assignees[assigneeIndex].paid = event.target.checked;
+        if (!event.target.checked) {
+          entries[entryIndex].assignees[assigneeIndex].paidHours = 0;
+        } else if (!entries[entryIndex].assignees[assigneeIndex].paidHours) {
+          entries[entryIndex].assignees[assigneeIndex].paidHours = entries[entryIndex].durationHours || '';
+        }
+        syncAssigneePayableUi(assigneeRow, assigneeIndex, entryIndex);
+        syncEntries();
+      });
+      syncAssigneePayableUi(assigneeRow, assigneeIndex, entryIndex);
       assigneeRow.querySelector('.js-assignee-notes')?.addEventListener('input', function (event) {
         entries[entryIndex].assignees[assigneeIndex].notes = event.target.value;
         syncEntries();
@@ -1839,7 +2017,9 @@ document.addEventListener('DOMContentLoaded', function () {
         return {
           ...assignee,
           roles: Array.isArray(assignee.roles) ? [...assignee.roles] : normalizeRoleList(assignee.roles || assignee.role),
-          paidHours: assignee.paidHours || durationHours
+          paidHours: assignee.paidHours || durationHours,
+          startTime: normalizeClockTime(assignee.startTime) || startTime,
+          endTime: normalizeClockTime(assignee.endTime) || endTime
         };
       });
       entries.push(getDefaultEntry({
@@ -2067,7 +2247,7 @@ document.addEventListener('DOMContentLoaded', function () {
             blockedCount += 1;
             return;
           }
-          const attendee = normalizeAttendee(item, entries[entryIndex]?.durationHours || '');
+          const attendee = normalizeAttendee(item, entries[entryIndex]?.durationHours || '', entries[entryIndex]);
           if (!attendee) return;
           entries[entryIndex].excludedPersonIds = normalizePersonIdList(entries[entryIndex].excludedPersonIds || []).filter(function (entryPersonId) {
             return entryPersonId !== personId;

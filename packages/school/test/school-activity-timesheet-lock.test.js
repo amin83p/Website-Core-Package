@@ -299,6 +299,112 @@ test('isPersonHiddenFromTimesheetSelection blocks hidden allowed persons only', 
   assert.equal(activityService.isPersonEligibleForActivity(activity, 'TEACHER_A'), true);
 });
 
+test('sumAssigneeHoursOnTimesheet totals matching activity entry hours', () => {
+  const hours = activityService.sumAssigneeHoursOnTimesheet({
+    teacherId: 'TEACHER/A',
+    entries: [
+      { activityId: 'ACT/1', activityEntryId: 'ENT/1', personId: '', hours: 4, isDeleted: false },
+      { activityId: 'ACT/1', activityEntryId: 'ENT/1', personId: 'TEACHER/B', hours: 2, isDeleted: false },
+      { activityId: 'ACT/1', activityEntryId: 'ENT/2', personId: '', hours: 1, isDeleted: false }
+    ]
+  }, {
+    activityId: 'ACT/1',
+    entryId: 'ENT/1',
+    personId: 'TEACHER/A'
+  });
+  assert.equal(hours, 4);
+});
+
+test('buildActivityAssigneeLockDisplays returns editor link for linked timesheet lock', async () => {
+  const schoolDataService = require('../MVC/services/school/schoolDataService');
+  const originalFetchAll = schoolDataService.fetchAllData;
+  const originalGetById = schoolDataService.getDataById;
+  const originalListExisting = schoolDependencyService.listExistingTimesheetIds;
+  schoolDependencyService.listExistingTimesheetIds = async () => ['TS/1'];
+  schoolDataService.fetchAllData = async (table) => {
+    if (table !== 'timesheets') return [];
+    return [{
+      id: 'TS/1',
+      orgId: 'ORG_1',
+      periodId: 'PER/1',
+      teacherId: 'TEACHER/A',
+      status: 'submitted',
+      entries: [{ activityId: 'ACT/1', activityEntryId: 'ENT/1', personId: '', hours: 6 }]
+    }];
+  };
+  schoolDataService.getDataById = async (table, id) => {
+    if (table === 'timesheetPeriods' && id === 'PER/1') {
+      return { id: 'PER/1', name: 'March 2026' };
+    }
+    return null;
+  };
+  try {
+    const displays = await activityService.buildActivityAssigneeLockDisplays({
+      id: 'ACT/1',
+      orgId: 'ORG_1',
+      entries: [{
+        entryId: 'ENT/1',
+        assignees: [{
+          personId: 'TEACHER/A',
+          locked: true,
+          lockReason: 'timesheet_approved',
+          lockedTimesheetId: 'TS/1'
+        }]
+      }]
+    }, {});
+    const display = displays['ENT/1::TEACHER/A'];
+    assert.ok(display);
+    assert.equal(display.isOrphan, false);
+    assert.equal(display.timesheetStatus, 'submitted');
+    assert.equal(display.periodLabel, 'March 2026');
+    assert.equal(display.hours, 6);
+    assert.match(display.editorUrl, /\/school\/timesheets\/editor\/PER%2F1\?teacherId=TEACHER%2FA/);
+  } finally {
+    schoolDataService.fetchAllData = originalFetchAll;
+    schoolDataService.getDataById = originalGetById;
+    schoolDependencyService.listExistingTimesheetIds = originalListExisting;
+  }
+});
+
+test('buildActivityAssigneeLockDisplays marks missing timesheet as orphan without editor link', async () => {
+  const originalListExisting = schoolDependencyService.listExistingTimesheetIds;
+  schoolDependencyService.listExistingTimesheetIds = async () => [];
+  try {
+    const displays = await activityService.buildActivityAssigneeLockDisplays({
+      id: 'ACT/1',
+      orgId: 'ORG_1',
+      entries: [{
+        entryId: 'ENT/1',
+        assignees: [{
+          personId: 'TEACHER/A',
+          locked: true,
+          lockReason: 'timesheet_approved',
+          lockedTimesheetId: 'TS/MISSING'
+        }]
+      }]
+    }, {});
+    const display = displays['ENT/1::TEACHER/A'];
+    assert.ok(display);
+    assert.equal(display.isOrphan, true);
+    assert.equal(display.editorUrl, '');
+    assert.equal(display.timesheetId, 'TS/MISSING');
+  } finally {
+    schoolDependencyService.listExistingTimesheetIds = originalListExisting;
+  }
+});
+
+test('buildActivityAssigneeLockDisplays omits unlocked assignees', async () => {
+  const displays = await activityService.buildActivityAssigneeLockDisplays({
+    id: 'ACT/1',
+    orgId: 'ORG_1',
+    entries: [{
+      entryId: 'ENT/1',
+      assignees: [{ personId: 'TEACHER/A', locked: false }]
+    }]
+  }, {});
+  assert.deepEqual(displays, {});
+});
+
 test('listManualEntryActivitiesForPerson excludes hidden activities for person', async () => {
   const schoolDataService = require('../MVC/services/school/schoolDataService');
   const originalFetchData = schoolDataService.fetchData;

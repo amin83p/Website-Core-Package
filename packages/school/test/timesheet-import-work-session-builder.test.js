@@ -179,6 +179,7 @@ test('buildImportWorkSessionEntryDrafts bills optional-only rows with optional c
 test('buildCompletedAssignee marks attendance activities attended', () => {
   const assignee = builder.buildCompletedAssignee({
     activity: ACTIVITY,
+    entry: { startTime: '09:00', endTime: '11:00', durationHours: 2 },
     personId: 'PERSON_1',
     personRole: 'teacher',
     hours: 2,
@@ -186,6 +187,8 @@ test('buildCompletedAssignee marks attendance activities attended', () => {
   });
   assert.equal(assignee.status, 'attended');
   assert.equal(assignee.paidHours, 2);
+  assert.equal(assignee.startTime, '09:00');
+  assert.equal(assignee.endTime, '11:00');
   assert.deepEqual(assignee.roles, ['teacher']);
 });
 
@@ -215,6 +218,8 @@ test('buildImportWorkSessionEntryDrafts stamp import trace metadata', () => {
   assert.equal(drafts[0].legacyImportBatchId, 'BATCH_1');
   assert.equal(drafts[0].legacyImportSourceFileName, 'march.xlsx');
   assert.equal(drafts[0].assignees[0].legacyImportBatchId, 'BATCH_1');
+  assert.equal(drafts[0].assignees[0].startTime, '00:00');
+  assert.equal(drafts[0].assignees[0].endTime, '02:00');
   assert.match(drafts[0].notes, /Prep/);
 });
 

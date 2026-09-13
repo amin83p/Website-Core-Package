@@ -1,6 +1,7 @@
 'use strict';
 
 const activityService = require('./activityService');
+const activityAssigneeTimingService = require('./activityAssigneeTimingService');
 const activityEntryIdService = require('./activityEntryIdService');
 const dataService = require('./schoolDataService');
 const schoolDependencyService = require('./schoolDependencyService');
@@ -169,6 +170,7 @@ function stackCompiledRowsByDate(compiledRows = [], { baseStartTime = '00:00' } 
 
 function buildCompletedAssignee({
   activity = {},
+  entry = {},
   personId = '',
   personName = '',
   personRole = '',
@@ -190,9 +192,13 @@ function buildCompletedAssignee({
     ...roleFields,
     ...importTrace
   };
+  const timedBase = activityAssigneeTimingService.applyAssigneeTiming(base, entry, {
+    startTime: entry?.startTime,
+    paidHours: paid ? safeHours : 0
+  });
   if (evaluationType === 'completion') {
     return {
-      ...base,
+      ...timedBase,
       status: paid ? 'attended' : 'attended',
       completionStatus: 'completed',
       completedAt: nowIso,
@@ -200,7 +206,7 @@ function buildCompletedAssignee({
     };
   }
   return {
-    ...base,
+    ...timedBase,
     status: 'attended',
     completionStatus: 'pending'
   };
@@ -234,16 +240,20 @@ function buildImportWorkSessionEntryDrafts({
   return stackedRows.map((row, index) => {
     const title = String(row?.className || '').trim();
     const notes = buildImportRowNotes(row);
-    return {
+    const entryDraft = {
       title,
       date: row.date,
       startTime: row.startTime,
       endTime: row.endTime,
       durationHours: row.durationHours,
       status: 'posted',
-      notes,
+      notes
+    };
+    return {
+      ...entryDraft,
       assignees: [buildCompletedAssignee({
         activity,
+        entry: entryDraft,
         personId: targetPersonId,
         personName,
         personRole,

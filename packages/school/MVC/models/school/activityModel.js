@@ -7,6 +7,7 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const dataPath = path.join(resolveCoreRoot(), 'data/school/activities.json');
 const ACTIVITY_STATUSES = new Set(['draft', 'posted', 'cancelled', 'void']);
 const { applyVoidMetadata } = require('./voidRecordMetadata');
+const activityAssigneeTimingService = require('../../services/school/activityAssigneeTimingService');
 const ATTENDANCE_STATUSES = new Set(['attended', 'absent', 'excused']);
 const COMPLETION_STATUSES = new Set(['pending', 'completed']);
 const EVALUATION_TYPES = new Set(['attendance', 'completion']);
@@ -92,7 +93,7 @@ function normalizeActivityVisibilityScope(value) {
   return raw;
 }
 
-function sanitizeAttendee(input = {}, activityPaid = false, durationHours = 0) {
+function sanitizeAttendee(input = {}, activityPaid = false, durationHours = 0, entryContext = {}) {
   const personId = cleanId(input.personId || input.id, { allowEmpty: false });
   const personName = cleanString(input.personName || input.displayName || input.name, { max: 180, allowEmpty: true });
   const role = cleanString(input.role || input.personRole || input.matchedRole || 'participant', { max: 40, allowEmpty: true }).toLowerCase() || 'participant';
@@ -122,7 +123,7 @@ function sanitizeAttendee(input = {}, activityPaid = false, durationHours = 0) {
   const completedBy = completionStatus === 'completed'
     ? cleanId(input.completedBy, { allowEmpty: true })
     : '';
-  return {
+  const base = {
     personId,
     personName,
     roles: roles.length ? roles : [role],
@@ -140,6 +141,26 @@ function sanitizeAttendee(input = {}, activityPaid = false, durationHours = 0) {
     lockReason,
     lockedTimesheetId
   };
+  const entry = {
+    startTime: cleanTime(entryContext.startTime, { allowEmpty: true }),
+    endTime: cleanTime(entryContext.endTime, { allowEmpty: true }),
+    durationHours
+  };
+  const inputStart = cleanTime(input.startTime, { allowEmpty: true });
+  const inputEnd = cleanTime(input.endTime, { allowEmpty: true });
+  const timed = activityAssigneeTimingService.applyAssigneeTiming(
+    { ...base, startTime: inputStart, endTime: inputEnd },
+    entry,
+    {
+      paidHours,
+      startTime: inputStart || undefined,
+      endTime: inputEnd || undefined
+    }
+  );
+  const result = { ...base };
+  if (timed.startTime) result.startTime = timed.startTime;
+  if (timed.endTime) result.endTime = timed.endTime;
+  return result;
 }
 
 function parseJsonArray(value, fieldName = 'value') {
@@ -253,7 +274,7 @@ function sanitizeActivityEntry(input = {}, context = {}) {
     ? input.attendees
     : parseJsonArray(input.attendees, 'Activity session attendees');
   const assignees = (assigneesSource.length ? assigneesSource : fallbackAttendees)
-    .map((row) => sanitizeAttendee(row, activityPaid, durationHours));
+    .map((row) => sanitizeAttendee(row, activityPaid, durationHours, { startTime, endTime }));
   const excludedPersonIds = parsePersonIdArray(input.excludedPersonIds || input.excludedPersons || [], 'Work session excluded persons');
   return {
     entryId: cleanId(input.entryId || input.id || generateEntryId(index), { allowEmpty: false }),

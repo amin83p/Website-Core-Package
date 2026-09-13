@@ -838,6 +838,8 @@ test('syncStatHolidayWorkSessionsForPersonPeriod normalizes corrupted day entry 
     const entry = maintenanceArgs?.payload?.entries?.[0];
     assert.equal(entry.durationHours, 12);
     assert.equal(entry.assignees?.[0]?.paidHours, 6);
+    assert.equal(entry.assignees?.[0]?.startTime, '08:00');
+    assert.equal(entry.assignees?.[0]?.endTime, '14:00');
   } finally {
     activityService.isPersonEligibleForActivity = originalEligible;
     activityService.getActivity = originalGetActivity;

@@ -1,6 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const schoolRecordAccessService = require('./schoolRecordAccessService');
 const activityService = require('./activityService');
+const activityAssigneeTimingService = require('./activityAssigneeTimingService');
 const schoolDependencyService = require('./schoolDependencyService');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -145,7 +146,7 @@ function buildAssigneeCompletionLabel(activity, assignee) {
   return normalizeStatus(assignee.status) ? 'Attendance recorded' : 'Pending attendance';
 }
 
-function enrichAssigneeRow(activity, assignee, { entry, reqUser, access, scopedPersonId } = {}) {
+function enrichAssigneeRow(activity, assignee, { entry, reqUser, access, scopedPersonId, lockDisplays } = {}) {
   const locked = activityService.isWorkSessionAssigneeLocked(entry || {}, assignee);
   const editable = isAssigneeRowEditable({
     entry,
@@ -155,11 +156,14 @@ function enrichAssigneeRow(activity, assignee, { entry, reqUser, access, scopedP
     targetPersonId: assignee.personId
   });
   const isSelf = scopedPersonId && idsEqual(assignee.personId, scopedPersonId);
+  const lockKey = activityService.buildAssigneeLockDisplayKey(entry?.entryId || entry?.id, assignee.personId);
+  const lockDisplay = lockDisplays && lockDisplays[lockKey] ? lockDisplays[lockKey] : null;
   return {
     ...assignee,
     locked,
     editable,
     isSelf,
+    lockDisplay,
     readyForTimesheet: activityService.isAssigneeEligibleForTimesheet(activity, assignee),
     completionLabel: buildAssigneeCompletionLabel(activity, assignee)
   };
@@ -331,9 +335,16 @@ async function getWorkSessionContext(activityId, entryId, reqUser, accessContext
       normalizeRoleList(row.roles || row.matchedRole || row.role, row.matchedRole || 'participant')
     ]).filter(([personId]) => Boolean(personId))
   );
+  const assigneeLockDisplays = await activityService.buildActivityAssigneeLockDisplays(activity, reqUser);
   const assignees = normalizeAssigneeRows(entry.assignees)
     .map((assignee) => {
-      const enriched = enrichAssigneeRow(activity, assignee, { entry, reqUser, access, scopedPersonId });
+      const enriched = enrichAssigneeRow(activity, assignee, {
+        entry,
+        reqUser,
+        access,
+        scopedPersonId,
+        lockDisplays: assigneeLockDisplays
+      });
       const personId = normalizeId(enriched.personId);
       const mergedRoles = mergeAssigneeRoleLists(
         enriched.roles || enriched.role,
@@ -382,7 +393,14 @@ function mergeAssigneeRoleLists(storedRoles, lookupRoles, selectedRole = 'partic
   return { role: normalizedRole, roles };
 }
 
-function normalizeAdminAssigneeRow(row = {}, priorByPerson = new Map(), durationHours = 0, evaluationType = 'attendance', reqUser = {}) {
+function normalizeAdminAssigneeRow(
+  row = {},
+  priorByPerson = new Map(),
+  durationHours = 0,
+  evaluationType = 'attendance',
+  reqUser = {},
+  timingContext = {}
+) {
   const personId = normalizeId(row.personId || row.id);
   if (!personId) return null;
   const prior = priorByPerson.get(personId) || {};
@@ -410,7 +428,7 @@ function normalizeAdminAssigneeRow(row = {}, priorByPerson = new Map(), duration
     completedAt = prior.completedAt || '';
     completedByValue = prior.completedBy || '';
   }
-  return {
+  const base = {
     ...prior,
     personId,
     personName: cleanText(row.personName || row.displayName || row.name || prior.personName || personId, { max: 180 }),
@@ -424,13 +442,44 @@ function normalizeAdminAssigneeRow(row = {}, priorByPerson = new Map(), duration
     completedAt,
     completedBy: completedByValue
   };
+  const entry = {
+    startTime: timingContext.newSessionStartTime || timingContext.priorSessionStartTime || '',
+    endTime: timingContext.sessionEndTime || '',
+    durationHours
+  };
+  const nextStart = activityAssigneeTimingService.resolveAssigneeStartAfterSessionChange({
+    assignee: base,
+    priorSessionStartTime: timingContext.priorSessionStartTime,
+    newSessionStartTime: timingContext.newSessionStartTime
+  });
+  const inputStart = activityAssigneeTimingService.normalizeClockTime(row.startTime);
+  const inputEnd = activityAssigneeTimingService.normalizeClockTime(row.endTime);
+  return activityAssigneeTimingService.applyAssigneeTiming(base, entry, {
+    startTime: inputStart || nextStart,
+    endTime: inputEnd || undefined,
+    paidHours: durationHours
+  });
 }
 
-function normalizeAdminAssigneeRows(inputRows, existingRows = [], durationHours = 0, evaluationType = 'attendance', reqUser = {}) {
+function normalizeAdminAssigneeRows(
+  inputRows,
+  existingRows = [],
+  durationHours = 0,
+  evaluationType = 'attendance',
+  reqUser = {},
+  timingContext = {}
+) {
   const priorByPerson = new Map(normalizeAssigneeRows(existingRows).map((row) => [normalizeId(row.personId), row]));
   const seen = new Set();
   return (Array.isArray(inputRows) ? inputRows : []).map((row) => {
-    const normalized = normalizeAdminAssigneeRow(row, priorByPerson, durationHours, evaluationType, reqUser);
+    const normalized = normalizeAdminAssigneeRow(
+      row,
+      priorByPerson,
+      durationHours,
+      evaluationType,
+      reqUser,
+      timingContext
+    );
     if (!normalized || seen.has(normalized.personId)) return null;
     seen.add(normalized.personId);
     return normalized;
@@ -456,6 +505,10 @@ async function saveWorkSessionMetadata({
   if (!['posted', 'cancelled'].includes(status)) {
     throw new Error('Manage Work Session supports only posted or cancelled status.');
   }
+  const priorSessionStartRaw = String(input.priorSessionStartTime || entry.startTime || '').trim();
+  const priorSessionStartTime = /^\d{2}:\d{2}$/.test(priorSessionStartRaw)
+    ? priorSessionStartRaw
+    : normalizeClockTime(entry.startTime, 'Start time');
   const startTime = normalizeClockTime(input.startTime || entry.startTime, 'Start time');
   const endTime = normalizeClockTime(input.endTime || entry.endTime, 'End time');
   const durationHours = calculateDurationHours(startTime, endTime);
@@ -472,7 +525,12 @@ async function saveWorkSessionMetadata({
     entry.assignees,
     durationHours,
     evaluationType,
-    reqUser
+    reqUser,
+    {
+      priorSessionStartTime,
+      newSessionStartTime: startTime,
+      sessionEndTime: endTime
+    }
   ).map((assignee) => {
     const prior = priorAssigneeByPerson.get(normalizeId(assignee.personId));
     if (prior && activityService.isAssigneeTimesheetLocked(prior)) {
@@ -571,13 +629,29 @@ async function saveAssigneeRow({
   } else if (input.status !== undefined && normalizeStatus(input.status) !== normalizeStatus(assignee.status)) {
     throw new Error('Attendance cannot be changed on completion-type activities. Use Mark complete instead.');
   }
-  await persistAssigneeUpdate(activityId, entryId, targetPersonId, (row) => ({
-    ...row,
-    status,
-    paid,
-    paidHours: Number.isFinite(paidHours) ? Number(paidHours.toFixed(2)) : row.paidHours,
-    notes: notes.slice(0, 500)
-  }), reqUser);
+  const safePaidHours = Number.isFinite(paidHours)
+    ? Number(paidHours.toFixed(2))
+    : Number(assignee.paidHours || durationHours || 0);
+  const inputStartTime = input.startTime === undefined || input.startTime === ''
+    ? undefined
+    : normalizeClockTime(input.startTime, 'Assignee start time');
+  const inputEndTime = input.endTime === undefined || input.endTime === ''
+    ? undefined
+    : normalizeClockTime(input.endTime, 'Assignee end time');
+  await persistAssigneeUpdate(activityId, entryId, targetPersonId, (row) => {
+    const next = {
+      ...row,
+      status,
+      paid,
+      paidHours: safePaidHours,
+      notes: notes.slice(0, 500)
+    };
+    return activityAssigneeTimingService.applyAssigneeTiming(next, context.entry, {
+      startTime: inputStartTime,
+      endTime: inputEndTime,
+      paidHours: safePaidHours
+    });
+  }, reqUser);
   const nextContext = await getWorkSessionContext(activityId, entryId, reqUser, accessContext);
   return buildMutationPayload(nextContext, accessContext, reqUser);
 }
@@ -627,16 +701,24 @@ async function completeAssignee({
   const notes = input.notes === undefined ? (assignee.notes || '') : String(input.notes || '').trim();
   const completedBy = toPublicId(reqUser?.personId || reqUser?.id);
   const completedAt = new Date().toISOString();
-  await persistAssigneeUpdate(activityId, entryId, targetPersonId, (row) => ({
-    ...row,
-    status,
-    paid: row.paid !== false,
-    paidHours: Number.isFinite(paidHours) ? Number(paidHours.toFixed(2)) : row.paidHours,
-    notes: notes.slice(0, 500),
-    completionStatus: 'completed',
-    completedAt,
-    completedBy
-  }), reqUser);
+  const safePaidHours = Number.isFinite(paidHours)
+    ? Number(paidHours.toFixed(2))
+    : Number(assignee.paidHours || durationHours || 0);
+  await persistAssigneeUpdate(activityId, entryId, targetPersonId, (row) => {
+    const next = {
+      ...row,
+      status,
+      paid: row.paid !== false,
+      paidHours: safePaidHours,
+      notes: notes.slice(0, 500),
+      completionStatus: 'completed',
+      completedAt,
+      completedBy
+    };
+    return activityAssigneeTimingService.applyAssigneeTiming(next, context.entry, {
+      paidHours: safePaidHours
+    });
+  }, reqUser);
   const nextContext = await getWorkSessionContext(activityId, entryId, reqUser, accessContext);
   return buildMutationPayload(nextContext, accessContext, reqUser);
 }
@@ -677,14 +759,22 @@ async function resetAssigneeCompletion({
     ? Number(assignee.paidHours || durationHours || 0)
     : Number(input.paidHours);
   const notes = input.notes === undefined ? (assignee.notes || '') : String(input.notes || '').trim();
-  await persistAssigneeUpdate(activityId, entryId, targetPersonId, (row) => ({
-    ...row,
-    paidHours: Number.isFinite(paidHours) ? Number(paidHours.toFixed(2)) : row.paidHours,
-    notes: notes.slice(0, 500),
-    completionStatus: 'pending',
-    completedAt: '',
-    completedBy: ''
-  }), reqUser);
+  const safePaidHours = Number.isFinite(paidHours)
+    ? Number(paidHours.toFixed(2))
+    : Number(assignee.paidHours || durationHours || 0);
+  await persistAssigneeUpdate(activityId, entryId, targetPersonId, (row) => {
+    const next = {
+      ...row,
+      paidHours: safePaidHours,
+      notes: notes.slice(0, 500),
+      completionStatus: 'pending',
+      completedAt: '',
+      completedBy: ''
+    };
+    return activityAssigneeTimingService.applyAssigneeTiming(next, context.entry, {
+      paidHours: safePaidHours
+    });
+  }, reqUser);
   const nextContext = await getWorkSessionContext(activityId, entryId, reqUser, accessContext);
   return buildMutationPayload(nextContext, accessContext, reqUser);
 }
