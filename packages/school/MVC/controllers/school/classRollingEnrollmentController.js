@@ -46,6 +46,7 @@ const rollingEnrollmentPeriodFilterService = require('../../services/school/roll
 const rollingEnrollmentExcelExportService = require('../../services/school/rollingEnrollmentExcelExportService');
 const rollingEnrollmentEngineService = require('../../services/school/rollingEnrollmentEngineService');
 const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
+const enrollmentHoldService = require('../../services/school/enrollmentHoldService');
 const rollingEnrollmentAttendanceReportService = require('../../services/school/rollingEnrollmentAttendanceReportService');
 const extensionEnrollmentService = require('../../services/school/extensionEnrollmentService');
 const sessionEnrollmentPickerService = require('../../services/school/sessionEnrollmentPickerService');
@@ -1267,9 +1268,14 @@ async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user, stude
     return {
       ...row,
       studentLabel: display.studentLabel,
-      studentRecordId: display.studentRecordId
+      studentRecordId: display.studentRecordId,
+      studentGender: display.studentGender
     };
   });
+}
+
+function resolveStudentGenderToken(person) {
+  return String(person?.demographics?.gender || person?.gender || '').trim().toLowerCase();
 }
 
 function buildEnrollmentPeriodStudentLabelLookup(students = [], personById = new Map()) {
@@ -1279,9 +1285,14 @@ function buildEnrollmentPeriodStudentLabelLookup(students = [], personById = new
     const studentId = toPublicId(student?.id);
     const personId = toPublicId(student?.personId);
     if (!studentId) return;
-    const name = schoolPersonAccessService.formatPersonName(personById.get(personId), studentId);
+    const person = personById.get(personId);
+    const name = schoolPersonAccessService.formatPersonName(person, studentId);
     const label = student?.studentNumber ? `${name} (${student.studentNumber})` : name;
-    const entry = { label, studentRecordId: studentId };
+    const entry = {
+      label,
+      studentRecordId: studentId,
+      studentGender: resolveStudentGenderToken(person)
+    };
     byStudentId.set(studentId, entry);
     if (personId) byPersonId.set(personId, entry);
   });
@@ -1290,22 +1301,24 @@ function buildEnrollmentPeriodStudentLabelLookup(students = [], personById = new
 
 function resolveEnrollmentPeriodStudentDisplay(studentId, lookup = {}) {
   const token = toPublicId(studentId);
-  if (!token) return { studentLabel: '', studentRecordId: '' };
+  if (!token) return { studentLabel: '', studentRecordId: '', studentGender: '' };
   const direct = lookup.byStudentId?.get(token);
   if (direct) {
     return {
       studentLabel: direct.label || token,
-      studentRecordId: direct.studentRecordId || token
+      studentRecordId: direct.studentRecordId || token,
+      studentGender: String(direct.studentGender || '').trim().toLowerCase()
     };
   }
   const byPerson = lookup.byPersonId?.get(token);
   if (byPerson) {
     return {
       studentLabel: byPerson.label || token,
-      studentRecordId: byPerson.studentRecordId || token
+      studentRecordId: byPerson.studentRecordId || token,
+      studentGender: String(byPerson.studentGender || '').trim().toLowerCase()
     };
   }
-  return { studentLabel: token, studentRecordId: token };
+  return { studentLabel: token, studentRecordId: token, studentGender: '' };
 }
 
 async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData, user, students = null) {
@@ -1430,7 +1443,8 @@ async function showRollingEnrollmentPage(req, res) {
           id: studentId,
           personId,
           studentNumber: String(student?.studentNumber || '').trim(),
-          label: student?.studentNumber ? `${label} (${student.studentNumber})` : label
+          label: student?.studentNumber ? `${label} (${student.studentNumber})` : label,
+          gender: resolveStudentGenderToken(personById.get(personId))
         };
       })
       .filter((row) => row.id)
@@ -1444,7 +1458,8 @@ async function showRollingEnrollmentPage(req, res) {
         return {
           ...row,
           studentLabel: display.studentLabel,
-          studentRecordId: display.studentRecordId
+          studentRecordId: display.studentRecordId,
+          studentGender: display.studentGender
         };
       });
     periodRows = attachFunderLabelsToPeriodRows(periodRows, funderOptions);
@@ -1478,7 +1493,8 @@ async function showRollingEnrollmentPage(req, res) {
       orgToday: resolveOrgTodayFromRequest(req),
       user: req.user,
       actionStateId: req.actionStateId,
-      canManageEnrollmentOffice: isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)
+      canManageEnrollmentOffice: isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
+      canEditStudentClb: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE)
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -4171,7 +4187,29 @@ async function editClassEnrollmentPeriod(req, res) {
       : String(periodRow?.status || 'active').trim().toLowerCase();
     const currentStatus = String(periodRow?.status || '').trim().toLowerCase();
     if (status !== currentStatus) {
-      throw new Error('Registration status cannot be changed from the general edit action. Use the registration status workflow.');
+      const openEditableStatuses = classEnrollmentSessionApplicabilityService.OPEN_EDITABLE_STATUSES;
+      if (!openEditableStatuses.has(currentStatus) || !openEditableStatuses.has(status)) {
+        throw new Error('Registration status cannot be changed from the general edit action. Use the registration status workflow.');
+      }
+      if (['waiting_list', 'to_be_confirmed'].includes(status)) {
+        const sessions = await schoolDataService.getClassSessions(classData.id, req.user);
+        const student = await schoolDataService.getDataById('students', periodRow.studentId, req.user);
+        const studentToPersonMap = new Map([
+          [toPublicId(student?.id), toPublicId(student?.personId)]
+        ].filter(([studentId, personId]) => studentId && personId));
+        const hasNonNaAttendanceMarkings = classEnrollmentSessionApplicabilityService.periodHasNonNaAttendanceMarkings({
+          period: {
+            ...periodRow,
+            startDate,
+            endDate: endDate || periodRow?.endDate || ''
+          },
+          sessions,
+          studentToPersonMap
+        });
+        if (hasNonNaAttendanceMarkings) {
+          throw new Error('Cannot change to Waiting List or To Be Confirmed when attendance has been recorded for non-N/A sessions.');
+        }
+      }
     }
     const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(
       req.body?.targetSessionCount !== undefined ? req.body?.targetSessionCount : periodRow?.targetSessionCount
@@ -4523,9 +4561,53 @@ async function createClassEnrollmentPeriod(req, res) {
 }
 
 async function closeClassEnrollmentPeriod(req, res) {
+  let guardKey = '';
   try {
-    throw new Error('Use the registration status preview and apply workflow to close an enrollment period.');
+    const periodId = toPublicId(req.params?.periodId || req.body?.periodId || '');
+    if (!periodId) throw new Error('periodId is required.');
+    const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!periodRow) throw new Error('Enrollment period not found.');
+    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const targetStatus = String(req.body?.status || 'withdrawn').trim().toLowerCase();
+    if (targetStatus !== 'withdrawn') {
+      throw new Error('Use the registration status preview and apply workflow to close an enrollment period.');
+    }
+    const endDate = String(req.body?.endDate || req.body?.effectiveDate || '').trim();
+    const reasonEnd = String(req.body?.reasonEnd || req.body?.reason || '').trim();
+    if (!endDate) throw new Error('endDate is required.');
+    if (!reasonEnd) throw new Error('A reason is required to close the enrollment period.');
+
+    guardKey = idempotencyGuardService.createGuardKey([
+      'class_enrollment_period_close_withdrawn',
+      String(classData?.orgId || '').trim(),
+      String(classData?.id || '').trim(),
+      periodId,
+      { endDate, reasonEnd }
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 90000,
+      replayTtlMs: 15000
+    });
+    if (sendGuardedResponse(req, res, guardResult, 'Enrollment withdrawal is already in progress. Please wait.')) return;
+
+    const updated = await schoolDataService.closeClassEnrollmentPeriod(periodId, {
+      status: 'withdrawn',
+      endDate,
+      reasonEnd
+    }, req.user, { orgToday: resolveOrgTodayFromRequest(req) });
+
+    const payloadOut = {
+      status: 'success',
+      message: 'Enrollment marked as withdrawn.',
+      data: updated || null
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    return res.json(payloadOut);
   } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
     return res.status(400).json({ status: 'error', message: error.message });
   }
 }
@@ -5058,6 +5140,106 @@ async function applyEnrollmentPeriodSessionMarks(req, res) {
   }
 }
 
+async function previewEnrollmentHoldPeriod(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+      throw new Error('Office access is required to manage enrollment on-hold periods.');
+    }
+    const preview = await enrollmentHoldService.previewHoldPeriod(periodId, {
+      startDate: req.body?.startDate,
+      endDate: req.body?.endDate,
+      reason: req.body?.reason,
+      excludeHoldId: req.body?.excludeHoldId
+    });
+    return res.json({
+      status: preview.canApply ? 'success' : 'blocked',
+      message: preview.canApply
+        ? 'On-hold preview is ready.'
+        : 'Resolve the listed attendance conflicts before applying the on-hold period.',
+      preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
+  }
+}
+
+async function applyEnrollmentHoldPeriod(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+      throw new Error('Office access is required to manage enrollment on-hold periods.');
+    }
+    const result = await enrollmentHoldService.applyHoldPeriod(periodId, {
+      startDate: req.body?.startDate,
+      endDate: req.body?.endDate,
+      reason: req.body?.reason
+    }, req.user);
+    return res.json({
+      status: 'success',
+      message: `On-hold period applied to ${result.updatedSessionCount} session(s).`,
+      hold: result.hold,
+      period: result.period
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
+  }
+}
+
+async function revokeEnrollmentHoldPeriod(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const holdId = toPublicId(req.params?.holdId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+      throw new Error('Office access is required to manage enrollment on-hold periods.');
+    }
+    const result = await enrollmentHoldService.revokeHoldPeriod(periodId, holdId, req.user);
+    return res.json({
+      status: 'success',
+      message: `On-hold period removed. ${result.revertedSessionCount} session roster(s) reverted.`,
+      hold: result.hold,
+      period: result.period
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function updateEnrollmentHoldPeriod(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const holdId = toPublicId(req.params?.holdId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+      throw new Error('Office access is required to manage enrollment on-hold periods.');
+    }
+    const result = await enrollmentHoldService.updateHoldPeriod(periodId, holdId, {
+      startDate: req.body?.startDate,
+      endDate: req.body?.endDate,
+      reason: req.body?.reason
+    }, req.user);
+    return res.json({
+      status: 'success',
+      message: `On-hold period updated for ${result.updatedSessionCount} session(s).`,
+      hold: result.hold,
+      period: result.period
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
+  }
+}
+
 async function getEnrollmentPeriodAttendanceReport(req, res) {
   try {
     const periodId = toPublicId(req.params?.periodId);
@@ -5160,6 +5342,10 @@ module.exports = {
   previewClassEnrollmentStatusTransition,
   applyClassEnrollmentStatusTransition,
   getEnrollmentPeriodSessionWindow,
+  previewEnrollmentHoldPeriod,
+  applyEnrollmentHoldPeriod,
+  revokeEnrollmentHoldPeriod,
+  updateEnrollmentHoldPeriod,
   getEnrollmentPeriodAttendanceReport,
   applyEnrollmentPeriodSessionMarks,
   createExtensionEnrollmentPeriod,

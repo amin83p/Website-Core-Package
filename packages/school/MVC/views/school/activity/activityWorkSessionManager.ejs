@@ -1042,7 +1042,7 @@
                     <th class="ps-2">Person</th>
                     <th class="ws-role-col">Role</th>
                     <% if (canEditWorkSessionMetadata && activityRow.paid) { %><th class="ws-payable-col">Payable</th><% } %>
-                    <th class="text-end">Hours</th>
+                    <th class="text-end">Paid hours</th>
                     <th class="ws-status-col">Status</th>
                     <th class="ws-notes-col">Notes</th>
                   </tr>
@@ -1212,7 +1212,7 @@
             const hiddenAssigneeEndTime = String(assignee.endTime || entryRow.endTime || '').trim();
           %>
             <% if (activityRow.paid) { %>
-              <input type="hidden" class="ws-paid-hours-input" id="paidHours_<%= rowKey %>" data-person-id="<%= assignee.personId %>" value="<%= Number(entryRow.durationHours || 0).toFixed(2) %>">
+              <input type="hidden" class="ws-paid-hours-input" id="paidHours_<%= rowKey %>" data-person-id="<%= assignee.personId %>" value="<%= Number(assignee.paidHours ?? entryRow.durationHours ?? 0).toFixed(2) %>">
             <% } %>
             <% if (rowEditable) { %>
               <form method="POST" action="<%= manageUrl %>/save" class="ws-assignee-save-form" data-person-id="<%= assignee.personId %>">
@@ -1540,6 +1540,21 @@
       return calculateDurationHours(start, end) || Number('<%= Number(entryRow.durationHours || 0).toFixed(2) %>') || 0;
     }
 
+    function resolveRowPaidHours(row) {
+      if (!row) return 0;
+      const isPaid = String(row.getAttribute('data-paid') || 'true').toLowerCase() !== 'false';
+      if (!isPaid) return 0;
+      const personId = String(row.getAttribute('data-person-id') || '').trim();
+      if (personId) {
+        const paidInput = document.querySelector('.ws-paid-hours-input[data-person-id="' + escapeSelectorValue(personId) + '"]');
+        const inputValue = Number(paidInput?.value);
+        if (Number.isFinite(inputValue) && inputValue >= 0) return inputValue;
+      }
+      const stored = Number(row.getAttribute('data-paid-hours'));
+      if (Number.isFinite(stored) && stored >= 0) return stored;
+      return currentDerivedHours();
+    }
+
     function getRowAssigneeStart(row) {
       const personId = row?.getAttribute('data-person-id');
       const timingRow = personId ? getAssigneeTimingRow(personId) : null;
@@ -1585,13 +1600,6 @@
       const label = hours.toFixed(2) + ' h';
       const sessionHours = document.getElementById('workSessionDerivedHours');
       if (sessionHours) sessionHours.textContent = label;
-      document.querySelectorAll('.ws-paid-hours-input').forEach((input) => {
-        input.value = hours.toFixed(2);
-      });
-      document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row').forEach((row) => {
-        if (String(row.getAttribute('data-paid') || 'true').toLowerCase() === 'false') return;
-        row.setAttribute('data-paid-hours', hours.toFixed(2));
-      });
       refreshAssigneeTimingDisplays();
     }
 
@@ -1629,8 +1637,10 @@
     function syncRowFields(personId) {
       const safePersonId = escapeSelectorValue(personId);
       const personSelector = '[data-person-id="' + safePersonId + '"]';
+      const row = document.querySelector('#workSessionAssigneeTableBody tr.roster-row' + personSelector);
       const status = document.querySelector('input.ws-att-radio' + personSelector + ':checked');
       const paidHours = document.querySelector('.ws-paid-hours-input' + personSelector);
+      const resolvedPaidHours = row ? resolveRowPaidHours(row) : Number(paidHours?.value || 0);
       const startTime = document.querySelector('.ws-assignee-start-input' + personSelector);
       const endTime = document.querySelector('.ws-assignee-end-input' + personSelector);
       const notes = document.querySelector('.ws-notes-input' + personSelector);
@@ -1639,8 +1649,10 @@
         else if (isCompletionMode) input.value = input.value || 'attended';
       });
       document.querySelectorAll('input[name="paidHours"]' + personSelector).forEach((input) => {
-        if (paidHours) input.value = paidHours.value;
+        input.value = Number(resolvedPaidHours || 0).toFixed(2);
       });
+      if (paidHours) paidHours.value = Number(resolvedPaidHours || 0).toFixed(2);
+      if (row) row.setAttribute('data-paid-hours', Number(resolvedPaidHours || 0).toFixed(2));
       document.querySelectorAll('input[name="startTime"]' + personSelector).forEach((input) => {
         if (startTime) input.value = startTime.value;
       });
@@ -1653,7 +1665,6 @@
     }
 
     function collectAdminAssignees() {
-      const hours = currentDerivedHours();
       return Array.from(document.querySelectorAll('.work-session-assignee-form[data-person-id]'))
         .map((row) => {
           const personId = String(row.getAttribute('data-person-id') || '').trim();
@@ -1686,7 +1697,7 @@
             roles: roleList.includes(role) ? roleList : [role].concat(roleList),
             status: statusInput ? statusInput.value : (row.getAttribute('data-status') || 'attended'),
             paid: isPaid,
-            paidHours: isPaid ? Number(hours.toFixed(2)) : 0,
+            paidHours: isPaid ? Number(resolveRowPaidHours(row).toFixed(2)) : 0,
             startTime: assigneeStart,
             endTime: assigneeEnd,
             notes: notesInput ? notesInput.value : (row.getAttribute('data-notes') || ''),

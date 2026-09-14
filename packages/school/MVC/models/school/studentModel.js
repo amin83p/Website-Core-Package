@@ -103,10 +103,12 @@ function cleanClbLevelHistory(value) {
         if (!isPlainObject(entry)) throw new Error('Invalid CLB level history entry.');
         const recordedAt = cleanDateISO(entry.recordedAt, { allowEmpty: false });
         if (!recordedAt) throw new Error(`CLB level history entry ${index + 1} requires a valid recordedAt date.`);
+        const resultRecordedAt = cleanDateISO(entry.resultRecordedAt, { allowEmpty: true }) || '';
         const id = cleanId(entry.id, { max: 64, allowEmpty: true }) || `clb_${Date.now()}_${index}`;
         return {
             id,
             recordedAt,
+            resultRecordedAt,
             goal: cleanClbSkillLevels(entry.goal),
             current: cleanClbSkillLevels(entry.current),
             result: cleanClbSkillLevels(entry.result)

@@ -43,16 +43,46 @@
     return String(state?.mode || '').trim() === 'manageEnrollmentSessions';
   }
 
+  function isOnHoldPreviewMode() {
+    return String(state?.mode || '').trim() === 'enrollmentOnHoldPreview';
+  }
+
+  function isManageLikeMode() {
+    return isManageMode() || isOnHoldPreviewMode();
+  }
+
   function isPartialMode() {
     return String(state?.mode || '').trim() === 'partial';
   }
 
   function isEventNaMarked(ev = {}) {
+    if (isOnHoldPreviewMode()) {
+      const previewState = resolveOnHoldPreviewNaState(ev);
+      return previewState !== 'normal' && previewState !== 'blocked';
+    }
     if (isManageMode()) {
       return resolveManageNaState(ev) !== 'normal';
     }
     const attendance = String(ev?.attendance || '').trim().toLowerCase();
     return Boolean(ev?.marked) || attendance === 'not_applicable';
+  }
+
+  function resolveOnHoldPreviewNaState(ev = {}) {
+    const sessionId = String(ev?.sessionId || '').trim();
+    if (!sessionId || !state) return 'normal';
+    const blockerSet = state.holdBlockerSessionIds || new Set();
+    const previewSet = state.holdPreviewSessionIds || new Set();
+    if (blockerSet.has(sessionId)) return 'blocked';
+    if (!previewSet.has(sessionId)) return 'normal';
+    return state.holdPreviewKind === 'applied' ? 'saved' : 'projected';
+  }
+
+  function annotateOnHoldPreviewEvents() {
+    if (!isOnHoldPreviewMode() || !Array.isArray(allEvents)) return;
+    allEvents.forEach((ev) => {
+      ev.onHoldPreviewState = resolveOnHoldPreviewNaState(ev);
+      ev.marked = ev.onHoldPreviewState !== 'normal';
+    });
   }
 
   function resolveManageNaState(ev = {}) {
@@ -315,28 +345,33 @@
     const presetGroup = qs('sessionEnrollmentCalendarPresetGroup');
     const dialogEl = modalEl?.querySelector('.modal-dialog') || qs('sessionEnrollmentCalendarModal')?.querySelector('.modal-dialog');
     const manage = isManageMode();
+    const onHoldPreview = isOnHoldPreviewMode();
     const partial = isPartialMode();
     if (titleEl) {
-      titleEl.textContent = manage
-        ? 'Manage enrollment sessions'
-        : (partial ? 'Review staged sessions' : 'Select sessions');
+      titleEl.textContent = onHoldPreview
+        ? 'On-hold session preview'
+        : (manage
+          ? 'Manage enrollment sessions'
+          : (partial ? 'Review staged sessions' : 'Select sessions'));
     }
     if (hintEl) {
       hintEl.classList.toggle('d-none', false);
-      hintEl.textContent = manage
-        ? 'Click sessions to stage N/A mark or unmark changes, then click Save changes.'
-        : (partial
-          ? 'Click empty grid space to stage sessions; adjust staged sessions, then click Apply to schedule.'
-          : 'Click empty grid space to stage sessions; click sessions to include or exclude.');
+      hintEl.textContent = onHoldPreview
+        ? 'Highlighted sessions will be marked N/A on attendance. Warning sessions have attendance conflicts.'
+        : (manage
+          ? 'Click sessions to stage N/A mark or unmark changes, then click Save changes.'
+          : (partial
+            ? 'Click empty grid space to stage sessions; adjust staged sessions, then click Apply to schedule.'
+            : 'Click empty grid space to stage sessions; click sessions to include or exclude.'));
     }
     if (saveBtn) saveBtn.textContent = partial ? 'Apply to schedule' : 'Save selection';
-    clearBtn?.classList.toggle('d-none', manage);
-    saveBtn?.classList.toggle('d-none', manage);
+    clearBtn?.classList.toggle('d-none', manage || onHoldPreview);
+    saveBtn?.classList.toggle('d-none', manage || onHoldPreview);
     doneBtn?.classList.toggle('d-none', !manage);
     bulkNaBtn?.classList.toggle('d-none', !manage);
     presetGroup?.classList.toggle('d-none', partial);
     if (dialogEl) {
-      dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage);
+      dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage || onHoldPreview);
       dialogEl.classList.toggle('session-enrollment-calendar-dialog--partial', partial);
     }
     syncDoneButtonLabel();
@@ -345,6 +380,10 @@
   }
 
   function renderSessionsLegendForMode() {
+    if (isOnHoldPreviewMode()) {
+      renderOnHoldPreviewSessionsLegend();
+      return;
+    }
     if (isManageMode()) {
       renderEnrollmentSessionsLegend();
       return;
@@ -376,6 +415,21 @@
       +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-attendance" aria-hidden="true"></span><span>Selected session</span></div>'
       +   '<div class="session-enrollment-legend-item session-enrollment-legend-hint text-muted"><i class="bi bi-hand-index-thumb" aria-hidden="true"></i><span>Click a session to include or exclude it</span></div>'
       +   '<div class="session-enrollment-legend-item session-enrollment-legend-hint text-muted"><i class="bi bi-mouse2" aria-hidden="true"></i><span>Right-click for bulk select by time window</span></div>'
+      + '</div>';
+  }
+
+  function renderOnHoldPreviewSessionsLegend() {
+    const modalBody = qs('sessionEnrollmentCalendarLegendModalBody');
+    if (!modalBody) return;
+    const kind = String(state?.holdPreviewKind || 'projected').trim();
+    const projectedLabel = kind === 'applied'
+      ? 'On-hold session (already applied)'
+      : 'Projected on-hold N/A';
+    modalBody.innerHTML = ''
+      + '<div class="session-enrollment-legend-items">'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Other session</span></div>'
+      +   `<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch ${kind === 'applied' ? 'is-na-saved' : 'is-na-projected'}" aria-hidden="true"></span><span>${projectedLabel}</span></div>`
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-blocked" aria-hidden="true"></span><span>Attendance conflict (cannot apply)</span></div>'
       + '</div>';
   }
 
@@ -504,6 +558,7 @@
     allEvents = (Array.isArray(data?.sessions) ? data.sessions : [])
       .map((row) => mapSessionWindowRowToEvent(row))
       .filter((row) => row.sessionId && row.date);
+    annotateOnHoldPreviewEvents();
 
     if (!preserveViewRange) {
       initManageModeViewRange();
@@ -511,9 +566,14 @@
     syncPresetButtons();
     syncViewModeButtons();
     renderCalendar();
-    updateManageSummary();
+    if (isOnHoldPreviewMode()) {
+      updateOnHoldPreviewSummary();
+    } else {
+      updateManageSummary();
+    }
     if (!skipScroll) {
-      scrollToFirstNaInView();
+      if (isOnHoldPreviewMode()) scrollToFirstOnHoldPreviewInView();
+      else scrollToFirstNaInView();
     }
   }
 
@@ -525,9 +585,42 @@
     });
   }
 
+  function scrollToFirstOnHoldPreviewInView() {
+    const previewSet = state?.holdPreviewSessionIds || new Set();
+    const blockerSet = state?.holdBlockerSessionIds || new Set();
+    const targetEvent = getVisibleEvents().find((ev) => {
+      const id = String(ev?.sessionId || '').trim();
+      return previewSet.has(id) || blockerSet.has(id);
+    }) || allEvents.find((ev) => {
+      const id = String(ev?.sessionId || '').trim();
+      return previewSet.has(id) || blockerSet.has(id);
+    });
+    if (!targetEvent?.date) return;
+    requestAnimationFrame(() => {
+      scrollHostToStagedDate(targetEvent.date);
+    });
+  }
+
+  function updateOnHoldPreviewSummary() {
+    summaryEl = qs('sessionEnrollmentCalendarSummary');
+    if (!summaryEl || !state) return;
+    const previewSet = state.holdPreviewSessionIds || new Set();
+    const blockerSet = state.holdBlockerSessionIds || new Set();
+    const count = previewSet.size;
+    const blockerCount = blockerSet.size;
+    summaryEl.classList.add('is-plain');
+    if (!count && !blockerCount) {
+      summaryEl.textContent = 'No sessions fall within this on-hold date range.';
+      return;
+    }
+    const parts = [`${count} on-hold session(s)`];
+    if (blockerCount) parts.push(`${blockerCount} conflict(s)`);
+    summaryEl.textContent = parts.join(' · ');
+  }
+
   async function fetchSessionWindowData({ reload = false } = {}) {
     if (!state?.periodId) throw new Error('periodId is required for manage enrollment sessions.');
-    if (!reload && state.sessionWindowLoaded && isManageMode()) {
+    if (!reload && state.sessionWindowLoaded && isManageLikeMode()) {
       await refreshPickerViewLocally();
       return;
     }
@@ -578,6 +671,12 @@
   }
 
   function buildManageNaHeadHtml(naState) {
+    if (naState === 'blocked') {
+      return '<div class="session-manage-na-head is-blocked" style="color:#842029;font-weight:800;font-size:0.68rem;line-height:1.1;">Conflict</div>';
+    }
+    if (naState === 'projected') {
+      return '<div class="session-manage-na-head is-projected" style="color:#664d03;font-weight:800;font-size:0.68rem;line-height:1.1;">N/A · projected</div>';
+    }
     if (naState === 'pending') {
       return '<div class="session-manage-na-head is-pending" style="color:#997404;font-weight:800;font-size:0.68rem;line-height:1.1;">N/A · pending</div>';
     }
@@ -590,6 +689,12 @@
   function buildManageBlockInlineStyle(naState, attendance = '') {
     const att = String(attendance || '').trim().toLowerCase();
     const base = 'box-sizing:border-box;border-radius:4px;';
+    if (naState === 'blocked') {
+      return `${base}border:2px solid #f1aeb5;background-color:#fff3cd;`;
+    }
+    if (naState === 'projected') {
+      return `${base}border:2px dashed #ced4da;background-color:#f8f9fa;`;
+    }
     if (naState === 'saved') {
       return `${base}border:2px solid #f1aeb5;background-color:#fde8ea;`;
     }
@@ -602,9 +707,14 @@
     return `${base}border:2px solid #9ec5fe;background-color:#f0f6ff;`;
   }
 
+  function resolveEventNaState(ev = {}) {
+    if (isOnHoldPreviewMode()) return resolveOnHoldPreviewNaState(ev);
+    return resolveManageNaState(ev);
+  }
+
   function buildManageEnrollmentBlockHtml(ev) {
     const sessionId = String(ev?.sessionId || '').trim();
-    const naState = resolveManageNaState(ev);
+    const naState = resolveEventNaState(ev);
     const attendance = String(ev?.attendance || '').trim().toLowerCase();
     const isOpenSession = naState === 'normal' && !attendance;
     const hasAttendance = naState === 'normal' && attendance && attendance !== 'not_applicable';
@@ -613,17 +723,20 @@
       'session-manage-block',
       naState === 'saved' ? 'is-na-saved' : '',
       naState === 'pending' ? 'is-na-pending' : '',
+      naState === 'projected' ? 'is-na-projected' : '',
+      naState === 'blocked' ? 'is-blocked' : '',
       hasAttendance ? 'has-attendance' : '',
       isOpenSession ? 'is-scheduled-open' : ''
     ].filter(Boolean).join(' ');
     const inlineStyle = buildManageBlockInlineStyle(naState, attendance);
     const timeLabel = buildManageSessionTimeLabel(ev);
     const metaLabel = buildManageSessionMetaLine(ev, naState);
+    const selectableAttr = isOnHoldPreviewMode() ? '0' : '1';
     return `
       <div class="${classes}"
            style="${inlineStyle}"
            data-session-id="${core.escapeHtml(sessionId)}"
-           data-selectable="1"
+           data-selectable="${selectableAttr}"
            data-session-kind="scheduled"
            data-na-marked="${naState !== 'normal' ? '1' : '0'}"
            data-na-state="${core.escapeHtml(naState)}"
@@ -638,6 +751,8 @@
   }
 
   function buildManageListChipHtml(naState, attendance = '') {
+    if (naState === 'blocked') return '<span class="session-manage-chip is-blocked">Conflict</span>';
+    if (naState === 'projected') return '<span class="session-manage-chip is-na-projected">N/A · projected</span>';
     if (naState === 'saved') return '<span class="session-manage-chip is-na-saved">N/A</span>';
     if (naState === 'pending') return '<span class="session-manage-chip is-na-pending">N/A · pending</span>';
     const attendanceLabel = formatManageAttendanceLabel(attendance);
@@ -649,7 +764,7 @@
 
   function buildManageListDayCardHtml(ev) {
     const sessionId = String(ev?.sessionId || '').trim();
-    const naState = resolveManageNaState(ev);
+    const naState = resolveEventNaState(ev);
     const attendance = String(ev?.attendance || '').trim();
     const isOpenSession = naState === 'normal' && !String(attendance || '').trim();
     const hasAttendance = naState === 'normal' && attendance && attendance.toLowerCase() !== 'not_applicable';
@@ -658,6 +773,8 @@
       'session-manage-card',
       naState === 'saved' ? 'is-na-saved' : '',
       naState === 'pending' ? 'is-na-pending' : '',
+      naState === 'projected' ? 'is-na-projected' : '',
+      naState === 'blocked' ? 'is-blocked' : '',
       hasAttendance ? 'has-attendance' : '',
       isOpenSession ? 'is-scheduled-open' : ''
     ].filter(Boolean).join(' ');
@@ -665,8 +782,9 @@
     const metaLabel = buildManageSessionMetaLine(ev, naState);
     const chipHtml = buildManageListChipHtml(naState, attendance);
     const inlineStyle = buildManageBlockInlineStyle(naState, attendance);
+    const selectableAttr = isOnHoldPreviewMode() ? '0' : '1';
     return `
-      <div class="${classes}" style="${inlineStyle}" data-session-id="${core.escapeHtml(sessionId)}" data-selectable="1" data-session-kind="scheduled" data-na-marked="${naState !== 'normal' ? '1' : '0'}" data-na-state="${core.escapeHtml(naState)}" role="button" aria-selected="false">
+      <div class="${classes}" style="${inlineStyle}" data-session-id="${core.escapeHtml(sessionId)}" data-selectable="${selectableAttr}" data-session-kind="scheduled" data-na-marked="${naState !== 'normal' ? '1' : '0'}" data-na-state="${core.escapeHtml(naState)}" role="button" aria-selected="false">
         <div class="flex-grow-1">
           <div class="d-flex align-items-center gap-2 mb-1">
             ${chipHtml}
@@ -2977,7 +3095,7 @@
       holidayDates: state.holidayDates || null,
       enrollmentStartDate: state.startDate || ''
     };
-    if (isManageMode()) {
+    if (isManageLikeMode()) {
       calendarOptions.buildPositionedBlockHtml = (ev) => buildManageEnrollmentBlockHtml(ev);
       calendarOptions.buildListDayCardHtml = (ev) => buildManageListDayCardHtml(ev);
     } else if (isPartialMode()) {
@@ -2992,6 +3110,10 @@
   }
 
   function updateSummary(serverSummary) {
+    if (isOnHoldPreviewMode()) {
+      updateOnHoldPreviewSummary();
+      return;
+    }
     if (isManageMode()) {
       updateManageSummary();
       return;
@@ -3067,6 +3189,7 @@
     }
     const block = event.target.closest('[data-session-id]');
     if (block) {
+      if (isOnHoldPreviewMode()) return;
       if (isPartialMode() && String(block.getAttribute('data-session-kind') || '') === 'staged') {
         return;
       }
@@ -3172,7 +3295,7 @@
       state.dayWidthUserAdjusted = false;
       const bounds = resolveEnrollmentWindowBounds();
       const shifted = core.shiftViewRange(state.viewRange, -1, bounds);
-      if (isManageMode()) {
+      if (isManageLikeMode()) {
         applyViewRange(shifted);
       } else {
         state.viewRange = core.clampViewRangeToEnrollmentStart(shifted, state.startDate);
@@ -3186,7 +3309,7 @@
       state.dayWidthUserAdjusted = false;
       const bounds = resolveEnrollmentWindowBounds();
       const shifted = core.shiftViewRange(state.viewRange, 1, bounds);
-      if (isManageMode()) {
+      if (isManageLikeMode()) {
         applyViewRange(shifted);
       } else {
         state.viewRange = shifted;
@@ -3199,7 +3322,7 @@
       if (!state) return;
       state.dayWidthUserAdjusted = false;
       state.anchorDate = core.clampAnchorDate(core.parseAnchorDate(''), state.startDate);
-      if (isManageMode()) {
+      if (isManageLikeMode()) {
         applyViewRange(computePresetViewRange(state.viewPreset));
       } else {
         state.viewRange = core.computeViewRange(state.viewPreset, state.anchorDate);
@@ -3399,8 +3522,8 @@
       console.error('SessionEnrollmentCalendarModal.open requires classId');
       return;
     }
-    if (mode === 'manageEnrollmentSessions' && !periodId) {
-      console.error('SessionEnrollmentCalendarModal.open manage mode requires periodId');
+    if ((mode === 'manageEnrollmentSessions' || mode === 'enrollmentOnHoldPreview') && !periodId) {
+      console.error('SessionEnrollmentCalendarModal.open manage/on-hold preview mode requires periodId');
       return;
     }
     bindModalEvents();
@@ -3418,7 +3541,7 @@
       endDate: options.endDate
     });
 
-    const viewPreset = mode === 'manageEnrollmentSessions'
+    const viewPreset = (mode === 'manageEnrollmentSessions' || mode === 'enrollmentOnHoldPreview')
       ? 'thirtyDays'
       : (mode === 'partial'
         ? 'custom'
@@ -3472,7 +3595,18 @@
       requestJson: options.requestJson,
       pendingMarkChanges: new Map(),
       sessionWindowLoaded: false,
-      markSaveInFlight: false
+      markSaveInFlight: false,
+      holdPreviewSessionIds: new Set(
+        (Array.isArray(options.previewSessionIds) ? options.previewSessionIds : [])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean)
+      ),
+      holdBlockerSessionIds: new Set(
+        (Array.isArray(options.blockerSessionIds) ? options.blockerSessionIds : [])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean)
+      ),
+      holdPreviewKind: String(options.previewKind || 'projected').trim()
     };
 
     if (mode === 'partial') {
@@ -3492,7 +3626,7 @@
     if (dayWidthInput) dayWidthInput.value = String(dayWidth);
 
     hostEl = qs('sessionEnrollmentCalendarHost');
-    if (mode === 'partial' || (options.prefetchedPickerData && mode !== 'manageEnrollmentSessions')) {
+    if (mode === 'partial' || (options.prefetchedPickerData && !isManageLikeMode())) {
       const pickerData = options.prefetchedPickerData || buildPartialPickerData({
         classId,
         classLabel: options.classLabel,
@@ -3513,7 +3647,14 @@
     }
 
     getModal()?.show();
-    if (mode === 'manageEnrollmentSessions') {
+    if (mode === 'manageEnrollmentSessions' || mode === 'enrollmentOnHoldPreview') {
+      if (mode === 'enrollmentOnHoldPreview' && options.anchorDate) {
+        state.anchorDate = core.clampAnchorDate(
+          core.parseAnchorDate(options.anchorDate),
+          state.startDate
+        );
+        state.viewRange = core.computeViewRange(state.viewPreset, state.anchorDate);
+      }
       fetchSessionWindowData({ reload: true }).catch((err) => {
         if (hostEl) {
           hostEl.innerHTML = `<div class="alert alert-warning">${core.escapeHtml(err.message || 'Unable to load sessions.')}</div>`;

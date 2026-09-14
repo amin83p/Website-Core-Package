@@ -1,5 +1,7 @@
 'use strict';
 
+const { getClbBaseInteger } = require('../../utils/clbLevelValueParser');
+
 const CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
 
 /**
@@ -8,12 +10,7 @@ const CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
  * @returns {number|null}
  */
 function normalizeClbLevelToken(value) {
-  const s = String(value || '').trim();
-  if (!s) return null;
-  const stripped = s.replace(/[+\-]/g, '');
-  const n = Number(stripped);
-  if (!Number.isInteger(n) || n < 1 || n > 12) return null;
-  return n;
+  return getClbBaseInteger(value);
 }
 
 /**

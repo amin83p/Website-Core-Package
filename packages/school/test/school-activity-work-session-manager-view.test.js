@@ -30,3 +30,13 @@ test('activity work session manager view uses session manager roster table and r
   assert.doesNotMatch(source, /buildAdminAssigneeCard/);
   assert.doesNotMatch(source, /id="workSessionAssigneeForms"/);
 });
+
+test('activity work session manager view preserves per-assignee paid hours', () => {
+  const source = fs.readFileSync(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<th class="text-end">Paid hours<\/th>/);
+  assert.match(source, /function resolveRowPaidHours/);
+  assert.match(source, /paidHours: isPaid \? Number\(resolveRowPaidHours\(row\)\.toFixed\(2\)\) : 0/);
+  assert.match(source, /assignee\.paidHours \?\? entryRow\.durationHours/);
+  assert.doesNotMatch(source, /row\.setAttribute\('data-paid-hours', hours\.toFixed\(2\)\)/);
+});

@@ -66,6 +66,7 @@ test('sanitizeStudentInput accepts valid CLB history and sorts newest first', ()
       {
         id: 'clb_new',
         recordedAt: '2026-07-08',
+        resultRecordedAt: '2026-08-15',
         goal: { listening: '7-8', speaking: '7-8', reading: '6', writing: '6' },
         current: { listening: '7+', speaking: '7+', reading: '6-', writing: '5+' },
         result: { listening: '7', speaking: '7', reading: '6', writing: '5' }
@@ -78,7 +79,9 @@ test('sanitizeStudentInput accepts valid CLB history and sorts newest first', ()
   assert.equal(out.clbLevelHistory[0].goal.listening, '7-8');
   assert.equal(out.clbLevelHistory[0].current.writing, '5+');
   assert.equal(out.clbLevelHistory[0].result.reading, '6');
+  assert.equal(out.clbLevelHistory[0].resultRecordedAt, '2026-08-15');
   assert.equal(out.clbLevelHistory[1].result.listening, '4');
+  assert.equal(out.clbLevelHistory[1].resultRecordedAt, '');
 });
 
 test('sanitizeStudentInput keeps legacy CLB entries without results backward compatible', () => {
@@ -97,12 +100,25 @@ test('sanitizeStudentInput keeps legacy CLB entries without results backward com
     reading: '',
     writing: ''
   });
+  assert.equal(out.clbLevelHistory[0].resultRecordedAt, '');
 });
 
 test('sanitizeStudentInput rejects invalid CLB recordedAt', () => {
   assert.throws(() => studentModel.sanitizeStudentInput(baseStudentInput({
     clbLevelHistory: [{ recordedAt: 'not-a-date', goal: {}, current: {} }]
   })), /Invalid enrollmentDate|recordedAt/i);
+});
+
+test('sanitizeStudentInput rejects invalid CLB resultRecordedAt', () => {
+  assert.throws(() => studentModel.sanitizeStudentInput(baseStudentInput({
+    clbLevelHistory: [{
+      recordedAt: '2026-07-08',
+      resultRecordedAt: 'not-a-date',
+      goal: { listening: '5' },
+      current: { listening: '4' },
+      result: { listening: '4' }
+    }]
+  })), /Invalid enrollmentDate/i);
 });
 
 test('sanitizeStudentInput defaults missing CLB history to empty array', () => {
@@ -173,6 +189,7 @@ test('buildPrefillSnapshot exposes latest CLB goal, current, result, and date ke
           {
             id: 'new',
             recordedAt: '2026-07-08',
+            resultRecordedAt: '2026-08-20',
             goal: { listening: '7-8', speaking: '7-8', reading: '6', writing: '6' },
             current: { listening: '7+', speaking: '7+', reading: '6-', writing: '5+' },
             result: { listening: '7', speaking: '7', reading: '6', writing: '5' }
@@ -216,6 +233,7 @@ test('buildPrefillSnapshot exposes latest CLB goal, current, result, and date ke
     assert.equal(snapshot.CLB_current_reading, '6-');
     assert.equal(snapshot.CLB_current_writing, '5+');
     assert.equal(snapshot.CLB_latest_recorded_at, '2026-07-08');
+    assert.equal(snapshot.CLB_latest_result_recorded_at, '2026-08-20');
     assert.equal(snapshot.CLB_result_listening, '7');
     assert.equal(snapshot.CLB_result_speaking, '7');
     assert.equal(snapshot.CLB_result_reading, '6');
@@ -236,6 +254,7 @@ test('buildPrefillSnapshot exposes latest CLB goal, current, result, and date ke
     assert.equal(collections.student_clb_entries[0].clb_entry_id, 'new');
     assert.equal(collections.student_clb_entries[0].clb_entry_no, 1);
     assert.equal(collections.student_clb_entries[0].clb_is_latest, true);
+    assert.equal(collections.student_clb_entries[0].clb_result_recorded_at, '2026-08-20');
     assert.deepEqual({
       goalListening: collections.student_clb_entries[0].clb_goal_listening,
       goalSpeaking: collections.student_clb_entries[0].clb_goal_speaking,
@@ -285,9 +304,41 @@ test('student controller parses clbLevelHistory on save', () => {
   assert.match(source, /clbLevelHistory:\s*parsedClbLevelHistory/);
 });
 
+test('student routes expose CLB level history API endpoints', () => {
+  const routesSource = read('packages/school/MVC/routes/studentRoutes.js');
+  assert.match(routesSource, /router\.get\('\/api\/:id\/clb-level-history'/);
+  assert.match(routesSource, /router\.put\('\/api\/:id\/clb-level-history'/);
+  assert.match(routesSource, /ctrl\.getStudentClbLevelHistoryApi/);
+  assert.match(routesSource, /ctrl\.putStudentClbLevelHistoryApi/);
+});
+
+test('student controller CLB history API merges existing student on save', () => {
+  const controllerSource = read('packages/school/MVC/controllers/school/studentController.js');
+  assert.match(controllerSource, /getStudentClbLevelHistoryApi/);
+  assert.match(controllerSource, /putStudentClbLevelHistoryApi/);
+  assert.match(controllerSource, /\{ \.\.\.existingStudent, clbLevelHistory: incomingHistory \}/);
+  assert.match(controllerSource, /getSortedClbLevelHistory/);
+});
+
+test('reportService exports sorted CLB history helper', () => {
+  const reportSource = read('packages/school/MVC/services/school/reportService.js');
+  assert.match(reportSource, /getSortedClbLevelHistory,/);
+  const sorted = reportService.getSortedClbLevelHistory({
+    clbLevelHistory: [
+      { id: 'a', recordedAt: '2026-01-01' },
+      { id: 'b', recordedAt: '2026-07-08' }
+    ]
+  });
+  assert.equal(sorted[0].id, 'b');
+});
+
 test('student form includes CLB history UI and hidden JSON field', () => {
   const source = read('packages/school/MVC/views/school/student/studentForm.ejs');
   const reportTemplateSource = read('packages/school/MVC/views/school/report/templateForm.ejs');
+  assert.match(source, /clbLevelValueParser\.js/);
+  assert.match(source, /id="clbEntryWarnings"/);
+  assert.match(source, /function refreshClbEditorWarnings\(/);
+  assert.match(source, /clb-level-value-warning/);
   assert.match(source, /hid_clbLevelHistory/);
   assert.match(source, /__INIT_CLB_LEVEL_HISTORY__/);
   assert.match(source, /btnAddClbEntry/);
@@ -296,6 +347,9 @@ test('student form includes CLB history UI and hidden JSON field', () => {
   assert.match(source, /Current CLB Level/);
   assert.match(source, /CLB Result/);
   assert.match(source, /inp_clb_result_listening/);
+  assert.match(source, /inp_clbResultRecordedAt/);
+  assert.match(source, /Goal \/ Current Date/);
+  assert.match(source, /resultRecordedAt/);
   assert.match(source, /btn-edit-clb-entry/);
   assert.match(source, /showClbEditorForEdit/);
   assert.match(source, /editingClbEntryId/);

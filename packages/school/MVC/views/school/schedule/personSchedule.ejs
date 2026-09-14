@@ -2210,10 +2210,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 event.caseSummary.totalCount != null ? `Total: ${event.caseSummary.totalCount}` : ''
             ].filter(Boolean).join(' | ')
             : '';
+        const isActivityEvent = String(event?.eventType || '').trim() === 'school_activity'
+            || String(event?.targetType || '').trim() === 'activity';
+        const hoursValue = isActivityEvent
+            ? Number(event?.paidHours ?? event?.duration ?? 0)
+            : Number(event?.duration ?? 0);
         addDetail('Session', getEventTitle(event));
         addDetail('Date', formatScheduleDateLabel(event?.date));
         addDetail('Time', time);
-        addDetail('Duration', Number.isFinite(Number(event?.duration)) ? `${Number(event.duration).toFixed(2)} h` : '');
+        if (Number.isFinite(hoursValue) && hoursValue > 0) {
+            addDetail(isActivityEvent ? 'Paid hours' : 'Duration', `${hoursValue.toFixed(2)} h`);
+        }
         addDetail('Status', scan?.scanLabel || formatStatusLabel(event?.status));
         addDetail('Role', role);
         addDetail('Person', event?.personName || event?.teacherName || event?.studentName);

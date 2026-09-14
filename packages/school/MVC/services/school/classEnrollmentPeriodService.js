@@ -554,6 +554,7 @@ async function updatePeriod(periodId, input = {}, requestingUser = null, options
   if (input.cycleAttendanceSummary !== undefined) patch.cycleAttendanceSummary = input.cycleAttendanceSummary;
   if (input.enrollmentSessionMarks !== undefined) patch.enrollmentSessionMarks = input.enrollmentSessionMarks;
   if (input.enrollmentExtensions !== undefined) patch.enrollmentExtensions = input.enrollmentExtensions;
+  if (input.enrollmentHoldPeriods !== undefined) patch.enrollmentHoldPeriods = input.enrollmentHoldPeriods;
   if (input.transactionSummary !== undefined) {
     patch.transactionSummary = (input.transactionSummary && typeof input.transactionSummary === 'object')
       ? input.transactionSummary

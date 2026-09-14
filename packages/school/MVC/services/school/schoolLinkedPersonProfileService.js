@@ -5,7 +5,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const coreDataService = requireCoreModule('MVC/services/dataService');
-const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getActiveOrgIdOrThrow, assertOrgAccess } = requireCoreModule('MVC/utils/orgContextUtils');
 const publicRegistrationService = requireCoreModule('MVC/services/person/publicRegistrationService');
@@ -53,23 +53,13 @@ function getLinkConfig(linkType) {
   return LINK_TYPE_CONFIG[normalizeLinkType(linkType)];
 }
 
-function hasSectionPermission(reqUser, sectionId, operationId) {
-  return Boolean(adminAuthorityService.isAdminForRequest(reqUser, sectionId, operationId, {
-    section: { id: sectionId }
-  }));
-}
-
 async function hasSectionPermissionAsync(reqUser, sectionId, operationId) {
-  if (typeof adminAuthorityService.isAdminForRequestAsync === 'function') {
-    return Boolean(await adminAuthorityService.isAdminForRequestAsync(reqUser, sectionId, operationId, {
-      section: { id: sectionId }
-    }));
-  }
-  return hasSectionPermission(reqUser, sectionId, operationId);
+  return schoolAdminAccessService.isAdminForRequestAsync(reqUser, sectionId, operationId);
 }
 
-function assertSectionPermission(reqUser, sectionId, operationId) {
-  if (!hasSectionPermission(reqUser, sectionId, operationId)) {
+async function assertSectionPermission(reqUser, sectionId, operationId) {
+  const allowed = await hasSectionPermissionAsync(reqUser, sectionId, operationId);
+  if (!allowed) {
     throw new Error('You do not have permission to perform this action.');
   }
 }
@@ -118,7 +108,7 @@ async function assertLinkedPersonAccess({
     if (!person) throw new Error('Person is not available in the active organization context.');
   }
 
-  assertSectionPermission(reqUser, config.section, operation);
+  await assertSectionPermission(reqUser, config.section, operation);
   return { personId: targetPersonId, activeOrgId, linkType: normalizeLinkType(linkType), linkId: entityId };
 }
 

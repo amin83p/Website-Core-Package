@@ -42,6 +42,7 @@
   const cycleEndDateJson = jsonForScript(cycleEndDate);
   const isClosedForNewEnrollmentJson = jsonForScript(Boolean(isClosedForNewEnrollment));
   const canManageEnrollmentOfficeJson = jsonForScript(Boolean(typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice));
+  const canEditStudentClbJson = jsonForScript(Boolean(typeof canEditStudentClb !== 'undefined' && canEditStudentClb));
   const isRollingJson = jsonForScript(Boolean(isRolling));
   const rollingFilters = (typeof filters !== 'undefined' && filters && typeof filters === 'object') ? filters : {};
   const hasRollingFiltersAppliedFlag = typeof hasRollingFiltersApplied !== 'undefined' && hasRollingFiltersApplied === true;
@@ -257,6 +258,20 @@
     position: fixed;
     margin: 0;
   }
+  .clb-level-value-warning {
+    background-color: #f8d7da !important;
+    border-color: #f1aeb5 !important;
+  }
+  .rolling-enrollment-page .rolling-student-gender-line {
+    font-size: 0.62rem;
+    line-height: 1.15;
+    letter-spacing: 0.03em;
+    text-transform: capitalize;
+  }
+  .rolling-enrollment-page .rolling-student-id-line {
+    font-size: 0.68rem;
+    line-height: 1.15;
+  }
   .rolling-enrollment-page kbd {
     background: #f1f3f5;
     color: #495057;
@@ -264,6 +279,15 @@
     font-size: 0.7rem;
     padding: 0.08rem 0.3rem;
     border-radius: 0.25rem;
+  }
+  #addEnrollmentPeriodModal.enrollment-modal-is-busy .modal-content {
+    pointer-events: none;
+    user-select: none;
+  }
+  #addEnrollmentPeriodModal.enrollment-modal-is-busy .btn-close,
+  #addEnrollmentPeriodModal.enrollment-modal-is-busy [data-bs-dismiss="modal"] {
+    pointer-events: none;
+    opacity: 0.45;
   }
   .attendance-report-modal .attendance-report-hero {
     border: 1px solid rgba(23, 50, 77, 0.12);
@@ -1577,6 +1601,112 @@
   </div>
 </div>
 
+<div class="modal fade" id="rollingStudentClbModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-bar-chart-steps me-1"></i>CLB Entries</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-8">
+            <label class="form-label small fw-bold" for="rollingClb_studentLabel">Student</label>
+            <input type="text" id="rollingClb_studentLabel" class="form-control form-control-sm bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold" for="rollingClb_studentId">Student ID</label>
+            <input type="text" id="rollingClb_studentId" class="form-control form-control-sm bg-light font-monospace" readonly>
+          </div>
+        </div>
+
+        <div id="rollingClb_listPanel">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="fw-semibold small">CLB history (newest Goal / Current date first)</div>
+            <button type="button" class="btn btn-sm btn-outline-primary d-none" id="btn_rollingClbAddEntry">
+              <i class="bi bi-plus-lg me-1"></i>Add CLB Entry
+            </button>
+          </div>
+          <div id="rollingClb_historyEmpty" class="text-muted small text-center py-3 border rounded bg-light">No CLB entries yet.</div>
+          <div id="rollingClb_historyWrap" class="d-none table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 14%;">Goal / Current Date</th>
+                  <th style="width: 14%;">Result Date</th>
+                  <th>Summary</th>
+                </tr>
+              </thead>
+              <tbody id="rollingClb_historyTbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="rollingClb_editorPanel" class="border rounded p-3 mt-3 bg-light d-none">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0" id="rollingClb_editorTitle">CLB Entry</h6>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn_rollingClbCancelEditor">Back to list</button>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold small" for="inp_rolling_clbRecordedAt">Goal / Current Date *</label>
+              <input type="date" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clbRecordedAt">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold small" for="inp_rolling_clbResultRecordedAt">Result Date</label>
+              <input type="date" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clbResultRecordedAt">
+            </div>
+          </div>
+          <div id="rollingClb_entryWarnings" class="alert alert-warning border py-2 px-3 small d-none mb-3"></div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-3">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 18%;">Row</th>
+                  <th>Listening</th>
+                  <th>Speaking</th>
+                  <th>Reading</th>
+                  <th>Writing</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="fw-bold small">CLB Goal</td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_goal_listening" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_goal_speaking" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_goal_reading" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_goal_writing" maxlength="20"></td>
+                </tr>
+                <tr>
+                  <td class="fw-bold small">Current CLB Level</td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_current_listening" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_current_speaking" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_current_reading" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_current_writing" maxlength="20"></td>
+                </tr>
+                <tr>
+                  <td class="fw-bold small">CLB Result</td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_result_listening" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_result_speaking" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_result_reading" maxlength="20"></td>
+                  <td><input type="text" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_result_writing" maxlength="20"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-primary fw-bold d-none" id="btn_rollingClbSaveEntry">Save CLB Entry</button>
+            <button type="button" class="btn btn-sm btn-outline-danger d-none" id="btn_rollingClbRemoveEntry">Remove Entry</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="closePeriodModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -1593,6 +1723,7 @@
         <div class="mb-2">
           <label class="form-label">Status</label>
           <select id="close_status" class="form-select">
+            <option value="withdrawn">Withdrawn</option>
             <option value="completed" selected>Completed</option>
             <option value="cancelled">Cancelled</option>
             <option value="archived">Archived</option>
@@ -1662,7 +1793,7 @@
 </div>
 
 <div class="modal fade" id="editPeriodModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Edit Enrollment Period</h5>
@@ -1690,20 +1821,47 @@
             <div class="form-text compact-help">Hour target; cannot combine with session target.</div>
           </div>
 
-          <div class="col-md-6">
-            <label class="form-label">Status</label>
+          <div class="col-md-6" id="wrap_edit_status">
+            <label class="form-label" for="edit_status">Status</label>
             <select id="edit_status" class="form-select">
               <option value="active">Active</option>
               <option value="to_be_confirmed">To be Confirmed</option>
               <option value="waiting_list">Waiting list</option>
-              <option value="draft">Draft</option>
-              <option value="planned">Planned</option>
-              <option value="completed">Completed</option>
+              <option value="close">Close</option>
+            </select>
+            <div id="edit_statusAttendanceHelp" class="form-text compact-help text-warning d-none"></div>
+          </div>
+          <div class="col-md-6 d-none" id="wrap_edit_statusReadonly">
+            <label class="form-label" for="edit_statusReadonly">Status</label>
+            <input type="text" id="edit_statusReadonly" class="form-control" readonly>
+            <div class="form-text compact-help" id="edit_statusReadonlyHelp"></div>
+          </div>
+          <div class="col-12 d-none" id="wrap_edit_closeReason">
+            <label class="form-label" for="edit_closeReason">Close Reason</label>
+            <select id="edit_closeReason" class="form-select">
               <option value="withdrawn">Withdrawn</option>
               <option value="cancelled">Cancelled</option>
               <option value="archived">Archived</option>
-              <option value="error">Error</option>
+              <option value="completed" selected>Completed</option>
             </select>
+          </div>
+          <div class="col-12 d-none" id="wrap_edit_closeFields">
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label" for="edit_closeEndDate">End Date *</label>
+                <input type="date" id="edit_closeEndDate" class="form-control">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="edit_closeReasonEnd">Reason *</label>
+                <textarea id="edit_closeReasonEnd" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="col-12">
+                <div id="edit_closeStatusPreview" class="alert alert-light border mb-0">
+                  Preview the financial effect before applying cancellation, completion, or archival.
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="btn_previewEditClosePeriod">Preview</button>
+              </div>
+            </div>
           </div>
           <div class="col-md-6">
             <label class="form-label" for="edit_sessionCapacityType">Session Capacity</label>
@@ -1735,6 +1893,65 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_confirmEditPeriod">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="enrollmentOnHoldModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Enrollment On Hold</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="onHold_periodId">
+        <input type="hidden" id="onHold_editingHoldId" value="">
+        <div class="small text-muted mb-3" id="onHold_contextLabel"></div>
+        <div class="border rounded p-3 mb-3" id="onHold_newPeriodSection">
+          <div class="fw-semibold mb-2" id="onHold_formTitle">New On-Hold Period</div>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label" for="onHold_startDate">Start Date *</label>
+              <input type="date" id="onHold_startDate" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="onHold_endDate">End Date *</label>
+              <input type="date" id="onHold_endDate" class="form-control">
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="onHold_reason">Reason *</label>
+              <textarea id="onHold_reason" class="form-control" rows="2" placeholder="Reason for placing this enrollment on hold"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="mb-0">
+          <div class="fw-semibold mb-2">Existing On-Hold Periods</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Reason</th>
+                  <th class="text-center">Sessions</th>
+                  <th>Applied</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="onHold_existingBody">
+                <tr><td colspan="6" class="text-muted text-center py-3">No on-hold periods yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex-wrap">
+        <div id="onHold_applyHint" class="small text-muted me-auto w-100 w-md-auto mb-2 mb-md-0">Preview the on-hold period to see affected sessions on the calendar.</div>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewOnHoldPeriod">Preview</button>
+        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_applyOnHoldPeriod" disabled>Apply Hold</button>
       </div>
     </div>
   </div>
@@ -1933,6 +2150,7 @@
 <script src="/scripts/sessionCalendarCore.js"></script>
 <script src="/scripts/sessionEnrollmentCalendarModal.js"></script>
 <script src="/scripts/rollingEnrollmentAlignmentClient.js"></script>
+<script src="/scripts/clbLevelValueParser.js"></script>
 <script src="/scripts/wizardStepRail.js"></script>
 <div class="modal fade" id="studentConflictModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1990,6 +2208,7 @@
   const canCreateProgramRegistrations = <%- canCreateProgramRegistrationsJson %>;
   const canCreatePriorSubjectCredits = <%- canCreatePriorSubjectCreditsJson %>;
   const canManageEnrollmentOffice = <%- canManageEnrollmentOfficeJson %>;
+  const canEditStudentClb = <%- canEditStudentClbJson %>;
   const defaultTeacher = <%- defaultTeacherJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
@@ -2494,6 +2713,7 @@
   const closeModalEl = qs('closePeriodModal');
   const reentryModalEl = qs('reentryModal');
   const editModalEl = qs('editPeriodModal');
+  const onHoldModalEl = qs('enrollmentOnHoldModal');
   const chargeModalEl = qs('enrollmentChargeModal');
   const programShortcutModalEl = qs('programRegistrationShortcutModal');
   const priorCreditRepairModalEl = qs('priorCreditRepairModal');
@@ -2502,9 +2722,29 @@
   const unmarkSessionListModalEl = qs('unmarkSessionListModal');
   const groupEnrollmentModalEl = qs('groupEnrollmentModal');
   const groupEnrollmentResultsModalEl = qs('groupEnrollmentResultsModal');
+  const rollingStudentClbModalEl = qs('rollingStudentClbModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
+  const ROLLING_CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
+  const ROLLING_CLB_VALUE_GROUPS = ['goal', 'current', 'result'];
+  let rollingClbLevelHistory = [];
+  let rollingClbContext = { studentId: '', studentLabel: '' };
+  let rollingClbEditingEntryId = '';
 
-  function syncRollingModalLayer() {
+  function cleanupRollingModalLayer() {
+    try {
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+    } catch (_) {}
+    rollingBusyDepth = 0;
+    rollingBusyToken = null;
+
+    const loadingEl = document.getElementById('globalLoadingModal');
+    if (loadingEl) {
+      loadingEl.classList.remove('is-visible');
+      loadingEl.setAttribute('aria-hidden', 'true');
+    }
+
     const openModals = document.querySelectorAll('.modal.show');
     const backdrops = document.querySelectorAll('.modal-backdrop');
     if (!openModals.length) {
@@ -2517,9 +2757,114 @@
         backdrops[index]?.remove();
       }
     }
-    if (typeof window.hideLoading === 'function' && !openModals.length && rollingBusyDepth <= 0) {
-      window.hideLoading({ force: true });
+  }
+
+  function syncRollingModalLayer() {
+    cleanupRollingModalLayer();
+  }
+
+  function forceCloseModalElement(modalEl) {
+    if (!modalEl) return;
+    const isEnrollmentModal = modalEl === addEnrollmentModalEl;
+    if (isEnrollmentModal) {
+      enrollmentModalProgrammaticDismiss = true;
+      if (enrollmentModalBusy) endEnrollmentModalWork();
     }
+    try {
+      const instance = bootstrapApi?.Modal?.getInstance(modalEl);
+      if (instance) instance.hide();
+    } catch (_) {}
+    modalEl.classList.remove('show');
+    modalEl.setAttribute('aria-hidden', 'true');
+    modalEl.removeAttribute('aria-modal');
+    modalEl.style.display = 'none';
+    if (isEnrollmentModal) enrollmentModalProgrammaticDismiss = false;
+  }
+
+  function hideBootstrapModalAndWait(modalEl) {
+    if (!modalEl) return Promise.resolve();
+    if (!modalEl.classList.contains('show')) return Promise.resolve();
+    const isEnrollmentModal = modalEl === addEnrollmentModalEl;
+    if (isEnrollmentModal) enrollmentModalProgrammaticDismiss = true;
+    if (bootstrapApi?.Modal) {
+      const instance = bootstrapApi.Modal.getInstance(modalEl)
+        || (typeof bootstrapApi.Modal.getOrCreateInstance === 'function'
+          ? bootstrapApi.Modal.getOrCreateInstance(modalEl)
+          : null);
+      if (instance) {
+        return new Promise((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            if (isEnrollmentModal) enrollmentModalProgrammaticDismiss = false;
+            resolve();
+          };
+          modalEl.addEventListener('hidden.bs.modal', finish, { once: true });
+          modalEl.addEventListener('hidePrevented.bs.modal', () => {
+            forceCloseModalElement(modalEl);
+            finish();
+          }, { once: true });
+          instance.hide();
+          window.setTimeout(() => {
+            if (modalEl.classList.contains('show')) {
+              forceCloseModalElement(modalEl);
+            }
+            finish();
+          }, 0);
+        });
+      }
+    }
+    forceCloseModalElement(modalEl);
+    return Promise.resolve();
+  }
+
+  function prepareGenericPickerForOpen() {
+    const pickerEl = document.getElementById('genericPickerModal');
+    if (!pickerEl || !bootstrapApi?.Modal) return;
+    if (pickerEl.parentElement !== document.body) {
+      document.body.appendChild(pickerEl);
+    }
+    pickerEl.style.removeProperty('z-index');
+    const instance = bootstrapApi.Modal.getInstance(pickerEl)
+      || (typeof bootstrapApi.Modal.getOrCreateInstance === 'function'
+        ? bootstrapApi.Modal.getOrCreateInstance(pickerEl)
+        : null);
+    if (instance && pickerEl.classList.contains('show')) {
+      instance.hide();
+    }
+  }
+
+  function getEnrollmentWorkflowModalEls() {
+    return [
+      addEnrollmentModalEl,
+      programShortcutModalEl,
+      chargeModalEl,
+      priorCreditRepairModalEl,
+      clbPlacementInsightModalEl,
+      enrollmentSessionListModalEl,
+      unmarkSessionListModalEl,
+      document.getElementById('sessionEnrollmentCalendarModal'),
+      groupEnrollmentModalEl,
+      groupEnrollmentResultsModalEl,
+      document.getElementById('genericPickerModal')
+    ].filter(Boolean);
+  }
+
+  async function dismissEnrollmentWorkflowModals() {
+    if (enrollmentModalBusy) endEnrollmentModalWork();
+    const modalEls = getEnrollmentWorkflowModalEls();
+    await Promise.all(modalEls.map((modalEl) => hideBootstrapModalAndWait(modalEl)));
+    modalEls.forEach((modalEl) => {
+      if (modalEl.classList.contains('show')) forceCloseModalElement(modalEl);
+    });
+    document.querySelectorAll('[data-fallback-backdrop="1"]').forEach((backdrop) => backdrop.remove());
+    cleanupRollingModalLayer();
+  }
+
+  async function finalizeEnrollmentWorkflowDismissal() {
+    endEnrollmentModalWork();
+    await dismissEnrollmentWorkflowModals();
   }
 
   function createModalController(modalEl) {
@@ -2591,6 +2936,7 @@
   const closeModal = createModalController(closeModalEl);
   const reentryModal = createModalController(reentryModalEl);
   const editModal = createModalController(editModalEl);
+  const onHoldModal = createModalController(onHoldModalEl);
   const chargeModal = createModalController(chargeModalEl);
   const programShortcutModal = createModalController(programShortcutModalEl);
   const priorCreditRepairModal = createModalController(priorCreditRepairModalEl);
@@ -2599,8 +2945,15 @@
   const unmarkSessionListModal = createModalController(unmarkSessionListModalEl);
   const groupEnrollmentModal = createModalController(groupEnrollmentModalEl);
   const groupEnrollmentResultsModal = createModalController(groupEnrollmentResultsModalEl);
+  const rollingStudentClbModal = createModalController(rollingStudentClbModalEl);
   const addButton = qs('btn_addPeriod');
   let approvedCloseStatusPayload = null;
+  let approvedEditCloseStatusPayload = null;
+  let editModalCurrentRow = null;
+  let approvedOnHoldPayload = null;
+  let onHoldModalCurrentRow = null;
+  const OPEN_EDITABLE_ENROLLMENT_STATUSES = ['active', 'to_be_confirmed', 'waiting_list'];
+  const ON_HOLD_ELIGIBLE_STATUSES = ['active', 'to_be_confirmed', 'waiting_list', 'planned'];
 
   function formatResolvedRegistrationLabel(resolved = {}) {
     const label = String(resolved?.label || '').trim();
@@ -3533,6 +3886,8 @@
         await refreshGroupEnrollmentResultPrereq(resultCtx.resultIndex);
         groupEnrollmentResultRepairContext = null;
         programShortcutModal?.hide();
+        await hideBootstrapModalAndWait(programShortcutModalEl);
+        cleanupRollingModalLayer();
         await notifyProgramRegistrationShortcutOutcome(
           'success',
           'Program registration finalized. Review the updated result row, then complete enrollment when ready.',
@@ -3542,6 +3897,9 @@
       }
       showBusy('Refreshing Rolling Enrollment eligibility...');
       await refreshRollingEligibility();
+      programShortcutModal?.hide();
+      await hideBootstrapModalAndWait(programShortcutModalEl);
+      cleanupRollingModalLayer();
       await notifyProgramRegistrationShortcutOutcome(
         'success',
         'Eligibility was refreshed. Review the Program registration section, then continue Rolling Enrollment.',
@@ -4737,15 +5095,344 @@
     }
   }
 
-  function openRollingClassPicker() {
+  function sortRollingClbHistory(entries) {
+    return [...(Array.isArray(entries) ? entries : [])].sort((a, b) => {
+      const dateCmp = String(b?.recordedAt || '').localeCompare(String(a?.recordedAt || ''));
+      if (dateCmp !== 0) return dateCmp;
+      return String(b?.id || '').localeCompare(String(a?.id || ''));
+    });
+  }
+
+  function createRollingClbEntryId(index = 0) {
+    return `clb_${Date.now()}_${Number(index) || 0}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function getRollingClbEditorInput(group, skill) {
+    return qs(`inp_rolling_clb_${group}_${skill}`);
+  }
+
+  function getLatestRollingClbEntry(history = rollingClbLevelHistory) {
+    const sorted = sortRollingClbHistory(history);
+    return sorted[0] || null;
+  }
+
+  function formatRollingClbCell(value) {
+    const text = String(value || '').trim();
+    return text || '—';
+  }
+
+  function formatRollingClbSkillSummary(entry) {
+    const parts = [];
+    const labels = { goal: 'Goal', current: 'Current', result: 'Result' };
+    ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
+      const values = ROLLING_CLB_SKILLS
+        .map((skill) => String(entry?.[group]?.[skill] || '').trim())
+        .filter(Boolean);
+      if (values.length) parts.push(`${labels[group]}: ${values.join('/')}`);
+    });
+    return parts.join(' · ') || '—';
+  }
+
+  function syncRollingClbEditPermissions() {
+    const editable = canEditStudentClb === true;
+    qs('btn_rollingClbAddEntry')?.classList.toggle('d-none', !editable);
+    qs('btn_rollingClbSaveEntry')?.classList.toggle('d-none', !editable);
+    document.querySelectorAll('.rolling-clb-editor-input').forEach((input) => {
+      input.readOnly = !editable;
+      if (input.type === 'date') input.disabled = !editable;
+    });
+  }
+
+  function showRollingClbListPanel() {
+    qs('rollingClb_listPanel')?.classList.remove('d-none');
+    qs('rollingClb_editorPanel')?.classList.add('d-none');
+    rollingClbEditingEntryId = '';
+  }
+
+  function clearRollingClbEditor() {
+    const recordedAt = qs('inp_rolling_clbRecordedAt');
+    const resultRecordedAt = qs('inp_rolling_clbResultRecordedAt');
+    if (recordedAt) {
+      recordedAt.value = (window.AppOrgDateTime && AppOrgDateTime.today)
+        ? String(AppOrgDateTime.today)
+        : String(orgToday || '');
+    }
+    if (resultRecordedAt) resultRecordedAt.value = '';
+    ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
+      ROLLING_CLB_SKILLS.forEach((skill) => {
+        const input = getRollingClbEditorInput(group, skill);
+        if (input) input.value = '';
+      });
+      const firstSkillInput = getRollingClbEditorInput(group, ROLLING_CLB_SKILLS[0]);
+      if (firstSkillInput) firstSkillInput.value = '-';
+    });
+  }
+
+  function prefillRollingClbCurrentFromLatest() {
+    const latest = getLatestRollingClbEntry();
+    if (!latest) return;
+    ROLLING_CLB_SKILLS.forEach((skill) => {
+      const input = getRollingClbEditorInput('current', skill);
+      const value = String(latest?.result?.[skill] || '').trim();
+      if (input && value) input.value = value;
+    });
+  }
+
+  function collectRollingClbEditorGroupsFromInputs() {
+    const values = { goal: {}, current: {}, result: {} };
+    ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
+      ROLLING_CLB_SKILLS.forEach((skill) => {
+        values[group][skill] = String(getRollingClbEditorInput(group, skill)?.value || '').trim();
+      });
+    });
+    return values;
+  }
+
+  function refreshRollingClbEditorWarnings() {
+    const parser = window.ClbLevelValueParser;
+    const alertEl = qs('rollingClb_entryWarnings');
+    document.querySelectorAll('.rolling-clb-editor-input').forEach((input) => {
+      input.classList.remove('clb-level-value-warning');
+    });
+    if (!parser || !alertEl) return;
+    const context = {
+      mode: rollingClbEditingEntryId ? 'edit' : 'new',
+      previousEntry: rollingClbEditingEntryId ? null : getLatestRollingClbEntry()
+    };
+    const warnings = parser.evaluateClbEditorWarnings(collectRollingClbEditorGroupsFromInputs(), context);
+    const list = Object.values(warnings);
+    if (!list.length) {
+      alertEl.classList.add('d-none');
+      alertEl.innerHTML = '';
+      return;
+    }
+    alertEl.classList.remove('d-none');
+    alertEl.innerHTML = list.map((warning) => `<div>${htmlEscape(warning.message)}</div>`).join('');
+    list.forEach((warning) => {
+      const input = document.getElementById(parser.resolveClbEditorInputId(warning, 'rolling'));
+      if (input) input.classList.add('clb-level-value-warning');
+    });
+  }
+
+  function resetRollingClbEditorMode() {
+    rollingClbEditingEntryId = '';
+    const title = qs('rollingClb_editorTitle');
+    const saveBtn = qs('btn_rollingClbSaveEntry');
+    const removeBtn = qs('btn_rollingClbRemoveEntry');
+    if (title) title.textContent = 'New CLB Entry';
+    if (saveBtn) saveBtn.textContent = 'Save CLB Entry';
+    if (removeBtn) removeBtn.classList.add('d-none');
+  }
+
+  function showRollingClbEditorPanel() {
+    qs('rollingClb_listPanel')?.classList.add('d-none');
+    qs('rollingClb_editorPanel')?.classList.remove('d-none');
+    syncRollingClbEditPermissions();
+  }
+
+  function openRollingClbEditorForNewEntry() {
+    resetRollingClbEditorMode();
+    clearRollingClbEditor();
+    prefillRollingClbCurrentFromLatest();
+    showRollingClbEditorPanel();
+    refreshRollingClbEditorWarnings();
+  }
+
+  function openRollingClbEditorForEntry(entryId) {
+    const entry = rollingClbLevelHistory.find((row) => String(row?.id || '') === String(entryId || ''));
+    if (!entry) return;
+    clearRollingClbEditor();
+    rollingClbEditingEntryId = String(entry.id || '');
+    const recordedAt = qs('inp_rolling_clbRecordedAt');
+    const resultRecordedAt = qs('inp_rolling_clbResultRecordedAt');
+    if (recordedAt) recordedAt.value = String(entry.recordedAt || '');
+    if (resultRecordedAt) resultRecordedAt.value = String(entry.resultRecordedAt || '');
+    ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
+      ROLLING_CLB_SKILLS.forEach((skill) => {
+        const input = getRollingClbEditorInput(group, skill);
+        if (input) input.value = String(entry?.[group]?.[skill] || '');
+      });
+    });
+    const title = qs('rollingClb_editorTitle');
+    const saveBtn = qs('btn_rollingClbSaveEntry');
+    const removeBtn = qs('btn_rollingClbRemoveEntry');
+    if (title) title.textContent = 'Edit CLB Entry';
+    if (saveBtn) saveBtn.textContent = 'Update CLB Entry';
+    if (removeBtn) removeBtn.classList.toggle('d-none', !canEditStudentClb);
+    showRollingClbEditorPanel();
+    refreshRollingClbEditorWarnings();
+  }
+
+  function collectRollingClbEditorEntry() {
+    const recordedAt = String(qs('inp_rolling_clbRecordedAt')?.value || '').trim();
+    if (!recordedAt) throw new Error('Goal / Current date is required for a CLB entry.');
+    const resultRecordedAt = String(qs('inp_rolling_clbResultRecordedAt')?.value || '').trim();
+    const values = { goal: {}, current: {}, result: {} };
+    ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
+      ROLLING_CLB_SKILLS.forEach((skill) => {
+        values[group][skill] = String(getRollingClbEditorInput(group, skill)?.value || '').trim();
+      });
+    });
+    const labels = { goal: 'CLB Goal', current: 'Current CLB Level', result: 'CLB Result' };
+    ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
+      if (!ROLLING_CLB_SKILLS.some((skill) => values[group][skill])) {
+        throw new Error(`Enter at least one value for ${labels[group]}.`);
+      }
+    });
+    return {
+      id: rollingClbEditingEntryId || createRollingClbEntryId(rollingClbLevelHistory.length),
+      recordedAt,
+      resultRecordedAt,
+      goal: values.goal,
+      current: values.current,
+      result: values.result
+    };
+  }
+
+  async function persistRollingClbHistory() {
+    const studentId = String(rollingClbContext?.studentId || '').trim();
+    if (!studentId) throw new Error('Student id is missing.');
+    const result = await requestJson(
+      `/school/students/api/${encodeURIComponent(studentId)}/clb-level-history`,
+      'PUT',
+      { clbLevelHistory: sortRollingClbHistory(rollingClbLevelHistory) }
+    );
+    if (!result) return false;
+    rollingClbLevelHistory = Array.isArray(result.data?.clbLevelHistory)
+      ? result.data.clbLevelHistory
+      : rollingClbLevelHistory;
+    if (result.data?.studentLabel) {
+      rollingClbContext.studentLabel = String(result.data.studentLabel || '').trim();
+      if (qs('rollingClb_studentLabel')) qs('rollingClb_studentLabel').value = rollingClbContext.studentLabel;
+    }
+    return true;
+  }
+
+  function renderRollingClbList() {
+    const emptyEl = qs('rollingClb_historyEmpty');
+    const wrapEl = qs('rollingClb_historyWrap');
+    const tbody = qs('rollingClb_historyTbody');
+    rollingClbLevelHistory = sortRollingClbHistory(rollingClbLevelHistory);
+    syncRollingClbEditPermissions();
+    if (!emptyEl || !wrapEl || !tbody) return;
+
+    if (!rollingClbLevelHistory.length) {
+      emptyEl.classList.remove('d-none');
+      wrapEl.classList.add('d-none');
+      tbody.innerHTML = '';
+      return;
+    }
+
+    emptyEl.classList.add('d-none');
+    wrapEl.classList.remove('d-none');
+    tbody.innerHTML = rollingClbLevelHistory.map((entry) => {
+      const entryId = htmlEscape(String(entry?.id || ''));
+      return `
+        <tr class="rolling-clb-history-row" data-entry-id="${entryId}" role="button" tabindex="0">
+          <td class="fw-semibold">${htmlEscape(formatRollingClbCell(entry?.recordedAt))}</td>
+          <td>${htmlEscape(formatRollingClbCell(entry?.resultRecordedAt))}</td>
+          <td class="small">${htmlEscape(formatRollingClbSkillSummary(entry))}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function saveRollingClbEntryFromEditor() {
+    if (!canEditStudentClb) {
+      await showMsg('CLB Entries', 'warning', 'You do not have permission to edit CLB entries.');
+      return;
+    }
+    try {
+      const entry = collectRollingClbEditorEntry();
+      const wasEditing = Boolean(rollingClbEditingEntryId);
+      if (rollingClbEditingEntryId) {
+        const index = rollingClbLevelHistory.findIndex((row) => String(row?.id || '') === rollingClbEditingEntryId);
+        if (index < 0) throw new Error('The CLB entry being edited is no longer available.');
+        rollingClbLevelHistory[index] = entry;
+      } else {
+        rollingClbLevelHistory.push(entry);
+      }
+      showBusy('Saving CLB entry...');
+      const saved = await persistRollingClbHistory();
+      if (!saved) return;
+      showRollingClbListPanel();
+      renderRollingClbList();
+      await showMsg('Success', 'success', wasEditing ? 'CLB entry updated.' : 'CLB entry added.');
+    } catch (error) {
+      await showMsg('CLB Entry', 'warning', error.message || 'Unable to save CLB entry.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function removeRollingClbEntryFromEditor() {
+    if (!canEditStudentClb || !rollingClbEditingEntryId) return;
+    const confirmed = window.confirm('Remove this CLB entry from the student profile?');
+    if (!confirmed) return;
+    rollingClbLevelHistory = rollingClbLevelHistory.filter((row) => String(row?.id || '') !== rollingClbEditingEntryId);
+    try {
+      showBusy('Removing CLB entry...');
+      const saved = await persistRollingClbHistory();
+      if (!saved) return;
+      showRollingClbListPanel();
+      renderRollingClbList();
+      await showMsg('Success', 'success', 'CLB entry removed.');
+    } catch (error) {
+      await showMsg('CLB Entry', 'error', error.message || 'Unable to remove CLB entry.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function openRollingStudentClbModal(periodId) {
+    const row = periodRows.find((item) => String(item?.id || '') === String(periodId || ''));
+    if (!row) return;
+    const studentDisplay = resolveStudentRowDisplay(row);
+    const studentId = resolveEnrollmentPeriodStudentId(row);
+    if (!studentId) {
+      await showMsg('CLB Entries', 'warning', 'Student id is missing for this enrollment period.');
+      return;
+    }
+    rollingClbContext = {
+      studentId,
+      studentLabel: String(row.studentLabel || studentDisplay.label || studentId).trim()
+    };
+    try {
+      showBusy('Loading CLB entries...');
+      const result = await requestJson(`/school/students/api/${encodeURIComponent(studentId)}/clb-level-history`);
+      if (!result) return;
+      rollingClbLevelHistory = Array.isArray(result.data?.clbLevelHistory) ? result.data.clbLevelHistory : [];
+      rollingClbContext.studentLabel = String(result.data?.studentLabel || rollingClbContext.studentLabel || studentId).trim();
+      if (qs('rollingClb_studentLabel')) qs('rollingClb_studentLabel').value = rollingClbContext.studentLabel;
+      if (qs('rollingClb_studentId')) qs('rollingClb_studentId').value = studentId;
+      showRollingClbListPanel();
+      renderRollingClbList();
+      rollingStudentClbModal?.show();
+    } catch (error) {
+      await showMsg('CLB Entries', 'error', error.message || 'Unable to load CLB entries.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function openRollingClassPicker() {
     if (!window.GenericPicker || !window.GenericPickerPresets) {
-      showMsg('Picker Unavailable', 'warning', 'Class picker is not loaded on this page.');
+      await showMsg('Picker Unavailable', 'warning', 'Class picker is not loaded on this page.');
       return;
     }
     if (isGenericPickerOpen()) return;
-    addEnrollmentModal?.hide();
-    groupEnrollmentModal?.hide();
-    syncRollingModalLayer();
+    await dismissEnrollmentWorkflowModals();
+    cleanupRollingModalLayer();
+    if (isGenericPickerOpen()) return;
+    prepareGenericPickerForOpen();
+    const pickerEl = document.getElementById('genericPickerModal');
+    pickerEl?.addEventListener('shown.bs.modal', () => {
+      const pickerZ = 12010;
+      pickerEl.style.setProperty('z-index', String(pickerZ), 'important');
+      const backdrops = document.querySelectorAll('.modal-backdrop.show');
+      const lastBackdrop = backdrops[backdrops.length - 1];
+      if (lastBackdrop) lastBackdrop.style.setProperty('z-index', String(pickerZ - 5), 'important');
+    }, { once: true });
     GenericPicker.open(GenericPickerPresets.class({
       title: 'Select rolling class',
       icon: 'bi-book',
@@ -5049,6 +5736,69 @@
 
   let rollingBusyDepth = 0;
   let rollingBusyToken = null;
+  let enrollmentModalBusy = false;
+  let enrollmentModalDismissConfig = null;
+  let enrollmentModalProgrammaticDismiss = false;
+
+  function getEnrollmentModalBusyControls() {
+    if (!addEnrollmentModalEl) return [];
+    const footer = addEnrollmentModalEl.querySelector('.modal-footer');
+    const headerClose = addEnrollmentModalEl.querySelector('.modal-header .btn-close');
+    return [
+      qs('btn_addPeriod'),
+      qs('btn_enrollWizardBack'),
+      headerClose,
+      ...(footer ? Array.from(footer.querySelectorAll('[data-bs-dismiss="modal"]')) : [])
+    ].filter(Boolean);
+  }
+
+  function beginEnrollmentModalWork(message = 'Please wait...') {
+    if (enrollmentModalBusy) return false;
+    enrollmentModalBusy = true;
+    addEnrollmentModalEl?.classList.add('enrollment-modal-is-busy');
+    getEnrollmentModalBusyControls().forEach((control) => {
+      control.disabled = true;
+    });
+
+    if (addEnrollmentModalEl && bootstrapApi?.Modal) {
+      const instance = bootstrapApi.Modal.getInstance(addEnrollmentModalEl)
+        || (typeof bootstrapApi.Modal.getOrCreateInstance === 'function'
+          ? bootstrapApi.Modal.getOrCreateInstance(addEnrollmentModalEl)
+          : null);
+      if (instance?._config) {
+        enrollmentModalDismissConfig = {
+          keyboard: instance._config.keyboard,
+          backdrop: instance._config.backdrop
+        };
+        instance._config.keyboard = false;
+        instance._config.backdrop = 'static';
+      }
+    }
+
+    showBusy(message);
+    return true;
+  }
+
+  function endEnrollmentModalWork() {
+    if (!enrollmentModalBusy) return;
+    enrollmentModalBusy = false;
+    addEnrollmentModalEl?.classList.remove('enrollment-modal-is-busy');
+
+    if (addEnrollmentModalEl && bootstrapApi?.Modal && enrollmentModalDismissConfig) {
+      const instance = bootstrapApi.Modal.getInstance(addEnrollmentModalEl);
+      if (instance?._config) {
+        instance._config.keyboard = enrollmentModalDismissConfig.keyboard;
+        instance._config.backdrop = enrollmentModalDismissConfig.backdrop;
+      }
+      enrollmentModalDismissConfig = null;
+    }
+
+    getEnrollmentModalBusyControls().forEach((control) => {
+      control.disabled = false;
+    });
+    syncEnrollmentWizardPrimaryButton();
+    hideBusy();
+  }
 
   function showBusy(message = 'Please wait...') {
     const isNewOverlay = !rollingBusyToken;
@@ -7132,32 +7882,33 @@
       await showMsg('Date out of range', 'warning', cycleDateIssue);
       return;
     }
-    await refreshRollingEligibility();
-    if (!lastRollingEligibility || lastRollingEligibility.eligible !== true) {
-      const issues = lastRollingEligibility?.prerequisite?.issues || [];
-      const warnings = lastRollingEligibility?.prerequisite?.warnings || [];
-      const msg = issues.length > 0
-        ? issues.join('\n')
-        : (warnings.length > 0
-          ? warnings.join('\n')
-          : 'The student must have an active program registration allowed for this class and meet prerequisites. Fix the issues shown under Program registration, then try again.');
-      await showMsg(
-        'Not eligible',
-        'warning',
-        msg
-      );
-      return;
-    }
+    if (!beginEnrollmentModalWork('Checking enrollment eligibility...')) return;
     try {
+      await refreshRollingEligibility();
+      if (!lastRollingEligibility || lastRollingEligibility.eligible !== true) {
+        const issues = lastRollingEligibility?.prerequisite?.issues || [];
+        const warnings = lastRollingEligibility?.prerequisite?.warnings || [];
+        const msg = issues.length > 0
+          ? issues.join('\n')
+          : (warnings.length > 0
+            ? warnings.join('\n')
+            : 'The student must have an active program registration allowed for this class and meet prerequisites. Fix the issues shown under Program registration, then try again.');
+        await showMsg(
+          'Not eligible',
+          'warning',
+          msg
+        );
+        return;
+      }
       showBusy('Preparing enrollment...');
       const preview = await requestJson('/school/classes/api/enrollment-periods/preview-create', 'POST', payload);
       if (!preview) return;
       if (String(preview.mode || '').toLowerCase() === 'chargeable' && preview.requiresDraft) {
-        hideBusy();
         openChargeModalWithDraft(payload, preview.draft || {});
         return;
       }
 
+      showBusy('Saving enrollment...');
       const enginePayload = buildRollingEnrollmentEnginePayload();
       const result = await requestJson(
         `/school/classes/api/${encodeURIComponent(classId)}/rolling-enrollment/execute`,
@@ -7166,9 +7917,10 @@
       );
       if (!result) return;
       const period = result.period || result.data?.results?.find((row) => row?.ok)?.period || result.data?.period;
-      addEnrollmentModal?.hide();
+      await finalizeEnrollmentWorkflowDismissal();
       const ledgerNote = academicLedgerHtmlNote(result.academicLedger);
       await showMsg('Success', 'success', (result.message || 'Enrollment period created.') + ledgerNote);
+      cleanupRollingModalLayer();
       await loadRows();
       clearEntryDraft();
       pendingPlannedNaSessionIds = [];
@@ -7178,7 +7930,7 @@
     } catch (error) {
       await showMsg('Create Failed', 'error', error.message || 'Unable to create enrollment period.');
     } finally {
-      hideBusy();
+      endEnrollmentModalWork();
     }
   }
 
@@ -7572,8 +8324,9 @@
         addedRows: collectAddedRows()
       });
       if (!result) return;
-      chargeModal?.hide();
+      await finalizeEnrollmentWorkflowDismissal();
       await showMsg('Success', 'success', result.message || 'Draft enrollment saved.');
+      cleanupRollingModalLayer();
       await loadRows();
       clearEntryDraft();
       resetChargeModalState();
@@ -7765,6 +8518,18 @@
     return result;
   }
 
+  function formatStudentGenderLabel(gender) {
+    const token = String(gender || '').trim().toLowerCase();
+    if (!token) return '';
+    const labels = {
+      male: 'Male',
+      female: 'Female',
+      nonbinary: 'Non-binary',
+      other: 'Other'
+    };
+    return labels[token] || token.charAt(0).toUpperCase() + token.slice(1);
+  }
+
   function resolveStudentRowDisplay(row) {
     const studentId = String(row?.studentId || '').trim();
     const mapped = studentMap.get(studentId)
@@ -7772,10 +8537,16 @@
       || [...studentMap.values()].find((item) => String(item?.personId || '') === studentId);
     const label = String(row?.studentLabel || mapped?.label || '').trim();
     const recordId = String(row?.studentRecordId || mapped?.id || studentId).trim();
+    const gender = formatStudentGenderLabel(row?.studentGender || mapped?.gender || '');
     return {
       label: label || studentId || '-',
-      recordId: recordId || studentId
+      recordId: recordId || studentId,
+      gender
     };
+  }
+
+  function resolveEnrollmentPeriodStudentId(row) {
+    return String(resolveStudentRowDisplay(row).recordId || '').trim();
   }
 
   function resolvePeriodEndSortValue(row = {}, explicitTargetSessionCount = 0) {
@@ -7855,6 +8626,7 @@
           : (status === 'waiting_list' ? 'bg-primary'
             : (status === 'planned' ? 'bg-primary' : (status === 'draft' ? 'bg-warning text-dark' : 'bg-secondary'))));
       const canClose = isOpenStatus(status);
+      const canOnHold = canManageEnrollmentOffice && ON_HOLD_ELIGIBLE_STATUSES.includes(status);
       const canArchive = ['completed', 'withdrawn', 'cancelled'].includes(status);
       const canReenter = ['completed', 'withdrawn', 'cancelled', 'archived'].includes(status);
       const transactionSummary = row?.transactionSummary && typeof row.transactionSummary === 'object'
@@ -7899,12 +8671,17 @@
       const remainingSortValue = remainingDisplay || '';
       const isVoid = status === 'void';
       const rowClass = isEndedEnrollmentRow(row) ? 'rolling-period-row-ended' : '';
+      const periodStudentId = resolveEnrollmentPeriodStudentId(row);
+      const clbEntriesBtn = `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-clb-entries" data-period-id="${htmlEscape(String(row?.id || ''))}" data-student-id="${htmlEscape(periodStudentId)}"><i class="bi bi-bar-chart-steps me-1"></i>CLB entries</button>`;
       const actionsMenuHtml = isVoid
-        ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-details" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-eye me-1"></i>Details</button>`
+        ? `${clbEntriesBtn}
+                <button type="button" class="btn btn-outline-primary btn-sm btn-row-details" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-eye me-1"></i>Details</button>`
         : `
+                ${clbEntriesBtn}
                 <button type="button" class="btn btn-outline-primary btn-sm btn-row-attendance-report" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-clipboard-data me-1"></i>Attendance report</button>
                 <button type="button" class="btn btn-outline-primary btn-sm btn-row-edit" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
-                ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-manage-sessions" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-calendar-week me-1"></i>Manage enrollment sessions</button>` : ''}
+                ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-manage-sessions" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-calendar-week me-1"></i>Manage Sessions</button>` : ''}
+                ${canOnHold ? `<button type="button" class="btn btn-outline-warning btn-sm btn-row-on-hold" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pause-circle me-1"></i>On Hold</button>` : ''}
                 ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-success btn-sm btn-row-extension" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-plus-circle me-1"></i>Extension enrollment</button>` : ''}
                 ${canReviewDraft ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-review-draft" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-text me-1"></i>Review Draft</button>` : ''}
                 ${canReenter ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>` : ''}
@@ -7915,8 +8692,9 @@
       return `
         <tr class="${rowClass}">
           <td class="ps-4" data-column="student" data-sort-value="${htmlEscape(studentSortValue)}">
+            ${studentDisplay.gender ? `<div class="x-small text-muted font-monospace rolling-student-gender-line">${htmlEscape(studentDisplay.gender)}</div>` : ''}
             <div class="fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(studentDisplay.label, studentDisplay.recordId, { className: 'text-decoration-none fw-semibold' }) : htmlEscape(studentDisplay.label))}</div>
-            <div class="x-small text-muted font-monospace">${htmlEscape(studentId)}</div>
+            <div class="x-small text-muted font-monospace rolling-student-id-line">${htmlEscape(studentDisplay.recordId || studentId)}</div>
           </td>
           <td data-column="startDate" data-sort-value="${htmlEscape(String(row?.startDate || ''))}">${htmlEscape(String(row?.startDate || '-'))}</td>
           <td data-column="endDate" data-sort-value="${htmlEscape(endSortValue)}">${hasEnrollmentTarget ? '<span class="text-muted">Target-based</span>' : htmlEscape(String(row?.endDate || 'Open'))}</td>
@@ -8048,8 +8826,13 @@
       }
       if (isGroupSessionCapacityEnrollment()) {
         if (hasEnrollmentCap()) {
-          const alignmentGate = await ensureEnrollmentSessionAlignment();
-          if (!alignmentGate.ok) return;
+          if (!beginEnrollmentModalWork('Checking session alignment...')) return;
+          try {
+            const alignmentGate = await ensureEnrollmentSessionAlignment();
+            if (!alignmentGate.ok) return;
+          } finally {
+            endEnrollmentModalWork();
+          }
         }
         await proceedWithEnrollmentAfterAlignment();
         return;
@@ -8080,18 +8863,24 @@
     }
 
     if (enrollWizardStep === 'addSessions') {
-      await refreshAlignmentWithStagedSessions();
-      if (!await validateEnrollmentPickForContinue()) {
-        syncEnrollmentWizardPrimaryButton();
-        return;
-      }
-      syncPlannedNaFromIncludedSelection();
-      if (pendingStagedSessions.length) {
-        const loaded = await loadConflictReviewStep();
-        if (!loaded) return;
-        enrollWizardStep = 'conflicts';
-        setEnrollmentWizardStepVisibility();
-        return;
+      if (!beginEnrollmentModalWork('Refreshing session alignment...')) return;
+      try {
+        await refreshAlignmentWithStagedSessions();
+        if (!await validateEnrollmentPickForContinue()) {
+          syncEnrollmentWizardPrimaryButton();
+          return;
+        }
+        syncPlannedNaFromIncludedSelection();
+        if (pendingStagedSessions.length) {
+          showBusy('Loading conflict review...');
+          const loaded = await loadConflictReviewStep();
+          if (!loaded) return;
+          enrollWizardStep = 'conflicts';
+          setEnrollmentWizardStepVisibility();
+          return;
+        }
+      } finally {
+        endEnrollmentModalWork();
       }
       await proceedWithEnrollmentAfterAlignment();
       return;
@@ -8112,11 +8901,16 @@
       }
       pendingPlannedNaSessionIds = selectedSessions.slice();
       if (pendingStagedSessions.length) {
-        const loaded = await loadConflictReviewStep();
-        if (!loaded) return;
-        enrollWizardStep = 'conflicts';
-        setEnrollmentWizardStepVisibility();
-        return;
+        if (!beginEnrollmentModalWork('Loading conflict review...')) return;
+        try {
+          const loaded = await loadConflictReviewStep();
+          if (!loaded) return;
+          enrollWizardStep = 'conflicts';
+          setEnrollmentWizardStepVisibility();
+          return;
+        } finally {
+          endEnrollmentModalWork();
+        }
       }
       await proceedWithEnrollmentAfterAlignment();
       return;
@@ -8131,6 +8925,39 @@
     }
   }
 
+  function isOpenEditableEnrollmentStatus(status) {
+    return OPEN_EDITABLE_ENROLLMENT_STATUSES.includes(String(status || '').trim().toLowerCase());
+  }
+
+  function syncCloseModalUi() {
+    const targetStatus = String(qs('close_status')?.value || 'completed').trim().toLowerCase();
+    const isWithdrawn = targetStatus === 'withdrawn';
+    const previewBtn = qs('btn_previewClosePeriod');
+    const previewPanel = qs('close_statusPreview');
+    if (previewBtn) previewBtn.classList.toggle('d-none', isWithdrawn);
+    if (previewPanel) previewPanel.classList.toggle('d-none', isWithdrawn);
+    if (isWithdrawn) {
+      approvedCloseStatusPayload = null;
+      syncCloseModalWithdrawnConfirmState();
+    } else {
+      approvedCloseStatusPayload = null;
+      if (qs('btn_confirmClosePeriod')) qs('btn_confirmClosePeriod').disabled = true;
+      if (previewPanel) {
+        previewPanel.className = 'alert alert-light border mt-3 mb-0';
+        previewPanel.textContent = 'Preview the financial effect before applying the status change.';
+      }
+    }
+  }
+
+  function syncCloseModalWithdrawnConfirmState() {
+    const periodId = String(qs('close_periodId')?.value || '').trim();
+    const effectiveDate = String(qs('close_endDate')?.value || '').trim();
+    const reason = String(qs('close_reasonEnd')?.value || '').trim();
+    const confirmBtn = qs('btn_confirmClosePeriod');
+    if (!confirmBtn) return;
+    confirmBtn.disabled = !(periodId && effectiveDate && reason);
+  }
+
   function openCloseModal(periodId, targetStatus = 'completed') {
     const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
     if (!row || !closeModal) return;
@@ -8139,9 +8966,7 @@
     qs('close_endDate').value = String(row.endDate || '').trim() || orgTodayFallback();
     qs('close_status').value = targetStatus;
     qs('close_reasonEnd').value = '';
-    qs('btn_confirmClosePeriod').disabled = true;
-    qs('close_statusPreview').className = 'alert alert-light border mt-3 mb-0';
-    qs('close_statusPreview').textContent = 'Preview the financial effect before applying the status change.';
+    syncCloseModalUi();
     closeModal.show();
   }
 
@@ -8189,6 +9014,29 @@
   async function submitClosePeriod() {
     const periodId = String(qs('close_periodId')?.value || '').trim();
     const payload = readCloseStatusPayload();
+    if (payload.targetStatus === 'withdrawn') {
+      if (!periodId || !payload.effectiveDate || !payload.reason) {
+        await showMsg('Missing Fields', 'warning', 'Period, effective date, and reason are required.');
+        return;
+      }
+      try {
+        showBusy('Applying withdrawal...');
+        const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/close`, 'POST', {
+          status: 'withdrawn',
+          endDate: payload.effectiveDate,
+          reasonEnd: payload.reason
+        });
+        if (!result) return;
+        closeModal.hide();
+        await showMsg('Status Updated', 'success', result.message || 'Enrollment marked as withdrawn.');
+        await loadRows();
+      } catch (error) {
+        await showMsg('Status Change Failed', 'error', error.message || 'Unable to update enrollment status.');
+      } finally {
+        hideBusy();
+      }
+      return;
+    }
     if (!approvedCloseStatusPayload || JSON.stringify(payload) !== JSON.stringify(approvedCloseStatusPayload)) {
       await showMsg('Preview Required', 'warning', 'Preview the current status, date, and reason before applying.');
       qs('btn_confirmClosePeriod').disabled = true;
@@ -8222,13 +9070,141 @@
     reentryModal.show();
   }
 
+  function syncEditStatusUi(row = editModalCurrentRow) {
+    const currentStatus = String(row?.status || '').trim().toLowerCase();
+    const editable = isOpenEditableEnrollmentStatus(currentStatus);
+    const statusWrap = qs('wrap_edit_status');
+    const readonlyWrap = qs('wrap_edit_statusReadonly');
+    const closeReasonWrap = qs('wrap_edit_closeReason');
+    const closeFieldsWrap = qs('wrap_edit_closeFields');
+    const attendanceHelp = qs('edit_statusAttendanceHelp');
+    const statusSelect = qs('edit_status');
+    const hasAttendanceBlock = Boolean(row?.hasNonNaAttendanceMarkings);
+
+    statusWrap?.classList.toggle('d-none', !editable);
+    readonlyWrap?.classList.toggle('d-none', editable);
+    if (!editable) {
+      if (qs('edit_statusReadonly')) qs('edit_statusReadonly').value = formatPeriodStatusLabel(currentStatus);
+      const helpEl = qs('edit_statusReadonlyHelp');
+      if (helpEl) {
+        helpEl.textContent = ['draft', 'planned', 'error'].includes(currentStatus)
+          ? 'Use Review Draft or the dedicated workflow to change this status.'
+          : 'Status changes for ended enrollments use the Close action or re-entry workflow.';
+      }
+      closeReasonWrap?.classList.add('d-none');
+      closeFieldsWrap?.classList.add('d-none');
+      return;
+    }
+
+    const selectedStatus = String(statusSelect?.value || 'active').trim().toLowerCase();
+    const isClose = selectedStatus === 'close';
+    closeReasonWrap?.classList.toggle('d-none', !isClose);
+    closeFieldsWrap?.classList.toggle('d-none', !isClose);
+
+    if (statusSelect) {
+      const tbcOption = statusSelect.querySelector('option[value="to_be_confirmed"]');
+      const wlOption = statusSelect.querySelector('option[value="waiting_list"]');
+      if (tbcOption) tbcOption.disabled = hasAttendanceBlock;
+      if (wlOption) wlOption.disabled = hasAttendanceBlock;
+    }
+    if (attendanceHelp) {
+      attendanceHelp.classList.toggle('d-none', !hasAttendanceBlock);
+      attendanceHelp.textContent = hasAttendanceBlock
+        ? 'Waiting List and To Be Confirmed are unavailable because attendance has been recorded for non-N/A sessions.'
+        : '';
+    }
+
+    if (isClose) {
+      approvedEditCloseStatusPayload = null;
+      const closeReason = String(qs('edit_closeReason')?.value || 'completed').trim().toLowerCase();
+      const isWithdrawn = closeReason === 'withdrawn';
+      qs('btn_previewEditClosePeriod')?.classList.toggle('d-none', isWithdrawn);
+      qs('edit_closeStatusPreview')?.classList.toggle('d-none', isWithdrawn);
+      if (isWithdrawn) {
+        approvedEditCloseStatusPayload = null;
+      } else if (qs('edit_closeStatusPreview')) {
+        qs('edit_closeStatusPreview').className = 'alert alert-light border mb-0';
+        qs('edit_closeStatusPreview').textContent = 'Preview the financial effect before applying cancellation, completion, or archival.';
+      }
+    }
+  }
+
+  function readEditStatusPayload() {
+    const row = editModalCurrentRow || {};
+    const currentStatus = String(row?.status || 'active').trim().toLowerCase();
+    if (!isOpenEditableEnrollmentStatus(currentStatus)) {
+      return { mode: 'readonly', status: currentStatus };
+    }
+    const selectedStatus = String(qs('edit_status')?.value || 'active').trim().toLowerCase();
+    if (selectedStatus === 'close') {
+      return {
+        mode: 'close',
+        closeReason: String(qs('edit_closeReason')?.value || 'completed').trim().toLowerCase(),
+        effectiveDate: String(qs('edit_closeEndDate')?.value || '').trim(),
+        reason: String(qs('edit_closeReasonEnd')?.value || '').trim()
+      };
+    }
+    return { mode: 'open', status: selectedStatus };
+  }
+
+  async function previewEditClosePeriod() {
+    const periodId = String(qs('edit_periodId')?.value || '').trim();
+    const statusPayload = readEditStatusPayload();
+    if (statusPayload.mode !== 'close' || statusPayload.closeReason === 'withdrawn') return;
+    if (!periodId || !statusPayload.effectiveDate || !statusPayload.reason) {
+      await showMsg('Missing Fields', 'warning', 'Period, end date, and reason are required.');
+      return;
+    }
+    const payload = {
+      targetStatus: statusPayload.closeReason,
+      effectiveDate: statusPayload.effectiveDate,
+      reason: statusPayload.reason
+    };
+    try {
+      showBusy('Preparing status preview...');
+      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/status/preview`, 'POST', payload);
+      if (!result) return;
+      approvedEditCloseStatusPayload = payload;
+      const preview = result.preview || {};
+      const previewEl = qs('edit_closeStatusPreview');
+      if (previewEl) {
+        previewEl.className = 'alert alert-info mb-0';
+        previewEl.textContent = payload.targetStatus === 'cancelled'
+          ? 'Cancellation will reverse ' + (preview.sourceTransactions || []).length +
+            ' charge transaction(s), total ' + Number(preview.adjustmentTotal || 0).toFixed(2) +
+            '. Payments will remain unchanged.'
+          : (payload.targetStatus === 'archived'
+            ? 'Archival will leave financial transactions unchanged.'
+            : 'Completion will leave financial transactions unchanged.');
+      }
+    } catch (error) {
+      approvedEditCloseStatusPayload = null;
+      const previewEl = qs('edit_closeStatusPreview');
+      if (previewEl) {
+        previewEl.className = 'alert alert-light border mb-0';
+        previewEl.textContent = 'Preview the financial effect before applying cancellation, completion, or archival.';
+      }
+      await showMsg('Preview failed', 'error', error.message || 'Unable to prepare status preview.');
+    } finally {
+      hideBusy();
+    }
+  }
+
   async function openEditModal(periodId) {
     const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
     if (!row || !editModal) return;
+    editModalCurrentRow = row;
+    approvedEditCloseStatusPayload = null;
     qs('edit_periodId').value = String(row?.id || '').trim();
     qs('edit_startDate').value = String(row?.startDate || '').trim();
     qs('edit_endDate').value = String(row?.endDate || '').trim();
-    qs('edit_status').value = String(row?.status || 'active').trim().toLowerCase() || 'active';
+    const currentStatus = String(row?.status || 'active').trim().toLowerCase() || 'active';
+    if (isOpenEditableEnrollmentStatus(currentStatus)) {
+      qs('edit_status').value = currentStatus;
+    }
+    qs('edit_closeReason').value = 'completed';
+    qs('edit_closeEndDate').value = String(row?.endDate || '').trim() || orgTodayFallback();
+    qs('edit_closeReasonEnd').value = '';
     setSessionCapacitySelectValue('edit_sessionCapacityType', row?.sessionCapacityType);
     setFunderSelectValue('edit_funder', row);
     setEditFunderLocked(enrollmentHasAttachedTransactions(row));
@@ -8237,6 +9213,7 @@
     if (qs('edit_targetSessionCount')) qs('edit_targetSessionCount').value = row?.targetSessionCount ? String(row.targetSessionCount) : '';
     if (qs('edit_targetHours')) qs('edit_targetHours').value = row?.targetHours ? String(row.targetHours) : '';
     applyEnrollmentCapUi();
+    syncEditStatusUi(row);
     editModal.show();
   }
 
@@ -8358,18 +9335,44 @@
       await showMsg('Date out of range', 'warning', cycleDateIssue);
       return;
     }
-    const nextStatus = String(qs('edit_status')?.value || 'active').trim().toLowerCase();
-    if (cycleWindow?.isClosedForNewEnrollment && nextStatus === 'active') {
-      const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === periodId);
-      const priorStatus = String(row?.status || '').trim().toLowerCase();
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === periodId)
+      || editModalCurrentRow
+      || {};
+    const priorStatus = String(row?.status || '').trim().toLowerCase();
+    const statusPayload = readEditStatusPayload();
+    const nextOpenStatus = statusPayload.mode === 'open' ? statusPayload.status : priorStatus;
+
+    if (statusPayload.mode === 'open'
+      && ['waiting_list', 'to_be_confirmed'].includes(nextOpenStatus)
+      && row?.hasNonNaAttendanceMarkings) {
+      await showMsg('Status blocked', 'warning', 'Cannot change to Waiting List or To Be Confirmed when attendance has been recorded for non-N/A sessions.');
+      return;
+    }
+    if (cycleWindow?.isClosedForNewEnrollment && nextOpenStatus === 'active') {
       if (['draft', 'planned', 'to_be_confirmed', 'waiting_list', 'error'].includes(priorStatus)) {
         await showMsg('Cycle closed', 'warning', 'This cycle is closed for new enrollment. Pending periods cannot be approved to active.');
         return;
       }
     }
+    if (statusPayload.mode === 'close') {
+      if (!statusPayload.effectiveDate || !statusPayload.reason) {
+        await showMsg('Missing Fields', 'warning', 'End date and reason are required to close the enrollment.');
+        return;
+      }
+      if (statusPayload.closeReason !== 'withdrawn') {
+        if (!approvedEditCloseStatusPayload
+          || JSON.stringify({
+            targetStatus: statusPayload.closeReason,
+            effectiveDate: statusPayload.effectiveDate,
+            reason: statusPayload.reason
+          }) !== JSON.stringify(approvedEditCloseStatusPayload)) {
+          await showMsg('Preview Required', 'warning', 'Preview the close reason, date, and reason before applying.');
+          return;
+        }
+      }
+    }
     try {
-      showBusy('Saving enrollment period changes...');
-      const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === periodId);
+      showBusy(statusPayload.mode === 'close' ? 'Closing enrollment period...' : 'Saving enrollment period changes...');
       const funderLocked = enrollmentHasAttachedTransactions(row);
       const funder = funderLocked
         ? {
@@ -8382,7 +9385,7 @@
       const editPayload = {
         startDate,
         endDate: String(qs('edit_endDate')?.value || '').trim(),
-        status: String(qs('edit_status')?.value || 'active').trim(),
+        status: priorStatus,
         funderType: funder.funderType,
         funderId: funder.funderId,
         claimNumber: String(qs('edit_claimNumber')?.value || '').trim(),
@@ -8390,6 +9393,9 @@
         sessionCountPolicy: 'all_non_na',
         sessionCapacityType: readSessionCapacityTypeFromSelect('edit_sessionCapacityType')
       };
+      if (statusPayload.mode === 'open') {
+        editPayload.status = nextOpenStatus;
+      }
       if (hasTargetSessionCount('edit_targetSessionCount')) {
         editPayload.targetSessionCount = String(qs('edit_targetSessionCount')?.value || '').trim();
       } else {
@@ -8406,8 +9412,31 @@
       }
       const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/edit`, 'POST', editPayload);
       if (!result) return;
+
+      if (statusPayload.mode === 'close') {
+        if (statusPayload.closeReason === 'withdrawn') {
+          const closeResult = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/close`, 'POST', {
+            status: 'withdrawn',
+            endDate: statusPayload.effectiveDate,
+            reasonEnd: statusPayload.reason
+          });
+          if (!closeResult) return;
+        } else {
+          const applyResult = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/status/apply`, 'POST', {
+            targetStatus: statusPayload.closeReason,
+            effectiveDate: statusPayload.effectiveDate,
+            reason: statusPayload.reason
+          });
+          if (!applyResult) return;
+        }
+      }
+
       editModal?.hide();
-      await showMsg('Updated', 'success', result.message || 'Enrollment period updated.');
+      editModalCurrentRow = null;
+      approvedEditCloseStatusPayload = null;
+      await showMsg('Updated', 'success', statusPayload.mode === 'close'
+        ? 'Enrollment status updated.'
+        : (result.message || 'Enrollment period updated.'));
       await loadRows();
     } catch (error) {
       await showMsg('Update Failed', 'error', error.message || 'Unable to update enrollment period.');
@@ -8763,6 +9792,310 @@
     await fetchEnrollmentAttendanceReport(enrollmentAttendanceReportPeriodId, defaultDate);
   }
 
+  function getAppliedOnHoldPeriods(holds = []) {
+    return (Array.isArray(holds) ? holds : []).filter((row) => String(row?.status || 'applied').toLowerCase() === 'applied');
+  }
+
+  function findOnHoldPeriodById(holdId) {
+    const targetId = String(holdId || '').trim();
+    if (!targetId) return null;
+    const holds = getAppliedOnHoldPeriods(onHoldModalCurrentRow?.enrollmentHoldPeriods || []);
+    return holds.find((row) => String(row?.id || '') === targetId) || null;
+  }
+
+  function syncOnHoldFormMode() {
+    const editingHoldId = String(qs('onHold_editingHoldId')?.value || '').trim();
+    const formTitle = qs('onHold_formTitle');
+    const applyBtn = qs('btn_applyOnHoldPeriod');
+    if (formTitle) {
+      formTitle.textContent = editingHoldId ? 'Edit On-Hold Period' : 'New On-Hold Period';
+    }
+    if (applyBtn) {
+      applyBtn.textContent = editingHoldId ? 'Update Hold' : 'Apply Hold';
+    }
+  }
+
+  function clearOnHoldEditMode() {
+    if (qs('onHold_editingHoldId')) qs('onHold_editingHoldId').value = '';
+    syncOnHoldFormMode();
+  }
+
+  function renderOnHoldExistingRows(holds = []) {
+    const body = qs('onHold_existingBody');
+    if (!body) return;
+    const rows = getAppliedOnHoldPeriods(holds);
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No on-hold periods yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map((hold) => `
+      <tr data-hold-id="${htmlEscape(String(hold?.id || ''))}">
+        <td>${htmlEscape(String(hold?.startDate || '-'))}</td>
+        <td>${htmlEscape(String(hold?.endDate || '-'))}</td>
+        <td class="small">${htmlEscape(String(hold?.reason || ''))}</td>
+        <td class="text-center">${htmlEscape(String((hold?.sessionIds || []).length || 0))}</td>
+        <td class="small text-muted">${htmlEscape(String(hold?.createdAt || '').slice(0, 10) || '-')}</td>
+        <td>
+          <div class="btn-group btn-group-sm" role="group" aria-label="On-hold actions">
+            <button type="button" class="btn btn-outline-primary btn-onhold-preview" data-hold-id="${htmlEscape(String(hold?.id || ''))}">Preview</button>
+            <button type="button" class="btn btn-outline-secondary btn-onhold-edit" data-hold-id="${htmlEscape(String(hold?.id || ''))}">Edit</button>
+            <button type="button" class="btn btn-outline-danger btn-onhold-delete" data-hold-id="${htmlEscape(String(hold?.id || ''))}">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function readOnHoldPayload() {
+    const payload = {
+      startDate: String(qs('onHold_startDate')?.value || '').trim(),
+      endDate: String(qs('onHold_endDate')?.value || '').trim(),
+      reason: String(qs('onHold_reason')?.value || '').trim()
+    };
+    const editingHoldId = String(qs('onHold_editingHoldId')?.value || '').trim();
+    if (editingHoldId) payload.excludeHoldId = editingHoldId;
+    return payload;
+  }
+
+  function setOnHoldApplyHint(message = '', tone = 'muted') {
+    const hint = qs('onHold_applyHint');
+    if (!hint) return;
+    hint.className = `small me-auto w-100 w-md-auto mb-2 mb-md-0${tone === 'warning' ? ' text-warning' : tone === 'success' ? ' text-success' : ' text-muted'}`;
+    hint.textContent = message || 'Preview the on-hold period to see affected sessions on the calendar.';
+  }
+
+  function resetOnHoldPreviewState() {
+    approvedOnHoldPayload = null;
+    if (qs('btn_applyOnHoldPeriod')) qs('btn_applyOnHoldPeriod').disabled = true;
+    setOnHoldApplyHint();
+  }
+
+  function openOnHoldCalendarPreview({
+    periodId,
+    previewSessionIds = [],
+    previewKind = 'projected',
+    anchorDate = '',
+    blockers = []
+  } = {}) {
+    const row = onHoldModalCurrentRow
+      || (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    if (!window.SessionEnrollmentCalendarModal || !row) return;
+    const blockerSessionIds = (Array.isArray(blockers) ? blockers : [])
+      .map((item) => String(item?.sessionId || '').trim())
+      .filter(Boolean);
+    window.SessionEnrollmentCalendarModal.open({
+      mode: 'enrollmentOnHoldPreview',
+      periodId: String(periodId || row?.id || ''),
+      classId,
+      studentId: String(row?.studentId || '').trim(),
+      studentLabel: String(row?.studentLabel || row?.studentId || '').trim(),
+      classLabel: String(classId || '').trim(),
+      startDate: String(row?.startDate || '').trim(),
+      endDate: String(row?.endDate || '').trim(),
+      cycleEndDate: String(cycleWindow?.endDate || '').trim(),
+      anchorDate: String(anchorDate || qs('onHold_startDate')?.value || row?.startDate || '').trim(),
+      previewSessionIds,
+      blockerSessionIds,
+      previewKind,
+      requestJson
+    });
+  }
+
+  function openEnrollmentOnHoldModal(periodId) {
+    if (!canManageEnrollmentOffice) return;
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    if (!row || !onHoldModal) return;
+    onHoldModalCurrentRow = row;
+    approvedOnHoldPayload = null;
+    clearOnHoldEditMode();
+    qs('onHold_periodId').value = String(row?.id || '').trim();
+    const enrollmentEnd = String(row?.endDate || '').trim() || 'Open';
+    qs('onHold_contextLabel').textContent = `${row?.studentLabel || row?.studentId || ''} | Enrollment: ${row?.startDate || '?'} to ${enrollmentEnd}`;
+    qs('onHold_startDate').value = String(row?.startDate || '').trim();
+    qs('onHold_endDate').value = String(row?.endDate || '').trim() || orgTodayFallback();
+    qs('onHold_startDate').min = String(row?.startDate || '').trim();
+    qs('onHold_endDate').min = String(row?.startDate || '').trim();
+    if (row?.endDate) {
+      qs('onHold_startDate').max = String(row.endDate).trim();
+      qs('onHold_endDate').max = String(row.endDate).trim();
+    } else {
+      qs('onHold_startDate').removeAttribute('max');
+      qs('onHold_endDate').removeAttribute('max');
+    }
+    qs('onHold_reason').value = '';
+    renderOnHoldExistingRows(row?.enrollmentHoldPeriods || []);
+    resetOnHoldPreviewState();
+    onHoldModal.show();
+  }
+
+  async function previewEnrollmentHold() {
+    const periodId = String(qs('onHold_periodId')?.value || '').trim();
+    const payload = readOnHoldPayload();
+    if (!periodId || !payload.startDate || !payload.endDate || !payload.reason) {
+      await showMsg('Missing Fields', 'warning', 'Start date, end date, and reason are required.');
+      return;
+    }
+    try {
+      showBusy('Previewing on-hold period...');
+      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/on-hold/preview`, 'POST', payload);
+      if (!result) return;
+      const preview = result.preview || {};
+      if (onHoldModalCurrentRow && preview.existingHolds) {
+        onHoldModalCurrentRow.enrollmentHoldPeriods = preview.existingHolds;
+      }
+      renderOnHoldExistingRows(preview.existingHolds || onHoldModalCurrentRow?.enrollmentHoldPeriods || []);
+      const sessions = Array.isArray(preview.sessions) ? preview.sessions : [];
+      const blockers = Array.isArray(preview.blockers) ? preview.blockers : [];
+      const previewSessionIds = sessions.map((row) => String(row?.sessionId || '').trim()).filter(Boolean);
+      openOnHoldCalendarPreview({
+        periodId,
+        previewSessionIds,
+        previewKind: 'projected',
+        anchorDate: payload.startDate,
+        blockers
+      });
+      if (preview.canApply) {
+        approvedOnHoldPayload = { ...payload };
+        if (qs('btn_applyOnHoldPeriod')) qs('btn_applyOnHoldPeriod').disabled = false;
+        setOnHoldApplyHint(`${sessions.length} session(s) ready to mark N/A on attendance.`, 'success');
+      } else {
+        approvedOnHoldPayload = null;
+        if (qs('btn_applyOnHoldPeriod')) qs('btn_applyOnHoldPeriod').disabled = true;
+        const blockerText = blockers.length
+          ? blockers.map((row) => String(row?.message || '')).filter(Boolean).join(' ')
+          : 'No sessions fall within this on-hold date range.';
+        setOnHoldApplyHint(blockerText, 'warning');
+      }
+    } catch (error) {
+      approvedOnHoldPayload = null;
+      if (qs('btn_applyOnHoldPeriod')) qs('btn_applyOnHoldPeriod').disabled = true;
+      setOnHoldApplyHint(error.message || 'Preview failed.', 'warning');
+      await showMsg('Preview failed', 'error', error.message || 'Unable to preview on-hold period.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function applyEnrollmentHold() {
+    const periodId = String(qs('onHold_periodId')?.value || '').trim();
+    const payload = readOnHoldPayload();
+    const editingHoldId = String(qs('onHold_editingHoldId')?.value || '').trim();
+    const approvedPayload = approvedOnHoldPayload || null;
+    const comparablePayload = approvedPayload ? { ...approvedPayload } : null;
+    const comparableCurrent = { ...payload };
+    if (comparablePayload) delete comparablePayload.excludeHoldId;
+    if (comparableCurrent.excludeHoldId && !editingHoldId) delete comparableCurrent.excludeHoldId;
+    if (!approvedPayload || JSON.stringify(comparableCurrent) !== JSON.stringify(comparablePayload)) {
+      await showMsg('Preview Required', 'warning', 'Preview the current dates and reason before applying the on-hold period.');
+      if (qs('btn_applyOnHoldPeriod')) qs('btn_applyOnHoldPeriod').disabled = true;
+      return;
+    }
+    try {
+      const busyLabel = editingHoldId ? 'Updating on-hold period...' : 'Applying on-hold period...';
+      showBusy(busyLabel);
+      const submitPayload = {
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        reason: payload.reason
+      };
+      const url = editingHoldId
+        ? `/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/on-hold/${encodeURIComponent(editingHoldId)}/update`
+        : `/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/on-hold/apply`;
+      const result = await requestJson(url, 'POST', submitPayload);
+      if (!result) return;
+      onHoldModal.hide();
+      onHoldModalCurrentRow = null;
+      approvedOnHoldPayload = null;
+      clearOnHoldEditMode();
+      const successTitle = editingHoldId ? 'On Hold Updated' : 'On Hold Applied';
+      await showMsg(successTitle, 'success', result.message || 'On-hold period saved.');
+      await loadRows();
+    } catch (error) {
+      await showMsg('Save Failed', 'error', error.message || 'Unable to save on-hold period.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  function startEditOnHoldPeriod(holdId) {
+    const hold = findOnHoldPeriodById(holdId);
+    if (!hold) return;
+    qs('onHold_editingHoldId').value = String(hold.id || '').trim();
+    qs('onHold_startDate').value = String(hold.startDate || '').trim();
+    qs('onHold_endDate').value = String(hold.endDate || '').trim();
+    qs('onHold_reason').value = String(hold.reason || '').trim();
+    syncOnHoldFormMode();
+    resetOnHoldPreviewState();
+    qs('onHold_newPeriodSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function deleteOnHoldPeriod(holdId) {
+    const hold = findOnHoldPeriodById(holdId);
+    if (!hold) return;
+    const confirmed = window.confirm(
+      `Remove the on-hold period from ${hold.startDate} to ${hold.endDate}?\n\nSafe N/A markings from this hold will be reverted.`
+    );
+    if (!confirmed) return;
+    const periodId = String(qs('onHold_periodId')?.value || '').trim();
+    if (!periodId) return;
+    try {
+      showBusy('Removing on-hold period...');
+      const result = await requestJson(
+        `/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/on-hold/${encodeURIComponent(hold.id)}/revoke`,
+        'POST',
+        {}
+      );
+      if (!result) return;
+      if (String(qs('onHold_editingHoldId')?.value || '') === String(hold.id || '')) {
+        clearOnHoldEditMode();
+        qs('onHold_reason').value = '';
+      }
+      if (result.period) {
+        onHoldModalCurrentRow = {
+          ...(onHoldModalCurrentRow || {}),
+          enrollmentHoldPeriods: result.period.enrollmentHoldPeriods || []
+        };
+        renderOnHoldExistingRows(onHoldModalCurrentRow.enrollmentHoldPeriods);
+      }
+      resetOnHoldPreviewState();
+      await loadRows();
+      const refreshedRow = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === periodId);
+      if (refreshedRow) {
+        onHoldModalCurrentRow = refreshedRow;
+        renderOnHoldExistingRows(refreshedRow.enrollmentHoldPeriods || []);
+      }
+      await showMsg('On Hold Removed', 'success', result.message || 'On-hold period removed.');
+    } catch (error) {
+      await showMsg('Delete Failed', 'error', error.message || 'Unable to remove on-hold period.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  function handleOnHoldExistingBodyClick(event) {
+    const previewBtn = event.target.closest('.btn-onhold-preview');
+    if (previewBtn) {
+      const hold = findOnHoldPeriodById(previewBtn.getAttribute('data-hold-id'));
+      if (!hold) return;
+      openOnHoldCalendarPreview({
+        periodId: String(qs('onHold_periodId')?.value || '').trim(),
+        previewSessionIds: Array.isArray(hold.sessionIds) ? hold.sessionIds : [],
+        previewKind: 'applied',
+        anchorDate: hold.startDate
+      });
+      return;
+    }
+    const editBtn = event.target.closest('.btn-onhold-edit');
+    if (editBtn) {
+      startEditOnHoldPeriod(editBtn.getAttribute('data-hold-id'));
+      return;
+    }
+    const deleteBtn = event.target.closest('.btn-onhold-delete');
+    if (deleteBtn) {
+      deleteOnHoldPeriod(deleteBtn.getAttribute('data-hold-id'));
+    }
+  }
+
   async function openEnrollmentSessionManagerModal(periodId) {
     if (!canManageEnrollmentOffice) return;
     const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
@@ -9001,6 +10334,13 @@
       return;
     }
 
+    const onHoldBtn = event.target.closest('.btn-row-on-hold');
+    if (onHoldBtn) {
+      closeAllActionMenus();
+      openEnrollmentOnHoldModal(onHoldBtn.getAttribute('data-period-id'));
+      return;
+    }
+
     const attendanceReportBtn = event.target.closest('.btn-row-attendance-report');
     if (attendanceReportBtn) {
       closeAllActionMenus();
@@ -9012,6 +10352,13 @@
     if (extensionBtn) {
       closeAllActionMenus();
       openExtensionEnrollmentModal(extensionBtn.getAttribute('data-period-id'));
+      return;
+    }
+
+    const clbEntriesBtn = event.target.closest('.btn-row-clb-entries');
+    if (clbEntriesBtn) {
+      closeAllActionMenus();
+      openRollingStudentClbModal(clbEntriesBtn.getAttribute('data-period-id'));
       return;
     }
 
@@ -9076,8 +10423,48 @@
     }
   });
 
+  document.getElementById('rollingClb_editorPanel')?.addEventListener('input', (event) => {
+    if (event.target?.closest('.rolling-clb-editor-input')) refreshRollingClbEditorWarnings();
+  });
+  qs('btn_rollingClbAddEntry')?.addEventListener('click', openRollingClbEditorForNewEntry);
+  qs('btn_rollingClbCancelEditor')?.addEventListener('click', () => {
+    showRollingClbListPanel();
+    renderRollingClbList();
+  });
+  qs('btn_rollingClbSaveEntry')?.addEventListener('click', () => {
+    saveRollingClbEntryFromEditor().catch((error) => {
+      console.error('Unable to save rolling CLB entry.', error);
+    });
+  });
+  qs('btn_rollingClbRemoveEntry')?.addEventListener('click', () => {
+    removeRollingClbEntryFromEditor().catch((error) => {
+      console.error('Unable to remove rolling CLB entry.', error);
+    });
+  });
+  qs('rollingClb_historyTbody')?.addEventListener('click', (event) => {
+    const row = event.target.closest('.rolling-clb-history-row');
+    if (!row) return;
+    openRollingClbEditorForEntry(row.getAttribute('data-entry-id') || '');
+  });
+  qs('rollingClb_historyTbody')?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const row = event.target.closest('.rolling-clb-history-row');
+    if (!row) return;
+    event.preventDefault();
+    openRollingClbEditorForEntry(row.getAttribute('data-entry-id') || '');
+  });
+  rollingStudentClbModalEl?.addEventListener('hidden.bs.modal', () => {
+    showRollingClbListPanel();
+    rollingClbLevelHistory = [];
+    rollingClbContext = { studentId: '', studentLabel: '' };
+  });
+
   qs('btn_openAddEnrollmentModal')?.addEventListener('click', openAddEnrollmentModal);
-  qs('btn_openRollingClassPicker')?.addEventListener('click', openRollingClassPicker);
+  qs('btn_openRollingClassPicker')?.addEventListener('click', () => {
+    openRollingClassPicker().catch((error) => {
+      console.error('Unable to open rolling class picker.', error);
+    });
+  });
   qs('btn_openGroupEnrollmentModal')?.addEventListener('click', openGroupEnrollmentModal);
   qs('btn_pickGroupEntryStudent')?.addEventListener('click', () => pickGroupEntryStudent(qs('grp_studentLabel')?.value || ''));
   qs('btn_addGroupEnrollmentEntry')?.addEventListener('click', addGroupEnrollmentEntry);
@@ -9228,6 +10615,12 @@
   qs('unmarkSessionListTbody')?.addEventListener('click', (event) => {
     handleUnmarkSessionToggleClick(event, qs('unmarkSessionListTbody'));
   });
+  addEnrollmentModalEl?.addEventListener('hide.bs.modal', (event) => {
+    if (enrollmentModalBusy && !enrollmentModalProgrammaticDismiss) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  });
   addEnrollmentModalEl?.addEventListener('hidden.bs.modal', () => {
     if (enrollWizardStep === 'addSessions' || pendingStagedSessions.length) captureGapFormDraft();
     syncRollingModalLayer();
@@ -9248,6 +10641,25 @@
   });
   qs('btn_confirmClosePeriod')?.addEventListener('click', submitClosePeriod);
   qs('btn_previewClosePeriod')?.addEventListener('click', previewClosePeriod);
+  qs('close_status')?.addEventListener('change', syncCloseModalUi);
+  qs('close_endDate')?.addEventListener('input', syncCloseModalWithdrawnConfirmState);
+  qs('close_reasonEnd')?.addEventListener('input', syncCloseModalWithdrawnConfirmState);
+  qs('edit_status')?.addEventListener('change', () => {
+    approvedEditCloseStatusPayload = null;
+    syncEditStatusUi();
+  });
+  qs('edit_closeReason')?.addEventListener('change', () => {
+    approvedEditCloseStatusPayload = null;
+    syncEditStatusUi();
+  });
+  qs('btn_previewEditClosePeriod')?.addEventListener('click', previewEditClosePeriod);
+  qs('btn_previewOnHoldPeriod')?.addEventListener('click', previewEnrollmentHold);
+  qs('btn_applyOnHoldPeriod')?.addEventListener('click', applyEnrollmentHold);
+  qs('onHold_existingBody')?.addEventListener('click', handleOnHoldExistingBodyClick);
+  ['onHold_startDate', 'onHold_endDate', 'onHold_reason'].forEach((id) => {
+    qs(id)?.addEventListener('input', resetOnHoldPreviewState);
+    qs(id)?.addEventListener('change', resetOnHoldPreviewState);
+  });
   qs('btn_confirmReentry')?.addEventListener('click', submitReentry);
   qs('btn_confirmEditPeriod')?.addEventListener('click', submitEditPeriod);
   qs('btn_confirmChargeEnrollment')?.addEventListener('click', submitChargeableEnrollment);

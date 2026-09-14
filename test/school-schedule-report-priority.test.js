@@ -23,6 +23,7 @@ assert.ok(person.indexOf('for="sch_role"') < person.indexOf('id="btn_openPersonP
 assert.ok(person.includes('<option value="teacher" selected>Teacher</option>'), 'person schedule defaults admin role to teacher');
 assert.ok(person.includes("pickerParams.set('role', pickerRole)") && person.includes('apiEndpoint: pickerEndpoint'), 'person picker endpoint includes selected role filtering');
 assert.ok(person.includes('function scheduleStatusChip') && person.includes('function buildScheduleEventTooltip'), 'person schedule uses hub-style card status and tooltip helpers');
+assert.ok(person.includes("event?.eventType || '').trim() === 'school_activity'") && person.includes("isActivityEvent ? 'Paid hours' : 'Duration'"), 'person schedule tooltip shows paid hours for activity work sessions');
 assert.ok(person.includes("return detailParts.join('\\n')") && person.includes('sch-tip-date'), 'person schedule tooltip renders newline field rows with LTR dates');
 assert.ok(person.includes('schedule-status-chip') && person.includes('schedule-event-title') && !person.includes('Open item details'), 'person schedule cards use status chip and avoid old open-details tooltip text');
 assert.ok(person.includes('function scheduleSoloStudentHtml') && person.includes('schedule-event-student') && person.includes("addDetail('Student', event?.soloStudentName || event?.singleStudentName)"), 'person schedule displays one-to-one student names on session cards and tooltips');

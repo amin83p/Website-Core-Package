@@ -62,6 +62,12 @@ async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData
     const hourTargetReached = effectiveTargetHours
       && consumedHours !== null
       && consumedHours >= effectiveTargetHours;
+    const personId = classEnrollmentSessionApplicabilityService.resolveStudentPersonId(row, studentToPersonMap);
+    const hasNonNaAttendanceMarkings = classEnrollmentSessionApplicabilityService.periodHasNonNaAttendanceMarkings({
+      period: row,
+      sessions,
+      personId
+    });
     const sessionCompletion = row?.completionDate ? {
       date: row.completionDate,
       sessionId: row.completionSessionId || '',
@@ -104,7 +110,8 @@ async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData
       remainingHours: effectiveTargetHours !== null && consumedHours !== null
         ? Math.max(0, classEnrollmentSessionApplicabilityService.roundTargetHours(effectiveTargetHours - consumedHours))
         : null,
-      sessionCompletion
+      sessionCompletion,
+      hasNonNaAttendanceMarkings
     };
   });
 }

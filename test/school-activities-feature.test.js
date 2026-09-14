@@ -515,6 +515,58 @@ test('getScheduleEventsForPerson enriches work-session completion scan fields', 
   }
 });
 
+test('getScheduleEventsForPerson uses assignee paid hours instead of session duration', async () => {
+  const activityService = require('../packages/school/MVC/services/school/activityService');
+  const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+  const originalFetchData = schoolDataService.fetchData;
+
+  const activities = [{
+    orgId: 'ORG-1',
+    id: 'ACT-PAID-HOURS',
+    title: 'Partial paid session',
+    status: 'posted',
+    paid: true,
+    categoryName: 'Admin',
+    departmentId: 'DEP-1',
+    departmentName: 'Ops',
+    visibilityScope: 'school',
+    evaluationType: 'attendance',
+    entries: [{
+      entryId: 'ENTRY-PAID',
+      date: '2026-07-11',
+      startTime: '09:00',
+      endTime: '15:00',
+      durationHours: 6,
+      status: 'posted',
+      assignees: [{ personId: 'P1', status: 'attended', paidHours: 4, role: 'staff' }]
+    }]
+  }];
+
+  try {
+    schoolDataService.fetchData = async (entityType) => {
+      if (entityType === 'activities') return activities;
+      if (entityType === 'activityCategories') return [];
+      if (entityType === 'departments') return [];
+      return [];
+    };
+
+    const events = await activityService.getScheduleEventsForPerson({
+      orgId: 'ORG-1',
+      personId: 'P1',
+      startDate: '2026-07-11',
+      endDate: '2026-07-11',
+      reqUser: { activeOrgId: 'ORG-1' }
+    });
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].duration, 4);
+    assert.equal(events[0].paidHours, 4);
+    assert.equal(events[0].eventType, 'school_activity');
+  } finally {
+    schoolDataService.fetchData = originalFetchData;
+  }
+});
+
 test('buildActivityScheduleCompletionScan maps completion and attendance assignee states', () => {
   const activityService = require('../packages/school/MVC/services/school/activityService');
 

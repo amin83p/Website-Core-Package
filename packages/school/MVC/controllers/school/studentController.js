@@ -35,6 +35,7 @@ const schoolDeletionGuardService = require('../../services/school/schoolDeletion
 const studentSystemIdMigrationService = require('../../services/school/studentSystemIdMigrationService');
 const programRegistrationApplyService = require('../../services/school/programRegistrationApplyService');
 const programRegistrationViewService = require('../../services/school/programRegistrationViewService');
+const reportService = require('../../services/school/reportService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
@@ -1188,6 +1189,87 @@ exports.saveStudent = async (req, res) => {
         };
         if (isAjax(req)) return res.status(statusCode).json(responsePayload);
         res.status(statusCode).render('error', { title: 'Error', error, message: error.message, user: req.user, statusCode });
+    }
+};
+
+async function resolveStudentLabelForApi(student, reqUser) {
+    if (!student) return '';
+    const person = await schoolPersonAccessService.getPersonById({ reqUser, personId: student.personId });
+    const name = person ? schoolPersonAccessService.formatPersonName(person, '') : '';
+    return name || String(student.customStudentId || student.id || '').trim();
+}
+
+exports.getStudentClbLevelHistoryApi = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const studentId = toPublicId(req.params.id);
+        if (!studentId) throw new Error('Student id is required.');
+
+        const student = await dataService.getDataById('students', studentId, req.user, routeAccess(req));
+        if (!student) throw new Error('Student not found.');
+        assertStudentOrgAccess(student, activeOrgId, req.user);
+
+        const clbLevelHistory = reportService.getSortedClbLevelHistory(student);
+        const studentLabel = await resolveStudentLabelForApi(student, req.user);
+
+        return res.json({
+            status: 'success',
+            message: 'CLB level history loaded.',
+            data: {
+                studentId,
+                studentLabel,
+                clbLevelHistory
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to load CLB level history.'
+        });
+    }
+};
+
+exports.putStudentClbLevelHistoryApi = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const studentId = toPublicId(req.params.id);
+        if (!studentId) throw new Error('Student id is required.');
+
+        const existingStudent = await dataService.getDataById('students', studentId, req.user, routeAccess(req));
+        if (!existingStudent) throw new Error('Student not found.');
+        assertStudentOrgAccess(existingStudent, activeOrgId, req.user);
+
+        let incomingHistory = req.body?.clbLevelHistory;
+        if (typeof incomingHistory === 'string') {
+            incomingHistory = parseJsonSafe(incomingHistory, null);
+        }
+        if (!Array.isArray(incomingHistory)) {
+            throw new Error('clbLevelHistory must be an array.');
+        }
+
+        const updatedStudent = await dataService.updateData(
+            'students',
+            studentId,
+            { ...existingStudent, clbLevelHistory: incomingHistory },
+            req.user
+        );
+        const clbLevelHistory = reportService.getSortedClbLevelHistory(updatedStudent);
+        const studentLabel = await resolveStudentLabelForApi(updatedStudent, req.user);
+
+        return res.json({
+            status: 'success',
+            message: 'CLB level history saved.',
+            data: {
+                studentId,
+                studentLabel,
+                clbLevelHistory
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to save CLB level history.'
+        });
     }
 };
 

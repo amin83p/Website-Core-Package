@@ -19,7 +19,7 @@ const routesSource = fs.readFileSync(
 test('rolling enrollment view includes group enrollment entry and modals', () => {
   assert.match(viewSource, /id="btn_openGroupEnrollmentModal"/);
   assert.match(belowHeadingSource, /id="btn_openRollingClassPicker"/);
-  assert.match(viewSource, /function openRollingClassPicker\(/);
+  assert.match(viewSource, /async function openRollingClassPicker\(/);
   assert.match(viewSource, /GenericPickerPresets\.class\(/);
   assert.match(viewSource, /itemFilter:/);
   assert.match(viewSource, /registrationMode/);
@@ -180,4 +180,122 @@ test('group enrollment shows anticipated finish hints under cap inputs', () => {
   assert.match(viewSource, /unmarkSessionIds/);
   assert.match(viewSource, /id="enrollWizardStepUnmarkSessions"/);
   assert.match(viewSource, /pendingUnmarkSessionIds/);
+});
+
+test('rolling enrollment includes modal cleanup helpers for stacked workflow modals', () => {
+  assert.match(viewSource, /function cleanupRollingModalLayer\(/);
+  assert.match(viewSource, /function hideBootstrapModalAndWait\(/);
+  assert.match(viewSource, /function dismissEnrollmentWorkflowModals\(/);
+  assert.match(viewSource, /function finalizeEnrollmentWorkflowDismissal\(/);
+  assert.match(viewSource, /getElementById\('globalLoadingModal'\)/);
+  assert.match(viewSource, /getElementById\('sessionEnrollmentCalendarModal'\)/);
+  assert.match(viewSource, /getElementById\('genericPickerModal'\)/);
+});
+
+test('openRollingClassPicker dismisses workflow modals before opening class picker', () => {
+  const pickerFn = viewSource.slice(
+    viewSource.indexOf('async function openRollingClassPicker('),
+    viewSource.indexOf('function pickGroupEntryStudent(')
+  );
+  assert.match(pickerFn, /await dismissEnrollmentWorkflowModals\(\)/);
+  assert.match(pickerFn, /cleanupRollingModalLayer\(\)/);
+  assert.match(pickerFn, /GenericPicker\.open\(GenericPickerPresets\.class\(/);
+  assert.doesNotMatch(pickerFn, /addEnrollmentModal\?\.hide\(\)/);
+});
+
+test('enrollment success paths finalize workflow modals before success message', () => {
+  const proceedFn = viewSource.slice(
+    viewSource.indexOf('async function proceedWithEnrollmentAfterAlignment('),
+    viewSource.indexOf('function formatAccountLabel(')
+  );
+  const chargeFn = viewSource.slice(
+    viewSource.indexOf('async function submitChargeableEnrollment('),
+    viewSource.indexOf('async function saveExistingDraftEnrollment(')
+  );
+  assert.match(proceedFn, /await finalizeEnrollmentWorkflowDismissal\(\)/);
+  assert.match(proceedFn, /cleanupRollingModalLayer\(\)/);
+  assert.match(chargeFn, /await finalizeEnrollmentWorkflowDismissal\(\)/);
+  assert.match(chargeFn, /cleanupRollingModalLayer\(\)/);
+});
+
+test('program registration shortcut retry hides shortcut modal on normal path', () => {
+  const retryFn = viewSource.slice(
+    viewSource.indexOf('async function retryProgramRegistrationShortcutEligibility('),
+    viewSource.indexOf('function mergeRollingPrerequisiteSlice(')
+  );
+  assert.match(retryFn, /programShortcutModal\?\.hide\(\)/);
+  assert.match(retryFn, /await hideBootstrapModalAndWait\(programShortcutModalEl\)/);
+  assert.match(retryFn, /cleanupRollingModalLayer\(\)/);
+});
+
+test('rolling enrollment row actions include CLB entries manager', () => {
+  assert.match(viewSource, /btn-row-clb-entries/);
+  assert.match(viewSource, /CLB entries/);
+  assert.match(viewSource, /id="rollingStudentClbModal"/);
+  assert.match(viewSource, /async function openRollingStudentClbModal\(/);
+  assert.match(viewSource, /function prefillRollingClbCurrentFromLatest\(/);
+  assert.match(viewSource, /latest\?\.result\?\.\[skill\]/);
+  assert.match(viewSource, /\/school\/students\/api\/\$\{encodeURIComponent\(studentId\)\}\/clb-level-history/);
+  assert.match(viewSource, /canEditStudentClb/);
+  assert.match(viewSource, /function sortRollingClbHistory\(/);
+  assert.match(viewSource, /function resolveEnrollmentPeriodStudentId\(/);
+  assert.match(viewSource, /resolveEnrollmentPeriodStudentId\(row\)/);
+  assert.match(viewSource, /data-student-id="/);
+  assert.match(viewSource, /function refreshRollingClbEditorWarnings\(/);
+  assert.match(viewSource, /clbLevelValueParser\.js/);
+  assert.match(viewSource, /clb-level-value-warning/);
+  const renderRowsFn = viewSource.slice(
+    viewSource.indexOf('function renderRows('),
+    viewSource.indexOf('function isGenericPickerOpen(')
+  );
+  assert.match(renderRowsFn, /const isVoid = status === 'void'/);
+  assert.match(renderRowsFn, /btn-row-clb-entries/);
+  assert.match(renderRowsFn, /btn-row-details/);
+});
+
+test('rolling enrollment student column shows gender above name and id below', () => {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/classRollingEnrollmentController.js'),
+    'utf8'
+  );
+  assert.match(viewSource, /rolling-student-gender-line/);
+  assert.match(viewSource, /rolling-student-id-line/);
+  assert.match(viewSource, /function formatStudentGenderLabel\(/);
+  assert.match(viewSource, /studentDisplay\.gender/);
+  assert.match(controllerSource, /studentGender/);
+  assert.match(controllerSource, /resolveStudentGenderToken/);
+});
+
+test('edit enrollment modal gates waiting list and to be confirmed by attendance markings', () => {
+  assert.match(viewSource, /OPEN_EDITABLE_ENROLLMENT_STATUSES/);
+  assert.match(viewSource, /edit_statusAttendanceHelp/);
+  assert.match(viewSource, /to_be_confirmed'\]\.includes\(nextOpenStatus\)/);
+  assert.match(viewSource, /row\?\.hasNonNaAttendanceMarkings/);
+});
+
+test('new enrollment modal freezes and shows waiting overlay during submit', () => {
+  assert.match(viewSource, /enrollment-modal-is-busy/);
+  assert.match(viewSource, /function beginEnrollmentModalWork\(/);
+  assert.match(viewSource, /function endEnrollmentModalWork\(/);
+  assert.match(viewSource, /let enrollmentModalBusy = false/);
+
+  const proceedFn = viewSource.slice(
+    viewSource.indexOf('async function proceedWithEnrollmentAfterAlignment('),
+    viewSource.indexOf('function formatAccountLabel(')
+  );
+  assert.match(proceedFn, /beginEnrollmentModalWork\('Checking enrollment eligibility\.\.\.'\)/);
+  assert.match(proceedFn, /await refreshRollingEligibility\(\)/);
+  assert.match(proceedFn, /showBusy\('Saving enrollment\.\.\.'\)/);
+  assert.match(proceedFn, /endEnrollmentModalWork\(\)/);
+
+  const addPeriodFn = viewSource.slice(
+    viewSource.indexOf('async function addPeriod('),
+    viewSource.indexOf('function openCloseModal(')
+  );
+  assert.match(addPeriodFn, /beginEnrollmentModalWork\('Checking session alignment\.\.\.'\)/);
+  assert.match(addPeriodFn, /beginEnrollmentModalWork\('Refreshing session alignment\.\.\.'\)/);
+  assert.match(addPeriodFn, /beginEnrollmentModalWork\('Loading conflict review\.\.\.'\)/);
+
+  assert.match(viewSource, /addEnrollmentModalEl\?\.addEventListener\('hide\.bs\.modal'/);
+  assert.match(viewSource, /if \(enrollmentModalBusy\)/);
 });

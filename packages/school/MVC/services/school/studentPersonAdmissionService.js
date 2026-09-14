@@ -354,6 +354,7 @@ async function admitNewPersonAndStudentFromRecord(record, context = {}) {
     studentPayload.clbLevelHistory.push({
       id: `clb_${Date.now()}_0`,
       recordedAt: todayStr,
+      resultRecordedAt: '',
       current: clbCurrent,
       goal: clbGoal,
       result: clbResult

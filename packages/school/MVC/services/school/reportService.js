@@ -2013,6 +2013,7 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
         student_display_name: studentRow.student_display_name || studentRow.student_full_name || context.personId,
         clb_entry_id: String(entry?.id || ''),
         clb_recorded_at: String(entry?.recordedAt || ''),
+        clb_result_recorded_at: String(entry?.resultRecordedAt || ''),
         clb_is_latest: entryIndex === 0,
         clb_goal_listening: String(entry?.goal?.listening || ''),
         clb_goal_speaking: String(entry?.goal?.speaking || ''),
@@ -2248,6 +2249,7 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     CLB_current_reading: String(latestClbLevelEntry?.current?.reading || ''),
     CLB_current_writing: String(latestClbLevelEntry?.current?.writing || ''),
     CLB_latest_recorded_at: String(latestClbLevelEntry?.recordedAt || ''),
+    CLB_latest_result_recorded_at: String(latestClbLevelEntry?.resultRecordedAt || ''),
     CLB_result_listening: String(latestClbLevelEntry?.result?.listening || ''),
     CLB_result_speaking: String(latestClbLevelEntry?.result?.speaking || ''),
     CLB_result_reading: String(latestClbLevelEntry?.result?.reading || ''),
@@ -2539,6 +2541,7 @@ function validateTemplatePrefillKeys(templateOrSchema) {
 
 module.exports = {
   buildPrefillSnapshot,
+  getSortedClbLevelHistory,
   getLatestClbLevelEntry,
   // Runs dependency-aware calculated fields on merged answers.
   recomputeCalculatedAnswers: reportRuleEngineService.recomputeCalculatedAnswers,

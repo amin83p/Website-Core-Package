@@ -6,8 +6,9 @@ const path = require('node:path');
 const servicePath = path.resolve(__dirname, '../packages/school/MVC/services/school/schoolLinkedPersonProfileService.js');
 const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
 const schoolPersonAccessService = require('../packages/school/MVC/services/school/schoolPersonAccessService');
+const schoolAdminAccessService = require('../packages/school/MVC/services/school/schoolAdminAccessService');
 const { requireCoreModule } = require('../packages/school/MVC/services/school/schoolCoreContracts');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { OPERATIONS } = require('../packages/school/config/accessConstants');
 const coreDataService = requireCoreModule('MVC/services/dataService');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -22,13 +23,29 @@ function reloadService() {
 }
 
 function mockAdminAccess(allowed = true) {
-  const originalSync = adminChekersService.isAdminForRequest;
-  const originalAsync = adminChekersService.isAdminForRequestAsync;
-  adminChekersService.isAdminForRequest = () => allowed;
-  adminChekersService.isAdminForRequestAsync = async () => allowed;
+  const originalSync = schoolAdminAccessService.isAdminForRequest;
+  const originalAsync = schoolAdminAccessService.isAdminForRequestAsync;
+  schoolAdminAccessService.isAdminForRequest = () => allowed;
+  schoolAdminAccessService.isAdminForRequestAsync = async () => allowed;
   return () => {
-    adminChekersService.isAdminForRequest = originalSync;
-    adminChekersService.isAdminForRequestAsync = originalAsync;
+    schoolAdminAccessService.isAdminForRequest = originalSync;
+    schoolAdminAccessService.isAdminForRequestAsync = originalAsync;
+  };
+}
+
+function categoryAdminUser(overrides = {}) {
+  return {
+    id: 'CAT-ADMIN-1',
+    activeOrgId: 'ORG-1',
+    allowedOrgs: [{ orgId: 'ORG-1', name: 'Test Org', roles: ['member'] }],
+    activeProfile: {
+      active: true,
+      orgId: 'ORG-1',
+      fullAdmin: false,
+      adminCategories: ['SCHOOL'],
+      sections: [],
+      ...overrides
+    }
   };
 }
 
@@ -115,6 +132,81 @@ test('assertLinkedPersonAccess rejects mismatched personId on edit link', async 
     schoolDataService.getDataById = originalGetStudent;
     restoreAdmin();
   }
+});
+
+test('assertLinkedPersonAccess allows SCHOOL category admin for student READ_ALL', async () => {
+  const service = reloadService();
+  const originalGetStudent = schoolDataService.getDataById;
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'students' && id === 'STU-1') {
+      return { id: 'STU-1', orgId: 'ORG-1', personId: 'PER-1' };
+    }
+    return null;
+  };
+  try {
+    const result = await service.assertLinkedPersonAccess({
+      reqUser: categoryAdminUser(),
+      personId: 'PER-1',
+      linkType: 'student',
+      linkId: 'STU-1',
+      operation: OPERATIONS.READ_ALL
+    });
+    assert.equal(result.personId, 'PER-1');
+    assert.equal(result.linkId, 'STU-1');
+  } finally {
+    schoolDataService.getDataById = originalGetStudent;
+  }
+});
+
+test('getLinkedPersonProfile allows SCHOOL category admin without per-section adminAccess', async () => {
+  const service = reloadService();
+  const originalGetStudent = schoolDataService.getDataById;
+  const originalGetPerson = coreDataService.getDataById;
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'students' && id === 'STU-1') {
+      return { id: 'STU-1', orgId: 'ORG-1', personId: 'PER-1' };
+    }
+    return null;
+  };
+  coreDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'persons' && id === 'PER-1') {
+      return {
+        id: 'PER-1',
+        active: true,
+        personProfileType: 'individual',
+        name: { first: 'Margaret', last: 'Student' },
+        demographics: { gender: 'female', dateOfBirth: '2000-01-01' },
+        contact: { emails: [{ type: 'primary', email: 'student@example.com', isPrimary: true }], phones: [] },
+        addresses: [],
+        organizations: [{ orgId: 'ORG-1', roles: ['school_student'] }]
+      };
+    }
+    return null;
+  };
+  try {
+    const result = await service.getLinkedPersonProfile({
+      reqUser: categoryAdminUser(),
+      personId: 'PER-1',
+      linkType: 'student',
+      linkId: 'STU-1'
+    });
+    assert.equal(result.person.id, 'PER-1');
+    assert.equal(result.person.firstName, 'Margaret');
+    assert.equal(result.displayName, 'Margaret Student');
+  } finally {
+    schoolDataService.getDataById = originalGetStudent;
+    coreDataService.getDataById = originalGetPerson;
+  }
+});
+
+test('evaluateCanEditLinkedPerson allows SCHOOL category admin for student edit', async () => {
+  const service = reloadService();
+  const allowed = await service.evaluateCanEditLinkedPerson({
+    reqUser: categoryAdminUser(),
+    linkType: 'student',
+    isEdit: true
+  });
+  assert.equal(allowed, true);
 });
 
 test('assertLinkedPersonAccess allows create-mode eligible person', async () => {
@@ -349,8 +441,16 @@ test('identity routes and forms expose linked person profile integration', () =>
   assert.match(read('packages/school/MVC/views/school/partials/personProfileEditModal.ejs'), /school-person-individual-fields/);
 
   const linkedService = read('packages/school/MVC/services/school/schoolLinkedPersonProfileService.js');
+  assert.match(linkedService, /schoolAdminAccessService/);
+  assert.doesNotMatch(linkedService, /adminAuthorityService/);
+  assert.match(linkedService, /schoolAdminAccessService\.isAdminForRequestAsync/);
+  assert.match(linkedService, /await assertSectionPermission/);
   assert.match(linkedService, /funder:\s*\{[\s\S]*?entityType:\s*'funders'/);
   assert.match(linkedService, /SCHOOL_FUNDERS/);
   assert.match(linkedService, /personProfileType/);
   assert.match(linkedService, /organizationLegalName/);
+
+  const controllerSource = read('packages/school/MVC/controllers/school/schoolLinkedPersonProfileController.js');
+  assert.match(controllerSource, /schoolAdminAccessService\.isAdminForRequestAsync/);
+  assert.doesNotMatch(controllerSource, /adminAuthorityService/);
 });

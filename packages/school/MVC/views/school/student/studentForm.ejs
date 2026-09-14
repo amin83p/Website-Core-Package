@@ -278,7 +278,8 @@
                        <table class="table table-sm table-bordered align-middle mb-0" id="clbHistoryTable">
                          <thead class="table-light">
                            <tr>
-                             <th style="width: 12%;">Date</th>
+                             <th style="width: 12%;">Goal / Current Date</th>
+                             <th style="width: 12%;">Result Date</th>
                              <th style="width: 14%;">Row</th>
                              <th>Listening</th>
                              <th>Speaking</th>
@@ -299,10 +300,15 @@
                      </div>
                      <div class="row g-3 mb-3">
                        <div class="col-md-4">
-                         <label class="form-label fw-bold small" for="inp_clbRecordedAt">Recorded Date *</label>
+                         <label class="form-label fw-bold small" for="inp_clbRecordedAt">Goal / Current Date *</label>
                          <input type="date" class="form-control form-control-sm" id="inp_clbRecordedAt">
                        </div>
+                       <div class="col-md-4">
+                         <label class="form-label fw-bold small" for="inp_clbResultRecordedAt">Result Date</label>
+                         <input type="date" class="form-control form-control-sm" id="inp_clbResultRecordedAt">
+                       </div>
                      </div>
+                     <div id="clbEntryWarnings" class="alert alert-warning border py-2 px-3 small d-none mb-3"></div>
                      <div class="table-responsive">
                        <table class="table table-sm table-bordered align-middle mb-3">
                          <thead class="table-light">
@@ -546,6 +552,10 @@
   #studentSaveProgressModal .student-save-progress-message {
     line-height: 1.25;
   }
+  .clb-level-value-warning {
+    background-color: #f8d7da !important;
+    border-color: #f1aeb5 !important;
+  }
 </style>
 
 <div class="modal fade" id="studentSaveProgressModal" tabindex="-1" aria-labelledby="studentSaveProgressTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -583,6 +593,7 @@
   </div>
 </div>
 
+<script src="/scripts/clbLevelValueParser.js"></script>
 <script>
   window.__INIT_STUDENT_ATTACHMENTS__ = <%- initAttachmentsJson %>;
   window.__INIT_CLB_LEVEL_HISTORY__ = <%- initClbLevelHistoryJson %>;
@@ -642,6 +653,7 @@
   const btnSaveClbEntry = document.getElementById('btnSaveClbEntry');
   const clbEntryEditorTitle = clbEntryEditor?.querySelector('h6') || null;
   const inpClbRecordedAt = document.getElementById('inp_clbRecordedAt');
+  const inpClbResultRecordedAt = document.getElementById('inp_clbResultRecordedAt');
   let editingClbEntryId = '';
   let newFileObjectUrls = [];
   let currentWizardStep = 0;
@@ -1647,6 +1659,11 @@
     return text ? safeHtml(text) : '<span class="text-muted">—</span>';
   }
 
+  function renderClbDateCell(value) {
+    const text = String(value || '').trim();
+    return text ? safeHtml(text) : '<span class="text-muted">—</span>';
+  }
+
   function renderClbHistoryTable() {
     clbLevelHistory = sortClbHistory(clbLevelHistory);
     if (!clbHistoryTbody || !clbHistoryEmpty || !clbHistoryWrap) return;
@@ -1670,7 +1687,8 @@
       const resultCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.result?.[skill])}</td>`).join('');
       clbHistoryTbody.innerHTML += `
         <tr>
-          <td rowspan="3" class="align-middle fw-semibold">${safeHtml(entry?.recordedAt || '')}</td>
+          <td rowspan="2" class="align-middle fw-semibold">${renderClbDateCell(entry?.recordedAt)}</td>
+          <td></td>
           <td class="fw-bold small">CLB Goal</td>
           ${goalCells}
           <td rowspan="3" class="text-end align-middle">
@@ -1685,10 +1703,13 @@
           </td>
         </tr>
         <tr>
+          <td></td>
           <td class="fw-bold small">Current CLB Level</td>
           ${currentCells}
         </tr>
         <tr>
+          <td></td>
+          <td class="align-middle fw-semibold">${renderClbDateCell(entry?.resultRecordedAt)}</td>
           <td class="fw-bold small">CLB Result</td>
           ${resultCells}
         </tr>
@@ -1715,6 +1736,7 @@
 
   function clearClbEditor() {
     if (inpClbRecordedAt && window.AppOrgDateTime && AppOrgDateTime.today) inpClbRecordedAt.value = String(AppOrgDateTime.today);
+    if (inpClbResultRecordedAt) inpClbResultRecordedAt.value = '';
     CLB_VALUE_GROUPS.forEach((group) => {
       CLB_SKILLS.forEach((skill) => {
         const input = getClbEditorInput(group, skill);
@@ -1731,10 +1753,52 @@
     if (btnSaveClbEntry) btnSaveClbEntry.textContent = 'Save CLB Entry';
   }
 
+  function getLatestClbLevelEntry() {
+    const sorted = sortClbHistory(clbLevelHistory);
+    return sorted[0] || null;
+  }
+
+  function collectClbEditorGroupsFromInputs() {
+    const values = { goal: {}, current: {}, result: {} };
+    CLB_VALUE_GROUPS.forEach((group) => {
+      CLB_SKILLS.forEach((skill) => {
+        values[group][skill] = String(getClbEditorInput(group, skill)?.value || '').trim();
+      });
+    });
+    return values;
+  }
+
+  function refreshClbEditorWarnings() {
+    const parser = window.ClbLevelValueParser;
+    const alertEl = document.getElementById('clbEntryWarnings');
+    document.querySelectorAll('.clb-editor-input').forEach((input) => {
+      input.classList.remove('clb-level-value-warning');
+    });
+    if (!parser || !alertEl) return;
+    const context = {
+      mode: editingClbEntryId ? 'edit' : 'new',
+      previousEntry: editingClbEntryId ? null : getLatestClbLevelEntry()
+    };
+    const warnings = parser.evaluateClbEditorWarnings(collectClbEditorGroupsFromInputs(), context);
+    const list = Object.values(warnings);
+    if (!list.length) {
+      alertEl.classList.add('d-none');
+      alertEl.innerHTML = '';
+      return;
+    }
+    alertEl.classList.remove('d-none');
+    alertEl.innerHTML = list.map((warning) => `<div>${safeHtml(warning.message)}</div>`).join('');
+    list.forEach((warning) => {
+      const input = document.getElementById(parser.resolveClbEditorInputId(warning, 'student'));
+      if (input) input.classList.add('clb-level-value-warning');
+    });
+  }
+
   function showClbEditor() {
     resetClbEditorMode();
     clearClbEditor();
     if (clbEntryEditor) clbEntryEditor.classList.remove('d-none');
+    refreshClbEditorWarnings();
   }
 
   function showClbEditorForEdit(entryId) {
@@ -1743,6 +1807,7 @@
     clearClbEditor();
     editingClbEntryId = String(entry.id || '');
     if (inpClbRecordedAt) inpClbRecordedAt.value = String(entry.recordedAt || '');
+    if (inpClbResultRecordedAt) inpClbResultRecordedAt.value = String(entry.resultRecordedAt || '');
     CLB_VALUE_GROUPS.forEach((group) => {
       CLB_SKILLS.forEach((skill) => {
         const input = getClbEditorInput(group, skill);
@@ -1752,6 +1817,7 @@
     if (clbEntryEditorTitle) clbEntryEditorTitle.textContent = 'Edit CLB Entry';
     if (btnSaveClbEntry) btnSaveClbEntry.textContent = 'Update CLB Entry';
     if (clbEntryEditor) clbEntryEditor.classList.remove('d-none');
+    refreshClbEditorWarnings();
   }
 
   function hideClbEditor() {
@@ -1762,7 +1828,8 @@
 
   function collectClbEditorEntry() {
     const recordedAt = String(inpClbRecordedAt?.value || '').trim();
-    if (!recordedAt) throw new Error('Recorded date is required for a CLB entry.');
+    if (!recordedAt) throw new Error('Goal / Current date is required for a CLB entry.');
+    const resultRecordedAt = String(inpClbResultRecordedAt?.value || '').trim();
     const values = { goal: {}, current: {}, result: {} };
     CLB_VALUE_GROUPS.forEach((group) => {
       CLB_SKILLS.forEach((skill) => {
@@ -1778,6 +1845,7 @@
     return {
       id: editingClbEntryId || createClbEntryId(clbLevelHistory.length),
       recordedAt,
+      resultRecordedAt,
       goal: values.goal,
       current: values.current,
       result: values.result
@@ -1800,6 +1868,9 @@
   function wireClbLevelHistoryUi() {
     if (btnAddClbEntry) btnAddClbEntry.addEventListener('click', showClbEditor);
     if (btnCancelClbEntry) btnCancelClbEntry.addEventListener('click', hideClbEditor);
+    clbEntryEditor?.addEventListener('input', (event) => {
+      if (event.target?.closest('.clb-editor-input')) refreshClbEditorWarnings();
+    });
     if (btnSaveClbEntry) {
       btnSaveClbEntry.addEventListener('click', () => {
         try {

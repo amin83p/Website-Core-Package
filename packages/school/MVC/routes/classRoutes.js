@@ -472,6 +472,29 @@ router.post('/api/enrollment-periods/:periodId/session-marks',
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.applyEnrollmentPeriodSessionMarks);
 
+router.post('/api/enrollment-periods/:periodId/on-hold/preview',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, {
+    ...rollingEnrollmentMutationActionState,
+    requireToken: false
+  }),
+  rollingCtrl.previewEnrollmentHoldPeriod);
+
+router.post('/api/enrollment-periods/:periodId/on-hold/apply',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.applyEnrollmentHoldPeriod);
+
+router.post('/api/enrollment-periods/:periodId/on-hold/:holdId/update',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.updateEnrollmentHoldPeriod);
+
+router.post('/api/enrollment-periods/:periodId/on-hold/:holdId/revoke',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.revokeEnrollmentHoldPeriod);
+
 router.post('/api/enrollment-periods/:periodId/extension',
   requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),

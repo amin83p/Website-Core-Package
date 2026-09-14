@@ -1250,6 +1250,17 @@
   border-style: dashed;
 }
 
+.session-enrollment-legend-swatch.is-na-projected {
+  background: #f8f9fa;
+  border-color: #ced4da;
+  border-style: dashed;
+}
+
+.session-enrollment-legend-swatch.is-blocked {
+  background: #fff3cd;
+  border-color: #f1aeb5;
+}
+
 #sessionEnrollmentCalendarLegendModal {
   z-index: 1065;
 }

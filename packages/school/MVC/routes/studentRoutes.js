@@ -49,6 +49,16 @@ router.get('/api/name-matches',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
   ctrl.listNameMatches);
 
+router.get('/api/:id/clb-level-history',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getStudentClbLevelHistoryApi);
+
+router.put('/api/:id/clb-level-history',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.putStudentClbLevelHistoryApi);
+
 router.post('/recover/:id',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),

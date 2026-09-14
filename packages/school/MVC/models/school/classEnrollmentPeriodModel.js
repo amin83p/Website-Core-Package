@@ -92,6 +92,38 @@ function sanitizeEnrollmentSessionMarks(value) {
   return out.slice(0, 500);
 }
 
+const HOLD_PERIOD_STATUSES = new Set(['applied', 'revoked']);
+
+function sanitizeEnrollmentHoldPeriods(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  const seen = new Set();
+  value.forEach((row) => {
+    if (!isPlainObject(row)) return;
+    const id = cleanId(row.id, { max: 80, allowEmpty: true });
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    const startDate = normalizeDateOrEmpty(row.startDate);
+    const endDate = normalizeDateOrEmpty(row.endDate);
+    if (!startDate || !endDate || endDate < startDate) return;
+    const status = cleanString(row.status, { max: 40, allowEmpty: true }).toLowerCase() || 'applied';
+    const sessionIds = (Array.isArray(row.sessionIds) ? row.sessionIds : [])
+      .map((sessionId) => cleanId(sessionId, { max: 120, allowEmpty: true }))
+      .filter(Boolean);
+    out.push({
+      id,
+      startDate,
+      endDate,
+      reason: cleanString(row.reason, { max: 500, allowEmpty: true }),
+      sessionIds: [...new Set(sessionIds)].slice(0, 500),
+      createdAt: cleanString(row.createdAt, { max: 40, allowEmpty: true }),
+      createdBy: cleanId(row.createdBy, { max: 80, allowEmpty: true }) || '',
+      status: HOLD_PERIOD_STATUSES.has(status) ? status : 'applied'
+    });
+  });
+  return out.slice(0, 100);
+}
+
 function sanitizeEnrollmentExtensions(value) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 100).map((row) => {
@@ -294,6 +326,7 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
     carriedForwardFromPeriodId: cleanId(input.carriedForwardFromPeriodId, { max: 80, allowEmpty: true }) || '',
     cycleAttendanceSummary: sanitizeCycleAttendanceSummary(input.cycleAttendanceSummary),
     enrollmentSessionMarks: sanitizeEnrollmentSessionMarks(input.enrollmentSessionMarks),
+    enrollmentHoldPeriods: sanitizeEnrollmentHoldPeriods(input.enrollmentHoldPeriods),
     enrollmentExtensions: sanitizeEnrollmentExtensions(input.enrollmentExtensions),
     plannedNotApplicableSessionIds: (() => {
       const marks = sanitizeEnrollmentSessionMarks(input.enrollmentSessionMarks);
@@ -499,6 +532,7 @@ module.exports = {
   sanitizeSessionCapacityType,
   sanitizeCycleAttendanceSummary,
   sanitizeEnrollmentSessionMarks,
+  sanitizeEnrollmentHoldPeriods,
   sanitizeEnrollmentExtensions,
   mergePlannedNaFromMarks,
   getAllEnrollmentPeriods,

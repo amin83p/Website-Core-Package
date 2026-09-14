@@ -207,6 +207,28 @@ function resolveStudentPersonId(period = {}, studentToPersonMap) {
   return toPublicId(studentToPersonMap.get(studentId) || '');
 }
 
+const OPEN_EDITABLE_STATUSES = new Set(['active', 'to_be_confirmed', 'waiting_list']);
+
+function periodHasNonNaAttendanceMarkings({
+  period = {},
+  sessions = [],
+  personId = '',
+  studentToPersonMap = null
+} = {}) {
+  const map = studentToPersonMap instanceof Map ? studentToPersonMap : new Map();
+  const resolvedPersonId = toPublicId(personId) || resolveStudentPersonId(period, map);
+  if (!resolvedPersonId) return false;
+  const sessionRows = normalizeSessionRows(sessions);
+  return sessionRows.some(({ session }) => {
+    if (!periodCoversSession(period, session)) return false;
+    const rosterRecord = getRosterRecord(session, resolvedPersonId);
+    if (!rosterRecord) return false;
+    const attendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(rosterRecord.attendance, '');
+    return Boolean(attendance)
+      && attendance !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+  });
+}
+
 /**
  * Resolves whether a person is inside at least one rolling-enrollment window
  * for a particular session. This is intentionally independent of attendance,
@@ -630,6 +652,7 @@ async function recomputeSessionCappedEnrollmentCompletionsForClass({
 
 module.exports = {
   COUNTED_ATTENDANCE_STATUSES,
+  OPEN_EDITABLE_STATUSES,
   OPEN_OR_HISTORICAL_STATUSES,
   ROLLING_DISPLAY_PERIOD_STATUSES,
   OPEN_STATUSES,
@@ -660,5 +683,7 @@ module.exports = {
   buildSessionCappedEnrollmentCompletionPatch,
   recomputeSessionCappedEnrollmentCompletionsForClass,
   getEnrollmentExcludedSessionIds,
+  periodHasNonNaAttendanceMarkings,
+  resolveStudentPersonId,
   APPLICABILITY_REASON
 };
