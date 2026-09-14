@@ -25,6 +25,68 @@ test('validatePolicyInput accepts disabled import without activity', () => {
   assert.equal(policy.importActivityId, '');
   assert.equal(policy.importTargetStatus, 'draft');
   assert.equal(policy.importBaseStartTime, '00:00');
+  assert.equal(policy.saveImportedSessionsIntoOneWorkSession, true);
+  assert.equal(policy.importWorkSessionStartTime, '07:00');
+  assert.equal(policy.importWorkSessionEndTime, '21:00');
+});
+
+test('validatePolicyInput forces consolidated work session flag on', () => {
+  const policy = timesheetImportPolicyService.validatePolicyInput({
+    saveImportedSessionsIntoOneWorkSession: false
+  });
+  assert.equal(policy.saveImportedSessionsIntoOneWorkSession, true);
+});
+
+test('validatePolicyInput accepts valid work session window', () => {
+  const policy = timesheetImportPolicyService.validatePolicyInput({
+    importWorkSessionStartTime: '08:00',
+    importWorkSessionEndTime: '20:00'
+  });
+  assert.equal(policy.importWorkSessionStartTime, '08:00');
+  assert.equal(policy.importWorkSessionEndTime, '20:00');
+});
+
+test('validatePolicyInput rejects work session window outside 07:00-21:00', () => {
+  assert.throws(
+    () => timesheetImportPolicyService.validatePolicyInput({
+      importWorkSessionStartTime: '06:30',
+      importWorkSessionEndTime: '20:00'
+    }),
+    /between 07:00 and 21:00/i
+  );
+  assert.throws(
+    () => timesheetImportPolicyService.validatePolicyInput({
+      importWorkSessionStartTime: '08:00',
+      importWorkSessionEndTime: '21:30'
+    }),
+    /between 07:00 and 21:00/i
+  );
+});
+
+test('validatePolicyInput rejects work session end before or equal to start', () => {
+  assert.throws(
+    () => timesheetImportPolicyService.validatePolicyInput({
+      importWorkSessionStartTime: '12:00',
+      importWorkSessionEndTime: '12:00'
+    }),
+    /end time must be after the start time/i
+  );
+});
+
+test('timesheet import policy model round-trips consolidated work session fields', async () => {
+  const timesheetImportPolicyModel = require('../MVC/models/school/timesheetImportPolicyModel');
+  const orgId = `ORG_POLICY_RT_${Date.now()}`;
+  const patch = timesheetImportPolicyService.validatePolicyInput({
+    importWorkSessionStartTime: '08:00',
+    importWorkSessionEndTime: '20:00',
+    importBaseStartTime: '08:30'
+  });
+  await timesheetImportPolicyModel.savePolicyForOrg(orgId, patch, 'TEST_USER');
+  const loaded = await timesheetImportPolicyModel.getPolicyForOrg(orgId);
+  assert.equal(loaded.saveImportedSessionsIntoOneWorkSession, true);
+  assert.equal(loaded.importWorkSessionStartTime, '08:00');
+  assert.equal(loaded.importWorkSessionEndTime, '20:00');
+  assert.equal(loaded.importBaseStartTime, '08:30');
 });
 
 test('validatePolicyInput accepts valid import base start time', () => {

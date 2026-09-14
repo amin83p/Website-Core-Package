@@ -359,6 +359,7 @@ function pickLegacyImportTraceFields(entry = {}) {
     'legacyImportPeriodId',
     'legacyImportSourceFileName',
     'legacyImportRowIndex',
+    'legacyImportClassName',
     'statHolidayId',
     'statHolidayPeriodId',
     'statHolidayPersonId'
@@ -1161,14 +1162,20 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
         .map((attendee) => {
           const hours = resolveActivityTimesheetEntryHours(activity, attendee, entry);
           const timing = activityAssigneeTimingService.resolveAssigneeTiming({ assignee: attendee, entry });
+          const importClassName = String(attendee?.legacyImportClassName || '').trim();
+          const rowIndex = Number(attendee?.legacyImportRowIndex);
+          const sessionIdSuffix = Number.isFinite(rowIndex) && rowIndex > 0 ? `-r${rowIndex}` : '';
+          const className = importClassName
+            ? (entryTitle.includes(importClassName) ? entryTitle : `${activity.title}: ${importClassName}`)
+            : entryTitle;
           return {
-            sessionId: `act-${activity.id}-${entry.entryId}-${targetPersonId}`,
+            sessionId: `act-${activity.id}-${entry.entryId}-${targetPersonId}${sessionIdSuffix}`,
             activityId: activity.id,
             activityEntryId: entry.entryId,
             date: entry.date,
             startTime: timing.startTime || entry.startTime,
             endTime: timing.endTime || entry.endTime,
-            className: entryTitle,
+            className,
             classId: null,
             deliveryDepartmentId: activity.departmentId,
             deliveryDepartmentName: activity.departmentName,

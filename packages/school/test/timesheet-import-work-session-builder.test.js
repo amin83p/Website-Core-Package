@@ -139,8 +139,10 @@ test('buildImportWorkSessionEntryDrafts with skipStacking preserves pre-assigned
   });
 
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].startTime, '09:00');
-  assert.equal(drafts[0].endTime, '12:00');
+  assert.equal(drafts[0].startTime, '07:00');
+  assert.equal(drafts[0].endTime, '21:00');
+  assert.equal(drafts[0].assignees[0].startTime, '09:00');
+  assert.equal(drafts[0].assignees[0].endTime, '12:00');
 });
 
 test('buildImportRowNotes mentions optional hours in comment', () => {
@@ -170,10 +172,9 @@ test('buildImportWorkSessionEntryDrafts bills optional-only rows with optional c
   });
 
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].durationHours, 1);
   assert.equal(drafts[0].assignees[0].paidHours, 1);
-  assert.match(drafts[0].notes, /This hour was optional \(1 hr\)/);
-  assert.match(drafts[0].notes, /Student: Student A/);
+  assert.match(drafts[0].assignees[0].notes, /This hour was optional \(1 hr\)/);
+  assert.match(drafts[0].assignees[0].notes, /Student: Student A/);
 });
 
 test('buildCompletedAssignee marks attendance activities attended', () => {
@@ -204,7 +205,7 @@ test('buildCompletedAssignee marks completion activities completed', () => {
   assert.deepEqual(assignee.roles, ['staff']);
 });
 
-test('buildImportWorkSessionEntryDrafts stamp import trace metadata', () => {
+test('buildImportWorkSessionEntryDrafts stamp import trace metadata on assignees', () => {
   const drafts = builder.buildImportWorkSessionEntryDrafts({
     compiledRows: [{ date: '2026-03-01', hours: 2, className: 'Math', comment: 'Prep' }],
     activity: ACTIVITY,
@@ -212,15 +213,19 @@ test('buildImportWorkSessionEntryDrafts stamp import trace metadata', () => {
     personRole: 'teacher',
     periodId: 'PER_A',
     batchId: 'BATCH_1',
-    sourceFileName: 'march.xlsx'
+    sourceFileName: 'march.xlsx',
+    workSessionStartTime: '07:00',
+    workSessionEndTime: '21:00'
   });
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].legacyImportBatchId, 'BATCH_1');
-  assert.equal(drafts[0].legacyImportSourceFileName, 'march.xlsx');
+  assert.equal(drafts[0].startTime, '07:00');
+  assert.equal(drafts[0].endTime, '21:00');
+  assert.equal(drafts[0].legacyImportBatchId, undefined);
   assert.equal(drafts[0].assignees[0].legacyImportBatchId, 'BATCH_1');
+  assert.equal(drafts[0].assignees[0].legacyImportClassName, 'Math');
   assert.equal(drafts[0].assignees[0].startTime, '00:00');
   assert.equal(drafts[0].assignees[0].endTime, '02:00');
-  assert.match(drafts[0].notes, /Prep/);
+  assert.match(drafts[0].assignees[0].notes, /Prep/);
 });
 
 test('filterImportWorkSessionsForTarget removes person entries inside period dates', () => {
@@ -275,7 +280,7 @@ test('isImportWorkSessionEntryForTarget matches legacyImportPersonId without ass
   }), true);
 });
 
-test('countOrphanImportWorkSessionsByPerson groups stamped sessions by person', async () => {
+test('countOrphanImportWorkSessionsByPerson groups stamped assignees by person', async () => {
   const activityService = require('../MVC/services/school/activityService');
   const originalGetActivity = activityService.getActivity;
   activityService.getActivity = async () => ({
@@ -286,21 +291,40 @@ test('countOrphanImportWorkSessionsByPerson groups stamped sessions by person', 
     entries: [
       {
         date: '2026-01-09',
-        legacyImportPersonId: 'PERSON_1',
-        legacyImportPeriodId: 'PER_A',
-        assignees: [{ personId: 'PERSON_1', status: 'attended', paid: true }]
+        assignees: [{
+          personId: 'PERSON_1',
+          legacyImportPersonId: 'PERSON_1',
+          legacyImportPeriodId: 'PER_A',
+          status: 'attended',
+          paid: true
+        }, {
+          personId: 'PERSON_1',
+          legacyImportPersonId: 'PERSON_1',
+          legacyImportPeriodId: 'PER_A',
+          legacyImportRowIndex: 2,
+          status: 'attended',
+          paid: true
+        }]
       },
       {
         date: '2026-01-10',
-        legacyImportPersonId: 'PERSON_1',
-        legacyImportPeriodId: 'PER_A',
-        assignees: [{ personId: 'PERSON_1', status: 'attended', paid: true }]
+        assignees: [{
+          personId: 'PERSON_1',
+          legacyImportPersonId: 'PERSON_1',
+          legacyImportPeriodId: 'PER_A',
+          status: 'attended',
+          paid: true
+        }]
       },
       {
         date: '2026-01-11',
-        legacyImportPersonId: 'PERSON_2',
-        legacyImportPeriodId: 'PER_A',
-        assignees: [{ personId: 'PERSON_2', status: 'attended', paid: true }]
+        assignees: [{
+          personId: 'PERSON_2',
+          legacyImportPersonId: 'PERSON_2',
+          legacyImportPeriodId: 'PER_A',
+          status: 'attended',
+          paid: true
+        }]
       }
     ]
   });
@@ -313,7 +337,7 @@ test('countOrphanImportWorkSessionsByPerson groups stamped sessions by person', 
       importActivityId: 'ACT_IMPORT',
       reqUser: {}
     });
-    assert.equal(counts.get('PERSON_1'), 2);
+    assert.equal(counts.get('PERSON_1'), 3);
     assert.equal(counts.get('PERSON_2'), 1);
   } finally {
     activityService.getActivity = originalGetActivity;
@@ -379,6 +403,10 @@ test('parseActivityEntryIdFromSessionId extracts entry id from act session id', 
     'act-566641-ENT-566641-0007-526625',
     { activityId: '566641', personId: '526625' }
   ), 'ENT-566641-0007');
+  assert.equal(builder.parseActivityEntryIdFromSessionId(
+    'act-566641-ENT-566641-0007-526625-r2',
+    { activityId: '566641', personId: '526625' }
+  ), 'ENT-566641-0007');
 });
 
 test('extractActivityEntryIdsFromTimesheetEntries collects act entry ids', () => {
@@ -389,7 +417,7 @@ test('extractActivityEntryIdsFromTimesheetEntries collects act entry ids', () =>
   assert.deepEqual(ids, ['ENT-1']);
 });
 
-test('buildImportWorkSessionEntryDrafts carries stacked titles and clock times', () => {
+test('buildImportWorkSessionEntryDrafts consolidates same-day rows into one daily entry', () => {
   const drafts = builder.buildImportWorkSessionEntryDrafts({
     compiledRows: [
       { date: '2026-01-09', hours: 3, className: 'ELA', sourceRowNumber: 1 },
@@ -401,20 +429,25 @@ test('buildImportWorkSessionEntryDrafts carries stacked titles and clock times',
     personRole: 'teacher',
     periodId: 'PER_A',
     batchId: 'BATCH_1',
-    sourceFileName: 'january.xlsx'
+    sourceFileName: 'january.xlsx',
+    workSessionStartTime: '07:00',
+    workSessionEndTime: '21:00'
   });
 
-  assert.equal(drafts.length, 3);
-  assert.equal(drafts[0].title, 'ELA');
-  assert.equal(drafts[0].startTime, '00:00');
-  assert.equal(drafts[0].endTime, '03:00');
-  assert.equal(drafts[1].title, 'LINC');
-  assert.equal(drafts[1].startTime, '03:00');
-  assert.equal(drafts[1].endTime, '07:00');
-  assert.equal(drafts[2].title, 'ELA One on One');
-  assert.equal(drafts[2].startTime, '07:00');
-  assert.equal(drafts[2].endTime, '08:00');
-  assert.equal(drafts[2].durationHours, 1);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].date, '2026-01-09');
+  assert.equal(drafts[0].startTime, '07:00');
+  assert.equal(drafts[0].endTime, '21:00');
+  assert.equal(drafts[0].assignees.length, 3);
+  assert.equal(drafts[0].assignees[0].legacyImportClassName, 'ELA');
+  assert.equal(drafts[0].assignees[0].startTime, '00:00');
+  assert.equal(drafts[0].assignees[0].endTime, '03:00');
+  assert.equal(drafts[0].assignees[1].legacyImportClassName, 'LINC');
+  assert.equal(drafts[0].assignees[1].startTime, '03:00');
+  assert.equal(drafts[0].assignees[1].endTime, '07:00');
+  assert.equal(drafts[0].assignees[2].legacyImportClassName, 'ELA One on One');
+  assert.equal(drafts[0].assignees[2].startTime, '07:00');
+  assert.equal(drafts[0].assignees[2].endTime, '08:00');
 });
 
 test('recomputeActivityLockedFromEntries clears legacy summary fields when import sessions are removed', () => {
@@ -515,9 +548,80 @@ test('createImportWorkSessions appends via maintenance entry update without resa
     assert.equal(maintenanceArgs?.options?.maintenanceActivityEntries, true);
     assert.equal(maintenanceArgs?.payload?.entries?.length, 2);
     assert.equal(maintenanceArgs?.payload?.entries?.[0]?.entryId, 'ENT-LEGACY-1');
-    assert.equal(maintenanceArgs?.payload?.entries?.[1]?.durationHours, 6);
+    assert.equal(maintenanceArgs?.payload?.entries?.[1]?.startTime, '07:00');
+    assert.equal(maintenanceArgs?.payload?.entries?.[1]?.endTime, '21:00');
+    assert.equal(maintenanceArgs?.payload?.entries?.[1]?.assignees?.length, 1);
   } finally {
     activityService.isPersonEligibleForActivity = originalEligible;
     dataService.updateData = originalUpdate;
   }
+});
+
+test('removeImportWorkSessionsByBatchId removes assignees only and keeps daily entry shell', async () => {
+  const activityService = require('../MVC/services/school/activityService');
+  const dataService = require('../MVC/services/school/schoolDataService');
+  const schoolDependencyService = require('../MVC/services/school/schoolDependencyService');
+
+  const activity = {
+    id: 'ACT_IMPORT',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    entries: [{
+      entryId: 'ENT-DAY-1',
+      date: '2026-01-09',
+      startTime: '07:00',
+      endTime: '21:00',
+      status: 'posted',
+      assignees: [
+        { personId: 'PERSON_1', legacyImportBatchId: 'BATCH_1', status: 'attended', paid: true, paidHours: 3 },
+        { personId: 'PERSON_2', legacyImportBatchId: 'BATCH_2', status: 'attended', paid: true, paidHours: 4 }
+      ]
+    }]
+  };
+
+  const originalGetActivity = activityService.getActivity;
+  const originalUpdate = dataService.updateData;
+  const originalUnlock = schoolDependencyService.forceUnlockImportBatchActivityEntries;
+
+  activityService.getActivity = async () => activity;
+  schoolDependencyService.forceUnlockImportBatchActivityEntries = async ({ activity: current }) => ({
+    changed: false,
+    activity: current
+  });
+  let savedEntries = null;
+  dataService.updateData = async (_entityType, _id, payload) => {
+    savedEntries = payload.entries;
+    return payload;
+  };
+
+  try {
+    const outcome = await builder.removeImportWorkSessionsByBatchId({
+      activityId: 'ACT_IMPORT',
+      batchId: 'BATCH_1',
+      reqUser: {}
+    });
+    assert.equal(outcome.removedAssignees, 1);
+    assert.equal(outcome.removedEntries, 0);
+    assert.equal(savedEntries.length, 1);
+    assert.equal(savedEntries[0].entryId, 'ENT-DAY-1');
+    assert.equal(savedEntries[0].assignees.length, 1);
+    assert.equal(savedEntries[0].assignees[0].personId, 'PERSON_2');
+  } finally {
+    activityService.getActivity = originalGetActivity;
+    dataService.updateData = originalUpdate;
+    schoolDependencyService.forceUnlockImportBatchActivityEntries = originalUnlock;
+  }
+});
+
+test('buildImportActivitySessionIds prefers explicit session ids with row suffixes', () => {
+  const ids = builder.buildImportActivitySessionIds({
+    sessionIds: [
+      'act-566641-ENT-566641-0007-526625-r1',
+      'act-566641-ENT-566641-0007-526625-r2'
+    ]
+  });
+  assert.equal(ids.size, 2);
+  assert.equal(ids.has('act-566641-ENT-566641-0007-526625-r1'), true);
+  assert.equal(ids.has('act-566641-ENT-566641-0007-526625-r2'), true);
 });

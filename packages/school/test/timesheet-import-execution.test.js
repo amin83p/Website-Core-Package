@@ -27,7 +27,11 @@ const POLICY = {
   importActivityId: 'ACT_IMPORT',
   allowImportInTimesheetManagement: true,
   allowImportInMyTimesheets: true,
-  importTargetStatus: 'draft'
+  importTargetStatus: 'draft',
+  importBaseStartTime: '00:00',
+  saveImportedSessionsIntoOneWorkSession: true,
+  importWorkSessionStartTime: '07:00',
+  importWorkSessionEndTime: '21:00'
 };
 const ACTIVITY = {
   id: 'ACT_IMPORT',
@@ -914,7 +918,10 @@ test('performImportExecution creates work sessions across mapped and default act
       sessionCreates.map((row) => row.activityId).sort(),
       ['ACT_IMPORT', 'ACT_LINC', 'ACT_MATH']
     );
-    assert.equal(outcome.steps.workSessions.summary, 'Created 3 work session(s) across 3 activities.');
+    assert.equal(
+      outcome.steps.workSessions.summary,
+      'Imported 3 class row(s) into 3 daily work session(s) across 3 activities.'
+    );
     const saved = stub.getCreatedTimesheets()[0];
     assert.deepEqual(saved.legacyImport.workSessionActivities.map((row) => row.activityId).sort(), [
       'ACT_IMPORT',

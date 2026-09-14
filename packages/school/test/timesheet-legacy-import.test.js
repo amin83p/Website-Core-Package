@@ -220,30 +220,31 @@ function stubLegacyImportDeleteDeps({
   timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByBatchId = async (args) => {
     batchRemovals.push(args);
     return {
-      removedEntries: 2,
-      removedAssignees: 0
+      removedEntries: 0,
+      removedAssignees: 2
     };
   };
   timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds = async (args) => {
     entryIdRemovals.push(args);
     return {
-      removedEntries: Array.isArray(args?.entryIds) ? args.entryIds.length : 0,
-      removedAssignees: 0
+      removedEntries: 0,
+      removedAssignees: Array.isArray(args?.entryIds) ? args.entryIds.length : 0
     };
   };
   timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = async (args) => {
     targetRemovals.push(args);
     return {
-      removedEntries: 1,
-      removedAssignees: 0
+      removedEntries: 0,
+      removedAssignees: 1
     };
   };
   timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = async (args) => {
     trackedRemovals.push(args);
     return {
-      removedEntries: 1,
+      removedEntries: 0,
+      removedAssignees: 1,
       scannedActivities: 1,
-      cleanedActivities: [{ activityId: args?.importActivityId || 'ACT_IMPORT', removedEntries: 1 }]
+      cleanedActivities: [{ activityId: args?.importActivityId || 'ACT_IMPORT', removedAssignees: 1, removedEntries: 0 }]
     };
   };
   dataService.deleteData = async (entityType, id) => {
@@ -831,7 +832,8 @@ test('deleteLegacyImport removes activity-first imported timesheet and work sess
     assert.equal(outcome.deletedTimesheet, true);
     assert.equal(outcome.timesheetId, '');
     assert.equal(outcome.tsStatus, 'not_started');
-    assert.equal(outcome.importWorkSessionCleanup?.removedEntries >= 2, true);
+    assert.equal(outcome.importWorkSessionCleanup?.removedAssignees >= 1, true);
+    assert.equal(outcome.importWorkSessionCleanup?.removedEntries || 0, 0);
     assert.deepEqual(stub.getBatchRemovals()[0], {
       activityId: 'ACT_IMPORT',
       batchId: 'BATCH_1',
@@ -891,7 +893,7 @@ test('deleteLegacyImport removes activity-first imported timesheet without batch
     assert.equal(stub.getTargetRemovals().length, 1);
     assert.equal(stub.getTrackedRemovals().length, 1);
     assert.ok(outcome.importWorkSessionCleanup);
-    assert.ok(outcome.importWorkSessionCleanup.removedEntries >= 2);
+    assert.ok(outcome.importWorkSessionCleanup.removedAssignees >= 2);
   } finally {
     stub.restore();
   }
@@ -932,11 +934,10 @@ test('deleteLegacyImport removes activity-first work sessions by stored entry id
     });
     assert.equal(outcome.deletedTimesheet, true);
     assert.equal(stub.getEntryIdRemovals().length, 1);
-    assert.deepEqual(stub.getEntryIdRemovals()[0], {
-      activityId: 'ACT_IMPORT',
-      entryIds: ['ENT-1', 'ENT-2'],
-      reqUser: REQ_USER
-    });
+    assert.equal(stub.getEntryIdRemovals()[0].activityId, 'ACT_IMPORT');
+    assert.deepEqual(stub.getEntryIdRemovals()[0].entryIds, ['ENT-1', 'ENT-2']);
+    assert.equal(stub.getEntryIdRemovals()[0].personId, 'PERSON_1');
+    assert.equal(stub.getEntryIdRemovals()[0].periodId, 'PER_A');
   } finally {
     stub.restore();
   }
@@ -1078,9 +1079,11 @@ test('deleteLegacyImport recovers orphan import work sessions when timesheet is 
     });
     assert.equal(outcome.hadLegacyImport, true);
     assert.equal(outcome.timesheetAlreadyRemoved, true);
-    assert.equal(outcome.importWorkSessionCleanup?.removedEntries, 1);
-    assert.equal(activityStore.entries.length, 1);
-    assert.equal(activityStore.entries[0].entryId, 'ENT-2');
+    assert.equal(outcome.importWorkSessionCleanup?.removedAssignees, 1);
+    assert.equal(outcome.importWorkSessionCleanup?.removedEntries || 0, 0);
+    assert.equal(activityStore.entries.length, 2);
+    assert.equal(activityStore.entries.find((entry) => entry.entryId === 'ENT-1')?.assignees?.length, 0);
+    assert.equal(activityStore.entries.find((entry) => entry.entryId === 'ENT-2')?.assignees?.length, 1);
   } finally {
     timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
     dataService.getDataById = originals.getById;
@@ -1296,8 +1299,9 @@ test('deleteLegacyImport recovers orphan import work sessions when activity has 
       scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
     });
     assert.equal(outcome.hadLegacyImport, true);
-    assert.ok(outcome.importWorkSessionCleanup?.removedEntries >= 1);
-    assert.equal(activityStore.entries.some((entry) => entry.entryId === 'ENT-1'), false);
+    assert.ok(outcome.importWorkSessionCleanup?.removedAssignees >= 1);
+    assert.equal(activityStore.entries.some((entry) => entry.entryId === 'ENT-1'), true);
+    assert.equal(activityStore.entries.find((entry) => entry.entryId === 'ENT-1')?.assignees?.length, 0);
   } finally {
     timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
     dataService.getDataById = originals.getById;

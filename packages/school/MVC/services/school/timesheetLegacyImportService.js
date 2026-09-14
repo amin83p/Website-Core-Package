@@ -391,6 +391,11 @@ async function cleanupImportWorkSessionsOnDelete({
       const entryCleanup = await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsByEntryIds({
         activityId: targetActivityId,
         entryIds,
+        personId: targetPersonId,
+        periodId,
+        periodStartDate,
+        periodEndDate,
+        batchId,
         reqUser
       });
       if (entryCleanup.removedEntries || entryCleanup.removedAssignees) {

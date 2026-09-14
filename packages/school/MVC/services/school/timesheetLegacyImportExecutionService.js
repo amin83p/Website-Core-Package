@@ -613,24 +613,32 @@ async function performImportExecution({
         batchId: resolvedBatchId,
         sourceFileName,
         baseStartTime: policy.importBaseStartTime,
+        workSessionStartTime: policy.importWorkSessionStartTime,
+        workSessionEndTime: policy.importWorkSessionEndTime,
+        consolidateIntoOneWorkSession: policy.saveImportedSessionsIntoOneWorkSession !== false,
         skipStacking: true,
         reqUser
       });
       workSessionOutcomes.push({
         activityId: cleanId(outcome.activityId),
         createdEntryIds: outcome.createdEntryIds,
+        createdSessionIds: outcome.createdSessionIds,
         rowCount: outcome.rowCount
       });
     }
 
-    const totalWorkSessionCount = workSessionOutcomes.reduce((sum, row) => sum + Number(row.rowCount || 0), 0);
+    const totalAssigneeRowCount = workSessionOutcomes.reduce((sum, row) => sum + Number(row.rowCount || 0), 0);
+    const totalDailyEntryCount = workSessionOutcomes.reduce(
+      (sum, row) => sum + (Array.isArray(row.createdEntryIds) ? row.createdEntryIds.length : 0),
+      0
+    );
     const createdEntryIds = workSessionOutcomes.flatMap((row) => row.createdEntryIds || []);
     const activityCount = workSessionOutcomes.length;
     steps.workSessions = {
       status: 'success',
       summary: activityCount > 1
-        ? `Created ${totalWorkSessionCount} work session(s) across ${activityCount} activities.`
-        : `Created ${totalWorkSessionCount} work session(s).`,
+        ? `Imported ${totalAssigneeRowCount} class row(s) into ${totalDailyEntryCount} daily work session(s) across ${activityCount} activities.`
+        : `Imported ${totalAssigneeRowCount} class row(s) into ${totalDailyEntryCount} daily work session(s).`,
       error: '',
       createdEntryIds,
       workSessionActivities: workSessionOutcomes
@@ -642,7 +650,8 @@ async function performImportExecution({
       timesheetImportWorkSessionBuilderService.buildImportActivitySessionIds({
         activityId: outcome.activityId,
         personId: targetPersonId,
-        entryIds: outcome.createdEntryIds
+        entryIds: outcome.createdEntryIds,
+        sessionIds: outcome.createdSessionIds
       }).forEach((sessionId) => allowedImportSessionIds.add(sessionId));
     });
     const importActivitySessionGuard = {
@@ -751,7 +760,7 @@ async function performImportExecution({
         sourceFileName,
         importedAt: nowIso,
         importedBy: cleanId(reqUser?.id),
-        rowCount: totalWorkSessionCount,
+        rowCount: totalAssigneeRowCount,
         matchedPeriodId: targetPeriodId,
         legacyImportBatchId: resolvedBatchId,
         executionMode: 'activity_first',

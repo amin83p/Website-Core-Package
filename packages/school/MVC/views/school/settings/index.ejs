@@ -72,7 +72,7 @@
   const payableHolidayTypesSelected = Array.isArray(statutoryHolidayPayPolicy.payableHolidayTypes)
     ? statutoryHolidayPayPolicy.payableHolidayTypes
     : ['National Holiday', 'Observance Paid'];
-  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', importBaseStartTime: '00:00', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
+  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', importBaseStartTime: '00:00', saveImportedSessionsIntoOneWorkSession: true, importWorkSessionStartTime: '07:00', importWorkSessionEndTime: '21:00', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
   const timesheetImportActivityOptionsList = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
   const statutoryHolidayPublicActivityOptionsList = Array.isArray(statutoryHolidayPublicActivityOptions)
     ? statutoryHolidayPublicActivityOptions
@@ -90,6 +90,9 @@
   const allowImportInMyTimesheetsValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.allowImportInMyTimesheets === true;
   const timesheetImportTargetStatusValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importTargetStatus) || 'draft').trim().toLowerCase();
   const timesheetImportBaseStartTimeValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importBaseStartTime) || '00:00').trim();
+  const saveImportedSessionsIntoOneWorkSessionValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.saveImportedSessionsIntoOneWorkSession !== false;
+  const timesheetImportWorkSessionStartTimeValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importWorkSessionStartTime) || '07:00').trim();
+  const timesheetImportWorkSessionEndTimeValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importWorkSessionEndTime) || '21:00').trim();
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
     : attendanceThresholdsEnabled !== false;
@@ -1699,11 +1702,37 @@
               </div>
               <div class="small text-muted mt-2" id="timesheetImportClassMappingEmptyHint">No class name mappings configured.</div>
             </div>
+            <div class="border rounded mt-4" id="cardTimesheetImportWorkSessions">
+              <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#timesheetImportWorkSessionCollapse" aria-expanded="true" aria-controls="timesheetImportWorkSessionCollapse">
+                  <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                  <i class="bi bi-calendar-day text-primary" aria-hidden="true"></i>
+                  <span>Imported work sessions</span>
+                </button>
+              </div>
+              <div class="collapse show p-3" id="timesheetImportWorkSessionCollapse">
+                <p class="small text-muted mb-3">Consolidate imported classes into one work session per day under the mapped activity. These options are fixed during this rollout.</p>
+                <div class="form-check mb-3">
+                  <input class="form-check-input" type="checkbox" id="saveImportedSessionsIntoOneWorkSession" name="saveImportedSessionsIntoOneWorkSession" value="true" <%= saveImportedSessionsIntoOneWorkSessionValue ? 'checked' : '' %> disabled>
+                  <label class="form-check-label" for="saveImportedSessionsIntoOneWorkSession">Save Imported Sessions into One Work Session</label>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label small fw-semibold" for="timesheetImportWorkSessionStartTime">Work session start time</label>
+                    <input class="form-control" type="time" id="timesheetImportWorkSessionStartTime" name="importWorkSessionStartTime" value="<%= timesheetImportWorkSessionStartTimeValue %>" min="07:00" max="21:00" disabled>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small fw-semibold" for="timesheetImportWorkSessionEndTime">Work session end time</label>
+                    <input class="form-control" type="time" id="timesheetImportWorkSessionEndTime" name="importWorkSessionEndTime" value="<%= timesheetImportWorkSessionEndTimeValue %>" min="07:00" max="21:00" disabled>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="rollup-feature-card mt-4">
               <div class="fw-semibold mb-1">Import time stacking</div>
-              <p class="small text-muted mb-3">When Excel rows have no clock times, the importer stacks classes on each day sequentially. The first class starts at this time; each following class starts when the previous one ends.</p>
+              <p class="small text-muted mb-3">When Excel rows have no clock times, the importer stacks classes on each day sequentially. The first class starts at this time; each following class starts when the previous one ends. This scheme is always active during this rollout.</p>
               <label class="form-label small fw-semibold" for="timesheetImportBaseStartTime">Base start time</label>
-              <input class="form-control" type="time" id="timesheetImportBaseStartTime" name="importBaseStartTime" value="<%= timesheetImportBaseStartTimeValue %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+              <input class="form-control" type="time" id="timesheetImportBaseStartTime" name="importBaseStartTime" value="<%= timesheetImportBaseStartTimeValue %>" disabled>
             </div>
             <div class="rollup-feature-card mt-4">
               <div class="fw-semibold mb-1">Import availability</div>
@@ -3189,6 +3218,9 @@
       allowImportInMyTimesheets: document.getElementById('allowImportInMyTimesheets')?.checked ? 'true' : 'false',
       importTargetStatus: document.getElementById('timesheetImportTargetStatus')?.value || 'draft',
       importBaseStartTime: document.getElementById('timesheetImportBaseStartTime')?.value || '00:00',
+      saveImportedSessionsIntoOneWorkSession: 'true',
+      importWorkSessionStartTime: document.getElementById('timesheetImportWorkSessionStartTime')?.value || '07:00',
+      importWorkSessionEndTime: document.getElementById('timesheetImportWorkSessionEndTime')?.value || '21:00',
       classNameActivityMappings: JSON.stringify(readTimesheetImportClassMappings())
     }, button, 'timesheetImportSettingsError');
     if (!result) return;

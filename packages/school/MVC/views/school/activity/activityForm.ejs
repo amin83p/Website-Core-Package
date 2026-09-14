@@ -844,13 +844,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const isAssignee = isScopePersonAssignee(personId);
         const isHidden = isScopePersonHidden(personId);
         const actionButtons = [];
-        if (isAssignee) {
-          if (isHidden) {
-            actionButtons.push('<button type="button" class="btn btn-outline-secondary btn-sm js-scope-unhide-person" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-eye me-1"></i>Unhide</button>');
-          } else {
-            actionButtons.push('<button type="button" class="btn btn-outline-warning btn-sm js-scope-hide-person" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-eye-slash me-1"></i>Hide</button>');
-          }
+        if (isHidden) {
+          actionButtons.push('<button type="button" class="btn btn-outline-secondary btn-sm js-scope-unhide-person" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-eye me-1"></i>Unhide</button>');
         } else {
+          actionButtons.push('<button type="button" class="btn btn-outline-warning btn-sm js-scope-hide-person" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-eye-slash me-1"></i>Hide</button>');
+        }
+        if (!isAssignee) {
           actionButtons.push('<button type="button" class="btn btn-outline-danger btn-sm js-scope-remove-allowed" data-person-id="' + escapeHtml(personId) + '"><i class="bi bi-trash me-1"></i>Remove</button>');
         }
         return [

@@ -26,6 +26,9 @@ function pickStoredPolicyFields(row) {
     allowImportInMyTimesheets: row.allowImportInMyTimesheets,
     importTargetStatus: row.importTargetStatus,
     importBaseStartTime: row.importBaseStartTime,
+    saveImportedSessionsIntoOneWorkSession: row.saveImportedSessionsIntoOneWorkSession,
+    importWorkSessionStartTime: row.importWorkSessionStartTime,
+    importWorkSessionEndTime: row.importWorkSessionEndTime,
     classNameActivityMappings: row.classNameActivityMappings
   };
 }

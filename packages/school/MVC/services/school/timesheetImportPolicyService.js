@@ -7,12 +7,18 @@ const IMPORT_TARGET_STATUSES = Object.freeze([
   'processed'
 ]);
 
+const IMPORT_WORK_SESSION_MIN_TIME = '07:00';
+const IMPORT_WORK_SESSION_MAX_TIME = '21:00';
+
 const DEFAULT_POLICY = Object.freeze({
   importActivityId: '',
   allowImportInTimesheetManagement: false,
   allowImportInMyTimesheets: false,
   importTargetStatus: 'draft',
   importBaseStartTime: '00:00',
+  saveImportedSessionsIntoOneWorkSession: true,
+  importWorkSessionStartTime: IMPORT_WORK_SESSION_MIN_TIME,
+  importWorkSessionEndTime: IMPORT_WORK_SESSION_MAX_TIME,
   classNameActivityMappings: []
 });
 
@@ -39,6 +45,30 @@ function normalizeImportBaseStartTime(value, fallback = '00:00') {
   const [h, m] = token.split(':').map(Number);
   if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return fallback;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function parseClockTimeToMinutes(value) {
+  const token = String(value ?? '').trim();
+  if (!/^\d{2}:\d{2}$/.test(token)) return NaN;
+  const [h, m] = token.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return NaN;
+  return (h * 60) + m;
+}
+
+function normalizeImportWorkSessionClockTime(value, fallback = IMPORT_WORK_SESSION_MIN_TIME) {
+  const token = String(value ?? '').trim();
+  if (!token) return fallback;
+  if (!/^\d{2}:\d{2}$/.test(token)) return fallback;
+  const minutes = parseClockTimeToMinutes(token);
+  const minMinutes = parseClockTimeToMinutes(IMPORT_WORK_SESSION_MIN_TIME);
+  const maxMinutes = parseClockTimeToMinutes(IMPORT_WORK_SESSION_MAX_TIME);
+  if (!Number.isFinite(minutes) || minutes < minMinutes || minutes > maxMinutes) return fallback;
+  const [h, m] = token.split(':').map(Number);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function normalizeSaveImportedSessionsIntoOneWorkSession(_value, fallback = true) {
+  return fallback === true;
 }
 
 function normalizeClassNameKey(value) {
@@ -94,23 +124,51 @@ function buildClassNameActivityLookup(mappings = []) {
 }
 
 function normalizePolicyFromStored(input = {}) {
+  const importWorkSessionStartTime = normalizeImportWorkSessionClockTime(
+    input.importWorkSessionStartTime,
+    IMPORT_WORK_SESSION_MIN_TIME
+  );
+  const importWorkSessionEndTime = normalizeImportWorkSessionClockTime(
+    input.importWorkSessionEndTime,
+    IMPORT_WORK_SESSION_MAX_TIME
+  );
   return {
     importActivityId: cleanId(input.importActivityId),
     allowImportInTimesheetManagement: cleanBoolean(input.allowImportInTimesheetManagement, false),
     allowImportInMyTimesheets: cleanBoolean(input.allowImportInMyTimesheets, false),
     importTargetStatus: normalizeImportTargetStatus(input.importTargetStatus, 'draft'),
     importBaseStartTime: normalizeImportBaseStartTime(input.importBaseStartTime, '00:00'),
+    saveImportedSessionsIntoOneWorkSession: normalizeSaveImportedSessionsIntoOneWorkSession(
+      input.saveImportedSessionsIntoOneWorkSession,
+      true
+    ),
+    importWorkSessionStartTime,
+    importWorkSessionEndTime,
     classNameActivityMappings: normalizeClassNameActivityMappings(input.classNameActivityMappings)
   };
 }
 
 function normalizePolicyFromForm(input = {}) {
+  const importWorkSessionStartTime = normalizeImportWorkSessionClockTime(
+    input.importWorkSessionStartTime,
+    IMPORT_WORK_SESSION_MIN_TIME
+  );
+  const importWorkSessionEndTime = normalizeImportWorkSessionClockTime(
+    input.importWorkSessionEndTime,
+    IMPORT_WORK_SESSION_MAX_TIME
+  );
   return {
     importActivityId: cleanId(input.importActivityId),
     allowImportInTimesheetManagement: cleanBoolean(input.allowImportInTimesheetManagement, false),
     allowImportInMyTimesheets: cleanBoolean(input.allowImportInMyTimesheets, false),
     importTargetStatus: normalizeImportTargetStatus(input.importTargetStatus, 'draft'),
     importBaseStartTime: normalizeImportBaseStartTime(input.importBaseStartTime, '00:00'),
+    saveImportedSessionsIntoOneWorkSession: normalizeSaveImportedSessionsIntoOneWorkSession(
+      input.saveImportedSessionsIntoOneWorkSession,
+      true
+    ),
+    importWorkSessionStartTime,
+    importWorkSessionEndTime,
     classNameActivityMappings: normalizeClassNameActivityMappings(
       input.classNameActivityMappings,
       { enforceUnique: true }
@@ -151,7 +209,45 @@ function validatePolicyInput(input = {}) {
       throw error;
     }
   }
+  const rawWorkSessionStart = String(input?.importWorkSessionStartTime ?? '').trim();
+  const rawWorkSessionEnd = String(input?.importWorkSessionEndTime ?? '').trim();
+  if (rawWorkSessionStart && !/^\d{2}:\d{2}$/.test(rawWorkSessionStart)) {
+    const error = new Error('Invalid import work session start time.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (rawWorkSessionEnd && !/^\d{2}:\d{2}$/.test(rawWorkSessionEnd)) {
+    const error = new Error('Invalid import work session end time.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const minMinutes = parseClockTimeToMinutes(IMPORT_WORK_SESSION_MIN_TIME);
+  const maxMinutes = parseClockTimeToMinutes(IMPORT_WORK_SESSION_MAX_TIME);
+  if (rawWorkSessionStart) {
+    const startMinutes = parseClockTimeToMinutes(rawWorkSessionStart);
+    if (!Number.isFinite(startMinutes) || startMinutes < minMinutes || startMinutes > maxMinutes) {
+      const error = new Error('Import work session start time must be between 07:00 and 21:00.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+  if (rawWorkSessionEnd) {
+    const endMinutes = parseClockTimeToMinutes(rawWorkSessionEnd);
+    if (!Number.isFinite(endMinutes) || endMinutes < minMinutes || endMinutes > maxMinutes) {
+      const error = new Error('Import work session end time must be between 07:00 and 21:00.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
   const normalized = normalizePolicyFromForm(input);
+  const startMinutes = parseClockTimeToMinutes(normalized.importWorkSessionStartTime);
+  const endMinutes = parseClockTimeToMinutes(normalized.importWorkSessionEndTime);
+  if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || endMinutes <= startMinutes) {
+    const error = new Error('Import work session end time must be after the start time.');
+    error.statusCode = 400;
+    throw error;
+  }
+  normalized.saveImportedSessionsIntoOneWorkSession = true;
   const requiresActivity = normalized.allowImportInTimesheetManagement || normalized.allowImportInMyTimesheets;
   if (requiresActivity && !normalized.importActivityId) {
     const error = new Error('Select a legacy import activity before enabling timesheet import.');
@@ -275,11 +371,14 @@ function listDistinctImportActivityIds(policy = {}) {
 
 module.exports = {
   IMPORT_TARGET_STATUSES,
+  IMPORT_WORK_SESSION_MIN_TIME,
+  IMPORT_WORK_SESSION_MAX_TIME,
   DEFAULT_POLICY,
   normalizeClassNameKey,
   normalizeClassNameActivityMappings,
   normalizeImportTargetStatus,
   normalizeImportBaseStartTime,
+  normalizeImportWorkSessionClockTime,
   normalizePolicyFromStored,
   normalizePolicyFromForm,
   resolvePolicy,
