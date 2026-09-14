@@ -729,6 +729,37 @@
     return tracks;
   }
 
+  function eventsOverlapByPos(a, b) {
+    if (!a?.pos || !b?.pos) return false;
+    return a.pos.startMin < b.pos.endMin && b.pos.startMin < a.pos.endMin;
+  }
+
+  function collectOverlapCluster(events, seedEv) {
+    const cluster = [seedEv];
+    const seen = new Set([seedEv]);
+    const queue = [seedEv];
+    while (queue.length) {
+      const current = queue.shift();
+      (events || []).forEach((other) => {
+        if (seen.has(other)) return;
+        if (eventsOverlapByPos(current, other)) {
+          seen.add(other);
+          cluster.push(other);
+          queue.push(other);
+        }
+      });
+    }
+    return cluster;
+  }
+
+  function resolveClusterTrackCount(cluster) {
+    let maxTrackIndex = 0;
+    (cluster || []).forEach((row) => {
+      maxTrackIndex = Math.max(maxTrackIndex, Number(row?.trackIndex || 0));
+    });
+    return Math.max(1, maxTrackIndex + 1);
+  }
+
   function formatSnappedTimelineLabel(offsetMinutes, boundsInput) {
     const bounds = resolveTimelineBounds(boundsInput || {});
     const timelineStartMin = bounds.startHour * 60;
@@ -1668,8 +1699,7 @@
   function renderVerticalDayCell(dateStr, dayEvents, inRange, holidayDates, options = {}) {
     const selectedSet = options.selectedSet || null;
     const timelineBounds = resolveTimelineBounds(options.timelineBounds || options);
-    const tracks = assignTracks((dayEvents || []).slice(), timelineBounds);
-    const trackCount = Math.max(1, tracks.length);
+    assignTracks((dayEvents || []).slice(), timelineBounds);
     const extraClass = resolveDayExtraClasses({ date: dateStr, inRange }, dayEvents, inRange, 'vertical', options);
     const dayClass = buildDayCalendarClasses(
       dateStr,
@@ -1681,8 +1711,10 @@
     );
     let sessionsHtml = '';
     (dayEvents || []).forEach((ev) => {
-      const trackLeft = (ev.trackIndex / trackCount) * 100;
-      const trackWidth = 100 / trackCount;
+      const cluster = collectOverlapCluster(dayEvents, ev);
+      const clusterTrackCount = resolveClusterTrackCount(cluster);
+      const trackLeft = (ev.trackIndex / clusterTrackCount) * 100;
+      const trackWidth = 100 / clusterTrackCount;
       const blockHeight = Math.max(1, Number(ev.pos?.width || 0));
       const blockHtml = resolvePositionedBlockHtml(ev, selectedSet, options, {
         mode: 'vertical',
@@ -1690,7 +1722,7 @@
         trackWidth,
         blockHeight,
         trackIndex: ev.trackIndex,
-        trackCount
+        trackCount: clusterTrackCount
       });
       sessionsHtml += `<div class="session-cal-positioned-session session-cal-positioned-vertical" data-timeline-start="${ev.pos.startMin}" data-timeline-end="${ev.pos.endMin}" style="top:${ev.pos.left}%;height:calc(${blockHeight}% - 4px);left:${trackLeft}%;width:calc(${trackWidth}% - 4px);">${blockHtml}</div>`;
     });

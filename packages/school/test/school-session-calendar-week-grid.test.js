@@ -67,6 +67,39 @@ test('formatClockTimeRange uses compact same-period range labels', () => {
   assert.match(core.formatDayHeaderHtml('2026-08-17', 'vertical'), /session-cal-day-header-weekday/);
 });
 
+test('renderVerticalWeekGrid gives solo sessions full width when other overlaps exist same day', () => {
+  const core = loadSessionCalendarCore();
+  const container = {
+    style: { setProperty() {} },
+    dataset: {},
+    innerHTML: ''
+  };
+  const eventsByDate = {
+    '2026-09-08': [
+      { sessionId: 'OVERLAP_A', date: '2026-09-08', start: '09:00', end: '10:00' },
+      { sessionId: 'OVERLAP_B', date: '2026-09-08', start: '09:00', end: '12:00' },
+      { sessionId: 'SOLO_C', date: '2026-09-08', start: '12:30', end: '15:30' }
+    ]
+  };
+  const ok = core.renderVerticalWeekGrid(eventsByDate, container, null, {
+    viewRange: { startDate: '2026-09-08', endDate: '2026-09-08' },
+    dayWidth: 200,
+    enableTimeHover: false,
+    buildPositionedBlockHtml: (ev) => `<span data-test-session="${ev.sessionId}"></span>`
+  });
+  assert.equal(ok, true);
+  const positionedChunks = container.innerHTML.split('session-cal-positioned-vertical').slice(1);
+  const overlapA = positionedChunks.find((chunk) => chunk.includes('data-test-session="OVERLAP_A"'));
+  const overlapB = positionedChunks.find((chunk) => chunk.includes('data-test-session="OVERLAP_B"'));
+  const soloC = positionedChunks.find((chunk) => chunk.includes('data-test-session="SOLO_C"'));
+  assert.ok(overlapA);
+  assert.ok(overlapB);
+  assert.ok(soloC);
+  assert.match(overlapA, /width:calc\(50% - 4px\)/);
+  assert.match(overlapB, /width:calc\(50% - 4px\)/);
+  assert.match(soloC, /width:calc\(100% - 4px\)/);
+});
+
 test('renderVerticalWeekGrid uses custom block builder callback', () => {
   const core = loadSessionCalendarCore();
   const container = {
