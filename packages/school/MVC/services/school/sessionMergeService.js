@@ -32,6 +32,28 @@ function normalizeClock(value) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+function timeToMinutes(value) {
+  const token = normalizeClock(value);
+  if (!token) return NaN;
+  const [hours, minutes] = token.split(':').map(Number);
+  return (hours * 60) + minutes;
+}
+
+function partnerSessionCoversMergingWindow({
+  partnerStart = '',
+  partnerEnd = '',
+  sourceStart = '',
+  sourceEnd = ''
+} = {}) {
+  const pStart = timeToMinutes(partnerStart);
+  const pEnd = timeToMinutes(partnerEnd);
+  const sStart = timeToMinutes(sourceStart);
+  const sEnd = timeToMinutes(sourceEnd);
+  if (![pStart, pEnd, sStart, sEnd].every(Number.isFinite)) return false;
+  if (pEnd <= pStart || sEnd <= sStart) return false;
+  return pStart <= sStart && pEnd >= sEnd;
+}
+
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
   if (!token) return '';
@@ -161,9 +183,16 @@ function evaluatePartnerSessionCandidate({
   const start = normalizeClock(session?.startTime);
   const end = normalizeClock(session?.endTime);
 
+  const coversMergingWindow = partnerSessionCoversMergingWindow({
+    partnerStart: start,
+    partnerEnd: end,
+    sourceStart,
+    sourceEnd
+  });
+
   if (!idsEqual(resolvedMain, resolvedMergingId)) {
     if (scan?.rejectCounts) scan.rejectCounts.notMainTeacher += 1;
-    if (scan && start === sourceStart && end === sourceEnd) {
+    if (scan && coversMergingWindow) {
       scan.partialMatches.push({
         classId,
         sessionId,
@@ -175,7 +204,7 @@ function evaluatePartnerSessionCandidate({
     return null;
   }
 
-  if (start !== sourceStart || end !== sourceEnd) {
+  if (!coversMergingWindow) {
     if (scan?.rejectCounts) scan.rejectCounts.timeMismatch += 1;
     if (scan) {
       scan.partialMatches.push({
@@ -183,7 +212,7 @@ function evaluatePartnerSessionCandidate({
         sessionId,
         startTime: start,
         endTime: end,
-        reason: 'time_mismatch'
+        reason: 'outside_merging_window'
       });
     }
     return null;
@@ -471,36 +500,38 @@ function buildPartnerMergeFailureMessage(scan = {}, teacherName = '') {
   const dateLabel = scan?.sourceDate || 'this date';
   const timeLabel = `${scan?.sourceStart || '--:--'} – ${scan?.sourceEnd || '--:--'}`;
 
+  const coverageRequirement = `The partner session must start at or before ${scan?.sourceStart || '--:--'} and end at or after ${scan?.sourceEnd || '--:--'}.`;
+
   if (!scan?.indexRowCount && !scan?.classScanSessionsOnDate) {
     if (Number(scan?.instructorClassCount || 0) > 0) {
-      return `${teacherLabel} is a class instructor on ${dateLabel}, but has no session there as the main teacher at ${timeLabel}. The schedule can show instructor classes even when this teacher is not the session main teacher. Merge needs another class session where ${teacherLabel} is the main teacher with the exact same start and end time.`;
+      return `${teacherLabel} is a class instructor on ${dateLabel}, but has no session there as the main teacher that fully covers ${timeLabel}. The schedule can show instructor classes even when this teacher is not the session main teacher. Merge needs another class session where ${teacherLabel} is the main teacher and ${coverageRequirement}`;
     }
-    return `${teacherLabel} has no main-teacher session on ${dateLabel} at ${timeLabel} in another class. Merge requires an exact date/time match where they are the main teacher on the partner session.`;
+    return `${teacherLabel} has no main-teacher session on ${dateLabel} that fully covers ${timeLabel} in another class. Merge requires a partner session on the same date where they are the main teacher and ${coverageRequirement}`;
   }
 
   const coTeacherOnly = (scan.partialMatches || []).some((row) => row.reason === 'not_main_teacher');
   if (coTeacherOnly || Number(scan?.rejectCounts?.notMainTeacher || 0) > 0) {
-    const hasExactTimeCoTeacher = (scan.partialMatches || []).some((row) => row.reason === 'not_main_teacher');
-    if (hasExactTimeCoTeacher) {
-      return `${teacherLabel} has a session on ${dateLabel} at ${timeLabel}, but only as a co-teacher. Merge requires a partner session where ${teacherLabel} is the main teacher with the exact same start and end time.`;
+    const hasCoveringCoTeacher = (scan.partialMatches || []).some((row) => row.reason === 'not_main_teacher');
+    if (hasCoveringCoTeacher) {
+      return `${teacherLabel} has a session on ${dateLabel} that could cover ${timeLabel}, but only as a co-teacher. Merge requires a partner session where ${teacherLabel} is the main teacher and ${coverageRequirement}`;
     }
   }
 
   if (Number(scan?.rejectCounts?.timeMismatch || 0) > 0) {
     const samples = (scan.partialMatches || [])
-      .filter((row) => row.reason === 'time_mismatch')
+      .filter((row) => row.reason === 'outside_merging_window' || row.reason === 'time_mismatch')
       .slice(0, 3)
       .map((row) => `${row.startTime || '--:--'} – ${row.endTime || '--:--'}`)
       .join(', ');
     const sampleText = samples ? ` Found: ${samples}.` : '';
-    return `${teacherLabel} has session(s) on ${dateLabel}, but none with the exact time ${timeLabel}.${sampleText} Merge requires an exact start/end match.`;
+    return `${teacherLabel} has session(s) on ${dateLabel}, but none that fully cover ${timeLabel}.${sampleText} ${coverageRequirement}`;
   }
 
   if (Number(scan?.rejectCounts?.excludedStatus || 0) > 0) {
     return `${teacherLabel} has session(s) on ${dateLabel}, but their status excludes them from the teacher schedule (for example cancelled or make-up).`;
   }
 
-  return `${teacherLabel} cannot take over this session and merge it to their class. A partner session on ${dateLabel} at ${timeLabel} where they are the main teacher is required.`;
+  return `${teacherLabel} cannot take over this session and merge it to their class. A partner session on ${dateLabel} that fully covers ${timeLabel} where they are the main teacher is required. ${coverageRequirement}`;
 }
 
 async function explainPartnerSessionMergeFailure(params = {}) {
@@ -862,6 +893,9 @@ module.exports = {
   SessionMergeError,
   normalizeClock,
   normalizeDateOnly,
+  timeToMinutes,
+  partnerSessionCoversMergingWindow,
+  evaluatePartnerSessionCandidate,
   isMergedSessionRow,
   canUserUndoSessionMerge,
   isPersonMergedPreviousTeacherEditor,

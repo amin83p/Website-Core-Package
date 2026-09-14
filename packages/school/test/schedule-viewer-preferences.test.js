@@ -312,4 +312,32 @@ test('schedule updates show waiting modal during applySavedSessionScheduleUpdate
   assert.match(scheduleUpdateBlock, /hideLoading\(\{ force: true \}\)/);
   assert.match(scheduleUpdateBlock, /loadingShown = false;\s*const conflicts/s);
   assert.match(scheduleUpdateBlock, /await uiConfirm/);
+  assert.match(scheduleUpdateBlock, /acknowledgeLocalScheduleMutation/);
+  assert.match(scheduleUpdateBlock, /revertSavedSessionScheduleInState/);
+});
+
+test('personSchedule uiAlert and uiConfirm route through window.showMessageModal', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(source, /window\.showMessageModal/);
+  assert.match(source, /inferScheduleAlertIcon/);
+  assert.doesNotMatch(source, /return confirm\(/);
+});
+
+test('commit staged sessions and bulk delete update state without reloading schedule', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const commitBlock = source.slice(
+    source.indexOf('async function commitScheduleDraftSessions'),
+    source.indexOf('let scheduleStageEditAttemptId')
+  );
+  assert.match(commitBlock, /appendSavedClassSessionsToState/);
+  assert.match(commitBlock, /acknowledgeLocalScheduleMutation/);
+  assert.doesNotMatch(commitBlock, /loadSchedulePerson/);
+
+  const bulkDeleteBlock = source.slice(
+    source.indexOf('async function openScheduleBulkSessionDeleteModal'),
+    source.indexOf('function isSavedSessionBulkContextMenu')
+  );
+  assert.match(bulkDeleteBlock, /removeSavedClassSessionsFromState/);
+  assert.match(bulkDeleteBlock, /acknowledgeLocalScheduleMutation/);
+  assert.doesNotMatch(bulkDeleteBlock, /loadSchedulePerson/);
 });

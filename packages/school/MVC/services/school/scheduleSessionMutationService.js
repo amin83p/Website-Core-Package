@@ -12,6 +12,7 @@ const sessionNavigationService = require('./sessionNavigationService');
 const classSessionCapacityService = require('./classSessionCapacityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const activityWorkSessionService = require('./activityWorkSessionService');
+const sessionManagementService = require('./sessionManagementService');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -209,10 +210,6 @@ async function updateClassSessionSchedule(input = {}, req = {}) {
     sessionId,
     sessionDate
   });
-  if (!isScheduledEditableSession(session)) {
-    throw new Error('Only scheduled, unlocked sessions can be moved or resized from Master Schedule.');
-  }
-
   const nextDate = normalizeDateOnly(input.date !== undefined ? input.date : session.date);
   const nextStart = normalizeClockTime(input.startTime !== undefined ? input.startTime : session.startTime);
   let nextEnd = normalizeClockTime(input.endTime !== undefined ? input.endTime : session.endTime);
@@ -226,6 +223,21 @@ async function updateClassSessionSchedule(input = {}, req = {}) {
       nextEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
     }
   }
+
+  await sessionManagementService.assertSessionScheduleUpdateAllowed({
+    classId,
+    sessionId,
+    session,
+    classData,
+    allSessions: sessions,
+    reqUser: req.user,
+    source: 'master_schedule',
+    proposedChanges: {
+      date: nextDate,
+      startTime: nextStart,
+      endTime: nextEnd
+    }
+  });
 
   const workingSession = { ...session };
   applyScheduleFields(workingSession, { date: nextDate, startTime: nextStart, endTime: nextEnd });
@@ -265,9 +277,17 @@ async function updateClassSessionStatus(input = {}, req = {}) {
     sessionId,
     sessionDate
   });
-  if (isSessionAdministrativelyLocked(session)) {
-    throw new Error('This session is locked and cannot be edited from Master Schedule.');
-  }
+  await sessionManagementService.assertSessionOperationAllowed({
+    classId,
+    sessionId,
+    session,
+    classData,
+    allSessions: sessions,
+    reqUser: req.user,
+    source: 'master_schedule',
+    operation: sessionManagementService.SESSION_OPERATIONS.CHANGE_STATUS,
+    proposedChanges: { status }
+  });
 
   const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || req.user?.activeOrgId || '', {
     includeInactive: true

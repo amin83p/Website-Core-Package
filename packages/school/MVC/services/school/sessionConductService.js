@@ -5,6 +5,8 @@
 
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
+const reportRosterService = require('./reportRosterService');
 
 const CONDUCT_PERCENT_KEYS = Object.freeze([
   'classEffortPercent',
@@ -179,6 +181,97 @@ function resolveConductPrefillForStudent({
  * Prefill map keyed by personId for a session roster.
  * @returns {Map<string, object>}
  */
+function targetRowMatchesSessionContext(row = {}, sessionContext = {}) {
+  const cleanSessionId = String(sessionContext?.sessionId || '').trim();
+  const cleanSessionDate = parseDateOnly(sessionContext?.sessionDate);
+  const targetType = String(row?.targetType || 'session').trim().toLowerCase();
+  if (targetType === 'session') {
+    return idsEqual(row?.sessionId, cleanSessionId);
+  }
+  const rowDate = parseDateOnly(row?.dueDate || row?.sessionDate || row?.reportDueDate);
+  return Boolean(cleanSessionDate && rowDate && rowDate === cleanSessionDate);
+}
+
+/**
+ * Union of report-selected student person IDs for session-scoped assignments that require conduct.
+ * Uses per-row targetStudentIds only (not session/class roster).
+ * @param {{ assignments?: Iterable<object>|Map, sessionContext?: { sessionId?: string, sessionDate?: string, classId?: string } }} args
+ * @returns {string[]}
+ */
+function resolveSessionReportConductPersonIds({
+  assignments = [],
+  sessionContext = {}
+} = {}) {
+  const union = new Set();
+  const list = assignments instanceof Map
+    ? Array.from(assignments.values())
+    : (Array.isArray(assignments) ? assignments : []);
+
+  list.forEach((assignment) => {
+    if (!reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext)) return;
+    const scope = reportAssignmentSessionUtils.inferAssignmentReportScope(assignment);
+    if (scope !== 'each_student' && scope !== 'selected_students') return;
+
+    const activeRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
+      .filter((row) => String(row?.status || 'active').trim().toLowerCase() === 'active')
+      .filter((row) => targetRowMatchesSessionContext(row, sessionContext));
+
+    activeRows.forEach((targetRow) => {
+      if (!assignmentRequiresConductBeforeFill(assignment, { assignmentRowId: targetRow?.rowId })) return;
+      reportRosterService.resolveConfiguredTargetStudentIds(assignment, targetRow)
+        .forEach((id) => union.add(id));
+    });
+  });
+
+  return [...union];
+}
+
+/**
+ * Build conduct UI roster rows for report-gated conduct (selected students only).
+ * @param {{ personIds?: string[], sessionRoster?: object[], prefetchedStudents?: object[] }} args
+ * @returns {object[]}
+ */
+function buildReportConductRoster({
+  personIds = [],
+  sessionRoster = [],
+  prefetchedStudents = []
+} = {}) {
+  const sessionRosterByPerson = new Map();
+  (Array.isArray(sessionRoster) ? sessionRoster : []).forEach((row) => {
+    const pid = personKey(row?.personId);
+    if (pid) sessionRosterByPerson.set(pid, row);
+  });
+  const studentsByPerson = new Map();
+  (Array.isArray(prefetchedStudents) ? prefetchedStudents : []).forEach((row) => {
+    const pid = personKey(row?.personId);
+    if (pid) studentsByPerson.set(pid, row);
+  });
+
+  const seen = new Set();
+  const result = [];
+  (Array.isArray(personIds) ? personIds : []).forEach((rawId) => {
+    const pid = personKey(rawId);
+    if (!pid || seen.has(pid)) return;
+    seen.add(pid);
+    const rosterRow = sessionRosterByPerson.get(pid);
+    if (rosterRow) {
+      result.push(rosterRow);
+      return;
+    }
+    const student = studentsByPerson.get(pid);
+    result.push({
+      personId: pid,
+      name: String(student?.name || student?.firstName || pid).trim(),
+      studentRecordId: String(student?.id || '').trim() || undefined,
+      classEffortPercent: null,
+      classParticipationPercent: null,
+      respectsTeachersPercent: null,
+      respectsStudentsPercent: null
+    });
+  });
+  return result;
+}
+
 function buildConductPrefillMap({
   roster = [],
   currentSession = null,
@@ -359,6 +452,9 @@ module.exports = {
   rosterRowHasRatedConduct,
   rosterRowHasSavedConduct,
   resolveReportPeriodForSession,
+  targetRowMatchesSessionContext,
+  resolveSessionReportConductPersonIds,
+  buildReportConductRoster,
   resolveConductPrefillForStudent,
   buildConductPrefillMap,
   isSessionConductReady,

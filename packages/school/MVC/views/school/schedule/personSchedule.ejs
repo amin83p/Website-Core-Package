@@ -629,6 +629,14 @@
         flex-wrap: wrap;
         gap: 0.45rem;
     }
+    .schedule-viewbar-sticky {
+        position: sticky;
+        top: var(--schedule-viewbar-sticky-top, calc(var(--header-height, 110px) + var(--notice-height, 0px)));
+        z-index: 990;
+        background-color: #fff;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+        transition: top 0.2s ease;
+    }
     .schedule-toolbar-hours {
         display: inline-flex;
         flex-wrap: wrap;
@@ -1502,6 +1510,7 @@
   const canDragCreateSessions = caps.canDragCreateSessions === true || scheduleAccess.canDragCreateSessions === true;
   const canLoadAllSchedules = caps.canLoadAllSchedules === true || scheduleAccess.canLoadAllSchedules === true;
   const canUseGlobalComparison = caps.canUseGlobalComparison === true || scheduleAccess.canUseGlobalComparison === true;
+  const canDeleteClassSessions = caps.canDeleteClassSessions === true || scheduleAccess.canDeleteClassSessions === true;
   const scheduleRoles = Array.isArray(scheduleAccess.availableRoles) ? scheduleAccess.availableRoles : [];
   const defaultRole = scheduleAccess.selectedRole || (scheduleRoles.length >= 1 ? scheduleRoles[0].key : '');
   const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
@@ -1655,7 +1664,7 @@
 
   <div id="scheduleContainer" class="d-none">
     <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2 py-2 px-3">
+      <div class="card-header schedule-viewbar-sticky bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2 py-2 px-3">
         <div class="d-flex gap-3 align-items-center flex-wrap small w-100" id="legendContainer"></div>
       </div>
       <div class="card-body p-2 p-md-3 schedule-calendar-card-body">
@@ -1705,6 +1714,15 @@
       <span>Open Manage Session</span>
     </button>
   </div>
+  <% if (canDeleteClassSessions) { %>
+  <div class="schedule-session-context-menu-divider d-none" id="scheduleSessionContextMenuBulkDivider"></div>
+  <div class="schedule-session-context-menu-actions d-none" id="scheduleSessionContextMenuBulk">
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleSessionContextDeleteSelected" role="menuitem">
+      <i class="bi bi-trash3" aria-hidden="true"></i>
+      <span>Delete selected</span>
+    </button>
+  </div>
+  <% } %>
   <div class="schedule-session-context-menu-divider"></div>
   <div class="schedule-session-context-menu-section-label">Session status</div>
   <div id="scheduleSessionContextStatusList" class="schedule-session-context-status-list"></div>
@@ -1783,6 +1801,24 @@
           <div class="small mt-1">This teacher has no active instructor classes in the current organization.</div>
         </div>
         <div id="scheduleClassPickerList" class="schedule-class-picker-list" role="listbox" aria-label="Classes"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<% if (canDeleteClassSessions) { %>
+<div class="modal fade" id="scheduleBulkSessionDeleteModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleBulkSessionDeleteModalTitle">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title fw-bold" id="scheduleBulkSessionDeleteModalTitle"><i class="bi bi-trash me-2"></i>Delete Selected Sessions</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="scheduleBulkSessionDeleteModalBody"></div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger d-none" id="btn_scheduleBulkSessionDeleteConfirm"><i class="bi bi-trash me-1"></i>Delete sessions</button>
       </div>
     </div>
   </div>
@@ -1930,6 +1966,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const canSelectAnyPerson = <%- JSON.stringify(canSelectAnyPerson) %>;
     const canDragCreateSessions = <%- JSON.stringify(canDragCreateSessions) %>;
     const canLoadAllSchedules = <%- JSON.stringify(canLoadAllSchedules) %>;
+    const canDeleteClassSessions = <%- JSON.stringify(canDeleteClassSessions) %>;
     const initialScheduleRoles = <%- JSON.stringify(scheduleRoles) %>;
     const initialDefaultRole = <%- JSON.stringify(defaultRole) %>;
     const initialLockedPersonId = <%- JSON.stringify(lockedPersonId) %>;
@@ -1937,9 +1974,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialScheduleViewerPrefs = <%- JSON.stringify(typeof initialScheduleViewerPrefs !== 'undefined' ? initialScheduleViewerPrefs : { startDate: '', endDate: '', activePersonId: '', persons: [], autoChangeDetector: true, timelineStartHour: 7, timelineEndHour: 22 }) %>;
     const SCHEDULE_VIEWER_PREFS_API = '/school/schedules/api/viewer-preferences';
     const SCHEDULE_COMMIT_STAGED_API = '/school/schedules/api/commit-staged-sessions';
+    const SCHEDULE_COMMIT_TIMEOUT_MS = 120000;
+    const SCHEDULE_DRAFT_BACKUP_KEY = 'schoolMasterViewer.scheduleDraftBackup';
     const SCHEDULE_UPDATE_CLASS_SESSION_SCHEDULE_API = '/school/schedules/api/update-class-session-schedule';
+    const SCHEDULE_SESSION_MANAGEMENT_POLICY_API = '/school/schedules/api/session-management-policy';
     const SCHEDULE_UPDATE_CLASS_SESSION_STATUS_API = '/school/schedules/api/update-class-session-status';
     const SCHEDULE_UPDATE_WORK_SESSION_SCHEDULE_API = '/school/schedules/api/update-work-session-schedule';
+    const SCHEDULE_BULK_DELETE_SESSIONS_PREVIEW_API = '/school/schedules/api/bulk-delete-sessions/preview';
+    const SCHEDULE_BULK_DELETE_SESSIONS_API = '/school/schedules/api/bulk-delete-sessions';
     const SCHEDULE_DRAGGABLE_BLOCK_SELECTOR = '[data-event-type="schedule_draft"], .is-schedule-draft[data-session-id], [data-event-type="class_session"][data-schedule-editable="1"]';
 
     function prefsHaveSavedWorkspace(prefs) {
@@ -2026,10 +2068,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildScheduleSessionBlockClickHandler(event) {
-        const detailsUrl = getEventDetailsUrl(event);
-        if (!shouldOpenSessionOnClick(event) || !detailsUrl) return '';
-        const encodedDetailsUrl = encodeURIComponent(detailsUrl);
-        return `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"`;
+        // Non-admin session open is handled by the visualArea click listener.
+        if (!shouldOpenSessionOnClick(event)) return '';
+        return '';
     }
     function mergeScheduleBlockLayoutStyle(layoutStyle, scan) {
         const scd = window.ScheduleCompletionDisplay;
@@ -2101,12 +2142,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function buildScheduleSessionSelectedClass(event) {
         if (event?.isDraft === true || event?.isStaged === true) {
+            if (!canDragCreateSessions) return '';
             return isDraftSessionSelected(event) ? ' is-session-selected is-draft-selected' : '';
         }
+        if (!canSelectAnyPerson) return '';
         const selectionKey = scheduleSessionSelectionKey(event);
         return selectionKey && getActiveScheduleSelectionSet().has(selectionKey) ? ' is-session-selected' : '';
     }
     function buildScheduleSessionUnselectableClass(event) {
+        if (!canSelectAnyPerson) return '';
         if (event?.isDraft === true) return '';
         const selectionKey = scheduleSessionSelectionKey(event);
         return selectionKey && !canSelectScheduleSession(event) ? ' is-session-unselectable' : '';
@@ -2311,35 +2355,82 @@ document.addEventListener('DOMContentLoaded', () => {
             + '<span class="small text-muted ms-1">Cycle Window: ' + escapeHtml(range) + '</span>';
     }
 
-    // --- Modal-friendly messaging helpers (fallback to alert/confirm if modal isn't available) ---
-    const uiAlert = async (message, title = 'Notice') => {
-        try {
-            if (typeof showMessageModal === 'function') {
-                await showMessageModal({ title, message, type: 'info', okText: 'OK' });
-                return;
-            }
-        } catch (e) { /* fall back */ }
-        alert(message);
+    // --- Modal-friendly messaging helpers ---
+    function inferScheduleAlertIcon(message = '', title = '', options = {}) {
+        const explicit = String(options.icon || options.type || '').trim();
+        if (explicit) return explicit;
+        const titleLower = String(title || '').toLowerCase();
+        const messageLower = String(message || '').toLowerCase();
+        const combined = `${titleLower} ${messageLower}`;
+        if (/fail|error|unable to|popup blocked/.test(combined)) return 'error';
+        if (/saved|deleted|success/.test(titleLower)) return 'success';
+        if (/conflict|warning|blocked|nothing saved|overlap|cannot/.test(combined)) return 'warning';
+        return 'info';
+    }
+
+    const uiAlert = async (message, title = 'Notice', options = {}) => {
+        const icon = inferScheduleAlertIcon(message, title, options);
+        const html = options.html === true || (/<[^>]+>/.test(String(message || '')) && options.html !== false);
+        const okClassByIcon = {
+            error: 'btn-danger',
+            warning: 'btn-warning',
+            success: 'btn-success',
+            info: 'btn-primary'
+        };
+        const okClass = String(options.okClass || okClassByIcon[icon] || 'btn-primary').trim();
+        const body = html ? String(message || '') : escapeHtml(String(message || ''));
+        if (typeof window.showMessageModal === 'function') {
+            await window.showMessageModal({
+                title,
+                message: body,
+                icon,
+                size: options.size || 'md',
+                buttons: [{ text: options.okText || 'OK', class: okClass }]
+            });
+            return;
+        }
+        console.error('showMessageModal is not available on Master Schedule.');
+        const plain = String(message || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (typeof window.alert === 'function') window.alert(plain || title);
     };
 
-    const uiConfirm = async (message, title = 'Confirm') => {
-        try {
-            if (typeof showMessageModal === 'function') {
-                const res = await showMessageModal({
-                    title,
-                    icon: 'warning',
-                    message,
-                    size: 'md',
-                    buttons: [
-                        { text: 'No', class: 'btn-secondary btn-md' },
-                        { text: 'Yes', class: 'btn-danger btn-md' }
-                    ]
-                });
-                return res === 'Yes';
-            }
-        } catch (e) { /* fall back */ }
-        return confirm(message);
+    const uiConfirm = async (message, title = 'Confirm', options = {}) => {
+        const icon = String(options.icon || 'warning').trim() || 'warning';
+        const cancelText = String(options.cancelText || options.noText || 'No').trim() || 'No';
+        const confirmText = String(options.confirmText || options.yesText || 'Yes').trim() || 'Yes';
+        const cancelClass = String(options.cancelClass || 'btn-secondary btn-md').trim();
+        const confirmClass = String(options.confirmClass || (icon === 'warning' ? 'btn-warning btn-md' : 'btn-primary btn-md')).trim();
+        const body = options.html === true ? String(message || '') : escapeHtml(String(message || ''));
+        if (typeof window.showMessageModal === 'function') {
+            const res = await window.showMessageModal({
+                title,
+                icon,
+                message: body,
+                size: options.size || 'md',
+                buttons: [
+                    { text: cancelText, class: cancelClass },
+                    { text: confirmText, class: confirmClass }
+                ]
+            });
+            return res === confirmText;
+        }
+        console.error('showMessageModal is not available on Master Schedule.');
+        return false;
     };
+
+    async function confirmDiscardPendingDraftsIfNeeded(actionLabel = 'Reload the schedule') {
+        if (countAllPendingDraftSessions() <= 0) return true;
+        return await uiConfirm(
+            `You have staged sessions that are not saved to class schedules. ${actionLabel} anyway? Staged sessions will stay in this browser until you save or delete them.`,
+            'Unsaved staged sessions',
+            {
+                icon: 'warning',
+                cancelText: 'Stay',
+                confirmText: 'Continue',
+                confirmClass: 'btn-warning btn-md'
+            }
+        );
+    }
 
     const SCHEDULE_DAY_WIDTH_STORAGE_KEY = 'schoolMasterViewer.scheduleDayWidth';
     const SCHEDULE_VERTICAL_DAY_WIDTH_KEY = 'schoolMasterViewer.scheduleVerticalDayWidth';
@@ -2615,6 +2706,7 @@ document.addEventListener('DOMContentLoaded', () => {
         remoteUpdateFingerprint: '',
         remoteUpdateModalDismissed: false,
         remoteUpdateModalOpen: false,
+        localMutationGraceUntil: 0,
         focusStagedSessionOnNextLayout: false,
         pendingStagedScrollDate: '',
         viewMode: readScheduleViewMode(),
@@ -2669,7 +2761,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return true;
         } catch (error) {
             if (!silent) {
-                await uiAlert(error.message || 'Unable to save preferences.', 'Schedule');
+                await uiAlert(error.message || 'Unable to save preferences.', 'Schedule', { icon: 'error' });
             }
             return false;
         }
@@ -2704,6 +2796,86 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function isScheduleAutoChangeDetectorEnabled() {
         return scheduleState.autoChangeDetectorEnabled !== false;
+    }
+
+    function countAllPendingDraftSessions() {
+        return Object.values(scheduleState.draftEventsByPersonId || {})
+            .reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);
+    }
+
+    async function fetchWithScheduleTimeout(url, options = {}, timeoutMs = SCHEDULE_COMMIT_TIMEOUT_MS) {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw new Error('Save timed out. The server took too long to respond. Your staged sessions were kept — try again.');
+            }
+            throw error;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }
+
+    function persistScheduleDraftBackup() {
+        if (!canDragCreateSessions || !window.localStorage) return;
+        try {
+            const hasDrafts = countAllPendingDraftSessions() > 0
+                || Object.values(scheduleState.draftBatchesByPersonId || {}).some((rows) => Array.isArray(rows) && rows.length);
+            if (!hasDrafts) {
+                window.localStorage.removeItem(SCHEDULE_DRAFT_BACKUP_KEY);
+                return;
+            }
+            window.localStorage.setItem(SCHEDULE_DRAFT_BACKUP_KEY, JSON.stringify({
+                draftEventsByPersonId: scheduleState.draftEventsByPersonId || {},
+                draftBatchesByPersonId: scheduleState.draftBatchesByPersonId || {},
+                savedAt: new Date().toISOString()
+            }));
+        } catch (_) { /* storage unavailable */ }
+    }
+
+    let scheduleDraftBackupTimer = null;
+    function schedulePersistDraftBackup() {
+        if (!canDragCreateSessions) return;
+        if (scheduleDraftBackupTimer) window.clearTimeout(scheduleDraftBackupTimer);
+        scheduleDraftBackupTimer = window.setTimeout(() => {
+            scheduleDraftBackupTimer = null;
+            persistScheduleDraftBackup();
+        }, 300);
+    }
+
+    function clearScheduleDraftBackup() {
+        try {
+            if (window.localStorage) window.localStorage.removeItem(SCHEDULE_DRAFT_BACKUP_KEY);
+        } catch (_) { /* storage unavailable */ }
+    }
+
+    function restoreScheduleDraftBackup() {
+        if (!canDragCreateSessions || !window.localStorage) return;
+        try {
+            const raw = window.localStorage.getItem(SCHEDULE_DRAFT_BACKUP_KEY);
+            if (!raw) return;
+            const payload = JSON.parse(raw);
+            if (!payload || typeof payload !== 'object') return;
+            Object.entries(payload.draftEventsByPersonId || {}).forEach(([personId, rows]) => {
+                if (!Array.isArray(rows) || !rows.length) return;
+                const existing = Array.isArray(scheduleState.draftEventsByPersonId[personId])
+                    ? scheduleState.draftEventsByPersonId[personId]
+                    : [];
+                if (existing.length) return;
+                scheduleState.draftEventsByPersonId[personId] = rows;
+            });
+            Object.entries(payload.draftBatchesByPersonId || {}).forEach(([personId, rows]) => {
+                if (!Array.isArray(rows) || !rows.length) return;
+                if (Array.isArray(scheduleState.draftBatchesByPersonId[personId]) && scheduleState.draftBatchesByPersonId[personId].length) return;
+                scheduleState.draftBatchesByPersonId[personId] = rows;
+            });
+        } catch (_) { /* storage unavailable */ }
+    }
+
+    function bindScheduleDraftUnloadGuard() {
+        // Draft safety uses localStorage backup/restore; in-app actions use uiConfirm modals.
     }
 
     function getScheduleEventsForPerson(personId) {
@@ -3005,11 +3177,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function openScheduleClassPickerModal(dragContext) {
         const person = activeSchedulePerson();
         if (!person?.id) {
-            if (typeof uiAlert === 'function') uiAlert('Load a teacher schedule before creating sessions.', 'Stage Sessions');
+            if (typeof uiAlert === 'function') uiAlert('Load a teacher schedule before creating sessions.', 'Stage Sessions', { icon: 'info' });
             return;
         }
         if (!scheduleState.loadedPersonIds.has(person.id)) {
-            if (typeof uiAlert === 'function') uiAlert('Load the schedule first, then create staged sessions.', 'Stage Sessions');
+            if (typeof uiAlert === 'function') uiAlert('Load the schedule first, then create staged sessions.', 'Stage Sessions', { icon: 'info' });
             return;
         }
         bindScheduleClassPickerList();
@@ -3039,7 +3211,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             getScheduleClassPickerModal()?.show();
         } catch (err) {
-            if (typeof uiAlert === 'function') uiAlert(err.message || 'Unable to load classes.', 'Stage Sessions');
+            if (typeof uiAlert === 'function') uiAlert(err.message || 'Unable to load classes.', 'Stage Sessions', { icon: 'error' });
         }
     }
 
@@ -3223,7 +3395,7 @@ document.addEventListener('DOMContentLoaded', () => {
             excludeSessionId: id
         });
         if (hasConflict) {
-            if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Move staged session');
+            if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Move staged session', { icon: 'warning' });
             return false;
         }
         const drafts = Array.isArray(scheduleState.draftEventsByPersonId?.[person.id]) ? scheduleState.draftEventsByPersonId[person.id] : [];
@@ -3258,7 +3430,7 @@ document.addEventListener('DOMContentLoaded', () => {
             excludeSessionId: id
         });
         if (hasConflict) {
-            if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Resize staged session');
+            if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Resize staged session', { icon: 'warning' });
             return false;
         }
         const drafts = Array.isArray(scheduleState.draftEventsByPersonId?.[person.id]) ? scheduleState.draftEventsByPersonId[person.id] : [];
@@ -3299,7 +3471,7 @@ document.addEventListener('DOMContentLoaded', () => {
             excludeSessionId: id
         });
         if (hasConflict) {
-            if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Edit staged session');
+            if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Edit staged session', { icon: 'warning' });
             return false;
         }
         const drafts = Array.isArray(scheduleState.draftEventsByPersonId?.[person.id]) ? scheduleState.draftEventsByPersonId[person.id] : [];
@@ -3453,6 +3625,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : [];
         scheduleState.draftBatchesByPersonId[pid] = batches.filter((batch) => String(batch?.classId || '') !== cid);
         scheduleState.selectedDraftSessionIdsByPersonId[pid] = new Set();
+        schedulePersistDraftBackup();
     }
 
     async function commitScheduleDraftSessions(options = {}) {
@@ -3471,27 +3644,35 @@ document.addEventListener('DOMContentLoaded', () => {
             byClass.get(classId).push(ev);
         });
         if (!byClass.size) {
-            if (typeof uiAlert === 'function') await uiAlert('Staged sessions are missing class information.', 'Save changes');
+            if (typeof uiAlert === 'function') await uiAlert('Staged sessions are missing class information.', 'Save changes', { icon: 'warning' });
             return;
         }
 
         if (!options.skipConfirm) {
             const confirmed = await uiConfirm(
                 `Save ${drafts.length} staged session(s) to ${byClass.size} class schedule(s)?`,
-                'Save changes?'
+                'Save changes?',
+                { icon: 'warning', cancelText: 'Cancel', confirmText: 'Save', confirmClass: 'btn-success btn-md' }
             );
             if (!confirmed) return;
         }
 
         let totalCreated = 0;
         const extendCycleEndDate = options.extendCycleEndDate === true;
+        let loadingShown = false;
+        const range = getScheduleRange();
+        const commitRole = selectedScheduleRole() || person.selectedRole || '';
         try {
+            if (typeof window.showLoading === 'function') {
+                window.showLoading('Saving staged sessions...');
+                loadingShown = true;
+            }
             for (const [classId, classDrafts] of byClass.entries()) {
                 const pendingStagedSessions = classDrafts
                     .map((ev) => draftEventToStagedSession(ev, person))
                     .filter((row) => row.sessionId && row.date && row.startTime && row.endTime);
                 if (!pendingStagedSessions.length) continue;
-                const res = await fetch(SCHEDULE_COMMIT_STAGED_API, {
+                const res = await fetchWithScheduleTimeout(SCHEDULE_COMMIT_STAGED_API, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3503,14 +3684,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         classId,
                         personId: person.id,
                         pendingStagedSessions,
-                        extendCycleEndDate
+                        extendCycleEndDate,
+                        startDate: range.startDate,
+                        endDate: range.endDate,
+                        role: commitRole
                     })
                 });
                 const result = await res.json().catch(() => ({}));
                 if (!res.ok || result.status !== 'success') {
                     const message = String(result.message || 'Unable to save staged sessions.');
                     if (!extendCycleEndDate && /cycle extension/i.test(message)) {
-                        const extend = await uiConfirm(`${message}\n\nExtend the class cycle and continue?`, 'Cycle extension required');
+                        if (loadingShown && typeof window.hideLoading === 'function') {
+                            window.hideLoading({ force: true });
+                            loadingShown = false;
+                        }
+                        const extend = await uiConfirm(`${message}\n\nExtend the class cycle and continue?`, 'Cycle extension required', {
+                            icon: 'warning',
+                            cancelText: 'Cancel',
+                            confirmText: 'Extend and save',
+                            confirmClass: 'btn-warning btn-md'
+                        });
                         if (extend) {
                             await commitScheduleDraftSessions({ skipConfirm: true, extendCycleEndDate: true });
                         }
@@ -3518,24 +3711,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     throw new Error(message);
                 }
-                totalCreated += Number(result?.data?.createdCount || 0);
-                removeDraftSessionsForClass(person.id, classId);
+                const createdCount = Number(result?.data?.createdCount || 0);
+                totalCreated += createdCount;
+                if (createdCount > 0) {
+                    removeDraftSessionsForClass(person.id, classId);
+                    appendSavedClassSessionsToState(person.id, result?.data?.events || []);
+                }
             }
-            clearRemoteUpdatePending();
-            delete scheduleState.eventsByPersonId[person.id];
-            delete scheduleState.statusMetaByPersonId[person.id];
-            delete scheduleState.errorByPersonId[person.id];
-            delete scheduleState.lastLoadedAtByPersonId[person.id];
-            delete scheduleState.scheduleFingerprintByPersonId[person.id];
-            scheduleState.loadedPersonIds.delete(person.id);
-            await loadSchedulePerson(person);
-            refreshScheduleActiveView();
-            await uiAlert(totalCreated
-                ? `${totalCreated} session(s) saved to class schedule(s).`
-                : 'No new sessions were saved (dates may already exist).',
-            'Save changes');
+            if (loadingShown && typeof window.hideLoading === 'function') {
+                window.hideLoading({ force: true });
+                loadingShown = false;
+            }
+            if (totalCreated > 0) {
+                await acknowledgeLocalScheduleMutation(person);
+                refreshScheduleActiveView();
+                if (countAllPendingDraftSessions() <= 0) clearScheduleDraftBackup();
+                await uiAlert(`${totalCreated} session(s) saved to class schedule(s).`, 'Sessions Saved', { icon: 'success' });
+            } else {
+                refreshScheduleActiveView();
+                await uiAlert(
+                    'No new sessions were saved. Staged sessions were kept.',
+                    'Nothing Saved',
+                    { icon: 'warning' }
+                );
+            }
         } catch (error) {
-            await uiAlert(error.message || 'Unable to save staged sessions.', 'Save changes');
+            if (loadingShown && typeof window.hideLoading === 'function') {
+                window.hideLoading({ force: true });
+                loadingShown = false;
+            }
+            await uiAlert(error.message || 'Unable to save staged sessions.', 'Save Failed', { icon: 'error' });
+        } finally {
+            if (loadingShown && typeof window.hideLoading === 'function') window.hideLoading({ force: true });
         }
     }
 
@@ -3545,7 +3752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!scheduleStageContext || !scheduleStageClassContext?.classId) return;
         const form = readScheduleStageFormValues();
         if (!form.weekdays.length) {
-            if (typeof uiAlert === 'function') uiAlert('Select at least one weekday.', 'Stage Sessions');
+            if (typeof uiAlert === 'function') uiAlert('Select at least one weekday.', 'Stage Sessions', { icon: 'info' });
             return;
         }
         const editAttemptId = String(scheduleStageEditAttemptId || '').trim();
@@ -3589,7 +3796,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!result.sessions.length) {
                 if (typeof uiAlert === 'function') {
-                    uiAlert('No sessions could be generated. Adjust weekdays, count, or holiday settings.', 'Stage Sessions');
+                    uiAlert('No sessions could be generated. Adjust weekdays, count, or holiday settings.', 'Stage Sessions', { icon: 'warning' });
                 }
                 return;
             }
@@ -3619,7 +3826,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scheduleStageEditAttemptId = '';
             hideScheduleStageModal();
             if (!window.SessionEnrollmentCalendarModal?.buildPartialPickerData) {
-                if (typeof uiAlert === 'function') uiAlert('Calendar modal is not available on this page.', 'Stage Sessions');
+                if (typeof uiAlert === 'function') uiAlert('Calendar modal is not available on this page.', 'Stage Sessions', { icon: 'warning' });
                 return;
             }
             applyDraftStagedSessionsToSchedule({
@@ -3713,7 +3920,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 event.preventDefault();
                 commitScheduleStageCreate().catch((err) => {
                     console.error(err);
-                    if (typeof uiAlert === 'function') uiAlert(err.message || 'Unable to create staged sessions.', 'Stage Sessions');
+                    if (typeof uiAlert === 'function') uiAlert(err.message || 'Unable to create staged sessions.', 'Stage Sessions', { icon: 'error' });
                 });
                 return;
             }
@@ -3781,6 +3988,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (block) {
             const event = resolveScheduleContextEventFromTarget(block);
             if (event) {
+                const originalDate = String(event.date || '').trim();
+                const nextDate = String(update.date || '').trim();
+                const dateChanged = Boolean(nextDate && originalDate && nextDate !== originalDate);
+                if (dateChanged && !canScheduleSessionChangeDate(event)) {
+                    if (typeof uiAlert === 'function') {
+                        uiAlert(formatSessionManagementBlockerMessage(event, 'This session cannot be moved to another date.'), 'Move session', { icon: 'warning' });
+                    }
+                    refreshScheduleActiveView();
+                    return;
+                }
+                if (!canScheduleSessionChangeTime(event)) {
+                    if (typeof uiAlert === 'function') {
+                        uiAlert(formatSessionManagementBlockerMessage(event, 'This session time cannot be changed.'), 'Move session', { icon: 'warning' });
+                    }
+                    refreshScheduleActiveView();
+                    return;
+                }
                 commitSavedSessionScheduleUpdate(event, {
                     date: update.date,
                     startTime: update.startTime,
@@ -3800,6 +4024,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (block) {
             const event = resolveScheduleContextEventFromTarget(block);
             if (event) {
+                if (!canScheduleSessionChangeTime(event)) {
+                    if (typeof uiAlert === 'function') {
+                        uiAlert(formatSessionManagementBlockerMessage(event, 'This session duration cannot be changed.'), 'Resize session', { icon: 'warning' });
+                    }
+                    refreshScheduleActiveView();
+                    return;
+                }
                 commitSavedSessionScheduleUpdate(event, {
                     date: update.date,
                     startTime: update.startTime,
@@ -3829,7 +4060,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return person?.id ? collectScheduleConflictSessionsForPerson(person.id) : [];
                 },
                 onMoveConflict: () => {
-                    if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Move session');
+                    if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Move session', { icon: 'warning' });
                 },
                 onMoveComplete: (update) => { handleScheduleBlockMoveComplete(update); }
             });
@@ -3842,7 +4073,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return person?.id ? collectScheduleConflictSessionsForPerson(person.id) : [];
                 },
                 onResizeConflict: () => {
-                    if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Resize session');
+                    if (typeof uiAlert === 'function') uiAlert('That time slot conflicts with another session.', 'Resize session', { icon: 'warning' });
                 },
                 onResizeComplete: (update) => { handleScheduleBlockResizeComplete(update); }
             });
@@ -3865,6 +4096,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let scheduleSavedSessionEditEvent = null;
     let scheduleDraftMenuBound = false;
     const scheduleSessionMutationTokens = new Map();
+
+    function isScheduleSavedSessionWorkActive() {
+        if (scheduleSessionEditOverlayMode !== 'saved') return false;
+        const editOverlay = document.getElementById('scheduleDraftEditOverlay');
+        const moveOverlay = document.getElementById('scheduleDraftMoveOverlay');
+        return Boolean(
+            (editOverlay && !editOverlay.classList.contains('d-none'))
+            || (moveOverlay && !moveOverlay.classList.contains('d-none'))
+            || document.body.classList.contains('is-schedule-draft-moving')
+            || document.body.classList.contains('is-schedule-draft-resizing')
+        );
+    }
 
     function beginScheduleSessionMutation(sessionId) {
         const id = String(sessionId || '').trim();
@@ -4097,9 +4340,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function promptDeleteDraftAttempt(attemptId, source = scheduleDraftContextSource) {
         const id = String(attemptId || '').trim();
         if (!id) return;
-        const ok = typeof uiConfirm === 'function'
-            ? await uiConfirm('Delete all staged sessions in this batch?', 'Delete all staged')
-            : confirm('Delete all staged sessions in this batch?');
+        const ok = await uiConfirm('Delete all staged sessions in this batch?', 'Delete all staged', {
+            icon: 'warning',
+            cancelText: 'Cancel',
+            confirmText: 'Delete',
+            confirmClass: 'btn-danger btn-md'
+        });
         if (ok) confirmDeleteDraftAttempt(id, source);
     }
 
@@ -4227,8 +4473,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const dateEl = document.getElementById('scheduleDraftEditDate');
         const startEl = document.getElementById('scheduleDraftEditStartTime');
-        if (dateEl) dateEl.value = String(event.date || '').trim();
-        if (startEl) startEl.value = String(event.start || '').trim();
+        if (dateEl) {
+            dateEl.value = String(event.date || '').trim();
+            const canChangeDate = scheduleSessionEditOverlayMode !== 'saved' || canScheduleSessionChangeDate(event);
+            dateEl.disabled = !canChangeDate;
+            dateEl.readOnly = !canChangeDate;
+            dateEl.title = canChangeDate ? '' : 'This session cannot be moved to another date.';
+        }
+        if (startEl) {
+            startEl.value = String(event.start || '').trim();
+            const canChangeTime = scheduleSessionEditOverlayMode !== 'saved' || canScheduleSessionChangeTime(event);
+            startEl.disabled = !canChangeTime;
+            startEl.readOnly = !canChangeTime;
+            startEl.title = canChangeTime ? '' : 'This session time cannot be changed.';
+        }
         const durationHours = nearestScheduleStageDurationChip(event.duration || event.scheduledDuration || 1);
         overlay.querySelectorAll('[data-draft-edit-duration]').forEach((btn) => {
             const hours = Number(btn.getAttribute('data-draft-edit-duration'));
@@ -4261,8 +4519,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const dateEl = document.getElementById('scheduleDraftMoveDate');
         const startEl = document.getElementById('scheduleDraftMoveStartTime');
-        if (dateEl) dateEl.value = String(event.date || '').trim();
-        if (startEl) startEl.value = String(event.start || event.startTime || '').trim();
+        if (dateEl) {
+            dateEl.value = String(event.date || '').trim();
+            const canChangeDate = scheduleSessionEditOverlayMode !== 'saved' || canScheduleSessionChangeDate(event);
+            dateEl.disabled = !canChangeDate;
+            dateEl.readOnly = !canChangeDate;
+            dateEl.title = canChangeDate ? '' : 'This session cannot be moved to another date.';
+        }
+        if (startEl) {
+            startEl.value = String(event.start || event.startTime || '').trim();
+            const canChangeTime = scheduleSessionEditOverlayMode !== 'saved' || canScheduleSessionChangeTime(event);
+            startEl.disabled = !canChangeTime;
+            startEl.readOnly = !canChangeTime;
+            startEl.title = canChangeTime ? '' : 'This session time cannot be changed.';
+        }
         const errorEl = document.getElementById('scheduleDraftMoveError');
         if (errorEl) {
             errorEl.classList.add('d-none');
@@ -4309,6 +4579,21 @@ document.addEventListener('DOMContentLoaded', () => {
             durationHours
         };
         if (scheduleSessionEditOverlayMode === 'saved' && scheduleSavedSessionEditEvent) {
+            const originalDate = String(scheduleSavedSessionEditEvent.date || '').trim();
+            if (values.date !== originalDate && !canScheduleSessionChangeDate(scheduleSavedSessionEditEvent)) {
+                if (errorEl) {
+                    errorEl.textContent = formatSessionManagementBlockerMessage(scheduleSavedSessionEditEvent, 'This session cannot be moved to another date.');
+                    errorEl.classList.remove('d-none');
+                }
+                return;
+            }
+            if (!canScheduleSessionChangeTime(scheduleSavedSessionEditEvent)) {
+                if (errorEl) {
+                    errorEl.textContent = formatSessionManagementBlockerMessage(scheduleSavedSessionEditEvent, 'This session time cannot be changed.');
+                    errorEl.classList.remove('d-none');
+                }
+                return;
+            }
             commitSavedSessionScheduleUpdate(scheduleSavedSessionEditEvent, {
                 date: values.date,
                 startTime: values.startTime,
@@ -4356,6 +4641,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (scheduleSessionEditOverlayMode === 'saved' && scheduleSavedSessionEditEvent) {
+            const originalDate = String(scheduleSavedSessionEditEvent.date || '').trim();
+            if (values.date !== originalDate && !canScheduleSessionChangeDate(scheduleSavedSessionEditEvent)) {
+                if (errorEl) {
+                    errorEl.textContent = formatSessionManagementBlockerMessage(scheduleSavedSessionEditEvent, 'This session cannot be moved to another date.');
+                    errorEl.classList.remove('d-none');
+                }
+                return;
+            }
+            if (!canScheduleSessionChangeTime(scheduleSavedSessionEditEvent)) {
+                if (errorEl) {
+                    errorEl.textContent = formatSessionManagementBlockerMessage(scheduleSavedSessionEditEvent, 'This session time cannot be changed.');
+                    errorEl.classList.remove('d-none');
+                }
+                return;
+            }
             const endTime = scheduleCalendarCore?.addDurationToTime
                 ? scheduleCalendarCore.addDurationToTime(values.startTime, values.durationHours)
                 : values.startTime;
@@ -4477,7 +4777,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyBulkDraftSessionTimes(selectedEvents, values = {}, source = 'timeline') {
         const validation = validateBulkDraftSessionTimes(selectedEvents, values);
         if (!validation.ok) {
-            if (typeof uiAlert === 'function') uiAlert(validation.message, 'Edit selected staged sessions');
+            if (typeof uiAlert === 'function') uiAlert(validation.message, 'Edit selected staged sessions', { icon: 'warning' });
             return false;
         }
         const { startTime, endTime, durationHours } = validation;
@@ -4539,9 +4839,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function promptDeleteSelectedDraftSessions(source = 'timeline') {
         const selectedIds = Array.from(getActiveDraftSelectionSet());
         if (!selectedIds.length) return;
-        const ok = typeof uiConfirm === 'function'
-            ? await uiConfirm(`Delete ${selectedIds.length} selected staged session(s)?`, 'Delete All')
-            : confirm(`Delete ${selectedIds.length} selected staged session(s)?`);
+        const ok = await uiConfirm(`Delete ${selectedIds.length} selected staged session(s)?`, 'Delete All', {
+            icon: 'warning',
+            cancelText: 'Cancel',
+            confirmText: 'Delete',
+            confirmClass: 'btn-danger btn-md'
+        });
         if (!ok) return;
         if (source === 'partialModal' && window.SessionEnrollmentCalendarModal?.deleteSelectedStagedSessions) {
             window.SessionEnrollmentCalendarModal.deleteSelectedStagedSessions(selectedIds);
@@ -4802,11 +5105,54 @@ document.addEventListener('DOMContentLoaded', () => {
         return Boolean(String(event?.classId || '').trim() && String(event?.sessionId || '').trim() && String(event?.date || '').trim());
     }
 
+    function readSessionManagementPolicy(event) {
+        const policy = event?.sessionManagement;
+        if (!policy || typeof policy !== 'object') {
+            return {
+                canDelete: true,
+                canChangeDate: true,
+                canChangeTime: true,
+                canChangeStatus: true
+            };
+        }
+        return {
+            canDelete: policy.canDelete !== false,
+            canChangeDate: policy.canChangeDate !== false,
+            canChangeTime: policy.canChangeTime !== false,
+            canChangeStatus: policy.canChangeStatus !== false,
+            blockers: Array.isArray(policy.blockers) ? policy.blockers : []
+        };
+    }
+
+    function formatSessionManagementBlockerMessage(event, fallback = 'This session change is not allowed.') {
+        const blockers = readSessionManagementPolicy(event).blockers || [];
+        if (!blockers.length) return fallback;
+        const labels = blockers.map((row) => String(row?.label || row?.code || '').trim()).filter(Boolean);
+        return labels.length ? `${fallback}\n\nBlocked by: ${labels.join(', ')}` : fallback;
+    }
+
+    function canScheduleSessionChangeDate(event) {
+        return isScheduledClassSessionForQuickEdit(event) && readSessionManagementPolicy(event).canChangeDate === true;
+    }
+
+    function canScheduleSessionChangeTime(event) {
+        return isScheduledClassSessionForQuickEdit(event) && readSessionManagementPolicy(event).canChangeTime === true;
+    }
+
+    function canScheduleSessionChangeStatus(event) {
+        return isScheduledClassSessionForQuickEdit(event) && readSessionManagementPolicy(event).canChangeStatus === true;
+    }
+
     function isScheduledClassSessionForQuickEdit(event) {
         return isClassSessionScheduleEvent(event)
             && normalizeSessionStatus(event?.status) === 'scheduled'
             && event?.locked !== true
             && event?.scheduleDisplayOnly !== true;
+    }
+
+    function isScheduledClassSessionScheduleEditable(event) {
+        return isScheduledClassSessionForQuickEdit(event)
+            && (canScheduleSessionChangeDate(event) || canScheduleSessionChangeTime(event));
     }
 
     function isWorkSessionScheduleEvent(event) {
@@ -4834,7 +5180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const classId = escapeHtml(String(event.classId || '').trim());
         const sessionId = escapeHtml(String(event.sessionId || '').trim());
         const sessionDate = escapeHtml(String(event.date || '').trim());
-        const editableAttr = (canDragCreateSessions && isScheduledClassSessionForQuickEdit(event)) ? ' data-schedule-editable="1"' : '';
+        const editableAttr = (canDragCreateSessions && isScheduledClassSessionScheduleEditable(event)) ? ' data-schedule-editable="1"' : '';
         return `${keyAttr} data-class-id="${classId}" data-session-id="${sessionId}" data-session-date="${sessionDate}" data-event-type="class_session"${editableAttr}`;
     }
 
@@ -5079,8 +5425,62 @@ document.addEventListener('DOMContentLoaded', () => {
             patched = next;
             return next;
         });
-        if (patched) scheduleState.remoteUpdatePending = true;
         return patched;
+    }
+
+    function buildSavedClassSessionStateKey(classId, sessionId, date) {
+        return `${String(classId || '').trim()}::${String(sessionId || '').trim()}::${String(date || '').trim()}`;
+    }
+
+    function removeSavedClassSessionsFromState(personId, classId, rows = []) {
+        const pid = String(personId || '').trim();
+        const cid = String(classId || '').trim();
+        if (!pid) return;
+        const removeKeys = new Set(
+            (Array.isArray(rows) ? rows : []).map((row) => buildSavedClassSessionStateKey(
+                cid || row?.classId,
+                row?.sessionId,
+                row?.date || row?.sessionDate
+            )).filter((key) => key && !key.endsWith('::'))
+        );
+        if (!removeKeys.size) return;
+        const events = Array.isArray(scheduleState.eventsByPersonId[pid]) ? scheduleState.eventsByPersonId[pid] : [];
+        scheduleState.eventsByPersonId[pid] = events.filter((ev) => {
+            if (String(ev?.eventType || '').trim().toLowerCase() !== 'class_session') return true;
+            const key = buildSavedClassSessionStateKey(ev?.classId, ev?.sessionId, ev?.date);
+            return !removeKeys.has(key);
+        });
+    }
+
+    function appendSavedClassSessionsToState(personId, events = []) {
+        const pid = String(personId || '').trim();
+        if (!pid) return;
+        const existing = Array.isArray(scheduleState.eventsByPersonId[pid]) ? scheduleState.eventsByPersonId[pid] : [];
+        const existingKeys = new Set(
+            existing
+                .filter((ev) => String(ev?.eventType || '').trim().toLowerCase() === 'class_session')
+                .map((ev) => buildSavedClassSessionStateKey(ev?.classId, ev?.sessionId, ev?.date))
+        );
+        const toAdd = (Array.isArray(events) ? events : []).filter((ev) => {
+            const key = buildSavedClassSessionStateKey(ev?.classId, ev?.sessionId, ev?.date);
+            return key && !key.endsWith('::') && !existingKeys.has(key);
+        });
+        if (!toAdd.length) return;
+        scheduleState.eventsByPersonId[pid] = [...existing, ...toAdd];
+    }
+
+    function revertSavedSessionScheduleInState(event, lookupSessionDate) {
+        if (!event) return;
+        patchSavedClassSessionEventInState(
+            { ...event, date: lookupSessionDate },
+            {
+                date: lookupSessionDate,
+                start: event.start || event.startTime,
+                end: event.end || event.endTime,
+                duration: event.duration
+            }
+        );
+        refreshScheduleActiveView();
     }
 
     function findScheduleEventInState(event, previousKey = '') {
@@ -5185,7 +5585,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     return parts.join(' · ');
                 }).join('\n');
                 const confirmed = typeof uiConfirm === 'function'
-                    ? await uiConfirm(`${result.message || 'Schedule conflicts were detected.'}${lines ? `\n\n${lines}` : ''}\n\nSave anyway?`, 'Schedule conflict')
+                    ? await uiConfirm(`${result.message || 'Schedule conflicts were detected.'}${lines ? `\n\n${lines}` : ''}\n\nSave anyway?`, 'Schedule conflict', {
+                        icon: 'warning',
+                        cancelText: 'Cancel',
+                        confirmText: 'Save anyway',
+                        confirmClass: 'btn-warning btn-md'
+                    })
                     : false;
                 if (confirmed) {
                     return applySavedSessionScheduleUpdate({
@@ -5199,16 +5604,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         mutationToken
                     });
                 }
+                revertSavedSessionScheduleInState(event, sessionLookupDate);
                 return false;
             }
             if (!res.ok || result.status !== 'success') {
-                const message = result.message || 'Unable to update session schedule.';
+                const message = result.message
+                    || (result.code === 'SESSION_DATE_MOVE_BLOCKED' ? 'This session cannot be moved to another date.'
+                        : result.code === 'SESSION_TIME_CHANGE_BLOCKED' ? 'This session time cannot be changed.'
+                            : 'Unable to update session schedule.');
                 if (errorEl) {
                     errorEl.textContent = message;
                     errorEl.classList.remove('d-none');
                 } else if (typeof uiAlert === 'function') {
-                    uiAlert(message, 'Update session');
+                    uiAlert(message, 'Update session', { icon: 'error' });
                 }
+                revertSavedSessionScheduleInState(event, sessionLookupDate);
                 return false;
             }
             if (!isLatestScheduleSessionMutation(sessionId, mutationToken)) {
@@ -5227,6 +5637,8 @@ document.addEventListener('DOMContentLoaded', () => {
             hideScheduleDraftEditOverlay();
             hideScheduleDraftMoveOverlay();
             refreshScheduleActiveView();
+            const person = activeSchedulePerson();
+            if (person?.id) await acknowledgeLocalScheduleMutation(person);
             return true;
         } catch (error) {
             const message = error.message || 'Unable to update session schedule.';
@@ -5234,8 +5646,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorEl.textContent = message;
                 errorEl.classList.remove('d-none');
             } else if (typeof uiAlert === 'function') {
-                uiAlert(message, 'Update session');
+                uiAlert(message, 'Update session', { icon: 'error' });
             }
+            revertSavedSessionScheduleInState(event, sessionLookupDate);
             return false;
         } finally {
             if (loadingShown && typeof window.hideLoading === 'function') window.hideLoading({ force: true });
@@ -5244,6 +5657,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function applyClassSessionStatusUpdate(event, status) {
         if (!canDragCreateSessions || !event || !status) return false;
+        if (!canScheduleSessionChangeStatus(event)) {
+            if (typeof uiAlert === 'function') {
+                uiAlert(formatSessionManagementBlockerMessage(event, 'This session status cannot be changed from Master Schedule.'), 'Session status', { icon: 'warning' });
+            }
+            return false;
+        }
         const previousKey = scheduleSessionSelectionKey(event);
         if (typeof window.showLoading === 'function') window.showLoading('Updating session status...');
         try {
@@ -5264,7 +5683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return false;
             }
             if (!res.ok || result.status !== 'success') {
-                if (typeof uiAlert === 'function') uiAlert(result.message || 'Unable to update session status.', 'Session status');
+                if (typeof uiAlert === 'function') uiAlert(result.message || 'Unable to update session status.', 'Session status', { icon: 'error' });
                 return false;
             }
             const session = result.session || {};
@@ -5273,9 +5692,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!rerenderScheduleSessionBlockFromState(event, { previousKey })) {
                 refreshScheduleActiveView();
             }
+            const person = activeSchedulePerson();
+            if (person?.id) await acknowledgeLocalScheduleMutation(person);
             return true;
         } catch (error) {
-            if (typeof uiAlert === 'function') uiAlert(error.message || 'Unable to update session status.', 'Session status');
+            if (typeof uiAlert === 'function') uiAlert(error.message || 'Unable to update session status.', 'Session status', { icon: 'error' });
             return false;
         } finally {
             if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
@@ -5306,7 +5727,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const result = await res.json();
             if (!res.ok || result.status !== 'success') {
-                if (typeof uiAlert === 'function') uiAlert(result.message || 'Unable to update work session.', 'Work session');
+                if (typeof uiAlert === 'function') uiAlert(result.message || 'Unable to update work session.', 'Work session', { icon: 'error' });
                 return false;
             }
             const entry = result.data?.entry || {};
@@ -5322,9 +5743,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!rerenderScheduleSessionBlockFromState(event, { previousKey })) {
                 refreshScheduleActiveView();
             }
+            const person = activeSchedulePerson();
+            if (person?.id) await acknowledgeLocalScheduleMutation(person);
             return true;
         } catch (error) {
-            if (typeof uiAlert === 'function') uiAlert(error.message || 'Unable to update work session.', 'Work session');
+            if (typeof uiAlert === 'function') uiAlert(error.message || 'Unable to update work session.', 'Work session', { icon: 'error' });
             return false;
         } finally {
             if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
@@ -5398,10 +5821,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const chipStyle = isWorkSessionScheduleEvent(event)
                 ? ''
                 : `style="background:${escapeHtml(item.colorBg)};color:${escapeHtml(item.colorText)};border-color:${escapeHtml(item.colorBorder)};"`;
-            const itemClass = `schedule-session-context-status-item${item.isCurrent ? ' is-current' : ''}${canDragCreateSessions && !item.isCurrent ? ' is-actionable' : ''}`;
+            const statusActionable = canDragCreateSessions && !item.isCurrent && (!isWorkSessionScheduleEvent(event) ? canScheduleSessionChangeStatus(event) : true);
+            const itemClass = `schedule-session-context-status-item${item.isCurrent ? ' is-current' : ''}${statusActionable ? ' is-actionable' : ''}`;
             const currentMark = item.isCurrent ? '<i class="bi bi-check-lg ms-auto text-success" aria-hidden="true"></i>' : '';
             const inner = `<span class="schedule-session-context-status-chip" ${chipStyle}>${escapeHtml(item.label)}</span>${currentMark}`;
-            if (canDragCreateSessions) {
+            if (statusActionable) {
                 return `<button type="button" class="${itemClass}" role="menuitem" ${attrs}>${inner}</button>`;
             }
             return `<div class="${itemClass}" role="menuitem">${inner}</div>`;
@@ -5426,15 +5850,48 @@ document.addEventListener('DOMContentLoaded', () => {
         const isWork = isWorkSessionScheduleEvent(event);
         if (!menu || (!isClass && !isWork)) return;
         scheduleSessionContextEvent = event;
-        renderScheduleSessionContextMenuHeader(event);
-        renderScheduleSessionContextStatusList(event);
-        const quickEdit = isClass && isScheduledClassSessionForQuickEdit(event);
-        document.getElementById('btn_scheduleSessionContextEdit')?.classList.toggle('d-none', !quickEdit);
-        document.getElementById('btn_scheduleSessionContextMove')?.classList.toggle('d-none', !quickEdit);
-        document.getElementById('btn_scheduleSessionContextAttendance')?.classList.toggle('d-none', !isClass);
-        document.getElementById('btn_scheduleSessionContextEnrollment')?.classList.toggle('d-none', !isClass);
-        const manageUrl = buildSessionManagerUrlForEvent(event);
-        document.getElementById('btn_scheduleSessionContextOpenSession')?.classList.toggle('d-none', !manageUrl);
+        const isBulkDeleteContext = isSavedSessionBulkContextMenu(event);
+        const bulkSection = document.getElementById('scheduleSessionContextMenuBulk');
+        const bulkDivider = document.getElementById('scheduleSessionContextMenuBulkDivider');
+        if (isBulkDeleteContext) {
+            const selectedCount = countActiveScheduleSelectedSessions();
+            const header = document.getElementById('scheduleSessionContextMenuHeader');
+            if (header) {
+                header.innerHTML = `<div class="schedule-session-context-menu-title">${escapeHtml(String(selectedCount))} sessions selected</div><div class="schedule-session-context-menu-meta">Delete selected saved sessions</div>`;
+            }
+            bulkSection?.classList.remove('d-none');
+            bulkDivider?.classList.remove('d-none');
+            document.getElementById('btn_scheduleSessionContextEdit')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextMove')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextAttendance')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextEnrollment')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextOpenSession')?.classList.add('d-none');
+            document.querySelectorAll('#scheduleSessionContextMenu .schedule-session-context-menu-divider').forEach((el) => {
+                if (el.id === 'scheduleSessionContextMenuBulkDivider') return;
+                el.classList.add('d-none');
+            });
+            document.querySelector('#scheduleSessionContextMenu .schedule-session-context-menu-section-label')?.classList.add('d-none');
+            document.getElementById('scheduleSessionContextStatusList')?.classList.add('d-none');
+        } else {
+            renderScheduleSessionContextMenuHeader(event);
+            renderScheduleSessionContextStatusList(event);
+            bulkSection?.classList.add('d-none');
+            bulkDivider?.classList.add('d-none');
+            const quickEdit = isClass && isScheduledClassSessionScheduleEditable(event);
+            const canMoveDate = isClass && canScheduleSessionChangeDate(event);
+            document.getElementById('btn_scheduleSessionContextEdit')?.classList.toggle('d-none', !quickEdit);
+            document.getElementById('btn_scheduleSessionContextMove')?.classList.toggle('d-none', !(quickEdit && canMoveDate));
+            document.getElementById('btn_scheduleSessionContextAttendance')?.classList.toggle('d-none', !isClass);
+            document.getElementById('btn_scheduleSessionContextEnrollment')?.classList.toggle('d-none', !isClass);
+            const manageUrl = buildSessionManagerUrlForEvent(event);
+            document.getElementById('btn_scheduleSessionContextOpenSession')?.classList.toggle('d-none', !manageUrl);
+            document.querySelectorAll('#scheduleSessionContextMenu .schedule-session-context-menu-divider').forEach((el) => {
+                if (el.id === 'scheduleSessionContextMenuBulkDivider') return;
+                el.classList.remove('d-none');
+            });
+            document.querySelector('#scheduleSessionContextMenu .schedule-session-context-menu-section-label')?.classList.remove('d-none');
+            document.getElementById('scheduleSessionContextStatusList')?.classList.remove('d-none');
+        }
         const menuWidth = 280;
         const menuHeight = Math.min(window.innerHeight - 16, 420);
         const left = Math.min(mouseEvent.clientX, window.innerWidth - menuWidth - 8);
@@ -5619,6 +6076,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const manageUrl = buildSessionManagerUrlForEvent(event);
             if (manageUrl) window.open(manageUrl, '_blank', 'noopener');
         });
+        document.getElementById('btn_scheduleSessionContextDeleteSelected')?.addEventListener('click', (clickEvent) => {
+            clickEvent.preventDefault();
+            hideScheduleSessionContextMenu();
+            void openScheduleBulkSessionDeleteModal();
+        });
 
         document.getElementById('btn_scheduleSessionContextEdit')?.addEventListener('click', (clickEvent) => {
             clickEvent.preventDefault();
@@ -5750,7 +6212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!id || !canDragCreateSessions) return;
         if (countActiveScheduleSelectedSessions() > 0) {
             if (typeof uiAlert === 'function') {
-                uiAlert('Clear saved session selections before selecting staged sessions.', 'Staged session selection');
+                uiAlert('Clear saved session selections before selecting staged sessions.', 'Staged session selection', { icon: 'info' });
             }
             return;
         }
@@ -5797,11 +6259,201 @@ document.addEventListener('DOMContentLoaded', () => {
         return '0 selected';
     }
 
+    function scheduleSessionPartsFromKey(key) {
+        const parts = String(key || '').split('::');
+        return {
+            classId: parts[0] || '',
+            sessionId: parts[1] || '',
+            sessionDate: parts[2] || ''
+        };
+    }
+
+    function buildSelectedSavedSessionDeletePayload() {
+        const keys = Array.from(getActiveScheduleSelectionSet());
+        if (!keys.length) return null;
+        const classId = activeScheduleSelectedClassId();
+        const sessions = keys.map((key) => {
+            const parts = scheduleSessionPartsFromKey(key);
+            return { sessionId: parts.sessionId, sessionDate: parts.sessionDate };
+        }).filter((row) => row.sessionId);
+        if (!classId || !sessions.length) return null;
+        return { classId, sessions };
+    }
+
     function buildScheduleSelectionChipHtml() {
         const total = countTotalScheduleSelectedSessions();
         const label = formatScheduleSelectionChipLabel();
         const title = total ? 'Clear all selections' : 'No sessions selected';
         return `<button type="button" class="schedule-selected-count-pill ${total ? '' : 'is-empty'}" data-schedule-clear-all-selected title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" ${total ? '' : 'disabled'}><i class="bi bi-check2-square" aria-hidden="true"></i><span data-schedule-selected-count>${escapeHtml(label)}</span></button>`;
+    }
+
+    function renderBulkSessionDeletePreviewHtml(plan) {
+        const deletable = Array.isArray(plan?.deletable) ? plan.deletable : [];
+        const blocked = Array.isArray(plan?.blocked) ? plan.blocked : [];
+        const deletableHtml = deletable.length
+            ? '<div class="small fw-semibold text-uppercase text-muted mb-2">Will be deleted</div>'
+                + '<ul class="list-group list-group-flush mb-3">'
+                + deletable.map((row) => {
+                    const datePart = row.date ? ` <span class="text-muted small">(${escapeHtml(row.date)})</span>` : '';
+                    return `<li class="list-group-item px-0 py-2"><strong>${escapeHtml(row.label || row.sessionId || 'Session')}</strong>${datePart}</li>`;
+                }).join('')
+                + '</ul>'
+            : '<p class="text-muted small mb-3">No selected sessions can be deleted.</p>';
+        const blockedHtml = blocked.length
+            ? '<div class="small fw-semibold text-uppercase text-muted mb-2">Cannot be deleted</div>'
+                + blocked.map((row) => {
+                    const blockers = Array.isArray(row.blockers) ? row.blockers : [];
+                    const blockerList = blockers.map((blocker) => {
+                        const detail = blocker.detail ? ` <span class="text-muted">(${escapeHtml(blocker.detail)})</span>` : '';
+                        return `<li>${escapeHtml(blocker.label || blocker.code || 'Blocked')}${detail}</li>`;
+                    }).join('');
+                    const datePart = row.date ? ` <span class="text-muted small">(${escapeHtml(row.date)})</span>` : '';
+                    return `<div class="border rounded p-3 mb-2 bg-light-subtle"><div class="fw-semibold mb-1">${escapeHtml(row.label || row.sessionId || 'Session')}${datePart}</div><ul class="small mb-0">${blockerList}</ul></div>`;
+                }).join('')
+            : '';
+        const intro = deletable.length
+            ? '<p class="text-danger small mb-3">Deleted sessions cannot be undone.</p>'
+            : '';
+        return intro + deletableHtml + blockedHtml;
+    }
+
+    function removeDeletedSessionsFromSelection(deleted = []) {
+        const person = activeSchedulePerson();
+        if (!person?.id) return;
+        const selectionSet = getActiveScheduleSelectionSet();
+        (Array.isArray(deleted) ? deleted : []).forEach((row) => {
+            const classId = activeScheduleSelectedClassId();
+            const sessionId = String(row?.sessionId || '').trim();
+            const sessionDate = String(row?.date || row?.sessionDate || '').trim();
+            if (!classId || !sessionId) return;
+            selectionSet.delete(`${classId}::${sessionId}::${sessionDate}`);
+        });
+    }
+
+    async function openScheduleBulkSessionDeleteModal(options = {}) {
+        if (!canDeleteClassSessions) return;
+        const payload = options.payload || buildSelectedSavedSessionDeletePayload();
+        if (!payload?.classId || !payload.sessions?.length) {
+            if (typeof uiAlert === 'function') await uiAlert('Select one or more saved class sessions to delete.', 'Delete sessions', { icon: 'info' });
+            return;
+        }
+
+        const modalEl = document.getElementById('scheduleBulkSessionDeleteModal');
+        const bodyEl = document.getElementById('scheduleBulkSessionDeleteModalBody');
+        const confirmBtn = document.getElementById('btn_scheduleBulkSessionDeleteConfirm');
+        if (!modalEl || !bodyEl || !confirmBtn) return;
+
+        bodyEl.innerHTML = '<div class="p-4 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Checking selected sessions...</div>';
+        confirmBtn.classList.add('d-none');
+        confirmBtn.disabled = true;
+        confirmBtn.onclick = null;
+
+        const bsModal = window.bootstrap?.Modal ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+        bsModal?.show();
+
+        let previewPayload = null;
+        let actionStateId = '';
+        try {
+            const res = await fetch(SCHEDULE_BULK_DELETE_SESSIONS_PREVIEW_API, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-AJAX-Request': 'true',
+                    Accept: 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+            previewPayload = await res.json().catch(() => ({}));
+            if (!res.ok || previewPayload.status !== 'success') {
+                throw new Error(previewPayload.message || 'Unable to preview session delete.');
+            }
+            actionStateId = String(previewPayload.actionStateId || '').trim();
+            const plan = previewPayload.data || {};
+            bodyEl.innerHTML = renderBulkSessionDeletePreviewHtml(plan);
+            const deletableCount = Array.isArray(plan.deletable) ? plan.deletable.length : 0;
+            if (deletableCount > 0) {
+                confirmBtn.classList.remove('d-none');
+                confirmBtn.innerHTML = `<i class="bi bi-trash me-1"></i>Delete ${deletableCount} session${deletableCount === 1 ? '' : 's'}`;
+                confirmBtn.disabled = false;
+                confirmBtn.onclick = async () => {
+                    if (!actionStateId) {
+                        if (typeof uiAlert === 'function') await uiAlert('Delete token is missing. Close this dialog and try again.', 'Delete Failed', { icon: 'error' });
+                        return;
+                    }
+                    confirmBtn.disabled = true;
+                    let loadingToken = typeof window.showLoading === 'function'
+                        ? window.showLoading({ title: 'Deleting Sessions', note: 'Removing selected sessions...', operation: 'Delete sessions' })
+                        : null;
+                    try {
+                        const deleteRes = await fetch(SCHEDULE_BULK_DELETE_SESSIONS_API, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-AJAX-Request': 'true',
+                                Accept: 'application/json'
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ ...payload, actionStateId })
+                        });
+                        const deletePayload = await deleteRes.json().catch(() => ({}));
+                        if (!deleteRes.ok || deletePayload.status !== 'success') {
+                            const err = new Error(deletePayload.message || 'Unable to delete selected sessions.');
+                            err.html = /<[^>]+>/.test(String(deletePayload.message || ''));
+                            throw err;
+                        }
+                        const result = deletePayload.data || {};
+                        removeDeletedSessionsFromSelection(result.deleted || []);
+                        const person = activeSchedulePerson();
+                        if (person?.id) {
+                            removeSavedClassSessionsFromState(person.id, payload.classId, result.deleted || []);
+                            await acknowledgeLocalScheduleMutation(person);
+                            refreshScheduleActiveView();
+                        }
+                        bsModal?.hide();
+                        const summaryMessage = String(deletePayload.message || 'Selected sessions deleted.');
+                        const blocked = Array.isArray(result.blocked) ? result.blocked : [];
+                        if (typeof uiAlert === 'function') {
+                            const alertIcon = blocked.length ? 'warning' : 'success';
+                            const alertTitle = blocked.length ? 'Sessions Partially Deleted' : 'Sessions Deleted';
+                            await uiAlert(summaryMessage, alertTitle, { icon: alertIcon });
+                        }
+                        if (blocked.length) {
+                            const blockedPlan = {
+                                deletable: [],
+                                blocked
+                            };
+                            bodyEl.innerHTML = renderBulkSessionDeletePreviewHtml(blockedPlan);
+                            confirmBtn.classList.add('d-none');
+                            confirmBtn.disabled = true;
+                            bsModal?.show();
+                        } else {
+                            refreshScheduleActiveView();
+                        }
+                    } catch (error) {
+                        if (typeof uiAlert === 'function') {
+                            await uiAlert(
+                                error.message || 'Unable to delete selected sessions.',
+                                'Delete Failed',
+                                { icon: 'error', html: error.html === true }
+                            );
+                        }
+                        confirmBtn.disabled = false;
+                    } finally {
+                        if (loadingToken && typeof window.hideLoading === 'function') window.hideLoading(loadingToken);
+                    }
+                };
+            }
+        } catch (error) {
+            bodyEl.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(error.message || 'Unable to preview session delete.')}</div>`;
+        }
+    }
+
+    function isSavedSessionBulkContextMenu(event) {
+        if (!canDeleteClassSessions || !isClassSessionScheduleEvent(event)) return false;
+        if (countActiveScheduleSelectedSessions() < 2) return false;
+        const key = scheduleSessionSelectionKey(event);
+        return Boolean(key && getActiveScheduleSelectionSet().has(key));
     }
 
     function hasScheduleWorkspaceToSave() {
@@ -5862,12 +6514,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveScheduleWorkspace() {
         if (!hasScheduleWorkspaceToSave()) {
-            await uiAlert('Select at least one person and a date range before saving.', 'Save workspace?');
+            await uiAlert('Select at least one person and a date range before saving.', 'Save workspace?', { icon: 'info' });
             return;
         }
         const confirmed = await uiConfirm(
             'This saves your selected people and date range only. Staged sessions, selections, and other unsaved changes are not saved. Continue?',
-            'Save workspace?'
+            'Save workspace?',
+            { icon: 'warning', cancelText: 'Cancel', confirmText: 'Save', confirmClass: 'btn-primary btn-md' }
         );
         if (!confirmed) return;
         try {
@@ -5891,9 +6544,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 Object.assign(initialScheduleViewerPrefs, payload);
             }
             renderSchedulePersonTabs();
-            await uiAlert('Workspace saved.', 'Save workspace');
+            await uiAlert('Workspace saved.', 'Save workspace', { icon: 'success' });
         } catch (error) {
-            await uiAlert(error.message || 'Unable to save workspace.', 'Save workspace');
+            await uiAlert(error.message || 'Unable to save workspace.', 'Save workspace', { icon: 'error' });
         }
     }
 
@@ -5901,7 +6554,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!hasServerSavedWorkspace()) return;
         const confirmed = await uiConfirm(
             'This removes your saved people and date range. The current screen will stay as-is, but the page will not preload them next time. Continue?',
-            'Clear saved workspace?'
+            'Clear saved workspace?',
+            { icon: 'warning', cancelText: 'Cancel', confirmText: 'Clear', confirmClass: 'btn-danger btn-md' }
         );
         if (!confirmed) return;
         try {
@@ -5926,9 +6580,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             markServerWorkspaceSaved(false);
             renderSchedulePersonTabs();
-            await uiAlert('Saved workspace cleared.', 'Clear workspace');
+            await uiAlert('Saved workspace cleared.', 'Clear workspace', { icon: 'success' });
         } catch (error) {
-            await uiAlert(error.message || 'Unable to clear saved workspace.', 'Clear workspace');
+            await uiAlert(error.message || 'Unable to clear saved workspace.', 'Clear workspace', { icon: 'error' });
         }
     }
 
@@ -6140,6 +6794,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.body.classList.contains('is-schedule-draft-resizing')) return true;
         const bulkOverlay = document.getElementById('scheduleDraftBulkEditOverlay');
         if (bulkOverlay && !bulkOverlay.classList.contains('d-none')) return true;
+        if (typeof isScheduleSavedSessionWorkActive === 'function' && isScheduleSavedSessionWorkActive()) return true;
         return false;
     }
 
@@ -6148,6 +6803,36 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleState.remoteUpdateFingerprint = '';
         scheduleState.remoteUpdateModalDismissed = false;
         scheduleState.remoteUpdateModalOpen = false;
+    }
+
+    async function acknowledgeLocalScheduleMutation(person, fingerprintOverride = '') {
+        if (!person?.id) return;
+        const override = String(fingerprintOverride || '').trim();
+        if (override) {
+            scheduleState.scheduleFingerprintByPersonId[person.id] = override;
+            clearRemoteUpdatePending();
+            scheduleState.localMutationGraceUntil = Date.now() + 15000;
+            return;
+        }
+        const range = getScheduleRange();
+        if (!range.startDate || !range.endDate) return;
+        try {
+            const params = buildScheduleVersionQuery(person);
+            const res = await fetch(`/school/schedules/api/person-schedule-version?${params.toString()}`, {
+                headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
+                credentials: 'same-origin'
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') return;
+            const nextFingerprint = String(result.fingerprint || '').trim();
+            if (nextFingerprint) {
+                scheduleState.scheduleFingerprintByPersonId[person.id] = nextFingerprint;
+            }
+            clearRemoteUpdatePending();
+            scheduleState.localMutationGraceUntil = Date.now() + 15000;
+        } catch (error) {
+            console.warn('Schedule fingerprint sync failed', error);
+        }
     }
 
     function markRemoteUpdatePending(nextFingerprint) {
@@ -6177,8 +6862,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const message = 'Schedule data has changed. Refresh to see the latest sessions.';
             const title = 'Schedule update available';
             let result = 'Dismiss';
-            if (typeof showMessageModal === 'function') {
-                result = await showMessageModal({
+            if (typeof window.showMessageModal === 'function') {
+                result = await window.showMessageModal({
                     title,
                     icon: 'warning',
                     message,
@@ -6188,7 +6873,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     ]
                 });
             } else {
-                const confirmed = await uiConfirm(message, title);
+                const confirmed = await uiConfirm(message, title, {
+                    icon: 'warning',
+                    cancelText: 'Dismiss',
+                    confirmText: 'Refresh now',
+                    confirmClass: 'btn-warning btn-md'
+                });
                 result = confirmed ? 'Refresh now' : 'Dismiss';
             }
             if (!scheduleState.remoteUpdatePending) return;
@@ -6208,7 +6898,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hasScheduleLocalWork()) {
             const confirmed = await uiConfirm(
                 'Refreshing will reload the schedule and clear your current selection. Continue?',
-                'Refresh schedule?'
+                'Refresh schedule?',
+                { icon: 'warning', cancelText: 'Cancel', confirmText: 'Refresh', confirmClass: 'btn-warning btn-md' }
             );
             if (!confirmed) return;
         }
@@ -6276,6 +6967,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (nextFingerprint === currentFingerprint) return;
             if (isScheduleDraftWorkActive()) {
+                scheduleState.scheduleFingerprintByPersonId[person.id] = nextFingerprint;
+                return;
+            }
+            if (Number(scheduleState.localMutationGraceUntil || 0) > Date.now()) {
                 scheduleState.scheduleFingerprintByPersonId[person.id] = nextFingerprint;
                 return;
             }
@@ -6727,11 +7422,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const startHour = parseTimelineTimeInputValue(host.querySelector('#scheduleTimelineStartInput')?.value);
         const endHour = parseTimelineTimeInputValue(host.querySelector('#scheduleTimelineEndInput')?.value);
         if (startHour === null || endHour === null) {
-            void uiAlert('Please choose a valid start and end time.', 'Display hours');
+            void uiAlert('Please choose a valid start and end time.', 'Display hours', { icon: 'info' });
             return;
         }
         if (endHour - startHour < 2) {
-            void uiAlert('Display hours must span at least 2 hours.', 'Display hours');
+            void uiAlert('Display hours must span at least 2 hours.', 'Display hours', { icon: 'info' });
             return;
         }
         applyScheduleTimelinePreset(startHour, endHour);
@@ -7366,7 +8061,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openSchedulePrint() {
         const printData = collectSchedulePrintData();
         if (!printData) {
-            uiAlert('Load a schedule for the active person first.', 'Nothing to print');
+            uiAlert('Load a schedule for the active person first.', 'Nothing to print', { icon: 'info' });
             return;
         }
 
@@ -7393,7 +8088,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 : null;
             if (!printWindow) {
-                uiAlert('Allow pop-ups for this site to open the print page.', 'Popup blocked');
+                uiAlert('Allow pop-ups for this site to open the print page.', 'Popup blocked', { icon: 'warning' });
             }
         };
 
@@ -7482,13 +8177,14 @@ document.addEventListener('DOMContentLoaded', () => {
             bindScheduleDragCreate(container, mode);
         }
         setSchedulePrintEnabled(true);
+        if (typeof schedulePersistDraftBackup === 'function') schedulePersistDraftBackup();
     }
 
     async function loadSchedulePerson(person, options = {}) {
         if (!person) return false;
         const silent = options.silent === true;
         const range = getScheduleRange();
-        if (!range.startDate || !range.endDate) { await uiAlert('Please select a start and end date.'); return false; }
+        if (!range.startDate || !range.endDate) { await uiAlert('Please select a start and end date.', 'Load schedule', { icon: 'info' }); return false; }
         const role = person.id === scheduleState.activePersonId ? String(selectedScheduleRole() || person.selectedRole || '').trim() : String(person.selectedRole || '').trim();
         person.selectedRole = role;
         scheduleState.loadingPersonId = person.id;
@@ -7538,7 +8234,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadActiveSchedulePerson() {
         const person = activeSchedulePerson();
-        if (!person) { await uiAlert('Please select a person first.'); return; }
+        if (!person) {
+            await uiAlert('Please select a person first.', 'Load schedule', { icon: 'info' });
+            return;
+        }
+        if (!(await confirmDiscardPendingDraftsIfNeeded('Reload the schedule'))) return;
         await loadSchedulePerson(person);
     }
 
@@ -7575,7 +8275,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const rolePeople = await fetchSchedulePeopleForRole(role);
                 if (!rolePeople.length) {
-                    await uiAlert(`No people were found for the selected ${role} role.`);
+                    await uiAlert(`No people were found for the selected ${role} role.`, 'Load people', { icon: 'info' });
                     return;
                 }
                 scheduleState.persons = [];
@@ -7587,13 +8287,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderSchedulePersonTabs();
                 refreshScheduleActiveView();
             } catch (error) {
-                await uiAlert(error.message || 'Unable to load people for the selected role.', 'Schedule');
+                await uiAlert(error.message || 'Unable to load people for the selected role.', 'Schedule', { icon: 'error' });
                 return;
             } finally {
                 if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
             }
         }
-        if (!scheduleState.persons.length) { await uiAlert('Please select at least one person first.'); return; }
+        if (!scheduleState.persons.length) { await uiAlert('Please select at least one person first.', 'Load schedules', { icon: 'info' }); return; }
         for (const person of scheduleState.persons) {
             // eslint-disable-next-line no-await-in-loop
             await loadSchedulePerson(person);
@@ -8043,7 +8743,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
                 const soloStudentHtml = scheduleSoloStudentHtml(ev);
-        const resizeHandles = canDragCreateSessions && (ev.isDraft || isScheduledClassSessionForQuickEdit(ev))
+        const resizeHandles = canDragCreateSessions && (ev.isDraft || canScheduleSessionChangeTime(ev))
             ? buildScheduleDraftResizeHandlesHtml()
             : '';
         return `
@@ -8347,6 +9047,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const draftInput = event.target.closest('[data-schedule-draft-select]');
         const draftLabel = event.target.closest('.schedule-draft-select');
         if (draftInput || draftLabel) {
+            if (!canDragCreateSessions) return;
             event.preventDefault();
             event.stopPropagation();
             const checkbox = draftInput || draftLabel?.querySelector('[data-schedule-draft-select]');
@@ -8355,26 +9056,37 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleDraftSessionSelection(sessionId);
             return;
         }
+        if (!canSelectAnyPerson) {
+            const savedEvent = resolveScheduleContextEventFromTarget(event.target)
+                || resolveWorkSessionEventFromTarget(event.target);
+            if (!savedEvent) return;
+            const manageUrl = buildSessionManagerUrlForEvent(savedEvent);
+            if (!manageUrl) return;
+            event.preventDefault();
+            event.stopPropagation();
+            window.open(manageUrl, '_blank', 'noopener');
+            return;
+        }
         const input = event.target.closest('[data-schedule-session-select]');
         const label = event.target.closest('.schedule-session-select:not(.schedule-draft-select)');
         const card = event.target.closest('[data-schedule-session-key]');
         const selectedClassId = activeScheduleSelectedClassId();
-        if (!input && !label && !(selectedClassId && card)) return;
+        if (!input && !label && !card) return;
         if (countActiveDraftSelectedSessions() > 0) {
             event.preventDefault();
             event.stopPropagation();
             if (typeof uiAlert === 'function') {
-                uiAlert('Clear staged session selections before selecting saved sessions.', 'Saved session selection');
+                uiAlert('Clear staged session selections before selecting saved sessions.', 'Saved session selection', { icon: 'info' });
             }
             return;
         }
         event.preventDefault();
         event.stopPropagation();
-        const checkbox = input || label?.querySelector('[data-schedule-session-select]');
+        const checkbox = input || label?.querySelector('[data-schedule-session-select]') || card?.querySelector('[data-schedule-session-select]');
         const key = String((checkbox?.getAttribute('data-session-key') || card?.getAttribute('data-schedule-session-key') || '')).trim();
-        if (!key || checkbox?.disabled) return;
         const classId = String(checkbox?.getAttribute('data-session-class-id') || scheduleSessionClassIdFromKey(key)).trim();
         const selectionSet = getActiveScheduleSelectionSet();
+        if (!key || checkbox?.disabled) return;
         if (!selectionSet.has(key) && selectedClassId && selectedClassId !== classId) return;
         const nextChecked = !selectionSet.has(key);
         if (nextChecked) selectionSet.add(key);
@@ -8440,6 +9152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 3. Deep Link / Saved Workspace Auto-Loader ---
     async function initializeScheduleViewer() {
         migrateScheduleAutoChangeDetectorFromLocalStorage();
+        if (typeof restoreScheduleDraftBackup === 'function') restoreScheduleDraftBackup();
 
         const urlParams = new URLSearchParams(window.location.search);
         const prefillId = canSelectAnyPerson ? urlParams.get('personId') : document.getElementById('sch_personId').value;
@@ -8558,6 +9271,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function syncScheduleViewbarStickyTop() {
+        const header = document.getElementById('main-header');
+        if (!header) return;
+        let topPx = Math.max(0, header.getBoundingClientRect().bottom);
+        const notice = document.querySelector('.notice-bar');
+        if (notice && !notice.classList.contains('hidden')) {
+            const noticeBottom = notice.getBoundingClientRect().bottom;
+            if (Number.isFinite(noticeBottom) && noticeBottom > topPx) {
+                topPx = noticeBottom;
+            }
+        }
+        document.documentElement.style.setProperty('--schedule-viewbar-sticky-top', `${topPx.toFixed(2)}px`);
+    }
+
+    function bindScheduleViewbarStickyOffset() {
+        const header = document.getElementById('main-header');
+        if (!header) return;
+        let stickyRaf = 0;
+        const scheduleSync = () => {
+            if (stickyRaf) return;
+            stickyRaf = requestAnimationFrame(() => {
+                stickyRaf = 0;
+                syncScheduleViewbarStickyTop();
+            });
+        };
+        syncScheduleViewbarStickyTop();
+        window.addEventListener('resize', scheduleSync, { passive: true });
+        window.addEventListener('scroll', scheduleSync, { passive: true });
+        header.addEventListener('transitionend', scheduleSync);
+        document.getElementById('headerCompactToggle')?.addEventListener('click', scheduleSync);
+        if (typeof ResizeObserver === 'function') {
+            const observer = new ResizeObserver(scheduleSync);
+            observer.observe(header);
+            const notice = document.querySelector('.notice-bar');
+            if (notice) observer.observe(notice);
+        }
+    }
+
+    bindScheduleViewbarStickyOffset();
+    if (typeof bindScheduleDraftUnloadGuard === 'function') bindScheduleDraftUnloadGuard();
     void initializeScheduleViewer();
 
 });

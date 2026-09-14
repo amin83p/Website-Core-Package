@@ -1,5 +1,4 @@
 const { DEFAULT_SESSION_STATUS_TEMPLATES } = require('../../models/school/sessionStatusModel');
-const schoolRepositories = require('../../repositories/school');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { evaluateSimpleFormula } = requireCoreModule('MVC/utils/simpleFormulaEvaluator');
@@ -50,8 +49,15 @@ function sortStatusRows(a, b) {
   return String(a?.label || a?.code || '').localeCompare(String(b?.label || b?.code || ''));
 }
 
+function getSessionStatusesRepository() {
+  const schoolRepositories = require('../../repositories/school');
+  const repository = schoolRepositories?.sessionStatuses;
+  if (!repository || typeof repository.list !== 'function') return null;
+  return repository;
+}
+
 async function buildStatusBundle(orgId, { includeInactive = false } = {}) {
-  const repository = Object.prototype.hasOwnProperty.call(schoolRepositories, 'sessionStatuses') ? schoolRepositories.sessionStatuses : null;
+  const repository = getSessionStatusesRepository();
   const all = repository && typeof repository.list === 'function'
     ? await repository.list({
       query: {},
@@ -109,7 +115,12 @@ async function ensureOrgDefaultSessionStatuses(orgId, userId = 'SYSTEM') {
   const targetOrgId = toPublicId(orgId) || '';
   if (!targetOrgId) throw new Error('Organization is required.');
 
-  const existing = await schoolRepositories.sessionStatuses.list({
+  const repository = getSessionStatusesRepository();
+  if (!repository) {
+    throw new Error('Session status repository is unavailable.');
+  }
+
+  const existing = await repository.list({
     query: { orgId__eq: targetOrgId },
     scope: { canViewAll: true }
   });
@@ -140,7 +151,7 @@ async function ensureOrgDefaultSessionStatuses(orgId, userId = 'SYSTEM') {
   for (const row of defaults) {
     try {
       // eslint-disable-next-line no-await-in-loop
-      const saved = await schoolRepositories.sessionStatuses.create(row);
+      const saved = await repository.create(row);
       if (saved) created.push(saved);
     } catch (error) {
       const message = String(error?.message || '').toLowerCase();
@@ -152,7 +163,7 @@ async function ensureOrgDefaultSessionStatuses(orgId, userId = 'SYSTEM') {
   if (created.length) {
     return [...orgRows, ...created];
   }
-  return await schoolRepositories.sessionStatuses.list({
+  return await repository.list({
     query: { orgId__eq: targetOrgId },
     scope: { canViewAll: true }
   });

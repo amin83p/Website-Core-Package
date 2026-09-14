@@ -606,6 +606,11 @@ router.post('/assignments/preview-target-rows',
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
   ctrl.previewAssignmentTargetRows);
 
+router.post('/assignments/eligible-students',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
+  ctrl.getAssignmentEligibleStudents);
+
 router.get('/assignments/edit/:id',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
@@ -620,6 +625,11 @@ router.post('/assignments/edit/:id/preview-target-rows',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentBulkActionState),
   ctrl.previewAssignmentTargetRows);
+
+router.post('/assignments/edit/:id/eligible-students',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentBulkActionState),
+  ctrl.getAssignmentEligibleStudents);
 
 router.post('/assignments/edit/:id/generate-target-rows',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),

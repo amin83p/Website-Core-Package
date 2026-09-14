@@ -21,6 +21,7 @@ const {
   resolveListFields,
   DELETE_STRATEGIES
 } = require('../../config/schoolDataMaintenanceCatalog');
+const sessionManagementService = require('./sessionManagementService');
 
 const MAINTENANCE_LIST_SCOPE = Object.freeze({ canViewAll: true });
 const CLASS_SESSION_ID_SEPARATOR = '::';
@@ -194,12 +195,23 @@ async function deleteClassSessionRow(compositeId, orgId, reqUser) {
   const classRow = await schoolDataService.getDataById('classes', parsed.classId, reqUser);
   if (!classRow || !isRowInOrg(classRow, orgId)) throw new Error('Class session not found in active organization.');
   const sessions = await schoolDataService.getClassSessions(parsed.classId, reqUser);
+  const targetSession = (Array.isArray(sessions) ? sessions : []).find((row) => (
+    idsEqual(row?.sessionId || row?.id, parsed.sessionId)
+  ));
+  if (!targetSession) throw new Error('Class session not found.');
+  await sessionManagementService.assertSessionCanDeleteOrThrow({
+    classId: parsed.classId,
+    sessionId: parsed.sessionId,
+    session: targetSession,
+    classData: classRow,
+    allSessions: sessions,
+    reqUser,
+    source: 'data_maintenance',
+    orgId
+  });
   const nextSessions = (Array.isArray(sessions) ? sessions : []).filter((row) => (
     !idsEqual(row?.sessionId || row?.id, parsed.sessionId)
   ));
-  if (nextSessions.length === (Array.isArray(sessions) ? sessions.length : 0)) {
-    throw new Error('Class session not found.');
-  }
   await schoolDataService.saveClassSessions(parsed.classId, nextSessions, reqUser);
   return { removed: 1, classId: parsed.classId, sessionId: parsed.sessionId };
 }

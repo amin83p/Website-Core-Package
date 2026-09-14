@@ -40,6 +40,7 @@ const registrationIntegrityService = require('../../services/school/registration
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const sessionDeletePreparationService = require('../../services/school/sessionDeletePreparationService');
+const sessionManagementService = require('../../services/school/sessionManagementService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
@@ -1272,6 +1273,15 @@ function normalizeDateOnlyValue(value) {
     const parsed = new Date(token);
     if (Number.isNaN(parsed.getTime())) return '';
     return parsed.toISOString().slice(0, 10);
+}
+
+function normalizeClassSessionsForForm(sessions = []) {
+    return (Array.isArray(sessions) ? sessions : []).map((session) => {
+        if (!session || typeof session !== 'object') return session;
+        const normalizedDate = normalizeDateOnlyValue(session.date || session.sessionDate || session.startDate);
+        if (!normalizedDate) return session;
+        return { ...session, date: normalizedDate };
+    });
 }
 
 function isActivePeriodOnDate(row, referenceDate = '', orgToday = '') {
@@ -3063,7 +3073,9 @@ async function showEditForm(req, res) {
     }));
 
     // Data Service handles all file logic now!
-    const sessionsData = await schoolDataService.getClassSessions(req.params.id, req.user);
+    const sessionsData = normalizeClassSessionsForForm(
+        await schoolDataService.getClassSessions(req.params.id, req.user)
+    );
 
     if (classData.instructors) {
         classData.instructors.forEach(inst => {
@@ -3134,7 +3146,9 @@ async function showEditWizardForm(req, res) {
       feeRules: Array.isArray(subject.feeRules) ? subject.feeRules : []
     }));
 
-    const sessionsData = await schoolDataService.getClassSessions(req.params.id, req.user);
+    const sessionsData = normalizeClassSessionsForForm(
+        await schoolDataService.getClassSessions(req.params.id, req.user)
+    );
 
     if (classData.instructors) {
         classData.instructors.forEach(inst => {
@@ -4466,9 +4480,18 @@ async function manageSession(req, res) {
             sessionReportViewerContext.assignmentMap,
             sessionId
         );
+        const reportConductPersonIds = sessionConductService.resolveSessionReportConductPersonIds({
+            assignments: sessionMatchedAssignments,
+            sessionContext
+        });
+        const reportConductRoster = sessionConductService.buildReportConductRoster({
+            personIds: reportConductPersonIds,
+            sessionRoster: session.roster,
+            prefetchedStudents: rosterIdentityData.students
+        });
         const conductPrefillByPersonId = Object.fromEntries(
             sessionConductService.buildConductPrefillMap({
-                roster: session.roster,
+                roster: reportConductRoster,
                 currentSession: sessions.find((row) => idsEqual(row?.sessionId, sessionId)) || session,
                 allSessions: sessions,
                 periodStart: sessionConductReportPeriod.startDate,
@@ -4564,6 +4587,7 @@ async function manageSession(req, res) {
             hasSessionBookCoveringReport: Boolean(sessionBookCoveringSummary?.id),
             sessionBookCoveringSummary,
             conductPrefillByPersonId,
+            reportConductRoster,
             sessionConductReportPeriod,
             sessionStatusMeta: getActiveSessionStatusMeta(sessionStatusMeta),
             selectableSessionStatusMeta: selectableSessionStatusMetaForSession,
@@ -5064,20 +5088,17 @@ async function deleteClassSession(req, res) {
     const sessions = await schoolDataService.getClassSessions(classId, req.user);
     const target = (Array.isArray(sessions) ? sessions : []).find((row) => idsEqual(row?.sessionId || row?.id, sessionId));
     if (!target) throw new Error('Session not found.');
-    schoolDependencyService.assertSessionTimesheetLockAllowsMutationScopes(
-      target,
-      [schoolDependencyService.SESSION_TIMESHEET_LOCK_MUTATION_SCOPE.DELETE],
-      'This session'
-    );
 
-    const preview = await schoolDeletionGuardService.previewDelete({
-      entityKey: 'session', id: sessionId, orgId: classData.orgId, reqUser: req.user, context: { classId }
+    await sessionManagementService.assertSessionCanDeleteOrThrow({
+      classId,
+      sessionId,
+      session: target,
+      classData,
+      allSessions: sessions,
+      reqUser: req.user,
+      source: 'session_manager',
+      orgId: classData.orgId
     });
-    const cascadeCodes = new Set(['REPORT_INSTANCE', 'REPORT_ASSIGNMENT', 'SESSION_CASE']);
-    const protectedBlockers = (preview.blockers || []).filter((row) => !cascadeCodes.has(row.code));
-    if (protectedBlockers.length) {
-      throw new schoolDeletionGuardService.DeleteBlockedError({ ...preview, blockers: protectedBlockers, canDelete: false });
-    }
 
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
     const survivingSessions = sessions.filter((row) => !idsEqual(row?.sessionId || row?.id, sessionId));
@@ -5089,7 +5110,6 @@ async function deleteClassSession(req, res) {
       statusDefinitions: sessionStatusMeta
     });
 
-    const deletedCounts = await deleteSessionDependencies(classId, sessionId, req.user, classData.orgId);
     let sessionsToSave = survivingSessions;
     if (target?.makeup?.isMakeup === true) {
         ({ sessions: sessionsToSave } = makeupSessionAllocationService.removeMakeupSessionFromLedger({
@@ -5103,9 +5123,17 @@ async function deleteClassSession(req, res) {
     await indexService.rebuildIndexesForClass(classId);
     return res.json({
       status: 'success', operation: 'physical-delete', entityType: 'classSession', id: sessionId,
-      deletedCounts: { classSessions: 1, ...deletedCounts }
+      deletedCounts: { classSessions: 1 }
     });
   } catch (error) {
+    if (error?.name === 'SessionOperationBlockedError') {
+      return res.status(Number(error?.statusCode) || 409).json({
+        status: 'error',
+        code: error.code,
+        message: error.message,
+        blockers: error.blockers || []
+      });
+    }
     if (error?.name === 'MakeupAllocationError' || error?.code?.startsWith?.('MAKEUP_')) {
       return res.status(Number(error?.statusCode) || 409).json({
         status: 'error',
@@ -5149,7 +5177,16 @@ async function deleteLinkedMakeupSession(req, res) {
                 statusDefinitions: sessionStatusMeta
             });
 
-            await deleteSessionDependencies(classId, makeupSessionId, req.user, classData.orgId);
+            await sessionManagementService.assertSessionCanDeleteOrThrow({
+                classId,
+                sessionId: makeupSessionId,
+                session: makeupSession,
+                classData,
+                allSessions: sessions,
+                reqUser: req.user,
+                source: 'session_manager',
+                orgId: classData.orgId
+            });
             const { sessions: sessionsToSave } = makeupSessionAllocationService.removeMakeupSessionFromLedger({
                 sessions,
                 classId,
@@ -5226,6 +5263,24 @@ async function uploadSessionFile(req, res) {
 
         const { classData, session } = await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, session, req.user);
+        const canOverrideUpload = await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_CLASSES,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_CLASSES } }
+        );
+        await sessionManagementService.assertSessionOperationAllowed({
+            classId,
+            sessionId,
+            session,
+            classData,
+            reqUser: req.user,
+            source: 'session_manager',
+            operation: sessionManagementService.SESSION_OPERATIONS.UPLOAD_FILE,
+            orgId: classData?.orgId,
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+            canOverride: canOverrideUpload
+        });
 
         const file = schoolFileService.normalizeUploadedFile(req.file, {
             kind,
@@ -5880,17 +5935,82 @@ async function saveSession(req, res) {
         }
         const existingNotes = String(originalSession.notes || '').trim();
         const notesChanged = notes !== undefined && normalizedNotes !== existingNotes;
+        const statusChanged = normalizedStatus !== sessionStatusPolicyService.normalizeStatusCode(originalSession.status || '');
+        const existingRoom = String(originalSession.room || '').trim();
+        const roomChanged = room !== undefined && normalizedRoom !== existingRoom;
+        const sessionManagementBase = {
+            classId,
+            sessionId,
+            session: originalSession,
+            classData,
+            allSessions: sessions,
+            reqUser: req.user,
+            source: 'session_manager',
+            orgId: orgIdForPolicies,
+            orgTimeZone: orgTimeZoneForPolicies,
+            statusMap
+        };
+        if (statusChanged) {
+            await sessionManagementService.assertSessionOperationAllowed({
+                ...sessionManagementBase,
+                operation: sessionManagementService.SESSION_OPERATIONS.CHANGE_STATUS,
+                proposedChanges: { status: normalizedStatus },
+                canOverride
+            });
+        }
+        if (!wasCompletion && willBeCompletion) {
+            await sessionManagementService.assertSessionOperationAllowed({
+                ...sessionManagementBase,
+                operation: sessionManagementService.SESSION_OPERATIONS.MARK_COMPLETE,
+                canOverride
+            });
+        }
+        if (sessionMetadataFieldsPresentInBody(normalizedMetadataBody)) {
+            await sessionManagementService.assertSessionScheduleUpdateAllowed({
+                ...sessionManagementBase,
+                proposedChanges: {
+                    date: normalizedMetadataBody.date,
+                    startTime: normalizedMetadataBody.startTime,
+                    endTime: normalizedMetadataBody.endTime
+                },
+                canOverride
+            });
+        }
+        if (roomChanged) {
+            await sessionManagementService.assertSessionOperationAllowed({
+                ...sessionManagementBase,
+                operation: sessionManagementService.SESSION_OPERATIONS.CHANGE_ROOM,
+                proposedChanges: { room: normalizedRoom },
+                canOverride
+            });
+        }
         if (notesChanged) {
-            await assertCompletedSessionSectionEditable('notes', canOverride);
+            await sessionManagementService.assertSessionOperationAllowed({
+                ...sessionManagementBase,
+                operation: sessionManagementService.SESSION_OPERATIONS.SAVE_NOTES,
+                canOverride
+            });
         }
         if (!shouldSkipInstructionalPayload && skillsCovered !== undefined) {
-            await assertCompletedSessionSectionEditable('curriculum', canOverride);
+            await sessionManagementService.assertSessionOperationAllowed({
+                ...sessionManagementBase,
+                operation: sessionManagementService.SESSION_OPERATIONS.SAVE_CURRICULUM,
+                canOverride
+            });
         }
         if (!shouldSkipInstructionalPayload && req.body?.gradebooks !== undefined) {
-            await assertCompletedSessionSectionEditable('gradebook', canOverride);
+            await sessionManagementService.assertSessionOperationAllowed({
+                ...sessionManagementBase,
+                operation: sessionManagementService.SESSION_OPERATIONS.SAVE_GRADEBOOK,
+                canOverride
+            });
         }
         if (!shouldSkipInstructionalPayload && roster !== undefined) {
-            await assertCompletedSessionSectionEditable('attendance', canOverrideAttendanceEdit);
+            await sessionManagementService.assertSessionOperationAllowed({
+                ...sessionManagementBase,
+                operation: sessionManagementService.SESSION_OPERATIONS.SAVE_ATTENDANCE,
+                canOverride: canOverrideAttendanceEdit
+            });
         }
 
         originalSession.status = normalizedStatus;
@@ -6261,12 +6381,18 @@ async function saveSessionGradebooks(req, res) {
         if (isAdministrativeSessionLock && !canOverride) {
             throw new Error('This session is locked and cannot be edited.');
         }
-        await sessionAttendanceEditAccessService.assertSessionSectionEditable({
-            orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+        await sessionManagementService.assertSessionOperationAllowed({
+            classId,
+            sessionId,
             session: sessions[sessionIndex],
+            classData,
+            allSessions: sessions,
+            reqUser: req.user,
+            source: 'session_manager',
+            operation: sessionManagementService.SESSION_OPERATIONS.SAVE_GRADEBOOK,
+            orgId: classData?.orgId,
             orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
             canOverride,
-            target: 'gradebook',
             statusMap
         });
 
@@ -6404,12 +6530,18 @@ async function saveSessionConduct(req, res) {
         if (isAdministrativeSessionLock && !canOverride) {
             return res.status(403).json({ status: 'error', message: 'This session is locked. Class conduct cannot be changed.' });
         }
-        await sessionAttendanceEditAccessService.assertSessionSectionEditable({
-            orgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+        await sessionManagementService.assertSessionOperationAllowed({
+            classId,
+            sessionId,
             session,
+            classData,
+            allSessions: sessions,
+            reqUser: req.user,
+            source: 'session_manager',
+            operation: sessionManagementService.SESSION_OPERATIONS.SAVE_CONDUCT,
+            orgId: classData?.orgId,
             orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
-            canOverride,
-            target: 'conduct'
+            canOverride
         });
 
         let incomingRoster = req.body?.roster;
@@ -6471,6 +6603,20 @@ async function setSessionLock(req, res) {
             return res.status(404).json({ status: 'error', message: 'Session not found.' });
         }
         assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
+        await sessionManagementService.assertSessionOperationAllowed({
+            classId,
+            sessionId,
+            session: sessions[sessionIndex],
+            classData,
+            allSessions: sessions,
+            reqUser: req.user,
+            source: 'session_manager',
+            operation: locked
+                ? sessionManagementService.SESSION_OPERATIONS.LOCK_SESSION
+                : sessionManagementService.SESSION_OPERATIONS.UNLOCK_SESSION,
+            orgId: classData?.orgId,
+            canOverride
+        });
 
         schoolDependencyService.applySessionAdminLock(sessions[sessionIndex], locked, req.user);
         await schoolDataService.saveClassSessions(classId, sessions, req.user);

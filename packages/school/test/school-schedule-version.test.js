@@ -67,6 +67,20 @@ test('personSchedule wires smart schedule polling without auto-reload on fingerp
   const pollFn = source.match(/async function pollScheduleVersionForActivePerson\(\)\s*\{[\s\S]*?\n    \}/);
   assert.ok(pollFn, 'pollScheduleVersionForActivePerson should be defined');
   assert.doesNotMatch(pollFn[0], /loadSchedulePerson/);
+  assert.match(source, /acknowledgeLocalScheduleMutation/);
+  assert.match(source, /localMutationGraceUntil/);
+  const patchBlock = source.slice(source.indexOf('function patchScheduleEventInState'), source.indexOf('function buildSavedClassSessionStateKey'));
+  assert.doesNotMatch(patchBlock, /remoteUpdatePending\s*=\s*true/);
+});
+
+test('personSchedule uses window.showMessageModal for uiAlert and uiConfirm without native confirm', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const helpersBlock = source.slice(source.indexOf('function inferScheduleAlertIcon'), source.indexOf('const SCHEDULE_DAY_WIDTH_STORAGE_KEY'));
+  assert.match(helpersBlock, /window\.showMessageModal/);
+  assert.match(helpersBlock, /inferScheduleAlertIcon/);
+  assert.match(helpersBlock, /confirmDiscardPendingDraftsIfNeeded/);
+  assert.doesNotMatch(helpersBlock, /\bconfirm\(/);
+  assert.doesNotMatch(source, /addEventListener\('beforeunload'[\s\S]*countAllPendingDraftSessions/);
 });
 
 function buildOverlappingClassSessionEvent(overrides = {}) {

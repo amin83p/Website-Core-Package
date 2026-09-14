@@ -211,15 +211,25 @@ async function resolveClassStudentPersonIds({
 
 async function resolveTargetStudentIds({
   assignment,
+  targetRow = null,
   classData,
   sessions,
   reqUser,
   requestedStudentIds = []
 } = {}) {
   const reportScope = inferAssignmentReportScope(assignment);
-  let referenceDate = String(assignment?.reportDueDate || assignment?.dueDate || assignment?.sessionDate || '').trim();
+  const effectiveRow = targetRow || null;
+  let referenceDate = String(
+    effectiveRow?.reportDueDate
+    || effectiveRow?.dueDate
+    || effectiveRow?.sessionDate
+    || assignment?.reportDueDate
+    || assignment?.dueDate
+    || assignment?.sessionDate
+    || ''
+  ).trim();
   if (!referenceDate && inferAssignmentTargetType(assignment) === 'session') {
-    const sessionId = String(assignment?.sessionId || '').trim();
+    const sessionId = String(effectiveRow?.sessionId || assignment?.sessionId || '').trim();
     if (sessionId) {
       const sessionMatch = (Array.isArray(sessions) ? sessions : [])
         .find((row) => String(row?.sessionId || '').trim() === sessionId);
@@ -231,11 +241,11 @@ async function resolveTargetStudentIds({
     classData,
     sessions,
     reqUser,
-    startDate: normalizeDateOnly(assignment?.reportStartDate) || referenceDate,
-    endDate: normalizeDateOnly(assignment?.reportDueDate) || referenceDate
+    startDate: normalizeDateOnly(effectiveRow?.reportStartDate || assignment?.reportStartDate) || referenceDate,
+    endDate: normalizeDateOnly(effectiveRow?.reportDueDate || assignment?.reportDueDate) || referenceDate
   });
   const classStudentSet = new Set(classStudentIds);
-  const sessionId = String(assignment?.sessionId || '').trim();
+  const sessionId = String(effectiveRow?.sessionId || assignment?.sessionId || '').trim();
   const sessionMatch = sessionId
     ? reportRosterService.findSessionInList(sessions, sessionId)
     : null;
@@ -246,6 +256,7 @@ async function resolveTargetStudentIds({
   } else if (reportScope === 'each_student') {
     targetStudentIds = await reportRosterService.resolveEachStudentTargetPersonIds({
       assignment,
+      targetRow: effectiveRow,
       classData,
       sessions,
       session: sessionMatch,
@@ -253,14 +264,15 @@ async function resolveTargetStudentIds({
       resolveEnrollmentPersonIds: async () => classStudentIds
     });
     if (!targetStudentIds.length) {
-      if (sessionId) throw new Error('No students found on the session roster for this assignment.');
       throw new Error('No students found for this class assignment.');
     }
   } else {
-    const configured = Array.isArray(assignment.targetStudentIds)
-      ? assignment.targetStudentIds.map((id) => String(id || '').trim()).filter(Boolean)
-      : [];
-    targetStudentIds = configured.filter((id) => classStudentSet.has(id));
+    targetStudentIds = await reportRosterService.resolveSelectedStudentTargetPersonIds({
+      assignment,
+      targetRow: effectiveRow,
+      classStudentSet,
+      resolveEnrollmentPersonIds: async () => classStudentIds
+    });
     if (!targetStudentIds.length) throw new Error('No valid selected students are available for this assignment.');
   }
 

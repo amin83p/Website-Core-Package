@@ -22,8 +22,8 @@ const classSessionCapacityService = require('../../services/school/classSessionC
 const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
-const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const scheduleSessionMutationService = require('../../services/school/scheduleSessionMutationService');
+const sessionManagementService = require('../../services/school/sessionManagementService');
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
@@ -1526,6 +1526,15 @@ async function buildEventsForPersonAndRange({
         const classHasInstructor = hasInstructorMatchWithTeacherLink(classDef, normalizedPersonId, teacherPersonMap);
         const sessions = await schoolDataService.getClassSessions(classId, reqUser, accessContext);
         classSessionsById.set(classId, Array.isArray(sessions) ? sessions : []);
+        const managementFlagsBySessionId = await sessionManagementService.buildSessionManagementFlagsForClassSessions({
+            classId,
+            classData: classDef,
+            sessions: Array.isArray(sessions) ? sessions : [],
+            allSessions: Array.isArray(sessions) ? sessions : [],
+            reqUser,
+            source: 'master_schedule',
+            accessContext
+        });
 
         for (const session of sessions || []) {
             const sessionDate = normalizeId(session?.date);
@@ -1614,7 +1623,13 @@ async function buildEventsForPersonAndRange({
                 soloStudentName: resolvedSoloStudentName,
                 singleStudentName: resolvedSoloStudentName,
                 merged: session?.merged && typeof session.merged === 'object' ? { ...session.merged } : null,
-                mergedPartner: session?.mergedPartner && typeof session.mergedPartner === 'object' ? { ...session.mergedPartner } : null
+                mergedPartner: session?.mergedPartner && typeof session.mergedPartner === 'object' ? { ...session.mergedPartner } : null,
+                sessionManagement: managementFlagsBySessionId.get(sessionId) || {
+                    canDelete: true,
+                    canChangeDate: true,
+                    canChangeTime: true,
+                    canChangeStatus: true
+                }
             });
         }
     }
@@ -1665,6 +1680,57 @@ async function buildEventsForPersonAndRange({
     }
 
     return { events, personName, personOrgRoles, allStudents, allTeachers, person };
+}
+
+async function buildPersonScheduleEventsForSessions({
+    personId,
+    startDate,
+    endDate,
+    role = '',
+    sessionRefs = [],
+    reqUser,
+    accessContext = {}
+} = {}) {
+    const activeOrgId = getActiveScheduleOrgId(reqUser);
+    const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId || '', { includeInactive: true });
+    const personResult = await buildEventsForPersonAndRange({
+        personId,
+        startDate,
+        endDate,
+        reqUser,
+        activeOrgId,
+        statusMap,
+        accessContext
+    });
+    const allEvents = filterScheduleEventsForRole(personResult?.events || [], role);
+    const refs = (Array.isArray(sessionRefs) ? sessionRefs : [])
+        .map((row) => ({
+            classId: normalizeId(row?.classId),
+            sessionId: normalizeId(row?.sessionId || row?.id),
+            date: normalizeDateOnly(row?.date || row?.sessionDate)
+        }))
+        .filter((row) => row.classId && row.sessionId);
+    if (!refs.length) {
+        return {
+            events: [],
+            fingerprint: buildScheduleEventsFingerprint(allEvents)
+        };
+    }
+    const events = allEvents.filter((event) => {
+        if (String(event?.eventType || '').trim().toLowerCase() !== 'class_session') return false;
+        const eventClassId = normalizeId(event?.classId);
+        const eventSessionId = normalizeId(event?.sessionId);
+        const eventDate = normalizeDateOnly(event?.date);
+        return refs.some((ref) => {
+            if (!idsEqual(ref.classId, eventClassId) || !idsEqual(ref.sessionId, eventSessionId)) return false;
+            if (ref.date && eventDate && ref.date !== eventDate) return false;
+            return true;
+        });
+    });
+    return {
+        events,
+        fingerprint: buildScheduleEventsFingerprint(allEvents)
+    };
 }
 
 async function showMySchedulePage(req, res) {
@@ -2278,11 +2344,22 @@ async function postCommitStagedSessions(req, res) {
             throw new Error('No staged sessions to save.');
         }
 
-        const conflictResult = await sessionConflictDetectionService.evaluateEnrollmentGapBatchConflicts({
+        const duplicateClassConflicts = await rollingEnrollmentSessionAlignmentService.findDuplicateClassSessionConflicts({
+            classData,
+            sessionsToAdd: pendingStagedSessions,
+            reqUser: req.user
+        });
+        if (duplicateClassConflicts.length) {
+            throw new Error(rollingEnrollmentSessionAlignmentService.buildDuplicateClassDateMessage(duplicateClassConflicts));
+        }
+
+        // Lazy require avoids circular dependency:
+        // scheduleController -> sessionConflictDetectionService -> scheduleController
+        const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
+        const conflictResult = await sessionConflictDetectionService.evaluateMasterScheduleStagedSessionConflicts({
             classData,
             proposedSessions: pendingStagedSessions,
             teacherId: personId,
-            enrollingStudentId: '',
             reqUser: req.user
         });
         if (conflictResult.hasConflicts) {
@@ -2298,6 +2375,36 @@ async function postCommitStagedSessions(req, res) {
             reqUser: req.user
         });
 
+        const createdSessions = Array.isArray(appendResult.createdSessions) ? appendResult.createdSessions : [];
+        const sessionDates = [
+            ...createdSessions.map((row) => normalizeDateOnly(row?.date)).filter(Boolean),
+            ...pendingStagedSessions.map((row) => normalizeDateOnly(row?.date)).filter(Boolean)
+        ];
+        const startDate = normalizeDateOnly(req.body?.startDate)
+            || (sessionDates.length ? sessionDates.reduce((min, date) => (date < min ? date : min)) : '');
+        const endDate = normalizeDateOnly(req.body?.endDate)
+            || (sessionDates.length ? sessionDates.reduce((max, date) => (date > max ? date : max)) : '');
+        const role = normalizeScheduleRole(req.body?.role || '');
+        let commitEvents = [];
+        let fingerprint = '';
+        if (createdSessions.length && startDate && endDate) {
+            const built = await buildPersonScheduleEventsForSessions({
+                personId,
+                startDate,
+                endDate,
+                role,
+                sessionRefs: createdSessions.map((row) => ({
+                    classId,
+                    sessionId: row?.sessionId || row?.id,
+                    date: row?.date
+                })),
+                reqUser: req.user,
+                accessContext
+            });
+            commitEvents = built.events || [];
+            fingerprint = built.fingerprint || '';
+        }
+
         const cycleNote = appendResult.cycleEndDateExtended
             ? ` Cycle end date extended from ${appendResult.previousCycleEndDate || 'not set'} to ${appendResult.newCycleEndDate}.`
             : '';
@@ -2308,7 +2415,9 @@ async function postCommitStagedSessions(req, res) {
                 : 'No new sessions were saved (dates may already exist).',
             data: {
                 createdCount: appendResult.createdCount,
-                createdSessions: appendResult.createdSessions || [],
+                createdSessions,
+                events: commitEvents,
+                fingerprint,
                 cycleEndDateExtended: appendResult.cycleEndDateExtended === true,
                 previousCycleEndDate: appendResult.previousCycleEndDate || '',
                 newCycleEndDate: appendResult.newCycleEndDate || ''
@@ -2319,11 +2428,145 @@ async function postCommitStagedSessions(req, res) {
     }
 }
 
+function parseBulkDeleteSessionsFromBody(body = {}) {
+    const classId = normalizeId(body?.classId);
+    let raw = body?.sessions ?? body?.sessionTargets ?? [];
+    if (typeof raw === 'string') {
+        try {
+            raw = JSON.parse(raw);
+        } catch (_) {
+            raw = [];
+        }
+    }
+    const sessions = (Array.isArray(raw) ? raw : [])
+        .map((row) => ({
+            sessionId: normalizeId(row?.sessionId || row?.id),
+            sessionDate: String(row?.sessionDate || row?.date || '').trim()
+        }))
+        .filter((row) => row.sessionId);
+    return { classId, sessions };
+}
+
+async function postBulkDeleteSessionsPreview(req, res) {
+    try {
+        const { classId, sessions } = parseBulkDeleteSessionsFromBody(req.body);
+        if (!classId) throw new Error('classId is required.');
+        if (!sessions.length) throw new Error('At least one session is required.');
+
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const plan = await sessionManagementService.buildBulkSessionDeletePlan({
+            classId,
+            targets: sessions,
+            reqUser: req.user,
+            source: 'master_schedule',
+            accessContext
+        });
+
+        return res.json({
+            status: 'success',
+            data: plan,
+            actionStateId: req.actionStateId || ''
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Unable to preview bulk session delete.'
+        });
+    }
+}
+
+async function postBulkDeleteSessions(req, res) {
+    try {
+        const { classId, sessions } = parseBulkDeleteSessionsFromBody(req.body);
+        if (!classId) throw new Error('classId is required.');
+        if (!sessions.length) throw new Error('At least one session is required.');
+
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const result = await sessionManagementService.executeBulkSessionDelete({
+            classId,
+            targets: sessions,
+            reqUser: req.user,
+            source: 'master_schedule',
+            accessContext
+        });
+
+        const deletedCount = Number(result?.deletedCount || 0);
+        const blockedCount = Array.isArray(result?.blocked) ? result.blocked.length : 0;
+        const message = deletedCount
+            ? (blockedCount
+                ? `${deletedCount} session(s) deleted. ${blockedCount} session(s) could not be deleted.`
+                : `${deletedCount} session(s) deleted.`)
+            : (blockedCount
+                ? 'No sessions were deleted. All selected sessions are blocked.'
+                : 'No sessions were deleted.');
+
+        return res.json({
+            status: 'success',
+            message,
+            data: result,
+            actionStateId: req.actionStateId || ''
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Unable to delete selected sessions.'
+        });
+    }
+}
+
+async function getSessionManagementPolicy(req, res) {
+    try {
+        const classId = String(req.query?.classId || '').trim();
+        const sessionId = String(req.query?.sessionId || '').trim();
+        const sessionDate = String(req.query?.sessionDate || '').trim();
+        if (!classId || !sessionId) {
+            return res.status(400).json({ status: 'error', message: 'classId and sessionId are required.' });
+        }
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+        if (!classData) {
+            return res.status(404).json({ status: 'error', message: 'Class not found.' });
+        }
+        const sessions = await schoolDataService.getClassSessions(classId, req.user, accessContext);
+        const session = (Array.isArray(sessions) ? sessions : []).find((row) => {
+            if (sessionDate && String(row?.date || '').trim() !== sessionDate) return false;
+            return idsEqual(row?.sessionId || row?.id, sessionId);
+        }) || (Array.isArray(sessions) ? sessions : []).find((row) => idsEqual(row?.sessionId || row?.id, sessionId));
+        if (!session) {
+            return res.status(404).json({ status: 'error', message: 'Session not found.' });
+        }
+        const policy = await sessionManagementService.evaluateSessionManagementPolicy({
+            classId,
+            sessionId,
+            session,
+            classData,
+            allSessions: sessions,
+            reqUser: req.user,
+            source: 'master_schedule',
+            accessContext
+        });
+        return res.json({ status: 'success', policy });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Unable to load session management policy.'
+        });
+    }
+}
+
 async function postUpdateClassSessionSchedule(req, res) {
     try {
         const result = await scheduleSessionMutationService.updateClassSessionSchedule(req.body || {}, req);
         return res.json({ status: 'success', message: 'Session schedule updated.', session: result.session });
     } catch (error) {
+        if (error?.name === 'SessionOperationBlockedError') {
+            return res.status(Number(error?.statusCode) || 409).json({
+                status: 'error',
+                code: error.code,
+                message: error.message,
+                blockers: error.blockers || []
+            });
+        }
         const statusCode = Number(error?.statusCode) || 400;
         return res.status(statusCode).json({
             status: statusCode === 409 ? 'warning' : 'error',
@@ -2339,6 +2582,14 @@ async function postUpdateClassSessionStatus(req, res) {
         const result = await scheduleSessionMutationService.updateClassSessionStatus(req.body || {}, req);
         return res.json({ status: 'success', message: 'Session status updated.', session: result.session });
     } catch (error) {
+        if (error?.name === 'SessionOperationBlockedError') {
+            return res.status(Number(error?.statusCode) || 409).json({
+                status: 'error',
+                code: error.code,
+                message: error.message,
+                blockers: error.blockers || []
+            });
+        }
         const statusCode = Number(error?.statusCode) || 400;
         return res.status(statusCode).json({
             status: 'error',
@@ -2376,6 +2627,9 @@ module.exports = {
     getSessionAttendanceList,
     getSessionEnrollmentList,
     postCommitStagedSessions,
+    postBulkDeleteSessionsPreview,
+    postBulkDeleteSessions,
+    getSessionManagementPolicy,
     postUpdateClassSessionSchedule,
     postUpdateClassSessionStatus,
     postUpdateWorkSessionSchedule,
@@ -2384,6 +2638,7 @@ module.exports = {
     buildScheduleViewerAccess,
     buildSchoolSchedulePersonPickerRows,
     buildEventsForPersonAndRange,
+    buildPersonScheduleEventsForSessions,
     buildScheduleEventsFingerprint,
     filterScheduleEventsForRole,
     summarizeEvents,

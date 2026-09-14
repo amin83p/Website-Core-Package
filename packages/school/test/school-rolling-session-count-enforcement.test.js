@@ -127,6 +127,22 @@ test('computeProposedCycleEndDate keeps current end when sessions are within cyc
   assert.equal(proposed, '2026-03-31');
 });
 
+test('computeProposedCycleEndDate does not extend when added session is earlier than existing latest', () => {
+  const existingSessions = [
+    { date: '2026-09-08', startTime: '10:00', endTime: '12:00' },
+    { date: '2026-12-17', startTime: '09:00', endTime: '10:00' }
+  ];
+  const proposed = alignmentService.computeProposedCycleEndDate({
+    cycleEndDate: '',
+    existingSessions,
+    sessions: [
+      ...existingSessions,
+      { date: '2026-09-08', startTime: '09:00', endTime: '10:00' }
+    ]
+  });
+  assert.equal(proposed, '');
+});
+
 test('resolveDefaultTeacherFromClass uses active instructor when primaryTeacherId is missing', () => {
   const teacher = alignmentService.resolveDefaultTeacherFromClass({
     instructors: [{ personId: 'PERSON_01', name: 'Jane Doe', status: 'active' }]

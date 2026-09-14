@@ -90,11 +90,117 @@ test('areMergeLinkedSessions links source merged metadata to partner session', (
   assert.equal(sessionMergeService.areMergeLinkedSessions(source, 'CLASS-A', { sessionId: 'OTHER' }, 'CLASS-B'), false);
 });
 
-test('normalizeClock normalizes HH:MM for exact-time matching', () => {
+test('normalizeClock normalizes HH:MM for merge time comparison', () => {
   assert.equal(sessionMergeService.normalizeClock('9:05'), '09:05');
   assert.equal(sessionMergeService.normalizeClock('09:05'), '09:05');
   assert.equal(sessionMergeService.normalizeClock('12:30:00'), '12:30');
   assert.equal(sessionMergeService.normalizeClock('invalid'), '');
+});
+
+test('partnerSessionCoversMergingWindow accepts wider partner windows and exact matches', () => {
+  const { partnerSessionCoversMergingWindow } = sessionMergeService;
+  const source = { sourceStart: '09:00', sourceEnd: '10:30' };
+
+  assert.equal(partnerSessionCoversMergingWindow({
+    ...source,
+    partnerStart: '08:30',
+    partnerEnd: '11:00'
+  }), true);
+  assert.equal(partnerSessionCoversMergingWindow({
+    ...source,
+    partnerStart: '09:00',
+    partnerEnd: '10:30'
+  }), true);
+});
+
+test('partnerSessionCoversMergingWindow rejects partial or non-covering partner windows', () => {
+  const { partnerSessionCoversMergingWindow } = sessionMergeService;
+  const source = { sourceStart: '09:00', sourceEnd: '10:30' };
+
+  assert.equal(partnerSessionCoversMergingWindow({
+    ...source,
+    partnerStart: '09:00',
+    partnerEnd: '10:00'
+  }), false);
+  assert.equal(partnerSessionCoversMergingWindow({
+    ...source,
+    partnerStart: '09:30',
+    partnerEnd: '11:00'
+  }), false);
+  assert.equal(partnerSessionCoversMergingWindow({
+    ...source,
+    partnerStart: '08:00',
+    partnerEnd: '10:00'
+  }), false);
+  assert.equal(partnerSessionCoversMergingWindow({
+    ...source,
+    partnerStart: '',
+    partnerEnd: '11:00'
+  }), false);
+});
+
+function buildPartnerCandidate({
+  sessionId = 'PART-1',
+  mainTeacherId = 'TAYLOR-1',
+  startTime = '08:30',
+  endTime = '11:00',
+  sourceStart = '09:00',
+  sourceEnd = '10:30'
+} = {}) {
+  return {
+    classId: 'CLASS-B',
+    session: {
+      sessionId,
+      status: 'scheduled',
+      startTime,
+      endTime,
+      delivery: { deliveredBy: mainTeacherId }
+    },
+    sourceClassId: 'CLASS-A',
+    sourceSessionId: 'SRC-1',
+    sourceStart,
+    sourceEnd,
+    resolvedMergingId: mainTeacherId,
+    teacherIdentityLookup: null,
+    statusMap: null
+  };
+}
+
+test('evaluatePartnerSessionCandidate accepts partner sessions that fully cover the merging window', () => {
+  const wider = sessionMergeService.evaluatePartnerSessionCandidate(buildPartnerCandidate({
+    startTime: '08:30',
+    endTime: '11:00'
+  }));
+  assert.ok(wider);
+  assert.equal(wider.sessionId, 'PART-1');
+
+  const exact = sessionMergeService.evaluatePartnerSessionCandidate(buildPartnerCandidate({
+    startTime: '09:00',
+    endTime: '10:30'
+  }));
+  assert.ok(exact);
+  assert.equal(exact.sessionId, 'PART-1');
+});
+
+test('evaluatePartnerSessionCandidate rejects partner sessions outside the merging window', () => {
+  const scan = { rejectCounts: { timeMismatch: 0 }, partialMatches: [] };
+  const endsEarly = sessionMergeService.evaluatePartnerSessionCandidate({
+    ...buildPartnerCandidate({ startTime: '09:00', endTime: '10:00' }),
+    scan
+  });
+  assert.equal(endsEarly, null);
+  assert.equal(scan.rejectCounts.timeMismatch, 1);
+  assert.equal(scan.partialMatches[0].reason, 'outside_merging_window');
+
+  const startsLate = sessionMergeService.evaluatePartnerSessionCandidate(
+    buildPartnerCandidate({ startTime: '09:30', endTime: '11:00' })
+  );
+  assert.equal(startsLate, null);
+
+  const doesNotReachEnd = sessionMergeService.evaluatePartnerSessionCandidate(
+    buildPartnerCandidate({ startTime: '08:00', endTime: '10:00' })
+  );
+  assert.equal(doesNotReachEnd, null);
 });
 
 test('explainPartnerSessionMergeFailure is available for merge preview diagnostics', () => {

@@ -92,7 +92,7 @@ test('buildSessionDeletePreview blocks delete when linked make-up child sessions
   }
 });
 
-test('buildSessionDeletePreview allows delete when only auto-cascade entities remain', async () => {
+test('buildSessionDeletePreview blocks delete when instructional data is present', async () => {
   const restore = stubSessionDeleteDeps({
     sessions: [{
       sessionId: SESSION_ID,
@@ -116,11 +116,32 @@ test('buildSessionDeletePreview allows delete when only auto-cascade entities re
       sessionId: SESSION_ID,
       reqUser: REQ_USER
     });
-    assert.equal(preview.canDelete, true);
-    assert.equal(preview.blockers.length, 0);
-    assert.ok(preview.autoCascade.some((row) => row.code === 'REPORT_INSTANCE'));
+    assert.equal(preview.canDelete, false);
+    assert.ok(preview.blockers.some((row) => row.code === 'GRADEBOOK_ACTIVITY'));
     assert.ok(preview.autoCascade.some((row) => row.code === 'EMBEDDED_GRADEBOOKS'));
     assert.ok(preview.autoCascade.some((row) => row.code === 'EMBEDDED_ATTENDANCE'));
+    assert.equal(preview.confirmationText, '');
+  } finally {
+    restore();
+  }
+});
+
+test('buildSessionDeletePreview allows delete for clean session without instructional blockers', async () => {
+  const restore = stubSessionDeleteDeps({
+    sessions: [{
+      sessionId: SESSION_ID,
+      date: '2026-03-01',
+      status: 'scheduled'
+    }]
+  });
+  try {
+    const preview = await sessionDeletePreparationService.buildSessionDeletePreview({
+      classId: CLASS_ID,
+      sessionId: SESSION_ID,
+      reqUser: REQ_USER
+    });
+    assert.equal(preview.canDelete, true);
+    assert.equal(preview.blockers.length, 0);
     assert.equal(preview.confirmationText, 'DELETE 2026-03-01 (SESSION/PARENT)');
   } finally {
     restore();

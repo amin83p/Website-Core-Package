@@ -6,9 +6,15 @@ const leaveRequestService = require('./leaveRequestService');
 const activityService = require('./activityService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
-const sessionMergeService = require('./sessionMergeService');
-const scheduleController = require('../../controllers/school/scheduleController');
 const schoolRepositories = require('../../repositories/school');
+
+function resolveSessionMergeService() {
+  return require('./sessionMergeService');
+}
+
+function resolveScheduleController() {
+  return require('../../controllers/school/scheduleController');
+}
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 
@@ -342,6 +348,32 @@ async function appendReportAssignmentConflicts({
   });
 }
 
+function isPersonInstructorOnClass(classRow = {}, personId = '') {
+  const pid = cleanPersonId(personId);
+  if (!pid) return false;
+  const rows = Array.isArray(classRow?.instructors) ? classRow.instructors : [];
+  return rows.some((row) => (
+    idsEqual(row?.personId, pid)
+    && String(row?.status || 'active').trim().toLowerCase() !== 'inactive'
+  ));
+}
+
+function sessionDateInWindow(sessionDate = '', startDate = '', endDate = '') {
+  const date = normalizeDateOnlyValue(sessionDate);
+  const start = normalizeDateOnlyValue(startDate);
+  const end = normalizeDateOnlyValue(endDate);
+  if (!date) return false;
+  if (start && date < start) return false;
+  if (end && date > end) return false;
+  return true;
+}
+
+function filterSessionsForConflictWindow(sessions = [], startDate = '', endDate = '') {
+  const rows = Array.isArray(sessions) ? sessions : [];
+  if (!startDate && !endDate) return rows;
+  return rows.filter((row) => sessionDateInWindow(row?.date, startDate, endDate));
+}
+
 async function detectSessionConflicts({
   classId = '',
   sessions = [],
@@ -349,23 +381,34 @@ async function detectSessionConflicts({
   reqUser,
   fallbackTeacherId = '',
   includeExternalScheduleConflicts = false,
-  externalFocusSessionIds = []
-}) {
+  externalFocusSessionIds = [],
+  instructorPersonId = '',
+  startDate = '',
+  endDate = ''
+} = {}) {
   const parsedSessions = Array.isArray(sessions) ? sessions : [];
   const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true });
   const teacherIdentityLookup = await buildTeacherIdentityLookup({ activeOrgId, reqUser });
+  const scopedInstructorId = cleanPersonId(instructorPersonId || fallbackTeacherId);
   const allClasses = await schoolDataService.fetchAllData('classes', {}, reqUser);
-  const scopedClasses = (Array.isArray(allClasses) ? allClasses : []).filter((row) => {
+  let scopedClasses = (Array.isArray(allClasses) ? allClasses : []).filter((row) => {
     if (!activeOrgId) return true;
     return idsEqual(row?.orgId, activeOrgId);
   });
+  if (scopedInstructorId) {
+    scopedClasses = scopedClasses.filter((row) => isPersonInstructorOnClass(row, scopedInstructorId));
+  }
   const classIdTitleMap = new Map(
     scopedClasses.map((row) => [toPublicId(row?.id), String(row?.title || row?.id || '').trim()])
   );
   const classSessionsBundle = await Promise.all(
     scopedClasses.map(async (row) => ({
       classId: toPublicId(row?.id),
-      sessions: await schoolDataService.getClassSessions(row?.id, reqUser)
+      sessions: filterSessionsForConflictWindow(
+        await schoolDataService.getClassSessions(row?.id, reqUser),
+        startDate,
+        endDate
+      )
     }))
   );
   const classSessionsById = new Map(
@@ -563,7 +606,7 @@ async function detectSessionConflicts({
           const existingFullSession = existingSessionId
             ? existingSessionRows.find((row) => idsEqual(row?.sessionId || row?.id, existingSessionId))
             : null;
-          if (existingFullSession && sessionMergeService.areMergeLinkedSessions(
+          if (existingFullSession && resolveSessionMergeService().areMergeLinkedSessions(
             ses,
             classId,
             existingFullSession,
@@ -604,7 +647,7 @@ async function detectSessionConflicts({
         if (Number.isNaN(otherStart.getTime()) || Number.isNaN(otherEnd.getTime())) continue;
 
         if (newStart < otherEnd && newEnd > otherStart) {
-          if (sessionMergeService.areMergeLinkedSessions(ses, classId, otherSes, classId)) continue;
+          if (resolveSessionMergeService().areMergeLinkedSessions(ses, classId, otherSes, classId)) continue;
           conflicts.push({
             sessionIndex: index,
             date: ses.date,
@@ -703,6 +746,7 @@ async function detectStudentScheduleConflicts({
   const normalizedClassId = toPublicId(classId);
   const conflicts = [];
 
+  const scheduleController = resolveScheduleController();
   for (const entry of entries) {
   // eslint-disable-next-line no-await-in-loop
     const scheduleResult = await scheduleController.buildEventsForPersonAndRange({
@@ -850,6 +894,40 @@ async function evaluateEnrollmentGapBatchConflicts({
   };
 }
 
+async function evaluateMasterScheduleStagedSessionConflicts({
+  classData = {},
+  proposedSessions = [],
+  teacherId = '',
+  reqUser
+} = {}) {
+  const classId = toPublicId(classData?.id);
+  const activeOrgId = String(classData?.orgId || reqUser?.activeOrgId || '').trim();
+  const fallbackTeacherId = cleanPersonId(teacherId);
+  const dates = (Array.isArray(proposedSessions) ? proposedSessions : [])
+    .map((row) => normalizeDateOnlyValue(row?.date))
+    .filter(Boolean);
+  const startDate = dates.length ? dates.reduce((min, date) => (min < date ? min : date)) : '';
+  const endDate = dates.length ? dates.reduce((max, date) => (max > date ? max : date)) : '';
+
+  const teacherConflicts = await detectSessionConflicts({
+    classId,
+    sessions: proposedSessions,
+    activeOrgId,
+    reqUser,
+    fallbackTeacherId,
+    includeExternalScheduleConflicts: true,
+    instructorPersonId: fallbackTeacherId,
+    startDate,
+    endDate
+  });
+
+  return {
+    teacherConflicts,
+    allConflicts: teacherConflicts,
+    hasConflicts: teacherConflicts.length > 0
+  };
+}
+
 function buildConflictBlockingMessage(conflicts = []) {
   if (!Array.isArray(conflicts) || !conflicts.length) return '';
   const lines = conflicts.slice(0, 5).map((c) =>
@@ -978,6 +1056,10 @@ module.exports = {
   detectSessionConflicts,
   detectStudentScheduleConflicts,
   evaluateEnrollmentGapBatchConflicts,
+  evaluateMasterScheduleStagedSessionConflicts,
+  isPersonInstructorOnClass,
+  sessionDateInWindow,
+  filterSessionsForConflictWindow,
   resolveSessionDeliveryPersonIds,
   resolveDeliveryPersonDisplayName,
   buildEnrollmentGapConflictReview,

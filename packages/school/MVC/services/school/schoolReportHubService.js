@@ -21,6 +21,7 @@ const { buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const accessService = requireCoreModule('MVC/services/security');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const sessionManagementService = require('./sessionManagementService');
 
 const PEOPLE_MODULES = Object.freeze([
   {
@@ -1337,19 +1338,30 @@ async function lockWorkspaceSessions(input = {}, req = {}) {
     // eslint-disable-next-line no-await-in-loop
     const sessions = await dataService.getClassSessions(classId, req.user);
     let changed = false;
-    (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    for (const session of (Array.isArray(sessions) ? sessions : [])) {
       const currentSessionId = toPublicId(session?.sessionId || session?.id);
-      if (!sessionIds.has(currentSessionId)) return;
+      if (!sessionIds.has(currentSessionId)) continue;
       if (session.locked === true || String(session.locked) === 'true') {
         summary.alreadyLocked += 1;
-        return;
+        continue;
       }
+      // eslint-disable-next-line no-await-in-loop
+      await sessionManagementService.assertSessionOperationAllowed({
+        classId,
+        sessionId: currentSessionId,
+        session,
+        classData: classRow,
+        allSessions: sessions,
+        reqUser: req.user,
+        source: 'report_hub',
+        operation: sessionManagementService.SESSION_OPERATIONS.LOCK_SESSION
+      });
       session.locked = true;
       session.lockedAt = new Date().toISOString();
       session.lockedBy = toPublicId(req.user?.id);
       summary.locked += 1;
       changed = true;
-    });
+    }
     sessionIds.forEach((sessionId) => {
       const found = (Array.isArray(sessions) ? sessions : []).some((session) => idsEqual(session?.sessionId || session?.id, sessionId));
       if (!found) summary.missing.push({ classId, sessionId });
@@ -1379,7 +1391,35 @@ async function updateWorkspaceSession(input = {}, req = {}) {
   if (index < 0) throw new Error('Session not found.');
 
   const session = sessions[index];
+  const scheduleFieldsPresent = input.date !== undefined || input.startTime !== undefined || input.endTime !== undefined;
+  if (scheduleFieldsPresent) {
+    await sessionManagementService.assertSessionScheduleUpdateAllowed({
+      classId,
+      sessionId,
+      session,
+      classData: classRow,
+      allSessions: sessions,
+      reqUser: req.user,
+      source: 'report_hub',
+      proposedChanges: {
+        date: input.date,
+        startTime: input.startTime,
+        endTime: input.endTime
+      }
+    });
+  }
   if (input.status !== undefined) {
+    await sessionManagementService.assertSessionOperationAllowed({
+      classId,
+      sessionId,
+      session,
+      classData: classRow,
+      allSessions: sessions,
+      reqUser: req.user,
+      source: 'report_hub',
+      operation: sessionManagementService.SESSION_OPERATIONS.CHANGE_STATUS,
+      proposedChanges: { status: input.status }
+    });
     const statusMap = await sessionStatusPolicyService.getStatusMap(classRow?.orgId, { includeInactive: true });
     const normalizedStatus = sessionStatusPolicyService.normalizeStatusCode(input.status);
     if (!normalizedStatus || !statusMap.has(normalizedStatus)) {
@@ -1415,6 +1455,48 @@ async function updateWorkspaceSession(input = {}, req = {}) {
   const nextEnd = normalizeClock(input.endTime, 'endTime') || session.endTime || '';
   if (nextStart && nextEnd && nextStart >= nextEnd) throw new Error('Start time must be before end time.');
 
+  if (input.room !== undefined) {
+    await sessionManagementService.assertSessionOperationAllowed({
+      classId,
+      sessionId,
+      session,
+      classData: classRow,
+      allSessions: sessions,
+      reqUser: req.user,
+      source: 'report_hub',
+      operation: sessionManagementService.SESSION_OPERATIONS.CHANGE_ROOM,
+      proposedChanges: { room: input.room }
+    });
+  }
+  if (input.notes !== undefined) {
+    await sessionManagementService.assertSessionOperationAllowed({
+      classId,
+      sessionId,
+      session,
+      classData: classRow,
+      allSessions: sessions,
+      reqUser: req.user,
+      source: 'report_hub',
+      operation: sessionManagementService.SESSION_OPERATIONS.SAVE_NOTES
+    });
+  }
+  if (input.teacherId !== undefined || input.teacherName !== undefined) {
+    await sessionManagementService.assertSessionOperationAllowed({
+      classId,
+      sessionId,
+      session,
+      classData: classRow,
+      allSessions: sessions,
+      reqUser: req.user,
+      source: 'report_hub',
+      operation: sessionManagementService.SESSION_OPERATIONS.CHANGE_TEACHER,
+      proposedChanges: {
+        teacherId: input.teacherId,
+        teacherName: input.teacherName
+      }
+    });
+  }
+
   session.date = nextDate;
   session.startTime = nextStart;
   session.endTime = nextEnd;
@@ -1424,6 +1506,20 @@ async function updateWorkspaceSession(input = {}, req = {}) {
   if (input.locked !== undefined) {
     const nextLocked = normalizeBooleanInput(input.locked, session.locked === true || String(session.locked) === 'true');
     const wasLocked = session.locked === true || String(session.locked) === 'true';
+    if (nextLocked !== wasLocked) {
+      await sessionManagementService.assertSessionOperationAllowed({
+        classId,
+        sessionId,
+        session,
+        classData: classRow,
+        allSessions: sessions,
+        reqUser: req.user,
+        source: 'report_hub',
+        operation: nextLocked
+          ? sessionManagementService.SESSION_OPERATIONS.LOCK_SESSION
+          : sessionManagementService.SESSION_OPERATIONS.UNLOCK_SESSION
+      });
+    }
     session.locked = nextLocked;
     if (nextLocked && !wasLocked) {
       session.lockedAt = new Date().toISOString();

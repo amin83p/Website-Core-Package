@@ -217,8 +217,6 @@ async function buildSessionRosterReconciliation({
   const cleanSessionId = String(sessionId || '').trim();
   if (!cleanClassId || !cleanSessionId) return [];
 
-  const expectedStudentIds = reportRosterService.resolveSessionRosterPersonIds(sessionRoster);
-  const expectedSet = new Set(expectedStudentIds.map((id) => toPublicId(id)).filter(Boolean));
   const sessionContext = { sessionId: cleanSessionId, sessionDate };
 
   const [reportAssignments, allRows] = await Promise.all([
@@ -244,7 +242,10 @@ async function buildSessionRosterReconciliation({
       sessionId: cleanSessionId,
       sessionDate
     }))
-    .filter((assignment) => reportAssignmentSessionUtils.inferAssignmentReportScope(assignment) === 'each_student');
+    .filter((assignment) => {
+      const scope = reportAssignmentSessionUtils.inferAssignmentReportScope(assignment);
+      return scope === 'each_student' || scope === 'selected_students';
+    });
 
   const reconciliation = [];
 
@@ -271,6 +272,10 @@ async function buildSessionRosterReconciliation({
 
     for (const targetRow of targetRows) {
       const assignmentRowId = String(targetRow?.rowId || '').trim();
+      const rowExpectedStudentIds = reportRosterService.resolveConfiguredTargetStudentIds(assignment, targetRow);
+      const rowExpectedSet = new Set(rowExpectedStudentIds.map((id) => toPublicId(id)).filter(Boolean));
+      if (!rowExpectedStudentIds.length) continue;
+
       const groupInstances = sessionRows.filter((row) => {
         if (!idsEqual(row?.assignmentId, assignmentId)) return false;
         if (assignmentRowId && String(row?.assignmentRowId || '').trim() !== assignmentRowId) return false;
@@ -281,7 +286,7 @@ async function buildSessionRosterReconciliation({
         groupInstances.map((row) => toPublicId(row?.studentId)).filter(Boolean)
       );
       const orphanedInstances = groupInstances
-        .filter((row) => !expectedSet.has(toPublicId(row?.studentId)))
+        .filter((row) => !rowExpectedSet.has(toPublicId(row?.studentId)))
         .map((row) => ({
           instanceId: toPublicId(row?.id),
           studentId: toPublicId(row?.studentId),
@@ -289,7 +294,7 @@ async function buildSessionRosterReconciliation({
         }))
         .filter((row) => Boolean(row.instanceId));
 
-      const missingStudentIds = expectedStudentIds
+      const missingStudentIds = rowExpectedStudentIds
         .map((id) => toPublicId(id))
         .filter((id) => id && !instanceStudentIds.has(id));
 
@@ -299,7 +304,7 @@ async function buildSessionRosterReconciliation({
         assignmentId,
         assignmentRowId,
         templateTitle,
-        expectedCount: expectedStudentIds.length,
+        expectedCount: rowExpectedStudentIds.length,
         missingCount: missingStudentIds.length,
         missingStudentIds,
         orphanedInstances

@@ -2,13 +2,14 @@ const schoolDataService = require('./schoolDataService');
 const schoolDeletionGuardService = require('./schoolDeletionGuardService');
 const makeupSessionAllocationService = require('./makeupSessionAllocationService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const sessionManagementService = require('./sessionManagementService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
-const AUTO_CASCADE_GUARD_CODES = new Set([
-  'REPORT_INSTANCE',
-  'REPORT_ASSIGNMENT',
-  'SESSION_CASE'
+const GUARD_ONLY_BLOCKER_CODES = new Set([
+  'TIMESHEET_LOCKED',
+  'TIMESHEET_APPROVED_REF',
+  'LEAVE_REQUEST'
 ]);
 
 function buildSessionLabel(session = {}, sessionId = '') {
@@ -48,15 +49,6 @@ function summarizeEmbeddedSessionAssets(session = {}) {
   };
 }
 
-function mapGuardBlockerToAutoCascade(blocker = {}) {
-  return {
-    code: String(blocker.code || '').trim(),
-    label: String(blocker.label || blocker.message || blocker.code || 'Related records').trim(),
-    count: Number(blocker.count || 0),
-    samples: Array.isArray(blocker.samples) ? blocker.samples : []
-  };
-}
-
 function buildMakeupChildBlocker(childSessions = [], classId = '') {
   const safeClassId = toPublicId(classId);
   const rows = Array.isArray(childSessions) ? childSessions : [];
@@ -81,6 +73,15 @@ function buildMakeupChildBlocker(childSessions = [], classId = '') {
       };
     }),
     childSessions: rows
+  };
+}
+
+function mapActivityBlockerToPreview(blocker = {}) {
+  return {
+    code: String(blocker.code || '').trim(),
+    label: String(blocker.label || blocker.code || 'Related records').trim(),
+    count: Number(blocker.count || 1),
+    message: `Remove ${String(blocker.label || blocker.code || 'related records').trim()} before deleting this session.`
   };
 }
 
@@ -112,12 +113,25 @@ async function buildSessionDeletePreview({ classId, sessionId, reqUser, orgId = 
   });
 
   const guardBlockers = Array.isArray(guardPreview?.blockers) ? guardPreview.blockers : [];
-  const autoCascadeFromGuard = guardBlockers
-    .filter((row) => AUTO_CASCADE_GUARD_CODES.has(String(row?.code || '').trim()))
-    .map(mapGuardBlockerToAutoCascade);
   const protectedGuardBlockers = guardBlockers.filter((row) => (
-    !AUTO_CASCADE_GUARD_CODES.has(String(row?.code || '').trim())
+    GUARD_ONLY_BLOCKER_CODES.has(String(row?.code || '').trim())
   ));
+
+  const managementPolicy = await sessionManagementService.evaluateSessionManagementPolicy({
+    classId: safeClassId,
+    sessionId: safeSessionId,
+    session,
+    classData: classRow,
+    allSessions: sessions,
+    reqUser,
+    source: 'session_manager',
+    orgId: resolvedOrgId
+  });
+  const deletePermission = managementPolicy.operations?.delete || { allowed: true, blockers: [] };
+  const activityBlockers = (deletePermission.blockers || [])
+    .filter((row) => !GUARD_ONLY_BLOCKER_CODES.has(String(row?.code || '').trim()))
+    .filter((row) => String(row?.code || '').trim() !== 'MAKEUP_CHILD_SESSIONS_EXIST')
+    .map(mapActivityBlockerToPreview);
 
   const childMakeups = makeupSessionAllocationService.findDirectChildMakeupSessions(
     sessions,
@@ -131,8 +145,7 @@ async function buildSessionDeletePreview({ classId, sessionId, reqUser, orgId = 
   const makeupBlocker = buildMakeupChildBlocker(childRows, safeClassId);
 
   const embeddedSummary = summarizeEmbeddedSessionAssets(session);
-  const autoCascade = [
-    ...autoCascadeFromGuard,
+  const informationalCascade = [
     ...(embeddedSummary.gradebookCount > 0 ? [{
       code: 'EMBEDDED_GRADEBOOKS',
       label: 'Session gradebooks',
@@ -162,7 +175,7 @@ async function buildSessionDeletePreview({ classId, sessionId, reqUser, orgId = 
     }] : [])
   ];
 
-  const blockers = [...protectedGuardBlockers];
+  const blockers = [...activityBlockers, ...protectedGuardBlockers];
   if (makeupBlocker) blockers.push(makeupBlocker);
 
   const label = buildSessionLabel(session, safeSessionId);
@@ -184,16 +197,17 @@ async function buildSessionDeletePreview({ classId, sessionId, reqUser, orgId = 
       originalSessionId: embeddedSummary.originalSessionId
     },
     blockers,
-    autoCascade,
+    autoCascade: informationalCascade,
     embeddedSummary,
+    operations: managementPolicy.operations,
+    sessionManagement: managementPolicy.sessionManagement,
     warnings: Array.isArray(guardPreview?.warnings) ? guardPreview.warnings : [],
-    policy: guardPreview?.policy || 'deletable',
+    policy: canDelete ? 'deletable' : 'blocked',
     confirmationText: canDelete ? `DELETE ${label}` : ''
   };
 }
 
 module.exports = {
-  AUTO_CASCADE_GUARD_CODES,
   buildSessionDeletePreview,
   buildSessionLabel,
   summarizeEmbeddedSessionAssets

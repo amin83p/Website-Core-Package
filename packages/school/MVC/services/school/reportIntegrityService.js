@@ -72,6 +72,24 @@ async function resolveClassStudentIds({
   return [...resolvedSet];
 }
 
+function resolveAssignmentDurationFromTargetRows(targetRows = []) {
+  const rows = Array.isArray(targetRows) ? targetRows : [];
+  const startDates = [];
+  const endDates = [];
+  rows.forEach((row) => {
+    const start = normalizeDateOnly(row?.reportStartDate);
+    const end = normalizeDateOnly(row?.reportDueDate || row?.dueDate || row?.sessionDate);
+    if (start) startDates.push(start);
+    if (end) endDates.push(end);
+  });
+  startDates.sort();
+  endDates.sort();
+  return {
+    startDate: startDates[0] || '',
+    endDate: endDates[endDates.length - 1] || ''
+  };
+}
+
 function getTargetDatesForValidation({
   hasSessionTargets = false,
   selectedSessionIds = [],
@@ -616,57 +634,50 @@ const reportIntegrityService = {
       .map((row) => String(row?.reportDueDate || row?.dueDate || row?.sessionDate || '').trim())
       .filter(Boolean))];
 
-    const studentIdsByTargetDate = new Map();
-    for (const targetDate of targetDates) {
-      const sessionTargetRows = effectiveTargetRows.filter((row) => {
-        const rowDate = normalizeDateOnly(row?.reportDueDate || row?.dueDate || row?.sessionDate);
-        return rowDate === targetDate && String(row?.sessionId || '').trim();
-      });
-      if (reportScope === 'each_student' && sessionTargetRows.length) {
-        const rosterSet = new Set();
-        sessionTargetRows.forEach((row) => {
-          const session = reportRosterService.findSessionInList(sessions, row.sessionId);
-          reportRosterService.resolveSessionRosterPersonIds(session).forEach((personId) => rosterSet.add(personId));
+    const studentScoped = reportScope === 'each_student' || reportScope === 'selected_students';
+    const persistedUnionStudentIds = new Set();
+
+    if (studentScoped) {
+      for (let rowIndex = 0; rowIndex < effectiveTargetRows.length; rowIndex += 1) {
+        const targetRow = effectiveTargetRows[rowIndex];
+        const rowStart = normalizeDateOnly(targetRow?.reportStartDate);
+        const rowEnd = normalizeDateOnly(targetRow?.reportDueDate || targetRow?.dueDate || targetRow?.sessionDate);
+        const rowLabel = rowStart && rowEnd ? `${rowStart} to ${rowEnd}` : `row ${rowIndex + 1}`;
+        // eslint-disable-next-line no-await-in-loop
+        const eligible = await resolveClassStudentIds({
+          classData,
+          sessions,
+          reqUser,
+          startDate: rowStart,
+          endDate: rowEnd,
+          referenceDate: rowEnd,
+          strictCanonical: true
         });
-        studentIdsByTargetDate.set(targetDate, rosterSet);
-        continue;
-      }
-      // eslint-disable-next-line no-await-in-loop
-      const studentIds = await resolveClassStudentIds({
-        classData,
-        sessions,
-        reqUser,
-        referenceDate: targetDate,
-        strictCanonical: true
-      });
-      studentIdsByTargetDate.set(targetDate, new Set(studentIds));
-    }
-
-    if (reportScope === 'each_student') {
-      const emptyDates = targetDates.filter((targetDate) => (studentIdsByTargetDate.get(targetDate)?.size || 0) === 0);
-      if (emptyDates.length) {
-        const sessionLinkedDates = emptyDates.filter((targetDate) => effectiveTargetRows.some((row) => {
-          const rowDate = normalizeDateOnly(row?.reportDueDate || row?.dueDate || row?.sessionDate);
-          return rowDate === targetDate && String(row?.sessionId || '').trim();
-        }));
-        if (sessionLinkedDates.length) {
-          throw new Error(`No students on the session roster for ${sessionLinkedDates.join(', ')} for "each student" scope.`);
+        const eligibleSet = new Set(eligible);
+        let rowStudentIds = Array.isArray(targetRow?.targetStudentIds)
+          ? targetRow.targetStudentIds.map((id) => String(id || '').trim()).filter(Boolean)
+          : [];
+        if (!rowStudentIds.length && Array.isArray(selectedTargetStudentIds) && selectedTargetStudentIds.length) {
+          rowStudentIds = selectedTargetStudentIds.map((id) => String(id || '').trim()).filter(Boolean);
         }
-        throw new Error(`No students with active enrollment on ${emptyDates.join(', ')} for "each student" scope.`);
-      }
-    }
-
-    const selectedIds = Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : [];
-    if (reportScope === 'selected_students' && !selectedIds.length) {
-      throw new Error('Select at least one student for "specific students" scope.');
-    }
-    if (reportScope === 'selected_students') {
-      for (const targetDate of targetDates) {
-        const studentSet = studentIdsByTargetDate.get(targetDate) || new Set();
-        const invalidIds = selectedIds.filter((studentId) => !studentSet.has(studentId));
+        if (reportScope === 'each_student' && !rowStudentIds.length) {
+          rowStudentIds = [...eligible];
+        }
+        if (reportScope === 'selected_students' && !rowStudentIds.length) {
+          throw new Error(`Select at least one student for target row (${rowLabel}).`);
+        }
+        const invalidIds = rowStudentIds.filter((studentId) => !eligibleSet.has(studentId));
         if (invalidIds.length) {
-          throw new Error(`One or more selected students are not actively enrolled on ${targetDate}.`);
+          throw new Error(`One or more selected students are not actively enrolled for target row (${rowLabel}).`);
         }
+        rowStudentIds.forEach((studentId) => persistedUnionStudentIds.add(studentId));
+        effectiveTargetRows[rowIndex] = {
+          ...targetRow,
+          targetStudentIds: rowStudentIds
+        };
+      }
+      if (reportScope === 'each_student' && !persistedUnionStudentIds.size) {
+        throw new Error('No students with active enrollment for any target row for "each student" scope.');
       }
     }
 
@@ -687,9 +698,7 @@ const reportIntegrityService = {
       });
     }
 
-    const classStudentIds = [...new Set(
-      targetDates.flatMap((targetDate) => [...(studentIdsByTargetDate.get(targetDate) || new Set())])
-    )];
+    const classStudentIds = studentScoped ? [...persistedUnionStudentIds] : [];
 
     return {
       classData,
@@ -698,7 +707,7 @@ const reportIntegrityService = {
       classStudentIds,
       effectiveDateTargets,
       effectiveTargetRows,
-      persistedTargetStudentIds: reportScope === 'selected_students' ? selectedTargetStudentIds : []
+      persistedTargetStudentIds: studentScoped ? [...persistedUnionStudentIds] : []
     };
   },
 
@@ -825,6 +834,7 @@ const reportIntegrityService = {
     } else if (reportScope === 'each_student') {
       targetStudentIds = await reportRosterService.resolveEachStudentTargetPersonIds({
         assignment,
+        targetRow,
         classData,
         sessions,
         session: sessionMatch,
@@ -832,14 +842,15 @@ const reportIntegrityService = {
         resolveEnrollmentPersonIds: async () => classStudentIds
       });
       if (!targetStudentIds.length) {
-        if (sessionId) throw new Error('No students found on the session roster for this assignment.');
         throw new Error('No students found for this class assignment.');
       }
     } else {
-      const configured = Array.isArray(assignment.targetStudentIds)
-        ? assignment.targetStudentIds.map((id) => String(id || '').trim()).filter(Boolean)
-        : [];
-      targetStudentIds = configured.filter((id) => classStudentSet.has(id));
+      targetStudentIds = await reportRosterService.resolveSelectedStudentTargetPersonIds({
+        assignment,
+        targetRow,
+        classStudentSet,
+        resolveEnrollmentPersonIds: async () => classStudentIds
+      });
       if (!targetStudentIds.length) throw new Error('No valid selected students are available for this assignment.');
     }
 

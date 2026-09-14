@@ -38,6 +38,7 @@ const {
     userCanMarkAttendanceExcused
 } = require('../../services/school/attendanceMatrixAccessService');
 const attendanceAccessService = require('../../services/school/attendanceAccessService');
+const sessionManagementService = require('../../services/school/sessionManagementService');
 const attendanceOperationPolicyService = require('../../services/school/attendanceOperationPolicyService');
 
 function buildAttendanceRouteAccessContext(req) {
@@ -1011,6 +1012,25 @@ async function addAttendanceComment(req, res) {
 
         const session = sessions[sessionIndex];
         await assertAttendanceMatrixSessionEditable(req, classData, session);
+        const canOverrideAttendanceEdit = await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_ATTENDANCES,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
+        );
+        await sessionManagementService.assertSessionOperationAllowed({
+            classId,
+            sessionId,
+            session,
+            classData,
+            allSessions: sessions,
+            reqUser: req.user,
+            source: 'attendance_matrix',
+            operation: sessionManagementService.SESSION_OPERATIONS.SAVE_ATTENDANCE,
+            orgId: classData?.orgId,
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+            canOverride: canOverrideAttendanceEdit
+        });
         await assertAttendanceEnrollmentWindow({
             classData,
             session,
@@ -1177,6 +1197,25 @@ async function updateAttendanceRosterCell(req, res) {
 
         const session = sessions[sessionIndex];
         await assertAttendanceMatrixSessionEditable(req, classData, session);
+        const canOverrideAttendanceEdit = await adminAuthorityService.isAdminForRequestAsync(
+            req.user,
+            SECTIONS.SCHOOL_ATTENDANCES,
+            OPERATIONS.UPDATE,
+            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
+        );
+        await sessionManagementService.assertSessionOperationAllowed({
+            classId,
+            sessionId,
+            session,
+            classData,
+            allSessions: sessions,
+            reqUser: req.user,
+            source: 'attendance_matrix',
+            operation: sessionManagementService.SESSION_OPERATIONS.SAVE_ATTENDANCE,
+            orgId: classData?.orgId,
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+            canOverride: canOverrideAttendanceEdit
+        });
         await assertAttendanceEnrollmentWindow({
             classData,
             session,

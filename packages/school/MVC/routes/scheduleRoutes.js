@@ -65,6 +65,20 @@ router.post('/api/commit-staged-sessions',
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   ctrl.postCommitStagedSessions);
+router.get('/api/session-management-policy',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getSessionManagementPolicy);
+router.post('/api/bulk-delete-sessions/preview',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: false, keepActive: true }),
+  ctrl.postBulkDeleteSessionsPreview);
+router.post('/api/bulk-delete-sessions',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
+  ctrl.postBulkDeleteSessions);
 router.post('/api/update-class-session-schedule',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),

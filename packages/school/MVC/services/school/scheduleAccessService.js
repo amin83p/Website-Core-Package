@@ -184,6 +184,12 @@ async function buildScheduleCapabilities(reqUser = {}, options = {}) {
     OPERATIONS.READ_ALL,
     orgContext
   ));
+  const canDeleteClassSessions = Boolean(adminAuthorityService.isAdminForRequest(
+    reqUser,
+    SECTIONS.SCHOOL_SESSIONS,
+    OPERATIONS.DELETE,
+    orgContext
+  ));
 
   const canRead = Boolean(readEval?.allowed);
   const canReadAll = Boolean(readAllEval?.allowed);
@@ -215,6 +221,7 @@ async function buildScheduleCapabilities(reqUser = {}, options = {}) {
     canUseGlobalComparison,
     canDragCreateSessions,
     canLoadAllSchedules,
+    canDeleteClassSessions,
     activeOrgId,
     ...locked
   };
@@ -285,7 +292,8 @@ function toViewerScheduleAccess(capabilities = {}) {
     scopeMode: capabilities.scopeMode || '',
     canDragCreateSessions: capabilities.canDragCreateSessions === true,
     canLoadAllSchedules: capabilities.canLoadAllSchedules === true,
-    canUseGlobalComparison: capabilities.canUseGlobalComparison === true
+    canUseGlobalComparison: capabilities.canUseGlobalComparison === true,
+    canDeleteClassSessions: capabilities.canDeleteClassSessions === true
   };
 }
 

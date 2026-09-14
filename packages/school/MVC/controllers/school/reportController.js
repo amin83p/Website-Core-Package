@@ -13,6 +13,7 @@ const reportPdfRenderService = require('../../services/school/reportPdfRenderSer
 const reportIntegrityService = require('../../services/school/reportIntegrityService');
 const reportViewService = require('../../services/school/reportViewService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
+const reportAssignmentStudentEligibilityService = require('../../services/school/reportAssignmentStudentEligibilityService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
@@ -846,6 +847,43 @@ async function previewAssignmentTargetRows(req, res) {
       excludeAssignmentId
     });
     return res.json({ status: 'success', ...payload });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function getAssignmentEligibleStudents(req, res) {
+  try {
+    const classId = String(req.body?.classId || '').trim();
+    if (!classId) throw new Error('Class is required.');
+
+    const classData = await schoolDataService.getDataById('classes', classId, req.user);
+    if (!classData) throw new Error('Class not found or inaccessible.');
+
+    const sessions = await schoolDataService.getClassSessions(classId, req.user);
+    const targetRows = reportViewService.parseTargetRowsField(req.body?.targetRowsJson || req.body?.targetRows);
+    const targetSessionIds = [...new Set(
+      (Array.isArray(targetRows) ? targetRows : [])
+        .map((row) => toPublicId(row?.sessionId))
+        .filter(Boolean)
+    )];
+    const duration = reportAssignmentStudentEligibilityService.resolveAssignmentDurationFromTargetRows(targetRows);
+    const startDate = reportViewService.parseDateOnlyValue(req.body?.startDate) || duration.startDate;
+    const endDate = reportViewService.parseDateOnlyValue(req.body?.endDate) || duration.endDate;
+    const personMap = await reportViewService.buildPersonNameMap(req.user);
+
+    const students = await reportAssignmentStudentEligibilityService.resolveEligibleStudentsForAssignment({
+      classData,
+      sessions,
+      reqUser: req.user,
+      startDate,
+      endDate,
+      targetSessionIds,
+      targetRows,
+      personMap
+    });
+
+    return res.json({ status: 'success', students });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
   }
@@ -2466,6 +2504,7 @@ module.exports = {
   showAssignmentForm,
   generateAssignmentTargetRows,
   previewAssignmentTargetRows,
+  getAssignmentEligibleStudents,
   saveAssignment,
   deleteAssignment,
   getAssignmentDeletePreview,

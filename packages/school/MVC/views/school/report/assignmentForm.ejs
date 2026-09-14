@@ -103,16 +103,6 @@
             <div class="form-text" id="reportScopeHelp">Select a template to see its approved report scopes.</div>
           </div>
 
-          <div class="col-md-8" id="specificStudentsSection">
-            <label class="form-label fw-bold">Specific Students</label>
-            <div class="input-group">
-              <input type="text" class="form-control bg-white" id="targetStudentSummaryInput" placeholder="No students selected" readonly>
-              <button type="button" class="btn btn-outline-primary" id="btnOpenStudentPicker"><i class="bi bi-people"></i></button>
-            </div>
-            <div id="selectedStudentsContainer" class="d-flex flex-wrap gap-1 mt-2"></div>
-            <div id="scopeStudentHint" class="small text-muted mt-1">For "each student" scope, all active class students are used automatically.</div>
-          </div>
-
           <div class="col-md-4">
             <label class="form-label fw-bold">Assignment Notes</label>
             <input type="text" class="form-control" name="notes" maxlength="1500" value="<%= assignment?.notes || '' %>" placeholder="Optional assignment notes">
@@ -148,6 +138,7 @@
                 <th>Teacher</th>
                 <th>Task Time</th>
                 <th>Timesheet</th>
+                <th>Students</th>
                 <th>Status</th>
                 <th class="text-end">Actions</th>
               </tr>
@@ -269,6 +260,15 @@
             <input type="number" class="form-control" id="rowModalAllocatedHours" min="0.25" max="24" step="0.25" placeholder="e.g. 1.5">
           </div>
 
+          <div class="col-12 d-none" id="rowModalStudentsSection">
+            <label class="form-label fw-bold">Students</label>
+            <div class="input-group">
+              <input type="text" class="form-control bg-white" id="rowModalStudentSummary" placeholder="No students selected" readonly>
+              <button type="button" class="btn btn-outline-primary" id="btnOpenRowStudentPicker"><i class="bi bi-people me-1"></i>Pick Students</button>
+            </div>
+            <div class="form-text" id="rowModalStudentHint">Pick students with valid enrollment for this row's report period.</div>
+          </div>
+
           <div class="col-12">
             <label class="form-label fw-bold">Row Notes</label>
             <textarea class="form-control" id="rowModalNotes" rows="2" maxlength="1500"></textarea>
@@ -278,6 +278,43 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-primary" id="btnSaveTargetRow">Save Row</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="rowStudentPickerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Pick Students</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="rowStudentPickerSelectAll" checked>
+            <label class="form-check-label small" for="rowStudentPickerSelectAll">Select all</label>
+          </div>
+          <span class="small text-muted" id="rowStudentPickerSummary"></span>
+        </div>
+        <div class="table-responsive border rounded" style="max-height: 360px; overflow-y: auto;">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 2rem;"></th>
+                <th>Student</th>
+                <th class="text-end" style="width: 8rem;">Eligible Sessions</th>
+              </tr>
+            </thead>
+            <tbody id="rowStudentPickerBody"></tbody>
+          </table>
+        </div>
+        <div id="rowStudentPickerEmpty" class="small text-muted mt-2 d-none">No enrollment-eligible students were found for this row.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmRowStudentPicker">Apply Selection</button>
       </div>
     </div>
   </div>
@@ -439,10 +476,11 @@
     const targetStudentIdsInput = document.getElementById('targetStudentIdsJson');
     const reportScopeInput = document.getElementById('reportScopeInput');
     const reportScopeHelp = document.getElementById('reportScopeHelp');
-    const targetStudentSummaryInput = document.getElementById('targetStudentSummaryInput');
-    const selectedStudentsContainer = document.getElementById('selectedStudentsContainer');
-    const specificStudentsSection = document.getElementById('specificStudentsSection');
-    const scopeStudentHint = document.getElementById('scopeStudentHint');
+    const rowModalStudentsSection = document.getElementById('rowModalStudentsSection');
+    const rowModalStudentSummary = document.getElementById('rowModalStudentSummary');
+    const rowModalStudentHint = document.getElementById('rowModalStudentHint');
+    const rowStudentPickerModalEl = document.getElementById('rowStudentPickerModal');
+    const rowStudentPickerBody = document.getElementById('rowStudentPickerBody');
     const targetRowsBody = document.getElementById('targetRowsBody');
     const targetRowsEmpty = document.getElementById('targetRowsEmpty');
     const formEl = document.getElementById('assignmentForm');
@@ -472,7 +510,7 @@
     };
 
     const allSessions = <%- JSON.stringify(sessions || []) %>;
-    const allStudents = <%- JSON.stringify(studentOptions || []) %>;
+    let allStudents = <%- JSON.stringify(studentOptions || []) %>;
     const teacherOptions = <%- JSON.stringify(teacherOptions || []) %>;
     const classFirstSessionDate = <%- JSON.stringify(classFirstSessionDate) %>;
     const classLastSessionDate = <%- JSON.stringify(classLastSessionDate) %>;
@@ -486,8 +524,11 @@
     const firstTeacherId = <%- JSON.stringify(firstTeacherId) %>;
     const isEditAssignment = <%= isEdit ? 'true' : 'false' %>;
     const assignmentId = <%- JSON.stringify(assignment?.id || '') %>;
-    let selectedTargetStudentIds = Array.isArray(<%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %>) ? <%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %> : [];
     let targetRows = Array.isArray(<%- JSON.stringify(initialTargetRows) %>) ? <%- JSON.stringify(initialTargetRows) %> : [];
+    let rowModalStudentIds = [];
+    let rowPickerEligibleStudents = [];
+    let rowPickerSelectedIds = [];
+    let isLoadingRowPickerStudents = false;
 
     function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
       if (typeof hideLoading === 'function') hideLoading();
@@ -628,8 +669,37 @@
         teacherId,
         teacherName: String(row.teacherName || getTeacherName(teacherId)).trim(),
         status: String(row.status || 'active').trim().toLowerCase(),
-        notes: String(row.notes || '').trim()
+        notes: String(row.notes || '').trim(),
+        targetStudentIds: uniq(Array.isArray(row.targetStudentIds) ? row.targetStudentIds : [])
       };
+    }
+
+    function isStudentScopedReport() {
+      const scope = getCurrentReportScope();
+      return scope === 'each_student' || scope === 'selected_students';
+    }
+
+    function collectUnionStudentIdsFromRows(rows = targetRows) {
+      const union = new Set();
+      (Array.isArray(rows) ? rows : []).forEach((row) => {
+        uniq(row?.targetStudentIds || []).forEach((id) => union.add(id));
+      });
+      return [...union];
+    }
+
+    function getStudentName(studentId) {
+      const id = String(studentId || '').trim();
+      const student = (allStudents || []).find((row) => String(row?.id || '') === id);
+      return String(student?.name || id).trim();
+    }
+
+    function renderRowModalStudentSummary() {
+      if (!rowModalStudentSummary) return;
+      const ids = uniq(rowModalStudentIds);
+      rowModalStudentIds = ids;
+      rowModalStudentSummary.value = ids.length
+        ? `${ids.length} student${ids.length === 1 ? '' : 's'} selected`
+        : 'No students selected';
     }
 
     function updateHiddenFields() {
@@ -639,7 +709,7 @@
       const selectedDateTargets = uniq(targetRows.map((row) => row.dueDate || row.sessionDate).filter(Boolean));
       sessionIdsInput.value = JSON.stringify(selectedSessionIds);
       dateTargetsInput.value = JSON.stringify(selectedDateTargets);
-      targetStudentIdsInput.value = JSON.stringify(uniq(selectedTargetStudentIds));
+      targetStudentIdsInput.value = JSON.stringify(collectUnionStudentIdsFromRows());
       targetRowsInput.value = JSON.stringify(targetRows);
       document.getElementById('legacyReportStartDateInput').value = activeRow.reportStartDate || '';
       document.getElementById('legacyReportDueDateInput').value = activeRow.reportDueDate || '';
@@ -650,6 +720,118 @@
       document.getElementById('legacyConductRequiredBeforeFillInput').value = activeRow.conductRequiredBeforeFill ? 'true' : 'false';
       document.getElementById('legacyAllocatedHoursInput').value = activeRow.allocatedHours || 0;
       document.getElementById('legacyStatusInput').value = activeRow.status || 'active';
+    }
+
+    function getCurrentReportScope() {
+      return String(reportScopeInput?.value || '').trim().toLowerCase();
+    }
+
+    function buildRowDraftFromModal() {
+      const targetType = String(modalFields.targetType.value || 'session') === 'date' ? 'date' : 'session';
+      const session = targetType === 'session' ? getSessionById(modalFields.sessionId.value) : null;
+      return {
+        rowId: modalFields.rowId.value,
+        targetType,
+        sessionId: targetType === 'session' ? modalFields.sessionId.value : '',
+        sessionDate: targetType === 'session' ? (modalFields.sessionDate.value || session?.date || '') : '',
+        dueDate: targetType === 'date' ? modalFields.dueDate.value : '',
+        reportStartDate: modalFields.reportStartDate.value,
+        reportDueDate: modalFields.reportDueDate.value,
+        targetStudentIds: [...rowModalStudentIds]
+      };
+    }
+
+    function getRowStudentPickerModalInstance() {
+      if (!rowStudentPickerModalEl || !window.bootstrap?.Modal) return null;
+      if (typeof window.bootstrap.Modal.getOrCreateInstance === 'function') {
+        return window.bootstrap.Modal.getOrCreateInstance(rowStudentPickerModalEl);
+      }
+      return new window.bootstrap.Modal(rowStudentPickerModalEl);
+    }
+
+    function showRowStudentPickerModal() {
+      const modalInstance = getRowStudentPickerModalInstance();
+      if (modalInstance) modalInstance.show();
+    }
+
+    function hideRowStudentPickerModal() {
+      const modalInstance = getRowStudentPickerModalInstance();
+      if (modalInstance) modalInstance.hide();
+    }
+
+    function renderRowStudentPicker() {
+      const rows = Array.isArray(rowPickerEligibleStudents) ? rowPickerEligibleStudents : [];
+      const emptyEl = document.getElementById('rowStudentPickerEmpty');
+      const selectAll = document.getElementById('rowStudentPickerSelectAll');
+      const summary = document.getElementById('rowStudentPickerSummary');
+      const selectedSet = new Set(rowPickerSelectedIds);
+      if (!rows.length) {
+        if (rowStudentPickerBody) rowStudentPickerBody.innerHTML = '';
+        emptyEl?.classList.remove('d-none');
+        if (summary) summary.textContent = '';
+        if (selectAll) selectAll.checked = false;
+        return;
+      }
+      emptyEl?.classList.add('d-none');
+      if (rowStudentPickerBody) {
+        rowStudentPickerBody.innerHTML = rows.map((student) => {
+          const id = String(student?.id || student?.personId || '').trim();
+          const name = String(student?.name || id).trim();
+          const count = Number(student?.eligibleSessionCount || 0);
+          const checked = selectedSet.has(id);
+          return `<tr>
+            <td><input type="checkbox" class="form-check-input js-row-student-picker-check" data-student-id="${escapeHtml(id)}" ${checked ? 'checked' : ''}></td>
+            <td>${escapeHtml(name)}</td>
+            <td class="text-end">${count}</td>
+          </tr>`;
+        }).join('');
+      }
+      const selectedCount = rows.filter((student) => selectedSet.has(String(student?.id || student?.personId || '').trim())).length;
+      if (summary) summary.textContent = `${selectedCount} of ${rows.length} selected`;
+      if (selectAll) selectAll.checked = selectedCount === rows.length && rows.length > 0;
+    }
+
+    async function fetchEligibleStudentsForRowDraft(rowDraft, options = {}) {
+      const { autoSelectAll = false } = options;
+      const classId = String(classIdInput?.value || '').trim();
+      if (!classId) throw new Error('Select a class first.');
+      const startDate = toDateOnly(rowDraft?.reportStartDate);
+      const endDate = toDateOnly(rowDraft?.reportDueDate);
+      if (!startDate || !endDate) throw new Error('Set report start and due dates first.');
+      const response = await fetch(getBulkApiUrl('eligible-students'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({
+          classId,
+          startDate,
+          endDate,
+          targetRows: [normalizeTargetRow(rowDraft)]
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.status === 'error') {
+        throw new Error(payload?.message || 'Unable to load eligible students.');
+      }
+      rowPickerEligibleStudents = Array.isArray(payload.students) ? payload.students : [];
+      allStudents = rowPickerEligibleStudents.map((student) => ({
+        id: String(student?.id || student?.personId || '').trim(),
+        name: String(student?.name || '').trim(),
+        eligibleSessionCount: Number(student?.eligibleSessionCount || 0)
+      })).filter((student) => Boolean(student.id));
+      const eligibleIds = allStudents.map((student) => student.id);
+      const previousSelection = new Set(rowPickerSelectedIds);
+      if (autoSelectAll || !rowPickerSelectedIds.length) {
+        rowPickerSelectedIds = [...eligibleIds];
+      } else {
+        rowPickerSelectedIds = eligibleIds.filter((id) => previousSelection.has(id));
+      }
+      renderRowStudentPicker();
+      return rowPickerEligibleStudents;
     }
 
     function renderTargetRows() {
@@ -668,6 +850,10 @@
         const periodLabel = `${row.reportStartDate || '-'} to ${row.reportDueDate || '-'}`;
         const taskLabel = row.taskStartTime && row.taskEndTime ? `${row.taskStartTime} - ${row.taskEndTime}` : '-';
         const timesheetLabel = row.timesheetReflection ? `${row.allocatedHours || '-'} hr` : 'No';
+        const studentCount = Array.isArray(row.targetStudentIds) ? row.targetStudentIds.length : 0;
+        const studentsLabel = isStudentScopedReport()
+          ? (studentCount ? `${studentCount} student${studentCount === 1 ? '' : 's'}` : 'None')
+          : '-';
         return `
           <tr data-target-row-index="${index}">
             <td>${escapeHtml(targetLabel)}</td>
@@ -675,6 +861,7 @@
             <td>${escapeHtml(row.teacherName || row.teacherId || '-')}</td>
             <td>${escapeHtml(taskLabel)}</td>
             <td>${escapeHtml(timesheetLabel)}</td>
+            <td>${escapeHtml(studentsLabel)}</td>
             <td><span class="badge ${row.status === 'active' ? 'bg-success' : 'bg-secondary'}">${escapeHtml(row.status || '-')}</span></td>
             <td class="table-actions pe-4">
               <div class="row-actions-wrap">
@@ -701,6 +888,18 @@
       document.getElementById('rowModalSessionSection')?.classList.toggle('d-none', targetType !== 'session');
       document.getElementById('rowModalDateSection')?.classList.toggle('d-none', targetType !== 'date');
       updateTeacherWarning();
+      syncRowModalStudentSection();
+    }
+
+    function syncRowModalStudentSection() {
+      const show = isStudentScopedReport();
+      rowModalStudentsSection?.classList.toggle('d-none', !show);
+      if (rowModalStudentHint) {
+        const scope = getCurrentReportScope();
+        rowModalStudentHint.textContent = scope === 'each_student'
+          ? 'All enrollment-eligible students for this row are selected by default. Uncheck any you want to exclude.'
+          : 'Pick one or more students enrolled for this row\'s report period.';
+      }
     }
 
     function updateTeacherWarning() {
@@ -730,6 +929,8 @@
       modalFields.allocatedHours.value = normalized.allocatedHours || '';
       modalFields.status.value = normalized.status || 'active';
       modalFields.notes.value = normalized.notes || '';
+      rowModalStudentIds = uniq(normalized.targetStudentIds || []);
+      renderRowModalStudentSummary();
       setModalTargetMode();
       showTargetRowModal();
     }
@@ -754,7 +955,8 @@
         conductRequiredBeforeFill: modalFields.conductRequiredBeforeFill.checked,
         allocatedHours: modalFields.allocatedHours.value,
         status: modalFields.status.value,
-        notes: modalFields.notes.value
+        notes: modalFields.notes.value,
+        targetStudentIds: [...rowModalStudentIds]
       });
     }
 
@@ -779,6 +981,9 @@
       if (row.timesheetReflection) {
         const allocated = Number(row.allocatedHours);
         if (!Number.isFinite(allocated) || allocated <= 0) return `${label}: enter allocated hours greater than zero.`;
+      }
+      if (isStudentScopedReport() && !(Array.isArray(row.targetStudentIds) && row.targetStudentIds.length)) {
+        return `${label}: pick at least one student for this row.`;
       }
       return '';
     }
@@ -1417,39 +1622,18 @@
       hideTargetRowModal();
     });
 
-    function renderSelectedStudents() {
-      const ids = uniq(selectedTargetStudentIds);
-      selectedTargetStudentIds = ids;
-      if (!ids.length) {
-        targetStudentSummaryInput.value = 'No students selected';
-        selectedStudentsContainer.innerHTML = '';
-        return;
-      }
-      targetStudentSummaryInput.value = `${ids.length} student${ids.length === 1 ? '' : 's'} selected`;
-      selectedStudentsContainer.innerHTML = ids.map((id) => {
-        const student = (allStudents || []).find((s) => String(s.id || '') === String(id || '')) || null;
-        const label = student ? `${student.name || id} (${id})` : id;
-        return `<span class="badge bg-light text-dark border">${escapeHtml(label)}</span>`;
-      }).join('');
-    }
-
     function applyScopeState() {
-      const scope = String(reportScopeInput?.value || '').trim().toLowerCase();
-      const useSpecificStudents = scope === 'selected_students';
-      specificStudentsSection.classList.toggle('opacity-50', !useSpecificStudents);
-      targetStudentSummaryInput.disabled = !useSpecificStudents;
-      document.getElementById('btnOpenStudentPicker').disabled = !useSpecificStudents;
-      scopeStudentHint.textContent = !scope
+      const scope = getCurrentReportScope();
+      reportScopeHelp.textContent = !scope
         ? 'Select an approved report scope.'
-        : (scope === 'each_student'
-        ? 'Each student in this class will receive a separate report instance.'
         : (scope === 'class'
           ? 'One report instance will be used for the whole class.'
-          : 'Pick one or more students for this assignment.'));
-      if (!useSpecificStudents) {
-        selectedTargetStudentIds = [];
-        renderSelectedStudents();
+          : 'Pick students on each report target row using that row\'s report period.');
+      if (!isStudentScopedReport()) {
+        targetRows = targetRows.map((row) => normalizeTargetRow({ ...row, targetStudentIds: [] }));
       }
+      syncRowModalStudentSection();
+      renderTargetRows();
       updateHiddenFields();
     }
 
@@ -1530,46 +1714,52 @@
 
     reportScopeInput?.addEventListener('change', applyScopeState);
 
-    document.getElementById('btnOpenStudentPicker')?.addEventListener('click', function () {
-      if (!window.GenericPicker || !window.GenericPickerPresets) return;
-      if (!String(classIdInput.value || '').trim()) {
-        showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class first.' });
+    document.getElementById('btnOpenRowStudentPicker')?.addEventListener('click', async function () {
+      if (isLoadingRowPickerStudents) return;
+      const rowDraft = buildRowDraftFromModal();
+      if (!toDateOnly(rowDraft.reportStartDate) || !toDateOnly(rowDraft.reportDueDate)) {
+        await showReportModal({ title: 'Dates Required', icon: 'warning', message: 'Set report start and due dates before picking students.' });
         return;
       }
-      if (!allStudents.length) {
-        showReportModal({ title: 'No Students', icon: 'info', message: 'No students are available for this class.' });
-        return;
+      rowPickerSelectedIds = [...rowModalStudentIds];
+      try {
+        isLoadingRowPickerStudents = true;
+        const autoSelectAll = getCurrentReportScope() === 'each_student' && !rowPickerSelectedIds.length;
+        await fetchEligibleStudentsForRowDraft(rowDraft, { autoSelectAll });
+        showRowStudentPickerModal();
+      } catch (error) {
+        await showReportModal({ title: 'Students Unavailable', icon: 'warning', message: String(error?.message || 'Unable to load eligible students.') });
+      } finally {
+        isLoadingRowPickerStudents = false;
       }
-      const localStudentItems = (allStudents || []).map((student) => {
-        const id = String(student?.id || '').trim();
-        const name = String(student?.name || '').trim();
-        return { id, name, title: name ? `${name} (${id})` : id };
-      }).filter((row) => Boolean(row.id));
-      const allowedStudentIds = new Set(localStudentItems.map((row) => row.id));
-      const selectedRowMap = new Map(localStudentItems.map((row) => [row.id, row]));
-      GenericPicker.open(GenericPickerPresets.person({
-        title: 'Select Students',
-        icon: 'bi-people',
-        placeholder: 'Search class students by name or id...',
-        sourceMode: 'local',
-        localItems: localStudentItems,
-        searchFields: 'id,name,title',
-        limit: 5000,
-        multiselect: true,
-        selectedItems: selectedTargetStudentIds.map((id) => selectedRowMap.get(String(id || '').trim())).filter(Boolean),
-        itemFilter: function (item) {
-          const id = String(item?.id || '').trim();
-          return Boolean(id && allowedStudentIds.has(id));
-        },
-        onSelect: function (items) {
-          const rows = Array.isArray(items) ? items : [items];
-          selectedTargetStudentIds = rows
-            .map((student) => String(student?.id || '').trim())
-            .filter((id) => allowedStudentIds.has(id));
-          renderSelectedStudents();
-          updateHiddenFields();
-        }
-      }));
+    });
+
+    rowStudentPickerBody?.addEventListener('change', function (event) {
+      const checkbox = event.target?.closest?.('.js-row-student-picker-check');
+      if (!checkbox) return;
+      const id = String(checkbox.getAttribute('data-student-id') || '').trim();
+      if (!id) return;
+      if (checkbox.checked) {
+        if (!rowPickerSelectedIds.includes(id)) rowPickerSelectedIds.push(id);
+      } else {
+        rowPickerSelectedIds = rowPickerSelectedIds.filter((studentId) => studentId !== id);
+      }
+      renderRowStudentPicker();
+    });
+
+    document.getElementById('rowStudentPickerSelectAll')?.addEventListener('change', function (event) {
+      const checked = Boolean(event.target?.checked);
+      const rows = Array.isArray(rowPickerEligibleStudents) ? rowPickerEligibleStudents : [];
+      rowPickerSelectedIds = checked
+        ? rows.map((student) => String(student?.id || student?.personId || '').trim()).filter(Boolean)
+        : [];
+      renderRowStudentPicker();
+    });
+
+    document.getElementById('btnConfirmRowStudentPicker')?.addEventListener('click', function () {
+      rowModalStudentIds = uniq(rowPickerSelectedIds);
+      renderRowModalStudentSummary();
+      hideRowStudentPickerModal();
     });
 
     let isSavingAssignment = false;
@@ -1599,10 +1789,6 @@
       targetRows = targetRows.map(normalizeTargetRow);
       if (!targetRows.length) {
         await showReportModal({ title: 'Target Rows Required', icon: 'warning', message: 'Add at least one report target row.' });
-        return;
-      }
-      if (reportScope === 'selected_students' && !selectedTargetStudentIds.length) {
-        await showReportModal({ title: 'Student Required', icon: 'warning', message: 'Select at least one student for the specific students scope.' });
         return;
       }
       for (let i = 0; i < targetRows.length; i += 1) {
@@ -1692,7 +1878,6 @@
       }
     });
 
-    renderSelectedStudents();
     renderTargetRows();
     applyTemplateScopePolicy();
   })();

@@ -753,10 +753,27 @@ function computeLatestSessionDate(sessions = []) {
   return latest;
 }
 
-function computeProposedCycleEndDate({ cycleEndDate = '', sessions = [] } = {}) {
+function computeProposedCycleEndDate({
+  cycleEndDate = '',
+  sessions = [],
+  existingSessions = null
+} = {}) {
   const currentEnd = normalizeDateOnly(cycleEndDate);
   const latestSessionDate = computeLatestSessionDate(sessions);
   if (!latestSessionDate) return currentEnd;
+
+  const baselineRows = Array.isArray(existingSessions) ? existingSessions : null;
+  if (baselineRows) {
+    const latestBaselineDate = computeLatestSessionDate(baselineRows);
+    if (!currentEnd) {
+      if (latestBaselineDate && latestSessionDate <= latestBaselineDate) return currentEnd;
+      return latestSessionDate;
+    }
+    if (latestSessionDate <= currentEnd) return currentEnd;
+    if (latestBaselineDate && latestSessionDate <= latestBaselineDate) return currentEnd;
+    return latestSessionDate;
+  }
+
   if (!currentEnd || latestSessionDate > currentEnd) return latestSessionDate;
   return currentEnd;
 }
@@ -787,7 +804,8 @@ async function appendBatchSessions({ classData, batchSpec = {}, reqUser, extendC
   const previousCycleEndDate = normalizeDateOnly(workingClassData?.cycleEndDate);
   const proposedCycleEndDate = computeProposedCycleEndDate({
     cycleEndDate: previousCycleEndDate,
-    sessions: nextSessions
+    sessions: nextSessions,
+    existingSessions
   });
   let cycleEndDateExtended = false;
 
@@ -1070,6 +1088,91 @@ function sessionScheduleKey(session = {}) {
   ].join('|');
 }
 
+function timeToMinutes(value) {
+  const token = cleanText(value);
+  const match = /^(\d{1,2}):(\d{2})$/.exec(token);
+  if (!match) return NaN;
+  return (Number(match[1]) * 60) + Number(match[2]);
+}
+
+function classSessionsOverlapOnDate(left = {}, right = {}) {
+  const leftDate = getSessionDate(left);
+  const rightDate = getSessionDate(right);
+  if (!leftDate || leftDate !== rightDate) return false;
+  const leftKey = sessionScheduleKey(left);
+  const rightKey = sessionScheduleKey(right);
+  if (leftKey && rightKey && leftKey === rightKey) return true;
+  const leftStart = timeToMinutes(left?.startTime || left?.start || '');
+  const leftEnd = timeToMinutes(left?.endTime || left?.end || '');
+  const rightStart = timeToMinutes(right?.startTime || right?.start || '');
+  const rightEnd = timeToMinutes(right?.endTime || right?.end || '');
+  if (![leftStart, leftEnd, rightStart, rightEnd].every(Number.isFinite)) {
+    return false;
+  }
+  return leftStart < rightEnd && rightStart < leftEnd;
+}
+
+function findOverlappingClassSession(existingSessions = [], candidate = {}) {
+  return (Array.isArray(existingSessions) ? existingSessions : [])
+    .find((row) => classSessionsOverlapOnDate(row, candidate)) || null;
+}
+
+async function findDuplicateClassSessionConflicts({
+  classData,
+  sessionsToAdd = [],
+  reqUser
+} = {}) {
+  if (!classData?.id) return [];
+  const stagedRows = parsePendingStagedSessions({ pendingStagedSessions: sessionsToAdd });
+  if (!stagedRows.length) return [];
+  const schoolDataService = resolveSchoolDataService();
+  const existingSessions = await schoolDataService.getClassSessions(classData.id, reqUser);
+  const conflicts = [];
+  const seenDates = new Set();
+  stagedRows.forEach((staged) => {
+    const stagedDate = staged.date;
+    const stagedKey = sessionScheduleKey(staged);
+    if (!stagedDate || (stagedKey && seenDates.has(stagedKey))) return;
+    const match = findOverlappingClassSession(existingSessions, staged);
+    if (!match) return;
+    if (stagedKey) seenDates.add(stagedKey);
+    conflicts.push({
+      date: stagedDate,
+      sessionId: getSessionId(match),
+      startTime: cleanText(match?.startTime || match?.start || ''),
+      endTime: cleanText(match?.endTime || match?.end || ''),
+      teacherName: cleanText(match?.delivery?.deliveredByName || ''),
+      stagedStartTime: cleanText(staged?.startTime || ''),
+      stagedEndTime: cleanText(staged?.endTime || ''),
+      rawDateField: String(match?.date || '').trim()
+    });
+  });
+  return conflicts;
+}
+
+async function findDuplicateClassSessionDates({
+  classData,
+  sessionsToAdd = [],
+  reqUser
+} = {}) {
+  const conflicts = await findDuplicateClassSessionConflicts({ classData, sessionsToAdd, reqUser });
+  return conflicts.map((row) => row.date).sort();
+}
+
+function buildDuplicateClassDateMessage(conflicts = []) {
+  const rows = (Array.isArray(conflicts) ? conflicts : [])
+    .map((row) => (typeof row === 'string' ? { date: normalizeDateOnly(row) } : row))
+    .filter((row) => row?.date);
+  if (!rows.length) return '';
+  const detail = rows.map((row) => {
+    const time = row.startTime && row.endTime ? ` ${row.startTime}-${row.endTime}` : '';
+    const teacher = row.teacherName ? `, taught by ${row.teacherName}` : '';
+    const id = row.sessionId ? ` (${row.sessionId})` : '';
+    return `${row.date}${time}${teacher}${id}`;
+  }).join('; ');
+  return `This class already has an overlapping session: ${detail}. Adjust the staged time or edit the existing session in the class Session Builder tab.`;
+}
+
 async function commitStagedSessions({
   classData,
   sessionsToAdd = [],
@@ -1092,9 +1195,6 @@ async function commitStagedSessions({
 
   const schoolDataService = resolveSchoolDataService();
   const existingSessions = await schoolDataService.getClassSessions(classData.id, reqUser);
-  const existingDates = new Set(
-    (Array.isArray(existingSessions) ? existingSessions : []).map((row) => getSessionDate(row)).filter(Boolean)
-  );
   const existingIds = new Set(
     (Array.isArray(existingSessions) ? existingSessions : []).map((row) => getSessionId(row)).filter(Boolean)
   );
@@ -1102,7 +1202,7 @@ async function commitStagedSessions({
   const created = [];
 
   stagedRows.forEach((row, index) => {
-    if (existingDates.has(row.date)) return;
+    if (findOverlappingClassSession(working, row)) return;
     const nextRow = { ...row };
     if (!getSessionId(nextRow) || existingIds.has(getSessionId(nextRow))) {
       nextRow.sessionId = buildNextSessionId(classData.id, working);
@@ -1112,7 +1212,6 @@ async function commitStagedSessions({
     }
     created.push(nextRow);
     working.push(nextRow);
-    existingDates.add(nextRow.date);
     existingIds.add(getSessionId(nextRow));
   });
 
@@ -1132,7 +1231,8 @@ async function commitStagedSessions({
   const previousCycleEndDate = normalizeDateOnly(workingClassData?.cycleEndDate);
   const proposedCycleEndDate = computeProposedCycleEndDate({
     cycleEndDate: previousCycleEndDate,
-    sessions: working
+    sessions: working,
+    existingSessions
   });
   let cycleEndDateExtended = false;
 
@@ -1211,9 +1311,14 @@ module.exports = {
   parsePendingStagedSessions,
   sanitizeStagedSessionRow,
   sessionScheduleKey,
+  classSessionsOverlapOnDate,
+  findOverlappingClassSession,
   previewGapBatchSessions,
   commitGapBatchSessions,
   commitStagedSessions,
+  findDuplicateClassSessionDates,
+  findDuplicateClassSessionConflicts,
+  buildDuplicateClassDateMessage,
   appendBatchSessions,
   materializePlannedNaAttendance,
   removePersonFromExcludedSessionRosters,

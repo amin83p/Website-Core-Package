@@ -15,6 +15,7 @@ const reportFunderPdfService = require('./reportFunderPdfService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const reportScopePolicy = require('./reportScopePolicy');
 const reportRosterService = require('./reportRosterService');
+const reportAssignmentStudentEligibilityService = require('./reportAssignmentStudentEligibilityService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function isSchoolReportAdminViewer(reqUser) {
@@ -907,40 +908,56 @@ function resolveAssignmentTargetDate(assignment = {}) {
   ).trim();
 }
 
-async function resolvePendingAssignmentStudentTargets({ assignment, classItem, reqUser, students = [], sessionRoster = null } = {}) {
+async function resolvePendingAssignmentStudentTargets({
+  assignment,
+  classItem,
+  reqUser,
+  students = [],
+  sessionRoster = null,
+  targetRow = null
+} = {}) {
   const reportScope = inferAssignmentReportScope(assignment);
   if (reportScope === 'class') return [''];
-  if (reportScope === 'selected_students') {
-    return [...new Set((Array.isArray(assignment?.targetStudentIds) ? assignment.targetStudentIds : [])
-      .map((id) => toPublicId(id))
-      .filter(Boolean))];
-  }
   if (!classItem) return [];
   const sessions = await schoolDataService.getClassSessions(toPublicId(classItem?.id), reqUser);
-  const sessionId = String(assignment?.sessionId || '').trim();
-  if (sessionId || (Array.isArray(sessionRoster) && sessionRoster.length)) {
-    return reportRosterService.resolveEachStudentTargetPersonIds({
-      assignment,
-      classData: classItem,
-      sessions,
-      session: sessionId ? reportRosterService.findSessionInList(sessions, sessionId) : null,
-      sessionRoster,
-      reqUser,
-      resolveEnrollmentPersonIds: async () => resolveClassStudentIds({
-        classData: classItem,
-        sessions,
-        reqUser,
-        referenceDate: resolveAssignmentTargetDate(assignment),
-        students
-      })
-    });
-  }
-  return resolveClassStudentIds({
+  const effectiveRow = targetRow || findAssignmentRow(assignment, assignment?.assignmentRowId || assignment?.rowId || '');
+  const sessionId = String(effectiveRow?.sessionId || assignment?.sessionId || '').trim();
+  const referenceDate = String(
+    effectiveRow?.reportDueDate
+    || effectiveRow?.dueDate
+    || effectiveRow?.sessionDate
+    || resolveAssignmentTargetDate(assignment)
+  ).trim();
+  const startDate = normalizeDateOnly(effectiveRow?.reportStartDate || assignment?.reportStartDate) || referenceDate;
+  const endDate = normalizeDateOnly(effectiveRow?.reportDueDate || assignment?.reportDueDate) || referenceDate;
+  const enrollmentResolver = async () => resolveClassStudentIds({
     classData: classItem,
     sessions,
     reqUser,
-    referenceDate: resolveAssignmentTargetDate(assignment),
+    startDate,
+    endDate,
+    referenceDate: endDate,
     students
+  });
+  if (reportScope === 'selected_students') {
+    const classStudentIds = await enrollmentResolver();
+    const classStudentSet = new Set(classStudentIds);
+    return reportRosterService.resolveSelectedStudentTargetPersonIds({
+      assignment,
+      targetRow: effectiveRow,
+      classStudentSet,
+      resolveEnrollmentPersonIds: enrollmentResolver
+    });
+  }
+  return reportRosterService.resolveEachStudentTargetPersonIds({
+    assignment,
+    targetRow: effectiveRow,
+    classData: classItem,
+    sessions,
+    session: sessionId ? reportRosterService.findSessionInList(sessions, sessionId) : null,
+    sessionRoster,
+    reqUser,
+    resolveEnrollmentPersonIds: enrollmentResolver
   });
 }
 
@@ -1298,21 +1315,30 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
   const selectedReportStartDate = String(assignment?.reportStartDate || '').trim();
   const selectedReportDueDate = String(assignment?.reportDueDate || '').trim();
   const canReuseAssignmentTargets = assignment && idsEqual(assignment?.classId, selectedClassId);
+  const legacyAssignmentStudentIds = canReuseAssignmentTargets && Array.isArray(assignment?.targetStudentIds)
+    ? assignment.targetStudentIds.map((id) => toPublicId(id)).filter(Boolean)
+    : [];
   if (canReuseAssignmentTargets) {
     const effectiveRows = getEffectiveAssignmentRows(assignment);
     effectiveRows.forEach((targetRow) => {
-      selectedTargetRows.push(targetRow);
+      const rowStudentIds = Array.isArray(targetRow?.targetStudentIds)
+        ? targetRow.targetStudentIds.map((id) => toPublicId(id)).filter(Boolean)
+        : [];
+      const migratedStudentIds = rowStudentIds.length
+        ? rowStudentIds
+        : (legacyAssignmentStudentIds.length ? [...legacyAssignmentStudentIds] : []);
+      selectedTargetRows.push({
+        ...targetRow,
+        targetStudentIds: migratedStudentIds
+      });
+      migratedStudentIds.forEach((id) => {
+        if (!selectedTargetStudentIds.includes(id)) selectedTargetStudentIds.push(id);
+      });
       const sid = String(targetRow?.sessionId || '').trim();
       if (sid) selectedSessionIds.push(sid);
       const dateTarget = String(targetRow?.dueDate || targetRow?.sessionDate || '').trim();
       if (dateTarget) selectedDateTargets.push(dateTarget);
     });
-    if (Array.isArray(assignment?.targetStudentIds)) {
-      assignment.targetStudentIds
-        .map((id) => toPublicId(id))
-        .filter(Boolean)
-        .forEach((id) => selectedTargetStudentIds.push(id));
-    }
   }
 
   const teacherOptionsMap = new Map();
@@ -1344,6 +1370,10 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
       students: allStudents
     })
     : [];
+  const studentOptions = selectedClass
+    ? buildClassStudentOptionsFromIds(resolvedStudentIds, sessions, personMap)
+      .map((student) => ({ ...student, eligibleSessionCount: 0 }))
+    : [];
 
   return {
     classes,
@@ -1367,7 +1397,7 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
     selectedReportScope,
     selectedTargetStudentIds,
     teacherOptions: Array.from(teacherOptionsMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
-    studentOptions: selectedClass ? buildClassStudentOptionsFromIds(resolvedStudentIds, sessions, personMap) : []
+    studentOptions
   };
 }
 
@@ -2163,5 +2193,6 @@ module.exports = {
   templateHasSharedStudentFields,
   evaluateSharedFieldsEditability,
   evaluateSharedFieldsLockAfterReopen,
-  loadAssignmentInstancesForSharedGate
+  loadAssignmentInstancesForSharedGate,
+  buildPersonNameMap
 };

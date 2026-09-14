@@ -32,8 +32,19 @@ function resolveSessionRosterPersonIds(sessionOrRoster) {
   return personIds;
 }
 
+function resolveConfiguredTargetStudentIds(assignment = {}, targetRow = null) {
+  const rowIds = Array.isArray(targetRow?.targetStudentIds)
+    ? targetRow.targetStudentIds.map((id) => toPublicId(id)).filter(Boolean)
+    : [];
+  if (rowIds.length) return rowIds;
+  return Array.isArray(assignment?.targetStudentIds)
+    ? assignment.targetStudentIds.map((id) => toPublicId(id)).filter(Boolean)
+    : [];
+}
+
 async function resolveEachStudentTargetPersonIds({
   assignment,
+  targetRow = null,
   classData,
   sessions = [],
   session = null,
@@ -44,17 +55,28 @@ async function resolveEachStudentTargetPersonIds({
   const reportScope = inferAssignmentReportScope(assignment);
   if (reportScope !== 'each_student') return [];
 
-  const sessionId = String(assignment?.sessionId || '').trim();
-  if (sessionId || (Array.isArray(sessionRoster) && sessionRoster.length)) {
-    if (Array.isArray(sessionRoster) && sessionRoster.length) {
-      return resolveSessionRosterPersonIds(sessionRoster);
-    }
-    const resolvedSession = session || findSessionInList(sessions, sessionId);
-    return resolveSessionRosterPersonIds(resolvedSession);
-  }
+  const configured = resolveConfiguredTargetStudentIds(assignment, targetRow);
+  if (configured.length) return configured;
 
   if (typeof resolveEnrollmentPersonIds === 'function') {
-    return resolveEnrollmentPersonIds({ assignment, classData, sessions, reqUser });
+    return resolveEnrollmentPersonIds({ assignment, targetRow, classData, sessions, reqUser });
+  }
+  return [];
+}
+
+async function resolveSelectedStudentTargetPersonIds({
+  assignment,
+  targetRow = null,
+  classStudentSet = new Set(),
+  resolveEnrollmentPersonIds
+} = {}) {
+  const configured = resolveConfiguredTargetStudentIds(assignment, targetRow);
+  if (configured.length) {
+    return configured.filter((id) => classStudentSet.has(id));
+  }
+  if (typeof resolveEnrollmentPersonIds === 'function') {
+    const fallback = await resolveEnrollmentPersonIds({ assignment, targetRow });
+    return Array.isArray(fallback) ? fallback.filter((id) => classStudentSet.has(id)) : [];
   }
   return [];
 }
@@ -62,6 +84,8 @@ async function resolveEachStudentTargetPersonIds({
 module.exports = {
   findSessionInList,
   resolveSessionRosterPersonIds,
+  resolveConfiguredTargetStudentIds,
   resolveEachStudentTargetPersonIds,
+  resolveSelectedStudentTargetPersonIds,
   inferAssignmentReportScope
 };

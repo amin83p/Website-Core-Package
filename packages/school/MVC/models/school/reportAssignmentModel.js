@@ -231,9 +231,18 @@ function sanitizeAssignmentTargetRows(v, input = {}, existing = null) {
       conductRequiredBeforeFill,
       teacherId,
       status: rowStatus,
-      notes: cleanString(row?.notes, { max: 1500, allowEmpty: true })
+      notes: cleanString(row?.notes, { max: 1500, allowEmpty: true }),
+      targetStudentIds: sanitizeStudentIds(row?.targetStudentIds)
     };
   });
+}
+
+function collectUnionStudentIdsFromRows(rows = []) {
+  const union = new Set();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    sanitizeStudentIds(row?.targetStudentIds).forEach((id) => union.add(id));
+  });
+  return [...union];
 }
 
 function getEffectiveTargetRows(assignment = {}) {
@@ -256,7 +265,8 @@ function getEffectiveTargetRows(assignment = {}) {
     conductRequiredBeforeFill: cleanBoolean(row?.conductRequiredBeforeFill, true),
     teacherId: cleanString(row?.teacherId, { max: 80, allowEmpty: true }),
     status: cleanString(row?.status, { max: 20, allowEmpty: true }).toLowerCase() || String(assignment?.status || 'active').toLowerCase(),
-    notes: cleanString(row?.notes, { max: 1500, allowEmpty: true })
+    notes: cleanString(row?.notes, { max: 1500, allowEmpty: true }),
+    targetStudentIds: sanitizeStudentIds(row?.targetStudentIds)
   }));
 
   const targetTypeRaw = cleanString(assignment?.targetType, { max: 20, allowEmpty: true }).toLowerCase();
@@ -355,9 +365,15 @@ function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
   } catch (_) {
     throw new Error('Invalid assignment report scope.');
   }
-  const targetStudentIds = sanitizeStudentIds(input.targetStudentIds);
-  if (reportScope === 'selected_students' && !targetStudentIds.length) {
-    throw new Error('Select at least one student for "specific students" scope.');
+  const inputStudentIds = sanitizeStudentIds(input.targetStudentIds);
+  const rowUnionStudentIds = collectUnionStudentIdsFromRows(targetRows);
+  const targetStudentIds = rowUnionStudentIds.length ? rowUnionStudentIds : inputStudentIds;
+  if (reportScope === 'selected_students') {
+    const activeRows = targetRows.filter((row) => row.status === 'active');
+    const missingRow = activeRows.find((row) => !sanitizeStudentIds(row?.targetStudentIds).length);
+    if (missingRow) {
+      throw new Error('Select at least one student for each target row.');
+    }
   }
 
   const status = cleanString(input.status, { max: 20, allowEmpty: true }).toLowerCase() || 'active';
@@ -380,7 +396,7 @@ function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
     sessionId,
     sessionDate,
     reportScope,
-    targetStudentIds: reportScope === 'selected_students' ? targetStudentIds : [],
+    targetStudentIds: (reportScope === 'selected_students' || reportScope === 'each_student') ? targetStudentIds : [],
     templateId,
     templateVersion,
     teacherIds,

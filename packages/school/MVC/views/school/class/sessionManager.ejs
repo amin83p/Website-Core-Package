@@ -417,6 +417,7 @@
         flex: 1 1 240px;
         min-width: 0;
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 0.55rem;
         border: 1px solid #e2e8f0;
@@ -503,6 +504,28 @@
     }
     .session-info-details-toggle[aria-expanded="true"] .session-info-expand-chevron {
         transform: rotate(180deg);
+    }
+    .session-pending-reports-hint {
+        flex: 1 1 100%;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.45rem;
+        margin-top: 0.15rem;
+        padding: 0.55rem 0.7rem;
+        border: 2px solid #f59e0b;
+        border-radius: 9px;
+        background: linear-gradient(180deg, #fff7ed 0%, #fffbeb 55%, #ffffff 100%);
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14), 0 2px 8px rgba(180, 83, 9, 0.1);
+        font-size: 0.8rem;
+        font-weight: 700;
+        line-height: 1.4;
+        color: #9a3412;
+    }
+    .session-pending-reports-hint i {
+        flex-shrink: 0;
+        margin-top: 0.1rem;
+        font-size: 1rem;
+        color: #d97706;
     }
     .session-info-status-slot {
         display: flex;
@@ -1528,6 +1551,9 @@
             { key: 'respectsTeachers', className: 'conduct-respects-teachers', label: 'Respects The Teachers', valueKey: 'respectsTeachersPercent', peClass: '' },
             { key: 'respectsStudents', className: 'conduct-respects-students', label: 'Treats Other Students With Respect', valueKey: 'respectsStudentsPercent', peClass: 'pe-4' }
         ];
+        const reportConductStudents = Array.isArray(typeof reportConductRoster !== 'undefined' ? reportConductRoster : null)
+            ? reportConductRoster
+            : [];
     %>
     <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' && actionStateId ? actionStateId : '' %>">
     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' && csrfToken ? csrfToken : '' %>">
@@ -1621,6 +1647,7 @@
                     <span class="session-info-expand-label">Details</span>
                     <i class="bi bi-chevron-down session-info-expand-chevron" aria-hidden="true"></i>
                 </span>
+                <div id="sessionPendingReportsHint" class="session-pending-reports-hint d-none" role="status"></div>
             </div>
             <div class="session-info-status-slot">
                 <div class="session-info-status-slot-label">
@@ -1665,7 +1692,6 @@
                         <% } %>
                     <% }) %>
                 </select>
-                <div id="sessionPendingReportsHint" class="small text-warning mt-1 d-none" role="status"></div>
             </div>
         </div>
         <div class="collapse" id="sessionInfoDetailsCollapse">
@@ -2531,7 +2557,7 @@
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-clipboard-check me-2"></i>Session reports</h5>
-                            <div class="small text-muted mt-1">Fill assigned reports for students on this session roster.</div>
+                            <div class="small text-muted mt-1">Fill assigned reports for students selected on each report assignment.</div>
                         </div>
                         <% if (hasSessionReportsAssignedFlag) { %>
                         <div class="d-flex flex-wrap gap-2">
@@ -2620,10 +2646,10 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <% if (session.roster.length === 0) { %>
-                                <tr><td colspan="5" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
+                            <% if (reportConductStudents.length === 0) { %>
+                                <tr><td colspan="5" class="text-center py-4 text-muted">No students are selected for reports on this session.</td></tr>
                             <% } else { %>
-                                <% session.roster.forEach((student) => { %>
+                                <% reportConductStudents.forEach((student) => { %>
                                     <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
                                         <td class="ps-4 fw-bold align-middle">
                                             <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
@@ -4665,7 +4691,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMergedSessionPreview(null);
         modal.querySelector('#mergedSessionContext').innerHTML = '<strong>Source session:</strong> ' + attendanceAttachmentEscape(sessionManagerSessionId)
             + '<div class="small text-muted mt-1">' + attendanceAttachmentEscape(sessionDefaultDate || '-') + ' · ' + attendanceAttachmentEscape(sessionDefaultStartTime || '-') + ' – ' + attendanceAttachmentEscape(sessionDefaultEndTime || '-') + '</div>'
-            + '<div class="small text-muted">Pick a teacher who has a session at the exact same start and end time.</div>';
+            + '<div class="small text-muted">Pick a teacher who has a session on the same date that starts at or before this session and ends at or after this session.</div>';
         if (window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(modal).show();
     }
 
@@ -7010,7 +7036,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         hint.classList.remove('d-none');
-        hint.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>${pending.length} assigned report(s) must be submitted before this session can be marked completed.`;
+        hint.innerHTML = `<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i><span>${pending.length} assigned report(s) must be submitted before this session can be marked completed.</span>`;
     }
     function initSessionManagerTooltips() {
         if (typeof bootstrap === 'undefined' || !bootstrap?.Tooltip) return;

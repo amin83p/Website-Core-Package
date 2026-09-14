@@ -3439,13 +3439,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.getElementById('sessionsTbody');
     const lblScheduled = document.getElementById('lbl_scheduledHours');
 
+    function resolveSessionDisplayDate(session = {}) {
+        const raw = String(session?.date || session?.sessionDate || session?.startDate || '').trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+        if (!raw) return '';
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return '';
+        return parsed.toISOString().slice(0, 10);
+    }
+
     function renderSessions() {
         tbody.innerHTML = '';
         let total = 0;
 
         sessionsState.sort((a, b) => {
-            const dateA = new Date(`${a.date}T${a.startTime || '00:00'}`);
-            const dateB = new Date(`${b.date}T${b.startTime || '00:00'}`);
+            const dateA = new Date(`${resolveSessionDisplayDate(a) || '1970-01-01'}T${a.startTime || '00:00'}`);
+            const dateB = new Date(`${resolveSessionDisplayDate(b) || '1970-01-01'}T${b.startTime || '00:00'}`);
             return dateA - dateB;
         });
 
@@ -3505,10 +3514,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `<a href="/school/classes/${classId}/sessions/${ses.sessionId}" class="btn btn-sm btn-outline-primary py-0 px-1" title="Manage Session Details" target="_blank"><i class="bi bi-box-arrow-in-right"></i></a>` 
                 : `<span class="badge bg-secondary" title="Save Class to Manage"><i class="bi bi-hourglass"></i></span>`;
 
+            const displayDate = resolveSessionDisplayDate(ses);
+            if (displayDate && displayDate !== ses.date) {
+                ses.date = displayDate;
+            }
+
             // FIX: Calculate the Day Name for readability
             let dayName = '';
-            if (ses.date) {
-                const [dy, dm, dd] = ses.date.split('-').map(Number);
+            if (displayDate) {
+                const [dy, dm, dd] = displayDate.split('-').map(Number);
                 const dateObj = new Date(dy, dm - 1, dd);
                 dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
             }
@@ -3539,7 +3553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="d-flex align-items-center gap-1">
                         ${manageBtnHtml}
                         <span class="badge bg-light text-dark border">${dayName}</span>
-                        <input type="date" class="form-control form-control-sm border-0 bg-transparent session-input px-1" data-index="${index}" data-field="date" value="${ses.date || ''}" ${metadataLockAttr}>
+                        <input type="date" class="form-control form-control-sm border-0 bg-transparent session-input px-1" data-index="${index}" data-field="date" value="${displayDate || ''}" ${metadataLockAttr}>
                     </div>
                 </td>
                 <td>
