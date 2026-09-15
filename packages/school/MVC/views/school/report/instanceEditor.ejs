@@ -123,7 +123,7 @@
   <input type="hidden" id="reportInstanceActionStateId" value="<%= actionStateId || '' %>">
   <input type="hidden" id="reportInstanceSafeReturnUrl" value="<%= typeof safeReturnUrl !== 'undefined' && safeReturnUrl ? safeReturnUrl : '' %>">
   <script type="application/json" id="reportInstanceFieldsConfig"><%- JSON.stringify(fields).replace(/</g, '\\u003c') %></script>
-  <script type="application/json" id="reportInstanceMergedData"><%- JSON.stringify(mergedData || {}).replace(/</g, '\\u003c') %></script>
+  <script type="application/json" id="reportInstanceMergedData"><%- JSON.stringify((typeof mergedDataForClient !== 'undefined' && mergedDataForClient) ? mergedDataForClient : (mergedData || {})).replace(/</g, '\\u003c') %></script>
   <script type="application/json" id="reportInstancePrefillData"><%- JSON.stringify(instance?.prefillSnapshot || {}).replace(/</g, '\\u003c') %></script>
 
   <div class="row g-2 align-items-start mb-4">
@@ -466,7 +466,7 @@
                                 <% if (field.type === 'textarea') { %>
                                   <textarea class="form-control bg-light" data-field-id="<%= field.id %>" rows="4" readonly><%= value %></textarea>
                                 <% } else if (field.type === 'number') { %>
-                                  <input type="number" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= value %>" readonly>
+                                  <input type="text" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= value %>" readonly inputmode="decimal">
                                 <% } else if (field.type === 'date') { %>
                                   <input type="date" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= value %>" readonly>
                                 <% } else if (field.type === 'checkbox') { %>
@@ -588,7 +588,7 @@
                             <% if (field.type === 'textarea') { %>
                               <textarea class="form-control bg-light" data-field-id="<%= field.id %>" rows="4" readonly><%= value %></textarea>
                             <% } else if (field.type === 'number') { %>
-                              <input type="number" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= value %>" readonly>
+                              <input type="text" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= value %>" readonly inputmode="decimal">
                             <% } else if (field.type === 'date') { %>
                               <input type="date" class="form-control bg-light" data-field-id="<%= field.id %>" value="<%= value %>" readonly>
                             <% } else if (field.type === 'checkbox') { %>
@@ -1789,6 +1789,7 @@
       const allIssues = [];
       (Array.isArray(fields) ? fields : []).forEach((field) => {
         if (isVisualOnlyField(field) || !field?.id) return;
+        if (field.readOnly === true || isCalculatedField(field)) return;
         const fieldId = String(field.id || '').trim();
         const label = String(field.label || fieldId || 'Field').trim();
         const value = mergedAnswers[fieldId];

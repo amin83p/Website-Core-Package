@@ -691,7 +691,7 @@
 
             <div class="col-12">
               <div class="d-flex align-items-center justify-content-between">
-                <label class="form-label fw-bold mb-1">Conversion Rule (Export Only)</label>
+                <label class="form-label fw-bold mb-1">Conversion Rule</label>
                 <button type="button" class="btn btn-sm btn-outline-info" id="btnConversionHelp"><i class="bi bi-question-circle me-1"></i>Conversion Help</button>
               </div>
               <div class="row g-2">
@@ -711,7 +711,11 @@
                   </select>
                 </div>
               </div>
-              <div class="form-text">Conversion runs only for export/DOCX placeholders. Raw answers stay unchanged.</div>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="fieldEditorConversionDisplayReadOnly">
+                <label class="form-check-label" for="fieldEditorConversionDisplayReadOnly">Show converted value on report (view-only fields)</label>
+              </div>
+              <div class="form-text">When enabled, conversion also applies to the displayed value on report instances and the fill-reports matrix (view-only fields only). Export/DOCX always uses conversion when enabled above. Stored answers stay unchanged.</div>
               <div class="form-text">Branching examples: <code>ifelse(num(value) >= 90, "A", "B")</code> or <code>caseof(value, "excellent", 4, "good", 3, "fair", 2, 0)</code>.</div>
               <div class="d-flex flex-wrap gap-2 mt-2">
                 <button type="button" class="btn btn-sm btn-outline-primary" id="btnInsertCatalogKeyConversion"><i class="bi bi-search me-1"></i>Insert Catalog Key</button>
@@ -726,6 +730,7 @@
                 <option value="calculated">Always calculated (read-only)</option>
               </select>
               <div class="form-text" id="fieldEditorValueModeHelp"></div>
+              <div class="form-text">For class conduct averages, use <strong>User-entered</strong> with a session-rating prefill key and <strong>View only</strong> so teachers edit ratings in Class Conduct only.</div>
             </div>
 
             <div class="col-12 d-none" id="fieldEditorExpressionPanel">
@@ -885,6 +890,7 @@
     const fieldEditorHelpInput = document.getElementById('fieldEditorHelp');
     const fieldEditorValidationRulesInput = document.getElementById('fieldEditorValidationRules');
     const fieldEditorConversionEnabledInput = document.getElementById('fieldEditorConversionEnabled');
+    const fieldEditorConversionDisplayReadOnlyInput = document.getElementById('fieldEditorConversionDisplayReadOnly');
     const fieldEditorConversionExpressionInput = document.getElementById('fieldEditorConversionExpression');
     const fieldEditorConversionOnErrorInput = document.getElementById('fieldEditorConversionOnError');
     const fieldEditorValueModeInput = document.getElementById('fieldEditorValueMode');
@@ -930,6 +936,7 @@
     const DOCX_ALIAS_PATTERN = /^[a-z][a-z0-9]{3}$/;
     const DOCX_ALIAS_FIRST_CHARS = 'abcdefghijklmnopqrstuvwxyz';
     const DOCX_ALIAS_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const SESSION_RATING_PREFILL_PATTERN = /^student_session_rating_span_/i;
     let editingIndex = -1;
     let dragIndex = -1;
     let fieldsState = [];
@@ -1057,8 +1064,28 @@
         docxAlias: generateUniqueDocxAlias(),
         options: [],
         validationRules: [],
-        conversionRule: { enabled: false, expression: '', onError: 'use_raw' }
+        conversionRule: { enabled: false, expression: '', onError: 'use_raw', applyOnReadOnlyDisplay: false }
       };
+    }
+
+    function finalizeClientConversionRule(rawRule, fieldContext = {}) {
+      const rule = rawRule && typeof rawRule === 'object' ? rawRule : {};
+      const enabled = rule.enabled === true;
+      const expression = String(rule.expression || '').trim();
+      const onError = String(rule.onError || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw';
+      const applyRequested = rule.applyOnReadOnlyDisplay === true;
+      const readOnly = fieldContext?.readOnly === true;
+      const allowDisplay = readOnly && enabled && Boolean(expression);
+      return {
+        enabled,
+        expression,
+        onError,
+        applyOnReadOnlyDisplay: allowDisplay && applyRequested
+      };
+    }
+
+    function isSessionRatingPrefillKey(prefillKey) {
+      return SESSION_RATING_PREFILL_PATTERN.test(String(prefillKey || '').trim());
     }
 
     function normalizeHexColor(rawValue) {
@@ -1419,6 +1446,7 @@ num(value) <= 95</code></pre>
       const calculationRuleRaw = raw && typeof raw.calculationRule === 'object' ? raw.calculationRule : {};
       const calculationDependencies = visualOnly ? [] : normalizeCalculationDependencies(raw?.calculationDependencies || []);
       const usesExpression = valueMode === VALUE_MODES.CALCULATED || valueMode === VALUE_MODES.DERIVED_EDITABLE;
+      const readOnly = visualOnly ? false : (valueMode === VALUE_MODES.CALCULATED || raw.readOnly === true || String(raw.readOnly) === 'true');
 
       return {
         id: visualOnly ? (id || buildAutoVisualId(type, raw.label || '', -1)) : id,
@@ -1426,7 +1454,7 @@ num(value) <= 95</code></pre>
         type,
         required: visualOnly ? false : (raw.required === true || String(raw.required) === 'true'),
         sharedAcrossStudents: raw.sharedAcrossStudents === true || String(raw.sharedAcrossStudents) === 'true',
-        readOnly: visualOnly ? false : (valueMode === VALUE_MODES.CALCULATED || raw.readOnly === true || String(raw.readOnly) === 'true'),
+        readOnly,
         fullPageWidth: visualOnly ? true : (raw.fullPageWidth === true || String(raw.fullPageWidth) === 'true'),
         valueMode,
         calculationRule: visualOnly
@@ -1454,12 +1482,14 @@ num(value) <= 95</code></pre>
           message: String(rule?.message || '').trim()
         })),
         conversionRule: visualOnly
-          ? { enabled: false, expression: '', onError: 'use_raw' }
-          : {
+          ? { enabled: false, expression: '', onError: 'use_raw', applyOnReadOnlyDisplay: false }
+          : finalizeClientConversionRule({
               enabled: conversionRuleRaw?.enabled === true || String(conversionRuleRaw?.enabled || '').trim().toLowerCase() === 'true',
               expression: String(conversionRuleRaw?.expression || '').trim(),
-              onError: String(conversionRuleRaw?.onError || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw'
-            }
+              onError: String(conversionRuleRaw?.onError || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw',
+              applyOnReadOnlyDisplay: conversionRuleRaw?.applyOnReadOnlyDisplay === true
+                || String(conversionRuleRaw?.applyOnReadOnlyDisplay || '').trim().toLowerCase() === 'true'
+            }, { readOnly })
       };
     }
 
@@ -1535,7 +1565,7 @@ num(value) <= 95</code></pre>
           ? `Validation rules: ${field.validationRules.length}`
           : '';
         const conversionSummary = field?.conversionRule?.enabled && String(field?.conversionRule?.expression || '').trim()
-          ? `Conversion: ${String(field.conversionRule.expression).trim()}`
+          ? `Conversion: ${String(field.conversionRule.expression).trim()}${field?.conversionRule?.applyOnReadOnlyDisplay ? ' (show on report)' : ''}`
           : '';
         const calcSummary = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED
           ? `Calculated: ${String(field?.calculationRule?.expression || '').trim()} | deps: ${(Array.isArray(field?.calculationDependencies) ? field.calculationDependencies : []).join(', ')}`
@@ -1613,12 +1643,13 @@ num(value) <= 95</code></pre>
         const calculationDependencies = usesExpression
           ? normalizeCalculationDependencies(source?.calculationDependencies || [])
           : [];
+        const readOnly = visualOnly ? false : (valueMode === VALUE_MODES.CALCULATED || source?.readOnly === true);
         fields.push({
           id: effectiveId,
           label,
           type: normalizedType,
           required: visualOnly ? false : source?.required === true,
-          readOnly: source?.readOnly === true,
+          readOnly,
           sharedAcrossStudents: source?.sharedAcrossStudents === true,
           fullPageWidth: visualOnly ? true : source?.fullPageWidth === true,
           valueMode,
@@ -1648,12 +1679,13 @@ num(value) <= 95</code></pre>
             : [],
           validationRules: visualOnly ? [] : (Array.isArray(source?.validationRules) ? source.validationRules : []),
           conversionRule: visualOnly
-            ? { enabled: false, expression: '', onError: 'use_raw' }
-            : {
+            ? { enabled: false, expression: '', onError: 'use_raw', applyOnReadOnlyDisplay: false }
+            : finalizeClientConversionRule({
                 enabled: source?.conversionRule?.enabled === true,
                 expression: String(source?.conversionRule?.expression || '').trim(),
-                onError: String(source?.conversionRule?.onError || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw'
-              }
+                onError: String(source?.conversionRule?.onError || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw',
+                applyOnReadOnlyDisplay: source?.conversionRule?.applyOnReadOnlyDisplay === true
+              }, { readOnly })
         });
 
         if (!visualOnly) {
@@ -1694,6 +1726,14 @@ num(value) <= 95</code></pre>
       if (fieldEditorConversionEnabledInput) fieldEditorConversionEnabledInput.disabled = visualOnly;
       if (fieldEditorConversionExpressionInput) fieldEditorConversionExpressionInput.disabled = visualOnly;
       if (fieldEditorConversionOnErrorInput) fieldEditorConversionOnErrorInput.disabled = visualOnly;
+      const conversionEnabled = fieldEditorConversionEnabledInput?.checked === true;
+      const viewOnly = fieldEditorReadonlyInput?.checked === true;
+      const canShowDisplayConversion = !visualOnly && !calculatedMode && viewOnly && conversionEnabled
+        && Boolean(String(fieldEditorConversionExpressionInput?.value || '').trim());
+      if (fieldEditorConversionDisplayReadOnlyInput) {
+        fieldEditorConversionDisplayReadOnlyInput.disabled = !canShowDisplayConversion;
+        if (!canShowDisplayConversion) fieldEditorConversionDisplayReadOnlyInput.checked = false;
+      }
       if (fieldEditorValueModeInput) fieldEditorValueModeInput.disabled = visualOnly;
       if (fieldEditorCalculationExpressionInput) fieldEditorCalculationExpressionInput.disabled = visualOnly || !expressionMode;
       if (fieldEditorCalculationOnErrorInput) fieldEditorCalculationOnErrorInput.disabled = visualOnly || !expressionMode;
@@ -1727,6 +1767,7 @@ num(value) <= 95</code></pre>
         fieldEditorConversionEnabledInput.checked = false;
         fieldEditorConversionExpressionInput.value = '';
         fieldEditorConversionOnErrorInput.value = 'use_raw';
+        if (fieldEditorConversionDisplayReadOnlyInput) fieldEditorConversionDisplayReadOnlyInput.checked = false;
         if (fieldEditorValueModeInput) fieldEditorValueModeInput.value = VALUE_MODES.MANUAL;
         fieldEditorCalculationExpressionInput.value = '';
         fieldEditorCalculationOnErrorInput.value = CALC_ON_ERROR.KEEP_LAST;
@@ -1738,6 +1779,9 @@ num(value) <= 95</code></pre>
       }
       if (valueMode === VALUE_MODES.DERIVED_EDITABLE) {
         fieldEditorReadonlyInput.checked = false;
+      }
+      if (!fieldEditorReadonlyInput.checked && fieldEditorConversionDisplayReadOnlyInput) {
+        fieldEditorConversionDisplayReadOnlyInput.checked = false;
       }
     }
 
@@ -1760,6 +1804,9 @@ num(value) <= 95</code></pre>
       fieldEditorConversionEnabledInput.checked = field?.conversionRule?.enabled === true;
       fieldEditorConversionExpressionInput.value = String(field?.conversionRule?.expression || '').trim();
       fieldEditorConversionOnErrorInput.value = String(field?.conversionRule?.onError || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw';
+      if (fieldEditorConversionDisplayReadOnlyInput) {
+        fieldEditorConversionDisplayReadOnlyInput.checked = field?.conversionRule?.applyOnReadOnlyDisplay === true;
+      }
       if (fieldEditorValueModeInput) fieldEditorValueModeInput.value = normalizeClientValueMode(field?.valueMode);
       fieldEditorCalculationExpressionInput.value = String(field?.calculationRule?.expression || '').trim();
       fieldEditorCalculationOnErrorInput.value = String(field?.calculationRule?.onError || CALC_ON_ERROR.KEEP_LAST).trim().toLowerCase() === CALC_ON_ERROR.EMPTY ? CALC_ON_ERROR.EMPTY : CALC_ON_ERROR.KEEP_LAST;
@@ -1832,6 +1879,8 @@ num(value) <= 95</code></pre>
       const conversionEnabled = fieldEditorConversionEnabledInput.checked === true;
       const conversionExpression = String(fieldEditorConversionExpressionInput.value || '').trim();
       const conversionOnError = String(fieldEditorConversionOnErrorInput.value || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw';
+      const conversionDisplayReadOnly = fieldEditorConversionDisplayReadOnlyInput?.checked === true;
+      const effectiveReadOnly = visualOnly ? false : (valueMode === VALUE_MODES.CALCULATED ? true : readOnly);
       if (!visualOnly && conversionEnabled && !conversionExpression) {
         showReportModal({ title: 'Invalid Conversion Rule', icon: 'warning', message: 'Conversion expression is required when conversion is enabled.' });
         return;
@@ -1896,7 +1945,7 @@ num(value) <= 95</code></pre>
         placeholderToken: visualOnly ? '' : placeholderToken,
         helpText,
         required: visualOnly ? false : required,
-        readOnly: visualOnly ? false : (valueMode === VALUE_MODES.CALCULATED ? true : readOnly),
+        readOnly: effectiveReadOnly,
         sharedAcrossStudents,
         fullPageWidth: visualOnly ? true : fullPageWidth,
         valueMode: visualOnly ? VALUE_MODES.MANUAL : valueMode,
@@ -1921,12 +1970,13 @@ num(value) <= 95</code></pre>
         options: visualOnly ? [] : options,
         validationRules: visualOnly ? [] : validationRules,
         conversionRule: visualOnly
-          ? { enabled: false, expression: '', onError: 'use_raw' }
-          : {
+          ? { enabled: false, expression: '', onError: 'use_raw', applyOnReadOnlyDisplay: false }
+          : finalizeClientConversionRule({
               enabled: conversionEnabled,
               expression: conversionExpression,
-              onError: conversionOnError
-            }
+              onError: conversionOnError,
+              applyOnReadOnlyDisplay: conversionDisplayReadOnly
+            }, { readOnly: effectiveReadOnly })
       });
 
       if (editingIndex >= 0) fieldsState[editingIndex] = nextField;
@@ -1934,6 +1984,13 @@ num(value) <= 95</code></pre>
 
       renderFieldRows();
       closeFieldEditor();
+      if (!visualOnly && valueMode === VALUE_MODES.MANUAL && isSessionRatingPrefillKey(prefillKey) && !effectiveReadOnly) {
+        showReportModal({
+          title: 'Session rating field',
+          icon: 'info',
+          message: 'Session ratings should be edited in Class Conduct. Enable View only on this field so the report shows conduct values without allowing overrides.'
+        });
+      }
     }
 
     function buildPreviewControlHtml(field) {
@@ -2169,6 +2226,9 @@ num(value) <= 95</code></pre>
     btnConversionHelp?.addEventListener('click', () => openExpressionHelp('conversion'));
     fieldEditorTypeInput?.addEventListener('change', updateFieldEditorOptionsVisibility);
     fieldEditorValueModeInput?.addEventListener('change', updateFieldEditorOptionsVisibility);
+    fieldEditorReadonlyInput?.addEventListener('change', updateFieldEditorOptionsVisibility);
+    fieldEditorConversionEnabledInput?.addEventListener('change', updateFieldEditorOptionsVisibility);
+    fieldEditorConversionExpressionInput?.addEventListener('input', updateFieldEditorOptionsVisibility);
     btnBrowsePrefillKey?.addEventListener('click', () => choosePrefillCatalogKey({ setPrefillKey: true }));
     btnInsertCatalogKeyFormula?.addEventListener('click', () => choosePrefillCatalogKey({ targetInput: fieldEditorCalculationExpressionInput }));
     btnInsertCatalogKeyConversion?.addEventListener('click', () => choosePrefillCatalogKey({ targetInput: fieldEditorConversionExpressionInput }));

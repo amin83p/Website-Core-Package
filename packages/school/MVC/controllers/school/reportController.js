@@ -1337,10 +1337,15 @@ async function buildInstanceEditorRenderContext(req) {
     mergedAnswers: mergedBeforeCalculation,
     prefill: latestInstance?.prefillSnapshot || {}
   });
-  const mergedData = calculatedForRender.answers;
+  const mergedDataForValidation = calculatedForRender.answers;
   const validationSummary = reportRuleEngineService.evaluateTemplateValidations({
     template,
-    mergedAnswers: mergedData,
+    mergedAnswers: mergedDataForValidation,
+    prefill: latestInstance?.prefillSnapshot || {}
+  });
+  const mergedData = reportRuleEngineService.applyReadOnlyDisplayConversions({
+    template,
+    mergedAnswers: mergedDataForValidation,
     prefill: latestInstance?.prefillSnapshot || {}
   });
 
@@ -1404,6 +1409,7 @@ async function buildInstanceEditorRenderContext(req) {
     classData,
     instanceDetails,
     mergedData,
+    mergedDataForClient: mergedDataForValidation,
     validationSummary,
     reportReviewNavigator,
     canUnlockReportInstance,

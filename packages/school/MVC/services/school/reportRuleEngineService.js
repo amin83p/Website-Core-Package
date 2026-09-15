@@ -768,7 +768,51 @@ function normalizeConversionRule(rawRule) {
   const expression = ensureExpressionText(rule.expression, { allowEmpty: true });
   const onErrorRaw = String(rule.onError || 'use_raw').trim().toLowerCase();
   const onError = VALID_CONVERSION_ON_ERROR.has(onErrorRaw) ? onErrorRaw : 'use_raw';
-  return { enabled, expression, onError };
+  const applyOnReadOnlyDisplay = rule.applyOnReadOnlyDisplay === true
+    || String(rule.applyOnReadOnlyDisplay || '').trim().toLowerCase() === 'true';
+  return { enabled, expression, onError, applyOnReadOnlyDisplay };
+}
+
+function finalizeConversionRuleForField(conversionRule, field = {}) {
+  const normalized = normalizeConversionRule(conversionRule || {});
+  const readOnly = field?.readOnly === true;
+  const allowDisplay = readOnly && normalized.enabled && Boolean(String(normalized.expression || '').trim());
+  return {
+    enabled: normalized.enabled,
+    expression: normalized.expression,
+    onError: normalized.onError,
+    applyOnReadOnlyDisplay: allowDisplay && normalized.applyOnReadOnlyDisplay
+  };
+}
+
+function shouldApplyReadOnlyDisplayConversion(field) {
+  if (!field || field.readOnly !== true || isCalculatedField(field)) return false;
+  const rule = normalizeConversionRule(field?.conversionRule || {});
+  return rule.enabled && Boolean(String(rule.expression || '').trim()) && rule.applyOnReadOnlyDisplay;
+}
+
+function resolveFieldDisplayValue({ field, value, answers = {}, prefill = {} } = {}) {
+  if (!shouldApplyReadOnlyDisplayConversion(field)) {
+    return { value, diagnostic: null };
+  }
+  const conversion = convertFieldValueForExport({ field, value, answers, prefill });
+  return { value: conversion.value, diagnostic: conversion.diagnostic };
+}
+
+function applyReadOnlyDisplayConversions({ template, mergedAnswers = {}, prefill = {} } = {}) {
+  const answers = mergedAnswers && typeof mergedAnswers === 'object' ? { ...mergedAnswers } : {};
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (!field?.id || !shouldApplyReadOnlyDisplayConversion(field)) return;
+    const resolved = resolveFieldDisplayValue({
+      field,
+      value: answers[field.id],
+      answers,
+      prefill
+    });
+    answers[field.id] = resolved.value;
+  });
+  return answers;
 }
 
 function findCyclePath(adjacency, nodeSet) {
@@ -948,7 +992,13 @@ function evaluateFieldValidations({ field, value, answers = {}, prefill = {} }) 
       source: 'required'
     });
   }
-  if (fieldType === 'number' && hasValue(value) && !Number.isFinite(Number(value))) {
+  if (
+    fieldType === 'number'
+    && field?.readOnly !== true
+    && !isCalculatedField(field)
+    && hasValue(value)
+    && !Number.isFinite(Number(value))
+  ) {
     issues.push({
       fieldId,
       fieldLabel: label,
@@ -1105,6 +1155,10 @@ module.exports = {
   expressionReferencesPrefill,
   normalizeValidationRule,
   normalizeConversionRule,
+  finalizeConversionRuleForField,
+  shouldApplyReadOnlyDisplayConversion,
+  resolveFieldDisplayValue,
+  applyReadOnlyDisplayConversions,
   buildCalculatedFieldPlan,
   recomputeCalculatedAnswers,
   validateExpressionSyntax,

@@ -101,16 +101,20 @@ function sanitizeValidationRules(rawRules) {
   return out;
 }
 
-function sanitizeConversionRule(rawRule) {
+function sanitizeConversionRule(rawRule, fieldContext = {}) {
   const normalized = reportRuleEngineService.normalizeConversionRule(rawRule || {});
   if (normalized.expression.length > reportRuleEngineService.MAX_EXPRESSION_LENGTH) {
     throw new Error('Conversion expression is too long.');
   }
-  return {
-    enabled: normalized.enabled,
-    expression: normalized.expression,
-    onError: normalized.onError
-  };
+  return reportRuleEngineService.finalizeConversionRuleForField(
+    {
+      enabled: normalized.enabled,
+      expression: normalized.expression,
+      onError: normalized.onError,
+      applyOnReadOnlyDisplay: normalized.applyOnReadOnlyDisplay
+    },
+    fieldContext
+  );
 }
 
 function sanitizeCalculationRule(rawRule) {
@@ -172,13 +176,18 @@ function sanitizeField(rawField, index) {
     }
   }
 
+  const readOnly = valueMode === 'calculated' || (rawField.readOnly === true || String(rawField.readOnly) === 'true');
+  const conversionRule = visualOnly
+    ? sanitizeConversionRule({ enabled: false, expression: '', onError: 'use_raw' }, { readOnly: false })
+    : sanitizeConversionRule(rawField.conversionRule, { readOnly });
+
   return {
     id,
     label,
     type,
     required: rawField.required === true || String(rawField.required) === 'true',
     sharedAcrossStudents: rawField.sharedAcrossStudents === true || String(rawField.sharedAcrossStudents) === 'true',
-    readOnly: valueMode === 'calculated' || (rawField.readOnly === true || String(rawField.readOnly) === 'true'),
+    readOnly,
     fullPageWidth:
       rawField.fullPageWidth === true ||
       String(rawField.fullPageWidth) === 'true' ||
@@ -204,7 +213,7 @@ function sanitizeField(rawField, index) {
     prefillKey: normalizePrefillKey(cleanString(rawField.prefillKey, { max: 120, allowEmpty: true })),
     options,
     validationRules: visualOnly ? [] : sanitizeValidationRules(rawField.validationRules),
-    conversionRule: visualOnly ? sanitizeConversionRule({ enabled: false, expression: '', onError: 'use_raw' }) : sanitizeConversionRule(rawField.conversionRule)
+    conversionRule
   };
 }
 

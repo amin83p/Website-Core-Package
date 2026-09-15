@@ -5,6 +5,7 @@ const reportInstanceSaveService = require('./reportInstanceSaveService');
 const sessionConductService = require('./sessionConductService');
 const reportViewService = require('./reportViewService');
 const reportGenerationEngineService = require('./reportGenerationEngineService');
+const reportRuleEngineService = require('./reportRuleEngineService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getPrefillValue } = require('./reportPrefillKeyUtils');
@@ -49,6 +50,22 @@ function isOverallAttendanceDayField(field = {}) {
   const prefillKey = clean(field?.prefillKey).toLowerCase();
   return /^attendance_(day|presence|note)_\d{2}$/.test(fieldId)
     || /^attendance_(day|presence|note)_\d{2}$/.test(prefillKey);
+}
+
+const PER_STUDENT_SESSION_RATING_FIELD_IDS = new Set([
+  'classeffort',
+  'class_participation',
+  'respects_the_teachers',
+  'treats_other_students',
+  'respectsteachers',
+  'respectsstudents'
+]);
+
+function isPerStudentSessionRatingField(field = {}) {
+  const prefillKey = clean(field?.prefillKey).toLowerCase();
+  if (prefillKey.startsWith('student_session_rating_span_')) return true;
+  const fieldId = clean(field?.id).toLowerCase();
+  return PER_STUDENT_SESSION_RATING_FIELD_IDS.has(fieldId);
 }
 
 function fieldPrefillTokens(field = {}) {
@@ -276,9 +293,14 @@ async function buildStudentMatrixRow({
     mergedAnswers,
     prefill
   });
-  const renderedAnswers = recalculated && recalculated.answers && typeof recalculated.answers === 'object'
+  const renderedAnswersRaw = recalculated && recalculated.answers && typeof recalculated.answers === 'object'
     ? recalculated.answers
     : mergedAnswers;
+  const renderedAnswers = reportRuleEngineService.applyReadOnlyDisplayConversions({
+    template,
+    mergedAnswers: renderedAnswersRaw,
+    prefill
+  });
   const studentName = clean(
     renderedAnswers.student_full_name
     || prefill.student_full_name
@@ -330,6 +352,7 @@ function classifyMatrixFields(template, rows, assignment, contextHints = {}) {
       || !isReadOnlyField(field)
       || isCalculatedField(field)
       || isOverallAttendanceDayField(field)
+      || isPerStudentSessionRatingField(field)
     ) return;
     if (isCommonContextPrefillField(field)) {
       commonReadOnlyFields.push(field);

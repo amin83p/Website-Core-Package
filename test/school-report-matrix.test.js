@@ -94,6 +94,28 @@ test('matrix classification omits visual fields and separates shared, common, an
   assert.equal(groups.sharedFields.some((field) => field.id === 'average_class_mark'), false);
 });
 
+test('matrix keeps session rating conduct columns student-specific even when values match', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'student_full_name', type: 'text', label: 'Student', readOnly: true, prefillKey: 'student_full_name' },
+        { id: 'Respects_The_Teachers', type: 'number', label: 'Respects The Teachers', readOnly: true, prefillKey: 'student_session_rating_span_respects_teachers_percent' },
+        { id: 'Treats_Other_Students', type: 'number', label: 'Treats Other Students With Respect', readOnly: true, prefillKey: 'student_session_rating_span_respects_students_percent' }
+      ]
+    }
+  };
+  const rows = [
+    { answers: { student_full_name: 'Alice', Respects_The_Teachers: 'Satisfying', Treats_Other_Students: 'Satisfying' } },
+    { answers: { student_full_name: 'Bob', Respects_The_Teachers: 'Satisfying', Treats_Other_Students: 'Satisfying' } }
+  ];
+  const groups = reportMatrixService.classifyMatrixFields(template, rows, { sharedAnswers: {} });
+  assert.deepEqual(
+    groups.tableFields.map((field) => field.id),
+    ['Respects_The_Teachers', 'Treats_Other_Students']
+  );
+  assert.equal(groups.commonFields.length, 0);
+});
+
 test('matrix keeps overall attendance day rows student-specific even when values match', () => {
   const template = {
     schema: {
