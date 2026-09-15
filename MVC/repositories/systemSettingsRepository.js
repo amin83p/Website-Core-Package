@@ -43,7 +43,10 @@ function mergeAppSettings(base = {}, incoming = {}) {
       defaultApp.uploadFolders,
       baseApp.uploadFolders,
       incomingApp.uploadFolders
-    )
+    ),
+    integrationVariables: Array.isArray(incomingApp.integrationVariables)
+      ? incomingApp.integrationVariables
+      : (Array.isArray(baseApp.integrationVariables) ? baseApp.integrationVariables : [])
   };
 }
 

@@ -24,6 +24,9 @@
   "app": {
     "defaultPageSize": 50,
     "searchDefaultKeyword": "aaa",
+    "genericPickerSearchDebounceMs": 400,
+    "requestCacheTtlSeconds": 900,
+    "requestCacheMaxEntries": 500,
     "buildVersionOverride": "",
     "defaultTimezone": "UTC",
     "uploadsPath": "/app/uploads",
@@ -41,6 +44,8 @@
       "school.examMedia": "school-exams/{templateId}/{questionId}",
       "school.classWorkspace": "school/classes/{classId}",
       "school.subjectWorkspace": "school/subjects/{subjectId}",
+      "school.bookCover": "school/books/{bookId}/cover",
+      "school.bookPdf": "school/books/{bookId}/pdf",
       "generated.heic": "heic-converter/{jobDate}/{jobId}",
       "generated.importReports": "importReports",
       "generated.benchpathReports": "benchpath/reports",
@@ -265,6 +270,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-08-07T02:16:41.634Z"
+    "lastUpdateDateTime": "2026-09-15T00:07:35.054Z"
   }
 }
