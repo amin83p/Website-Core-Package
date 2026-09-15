@@ -1,0 +1,17 @@
+<%
+  const bulkField = field && typeof field === 'object' ? field : {};
+  const bulkType = String(bulkField.type || 'text').trim().toLowerCase();
+  const bulkEligible = bulkField.readOnly !== true
+    && bulkField.calculated !== true
+    && bulkType !== 'textarea';
+  const bulkFieldId = String(bulkField.id || '').trim();
+%>
+<% if (bulkEligible && bulkFieldId) { %>
+  <button
+    type="button"
+    class="btn btn-outline-secondary btn-sm matrix-column-apply-all-btn mt-1 js-matrix-column-apply-all"
+    data-field-id="<%= bulkFieldId %>"
+    title="Apply to all students"
+    aria-label="Apply value to all students for <%= bulkField.label || bulkFieldId %>"
+  ><i class="bi bi-check2-all" aria-hidden="true"></i></button>
+<% } %>

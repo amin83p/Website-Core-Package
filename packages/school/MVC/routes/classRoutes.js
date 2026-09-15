@@ -516,6 +516,24 @@ router.post('/api/enrollment-periods/:periodId/extension',
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.createExtensionEnrollmentPeriod);
 
+router.get('/api/:classId/enrollment-move-target-classes',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, { keepActive: true }),
+  rollingCtrl.listEnrollmentMoveTargetClasses);
+
+router.post('/api/enrollment-periods/:periodId/move/preview',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, {
+    ...rollingEnrollmentMutationActionState,
+    requireToken: false
+  }),
+  rollingCtrl.previewEnrollmentMove);
+
+router.post('/api/enrollment-periods/:periodId/move/apply',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.applyEnrollmentMove);
+
 router.post('/api/:classId/cycles/close',
   requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),

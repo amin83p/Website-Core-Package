@@ -791,7 +791,6 @@ function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null,
   const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
   const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
   const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
-
   (Array.isArray(sessions) ? sessions : []).forEach((session) => {
     if (sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
       status: session?.status,
@@ -808,12 +807,19 @@ function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null,
       enabledAttendanceStatuses
     );
     const status = String(normalized?.attendance || '').trim().toLowerCase();
+    const hasSavedSessionConduct = Boolean(row?.conductSavedAt)
+      || ['classEffortPercent', 'classParticipationPercent', 'respectsTeachersPercent', 'respectsStudentsPercent']
+        .some((key) => normalizeSessionRatingPercent(row?.[key], null) !== null);
     // Allow unmarked attendance: Step 1 conduct is often saved before attendance is marked.
-    // Still exclude absent / N/A / other non-attending statuses from rating averages.
+    // When class conduct was saved for this session, include ratings even if attendance is absent/excused
+    // so Fill Reports matches the Class Conduct step (conduct is not attendance-gated after save).
     const attendanceEligible = status === 'present'
       || status === 'late'
-      || status === '';
-    if (!attendanceEligible) return;
+      || status === ''
+      || hasSavedSessionConduct;
+    if (!attendanceEligible) {
+      return;
+    }
 
     const pushIfRated = (bucket, raw) => {
       const value = normalizeSessionRatingPercent(raw, null);
@@ -2540,6 +2546,7 @@ function validateTemplatePrefillKeys(templateOrSchema) {
 }
 
 module.exports = {
+  buildStudentSessionRatingSummary,
   buildPrefillSnapshot,
   getSortedClbLevelHistory,
   getLatestClbLevelEntry,

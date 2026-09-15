@@ -2539,17 +2539,18 @@
                                                     <input type="hidden" class="att-comments" value="">
                                                 </td>
                                                 <td class="text-center pe-3 align-middle">
+                                                    <% const hasEnrollmentNote = String(student.enrollmentNotes || '').trim().length > 0; %>
                                                     <button type="button"
-                                                            class="btn btn-sm btn-outline-secondary py-0 px-1 js-enrollment-info-trigger"
-                                                            title="Enrollment info"
-                                                            aria-label="Enrollment info for <%= student.name %>"
+                                                            class="btn btn-sm py-0 px-1 js-enrollment-info-trigger <%= hasEnrollmentNote ? 'btn-warning text-dark enrollment-info-trigger-has-note' : 'btn-outline-secondary' %>"
+                                                            title="<%= hasEnrollmentNote ? 'Enrollment info (note on file)' : 'Enrollment info' %>"
+                                                            aria-label="<%= hasEnrollmentNote ? 'Enrollment info (note on file) for ' : 'Enrollment info for ' %><%= student.name %>"
                                                             data-enrollment-period-id="<%= student.enrollmentPeriodId || '' %>"
                                                             data-enrollment-finish-date="<%= student.enrollmentExpectedFinishDate || '' %>"
                                                             data-enrollment-notes="<%= (student.enrollmentNotes || '').replace(/"/g, '&quot;') %>"
                                                             data-enrollment-clb-recorded-at="<%= student.enrollmentClbRecordedAt || '' %>"
                                                             data-enrollment-clb-current="<%= encodeURIComponent(JSON.stringify(student.enrollmentClbCurrent || {})) %>"
                                                             data-enrollment-clb-goal="<%= encodeURIComponent(JSON.stringify(student.enrollmentClbGoal || {})) %>">
-                                                        <i class="bi bi-info-circle"></i>
+                                                        <i class="bi <%= hasEnrollmentNote ? 'bi-info-circle-fill' : 'bi-info-circle' %>"></i>
                                                     </button>
                                                 </td>
                                             </tr>
@@ -5375,6 +5376,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return token;
     }
 
+    function syncEnrollmentInfoTriggerNoteStyle(trigger, notes) {
+        if (!trigger) return;
+        const hasNote = Boolean(String(notes ?? trigger.dataset.enrollmentNotes ?? '').trim());
+        trigger.classList.remove('btn-outline-secondary', 'btn-warning', 'text-dark', 'enrollment-info-trigger-has-note');
+        if (hasNote) {
+            trigger.classList.add('btn-warning', 'text-dark', 'enrollment-info-trigger-has-note');
+        } else {
+            trigger.classList.add('btn-outline-secondary');
+        }
+        const icon = trigger.querySelector('i.bi');
+        if (icon) {
+            icon.classList.toggle('bi-info-circle-fill', hasNote);
+            icon.classList.toggle('bi-info-circle', !hasNote);
+        }
+        const row = trigger.closest('.roster-row');
+        const studentName = String(row?.dataset?.studentName || row?.getAttribute('data-student-name') || 'Student').trim() || 'Student';
+        const title = hasNote ? 'Enrollment info (note on file)' : 'Enrollment info';
+        trigger.title = title;
+        trigger.setAttribute('aria-label', `${title} for ${studentName}`);
+    }
+
     function resolveEnrollmentInfoFromTrigger(trigger) {
         if (!trigger) return null;
         const row = trigger.closest('.roster-row');
@@ -5486,6 +5508,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (activeEnrollmentInfoTrigger) {
                 activeEnrollmentInfoTrigger.dataset.enrollmentNotes = savedNotes;
+                syncEnrollmentInfoTriggerNoteStyle(activeEnrollmentInfoTrigger, savedNotes);
             }
             if (typeof uiAlert === 'function') uiAlert('Enrollment note saved.', 'Enrollment note', { icon: 'success' });
         } catch (error) {
@@ -5497,6 +5520,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    document.querySelectorAll('.js-enrollment-info-trigger').forEach((btn) => syncEnrollmentInfoTriggerNoteStyle(btn));
 
     function conductEscapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({

@@ -365,6 +365,26 @@ test('reportService skips null/empty conduct percents in session rating rollups'
   assert.match(source, /token === 'n\/a' \|\| token === 'na'/);
 });
 
+test('reportService includes saved session conduct in rating rollup when attendance is absent', () => {
+  const reportService = require('../packages/school/MVC/services/school/reportService');
+  const sessions = [{
+    sessionId: 'sess-today',
+    date: '2026-09-15',
+    roster: [{
+      personId: 'student-person-1',
+      attendance: 'absent',
+      classEffortPercent: 80,
+      classParticipationPercent: 75,
+      respectsTeachersPercent: 70,
+      respectsStudentsPercent: 65,
+      conductSavedAt: '2026-09-15T12:00:00.000Z'
+    }]
+  }];
+  const summary = reportService.buildStudentSessionRatingSummary(sessions, 'student-person-1');
+  assert.equal(summary.ratedSessions, 1);
+  assert.equal(summary.classEffortPercent, 80);
+});
+
 test('package manifest registers conductRatingScalePolicy entity', () => {
   const source = read('packages/school/package.manifest.json');
   assert.match(source, /"entityType": "conductRatingScalePolicy"/);

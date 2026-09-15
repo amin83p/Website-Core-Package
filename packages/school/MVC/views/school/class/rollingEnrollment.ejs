@@ -2111,6 +2111,136 @@
   </div>
 </div>
 
+<div class="modal fade" id="moveEnrollmentModal" tabindex="-1" aria-labelledby="moveEnrollmentModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="moveEnrollmentModalLabel"><i class="bi bi-arrow-left-right me-1"></i>Move Enrollment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="move_periodId">
+        <input type="hidden" id="move_studentId">
+        <div class="alert alert-light border small mb-3" id="move_sourceContext">
+          <div class="fw-semibold" id="move_studentLabel"></div>
+          <div class="text-muted" id="move_sourceClassLabel"></div>
+          <div class="text-muted" id="move_sourcePeriodLabel"></div>
+        </div>
+        <div class="border rounded p-3 mb-3" id="move_closeSection">
+          <div class="fw-semibold mb-2"><i class="bi bi-x-circle me-1 text-danger"></i>Close current enrollment</div>
+          <div class="row g-2">
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" for="move_close_endDate">End Date *</label>
+              <input type="date" id="move_close_endDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" for="move_close_status">Status</label>
+              <input type="text" id="move_close_status" class="form-control bg-light" value="Moved" readonly>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="move_close_reason">Close Reason *</label>
+              <textarea id="move_close_reason" class="form-control" rows="2" placeholder="Why is this enrollment being closed?"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="border rounded bg-light-subtle p-3 mb-3" id="move_targetSection">
+          <div class="fw-semibold mb-2"><i class="bi bi-person-plus me-1 text-primary"></i>Enroll in new class</div>
+          <div class="mb-2">
+            <label class="form-label" for="move_targetClassLabel">Target Class *</label>
+            <input type="hidden" id="move_targetClassId">
+            <div class="input-group">
+              <input type="text" id="move_targetClassLabel" class="form-control bg-white" placeholder="Pick a rolling class..." readonly>
+              <button type="button" class="btn btn-outline-primary" id="btn_pickMoveTargetClass" aria-label="Pick target class"><i class="bi bi-book"></i></button>
+            </div>
+          </div>
+          <div class="row g-2 enroll-cap-inputs-row">
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" for="move_startDate">Start Date *</label>
+              <input type="date" id="move_startDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <label class="form-label" for="move_endDate">End Date</label>
+              <input type="date" id="move_endDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %>>
+            </div>
+            <div class="col-lg-3 col-md-6 d-none" id="wrap_move_targetSessionCount">
+              <label class="form-label" for="move_targetSessionCount">Number of Sessions <span class="text-muted fw-normal">(optional)</span></label>
+              <input type="number" id="move_targetSessionCount" class="form-control" min="1" step="1" placeholder="e.g. 10">
+            </div>
+            <div class="col-lg-3 col-md-6 d-none" id="wrap_move_targetHours">
+              <label class="form-label" for="move_targetHours">Number of Hours <span class="text-muted fw-normal">(optional)</span></label>
+              <input type="number" id="move_targetHours" class="form-control" min="0.25" step="0.25" placeholder="e.g. 20">
+            </div>
+          </div>
+          <div class="row g-1 mt-1 enroll-cap-hints-row">
+            <div class="col-lg-3 col-md-6 d-none d-lg-block"></div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0" id="move_hint_endDate">Used with start date when no session or hour target is set.</div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0">Count sessions until target is reached. Cannot be combined with hour target.</div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="form-text compact-help mb-0">Allocate sessions by total hours. Cannot be combined with session target.</div>
+            </div>
+          </div>
+          <div class="row g-2 mt-2 align-items-start enroll-meta-inputs-row">
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label" for="move_funder">Funder</label>
+              <select id="move_funder" class="form-select">
+                <option value="self" selected>Self Fund</option>
+                <% (Array.isArray(funderOptions) ? funderOptions : []).forEach((funder) => { %>
+                <option value="<%= String(funder.id || '') %>"><%= String(funder.label || funder.id || '') %></option>
+                <% }); %>
+              </select>
+              <div class="form-text compact-help mb-0 mt-1">Self Fund posts to the student account. Other funders post to the funder account with student detail.</div>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label" for="move_status">Status</label>
+              <select id="move_status" class="form-select">
+                <option value="active" selected>Active</option>
+                <option value="to_be_confirmed">To be Confirmed</option>
+                <option value="waiting_list">Waiting list</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label" for="move_sessionCapacityType">Session Capacity</label>
+              <select id="move_sessionCapacityType" class="form-select">
+                <option value="group" selected>Group</option>
+                <option value="one_on_one">1 On 1</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label" for="move_claimNumber">Claim Number</label>
+              <select id="move_claimNumber" class="form-select">
+                <option value="">— None —</option>
+                <option value="__add_new__">+ Add New...</option>
+              </select>
+            </div>
+          </div>
+          <div class="row g-2 mt-1">
+            <div class="col-12">
+              <label class="form-label" for="move_reasonStart">Reason Start *</label>
+              <textarea id="move_reasonStart" class="form-control" rows="2" placeholder="Why is this enrollment starting?"></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="move_notes">Notes</label>
+              <textarea id="move_notes" class="form-control" rows="2" placeholder="Optional notes"></textarea>
+            </div>
+          </div>
+        </div>
+        <div id="move_previewPanel" class="alert alert-light border mb-0">
+          Preview the move before applying it.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewMoveEnrollment">Preview</button>
+        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_applyMoveEnrollment" disabled>Apply Move</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="reentryModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -2864,6 +2994,14 @@
     if (sourceInputId === 'grp_targetHours' && hasTargetHours('grp_targetHours')) {
       if (grpSessionInput) grpSessionInput.value = '';
     }
+    const moveSessionInput = qs('move_targetSessionCount');
+    const moveHoursInput = qs('move_targetHours');
+    if (sourceInputId === 'move_targetSessionCount' && hasTargetSessionCount('move_targetSessionCount')) {
+      if (moveHoursInput) moveHoursInput.value = '';
+    }
+    if (sourceInputId === 'move_targetHours' && hasTargetHours('move_targetHours')) {
+      if (moveSessionInput) moveSessionInput.value = '';
+    }
     applyEnrollmentCapUi();
     applyGroupEnrollmentCapUi();
   }
@@ -3114,6 +3252,7 @@
   const closeModalEl = qs('closePeriodModal');
   const undoCloseModalEl = qs('undoClosePeriodModal');
   const reentryModalEl = qs('reentryModal');
+  const moveEnrollmentModalEl = qs('moveEnrollmentModal');
   const editModalEl = qs('editPeriodModal');
   const onHoldModalEl = qs('enrollmentOnHoldModal');
   const enrollmentNoteModalEl = qs('enrollmentNoteModal');
@@ -3134,6 +3273,37 @@
   let rollingClbLevelHistory = [];
   let rollingClbContext = { studentId: '', studentLabel: '' };
   let rollingClbEditingEntryId = '';
+
+  function mountRollingModalToBody(modalEl) {
+    if (!modalEl || modalEl.parentElement === document.body) return modalEl;
+    document.body.appendChild(modalEl);
+    return modalEl;
+  }
+
+  function raiseRollingModalAboveStack(modalEl) {
+    if (!modalEl) return;
+    mountRollingModalToBody(modalEl);
+    let maxZ = 1050;
+    document.querySelectorAll('.modal.show').forEach((openModal) => {
+      if (openModal === modalEl) return;
+      const z = Number.parseInt(window.getComputedStyle(openModal).zIndex, 10);
+      if (Number.isFinite(z) && z > maxZ) maxZ = z;
+    });
+    const loadingEl = document.getElementById('globalLoadingModal');
+    if (loadingEl?.classList.contains('is-visible')) {
+      const loadingZ = Number.parseInt(window.getComputedStyle(loadingEl).zIndex, 10);
+      if (Number.isFinite(loadingZ) && loadingZ > maxZ) maxZ = loadingZ;
+    }
+    const modalZ = Math.max(maxZ + 10, 1055);
+    modalEl.style.setProperty('z-index', String(modalZ), 'important');
+    const backdrops = document.querySelectorAll('.modal-backdrop.show');
+    const backdrop = backdrops[backdrops.length - 1];
+    if (backdrop) backdrop.style.setProperty('z-index', String(modalZ - 5), 'important');
+  }
+
+  function clearRollingModalStackZIndex(modalEl) {
+    modalEl?.style.removeProperty('z-index');
+  }
 
   function cleanupRollingModalLayer() {
     try {
@@ -3341,6 +3511,7 @@
   const closeModal = createModalController(closeModalEl);
   const undoCloseModal = createModalController(undoCloseModalEl);
   const reentryModal = createModalController(reentryModalEl);
+  const moveEnrollmentModal = createModalController(moveEnrollmentModalEl);
   const editModal = createModalController(editModalEl);
   const enrollmentNoteModal = createModalController(enrollmentNoteModalEl);
   const onHoldModal = createModalController(onHoldModalEl);
@@ -3360,6 +3531,10 @@
   let rollingStudentContextState = null;
   const addButton = qs('btn_addPeriod');
   let approvedCloseStatusPayload = null;
+  let approvedMovePayload = null;
+  let approvedMovePreviewHash = null;
+  let moveTargetClassMeta = null;
+  let moveSourcePeriodRow = null;
   let approvedEditCloseStatusPayload = null;
   let editModalCurrentRow = null;
   let approvedOnHoldPayload = null;
@@ -6213,7 +6388,9 @@
       rollingClaimContext.studentLabel = String(result.data?.studentLabel || rollingClaimContext.studentLabel || studentId).trim();
       if (qs('rollingClaim_studentLabel')) qs('rollingClaim_studentLabel').value = rollingClaimContext.studentLabel;
       renderRollingClaimList();
+      mountRollingModalToBody(rollingStudentClaimNumbersModalEl);
       rollingStudentClaimNumbersModal?.show();
+      raiseRollingModalAboveStack(rollingStudentClaimNumbersModalEl);
       if (options.openEditorOnShow) showRollingClaimEditor(null);
     } catch (error) {
       await showMsg('Claim Numbers', 'error', error.message || 'Unable to load claim numbers.');
@@ -9502,6 +9679,7 @@
           : (status === 'waiting_list' ? 'bg-primary'
             : (status === 'planned' ? 'bg-primary' : (status === 'draft' ? 'bg-warning text-dark' : 'bg-secondary'))));
       const canClose = isOpenStatus(status);
+      const canMove = canManageEnrollmentOffice && canClose;
       const canOnHold = canManageEnrollmentOffice && ON_HOLD_ELIGIBLE_STATUSES.includes(status);
       const canArchive = ['completed', 'withdrawn', 'cancelled'].includes(status);
       const canReenter = ['completed', 'withdrawn', 'cancelled', 'archived'].includes(status);
@@ -9566,6 +9744,7 @@
                 ${canReviewDraft ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-review-draft" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-text me-1"></i>Review Draft</button>` : ''}
                 ${canUndoClose ? `<button type="button" class="btn btn-outline-success btn-sm btn-row-undo-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-counterclockwise me-1"></i>Undo Close</button>` : ''}
                 ${canReenter ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>` : ''}
+                ${canMove ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-move" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-left-right me-1"></i>Move</button>` : ''}
                 ${canClose ? `<button type="button" class="btn btn-outline-danger btn-sm btn-row-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-x-circle me-1"></i>Close</button>` : ''}
                 ${canArchive ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-archive" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-archive me-1"></i>Archive</button>` : ''}
                 ${canSyncAcademicLedger ? `<button type="button" class="btn btn-outline-info btn-sm btn-row-sync-ledger" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-bookmark me-1"></i>Sync academic ledger</button>` : ''}
@@ -9840,6 +10019,330 @@
     const confirmBtn = qs('btn_confirmClosePeriod');
     if (!confirmBtn) return;
     confirmBtn.disabled = !(periodId && effectiveDate && reason);
+  }
+
+  function resetMovePreviewState() {
+    approvedMovePayload = null;
+    approvedMovePreviewHash = null;
+    const applyBtn = qs('btn_applyMoveEnrollment');
+    if (applyBtn) applyBtn.disabled = true;
+    const panel = qs('move_previewPanel');
+    if (panel) {
+      panel.className = 'alert alert-light border mb-0';
+      panel.textContent = 'Preview the move before applying it.';
+    }
+  }
+
+  function normalizeMoveDateValue(value) {
+    const token = String(value || '').trim();
+    if (!token) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
+    const parsed = new Date(token);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  function resolveMoveSourceEndDate(row = {}) {
+    const explicitEndDate = normalizeMoveDateValue(row?.endDate);
+    if (explicitEndDate) return explicitEndDate;
+    const completionDate = normalizeMoveDateValue(row?.sessionCompletion?.date || row?.completionDate);
+    const hasEnrollmentTarget = normalizeTargetSessionCountValue(row?.targetSessionCount) > 0
+      || normalizeTargetHoursValue(row?.targetHours) > 0;
+    return hasEnrollmentTarget ? '' : completionDate;
+  }
+
+  function buildMoveCloseReason(targetClassTitle, userReason = '') {
+    const target = String(targetClassTitle || '').trim();
+    const reason = String(userReason || '').trim();
+    if (target && reason) return `Moved to ${target}: ${reason}`;
+    if (target) return `Moved to ${target}`;
+    return reason;
+  }
+
+  function extractMoveCloseUserReason(value = '') {
+    const reason = String(value || '').trim();
+    const match = reason.match(/^Moved to [^:]+:\s*(.*)$/i);
+    if (match) return String(match[1] || '').trim();
+    if (/^Moved to /i.test(reason)) return '';
+    return reason;
+  }
+
+  function inferMoveTargetEnrollmentMode(classItem = {}) {
+    const hours = normalizeTargetHoursValue(classItem.defaultTargetHours || classItem.targetHours);
+    const sessions = normalizeTargetSessionCountValue(classItem.defaultTargetSessionCount || classItem.targetSessionCount);
+    if (hours > 0) return 'hour_cap';
+    if (sessions > 0) return 'session_cap';
+    return 'date_window';
+  }
+
+  function clearMoveTargetClassPicker() {
+    moveTargetClassMeta = null;
+    if (qs('move_targetClassId')) qs('move_targetClassId').value = '';
+    if (qs('move_targetClassLabel')) qs('move_targetClassLabel').value = '';
+    syncMoveTargetClassFields();
+  }
+
+  function syncMoveCloseReasonWithTarget(targetClassTitle) {
+    const input = qs('move_close_reason');
+    if (!input) return;
+    input.value = buildMoveCloseReason(targetClassTitle, extractMoveCloseUserReason(input.value));
+  }
+
+  function readMoveEnrollmentPayload() {
+    const funder = resolveFunderSelectionFromSelect('move_funder');
+    const targetClassTitle = String(qs('move_targetClassLabel')?.value || '').trim();
+    const userCloseReason = extractMoveCloseUserReason(qs('move_close_reason')?.value);
+    const sessionCount = normalizeTargetSessionCountValue(qs('move_targetSessionCount')?.value);
+    const targetHours = normalizeTargetHoursValue(qs('move_targetHours')?.value);
+    return {
+      close: {
+        effectiveDate: String(qs('move_close_endDate')?.value || '').trim(),
+        targetStatus: 'completed',
+        reason: buildMoveCloseReason(targetClassTitle, userCloseReason)
+      },
+      target: {
+        classId: String(qs('move_targetClassId')?.value || '').trim(),
+        studentId: String(qs('move_studentId')?.value || '').trim(),
+        startDate: String(qs('move_startDate')?.value || '').trim(),
+        endDate: String(qs('move_endDate')?.value || '').trim(),
+        targetSessionCount: sessionCount,
+        targetHours,
+        funder,
+        reasonStart: String(qs('move_reasonStart')?.value || '').trim(),
+        notes: String(qs('move_notes')?.value || '').trim(),
+        status: String(qs('move_status')?.value || 'active').trim().toLowerCase() || 'active',
+        sessionCapacityType: readSessionCapacityTypeFromSelect('move_sessionCapacityType'),
+        claimNumber: readClaimNumberSelectValue('move_claimNumber'),
+        sessionCountPolicy: String(moveSourcePeriodRow?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na'
+      }
+    };
+  }
+
+  function syncMoveTargetClassFields() {
+    const meta = moveTargetClassMeta;
+    const mode = String(meta?.enrollmentMode || 'date_window').trim().toLowerCase();
+    const sessionWrap = qs('wrap_move_targetSessionCount');
+    const hoursWrap = qs('wrap_move_targetHours');
+    const hasTarget = Boolean(String(meta?.id || qs('move_targetClassId')?.value || '').trim());
+    if (!hasTarget) {
+      sessionWrap?.classList.add('d-none');
+      hoursWrap?.classList.add('d-none');
+      return;
+    }
+    if (mode === 'session_cap') {
+      sessionWrap?.classList.remove('d-none');
+      hoursWrap?.classList.add('d-none');
+    } else if (mode === 'hour_cap') {
+      sessionWrap?.classList.add('d-none');
+      hoursWrap?.classList.remove('d-none');
+    } else {
+      sessionWrap?.classList.remove('d-none');
+      hoursWrap?.classList.remove('d-none');
+    }
+    resetMovePreviewState();
+  }
+
+  async function syncMoveTargetClassFromPicker(item) {
+    const nextId = String(item?.id || '').trim();
+    const nextTitle = String(item?.title || item?.label || nextId).trim();
+    const studentId = String(qs('move_studentId')?.value || '').trim();
+    if (!nextId) return;
+    if (nextId === String(classId || '').trim()) {
+      clearMoveTargetClassPicker();
+      await showMsg('Invalid Target', 'warning', 'Target class must be different from the current class.');
+      return;
+    }
+    if (item?.isClosedForNewEnrollment === true || String(item?.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true') {
+      clearMoveTargetClassPicker();
+      await showMsg('Target Closed', 'warning', 'That class cycle is closed for new enrollment.');
+      return;
+    }
+    if (String(item?.registrationMode || '').trim().toLowerCase() !== 'rolling') {
+      clearMoveTargetClassPicker();
+      await showMsg('Invalid Target', 'warning', 'Target class must use rolling enrollment.');
+      return;
+    }
+    qs('move_targetClassId').value = nextId;
+    if (qs('move_targetClassLabel')) qs('move_targetClassLabel').value = nextTitle;
+    moveTargetClassMeta = {
+      id: nextId,
+      title: nextTitle,
+      enrollmentMode: inferMoveTargetEnrollmentMode(item),
+      isChargeable: String(item?.billingMode || '').trim().toLowerCase() === 'chargeable'
+    };
+    syncMoveCloseReasonWithTarget(nextTitle);
+    syncMoveTargetClassFields();
+  }
+
+  async function openMoveTargetClassPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      await showMsg('Picker Unavailable', 'warning', 'Class picker is not loaded on this page.');
+      return;
+    }
+    if (isGenericPickerOpen()) return;
+    const sourceClassId = String(classId || '').trim();
+    GenericPicker.open(GenericPickerPresets.class({
+      title: 'Select target class',
+      icon: 'bi-book',
+      placeholder: 'Search rolling classes...',
+      searchFields: 'id,title,status,registrationMode,deliveryDepartmentName',
+      context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      itemFilter: (item) => {
+        const itemId = String(item?.id || '').trim();
+        if (!itemId || itemId === sourceClassId) return false;
+        return String(item?.registrationMode || '').trim().toLowerCase() === 'rolling';
+      },
+      onSelect: (item) => {
+        syncMoveTargetClassFromPicker(item);
+      }
+    }));
+  }
+
+  async function openMoveEnrollmentModal(periodId) {
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    if (!row || !moveEnrollmentModal) return;
+    resetMovePreviewState();
+    moveSourcePeriodRow = row;
+    const studentDisplay = resolveStudentRowDisplay(row);
+    const sourceEndDate = resolveMoveSourceEndDate(row);
+    const closeDateDefault = sourceEndDate || orgTodayFallback();
+    const allowedStatuses = ['active', 'to_be_confirmed', 'waiting_list'];
+    const rowStatus = String(row.status || '').trim().toLowerCase();
+    qs('move_periodId').value = String(row.id || '');
+    qs('move_studentId').value = String(row.studentId || '');
+    qs('move_studentLabel').textContent = studentDisplay?.label || String(row.studentId || '');
+    qs('move_sourceClassLabel').textContent = `Current class: ${String(rollingClassData?.title || classId || '').trim()}`;
+    qs('move_sourcePeriodLabel').textContent = `Period ${String(row.startDate || '')}${row.endDate ? ' to ' + String(row.endDate) : ''} (${formatPeriodStatusLabel(row.status)})`;
+    qs('move_close_endDate').value = closeDateDefault;
+    qs('move_close_reason').value = '';
+    qs('move_startDate').value = closeDateDefault;
+    qs('move_endDate').value = sourceEndDate;
+    const sessionCount = normalizeTargetSessionCountValue(row?.targetSessionCount);
+    const hourCount = normalizeTargetHoursValue(row?.targetHours);
+    qs('move_targetSessionCount').value = sessionCount > 0 ? String(sessionCount) : '';
+    qs('move_targetHours').value = hourCount > 0 ? String(hourCount) : '';
+    qs('move_reasonStart').value = `Moved from ${String(rollingClassData?.title || classId || '').trim()}.`;
+    qs('move_notes').value = '';
+    setFunderSelectValue('move_funder', {
+      funderId: String(row?.funderId || 'self').trim() || 'self',
+      funderType: String(row?.funderType || 'self').trim() || 'self'
+    });
+    if (qs('move_status')) {
+      qs('move_status').value = allowedStatuses.includes(rowStatus) ? rowStatus : 'active';
+    }
+    setSessionCapacitySelectValue('move_sessionCapacityType', row?.sessionCapacityType || 'group');
+    clearMoveTargetClassPicker();
+    await refreshClaimNumberSelect('move_claimNumber', row.studentId, String(row?.claimNumber || '').trim());
+    moveEnrollmentModal.show();
+  }
+
+  function formatMoveScheduleConflictLines(conflicts = []) {
+    return (Array.isArray(conflicts) ? conflicts : []).slice(0, 5).map((row) => {
+      const date = String(row?.date || '').trim();
+      const conflictClass = String(row?.conflictClass || 'Class session').trim();
+      const existTime = String(row?.existTime || '').trim();
+      return `${date}: overlaps ${conflictClass}${existTime ? ` (${existTime})` : ''}`;
+    });
+  }
+
+  function renderMovePreviewPanel(preview) {
+    const panel = qs('move_previewPanel');
+    if (!panel) return;
+    const lines = Array.isArray(preview?.summaryLines) ? preview.summaryLines : [];
+    const blockers = Array.isArray(preview?.blockers) ? preview.blockers : [];
+    const warnings = Array.isArray(preview?.warnings) ? preview.warnings : [];
+    const scheduleConflicts = Array.isArray(preview?.scheduleConflicts?.conflicts)
+      ? preview.scheduleConflicts.conflicts
+      : (Array.isArray(preview?.targetEnrollmentPreview?.scheduleConflicts?.conflicts)
+        ? preview.targetEnrollmentPreview.scheduleConflicts.conflicts
+        : []);
+    const conflictLines = formatMoveScheduleConflictLines(scheduleConflicts);
+    if (preview?.canApply) {
+      panel.className = 'alert alert-info mb-0';
+      panel.innerHTML = [
+        '<div class="fw-semibold mb-1">Ready to apply</div>',
+        ...lines.map((line) => `<div>${htmlEscape(line)}</div>`),
+        warnings.length ? `<div class="small mt-2">${warnings.map((row) => htmlEscape(row.message || '')).join('<br>')}</div>` : ''
+      ].join('');
+      return;
+    }
+    panel.className = 'alert alert-warning mb-0';
+    panel.innerHTML = [
+      '<div class="fw-semibold mb-1">Preview blocked</div>',
+      ...blockers.map((row) => `<div>${htmlEscape(row.message || 'Unable to preview move.')}</div>`),
+      conflictLines.length ? `<div class="small mt-2">${conflictLines.map((line) => htmlEscape(line)).join('<br>')}</div>` : ''
+    ].join('');
+  }
+
+  async function previewMoveEnrollmentAction() {
+    const periodId = String(qs('move_periodId')?.value || '').trim();
+    const payload = readMoveEnrollmentPayload();
+    if (!periodId || !payload.close.effectiveDate || !payload.close.reason || !payload.target.classId || !payload.target.startDate || !payload.target.reasonStart) {
+      await showMsg('Missing Fields', 'warning', 'Complete all required close and target enrollment fields before previewing.');
+      return;
+    }
+    try {
+      showBusy('Previewing enrollment move...');
+      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/move/preview`, 'POST', payload);
+      if (!result) return;
+      const preview = result.preview || {};
+      renderMovePreviewPanel(preview);
+      if (preview.canApply) {
+        approvedMovePayload = payload;
+        approvedMovePreviewHash = String(preview.previewHash || '').trim();
+        qs('btn_applyMoveEnrollment').disabled = !approvedMovePreviewHash;
+      } else {
+        resetMovePreviewState();
+      }
+    } catch (error) {
+      resetMovePreviewState();
+      renderMovePreviewPanel(error.preview || { canApply: false, blockers: [{ message: error.message || 'Unable to preview move.' }] });
+      await showMsg('Preview failed', 'error', error.message || 'Unable to preview enrollment move.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function applyMoveEnrollmentAction() {
+    const periodId = String(qs('move_periodId')?.value || '').trim();
+    const payload = readMoveEnrollmentPayload();
+    if (!periodId) {
+      await showMsg('Missing Period', 'warning', 'Enrollment period is required.');
+      return;
+    }
+    if (!approvedMovePayload || !approvedMovePreviewHash || JSON.stringify(payload) !== JSON.stringify(approvedMovePayload)) {
+      await showMsg('Preview Required', 'warning', 'Preview the current move details before applying.');
+      resetMovePreviewState();
+      return;
+    }
+    const confirmed = await showConfirm('Apply this enrollment move?', 'Move Enrollment', {
+      confirmText: 'Apply Move',
+      confirmClass: 'btn-primary'
+    });
+    if (!confirmed) return;
+    try {
+      showBusy('Applying enrollment move...');
+      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/move/apply`, 'POST', {
+        ...payload,
+        previewHash: approvedMovePreviewHash
+      });
+      if (!result) return;
+      moveEnrollmentModal.hide();
+      await loadRows();
+      if (result.requiresDraftReview && result.targetPeriod?.id) {
+        await showMsg('Move Applied', 'success', result.message || 'Enrollment moved. Review draft charges for the new class enrollment.');
+        openDraftReviewModal(result.targetPeriod.id);
+        return;
+      }
+      await showMsg('Move Applied', 'success', result.message || 'Enrollment moved successfully.');
+    } catch (error) {
+      await showMsg('Move Failed', 'error', error.message || 'Unable to apply enrollment move.');
+      resetMovePreviewState();
+    } finally {
+      hideBusy();
+    }
   }
 
   function openCloseModal(periodId, targetStatus = 'completed') {
@@ -11413,6 +11916,13 @@
       return;
     }
 
+    const moveBtn = event.target.closest('.btn-row-move');
+    if (moveBtn) {
+      closeAllActionMenus();
+      openMoveEnrollmentModal(moveBtn.getAttribute('data-period-id'));
+      return;
+    }
+
     const closeBtn = event.target.closest('.btn-row-close');
     if (closeBtn) {
       closeAllActionMenus();
@@ -11685,6 +12195,28 @@
   });
   qs('btn_confirmClosePeriod')?.addEventListener('click', submitClosePeriod);
   qs('btn_previewClosePeriod')?.addEventListener('click', previewClosePeriod);
+  qs('btn_previewMoveEnrollment')?.addEventListener('click', previewMoveEnrollmentAction);
+  qs('btn_applyMoveEnrollment')?.addEventListener('click', applyMoveEnrollmentAction);
+  qs('btn_pickMoveTargetClass')?.addEventListener('click', openMoveTargetClassPicker);
+  ['move_close_endDate', 'move_close_reason', 'move_startDate', 'move_endDate', 'move_targetSessionCount', 'move_targetHours', 'move_reasonStart', 'move_notes', 'move_status', 'move_sessionCapacityType', 'move_claimNumber'].forEach((id) => {
+    qs(id)?.addEventListener('input', resetMovePreviewState);
+    qs(id)?.addEventListener('change', resetMovePreviewState);
+  });
+  qs('move_funder')?.addEventListener('change', resetMovePreviewState);
+  qs('move_targetSessionCount')?.addEventListener('input', () => applyEnrollmentCapMutualExclusion('move_targetSessionCount'));
+  qs('move_targetHours')?.addEventListener('input', () => applyEnrollmentCapMutualExclusion('move_targetHours'));
+  qs('move_claimNumber')?.addEventListener('change', () => {
+    handleClaimNumberSelectChange('move_claimNumber', qs('move_studentId')?.value || '', qs('move_studentLabel')?.textContent || '');
+    resetMovePreviewState();
+  });
+  qs('move_close_endDate')?.addEventListener('change', () => {
+    const closeDate = String(qs('move_close_endDate')?.value || '').trim();
+    const startInput = qs('move_startDate');
+    if (startInput && closeDate) {
+      startInput.value = closeDate;
+    }
+    resetMovePreviewState();
+  });
   qs('btn_confirmUndoClosePeriod')?.addEventListener('click', submitUndoClose);
   qs('btn_previewUndoClosePeriod')?.addEventListener('click', () => previewUndoClose());
   qs('undo_close_reason')?.addEventListener('input', syncUndoCloseConfirmState);
@@ -11824,12 +12356,16 @@
       renderRollingClaimList();
     }
   });
+  rollingStudentClaimNumbersModalEl?.addEventListener('shown.bs.modal', () => {
+    raiseRollingModalAboveStack(rollingStudentClaimNumbersModalEl);
+  });
   rollingStudentClaimNumbersModalEl?.addEventListener('hidden.bs.modal', () => {
     rollingClaimNumbers = [];
     rollingClaimEditingId = '';
     rollingClaimContext = { studentId: '', studentLabel: '', onSaved: null, selectAfterSave: '' };
     hideRollingClaimEditor();
     setRollingClaimAlert('');
+    clearRollingModalStackZIndex(rollingStudentClaimNumbersModalEl);
   });
   syncRollingStudentContextMenuPermissions();
 

@@ -732,6 +732,7 @@ async function detectStudentScheduleConflicts({
   classId = '',
   proposedSessions = [],
   studentPersonEntries = [],
+  excludeClassIds = [],
   reqUser
 } = {}) {
   const sessions = Array.isArray(proposedSessions) ? proposedSessions : [];
@@ -744,6 +745,9 @@ async function detectStudentScheduleConflicts({
   const startDate = dates.reduce((min, d) => (min < d ? min : d));
   const endDate = dates.reduce((max, d) => (max > d ? max : d));
   const normalizedClassId = toPublicId(classId);
+  const excludedClassIds = (Array.isArray(excludeClassIds) ? excludeClassIds : [])
+    .map((id) => toPublicId(id))
+    .filter(Boolean);
   const conflicts = [];
 
   const scheduleController = resolveScheduleController();
@@ -772,6 +776,7 @@ async function detectStudentScheduleConflicts({
 
         const eventClassId = toPublicId(event?.classId || event?.sourceClassId || '');
         if (normalizedClassId && eventClassId && idsEqual(eventClassId, normalizedClassId)) return;
+        if (eventClassId && excludedClassIds.some((excludedId) => idsEqual(eventClassId, excludedId))) return;
 
         const label = String(event?.title || event?.className || event?.classTitle || 'Class session').trim();
         conflicts.push({

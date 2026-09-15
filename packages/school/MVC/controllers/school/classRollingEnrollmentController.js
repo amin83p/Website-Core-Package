@@ -49,6 +49,7 @@ const enrollmentSessionMarksService = require('../../services/school/enrollmentS
 const enrollmentHoldService = require('../../services/school/enrollmentHoldService');
 const rollingEnrollmentAttendanceReportService = require('../../services/school/rollingEnrollmentAttendanceReportService');
 const extensionEnrollmentService = require('../../services/school/extensionEnrollmentService');
+const enrollmentMoveService = require('../../services/school/enrollmentMoveService');
 const sessionEnrollmentPickerService = require('../../services/school/sessionEnrollmentPickerService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
@@ -2120,7 +2121,8 @@ async function detectRollingEnrollmentScheduleConflicts(req, classData, student,
   startDate = '',
   endDate = '',
   workspaceSessions = null,
-  extraSessions = []
+  extraSessions = [],
+  excludeClassIds = []
 } = {}) {
   const normalizedStart = String(startDate || '').trim();
   const normalizedEnd = String(endDate || '').trim();
@@ -2167,6 +2169,7 @@ async function detectRollingEnrollmentScheduleConflicts(req, classData, student,
       personId: student.personId,
       name: studentLabel
     }],
+    excludeClassIds,
     reqUser: req.user
   });
 
@@ -5483,6 +5486,131 @@ async function createExtensionEnrollmentPeriod(req, res) {
   }
 }
 
+function assertEnrollmentOfficeAccess(req) {
+  if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+    throw new Error('Office access is required to move enrollments.');
+  }
+}
+
+async function listEnrollmentMoveTargetClasses(req, res) {
+  try {
+    const classId = toPublicId(req.params?.classId || '');
+    if (!classId) throw new Error('classId is required.');
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+    assertEnrollmentOfficeAccess(req);
+    const classes = await enrollmentMoveService.listMoveTargetClasses({
+      sourceClassId: classData.id,
+      studentId: toPublicId(req.query?.studentId || ''),
+      orgId: classData.orgId,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', classes });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+function buildMoveEnrollmentServiceOptions(req, { targetClassData, sourcePeriod } = {}) {
+  const sourceClassId = toPublicId(sourcePeriod?.classId || '');
+  return {
+    orgToday: resolveOrgTodayFromRequest(req),
+    assertPrerequisites: targetClassData
+      ? async (student, programId, termId, startDate) => {
+        await assertRollingEnrollmentPrerequisitesOrThrow(req, targetClassData, student, programId, termId, startDate);
+      }
+      : undefined,
+    detectScheduleConflicts: targetClassData && sourceClassId
+      ? async ({ targetClass, student, startDate, endDate }) => detectRollingEnrollmentScheduleConflicts(
+        req,
+        targetClass,
+        student,
+        {
+          startDate,
+          endDate,
+          excludeClassIds: [sourceClassId]
+        }
+      )
+      : undefined
+  };
+}
+
+async function previewEnrollmentMove(req, res) {
+  try {
+    const sourcePeriodId = toPublicId(req.params?.periodId || '');
+    const source = await schoolDataService.getDataById('classEnrollmentPeriods', sourcePeriodId, req.user);
+    if (!source) throw new Error('Source enrollment period not found.');
+    const { classData } = await getClassByIdWithOrgCheck(source.classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+    assertEnrollmentOfficeAccess(req);
+    const targetClassId = toPublicId(req.body?.target?.classId || req.body?.targetClassId || '');
+    let targetClassData = null;
+    if (targetClassId) {
+      const targetContext = await getClassByIdWithOrgCheck(targetClassId, req.user, buildRouteAccessContext(req));
+      targetClassData = targetContext.classData;
+      assertRollingWorkflowEnabledForClass(req, targetClassData);
+    }
+    const preview = await enrollmentMoveService.previewMoveEnrollment({
+      sourcePeriodId,
+      payload: req.body || {},
+      reqUser: req.user,
+      orgId: getActiveOrgIdOrThrow(req.user),
+      options: buildMoveEnrollmentServiceOptions(req, { targetClassData, sourcePeriod: source })
+    });
+    return res.status(preview.canApply ? 200 : 409).json({
+      status: preview.canApply ? 'success' : 'blocked',
+      message: preview.canApply
+        ? 'Move enrollment preview is ready.'
+        : (preview.blockers[0]?.message || 'Resolve the listed issues before applying this move.'),
+      preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
+  }
+}
+
+async function applyEnrollmentMove(req, res) {
+  try {
+    const sourcePeriodId = toPublicId(req.params?.periodId || '');
+    const source = await schoolDataService.getDataById('classEnrollmentPeriods', sourcePeriodId, req.user);
+    if (!source) throw new Error('Source enrollment period not found.');
+    const { classData } = await getClassByIdWithOrgCheck(source.classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+    assertEnrollmentOfficeAccess(req);
+    const targetClassId = toPublicId(req.body?.target?.classId || req.body?.targetClassId || '');
+    const { classData: targetClassData } = targetClassId
+      ? await getClassByIdWithOrgCheck(targetClassId, req.user, buildRouteAccessContext(req))
+      : { classData: null };
+    if (targetClassData) assertRollingWorkflowEnabledForClass(req, targetClassData);
+    const result = await enrollmentMoveService.applyMoveEnrollment({
+      sourcePeriodId,
+      payload: req.body || {},
+      previewHash: String(req.body?.previewHash || '').trim(),
+      reqUser: req.user,
+      orgId: getActiveOrgIdOrThrow(req.user),
+      engineHooks: targetClassData ? buildRollingEnrollmentEngineHooks(req, targetClassData) : {},
+      options: buildMoveEnrollmentServiceOptions(req, { targetClassData, sourcePeriod: source })
+    });
+    return res.json({
+      status: 'success',
+      message: result.requiresDraftReview
+        ? 'Enrollment moved. Review the draft charges for the new class enrollment.'
+        : 'Enrollment moved successfully.',
+      sourcePeriod: result.closedSource,
+      targetPeriod: result.targetPeriod,
+      requiresDraftReview: result.requiresDraftReview === true,
+      preview: result.preview
+    });
+  } catch (error) {
+    return res.status(error.preview?.blockers?.length ? 409 : 400).json({
+      status: 'error',
+      message: error.message,
+      preview: error.preview || null,
+      partial: error.partial || null
+    });
+  }
+}
+
 module.exports = {
   listRollingEnrollmentClasses,
   showRollingEnrollmentPage,
@@ -5526,6 +5654,9 @@ module.exports = {
   getEnrollmentPeriodAttendanceReport,
   applyEnrollmentPeriodSessionMarks,
   createExtensionEnrollmentPeriod,
+  listEnrollmentMoveTargetClasses,
+  previewEnrollmentMove,
+  applyEnrollmentMove,
   postEnrollmentSessionAlignment,
   postRollingEnrollmentWorkspace,
   postRollingEnrollmentPrerequisites,

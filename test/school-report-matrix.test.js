@@ -579,6 +579,10 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(matrixView, /data-bs-toggle="tooltip"/);
   assert.match(matrixView, /aria-label="Required"/);
   assert.match(matrixView, /matrix-header-label/);
+  assert.match(matrixView, /matrix-header-tip-trigger/);
+  assert.match(matrixView, /matrixColumnHeaderTip/);
+  assert.match(matrixView, /bindMatrixColumnHeaderTips/);
+  assert.doesNotMatch(matrixView, /matrix-help-icon/);
   assert.match(matrixView, /reportMatrixSharedSections/);
   assert.match(matrixView, /js-matrix-bulk-action/);
   assert.match(matrixView, /Save All Drafts/);
@@ -605,6 +609,14 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(matrixView, /matrix-context-label/);
   assert.match(sessionView, /matrixGroupKey/);
   assert.match(sessionView, />Fill Reports</);
+  assert.match(matrixView, /matrixColumnBulkHeader/);
+  assert.match(matrixView, /js-matrix-column-apply-all/);
+  assert.match(matrixView, /matrixColumnBulkPopover/);
+  assert.match(read('packages/school/MVC/views/school/report/partials/matrixColumnBulkHeader.ejs'), /bi-check2-all/);
+  assert.match(matrixView, /function applyColumnBulkValue/);
+  assert.match(matrixView, /function openMatrixColumnBulkPopover/);
+  assert.match(matrixView, /reportSelectField\.js/);
+  assert.match(matrixView, /matrix-column-apply-all-btn/);
 });
 
 test('report matrix EJS renders supported controls and locked row state', async () => {
@@ -624,10 +636,12 @@ test('report matrix EJS renders supported controls and locked row state', async 
     commonFields: [{ id: 'class_name', label: 'Class', type: 'text', readOnly: true, value: 'Class A', options: [] }],
     sharedFields: [{ id: 'goal', label: 'Goal', type: 'textarea', required: true, sharedAcrossStudents: true, readOnly: false, fullPageWidth: true, value: 'Practice', options: [] }],
     tableFields: [
-      { id: 'score', label: 'Score', type: 'number', readOnly: false, options: [] },
+      { id: 'score', label: 'Score', type: 'number', readOnly: false, helpText: 'Enter the session score.', options: [] },
+      { id: 'attended', label: 'Attended', type: 'select', readOnly: false, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] },
       { id: 'level', label: 'Level', type: 'select', readOnly: false, options: [{ value: 'good', label: 'Good' }] },
       { id: 'done', label: 'Done', type: 'checkbox', readOnly: false, options: [] },
-      { id: 'note', label: 'Note', type: 'text', readOnly: false, options: [] }
+      { id: 'note', label: 'Note', type: 'text', readOnly: false, options: [] },
+      { id: 'prefill_only', label: 'Prefill', type: 'text', readOnly: true, options: [] }
     ],
     rows: [{
       studentId: 'STU-1',
@@ -656,4 +670,14 @@ test('report matrix EJS renders supported controls and locked row state', async 
   assert.match(html, /id="btnReportMatrixExpandTable"/);
   assert.match(html, /id="reportMatrixTableModal"/);
   assert.match(html, /id="reportMatrixTableInlineHost"/);
+  assert.match(html, /js-matrix-column-apply-all/);
+  assert.match(html, /data-field-id="score"/);
+  assert.match(html, /data-field-id="attended"/);
+  assert.match(html, /matrix-column-apply-all-btn/);
+  assert.match(html, /bi-check2-all/);
+  assert.match(html, /id="matrixColumnBulkPopover"/);
+  assert.match(html, /matrix-header-tip-trigger/);
+  assert.match(html, /data-tip="Enter the session score/);
+  const matrixThead = html.match(/<thead class="table-light">[\s\S]*?<\/thead>/)?.[0] || '';
+  assert.doesNotMatch(matrixThead, /data-matrix-field-id="prefill_only"[\s\S]*js-matrix-column-apply-all/);
 });

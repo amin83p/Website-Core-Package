@@ -254,6 +254,17 @@ async function buildStudentMatrixRow({
       answers: {},
       prefillSnapshot
     };
+  } else {
+    const freshPrefill = await reportService.buildPrefillSnapshot({
+      assignment,
+      teacherId,
+      studentId,
+      reqUser
+    });
+    const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(instance, reqUser);
+    if (canEditAnswers) {
+      effectiveInstance = { ...instance, prefillSnapshot: freshPrefill };
+    }
   }
   const mergedAnswers = reportService.mergeTemplateData(template, effectiveInstance, assignment);
   const prefill = effectiveInstance.prefillSnapshot || {};
