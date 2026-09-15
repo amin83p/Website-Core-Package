@@ -197,6 +197,87 @@
     }
     .report-priority-marker { display: inline-flex; align-items: center; color: #dc3545; font-size: 1.05rem; line-height: 1; filter: drop-shadow(0 0 4px rgba(220, 53, 69, 0.35)); animation: reportPriorityBlink 1s ease-in-out infinite; }
     .report-priority-marker .bi { filter: drop-shadow(0 1px 1px rgba(120, 0, 0, 0.35)); }
+    .schedule-embedded-reports {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        margin-top: 0.25rem;
+        min-width: 0;
+    }
+    .schedule-embedded-report-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        max-width: 100%;
+        min-width: 0;
+        padding: 0.1rem 0.45rem;
+        border-radius: 999px;
+        border: 1px solid rgba(220, 53, 69, 0.35);
+        background: rgba(220, 53, 69, 0.08);
+        color: #b42318;
+        font-size: 0.62rem;
+        font-weight: 700;
+        line-height: 1.2;
+        text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .schedule-embedded-report-badge:hover,
+    .schedule-embedded-report-badge:focus {
+        color: #8f1a12;
+        background: rgba(220, 53, 69, 0.14);
+        text-decoration: none;
+    }
+    .schedule-embedded-report-badge .bi {
+        flex: 0 0 auto;
+        font-size: 0.72rem;
+    }
+    .event-block.has-embedded-reports,
+    .vertical-event-block.has-embedded-reports {
+        font-size: 0.68rem;
+        gap: 1px;
+        padding-top: 1.75rem;
+        padding-bottom: 4px;
+    }
+    .event-block.has-embedded-reports .schedule-event-title,
+    .vertical-event-block.has-embedded-reports .schedule-event-title {
+        font-size: 0.72rem;
+        margin-bottom: 0.1rem;
+        line-height: 1.15;
+    }
+    .event-block.has-embedded-reports .schedule-event-time,
+    .vertical-event-block.has-embedded-reports .schedule-event-time {
+        font-size: 0.62rem;
+        padding: 0.1rem 0.35rem;
+    }
+    .event-block.has-embedded-reports .schedule-event-time .bi,
+    .vertical-event-block.has-embedded-reports .schedule-event-time .bi {
+        font-size: 0.58rem;
+    }
+    .event-block.has-embedded-reports .schedule-event-student,
+    .vertical-event-block.has-embedded-reports .schedule-event-student {
+        font-size: 0.64rem;
+        padding-top: 0.1rem;
+    }
+    .event-block.has-embedded-reports .schedule-embedded-reports,
+    .vertical-event-block.has-embedded-reports .schedule-embedded-reports {
+        margin-top: 0.1rem;
+        gap: 0.15rem;
+    }
+    .event-block.has-embedded-reports .schedule-embedded-report-badge,
+    .vertical-event-block.has-embedded-reports .schedule-embedded-report-badge {
+        font-size: 0.56rem;
+        padding: 0.05rem 0.35rem;
+    }
+    .event-block.has-embedded-reports .schedule-embedded-report-badge .bi,
+    .vertical-event-block.has-embedded-reports .schedule-embedded-report-badge .bi {
+        font-size: 0.62rem;
+    }
+    .event-block.has-embedded-reports .event-meta,
+    .vertical-event-block.has-embedded-reports .event-meta {
+        gap: 4px;
+    }
     .event-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
     .session-status-tag { display: inline-block; border-radius: 999px; padding: 1px 6px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; border: 1px solid transparent; }
     .schedule-status-chip {
@@ -389,6 +470,38 @@
     .schedule-filter-card .card-header {
         border-bottom: 1px solid rgba(15, 23, 42, 0.06);
     }
+    .schedule-filter-card.is-expanded .schedule-filter-summary {
+        border-bottom-color: rgba(15, 23, 42, 0.08);
+    }
+    .schedule-filter-title-toggle {
+        cursor: pointer;
+        user-select: none;
+    }
+    .schedule-filter-summary {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        background: #fff;
+    }
+    .schedule-filter-summary-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: end;
+    }
+    .schedule-filter-summary-admin {
+        display: grid;
+        grid-template-columns: minmax(7.5rem, 0.7fr) minmax(11rem, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(9rem, 0.8fr);
+        gap: 1rem;
+        align-items: end;
+    }
+    .schedule-filter-summary-action .btn {
+        min-height: 2.75rem;
+        padding: 0 1.25rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        white-space: nowrap;
+    }
     .schedule-filter-toggle {
         color: #64748b;
         border-color: #cbd5e1;
@@ -467,8 +580,18 @@
         display: flex;
         gap: 0.65rem;
         justify-content: flex-end;
+        align-items: center;
         flex-wrap: wrap;
         padding-top: 0.15rem;
+    }
+    .schedule-filter-actions--with-cases {
+        justify-content: space-between;
+    }
+    .schedule-filter-actions-buttons {
+        display: flex;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
     .schedule-filter-actions .btn {
         min-height: 2.75rem;
@@ -484,20 +607,28 @@
         min-width: 8.5rem;
     }
     @media (max-width: 767.98px) {
-        .schedule-date-panel-row {
+        .schedule-date-panel-row,
+        .schedule-filter-summary-row {
             grid-template-columns: 1fr;
         }
-        .schedule-show-btn {
+        .schedule-show-btn,
+        .schedule-filter-summary-action .btn {
             width: 100%;
         }
         .schedule-range-group {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-        .schedule-filter-admin-row {
+        .schedule-filter-admin-row,
+        .schedule-filter-summary-admin {
             grid-template-columns: 1fr;
         }
-        .schedule-filter-actions {
+        .schedule-filter-actions--with-cases {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .schedule-filter-actions-buttons {
             justify-content: stretch;
+            width: 100%;
         }
         .schedule-filter-actions .btn {
             flex: 1 1 auto;
@@ -1544,9 +1675,11 @@
     <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
     <input type="hidden" id="sch_personName" value="<%= lockedPersonName %>">
   <% } %>
-  <div class="card border-0 shadow-sm mb-3 schedule-filter-card">
+  <div class="card border-0 shadow-sm mb-3 schedule-filter-card" id="scheduleFilterCard">
     <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
-      <div class="fw-bold text-dark"><i class="bi bi-calendar3 me-2"></i><%= canSelectAnyPerson ? 'Filter Schedule' : 'Choose dates' %></div>
+      <div id="scheduleFilterTitleToggle" class="fw-bold text-dark schedule-filter-title-toggle" role="button" tabindex="0" aria-controls="scheduleFilterCollapse">
+        <i class="bi bi-calendar3 me-2"></i><%= canSelectAnyPerson ? 'Filter Schedule' : 'Choose dates' %>
+      </div>
       <button
         id="scheduleFilterToggleBtn"
         type="button"
@@ -1559,49 +1692,69 @@
         <i id="scheduleFilterToggleIcon" class="bi bi-chevron-down"></i>
       </button>
     </div>
+    <div class="schedule-filter-summary">
+      <% if (canSelectAnyPerson) { %>
+      <div class="schedule-filter-summary-admin">
+        <div class="schedule-filter-field">
+          <label for="sch_role">Role</label>
+          <select id="sch_role" class="form-select schedule-filter-input">
+            <option value="teacher" selected>Teacher</option>
+            <option value="student">Student</option>
+            <option value="staff">Staff</option>
+            <option value="">All roles</option>
+          </select>
+        </div>
+        <div class="schedule-filter-field schedule-filter-people">
+          <label>People</label>
+          <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
+          <input type="hidden" id="sch_personName" value="<%= lockedPersonName %>">
+          <div class="schedule-people-actions">
+            <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker" title="Select people">
+              <i class="bi bi-people-fill me-1"></i>Select people
+            </button>
+            <button type="button" class="btn btn-outline-secondary px-3" id="btn_clearPerson" title="Clear people" aria-label="Clear people">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="schedule-filter-field">
+          <label for="sch_startDate">Start date</label>
+          <input type="date" id="sch_startDate" class="form-control schedule-date-input">
+        </div>
+        <div class="schedule-filter-field">
+          <label for="sch_endDate">End date</label>
+          <input type="date" id="sch_endDate" class="form-control schedule-date-input">
+        </div>
+        <div class="schedule-filter-field schedule-filter-summary-action">
+          <label class="d-none d-md-block" aria-hidden="true">&nbsp;</label>
+          <button type="button" id="btn_loadSchedule" class="btn btn-primary w-100">
+            <i class="bi bi-arrow-clockwise me-1"></i> Load tab
+          </button>
+        </div>
+      </div>
+      <% } else { %>
+      <div class="schedule-filter-summary-row">
+        <div class="schedule-date-field">
+          <label for="sch_startDate">Start date</label>
+          <input type="date" id="sch_startDate" class="form-control schedule-date-input">
+        </div>
+        <div class="schedule-date-field">
+          <label for="sch_endDate">End date</label>
+          <input type="date" id="sch_endDate" class="form-control schedule-date-input">
+        </div>
+        <div class="schedule-date-action schedule-filter-summary-action">
+          <label class="d-none d-md-block" aria-hidden="true">&nbsp;</label>
+          <button type="button" id="btn_loadSchedule" class="btn btn-primary schedule-show-btn w-100">
+            <i class="bi bi-arrow-clockwise me-1"></i> Show schedule
+          </button>
+        </div>
+      </div>
+      <% } %>
+    </div>
     <div class="collapse" id="scheduleFilterCollapse">
       <div class="card-body filter-panel p-3" id="scheduleFilterForm">
-              <% if (canSelectAnyPerson) { %>
+        <% if (canSelectAnyPerson) { %>
         <div class="schedule-filter-admin">
-          <div class="schedule-filter-admin-row">
-            <div class="schedule-filter-field">
-              <label for="sch_role">Role</label>
-              <select id="sch_role" class="form-select schedule-filter-input">
-                <option value="teacher" selected>Teacher</option>
-                <option value="student">Student</option>
-                <option value="staff">Staff</option>
-                <option value="">All roles</option>
-            </select>
-          </div>
-            <div class="schedule-filter-field schedule-filter-people">
-              <label>People</label>
-              <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
-              <input type="hidden" id="sch_personName" value="<%= lockedPersonName %>">
-              <div class="schedule-people-actions">
-                <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker" title="Select people">
-                  <i class="bi bi-people-fill me-1"></i>Select people
-              </button>
-                <button type="button" class="btn btn-outline-secondary px-3" id="btn_clearPerson" title="Clear people" aria-label="Clear people">
-                <i class="bi bi-x-lg"></i>
-              </button>
-          </div>
-          </div>
-            <div class="schedule-filter-field">
-              <label for="sch_startDate">Start date</label>
-              <input type="date" id="sch_startDate" class="form-control schedule-date-input">
-          </div>
-            <div class="schedule-filter-field">
-              <label for="sch_endDate">End date</label>
-              <input type="date" id="sch_endDate" class="form-control schedule-date-input">
-            </div>
-            <div class="schedule-filter-field schedule-filter-cases">
-              <label for="sch_hasCases">Cases</label>
-              <div class="schedule-cases-switch">
-              <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
-                <label class="form-check-label" for="sch_hasCases">With cases only</label>
-            </div>
-          </div>
-          </div>
           <div class="schedule-quick-dates">
             <span class="schedule-quick-dates-label">Quick range</span>
             <div class="schedule-range-group">
@@ -1614,33 +1767,21 @@
               <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="year">This year</button>
             </div>
           </div>
-          <div class="schedule-filter-actions">
-            <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary">Reset</button>
-            <button type="button" id="btn_loadSchedule" class="btn btn-primary">
-              <i class="bi bi-arrow-clockwise me-1"></i> Load tab
-            </button>
-            <button type="button" id="btn_loadAllSchedules" class="btn btn-outline-primary">
-              <i class="bi bi-cloud-arrow-down me-1"></i> Load all
-            </button>
+          <div class="schedule-filter-actions schedule-filter-actions--with-cases">
+            <div class="schedule-cases-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
+              <label class="form-check-label" for="sch_hasCases">With cases only</label>
+            </div>
+            <div class="schedule-filter-actions-buttons">
+              <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary">Reset</button>
+              <button type="button" id="btn_loadAllSchedules" class="btn btn-outline-primary">
+                <i class="bi bi-cloud-arrow-down me-1"></i> Load all
+              </button>
+            </div>
           </div>
         </div>
         <% } else { %>
         <div class="schedule-date-panel">
-          <div class="schedule-date-panel-row">
-            <div class="schedule-date-field">
-              <label for="sch_startDate">Start date</label>
-              <input type="date" id="sch_startDate" class="form-control schedule-date-input">
-      </div>
-            <div class="schedule-date-field">
-              <label for="sch_endDate">End date</label>
-              <input type="date" id="sch_endDate" class="form-control schedule-date-input">
-    </div>
-            <div class="schedule-date-action">
-              <button type="button" id="btn_loadSchedule" class="btn btn-primary schedule-show-btn">
-                <i class="bi bi-arrow-clockwise me-1"></i> Show schedule
-              </button>
-  </div>
-          </div>
           <div class="schedule-quick-dates">
             <span class="schedule-quick-dates-label">Quick range</span>
             <div class="schedule-range-group">
@@ -1651,11 +1792,10 @@
               <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="month">This month</button>
               <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="season">Next 3 months</button>
               <button type="button" class="btn btn-range range-chip schedule-range-chip" data-range="year">This year</button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
         <% } %>
-
       </div>
     </div>
   </div>
@@ -1832,6 +1972,7 @@
 
 <script src="/scripts/scheduleCompletionDisplay.js"></script>
 <script src="/scripts/sessionCalendarCore.js"></script>
+<script src="/scripts/scheduleEmbeddedReportUtils.js"></script>
 <script src="/scripts/attendanceMarkAppearanceClient.js"></script>
 <% if (canDragCreateSessions) { %>
 <script src="/scripts/sessionEnrollmentCalendarModal.js"></script>
@@ -1868,20 +2009,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const collapseEl = document.getElementById(String(options.collapseId || ''));
         const buttonEl = document.getElementById(String(options.buttonId || ''));
         const iconEl = document.getElementById(String(options.iconId || ''));
+        const titleEl = document.getElementById(String(options.titleId || ''));
+        const cardEl = document.getElementById(String(options.cardId || ''));
         if (!collapseEl || !buttonEl || !iconEl) return;
+
+        const collapseInstance = window.bootstrap?.Collapse
+            ? window.bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false })
+            : null;
+
         const setState = (open) => {
             iconEl.className = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
             buttonEl.setAttribute('aria-expanded', open ? 'true' : 'false');
             buttonEl.setAttribute('aria-label', open ? 'Close filters' : 'Open filters');
+            if (titleEl) titleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (cardEl) cardEl.classList.toggle('is-expanded', open);
         };
+
+        const toggleCollapse = () => {
+            if (collapseInstance) collapseInstance.toggle();
+            else buttonEl.click();
+        };
+
         setState(collapseEl.classList.contains('show'));
         collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
         collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+
+        if (titleEl) {
+            titleEl.addEventListener('click', (event) => {
+                if (event.target.closest('button, input, select, a, label')) return;
+                toggleCollapse();
+            });
+            titleEl.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                toggleCollapse();
+            });
+        }
     }
     bindCollapseToggle({
         collapseId: 'scheduleFilterCollapse',
         buttonId: 'scheduleFilterToggleBtn',
-        iconId: 'scheduleFilterToggleIcon'
+        iconId: 'scheduleFilterToggleIcon',
+        titleId: 'scheduleFilterTitleToggle',
+        cardId: 'scheduleFilterCard'
     });
 
     function setActiveRangeChip(range) {
@@ -2005,9 +2175,62 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(event?.eventType || '').trim().toLowerCase() === 'report_task'
             || Boolean(String(event?.assignmentId || '').trim());
     }
+    function isReadableScheduleReportTitle(value) {
+        const text = String(value || '').trim();
+        return Boolean(text) && !/^\d+$/.test(text);
+    }
+    function getScheduleReportClassLabel(event) {
+        const className = String(event?.className || '').trim();
+        const prefix = className.split('|')[0].trim();
+        if (isReadableScheduleReportTitle(prefix)) return prefix;
+        return '';
+    }
+    function getScheduleReportTitle(event) {
+        const explicit = String(event?.reportTemplateTitle || event?.reportTitle || '').trim();
+        if (isReadableScheduleReportTitle(explicit)) return explicit;
+        const className = String(event?.className || '').trim();
+        const match = className.match(/\|\s*Report:\s*(.+)$/i);
+        if (match) {
+            const candidate = String(match[1] || '').trim();
+            if (isReadableScheduleReportTitle(candidate)) return candidate;
+        }
+        return 'Report';
+    }
     function buildReportPriorityMarker(event) {
         if (!isReportScheduleEvent(event)) return '';
-        return '<span class="report-priority-marker" role="img" aria-label="Important report" title="Important report"><i class="bi bi-stars" aria-hidden="true"></i></span>';
+        const reportTitle = getScheduleReportTitle(event);
+        return `<span class="report-priority-marker" role="img" aria-label="${escapeHtml(reportTitle)}" title="${escapeHtml(reportTitle)}"><i class="bi bi-stars" aria-hidden="true"></i></span>`;
+    }
+    function prepareEventsByDateForTimelineGrid(eventsByDate) {
+        if (window.ScheduleEmbeddedReportUtils?.prepareEventsByDateForTimelineGrid) {
+            return window.ScheduleEmbeddedReportUtils.prepareEventsByDateForTimelineGrid(eventsByDate);
+        }
+        return eventsByDate;
+    }
+    function buildEmbeddedReportBadgesHtml(reports) {
+        const list = Array.isArray(reports) ? reports : [];
+        if (!list.length) return '';
+        const badges = list.map((report) => {
+            const title = getScheduleReportTitle(report);
+            const time = formatScheduleClockRange(report?.start, report?.end);
+            const tip = time && time !== '-' ? `${title} (${time})` : title;
+            const detailsUrl = String(report?.detailsUrl || '').trim();
+            const inner = `<i class="bi bi-stars" aria-hidden="true"></i><span class="schedule-embedded-report-badge-label">${escapeHtml(title)}</span>`;
+            if (detailsUrl) {
+                return `<a class="schedule-embedded-report-badge" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener" title="${escapeHtml(tip)}" aria-label="${escapeHtml(tip)}">${inner}</a>`;
+            }
+            return `<span class="schedule-embedded-report-badge" title="${escapeHtml(tip)}" aria-label="${escapeHtml(tip)}">${inner}</span>`;
+        }).join('');
+        return `<div class="schedule-embedded-reports">${badges}</div>`;
+    }
+    function getEmbeddedReportTooltipLine(event) {
+        const reports = Array.isArray(event?.embeddedReports) ? event.embeddedReports : [];
+        if (!reports.length) return '';
+        return reports.map((report) => getScheduleReportTitle(report)).filter(Boolean).join(', ');
+    }
+    function buildScheduleEmbeddedReportsClass(event) {
+        const reports = Array.isArray(event?.embeddedReports) ? event.embeddedReports : [];
+        return reports.length ? ' has-embedded-reports' : '';
     }
     function getEventTitle(event) {
         const soloName = normalizeScheduleTooltipValue(event?.soloStudentName || event?.singleStudentName);
@@ -2015,6 +2238,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const soloPersonId = String(event?.soloStudentPersonId || '').trim();
         const readableSoloName = soloName && !isScheduleOpaqueLabel(soloName, soloStudentId, soloPersonId) ? soloName : '';
         if (readableSoloName && (event?.isOneOnOneClass || event?.soloStudentId)) return readableSoloName;
+        if (isReportScheduleEvent(event)) {
+            const reportTitle = getScheduleReportTitle(event);
+            const classLabel = getScheduleReportClassLabel(event);
+            return classLabel ? `${classLabel} | ${reportTitle}` : reportTitle;
+        }
         return String(event?.className || event?.title || event?.label || event?.classId || 'Schedule Item').trim();
     }
 
@@ -2215,7 +2443,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const hoursValue = isActivityEvent
             ? Number(event?.paidHours ?? event?.duration ?? 0)
             : Number(event?.duration ?? 0);
-        addDetail('Session', getEventTitle(event));
+        if (isReportScheduleEvent(event)) {
+            addDetail('Report', getScheduleReportTitle(event));
+            const classLabel = getScheduleReportClassLabel(event);
+            if (classLabel) addDetail('Class', classLabel);
+        } else {
+            addDetail('Session', getEventTitle(event));
+            const embeddedReports = getEmbeddedReportTooltipLine(event);
+            if (embeddedReports) addDetail('Reports', embeddedReports);
+        }
         addDetail('Date', formatScheduleDateLabel(event?.date));
         addDetail('Time', time);
         if (Number.isFinite(hoursValue) && hoursValue > 0) {
@@ -8736,9 +8972,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const eventTitle = getEventTitle(ev);
                 const cssClass = scheduleEventRoleClass(ev);
                 const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+                const embeddedReportsClass = buildScheduleEmbeddedReportsClass(ev);
                 const blockClasses = scd
-            ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}`)
-            : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}`;
+            ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`)
+            : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`;
                 const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
                 const selectedClass = buildScheduleSessionSelectedClass(ev);
                 const unselectableClass = buildScheduleSessionUnselectableClass(ev);
@@ -8746,6 +8983,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
                 const detailsUrl = getEventDetailsUrl(ev);
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+                const embeddedReportBadges = buildEmbeddedReportBadgesHtml(ev?.embeddedReports);
         const clickHandler = buildScheduleSessionBlockClickHandler(ev);
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
@@ -8767,7 +9005,8 @@ document.addEventListener('DOMContentLoaded', () => {
                              ${selectionControl}
                              ${statusChip}
                              ${buildScheduleDraftBadge(ev)}
-                             <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
+                             <div class="schedule-event-title">${isReportScheduleEvent(ev) ? `${buildReportPriorityMarker(ev)} ` : ''}${escapeHtml(eventTitle)}</div>
+                             ${embeddedReportBadges}
                              ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
                              <div class="event-meta x-small">
                     <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatScheduleClockRange(ev.start, ev.end))}</span>
@@ -8784,15 +9023,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const eventTitle = getEventTitle(ev);
                 const cssClass = scheduleEventRoleClass(ev);
                 const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+                const embeddedReportsClass = buildScheduleEmbeddedReportsClass(ev);
                 const blockClasses = scd
-            ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}`)
-            : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}`;
+            ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`)
+            : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`;
                 const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
                 const selectedClass = buildScheduleSessionSelectedClass(ev);
                 const unselectableClass = buildScheduleSessionUnselectableClass(ev);
                 const selectionControl = buildScheduleSelectionControlHtml(ev);
                 const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+                const embeddedReportBadges = buildEmbeddedReportBadgesHtml(ev?.embeddedReports);
                 const clickHandler = buildScheduleSessionBlockClickHandler(ev);
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
@@ -8811,7 +9052,8 @@ document.addEventListener('DOMContentLoaded', () => {
                          ${selectionControl}
                          ${statusChip}
                          ${buildScheduleDraftBadge(ev)}
-                         <div class="schedule-event-title">${buildReportPriorityMarker(ev)} ${escapeHtml(eventTitle)}</div>
+                         <div class="schedule-event-title">${isReportScheduleEvent(ev) ? `${buildReportPriorityMarker(ev)} ` : ''}${escapeHtml(eventTitle)}</div>
+                         ${embeddedReportBadges}
                          ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
                          <div class="event-meta x-small">
                     <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatScheduleClockRange(ev.start, ev.end))}</span>
@@ -8834,7 +9076,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
         applyScheduleWeekGridHostSize(container, estimateScheduleWeekCountForRange());
-        return scheduleCalendarCore.renderHorizontalWeekGrid(eventsByDate, container, null, buildScheduleWeekGridRenderOptions('timeline'));
+        const preparedEventsByDate = prepareEventsByDateForTimelineGrid(eventsByDate);
+        return scheduleCalendarCore.renderHorizontalWeekGrid(preparedEventsByDate, container, null, buildScheduleWeekGridRenderOptions('timeline'));
     }
 
     function renderVerticalTimelineView(eventsByDate, container) {
@@ -8843,7 +9086,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
         applyScheduleWeekGridHostSize(container, estimateScheduleWeekCountForRange());
-        return scheduleCalendarCore.renderVerticalWeekGrid(eventsByDate, container, null, buildScheduleWeekGridRenderOptions('verticalTimeline'));
+        const preparedEventsByDate = prepareEventsByDateForTimelineGrid(eventsByDate);
+        return scheduleCalendarCore.renderVerticalWeekGrid(preparedEventsByDate, container, null, buildScheduleWeekGridRenderOptions('verticalTimeline'));
     }
 
     function formatScheduleCompactClock(timeStr) {

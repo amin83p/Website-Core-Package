@@ -172,6 +172,16 @@ function isRecordAccessibleByAssignment(record = {}, scope = {}, options = {}) {
     return idsEqual(record?.teacherId, personId);
   }
 
+  if (kind === 'teacherIds') {
+    const aliasIds = new Set(
+      [personId, ...(Array.isArray(scope?.delivererAliasIds) ? scope.delivererAliasIds : [])]
+        .map((id) => toPublicId(id))
+        .filter(Boolean)
+    );
+    const assignmentTeachers = Array.isArray(record?.teacherIds) ? record.teacherIds : [];
+    return assignmentTeachers.some((id) => aliasIds.has(toPublicId(id)));
+  }
+
   if (kind === 'personId') {
     return idsEqual(record?.personId, personId);
   }
@@ -184,6 +194,15 @@ function isRecordSubjectPersonMatch(record = {}, scope = {}, options = {}) {
   if (!personId) return false;
   const kind = String(options?.assignmentScopeKind || 'personId').trim() || 'personId';
   if (kind === 'teacherId') return idsEqual(record?.teacherId, personId);
+  if (kind === 'teacherIds') {
+    const aliasIds = new Set(
+      [personId, ...(Array.isArray(scope?.delivererAliasIds) ? scope.delivererAliasIds : [])]
+        .map((id) => toPublicId(id))
+        .filter(Boolean)
+    );
+    const assignmentTeachers = Array.isArray(record?.teacherIds) ? record.teacherIds : [];
+    return assignmentTeachers.some((id) => aliasIds.has(toPublicId(id)));
+  }
   if (kind === 'personId') return idsEqual(record?.personId, personId);
   return false;
 }
@@ -267,6 +286,17 @@ function buildAssignmentScopeFilter(scope = {}, options = {}) {
   }
   if (kind === 'teacherId') {
     return { teacherId: personId };
+  }
+  if (kind === 'teacherIds') {
+    const aliasIds = [...new Set(
+      [personId, ...(Array.isArray(scope?.delivererAliasIds) ? scope.delivererAliasIds : [])]
+        .map((id) => toPublicId(id))
+        .filter(Boolean)
+    )];
+    if (!aliasIds.length) return { id: '__NO_MATCH__' };
+    return aliasIds.length === 1
+      ? { teacherIds: aliasIds[0] }
+      : { teacherIds: { $in: aliasIds } };
   }
 
   return { id: '__NO_MATCH__' };
@@ -1013,7 +1043,8 @@ const schoolRepositories = {
       allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(row)
     }),
     replaceObjectFields: ['placeholderMap', 'pdfFieldMap'],
-    defaultSearchFields: ['id', 'orgId', 'title', 'type', 'status', 'description']
+    defaultSearchFields: ['id', 'orgId', 'title', 'type', 'status', 'description'],
+    assignmentScopeKind: 'catalog'
   }),
   reportAssignments: createSchoolRepository({
     entityName: 'reportAssignments',
@@ -1023,7 +1054,8 @@ const schoolRepositories = {
     create: reportAssignmentModel.addAssignment,
     update: reportAssignmentModel.updateAssignment,
     remove: reportAssignmentModel.deleteAssignment,
-    defaultSearchFields: ['id', 'orgId', 'classId', 'templateId', 'status', 'targetType', 'sessionDate', 'dueDate']
+    defaultSearchFields: ['id', 'orgId', 'classId', 'templateId', 'status', 'targetType', 'sessionDate', 'dueDate'],
+    assignmentScopeKind: 'teacherIds'
   }),
   reportInstances: createSchoolRepository({
     entityName: 'reportInstances',

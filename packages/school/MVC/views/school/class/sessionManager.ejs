@@ -5203,7 +5203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : 'null' %>;
     window.__attendanceThresholdsEnabled = <%= typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved?.thresholdsEnabled === false ? 'false' : 'true' %>;
     window.__conductRatingScale = <%- JSON.stringify(typeof conductRatingScaleResolved !== 'undefined' && conductRatingScaleResolved ? conductRatingScaleResolved : { levels: conductScaleDefaultLevels }) %>;
-    const sessionConductReadOnly = sessionConductSectionReadOnly || <%= JSON.stringify(!canViewClassConductPanelFlag) %>;
+    const sessionConductReadOnly = sessionConductSectionReadOnly || !sessionCanManageClassConduct;
     const conductDimensionMeta = <%- jsonForScript(conductDimensions) %>;
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;

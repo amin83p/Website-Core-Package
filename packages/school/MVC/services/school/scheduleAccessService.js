@@ -272,11 +272,14 @@ async function resolveLockedViewerAccess(reqUser, { activeOrgId, accessContext =
   }
 
   const availableRoles = Array.from(roleMap.values());
+  const selectedRole = availableRoles.length === 1
+    ? availableRoles[0].key
+    : (availableRoles.find((row) => row.key === 'teacher')?.key || availableRoles[0]?.key || '');
   return {
     lockedPersonId: personId,
     lockedPersonName: getScheduleViewerName({ person, reqUser, personId }),
     availableRoles,
-    selectedRole: availableRoles.length === 1 ? availableRoles[0].key : ''
+    selectedRole
   };
 }
 

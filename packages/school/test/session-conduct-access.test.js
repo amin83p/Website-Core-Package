@@ -33,4 +33,5 @@ test('sessionManager keeps report quick-rate conduct for session editors', () =>
   assert.match(sessionManagerSource, /canManageReportClassConductFlag/);
   assert.match(sessionManagerSource, /sessionHasConductRequiredReportsResolved && canManageReportClassConductFlag/);
   assert.match(sessionManagerSource, /btnOpenConductBulkModal/);
+  assert.match(sessionManagerSource, /sessionConductReadOnly = sessionConductSectionReadOnly \|\| !sessionCanManageClassConduct/);
 });

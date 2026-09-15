@@ -187,7 +187,94 @@ function wantsSessionsWithCasesOnly(query = {}) {
 
 function filterEventsWithCasesIfRequested(events, query = {}) {
     if (!wantsSessionsWithCasesOnly(query)) return Array.isArray(events) ? events : [];
-    return (Array.isArray(events) ? events : []).filter((event) => event?.caseSummary?.hasCases === true);
+    return (Array.isArray(events) ? events : []).filter((event) => {
+        if (String(event?.eventType || '').trim().toLowerCase() === 'report_task') return true;
+        return event?.caseSummary?.hasCases === true;
+    });
+}
+
+async function buildReportAssignmentListScope(reqUser, accessContext = {}, listScope = {}) {
+    const scope = { ...(listScope && typeof listScope === 'object' ? listScope : {}) };
+    const scopeMode = String(scope?.scopeMode || '').trim();
+    const scopedPersonId = normalizeId(scope?.personId);
+    if (scopeMode !== 'assignment' || !scopedPersonId) return scope;
+    const teachers = await schoolDataService.fetchAllData('teachers', { personId__eq: scopedPersonId }, reqUser, accessContext);
+    scope.delivererAliasIds = (Array.isArray(teachers) ? teachers : [])
+        .map((row) => normalizeId(row?.id))
+        .filter(Boolean);
+    return scope;
+}
+
+function buildReportTemplateListScope(activeOrgId, listScope = {}) {
+    const orgId = normalizeId(activeOrgId);
+    if (orgId) {
+        return {
+            ...(listScope && typeof listScope === 'object' ? listScope : {}),
+            activeOrgId: orgId,
+            scopeMode: 'orgWide',
+            canViewAll: false
+        };
+    }
+    return listScope && typeof listScope === 'object' ? listScope : {};
+}
+
+function isReadableReportTitle(value) {
+    const text = String(value || '').trim();
+    return Boolean(text) && !/^\d+$/.test(text);
+}
+
+function resolveReportTemplateTitle(templateMap, templateId) {
+    const key = normalizeId(templateId);
+    if (!key) return 'Report';
+    const direct = String(templateMap.get(key) || '').trim();
+    if (isReadableReportTitle(direct)) return direct;
+    if (templateMap instanceof Map) {
+        for (const [id, title] of templateMap.entries()) {
+            if (idsEqual(id, key)) {
+                const resolved = String(title || '').trim();
+                if (isReadableReportTitle(resolved)) return resolved;
+            }
+        }
+    }
+    return 'Report';
+}
+
+async function enrichReportTemplateTitleMap(templateTitleMap, assignments = []) {
+    const map = templateTitleMap instanceof Map ? templateTitleMap : new Map();
+    const needed = new Set();
+    (Array.isArray(assignments) ? assignments : []).forEach((assignment) => {
+        const templateId = normalizeId(assignment?.templateId);
+        if (!templateId) return;
+        if (!isReadableReportTitle(resolveReportTemplateTitle(map, templateId))) {
+            needed.add(templateId);
+        }
+    });
+    await Promise.all([...needed].map(async (templateId) => {
+        try {
+            const row = await schoolRepositories.reportTemplates.getById(templateId);
+            const title = String(row?.title || '').trim();
+            if (isReadableReportTitle(title)) {
+                map.set(templateId, title);
+            }
+        } catch (_) {
+            // ignore lookup failures; caller falls back to generic label
+        }
+    }));
+    return map;
+}
+
+function isTeacherAssignedOnReportAssignment(assignment, personId, teacherPersonMap = new Map()) {
+    const normalizedPersonId = normalizeId(personId);
+    if (!normalizedPersonId) return false;
+    const aliases = new Set(
+        teacherIdentityService.collectTeacherRecordIdsForPerson(normalizedPersonId, teacherPersonMap)
+            .map((id) => normalizeId(id))
+            .filter(Boolean)
+    );
+    const teacherIds = Array.isArray(assignment?.teacherIds)
+        ? assignment.teacherIds.map((id) => normalizeId(id)).filter(Boolean)
+        : [];
+    return teacherIds.some((id) => aliases.has(id));
 }
 
 function parseTimeToMinutes(value) {
@@ -1125,7 +1212,8 @@ async function appendReportEventsForPerson({
     studentClassIds,
     linkedStudentIds = [],
     reqUser,
-    isStudentActiveOnDate = null
+    isStudentActiveOnDate = null,
+    teacherPersonMap = new Map()
 }) {
     const normalizedPersonId = normalizeId(personId);
     if (!normalizedPersonId) return;
@@ -1143,10 +1231,7 @@ async function appendReportEventsForPerson({
         const status = String(assignment?.status || '').trim().toLowerCase();
         if (status !== 'active') continue;
 
-        const teacherIds = Array.isArray(assignment?.teacherIds)
-            ? assignment.teacherIds.map((id) => normalizeId(id)).filter(Boolean)
-            : [];
-        const isTeacherAssigned = teacherIds.includes(normalizedPersonId);
+        const isTeacherAssigned = isTeacherAssignedOnReportAssignment(assignment, normalizedPersonId, teacherPersonMap);
 
         const classId = normalizeId(assignment?.classId);
         const classRow = classMap.get(classId) || null;
@@ -1221,8 +1306,8 @@ async function appendReportEventsForPerson({
             }
         }
 
-        const templateTitle = String(templateMap.get(normalizeId(assignment?.templateId)) || assignment?.templateId || 'Report').trim();
-        const classTitle = String(classRow?.title || classId || 'Class').trim() || 'Class';
+        const templateTitle = resolveReportTemplateTitle(templateMap, assignment?.templateId);
+        const classTitle = String(classRow?.title || '').trim() || 'Class';
         const classLifecycle = buildClassLifecycleSnapshot(classRow);
         const role = isTeacherAssigned ? (isLikelyStaffOnly ? 'Staff' : 'Teacher') : 'Student';
         const roleLabel = role;
@@ -1242,6 +1327,7 @@ async function appendReportEventsForPerson({
             end: window.end,
             classId,
             className: `${classTitle} | Report: ${templateTitle}`,
+            reportTemplateTitle: templateTitle,
             classLifecycle,
             duration: durationHoursForEvent,
             status: 'scheduled',
@@ -1344,12 +1430,14 @@ async function buildEventsForPersonAndRange({
     skipEnrichment = false
 }) {
     const listScope = scheduleAccessService.resolveListScope(reqUser, accessContext);
+    const assignmentListScope = await buildReportAssignmentListScope(reqUser, accessContext, listScope);
+    const templateListScope = buildReportTemplateListScope(activeOrgId, listScope);
     const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents, allEnrollmentPeriods] = await Promise.all([
         schoolDataService.getStudentIndex(),
         schoolDataService.getTeacherIndex(),
         schoolDataService.fetchAllData('classes', {}, reqUser, accessContext),
-        schoolRepositories.reportAssignments.list({ query: {}, scope: listScope }),
-        schoolRepositories.reportTemplates.list({ query: {}, scope: listScope }),
+        schoolRepositories.reportAssignments.list({ query: {}, scope: assignmentListScope }),
+        schoolRepositories.reportTemplates.list({ query: {}, scope: templateListScope }),
         schoolDataService.fetchAllData('teachers', {}, reqUser, accessContext),
         schoolDataService.fetchAllData('students', {}, reqUser, accessContext),
         activeOrgId
@@ -1367,10 +1455,16 @@ async function buildEventsForPersonAndRange({
             .filter(([id]) => Boolean(id))
     );
     const classSessionsById = new Map();
-    const templateTitleMap = new Map(
-        (Array.isArray(allTemplates) ? allTemplates : [])
-            .map((row) => [normalizeId(row?.id), String(row?.title || '').trim()])
-            .filter(([id]) => Boolean(id))
+    const templateTitleMap = await enrichReportTemplateTitleMap(
+        new Map(
+            (Array.isArray(allTemplates) ? allTemplates : [])
+                .map((row) => [normalizeId(row?.id), String(row?.title || '').trim()])
+                .filter(([id, title]) => Boolean(id) && isReadableReportTitle(title))
+        ),
+        (Array.isArray(allAssignments) ? allAssignments : []).filter((row) => {
+            if (!activeOrgId) return true;
+            return idsEqual(row?.orgId, activeOrgId);
+        })
     );
 
     const person = await getSchoolPersonRecordById(normalizedPersonId, reqUser);
@@ -1650,7 +1744,8 @@ async function buildEventsForPersonAndRange({
         studentClassIds,
         linkedStudentIds,
         reqUser,
-        isStudentActiveOnDate
+        isStudentActiveOnDate,
+        teacherPersonMap
     });
 
     const approvedLeaveEvents = await leaveRequestService.getApprovedLeaveEventsForPerson({
@@ -2637,6 +2732,13 @@ module.exports = {
     getGlobalSchedule,
     buildScheduleViewerAccess,
     buildSchoolSchedulePersonPickerRows,
+    buildReportAssignmentListScope,
+    buildReportTemplateListScope,
+    enrichReportTemplateTitleMap,
+    isReadableReportTitle,
+    isTeacherAssignedOnReportAssignment,
+    resolveReportTemplateTitle,
+    filterEventsWithCasesIfRequested,
     buildEventsForPersonAndRange,
     buildPersonScheduleEventsForSessions,
     buildScheduleEventsFingerprint,

@@ -62,6 +62,11 @@ test('schedule APIs pass route access context into scoped data reads', () => {
   assert.match(controller, /buildSchoolSchedulePersonPickerRows[\s\S]*accessContext/);
 });
 
+test('report templates use catalog scope for schedule title resolution', () => {
+  const repo = read('MVC/repositories/school/index.js');
+  assert.match(repo, /reportTemplates:[\s\S]*assignmentScopeKind: 'catalog'/);
+});
+
 test('division-scoped READ_ALL users remain self-only in capability matrix', () => {
   const service = read('MVC/services/school/scheduleAccessService.js');
   assert.match(service, /canSelectAnyPerson = isOperationAdmin/);

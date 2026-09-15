@@ -7,6 +7,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const reportRosterService = require('./reportRosterService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 
 const CONDUCT_PERCENT_KEYS = Object.freeze([
   'classEffortPercent',
@@ -228,13 +229,14 @@ function resolveSessionReportConductPersonIds({
 
 /**
  * Build conduct UI roster rows for report-gated conduct (selected students only).
- * @param {{ personIds?: string[], sessionRoster?: object[], prefetchedStudents?: object[] }} args
+ * @param {{ personIds?: string[], sessionRoster?: object[], prefetchedStudents?: object[], prefetchedPersons?: object[] }} args
  * @returns {object[]}
  */
 function buildReportConductRoster({
   personIds = [],
   sessionRoster = [],
-  prefetchedStudents = []
+  prefetchedStudents = [],
+  prefetchedPersons = []
 } = {}) {
   const sessionRosterByPerson = new Map();
   (Array.isArray(sessionRoster) ? sessionRoster : []).forEach((row) => {
@@ -245,6 +247,11 @@ function buildReportConductRoster({
   (Array.isArray(prefetchedStudents) ? prefetchedStudents : []).forEach((row) => {
     const pid = personKey(row?.personId);
     if (pid) studentsByPerson.set(pid, row);
+  });
+  const personsByPerson = new Map();
+  (Array.isArray(prefetchedPersons) ? prefetchedPersons : []).forEach((row) => {
+    const pid = personKey(row?.id || row?.personId);
+    if (pid) personsByPerson.set(pid, row);
   });
 
   const seen = new Set();
@@ -259,9 +266,14 @@ function buildReportConductRoster({
       return;
     }
     const student = studentsByPerson.get(pid);
+    const person = personsByPerson.get(pid);
+    const resolvedName = schoolPersonAccessService.formatPersonName(
+      person,
+      String(student?.name || student?.firstName || pid).trim()
+    );
     result.push({
       personId: pid,
-      name: String(student?.name || student?.firstName || pid).trim(),
+      name: resolvedName,
       studentRecordId: String(student?.id || '').trim() || undefined,
       classEffortPercent: null,
       classParticipationPercent: null,

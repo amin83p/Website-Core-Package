@@ -4572,7 +4572,8 @@ async function manageSession(req, res) {
         const reportConductRoster = sessionConductService.buildReportConductRoster({
             personIds: reportConductPersonIds,
             sessionRoster: session.roster,
-            prefetchedStudents: rosterIdentityData.students
+            prefetchedStudents: rosterIdentityData.students,
+            prefetchedPersons: rosterIdentityData.persons
         });
         const conductPrefillByPersonId = Object.fromEntries(
             sessionConductService.buildConductPrefillMap({

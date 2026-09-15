@@ -79,3 +79,15 @@ test('buildReportConductRoster includes selected students even when absent from 
   assert.equal(roster[0].personId, 'STU-ONLY-REPORT');
   assert.equal(roster[0].name, 'Report Student');
 });
+
+test('buildReportConductRoster resolves synthetic row names from person records', () => {
+  const roster = sessionConductService.buildReportConductRoster({
+    personIds: ['474361'],
+    sessionRoster: [{ personId: 'STU-ON-ROSTER', name: 'Roster Student' }],
+    prefetchedStudents: [{ id: 'REG-474361', personId: '474361' }],
+    prefetchedPersons: [{ id: '474361', name: { first: 'Jane', last: 'Example' } }]
+  });
+  assert.equal(roster.length, 1);
+  assert.equal(roster[0].personId, '474361');
+  assert.equal(roster[0].name, 'Jane Example');
+});
