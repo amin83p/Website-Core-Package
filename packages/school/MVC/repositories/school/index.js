@@ -54,6 +54,8 @@ const { normalizeTransactionSummary } = require('../../models/school/registratio
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const taskModel = require('../../models/school/taskModel');
 const taskRoutingRuleModel = require('../../models/school/taskRoutingRuleModel');
+const notificationRuleModel = require('../../models/school/notificationRuleModel');
+const notificationRunModel = require('../../models/school/notificationRunModel');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const attendanceChangeLogModel = require('../../models/school/attendanceChangeLogModel');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
@@ -1680,6 +1682,28 @@ const schoolRepositories = {
       'notes'
     ],
     dateFields: ['audit.createDateTime', 'audit.lastUpdateDateTime']
+  }),
+  notificationRules: createSchoolRepository({
+    entityName: 'notificationRules',
+    collectionName: 'schoolNotificationRules',
+    getAll: notificationRuleModel.getAllNotificationRules,
+    getById: notificationRuleModel.getNotificationRuleById,
+    create: notificationRuleModel.addNotificationRule,
+    update: notificationRuleModel.updateNotificationRule,
+    remove: notificationRuleModel.deleteNotificationRule,
+    defaultSearchFields: ['id', 'orgId', 'label', 'ruleType', 'legacyKey'],
+    dateFields: ['audit.createDateTime', 'audit.lastUpdateDateTime']
+  }),
+  notificationRuns: createSchoolRepository({
+    entityName: 'notificationRuns',
+    collectionName: 'schoolNotificationRuns',
+    getAll: notificationRunModel.getAllNotificationRuns,
+    getById: notificationRunModel.getNotificationRunById,
+    create: notificationRunModel.createNotificationRun,
+    update: notificationRunModel.updateNotificationRun,
+    remove: async () => { throw new Error('Notification runs cannot be deleted.'); },
+    defaultSearchFields: ['id', 'orgId', 'ruleId', 'ruleType', 'status', 'trigger'],
+    dateFields: ['startedAt', 'completedAt', 'audit.createDateTime']
   })
 };
 
@@ -2912,6 +2936,8 @@ assertQueryableCrudRepository('schoolRepositories.attendanceChangeLogs', schoolR
 assertQueryableCrudRepository('schoolRepositories.sessionStudentCases', schoolRepositories.sessionStudentCases);
 assertQueryableCrudRepository('schoolRepositories.tasks', schoolRepositories.tasks);
 assertQueryableCrudRepository('schoolRepositories.taskRoutingRules', schoolRepositories.taskRoutingRules);
+assertQueryableCrudRepository('schoolRepositories.notificationRules', schoolRepositories.notificationRules);
+assertQueryableCrudRepository('schoolRepositories.notificationRuns', schoolRepositories.notificationRuns);
 
 module.exports = schoolRepositories;
 module.exports.__scopeTestHelpers = {

@@ -59,6 +59,10 @@ function isTasksAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_TASKS, OPERATIONS.READ_ALL);
 }
 
+function isNotificationCenterAdminViewer(user) {
+  return isAdminForRequest(user, SECTIONS.SCHOOL_NOTIFICATION_CENTER, OPERATIONS.READ_ALL);
+}
+
 function isTaskRoutingAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_TASKS, OPERATIONS.CONFIGURE);
 }
@@ -142,6 +146,7 @@ module.exports = {
   isAdminForRequest,
   isAdminForRequestAsync,
   isTasksAdminViewer,
+  isNotificationCenterAdminViewer,
   isTaskRoutingAdminViewer,
   isStudentCaseRoutingAdminViewer,
   isReportsInstancesAdminViewer,

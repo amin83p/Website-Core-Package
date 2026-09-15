@@ -82,6 +82,7 @@ router.use('/reports', require('./reportRoutes'));
 router.use('/exams', require('./examRoutes'));
 router.use('/leave-requests', require('./leaveRequestRoutes'));
 router.use('/tasks', require('./taskRoutes'));
+router.use('/notification-center', require('./notificationCenterRoutes'));
 router.use('/withdrawal', require('./withdrawalRoutes'));
 router.use('/', require('./deletionGuardRoutes'));
 router.use('/', require('./schoolRoutes'));

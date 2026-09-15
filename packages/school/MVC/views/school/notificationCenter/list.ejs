@@ -1,0 +1,79 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: access?.canConfigure ? '/school/notification-center/rules/new' : null,
+  newLabel: access?.canConfigure ? 'New rule' : null,
+  user,
+  tableName: 'school_notification_center',
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>'
+  ]
+}) %>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-bold"><i class="bi bi-sliders me-2"></i>Rules</div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Label</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% (rules || []).forEach((rule) => { %>
+              <tr>
+                <td class="fw-semibold"><%= rule.label %></td>
+                <td><code class="small"><%= rule.ruleType %></code></td>
+                <td>
+                  <% if (rule.enabled) { %><span class="badge bg-success">Enabled</span><% } else { %><span class="badge bg-secondary">Paused</span><% } %>
+                  <% if (rule.legacyKey) { %><span class="badge bg-light text-muted border ms-1">Legacy sync</span><% } %>
+                </td>
+                <td class="text-end">
+                  <% if (access?.canConfigure) { %>
+                    <a class="btn btn-sm btn-outline-primary" href="/school/notification-center/rules/<%= rule.id %>">Edit</a>
+                  <% } %>
+                  <% if (access?.canRunNow) { %>
+                    <form method="post" action="/school/notification-center/rules/<%= rule.id %>/run" class="d-inline">
+                      <button type="submit" class="btn btn-sm btn-outline-secondary">Run now</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+            <% if (!(rules || []).length) { %>
+              <tr><td colspan="4" class="text-center text-muted py-4">No rules yet. <% if (access?.canConfigure) { %>Create a rule or save session notification settings to import the legacy rule.<% } %></td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-bold"><i class="bi bi-clock-history me-2"></i>Recent runs</div>
+      <div class="list-group list-group-flush">
+        <% (runs || []).forEach((run) => { %>
+          <a href="/school/notification-center/runs/<%= run.id %>" class="list-group-item list-group-item-action">
+            <div class="d-flex justify-content-between">
+              <strong><%= run.ruleLabel || run.ruleType %></strong>
+              <span class="badge bg-light text-dark border"><%= run.status %></span>
+            </div>
+            <div class="small text-muted"><%= run.batchCount || 0 %> batch(es) · <%= run.findingCount || 0 %> finding(s) · <%= run.startedAt || '' %></div>
+          </a>
+        <% }); %>
+        <% if (!(runs || []).length) { %>
+          <div class="list-group-item text-muted">No runs yet.</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<span id="urlRef" data-id="school/notification-center" hidden></span>
+<%- include('partials/tablePages-end') %>

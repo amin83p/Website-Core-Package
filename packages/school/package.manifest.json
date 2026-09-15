@@ -199,6 +199,9 @@
           "id": "445576"
         },
         {
+          "id": "445586"
+        },
+        {
           "id": "778769"
         },
         {
@@ -4007,6 +4010,56 @@
       "adoptExisting": true
     },
     {
+      "id": "445586",
+      "name": "SCHOOL_NOTIFICATION_CENTER",
+      "category": "SCHOOL",
+      "description": "Configure notification rules, preview consolidated reminders, and queue email or SMS delivery.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/notification-center",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
       "id": "445577",
       "name": "SCHOOL_MASTER_ACADEMIA_HUB",
       "category": "SCHOOL",
@@ -5340,6 +5393,47 @@
             },
             {
               "operationId": "OP1005",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445586",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1012",
               "scopeId": "SCP_ORG",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,
@@ -6854,6 +6948,47 @@
           ]
         },
         {
+          "sectionId": "445586",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1012",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
           "sectionId": "445561",
           "adminAccess": false,
           "operations": [
@@ -8307,6 +8442,47 @@
           ]
         },
         {
+          "sectionId": "445586",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1012",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
           "sectionId": "445561",
           "adminAccess": false,
           "operations": [
@@ -9493,6 +9669,16 @@
       "active": true
     },
     {
+      "id": "school-menu-notification-center",
+      "label": "Notification Centre",
+      "href": "/school/notification-center",
+      "icon": "bi bi-megaphone",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
       "id": "school-menu-teachers",
       "label": "Teachers",
       "href": "/school/teachers",
@@ -9656,6 +9842,17 @@
       "href": "/school/tasks",
       "icon": "bi bi-bell-fill",
       "description": "Review school tasks and manage embedded follow-up assignments.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
+      "id": "school-dashboard-notification-center",
+      "label": "Notification Centre",
+      "href": "/school/notification-center",
+      "icon": "bi bi-megaphone",
+      "description": "Configure reminder rules, preview digests, and queue email or SMS notifications.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",
@@ -9902,6 +10099,16 @@
       "entityType": "taskRoutingRules",
       "label": "Task Routing Rules",
       "collectionName": "schoolTaskRoutingRules"
+    },
+    {
+      "entityType": "notificationRules",
+      "label": "Notification Rules",
+      "collectionName": "schoolNotificationRules"
+    },
+    {
+      "entityType": "notificationRuns",
+      "label": "Notification Runs",
+      "collectionName": "schoolNotificationRuns"
     },
     {
       "entityType": "sessionStudentCases",

@@ -114,6 +114,8 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   classEnrollmentPeriods: { repository: schoolRepositories.classEnrollmentPeriods },
   leaveRequests: { repository: schoolRepositories.leaveRequests },
   tasks: { repository: schoolRepositories.tasks },
+  notificationRules: { repository: schoolRepositories.notificationRules },
+  notificationRuns: { repository: schoolRepositories.notificationRuns },
   taskRoutingRules: { repository: schoolRepositories.taskRoutingRules },
   sessionStudentCases: { repository: schoolRepositories.sessionStudentCases },
   attendanceChangeLogs: { repository: schoolRepositories.attendanceChangeLogs }

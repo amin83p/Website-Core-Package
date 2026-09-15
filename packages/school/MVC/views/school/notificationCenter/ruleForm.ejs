@@ -1,0 +1,69 @@
+<div class="container py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0"><%= title %></h1>
+    <a href="/school/notification-center" class="btn btn-outline-secondary btn-sm">Back</a>
+  </div>
+  <form method="post" action="/school/notification-center/rules/save" class="card border-0 shadow-sm">
+    <div class="card-body">
+      <input type="hidden" name="rule[id]" value="<%= rule.id || '' %>">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="ruleLabel">Label</label>
+          <input class="form-control" id="ruleLabel" name="rule[label]" value="<%= rule.label || '' %>" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="ruleType">Rule type</label>
+          <select class="form-select" id="ruleType" name="rule[ruleType]" <%= rule.legacyKey ? 'disabled' : '' %>>
+            <% (ruleTypes || []).forEach((type) => { %>
+              <option value="<%= type %>" <%= rule.ruleType === type ? 'selected' : '' %>><%= type %></option>
+            <% }); %>
+          </select>
+          <% if (rule.legacyKey) { %>
+            <input type="hidden" name="rule[ruleType]" value="<%= rule.ruleType %>">
+            <div class="form-text">Legacy session rule type is managed from School Settings.</div>
+          <% } %>
+        </div>
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="ruleEnabled" name="rule[enabled]" value="true" <%= rule.enabled ? 'checked' : '' %>>
+            <label class="form-check-label" for="ruleEnabled">Enabled</label>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Email channel</label>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="rule[channels][email][enabled]" value="true" <%= rule.channels?.email?.enabled ? 'checked' : '' %>>
+            <label class="form-check-label">Enable email</label>
+          </div>
+          <input class="form-control form-control-sm mt-2" name="rule[channels][email][sendAtTime]" placeholder="Send at (HH:MM)" value="<%= rule.channels?.email?.sendAtTime || '18:00' %>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">SMS channel</label>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="rule[channels][sms][enabled]" value="true" <%= rule.channels?.sms?.enabled ? 'checked' : '' %>>
+            <label class="form-check-label">Enable SMS</label>
+          </div>
+          <input class="form-control form-control-sm mt-2" name="rule[channels][sms][sendAtTime]" placeholder="Send at (HH:MM)" value="<%= rule.channels?.sms?.sendAtTime || '18:00' %>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Session date range</label>
+          <select class="form-select" name="rule[criteria][sessionDateRange][type]">
+            <% ['this_week', 'two_weeks', 'this_month', 'days_before_today', 'timesheet_period'].forEach((opt) => { %>
+              <option value="<%= opt %>" <%= (rule.criteria?.sessionDateRange?.type || 'this_week') === opt ? 'selected' : '' %>><%= opt %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" name="rule[schedule][autoQueueOnSchedule]" value="true" <%= rule.schedule?.autoQueueOnSchedule !== false ? 'checked' : '' %>>
+            <label class="form-check-label">Auto-queue on scheduled prepare</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer bg-white d-flex justify-content-end gap-2">
+      <a href="/school/notification-center" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">Save rule</button>
+    </div>
+  </form>
+</div>

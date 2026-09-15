@@ -3566,7 +3566,7 @@
   }
 
   function renderStudentConflictHtml(message) {
-    const issue = htmlEscape(message || 'Scheduling conflicts detected with the student\'s existing schedule.');
+    const issue = formatRichServerMessageHtml(message || 'Scheduling conflicts detected with the student\'s existing schedule.');
     const conflicts = lastRollingEligibility?.prerequisite?.conflicts || [];
     const choiceText = conflicts.length === 1
       ? '1 session conflict detected.'
@@ -3593,7 +3593,7 @@
     if (student.id) params.set('studentId', student.id);
     params.set('returnTo', window.location.pathname);
     setRollingRegistrationPanelHtml(
-      '<div class="text-danger small mb-2">' + htmlEscape(message || 'Required term registration is missing.') + '</div>' +
+      '<div class="text-danger small mb-2">' + formatRichServerMessageHtml(message || 'Required term registration is missing.') + '</div>' +
       '<a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="/school/programs/register-terms-batch-wizard?' + htmlEscape(params.toString()) + '">' +
         '<i class="bi bi-box-arrow-up-right me-1"></i>Go To Term Registration' +
       '</a>' +
@@ -3649,7 +3649,7 @@
   }
 
   function renderProgramRegistrationShortcutPanel(message) {
-    const issue = htmlEscape(message || 'This student needs an approved program registration before Rolling Enrollment can continue.');
+    const issue = formatRichServerMessageHtml(message || 'This student needs an approved program registration before Rolling Enrollment can continue.');
     if (!canCreateProgramRegistrations) {
       setRollingRegistrationPanelHtml(
         '<div class="text-danger small mb-2">' + issue + '</div>' +
@@ -3906,10 +3906,10 @@
       ? lastRollingEligibility.prerequisite.warnings
       : [];
     const issue = prereqWarnings.length
-      ? prereqWarnings.map((item) => htmlEscape(item)).join('<br>')
+      ? prereqWarnings.map((item) => formatRichServerMessageHtml(item)).join('<br>')
       : ((Array.isArray(lastRollingEligibility?.prerequisite?.issues) && lastRollingEligibility.prerequisite.issues.length)
-        ? lastRollingEligibility.prerequisite.issues.map((item) => htmlEscape(item)).join('<br>')
-        : htmlEscape(message || (advisory
+        ? lastRollingEligibility.prerequisite.issues.map((item) => formatRichServerMessageHtml(item)).join('<br>')
+        : formatRichServerMessageHtml(message || (advisory
           ? 'Prerequisite warnings were found for this class. Enrollment is allowed, but prior credits may be needed.'
           : 'Prerequisites are not satisfied for this class.')));
     const alertClass = advisory ? 'text-warning' : 'text-danger';
@@ -4185,8 +4185,8 @@
         +   '<div class="small text-muted">Fee Category: ' + htmlEscape(row?.feeCategory || '-') + ' | Account: <span class="font-monospace">' + htmlEscape(row?.studentAccountId || '-') + '</span></div>'
         +   '<div class="small text-muted">Total Fee: <span class="fw-semibold">' + htmlEscape(Number(row?.totalAmount || 0).toFixed(2)) + '</span> | Transactions: <span class="fw-semibold">' + htmlEscape(row?.transactionCount || 0) + '</span></div>'
         +   (row?.registrationId ? '<div class="small text-muted">Draft Registration: <span class="font-monospace">' + htmlEscape(row.registrationId) + '</span></div>' : '')
-        +   (issues.length ? '<div class="' + issueClass + ' small mt-1">' + issues.map((issue) => htmlEscape(issue)).join('<br>') + '</div>' : '')
-        +   (row?.message && !issues.length ? '<div class="small mt-1">' + htmlEscape(row.message) + '</div>' : '')
+        +   (issues.length ? '<div class="' + issueClass + ' small mt-1">' + issues.map((issue) => formatRichServerMessageHtml(issue)).join('<br>') + '</div>' : '')
+        +   (row?.message && !issues.length ? '<div class="small mt-1">' + formatRichServerMessageHtml(row.message) + '</div>' : '')
         + '</div>';
     }).join('');
   }
@@ -4571,7 +4571,7 @@
       if (rollingEnrollmentWorkspace) rollingEnrollmentWorkspace.eligibility = merged;
     } catch (err) {
       const message = err?.message || 'Prerequisite check failed.';
-      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(message) + '</div>');
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + formatRichServerMessageHtml(message) + '</div>');
     }
   }
 
@@ -4602,7 +4602,7 @@
       if (rollingEnrollmentWorkspace) rollingEnrollmentWorkspace.eligibility = merged;
     } catch (err) {
       const message = err?.message || 'Conflict check failed.';
-      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(message) + '</div>');
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + formatRichServerMessageHtml(message) + '</div>');
     }
   }
 
@@ -4624,8 +4624,8 @@
     if (data.prerequisite && !data.resolved) {
       const conflictIssue = (data.prerequisite.issues || []).find(isStudentConflictMessage);
       const otherIssues = (data.prerequisite.issues || []).filter(msg => !isStudentConflictMessage(msg));
-      const issuesHtml = otherIssues.map((t) => htmlEscape(t)).join('<br>');
-      const msg = issuesHtml || htmlEscape(data.message || 'Not eligible for this class.');
+      const issuesHtml = otherIssues.map((t) => formatRichServerMessageHtml(t)).join('<br>');
+      const msg = issuesHtml || formatRichServerMessageHtml(data.message || 'Not eligible for this class.');
       const rawIssueMessage = data.message || (data.prerequisite.issues || []).join(' ');
       if (isMissingTermRegistrationMessage(rawIssueMessage)) {
         renderTermRegistrationShortcutPanel(rawIssueMessage);
@@ -4645,12 +4645,12 @@
       const ok = data.eligible === true;
       const conflictIssue = (data.prerequisite.issues || []).find(isStudentConflictMessage);
       const otherIssues = (data.prerequisite.issues || []).filter(msg => !isStudentConflictMessage(msg));
-      const issuesHtml = otherIssues.map((t) => htmlEscape(t)).join('<br>');
+      const issuesHtml = otherIssues.map((t) => formatRichServerMessageHtml(t)).join('<br>');
 
       const capacityWarningHtml = renderClassCapacityWarningPanel(data.prerequisite.capacity || {});
       const otherWarnings = (data.prerequisite.warnings || [])
         .filter((text) => !isCapacityWarningText(text))
-        .map((t) => htmlEscape(t))
+        .map((t) => formatRichServerMessageHtml(t))
         .join('<br>');
       const missingSubjects = Array.isArray(data.prerequisite.missingSubjects) ? data.prerequisite.missingSubjects : [];
       const advisoryPrereq = isAdvisoryPrerequisiteEnforcement(data.prerequisite);
@@ -4688,7 +4688,7 @@
         renderProgramRegistrationShortcutPanel(data.message);
         return;
       }
-      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(data.message) + '</div>');
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + formatRichServerMessageHtml(data.message) + '</div>');
     }
   }
 
@@ -4732,7 +4732,7 @@
         renderProgramRegistrationShortcutPanel(message);
         return;
       }
-      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(message) + '</div>');
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + formatRichServerMessageHtml(message) + '</div>');
     }
   }
 
@@ -4768,7 +4768,7 @@
         renderProgramRegistrationShortcutPanel(message);
         return;
       }
-      setRollingRegistrationPanelHtml('<div class="text-danger small">' + htmlEscape(message) + '</div>');
+      setRollingRegistrationPanelHtml('<div class="text-danger small">' + formatRichServerMessageHtml(message) + '</div>');
     }
   }
 
@@ -5873,7 +5873,7 @@
       return;
     }
     alertEl.classList.remove('d-none');
-    alertEl.innerHTML = list.map((warning) => `<div>${htmlEscape(warning.message)}</div>`).join('');
+    alertEl.innerHTML = list.map((warning) => `<div>${formatRichServerMessageHtml(warning.message)}</div>`).join('');
     list.forEach((warning) => {
       const input = document.getElementById(parser.resolveClbEditorInputId(warning, 'rolling'));
       if (input) input.classList.add('clb-level-value-warning');
@@ -6728,7 +6728,7 @@
       }
       renderEnrollmentDetailModal(result);
     } catch (error) {
-      bodyEl.innerHTML = '<div class="alert alert-warning">' + htmlEscape(error?.message || 'Failed to load enrollment details.') + '</div>';
+      bodyEl.innerHTML = '<div class="alert alert-warning">' + formatRichServerMessageHtml(error?.message || 'Failed to load enrollment details.') + '</div>';
     }
   }
 
@@ -6748,6 +6748,46 @@
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
+  }
+
+  function messageUsesRenderableHtml(value = '') {
+    const text = String(value || '');
+    if (!text) return false;
+    if (/<[a-z][\s\S]*?>/i.test(text)) return true;
+    return /&lt;(br|b|strong|i|em|ul|ol|li|p|a)\b/i.test(text);
+  }
+
+  function formatRichServerMessageHtml(value = '') {
+    const raw = String(value ?? '');
+    if (!raw) return '';
+    if (/<[a-z][\s\S]*?>/i.test(raw)) return raw;
+    return raw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/&lt;b&gt;/gi, '<b>')
+      .replace(/&lt;\/b&gt;/gi, '</b>')
+      .replace(/&lt;strong&gt;/gi, '<strong>')
+      .replace(/&lt;\/strong&gt;/gi, '</strong>')
+      .replace(/&lt;i&gt;/gi, '<i>')
+      .replace(/&lt;\/i&gt;/gi, '</i>')
+      .replace(/&lt;em&gt;/gi, '<em>')
+      .replace(/&lt;\/em&gt;/gi, '</em>')
+      .replace(/&lt;ul&gt;/gi, '<ul>')
+      .replace(/&lt;\/ul&gt;/gi, '</ul>')
+      .replace(/&lt;ol&gt;/gi, '<ol>')
+      .replace(/&lt;\/ol&gt;/gi, '</ol>')
+      .replace(/&lt;li&gt;/gi, '<li>')
+      .replace(/&lt;\/li&gt;/gi, '</li>')
+      .replace(/&lt;p&gt;/gi, '<p>')
+      .replace(/&lt;\/p&gt;/gi, '</p>')
+      .replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+  }
+
+  function resolveMessageBodyHtml(message, options = {}) {
+    if (options.html === false) return htmlEscape(String(message || ''));
+    const useHtml = options.html === true || messageUsesRenderableHtml(message);
+    return useHtml ? formatRichServerMessageHtml(message) : htmlEscape(String(message || ''));
   }
 
   let rollingBusyDepth = 0;
@@ -6855,7 +6895,7 @@
   async function showMsg(title, icon, message, options = {}) {
     // Busy overlay is z-index 20050; message modal must appear on top.
     while (rollingBusyDepth > 0) hideBusy();
-    const body = options.html ? String(message || '') : htmlEscape(String(message || ''));
+    const body = resolveMessageBodyHtml(message, options);
     if (typeof window.showMessageModal === 'function') {
       const modalOptions = {
         title,
@@ -6882,7 +6922,7 @@
     const cancelText = String(options.cancelText || 'Cancel').trim() || 'Cancel';
     const confirmText = String(options.confirmText || 'Confirm').trim() || 'Confirm';
     const icon = String(options.icon || 'warning').trim() || 'warning';
-    const body = options.html ? String(message || '') : htmlEscape(String(message || ''));
+    const body = resolveMessageBodyHtml(message, options);
     if (typeof window.showMessageModal === 'function') {
       const result = await window.showMessageModal({
         title,
@@ -10264,14 +10304,14 @@
       panel.innerHTML = [
         '<div class="fw-semibold mb-1">Ready to apply</div>',
         ...lines.map((line) => `<div>${htmlEscape(line)}</div>`),
-        warnings.length ? `<div class="small mt-2">${warnings.map((row) => htmlEscape(row.message || '')).join('<br>')}</div>` : ''
+        warnings.length ? `<div class="small mt-2">${warnings.map((row) => formatRichServerMessageHtml(row.message || '')).join('<br>')}</div>` : ''
       ].join('');
       return;
     }
     panel.className = 'alert alert-warning mb-0';
     panel.innerHTML = [
       '<div class="fw-semibold mb-1">Preview blocked</div>',
-      ...blockers.map((row) => `<div>${htmlEscape(row.message || 'Unable to preview move.')}</div>`),
+      ...blockers.map((row) => `<div>${formatRichServerMessageHtml(row.message || 'Unable to preview move.')}</div>`),
       conflictLines.length ? `<div class="small mt-2">${conflictLines.map((line) => htmlEscape(line)).join('<br>')}</div>` : ''
     ].join('');
   }

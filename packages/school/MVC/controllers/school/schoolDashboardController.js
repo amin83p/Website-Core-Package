@@ -34,6 +34,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/grades-matrix(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_GRADEBOOK },
     { pattern: /^\/school\/leave-requests(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_LEAVE_REQUESTS },
     { pattern: /^\/school\/tasks(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TASKS },
+    { pattern: /^\/school\/notification-center(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_NOTIFICATION_CENTER },
     { pattern: /^\/school\/holidays(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_HOLIDAYS },
     { pattern: /^\/school\/payRates(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_PAY_RATES },
     { pattern: /^\/school\/session-statuses(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SESSION_STATUSES },
@@ -394,6 +395,16 @@ async function showDashboard(req, res) {
                 icon: 'bi-bell-fill',
                 subtleClass: 'bg-warning-subtle text-warning',
                 buttonClass: 'btn btn-warning'
+            },
+            {
+                priority: 188,
+                title: 'Notification Centre',
+                description: 'Configure reminder rules, preview consolidated digests, and queue email or SMS notifications.',
+                href: '/school/notification-center',
+                buttonLabel: 'Open Notification Centre',
+                icon: 'bi-megaphone',
+                subtleClass: 'bg-info-subtle text-info',
+                buttonClass: 'btn btn-info'
             },
             // Payroll / Faculty Admin
             {

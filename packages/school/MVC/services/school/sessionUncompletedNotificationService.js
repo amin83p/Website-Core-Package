@@ -424,6 +424,8 @@ async function resolveTeacherSessionsForDigest({
 }
 
 module.exports = {
+  listSessionEditorIds,
+  buildSessionName,
   compareDateKeys,
   isSessionUncompleted,
   isSessionOnOrBeforeDate,

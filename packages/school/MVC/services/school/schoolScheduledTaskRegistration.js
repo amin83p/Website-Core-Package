@@ -10,6 +10,11 @@ const {
   SMS_PREPARE_TASK_KEY,
   SMS_DISPATCH_TASK_KEY
 } = require('./sessionAccessPolicyTaskSyncService');
+const {
+  PREPARE_TASK_KEY: NC_PREPARE_TASK_KEY,
+  DISPATCH_TASK_KEY: NC_DISPATCH_TASK_KEY
+} = require('./notificationCenterTaskSyncService');
+const notificationCenterDeliveryService = require('./notificationCenterDeliveryService');
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -93,6 +98,49 @@ function registerSchoolScheduledTasks() {
       return {
         resultSummary: `Dispatched ${metrics.sent} SMS message(s); ${metrics.failed} failed; ${metrics.skipped} skipped.`,
         metrics
+      };
+    }
+  });
+
+  registerPackageScheduledTaskHandler('SCHOOL', {
+    taskKey: NC_PREPARE_TASK_KEY,
+    label: 'Prepare notification centre rule',
+    description: 'Evaluates a notification centre rule and queues or previews recipient batches.',
+    scope: 'org',
+    handler: async ({ orgId, logger, now, input = {} }) => {
+      const ruleId = cleanText(input.ruleId);
+      const metrics = await notificationCenterDeliveryService.prepareScheduledRule({
+        orgId,
+        ruleId,
+        logger,
+        now
+      });
+      return {
+        resultSummary: `Notification centre prepare: ${metrics.prepared || 0} batch(es); mode ${metrics.mode || 'n/a'}.`,
+        metrics
+      };
+    }
+  });
+
+  registerPackageScheduledTaskHandler('SCHOOL', {
+    taskKey: NC_DISPATCH_TASK_KEY,
+    label: 'Dispatch notification centre messages',
+    description: 'Dispatches queued notification centre email/SMS outbox entries.',
+    scope: 'org',
+    handler: async ({ orgId, logger, now }) => {
+      const emailMetrics = await sessionNotificationOutboxDispatchService.dispatchUncompletedSessionEmailsForOrg({
+        orgId,
+        logger,
+        now
+      });
+      const smsMetrics = await sessionNotificationOutboxDispatchService.dispatchUncompletedSessionSmsForOrg({
+        orgId,
+        logger,
+        now
+      });
+      return {
+        resultSummary: `Dispatched email ${emailMetrics.sent || 0}, SMS ${smsMetrics.sent || 0}.`,
+        metrics: { email: emailMetrics, sms: smsMetrics }
       };
     }
   });
