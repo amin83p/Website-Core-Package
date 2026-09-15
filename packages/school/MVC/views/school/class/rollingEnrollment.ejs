@@ -2266,6 +2266,29 @@
   </div>
 </div>
 
+<div class="modal fade" id="enrollmentNoteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-sticky me-2"></i>Enrollment Note</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="enrollmentNote_periodId" value="">
+        <div class="small text-muted mb-1">Enrollment</div>
+        <div class="fw-semibold mb-3" id="enrollmentNote_contextLabel">—</div>
+        <label class="form-label" for="enrollmentNote_text">Note for teacher</label>
+        <textarea id="enrollmentNote_text" class="form-control" rows="5" maxlength="1000" placeholder="Add guidance or context for the teacher"></textarea>
+        <div class="form-text">This note appears in Manage Session enrollment info for the teacher.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_saveEnrollmentNote">Save Note</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="enrollmentOnHoldModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
     <div class="modal-content">
@@ -3093,6 +3116,7 @@
   const reentryModalEl = qs('reentryModal');
   const editModalEl = qs('editPeriodModal');
   const onHoldModalEl = qs('enrollmentOnHoldModal');
+  const enrollmentNoteModalEl = qs('enrollmentNoteModal');
   const chargeModalEl = qs('enrollmentChargeModal');
   const programShortcutModalEl = qs('programRegistrationShortcutModal');
   const priorCreditRepairModalEl = qs('priorCreditRepairModal');
@@ -3318,6 +3342,7 @@
   const undoCloseModal = createModalController(undoCloseModalEl);
   const reentryModal = createModalController(reentryModalEl);
   const editModal = createModalController(editModalEl);
+  const enrollmentNoteModal = createModalController(enrollmentNoteModalEl);
   const onHoldModal = createModalController(onHoldModalEl);
   const chargeModal = createModalController(chargeModalEl);
   const programShortcutModal = createModalController(programShortcutModalEl);
@@ -9534,6 +9559,7 @@
                 ${clbEntriesBtn}
                 <button type="button" class="btn btn-outline-primary btn-sm btn-row-attendance-report" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-clipboard-data me-1"></i>Attendance report</button>
                 <button type="button" class="btn btn-outline-primary btn-sm btn-row-edit" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm btn-row-note" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-sticky me-1"></i>Note</button>
                 ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-manage-sessions" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-calendar-week me-1"></i>Manage Sessions</button>` : ''}
                 ${canOnHold ? `<button type="button" class="btn btn-outline-warning btn-sm btn-row-on-hold" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pause-circle me-1"></i>On Hold</button>` : ''}
                 ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-success btn-sm btn-row-extension" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-plus-circle me-1"></i>Extension enrollment</button>` : ''}
@@ -10854,6 +10880,53 @@
     });
   }
 
+  function openEnrollmentNoteModal(periodId) {
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    if (!row || !enrollmentNoteModal) return;
+    qs('enrollmentNote_periodId').value = String(row?.id || '').trim();
+    const enrollmentEnd = String(row?.endDate || '').trim() || 'Open';
+    const contextLabel = qs('enrollmentNote_contextLabel');
+    if (contextLabel) {
+      contextLabel.textContent = `${row?.studentLabel || row?.studentId || ''} · ${row?.startDate || '?'} to ${enrollmentEnd}`;
+    }
+    const notesField = qs('enrollmentNote_text');
+    if (notesField) notesField.value = String(row?.notes || '').trim();
+    enrollmentNoteModal.show();
+  }
+
+  async function saveEnrollmentNote() {
+    const periodId = String(qs('enrollmentNote_periodId')?.value || '').trim();
+    const notes = String(qs('enrollmentNote_text')?.value || '').trim();
+    if (!periodId) return;
+    const saveBtn = qs('btn_saveEnrollmentNote');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+    }
+    try {
+      showBusy('Saving enrollment note...');
+      const result = await requestJson(
+        `/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/notes`,
+        'POST',
+        { notes }
+      );
+      if (!result) return;
+      const savedNotes = String(result.notes ?? result.data?.notes ?? notes).trim();
+      const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === periodId);
+      if (row) row.notes = savedNotes;
+      enrollmentNoteModal.hide();
+      await showMsg('Saved', 'success', result.message || 'Enrollment note saved.');
+    } catch (error) {
+      await showMsg('Save Failed', 'error', error.message || 'Could not save enrollment note.');
+    } finally {
+      hideBusy();
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Note';
+      }
+    }
+  }
+
   function openEnrollmentOnHoldModal(periodId) {
     if (!canManageEnrollmentOffice) return;
     const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
@@ -11333,6 +11406,13 @@
       return;
     }
 
+    const noteBtn = event.target.closest('.btn-row-note');
+    if (noteBtn) {
+      closeAllActionMenus();
+      openEnrollmentNoteModal(noteBtn.getAttribute('data-period-id'));
+      return;
+    }
+
     const closeBtn = event.target.closest('.btn-row-close');
     if (closeBtn) {
       closeAllActionMenus();
@@ -11629,6 +11709,7 @@
   });
   qs('btn_confirmReentry')?.addEventListener('click', submitReentry);
   qs('btn_confirmEditPeriod')?.addEventListener('click', submitEditPeriod);
+  qs('btn_saveEnrollmentNote')?.addEventListener('click', saveEnrollmentNote);
   qs('btn_confirmChargeEnrollment')?.addEventListener('click', submitChargeableEnrollment);
   qs('btn_saveDraftEnrollment')?.addEventListener('click', saveExistingDraftEnrollment);
   qs('btn_approveDraftEnrollment')?.addEventListener('click', approveDraftEnrollment);

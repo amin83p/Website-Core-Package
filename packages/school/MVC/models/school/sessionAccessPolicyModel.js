@@ -26,7 +26,8 @@ function pickStoredPolicyFields(row) {
     completedSessionGradebookEdit: row.completedSessionGradebookEdit,
     completedSessionConductEdit: row.completedSessionConductEdit,
     completedSessionCurriculumEdit: row.completedSessionCurriculumEdit,
-    completedSessionStudentCasesEdit: row.completedSessionStudentCasesEdit
+    completedSessionStudentCasesEdit: row.completedSessionStudentCasesEdit,
+    naAttendanceVisibility: row.naAttendanceVisibility
   };
 }
 

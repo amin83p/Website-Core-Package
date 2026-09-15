@@ -990,13 +990,61 @@
               </div>
             </div>
 
-            <div class="rollup-feature-card mb-4" id="cardSessionCompletedEditWindows">
-              <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
-                <div>
-                  <h3 class="h6 fw-bold mb-1"><i class="bi bi-lock me-1 text-primary"></i>Completed Session Edit Windows</h3>
-                  <p class="small text-muted mb-0">Control post-completion edit windows per section. Each section can be expanded/collapsed below.</p>
+            <div class="border rounded rollup-feature-card p-0 mb-4" id="cardNaAttendanceVisibility">
+              <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#naAttendanceVisibilityCollapse" aria-expanded="true" aria-controls="naAttendanceVisibilityCollapse">
+                  <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                  <i class="bi bi-dash-circle text-secondary" aria-hidden="true"></i>
+                  <span>Manage Session N/A visibility</span>
+                </button>
+              </div>
+              <div class="collapse show p-3" id="naAttendanceVisibilityCollapse">
+                <p class="small text-muted mt-0 mb-3">Choose which N/A students appear on Manage Session attendance. Teachers can click the info icon next to N/A status to view notes for visible rows.</p>
+                <div class="border rounded p-3 bg-light-subtle">
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="naVisibilityTeacherNa" checked disabled>
+                    <label class="form-check-label fw-semibold" for="naVisibilityTeacherNa">Teacher N/A</label>
+                    <p class="small text-muted mb-0 ms-0">Always visible when a teacher marks a student N/A on the session roster.</p>
+                  </div>
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="naVisibilityOnHoldNa" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="naVisibilityOnHoldNa">On-Hold N/A</label>
+                    <p class="small text-muted mb-0 ms-0">Students with N/A attendance during an enrollment on-hold period.</p>
+                  </div>
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="naVisibilityEnrollmentExcludedNa" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="naVisibilityEnrollmentExcludedNa">Enrollment Excluded N/A</label>
+                    <p class="small text-muted mb-0 ms-0">Sessions marked N/A by the enrollment office (locked, display-only on Manage Session).</p>
+                  </div>
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="naVisibilityApprovedLeaveNa" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="naVisibilityApprovedLeaveNa">Approved Leave N/A</label>
+                    <p class="small text-muted mb-0 ms-0">Students with approved leave for the session date.</p>
+                  </div>
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="naVisibilityMakeupRequiredNa" <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label fw-semibold" for="naVisibilityMakeupRequiredNa">Make-up Required N/A</label>
+                    <p class="small text-muted mb-0 ms-0">Students on sessions that require a make-up (forced N/A for tracking).</p>
+                  </div>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="naVisibilityCapReachedNa" disabled>
+                    <label class="form-check-label fw-semibold" for="naVisibilityCapReachedNa">Hour/Session Cap Reached N/A</label>
+                    <p class="small text-muted mb-0 ms-0">Always hidden — enrollment target is met and extra sessions are not expected.</p>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <div class="border rounded rollup-feature-card p-0 mb-4" id="cardSessionCompletedEditWindows">
+              <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sessionCompletedEditWindowsCollapse" aria-expanded="true" aria-controls="sessionCompletedEditWindowsCollapse">
+                  <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                  <i class="bi bi-lock text-primary" aria-hidden="true"></i>
+                  <span>Completed Session Edit Windows</span>
+                </button>
+              </div>
+              <div class="collapse show p-3" id="sessionCompletedEditWindowsCollapse">
+                <p class="small text-muted mt-0 mb-3">Control post-completion edit windows per section. Each section can be expanded or collapsed below.</p>
 
               <div class="border rounded rollup-feature-card p-0" id="cardSessionAttendanceEdit">
                 <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
@@ -1218,6 +1266,7 @@
                     <p class="small text-muted mt-2 mb-0" id="sessionStudentCasesEditPreview"></p>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
 
@@ -3390,7 +3439,15 @@
           }
         }
       },
-      ...completedSessionEditPolicies
+      ...completedSessionEditPolicies,
+      naAttendanceVisibility: {
+        teacherNa: document.getElementById('naVisibilityTeacherNa')?.checked === true,
+        onHoldNa: document.getElementById('naVisibilityOnHoldNa')?.checked === true,
+        enrollmentExcludedNa: document.getElementById('naVisibilityEnrollmentExcludedNa')?.checked === true,
+        approvedLeaveNa: document.getElementById('naVisibilityApprovedLeaveNa')?.checked === true,
+        makeupRequiredNa: document.getElementById('naVisibilityMakeupRequiredNa')?.checked === true,
+        capReachedNa: document.getElementById('naVisibilityCapReachedNa')?.checked === true
+      }
     };
   }
 
@@ -3557,6 +3614,16 @@
       if (windowTypeEl) windowTypeEl.value = edit.windowType || 'timesheet_period';
       if (daysAfterEl) daysAfterEl.value = edit.daysAfterSession || '';
     });
+
+    const naVisibility = sessionAccessPolicy?.naAttendanceVisibility || {};
+    const teacherNaEl = document.getElementById('naVisibilityTeacherNa');
+    if (teacherNaEl) teacherNaEl.checked = naVisibility.teacherNa !== false;
+    document.getElementById('naVisibilityOnHoldNa').checked = naVisibility.onHoldNa !== false;
+    document.getElementById('naVisibilityEnrollmentExcludedNa').checked = naVisibility.enrollmentExcludedNa === true;
+    document.getElementById('naVisibilityApprovedLeaveNa').checked = naVisibility.approvedLeaveNa !== false;
+    document.getElementById('naVisibilityMakeupRequiredNa').checked = naVisibility.makeupRequiredNa === true;
+    document.getElementById('naVisibilityCapReachedNa').checked = false;
+
     refreshSessionNotificationEmailTemplateWarning(
       email.emailTemplateBodyContentWarning
       || (email.emailTemplateMissingBodyContentSlot

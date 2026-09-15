@@ -182,6 +182,13 @@ test('group enrollment shows anticipated finish hints under cap inputs', () => {
   assert.match(viewSource, /pendingUnmarkSessionIds/);
 });
 
+test('rolling enrollment row actions include enrollment note menu item', () => {
+  assert.match(viewSource, /btn-row-note/);
+  assert.match(viewSource, /id="enrollmentNoteModal"/);
+  assert.match(viewSource, /function openEnrollmentNoteModal\(/);
+  assert.match(viewSource, /function saveEnrollmentNote\(/);
+});
+
 test('rolling enrollment includes modal cleanup helpers for stacked workflow modals', () => {
   assert.match(viewSource, /function cleanupRollingModalLayer\(/);
   assert.match(viewSource, /function hideBootstrapModalAndWait\(/);

@@ -406,6 +406,9 @@ router.post('/api/enrollment-periods/:periodId/sync-academic-ledger',
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.syncAcademicLedgerForEnrollmentPeriod);
 
+router.post('/api/enrollment-periods/:periodId/notes',
+  rollingCtrl.updateEnrollmentPeriodNotes);
+
 router.post('/api/enrollment-periods/:periodId/edit',
   requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),

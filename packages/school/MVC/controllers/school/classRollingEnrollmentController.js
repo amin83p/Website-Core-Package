@@ -60,6 +60,8 @@ const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const classEnrollmentPeriodProgressService = require('../../services/school/classEnrollmentPeriodProgressService');
+const sessionEnrollmentContextService = require('../../services/school/sessionEnrollmentContextService');
+const sessionAttendanceEditAccessService = require('../../services/school/sessionAttendanceEditAccessService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolRepositories = require('../../repositories/school');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -75,6 +77,7 @@ const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreMo
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
+const attendanceAccessService = require('../../services/school/attendanceAccessService');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function roundMoney(value) {
@@ -4155,6 +4158,107 @@ async function approveClassEnrollmentDraft(req, res) {
   }
 }
 
+async function updateEnrollmentPeriodNotes(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId || req.body?.periodId || '');
+    if (!periodId) throw new Error('periodId is required.');
+
+    const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!periodRow) throw new Error('Enrollment period not found.');
+
+    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const classId = toPublicId(req.body?.classId || classData?.id || '');
+    const sessionId = toPublicId(req.body?.sessionId || '');
+    let allowed = false;
+
+    const rollingAccess = await accessService.evaluateAccess({
+      user: req.user,
+      sectionId: SECTIONS.SCHOOL_ROLLING_ENROLLMENT,
+      operationId: OPERATIONS.UPDATE,
+      ipAddress: req.ip
+    }).catch(() => null);
+    if (rollingAccess?.allowed) {
+      allowed = true;
+    }
+
+    if (!allowed && classId && sessionId) {
+      if (!idsEqual(classId, classData?.id)) {
+        throw new Error('Enrollment period does not belong to the requested class.');
+      }
+      const sessions = await schoolDataService.getClassSessions(classId, req.user);
+      const session = (Array.isArray(sessions) ? sessions : []).find((row) => idsEqual(row?.sessionId || row?.id, sessionId)) || null;
+      if (!session) throw new Error('Session not found.');
+
+      const canOverride = await adminAuthorityService.isAdminForRequestAsync(
+        req.user,
+        SECTIONS.SCHOOL_CLASSES,
+        OPERATIONS.UPDATE,
+        { section: { id: SECTIONS.SCHOOL_CLASSES } }
+      );
+      const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || req.user?.activeOrgId || '', { includeInactive: true });
+      const attendanceEditAccess = await sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+        orgId: classData?.orgId || req.user?.activeOrgId || '',
+        session,
+        orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+        target: 'attendance',
+        statusMap
+      });
+      const attendanceAccess = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip).catch(() => ({ canEditRoster: false, canOverrideSessionLock: false }));
+      const canOverrideAttendanceEdit = canOverride || Boolean(attendanceAccess?.canOverrideSessionLock);
+      const attendanceEditLocked = !attendanceAccess?.canEditRoster
+        || (!attendanceEditAccess.editable && !canOverrideAttendanceEdit);
+      if (attendanceEditLocked) {
+        throw new Error('Attendance is read-only for this session.');
+      }
+
+      const students = await schoolDataService.fetchAllData('students', {}, req.user);
+      const studentToPersonMap = new Map(
+        (Array.isArray(students) ? students : [])
+          .map((row) => [toPublicId(row?.id), toPublicId(row?.personId)])
+          .filter(([studentId, personId]) => studentId && personId)
+      );
+      const personId = classEnrollmentSessionApplicabilityService.resolveStudentPersonId(periodRow, studentToPersonMap);
+      if (!personId) throw new Error('Enrollment student could not be resolved.');
+
+      const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, req.user);
+      const window = classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentWindowForPerson({
+        periodRows,
+        studentToPersonMap,
+        personId,
+        session,
+        activeOrgId: String(req.user?.activeOrgId || classData?.orgId || '').trim(),
+        allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+      });
+      if (!idsEqual(window?.periodId, periodId)) {
+        throw new Error('Enrollment period is not active for this session.');
+      }
+      allowed = true;
+    }
+
+    if (!allowed) {
+      throw new Error('You do not have permission to update enrollment notes.');
+    }
+
+    const result = await sessionEnrollmentContextService.updateEnrollmentPeriodNotes({
+      periodId,
+      notes: req.body?.notes,
+      reqUser: req.user,
+      updatedBy: req.user?.id || req.user?.username || ''
+    });
+
+    return res.json({
+      status: 'success',
+      message: 'Enrollment note saved.',
+      notes: result.notes,
+      data: { periodId: result.periodId, notes: result.notes }
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function editClassEnrollmentPeriod(req, res) {
   let guardKey = '';
   try {
@@ -5396,6 +5500,7 @@ module.exports = {
   approveClassEnrollmentDraft,
   syncAcademicLedgerForEnrollmentPeriod,
   editClassEnrollmentPeriod,
+  updateEnrollmentPeriodNotes,
   removeOrRollbackClassEnrollmentPeriod,
   removeOrRollbackClassEnrollmentPeriodFromPreparation,
   createClassEnrollmentPeriod,

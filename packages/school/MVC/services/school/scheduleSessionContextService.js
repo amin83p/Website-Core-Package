@@ -8,6 +8,8 @@ const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSes
 const classSessionCapacityService = require('./classSessionCapacityService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
+const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
+const sessionNaVisibilityService = require('./sessionNaVisibilityService');
 
 function cleanPersonId(value) {
     return String(value || '').trim();
@@ -141,6 +143,7 @@ async function resolveRosterResolution({
     if (registrationMode === 'rolling') {
         const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, reqUser);
         const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || activeOrgId, { includeInactive: true });
+        const naVisibility = (await sessionAccessPolicyModel.getPolicyForOrg(classData?.orgId || activeOrgId))?.naAttendanceVisibility || {};
         const applicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
             sessions: Array.isArray(sessions) && sessions.length ? sessions : [session],
             periodRows,
@@ -161,16 +164,13 @@ async function resolveRosterResolution({
                 session?.sessionId || session?.id
             );
             if (!state) return;
-            if (state.expected
-                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.APPROVED_LEAVE
-                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.MANUAL_NOT_APPLICABLE
-                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.MAKEUP_REQUIRED) {
+            if (sessionNaVisibilityService.shouldIncludeApplicabilityState(state, naVisibility)) {
                 const normalizedPersonId = cleanPersonId(personId);
                 personIds.add(normalizedPersonId);
                 applicabilityByPersonId.set(normalizedPersonId, state);
             }
         });
-        return { personIds, applicabilityByPersonId, periodRows, registrationMode };
+        return { personIds, applicabilityByPersonId, periodRows, registrationMode, naVisibility };
     }
 
     const rosterStatuses = ['active'];

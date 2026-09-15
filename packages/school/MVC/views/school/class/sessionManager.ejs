@@ -44,6 +44,96 @@
     .btn-check[value="absent"]:checked + .att-label { background-color: #dc3545; color: #fff; font-weight: bold; }
     .btn-check[value="acf"]:checked + .att-label { background-color: #b02a37; color: #fff; font-weight: bold; }
     .btn-check[value="not_applicable"]:checked + .att-label { background-color: #6c757d; color: #fff; font-weight: bold; }
+    .att-bulk-actions {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+    }
+    .att-bulk-actions-group {
+        border: 1px solid #dee2e6;
+        border-radius: 999px;
+        overflow: hidden;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+    .att-bulk-actions-group .att-bulk-btn {
+        border: 0;
+        border-right: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 0;
+        padding: 0.35rem 0.7rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1.2;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .att-bulk-actions-group .att-bulk-btn:last-child {
+        border-right: 0;
+    }
+    .att-bulk-actions-group .att-bulk-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.12);
+    }
+    .att-bulk-actions-group .att-bulk-btn:active {
+        transform: translateY(0);
+    }
+    .att-bulk-btn-present {
+        background: #ecfdf3;
+        color: #166534;
+    }
+    .att-bulk-btn-present:hover {
+        background: #198754;
+        color: #fff;
+    }
+    .att-bulk-btn-late {
+        background: #fff8db;
+        color: #92400e;
+    }
+    .att-bulk-btn-late:hover {
+        background: #ffc107;
+        color: #000;
+    }
+    .att-bulk-btn-absent {
+        background: #fef2f2;
+        color: #991b1b;
+    }
+    .att-bulk-btn-absent:hover {
+        background: #dc3545;
+        color: #fff;
+    }
+    .att-bulk-btn-na {
+        background: #f1f3f5;
+        color: #495057;
+    }
+    .att-bulk-btn-na:hover {
+        background: #6c757d;
+        color: #fff;
+    }
+    .att-bulk-btn-reset {
+        border: 1px solid #ced4da;
+        border-radius: 999px;
+        background: #fff;
+        color: #495057;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+    .att-bulk-btn-reset:hover {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+        color: #212529;
+        transform: translateY(-1px);
+    }
+    .att-bulk-btn-reset:active {
+        transform: translateY(0);
+    }
     .attendance-timing-toggle {
         min-height: 2.25rem;
         border-radius: 8px;
@@ -266,6 +356,165 @@
     #attendanceTable .sortable-att-name .attendance-sort-icon {
         font-size: 0.75rem;
         opacity: 0.65;
+    }
+    .enrollment-info-modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .enrollment-info-student-banner {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.85rem 1rem;
+        border: 1px solid #dbeafe;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%);
+    }
+    .enrollment-info-student-banner > i {
+        font-size: 1.35rem;
+        color: #0d6efd;
+        flex-shrink: 0;
+    }
+    .enrollment-info-student-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6c757d;
+        margin-bottom: 0.1rem;
+    }
+    .enrollment-info-student-name {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #1f2a37;
+        line-height: 1.2;
+    }
+    .enrollment-info-section {
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        background: #fff;
+        overflow: hidden;
+    }
+    .enrollment-info-section-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.55rem 0.85rem;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #495057;
+    }
+    .enrollment-info-section-header i {
+        color: #0d6efd;
+        font-size: 0.95rem;
+    }
+    .enrollment-info-section-header .enrollment-info-meta {
+        margin-left: auto;
+        font-size: 0.72rem;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: normal;
+        color: #6c757d;
+    }
+    .enrollment-info-section-body {
+        padding: 0.85rem;
+    }
+    .enrollment-info-clb-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.55rem;
+    }
+    @media (min-width: 480px) {
+        .enrollment-info-clb-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+    .enrollment-info-clb-skill {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 0.5rem 0.45rem;
+        text-align: center;
+        background: #fafbfc;
+    }
+    .enrollment-info-clb-skill-label {
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #6c757d;
+        margin-bottom: 0.35rem;
+    }
+    .enrollment-info-clb-values {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        align-items: center;
+    }
+    .enrollment-info-clb-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.1rem;
+        padding: 0.15rem 0.45rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .enrollment-info-clb-badge.current {
+        background: #e7f1ff;
+        color: #0d6efd;
+        border: 1px solid #b6d4fe;
+    }
+    .enrollment-info-clb-badge.goal {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #c8e6c9;
+    }
+    .enrollment-info-clb-badge.empty {
+        background: #f1f3f5;
+        color: #adb5bd;
+        border: 1px solid #dee2e6;
+        font-weight: 500;
+    }
+    .enrollment-info-clb-role {
+        font-size: 0.62rem;
+        color: #868e96;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .enrollment-info-finish-value {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.75rem 0.85rem;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1f2a37;
+    }
+    .enrollment-info-finish-value i {
+        color: #198754;
+        font-size: 1.1rem;
+    }
+    .enrollment-info-finish-value.is-muted {
+        font-weight: 500;
+        color: #6c757d;
+        font-size: 0.92rem;
+    }
+    .enrollment-info-section-note .enrollment-info-section-body {
+        padding-top: 0.65rem;
+    }
+    .enrollment-info-empty {
+        grid-column: 1 / -1;
+        padding: 0.85rem;
+        text-align: center;
+        color: #868e96;
+        font-size: 0.88rem;
+        font-style: italic;
     }
     .attendance-excuse-chip {
         display: inline-flex;
@@ -2185,14 +2434,26 @@
                             </a>
                             <% } %>
                             <% if (!attendanceReadOnly && session.roster.length > 0) { %>
-                                <div class="btn-group btn-group-sm" role="group" aria-label="Bulk attendance">
-                                    <button type="button" class="btn btn-outline-success" id="btnAllPresent">All Present</button>
-                                    <% if (enabledAttendanceSet.has('late')) { %>
-                                    <button type="button" class="btn btn-outline-warning" id="btnAllLate">All Late</button>
-                                    <% } %>
-                                    <button type="button" class="btn btn-outline-danger" id="btnAllAbsent">All Absent</button>
-                                    <button type="button" class="btn btn-outline-secondary" id="btnAllNotApplicable">All N/A</button>
-                                    <button type="button" class="btn btn-outline-dark" id="btnAllResetAttendance" title="Clear attendance back to unmarked">Reset</button>
+                                <div class="att-bulk-actions" aria-label="Bulk attendance">
+                                    <div class="att-bulk-actions-group btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn att-bulk-btn att-bulk-btn-present" id="btnAllPresent" title="Mark all editable students present">
+                                            <i class="bi bi-check-lg" aria-hidden="true"></i>All Present
+                                        </button>
+                                        <% if (enabledAttendanceSet.has('late')) { %>
+                                        <button type="button" class="btn att-bulk-btn att-bulk-btn-late" id="btnAllLate" title="Mark all editable students late">
+                                            <i class="bi bi-clock" aria-hidden="true"></i>All Late
+                                        </button>
+                                        <% } %>
+                                        <button type="button" class="btn att-bulk-btn att-bulk-btn-absent" id="btnAllAbsent" title="Mark all editable students absent">
+                                            <i class="bi bi-x-lg" aria-hidden="true"></i>All Absent
+                                        </button>
+                                        <button type="button" class="btn att-bulk-btn att-bulk-btn-na" id="btnAllNotApplicable" title="Mark all editable students N/A">
+                                            <i class="bi bi-dash-circle" aria-hidden="true"></i>All N/A
+                                        </button>
+                                    </div>
+                                    <button type="button" class="btn att-bulk-btn-reset" id="btnAllResetAttendance" title="Clear attendance back to unmarked">
+                                        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset
+                                    </button>
                                 </div>
                             <% } %>
                         </div>
@@ -2205,15 +2466,19 @@
                                         <th class="attendance-order-col ps-3" title="Row order">#</th>
                                         <th class="ps-2 sortable-att-name" id="attendanceSortName" title="Click to sort A–Z or Z–A">Student Name <i class="bi bi-arrow-down-up attendance-sort-icon" aria-hidden="true"></i></th>
                                         <th style="min-width: 280px;">Attendance Status</th>
+                                        <th class="text-center" style="width: 3rem;" aria-label="Enrollment info"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <% if (session.roster.length === 0) { %>
-                                        <tr><td colspan="3" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
+                                        <tr><td colspan="4" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
                                     <% } else { %>
                                         <% session.roster.forEach((student, i) => { %>
                                             <% const rowDisabledAttr = (attendanceReadOnly || enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) ? 'disabled' : ''; %>
-                                            <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
+                                            <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>"
+                                                data-na-note="<%= (student.naNote || '').replace(/"/g, '&quot;') %>"
+                                                data-na-label="<%= (student.naLabel || '').replace(/"/g, '&quot;') %>"
+                                                data-na-reason="<%= (student.naReasonCode || '').replace(/"/g, '&quot;') %>">
                                                 <td class="attendance-order-cell text-muted small ps-3"><%= i + 1 %></td>
                                                 <td class="ps-2 fw-bold align-middle">
                                                     <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
@@ -2245,7 +2510,11 @@
                                                             <% } %>
                                                             <% if (isAttendanceStatusShown('not_applicable', student.attendance)) { %>
                                                             <input type="radio" class="btn-check att-radio" name="att_<%= i %>" id="na_<%= i %>" value="not_applicable" <%= (student.attendance === 'not_applicable' || student.attendance === 'N/A' || student.attendance === 'n/a') ? 'checked' : '' %> <%- rowDisabledAttr %>>
-                                                            <label class="btn att-label" for="na_<%= i %>" title="Not applicable"><i class="bi bi-dash-circle"></i> N/A</label>
+                                                            <label class="btn att-label js-na-status-label" for="na_<%= i %>" title="Not applicable — click note icon to view reason"><i class="bi bi-dash-circle"></i> N/A</label>
+                                                            <% const showNaNoteBtn = (student.attendance === 'not_applicable' || student.attendance === 'N/A' || student.attendance === 'n/a'); %>
+                                                            <% if (showNaNoteBtn) { %>
+                                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1 js-na-note-trigger" title="View N/A note" aria-label="View N/A note for <%= student.name %>"><i class="bi bi-info-circle"></i></button>
+                                                            <% } %>
                                                             <% } %>
                                                         </div>
                                                         <% const hasDetails = student.lateMinutes || student.earlyLeaveMinutes || student.excuseRef || student.excuseAttachment || (student.comments && student.comments.length > 0); %>
@@ -2268,6 +2537,20 @@
                                                     <input type="hidden" class="att-excuse" value="<%= student.excuseRef || '' %>">
                                                     <input type="hidden" class="att-excuse-attachment" value="">
                                                     <input type="hidden" class="att-comments" value="">
+                                                </td>
+                                                <td class="text-center pe-3 align-middle">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary py-0 px-1 js-enrollment-info-trigger"
+                                                            title="Enrollment info"
+                                                            aria-label="Enrollment info for <%= student.name %>"
+                                                            data-enrollment-period-id="<%= student.enrollmentPeriodId || '' %>"
+                                                            data-enrollment-finish-date="<%= student.enrollmentExpectedFinishDate || '' %>"
+                                                            data-enrollment-notes="<%= (student.enrollmentNotes || '').replace(/"/g, '&quot;') %>"
+                                                            data-enrollment-clb-recorded-at="<%= student.enrollmentClbRecordedAt || '' %>"
+                                                            data-enrollment-clb-current="<%= encodeURIComponent(JSON.stringify(student.enrollmentClbCurrent || {})) %>"
+                                                            data-enrollment-clb-goal="<%= encodeURIComponent(JSON.stringify(student.enrollmentClbGoal || {})) %>">
+                                                        <i class="bi bi-info-circle"></i>
+                                                    </button>
                                                 </td>
                                             </tr>
                                         <% }) %>
@@ -2979,6 +3262,88 @@
                 <% if (!attendanceReadOnly) { %>
                     <button type="button" class="btn btn-primary fw-bold" id="btnSaveDetails">Apply Time/Excuse</button>
                 <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="attendanceNaNoteModal" tabindex="-1" aria-labelledby="attendanceNaNoteModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title fw-bold" id="attendanceNaNoteModalTitle"><i class="bi bi-dash-circle me-2"></i>N/A Note</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-muted mb-1">Student</div>
+                <div class="fw-semibold mb-3" id="attendanceNaNoteStudentName">—</div>
+                <div class="small text-muted mb-1">Reason</div>
+                <div class="fw-semibold mb-3" id="attendanceNaNoteReasonLabel">—</div>
+                <div class="small text-muted mb-1">Note</div>
+                <div class="border rounded p-3 bg-light-subtle" id="attendanceNaNoteBody" style="white-space: pre-wrap;">—</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="attendanceEnrollmentInfoModal" tabindex="-1" aria-labelledby="attendanceEnrollmentInfoModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-md">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white py-2">
+                <h5 class="modal-title fw-bold" id="attendanceEnrollmentInfoModalTitle"><i class="bi bi-info-circle me-2"></i>Enrollment Info</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body enrollment-info-modal-body">
+                <div class="enrollment-info-student-banner">
+                    <i class="bi bi-person-badge" aria-hidden="true"></i>
+                    <div>
+                        <div class="enrollment-info-student-label">Student</div>
+                        <div class="enrollment-info-student-name" id="attendanceEnrollmentInfoStudentName">—</div>
+                    </div>
+                </div>
+
+                <section class="enrollment-info-section" aria-labelledby="attendanceEnrollmentInfoClbHeading">
+                    <div class="enrollment-info-section-header" id="attendanceEnrollmentInfoClbHeading">
+                        <i class="bi bi-bar-chart-steps" aria-hidden="true"></i>
+                        <span>CLB levels</span>
+                        <span class="enrollment-info-meta" id="attendanceEnrollmentInfoClbRecordedAt"></span>
+                    </div>
+                    <div class="enrollment-info-section-body">
+                        <div id="attendanceEnrollmentInfoClbGrid" class="enrollment-info-clb-grid"></div>
+                    </div>
+                </section>
+
+                <section class="enrollment-info-section" aria-labelledby="attendanceEnrollmentInfoFinishHeading">
+                    <div class="enrollment-info-section-header" id="attendanceEnrollmentInfoFinishHeading">
+                        <i class="bi bi-calendar-check" aria-hidden="true"></i>
+                        <span>Expected finishing date</span>
+                    </div>
+                    <div class="enrollment-info-finish-value" id="attendanceEnrollmentInfoFinishDate">
+                        <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                        <span id="attendanceEnrollmentInfoFinishDateText">—</span>
+                    </div>
+                </section>
+
+                <section class="enrollment-info-section enrollment-info-section-note" aria-labelledby="attendanceEnrollmentInfoNotesLabel">
+                    <div class="enrollment-info-section-header">
+                        <i class="bi bi-sticky" aria-hidden="true"></i>
+                        <span id="attendanceEnrollmentInfoNotesLabel">Enrollment note</span>
+                    </div>
+                    <div class="enrollment-info-section-body">
+                        <textarea class="form-control" id="attendanceEnrollmentInfoNotes" rows="4" maxlength="1000" placeholder="Add a note for this enrollment..." <%= attendanceReadOnly ? 'disabled' : '' %>></textarea>
+                        <div class="form-text mt-2 mb-0">CLB levels and expected finish date are read-only.</div>
+                    </div>
+                </section>
+                <input type="hidden" id="attendanceEnrollmentInfoPeriodId" value="">
+            </div>
+            <div class="modal-footer py-2">
+                <% if (!attendanceReadOnly) { %>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSaveAttendanceEnrollmentNote" disabled>Save note</button>
+                <% } %>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -4860,7 +5225,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!personId) return acc;
         acc[personId] = {
             comments: Array.isArray(student.comments) ? student.comments : [],
-            excuseAttachment: student.excuseAttachment || null
+            excuseAttachment: student.excuseAttachment || null,
+            naNote: String(student.naNote || '').trim(),
+            naLabel: String(student.naLabel || '').trim(),
+            naReasonCode: String(student.naReasonCode || '').trim()
         };
         return acc;
     }, {})) %>;
@@ -4874,6 +5242,261 @@ document.addEventListener('DOMContentLoaded', () => {
         return attendanceDetailsState[key];
     }
     window.getAttendanceDetails = getAttendanceDetails;
+
+    function decodeHtmlAttribute(value) {
+        return String(value || '')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&');
+    }
+
+    function resolveNaNoteFromRow(row) {
+        if (!row) return { naNote: '', naLabel: '', studentName: '' };
+        const personId = String(row.dataset?.personid || row.getAttribute('data-personid') || '').trim();
+        const details = personId ? getAttendanceDetails(personId) : null;
+        const naNote = String(details?.naNote || decodeHtmlAttribute(row.dataset?.naNote || '')).trim();
+        const naLabel = String(details?.naLabel || decodeHtmlAttribute(row.dataset?.naLabel || '')).trim();
+        const studentName = String(row.dataset?.studentName || row.getAttribute('data-student-name') || '').trim();
+        return {
+            naNote: naNote || 'No note recorded.',
+            naLabel: naLabel || 'N/A',
+            studentName: studentName || 'Student'
+        };
+    }
+
+    function openAttendanceNaNoteModal(row) {
+        const modalEl = document.getElementById('attendanceNaNoteModal');
+        if (!modalEl || !row) return;
+        const payload = resolveNaNoteFromRow(row);
+        const titleEl = document.getElementById('attendanceNaNoteModalTitle');
+        const studentEl = document.getElementById('attendanceNaNoteStudentName');
+        const reasonEl = document.getElementById('attendanceNaNoteReasonLabel');
+        const bodyEl = document.getElementById('attendanceNaNoteBody');
+        if (studentEl) studentEl.textContent = payload.studentName;
+        if (reasonEl) reasonEl.textContent = payload.naLabel;
+        if (bodyEl) bodyEl.textContent = payload.naNote;
+        if (titleEl) titleEl.innerHTML = '<i class="bi bi-dash-circle me-2"></i>N/A Note';
+        if (window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        } else {
+            modalEl.classList.add('show');
+            modalEl.style.display = 'block';
+        }
+    }
+
+    document.getElementById('attendanceTable')?.addEventListener('click', (event) => {
+        const naTrigger = event.target.closest('.js-na-note-trigger');
+        if (naTrigger) {
+            event.preventDefault();
+            event.stopPropagation();
+            const row = naTrigger.closest('.roster-row');
+            openAttendanceNaNoteModal(row);
+            return;
+        }
+        const infoTrigger = event.target.closest('.js-enrollment-info-trigger');
+        if (infoTrigger) {
+            event.preventDefault();
+            event.stopPropagation();
+            openAttendanceEnrollmentInfoModal(infoTrigger);
+        }
+    });
+
+    const ENROLLMENT_CLB_SKILL_CODES = [
+        ['listening', 'L', 'Listening'],
+        ['speaking', 'S', 'Speaking'],
+        ['reading', 'R', 'Reading'],
+        ['writing', 'W', 'Writing']
+    ];
+
+    function parseEnrollmentInfoJsonAttr(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return {};
+        try {
+            return JSON.parse(decodeURIComponent(raw));
+        } catch (_) {
+            try {
+                return JSON.parse(raw);
+            } catch (_) {
+                return {};
+            }
+        }
+    }
+
+    function formatEnrollmentClbSkills(skills) {
+        const parts = [];
+        ENROLLMENT_CLB_SKILL_CODES.forEach(([key, letter]) => {
+            const token = String(skills?.[key] || '').trim();
+            if (token) parts.push(`${letter}${token}`);
+        });
+        return parts.length ? parts.join(' ') : 'Not recorded';
+    }
+
+    function renderEnrollmentClbGrid(currentSkills, goalSkills) {
+        const gridEl = document.getElementById('attendanceEnrollmentInfoClbGrid');
+        if (!gridEl) return;
+
+        const hasAnyValue = ENROLLMENT_CLB_SKILL_CODES.some(([key]) => {
+            return String(currentSkills?.[key] || '').trim() || String(goalSkills?.[key] || '').trim();
+        });
+
+        if (!hasAnyValue) {
+            gridEl.innerHTML = '<div class="enrollment-info-empty">No CLB levels recorded.</div>';
+            return;
+        }
+
+        gridEl.innerHTML = ENROLLMENT_CLB_SKILL_CODES.map(([key, , label]) => {
+            const current = String(currentSkills?.[key] || '').trim();
+            const goal = String(goalSkills?.[key] || '').trim();
+            const currentClass = current ? 'current' : 'empty';
+            const goalClass = goal ? 'goal' : 'empty';
+            return `<div class="enrollment-info-clb-skill">
+                <div class="enrollment-info-clb-skill-label">${conductEscapeHtml(label)}</div>
+                <div class="enrollment-info-clb-values">
+                    <span class="enrollment-info-clb-role">Current</span>
+                    <span class="enrollment-info-clb-badge ${currentClass}">${conductEscapeHtml(current || '—')}</span>
+                    <span class="enrollment-info-clb-role">Goal</span>
+                    <span class="enrollment-info-clb-badge ${goalClass}">${conductEscapeHtml(goal || '—')}</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function formatEnrollmentFinishDate(value) {
+        const token = String(value || '').trim();
+        if (!token) return 'Not available';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(token)) {
+            const parsed = new Date(`${token}T12:00:00`);
+            if (!Number.isNaN(parsed.getTime())) {
+                return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+        }
+        return token;
+    }
+
+    function resolveEnrollmentInfoFromTrigger(trigger) {
+        if (!trigger) return null;
+        const row = trigger.closest('.roster-row');
+        const studentName = String(row?.dataset?.studentName || row?.getAttribute('data-student-name') || '').trim();
+        return {
+            studentName: studentName || 'Student',
+            periodId: String(trigger.dataset.enrollmentPeriodId || '').trim(),
+            finishDate: String(trigger.dataset.enrollmentFinishDate || '').trim(),
+            notes: String(trigger.dataset.enrollmentNotes || '').trim(),
+            clbRecordedAt: String(trigger.dataset.enrollmentClbRecordedAt || '').trim(),
+            clbCurrent: parseEnrollmentInfoJsonAttr(trigger.dataset.enrollmentClbCurrent),
+            clbGoal: parseEnrollmentInfoJsonAttr(trigger.dataset.enrollmentClbGoal),
+            trigger
+        };
+    }
+
+    let activeEnrollmentInfoTrigger = null;
+
+    function setAttendanceEnrollmentNoteSaveEnabled(enabled) {
+        const saveBtn = document.getElementById('btnSaveAttendanceEnrollmentNote');
+        if (saveBtn) saveBtn.disabled = !enabled;
+    }
+
+    function openAttendanceEnrollmentInfoModal(trigger) {
+        const modalEl = document.getElementById('attendanceEnrollmentInfoModal');
+        if (!modalEl || !trigger) return;
+        const payload = resolveEnrollmentInfoFromTrigger(trigger);
+        if (!payload) return;
+        activeEnrollmentInfoTrigger = trigger;
+
+        const studentEl = document.getElementById('attendanceEnrollmentInfoStudentName');
+        const clbRecordedEl = document.getElementById('attendanceEnrollmentInfoClbRecordedAt');
+        const finishWrapEl = document.getElementById('attendanceEnrollmentInfoFinishDate');
+        const finishTextEl = document.getElementById('attendanceEnrollmentInfoFinishDateText');
+        const notesEl = document.getElementById('attendanceEnrollmentInfoNotes');
+        const periodEl = document.getElementById('attendanceEnrollmentInfoPeriodId');
+
+        if (studentEl) studentEl.textContent = payload.studentName;
+        if (clbRecordedEl) {
+            clbRecordedEl.textContent = payload.clbRecordedAt
+                ? `Recorded ${formatEnrollmentFinishDate(payload.clbRecordedAt)}`
+                : '';
+        }
+        renderEnrollmentClbGrid(payload.clbCurrent, payload.clbGoal);
+        const finishLabel = formatEnrollmentFinishDate(payload.finishDate);
+        if (finishTextEl) finishTextEl.textContent = finishLabel;
+        if (finishWrapEl) {
+            finishWrapEl.classList.toggle('is-muted', finishLabel === 'Not available');
+        }
+        if (notesEl) {
+            notesEl.value = payload.notes;
+            notesEl.dataset.initialValue = payload.notes;
+            notesEl.disabled = Boolean(<%= attendanceReadOnly ? 'true' : 'false' %>);
+        }
+        if (periodEl) periodEl.value = payload.periodId;
+        setAttendanceEnrollmentNoteSaveEnabled(false);
+
+        if (window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        } else {
+            modalEl.classList.add('show');
+            modalEl.style.display = 'block';
+        }
+    }
+
+    document.getElementById('attendanceEnrollmentInfoNotes')?.addEventListener('input', (event) => {
+        const textarea = event.target;
+        const initial = String(textarea?.dataset?.initialValue || '');
+        const current = String(textarea?.value || '');
+        const periodId = String(document.getElementById('attendanceEnrollmentInfoPeriodId')?.value || '').trim();
+        setAttendanceEnrollmentNoteSaveEnabled(Boolean(periodId) && current !== initial);
+    });
+
+    document.getElementById('btnSaveAttendanceEnrollmentNote')?.addEventListener('click', async () => {
+        const periodId = String(document.getElementById('attendanceEnrollmentInfoPeriodId')?.value || '').trim();
+        const notesEl = document.getElementById('attendanceEnrollmentInfoNotes');
+        const notes = String(notesEl?.value || '').trim();
+        if (!periodId) {
+            if (typeof uiAlert === 'function') uiAlert('Enrollment note is only available for rolling enrollment periods.', 'Enrollment note', { icon: 'info' });
+            return;
+        }
+        const saveBtn = document.getElementById('btnSaveAttendanceEnrollmentNote');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+        }
+        try {
+            const response = await fetch(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/notes`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+                },
+                body: JSON.stringify({
+                    notes,
+                    classId: sessionManagerClassId,
+                    sessionId: sessionManagerSessionId
+                })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || 'Could not save enrollment note.');
+            }
+            const savedNotes = String(result.notes ?? notes).trim();
+            if (notesEl) {
+                notesEl.value = savedNotes;
+                notesEl.dataset.initialValue = savedNotes;
+            }
+            if (activeEnrollmentInfoTrigger) {
+                activeEnrollmentInfoTrigger.dataset.enrollmentNotes = savedNotes;
+            }
+            if (typeof uiAlert === 'function') uiAlert('Enrollment note saved.', 'Enrollment note', { icon: 'success' });
+        } catch (error) {
+            if (typeof uiAlert === 'function') uiAlert(error.message || 'Could not save enrollment note.', 'Enrollment note', { icon: 'error' });
+        } finally {
+            if (saveBtn) {
+                saveBtn.textContent = 'Save note';
+                setAttendanceEnrollmentNoteSaveEnabled(false);
+            }
+        }
+    });
 
     function conductEscapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (ch) => ({

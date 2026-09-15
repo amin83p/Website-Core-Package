@@ -177,6 +177,16 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.match(view, /\/school\/settings\/autosave/);
   assert.match(view, /id="session-access"/);
   assert.match(view, /\/school\/settings\/session-access/);
+  assert.match(view, /id="cardNaAttendanceVisibility"/);
+  assert.match(view, /id="naAttendanceVisibilityCollapse"/);
+  assert.match(view, /data-bs-target="#naAttendanceVisibilityCollapse"/);
+  assert.match(view, /id="naVisibilityTeacherNa"/);
+  assert.match(view, /id="naVisibilityOnHoldNa"/);
+  assert.match(view, /id="naVisibilityEnrollmentExcludedNa"/);
+  assert.match(view, /id="naVisibilityApprovedLeaveNa"/);
+  assert.match(view, /id="naVisibilityMakeupRequiredNa"/);
+  assert.match(view, /id="naVisibilityCapReachedNa"/);
+  assert.match(view, /naAttendanceVisibility/);
   assert.match(view, /sessionNotificationEmailBody/);
   assert.match(view, /sessionNotificationEmailBodyEditBtn/);
   assert.match(view, /templateKind__eq=general/);
@@ -278,6 +288,14 @@ test('settings page renders in editable and read-only modes with valid client Ja
         enabled: true,
         windowType: 'timesheet_period',
         daysAfterSession: null
+      },
+      naAttendanceVisibility: {
+        teacherNa: true,
+        onHoldNa: true,
+        enrollmentExcludedNa: false,
+        approvedLeaveNa: true,
+        makeupRequiredNa: false,
+        capReachedNa: false
       }
     },
     autosaveSections: require('../packages/school/MVC/config/autosaveSectionCatalog').listAutosaveSections(),

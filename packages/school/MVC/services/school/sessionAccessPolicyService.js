@@ -115,8 +115,30 @@ const DEFAULT_POLICY = Object.freeze({
     enabled: true,
     windowType: 'timesheet_period',
     daysAfterSession: null
+  }),
+  naAttendanceVisibility: Object.freeze({
+    teacherNa: true,
+    onHoldNa: true,
+    enrollmentExcludedNa: false,
+    approvedLeaveNa: true,
+    makeupRequiredNa: false,
+    capReachedNa: false
   })
 });
+
+const NA_VISIBILITY_LOCKED = Object.freeze({
+  teacherNa: true,
+  capReachedNa: false
+});
+
+const NA_VISIBILITY_POLICY_KEYS = Object.freeze([
+  'teacherNa',
+  'onHoldNa',
+  'enrollmentExcludedNa',
+  'approvedLeaveNa',
+  'makeupRequiredNa',
+  'capReachedNa'
+]);
 
 function boolFlag(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback === true;
@@ -328,6 +350,26 @@ function normalizeAttendanceEditSettings(input = {}) {
   return normalizeCompletedSessionEditSettings(input, DEFAULT_POLICY.completedSessionAttendanceEdit);
 }
 
+function normalizeNaAttendanceVisibility(input = {}, fallback = DEFAULT_POLICY.naAttendanceVisibility) {
+  const source = input && typeof input === 'object' ? input : {};
+  const base = fallback && typeof fallback === 'object' ? fallback : DEFAULT_POLICY.naAttendanceVisibility;
+  const normalized = {};
+  NA_VISIBILITY_POLICY_KEYS.forEach((key) => {
+    normalized[key] = boolFlag(source[key], base[key] === true);
+  });
+  if (NA_VISIBILITY_LOCKED.teacherNa === true) {
+    normalized.teacherNa = true;
+  }
+  if (NA_VISIBILITY_LOCKED.capReachedNa === false) {
+    normalized.capReachedNa = false;
+  }
+  return normalized;
+}
+
+function resolveNaAttendanceVisibility(input = {}) {
+  return normalizeNaAttendanceVisibility(input, DEFAULT_POLICY.naAttendanceVisibility);
+}
+
 function normalizePolicyFromStored(input = {}) {
   return {
     uncompletedSessionNotification: normalizeNotificationSettings(input.uncompletedSessionNotification),
@@ -354,6 +396,10 @@ function normalizePolicyFromStored(input = {}) {
     completedSessionStudentCasesEdit: normalizeCompletedSessionEditSettings(
       input.completedSessionStudentCasesEdit,
       DEFAULT_POLICY.completedSessionStudentCasesEdit
+    ),
+    naAttendanceVisibility: normalizeNaAttendanceVisibility(
+      input.naAttendanceVisibility,
+      DEFAULT_POLICY.naAttendanceVisibility
     )
   };
 }
@@ -463,8 +509,12 @@ module.exports = {
   SESSION_DATE_RANGE_TYPES,
   WINDOW_TYPE_VALUES,
   COMPLETED_SESSION_EDIT_POLICY_KEYS,
+  NA_VISIBILITY_LOCKED,
+  NA_VISIBILITY_POLICY_KEYS,
   TEMPLATE_TOKENS,
   DEFAULT_POLICY,
+  normalizeNaAttendanceVisibility,
+  resolveNaAttendanceVisibility,
   normalizePolicyFromStored,
   normalizePolicyFromForm,
   resolvePolicy,

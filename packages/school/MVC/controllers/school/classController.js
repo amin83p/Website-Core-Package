@@ -47,6 +47,9 @@ const academicSnapshotService = require('../../services/school/academicSnapshotS
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
+const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
+const sessionNaVisibilityService = require('../../services/school/sessionNaVisibilityService');
+const sessionEnrollmentContextService = require('../../services/school/sessionEnrollmentContextService');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
@@ -1381,7 +1384,8 @@ async function resolveSessionRosterPersonIds({
     reqUser,
     students = [],
     prefetchedSessions = null,
-    prefetchedPeriodRows = null
+    prefetchedPeriodRows = null,
+    prefetchedNaVisibility = null
 } = {}) {
     const activeOrgId = String(reqUser?.activeOrgId || classData?.orgId || '').trim();
     const sessionDate = normalizeDateOnlyValue(session?.date);
@@ -1404,6 +1408,9 @@ async function resolveSessionRosterPersonIds({
             : await schoolDataService.getClassSessions(classData?.id, reqUser);
         const effectiveSessions = Array.isArray(allSessions) && allSessions.length ? allSessions : [session];
         const statusMapForApplicability = await sessionStatusPolicyService.getStatusMap(classData?.orgId || activeOrgId, { includeInactive: true });
+        const naVisibility = prefetchedNaVisibility
+            || await sessionAccessPolicyModel.getPolicyForOrg(classData?.orgId || activeOrgId)
+                .then((policy) => policy?.naAttendanceVisibility || {});
         const applicability = await classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentApplicabilityWithLeaves({
             sessions: effectiveSessions,
             periodRows,
@@ -1424,10 +1431,7 @@ async function resolveSessionRosterPersonIds({
                 session?.sessionId || session?.id
             );
             if (!state) return;
-            if (state.expected
-                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.APPROVED_LEAVE
-                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.MANUAL_NOT_APPLICABLE
-                || state.reason === classEnrollmentSessionApplicabilityService.APPLICABILITY_REASON.MAKEUP_REQUIRED) {
+            if (sessionNaVisibilityService.shouldIncludeApplicabilityState(state, naVisibility)) {
                 const normalizedPersonId = cleanPersonId(personId);
                 personIds.add(normalizedPersonId);
                 applicabilityByPersonId.set(normalizedPersonId, state);
@@ -1437,7 +1441,8 @@ async function resolveSessionRosterPersonIds({
             personIds,
             source: 'canonical_session_applicability',
             applicabilityByPersonId,
-            periodRows: Array.isArray(periodRows) ? periodRows : []
+            periodRows: Array.isArray(periodRows) ? periodRows : [],
+            naVisibility
         };
     }
 
@@ -1619,13 +1624,18 @@ async function buildEnrichedSessionRosterForMutation({
     prefetchedPersons = null,
     prefetchedStudents = null,
     prefetchedSessions = null,
-    prefetchedPeriodRows = null
+    prefetchedPeriodRows = null,
+    prefetchedNaVisibility = null
 }) {
     const hasPrefetch = Array.isArray(prefetchedPersons) && Array.isArray(prefetchedStudents);
     const identityData = hasPrefetch
         ? { persons: prefetchedPersons, students: prefetchedStudents }
         : await loadSessionRosterIdentityData(reqUser);
     const { persons, students } = identityData;
+    const orgId = classData?.orgId || reqUser?.activeOrgId || '';
+    const naVisibility = prefetchedNaVisibility
+        || (await sessionAccessPolicyModel.getPolicyForOrg(orgId))?.naAttendanceVisibility
+        || {};
 
     const workingSession = {
         ...session,
@@ -1638,10 +1648,14 @@ async function buildEnrichedSessionRosterForMutation({
         reqUser,
         students,
         prefetchedSessions,
-        prefetchedPeriodRows
+        prefetchedPeriodRows,
+        prefetchedNaVisibility: naVisibility
     });
     const activePersonIds = rosterResolution?.personIds instanceof Set ? rosterResolution.personIds : new Set();
     const activeApplicabilityByPersonId = rosterResolution?.applicabilityByPersonId instanceof Map ? rosterResolution.applicabilityByPersonId : new Map();
+    const periodRows = Array.isArray(rosterResolution?.periodRows)
+        ? rosterResolution.periodRows
+        : (Array.isArray(prefetchedPeriodRows) ? prefetchedPeriodRows : []);
 
     if (getClassRegistrationModeKey(classData) === 'rolling') {
         workingSession.roster = workingSession.roster.filter((row) => {
@@ -1649,17 +1663,22 @@ async function buildEnrichedSessionRosterForMutation({
             return pid && activePersonIds.has(pid);
         });
     }
-    const statusMapForSession = await sessionStatusPolicyService.getStatusMap(classData?.orgId || reqUser?.activeOrgId || '', { includeInactive: true });
+    const statusMapForSession = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
     const forceSessionNotApplicable = sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap(statusMapForSession, {
         status: workingSession?.status,
         notes: workingSession?.notes
     });
     const getApplicabilityForPerson = (pid) => activeApplicabilityByPersonId.get(cleanPersonId(pid)) || null;
     const hasApprovedLeaveFor = (pid) => getApplicabilityForPerson(pid)?.reason === 'approved_leave';
+    const hasEnrollmentExcludedFor = (pid) => getApplicabilityForPerson(pid)?.reason === 'enrollment_excluded';
 
     activePersonIds.forEach((pid) => {
         if (!workingSession.roster.find((r) => idsEqual(r.personId, pid))) {
-            const defaultAttendance = (forceSessionNotApplicable || hasApprovedLeaveFor(pid)) ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : '';
+            const defaultAttendance = (forceSessionNotApplicable
+                || hasApprovedLeaveFor(pid)
+                || hasEnrollmentExcludedFor(pid))
+                ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+                : '';
             workingSession.roster.push({
                 personId: pid,
                 attendance: defaultAttendance,
@@ -1676,6 +1695,9 @@ async function buildEnrichedSessionRosterForMutation({
         if (forceSessionNotApplicable) {
             return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false, absenceExcused: false };
         }
+        if (hasEnrollmentExcludedFor(pid)) {
+            return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false, absenceExcused: false };
+        }
         if (!hasApprovedLeaveFor(pid)) return row;
         const normalized = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(row?.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT);
         if (!attendanceMatrixMetricsService.isAbsentLikeStatus(normalized)
@@ -1685,16 +1707,43 @@ async function buildEnrichedSessionRosterForMutation({
         return { ...row, attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE, lateMinutes: 0, earlyLeaveMinutes: 0, lateExcused: false, earlyLeaveExcused: false, absenceExcused: false };
     });
 
+    const approvedLeaveNoteByPersonId = new Map();
+    if (getClassRegistrationModeKey(classData) === 'rolling' && activePersonIds.size) {
+        const leaveRequestService = require('../../services/school/leaveRequestService');
+        const windows = [...activePersonIds].map((personId) => ({
+            personId,
+            date: workingSession?.date,
+            startTime: workingSession?.startTime || workingSession?.start,
+            endTime: workingSession?.endTime || workingSession?.end,
+            sessionIndex: classEnrollmentSessionApplicabilityService.buildApplicabilityKey(
+                personId,
+                workingSession,
+                workingSession?.sessionId || workingSession?.id
+            )
+        }));
+        const leaveConflicts = await leaveRequestService.findApprovedLeaveConflicts({
+            orgId,
+            windows,
+            reqUser
+        }).catch(() => []);
+        (Array.isArray(leaveConflicts) ? leaveConflicts : []).forEach((row) => {
+            const personId = cleanPersonId(row?.personId);
+            if (!personId) return;
+            approvedLeaveNoteByPersonId.set(personId, String(row?.reason || '').trim());
+        });
+    }
+
     const personToStudentMap = schoolStudentProfileLinkService.buildPersonIdToStudentRecordIdMap(
         students,
-        classData?.orgId || reqUser?.activeOrgId || ''
+        orgId
     );
 
+    const contextByPersonId = new Map();
     const enrichedRoster = workingSession.roster.map((r) => {
         const pid = cleanPersonId(r.personId);
         const person = persons.find((p) => idsEqual(p.id, pid));
         const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
-        return {
+        const baseRow = {
             ...attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(r),
             personId: pid,
             name: displayName,
@@ -1707,6 +1756,18 @@ async function buildEnrichedSessionRosterForMutation({
             respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent, null),
             respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent, null)
         };
+        const naContext = sessionNaVisibilityService.resolveNaStatusContext({
+            personId: pid,
+            session: workingSession,
+            rosterRow: baseRow,
+            applicabilityState: getApplicabilityForPerson(pid),
+            periodRows,
+            classId: classData?.id,
+            approvedLeaveNote: approvedLeaveNoteByPersonId.get(pid) || '',
+            forceSessionMakeup: forceSessionNotApplicable
+        });
+        contextByPersonId.set(pid, naContext);
+        return sessionNaVisibilityService.attachNaContextToRosterRow(baseRow, naContext);
     });
 
     mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, workingSession, persons, {
@@ -1716,16 +1777,40 @@ async function buildEnrichedSessionRosterForMutation({
         personToStudentMap
     });
 
-    enrichedRoster.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    const filteredRoster = sessionNaVisibilityService.filterRosterByNaVisibilityPolicy(
+        enrichedRoster,
+        naVisibility,
+        contextByPersonId
+    );
+
+    filteredRoster.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+    const enrollmentContextByPersonId = await sessionEnrollmentContextService.buildRosterEnrollmentContextBatch({
+        personIds: filteredRoster.map((row) => cleanPersonId(row?.personId)).filter(Boolean),
+        session: workingSession,
+        classData,
+        periodRows,
+        students,
+        sessions: Array.isArray(prefetchedSessions) ? prefetchedSessions : [workingSession],
+        reqUser,
+        registrationMode: getClassRegistrationModeKey(classData)
+    });
+    filteredRoster.forEach((row) => {
+        const pid = cleanPersonId(row?.personId);
+        const enrollmentContext = enrollmentContextByPersonId.get(pid);
+        if (!enrollmentContext) return;
+        Object.assign(row, enrollmentContext);
+    });
+
     await assertRollingCapacityOneSessionRosterOrThrow({
         classData,
         session: workingSession,
-        roster: enrichedRoster,
+        roster: filteredRoster,
         reqUser,
-        prefetchedPeriodRows,
+        prefetchedPeriodRows: periodRows,
         prefetchedStudents: students
     });
-    return enrichedRoster;
+    return filteredRoster;
 }
 
 async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = [], orgToday = '') {
@@ -6074,7 +6159,7 @@ async function saveSession(req, res) {
         }
 
         if (!shouldSkipInstructionalPayload && roster !== undefined) {
-            const incomingRoster = typeof roster === 'string' ? JSON.parse(roster) : roster;
+            let incomingRoster = typeof roster === 'string' ? JSON.parse(roster) : roster;
             if (!Array.isArray(incomingRoster)) {
                 throw new Error('Invalid roster payload.');
             }
@@ -6085,6 +6170,16 @@ async function saveSession(req, res) {
                     : originalSession.date
             };
             const existingRoster = originalSession.roster || [];
+            if (getClassRegistrationModeKey(classData) === 'rolling') {
+                const periodRowsForSave = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, req.user);
+                incomingRoster = sessionNaVisibilityService.stripDisplayOnlyEnrollmentExcludedFromSave({
+                    incomingRoster,
+                    existingRoster,
+                    periodRows: periodRowsForSave,
+                    classId,
+                    sessionId: originalSession?.sessionId || originalSession?.id
+                });
+            }
             await assertSessionRosterEnrollmentWindows({
                 classData,
                 session: sessionForAttendanceWindow,
