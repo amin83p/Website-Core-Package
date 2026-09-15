@@ -133,6 +133,7 @@ const DEFAULTS = {
     contact: DEFAULT_APP_CONTACT,
     contactPage: DEFAULT_APP_CONTACT_PAGE,
     publicMenu: DEFAULT_APP_PUBLIC_MENU,
+    integrationVariables: [],
     ...(PACKAGE_SETTINGS_DEFAULTS.app || {})
   }
 };
@@ -206,7 +207,10 @@ function mergeAppSettings(base = {}, incoming = {}) {
       DEFAULTS.app.uploadFolders,
       baseApp.uploadFolders,
       incomingApp.uploadFolders
-    )
+    ),
+    integrationVariables: Array.isArray(incomingApp.integrationVariables)
+      ? incomingApp.integrationVariables
+      : (Array.isArray(baseApp.integrationVariables) ? baseApp.integrationVariables : [])
   };
 }
 

@@ -20,7 +20,7 @@
           <input type="hidden" id="schoolPersonProfileAddressesHidden" name="addresses" value="[]">
           <input type="hidden" id="schoolPersonProfileType" name="personProfileType" value="individual">
 
-          <div class="card shadow-sm border-0 mb-3">
+          <div class="card shadow-sm border-0 mb-3 school-person-profile-section-identity">
             <div class="card-body">
               <h6 class="fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person-bounding-box me-2"></i>Profile & Identity</h6>
 
@@ -79,28 +79,32 @@
             </div>
           </div>
 
-          <div class="row g-3 mb-3">
-            <div class="col-lg-6">
+          <div class="row g-3 mb-3 school-person-profile-section-contact-row">
+            <div class="col-lg-6 school-person-profile-section-communication-col">
               <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-light fw-bold text-uppercase small text-muted">
                   <i class="bi bi-envelope-paper me-2"></i>Communication
                 </div>
                 <div class="card-body">
+                  <div class="school-person-profile-section-emails">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <label class="form-label mb-0 fw-bold">Email Addresses *</label>
                     <button type="button" class="btn btn-sm btn-outline-primary" id="schoolPersonProfileBtnAddEmail"><i class="bi bi-plus-lg"></i> Add</button>
                   </div>
                   <div id="schoolPersonProfileEmailsList" class="mb-4"></div>
-                  <hr class="text-muted opacity-25">
+                  </div>
+                  <hr class="text-muted opacity-25 school-person-profile-section-emails-divider">
+                  <div class="school-person-profile-section-phones">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <label class="form-label mb-0 fw-bold">Phone Numbers</label>
                     <button type="button" class="btn btn-sm btn-outline-primary" id="schoolPersonProfileBtnAddPhone"><i class="bi bi-plus-lg"></i> Add</button>
                   </div>
                   <div id="schoolPersonProfilePhonesList"></div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="col-lg-6">
+            <div class="col-lg-6 school-person-profile-section-addresses-col">
               <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-light fw-bold text-uppercase small text-muted">
                   <i class="bi bi-geo-alt me-2"></i>Addresses
@@ -111,7 +115,7 @@
                       <i class="bi bi-search me-1"></i>Find Address (Canada)
                     </label>
                     <div class="input-group">
-                      <input type="text" id="schoolPersonProfileAddressSearch" class="form-control size-md" placeholder="Type street name..." autocomplete="off">
+                      <input type="text" id="schoolPersonProfileAddressSearch" class="form-control size-md" placeholder="Start typing a Canadian address..." autocomplete="off">
                       <button class="btn btn-outline-secondary" type="button" id="schoolPersonProfileBtnAddAddressManual">Manual</button>
                     </div>
                     <div id="schoolPersonProfileAddressSuggestions" class="list-group position-absolute w-100 shadow-lg" style="z-index: 1055; top: 100%; display: none;"></div>
@@ -122,14 +126,14 @@
             </div>
           </div>
 
-          <div class="card shadow-sm border-0 mb-3">
+          <div class="card shadow-sm border-0 mb-3 school-person-profile-section-notes">
             <div class="card-body">
               <label class="form-label fw-bold" for="schoolPersonProfileNotes">Person Notes</label>
               <textarea class="form-control" id="schoolPersonProfileNotes" name="notes" rows="3" placeholder="Optional notes about this person"></textarea>
             </div>
           </div>
 
-          <div class="card border shadow-sm bg-light-subtle mb-0">
+          <div class="card border shadow-sm bg-light-subtle mb-0 school-person-profile-section-roles">
             <div class="card-header bg-light fw-bold">
               <i class="bi bi-diagram-3 me-2"></i>Current Person Role Composition
             </div>
@@ -148,4 +152,5 @@
 </div>
 
 <script src="/scripts/schoolRoleDisplayUtils.js"></script>
+<script src="/scripts/canadianAddressAutocomplete.js"></script>
 <script src="/scripts/schoolPersonProfileModal.js"></script>

@@ -19,6 +19,7 @@ const coreResetRebootstrapService = require('../services/coreResetRebootstrapSer
 const actionStateRetentionService = require('../services/actionStateRetentionService');
 const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMigrationService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
+const integrationVariableModel = require('../models/integrationVariableModel');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
 const localPackageSyncService = require('../services/localPackageSyncService');
@@ -246,7 +247,8 @@ exports.showAppSettings = async (req, res) => {
       actionStateId: req.actionStateId,
       publicMenuEndpointOptions: appBrandingService.getPublicMenuEndpointOptions(),
       timezoneOptions: listCuratedTimezoneOptions(),
-      defaultTimezone: resolveDefaultTimezone()
+      defaultTimezone: resolveDefaultTimezone(),
+      integrationVariableRows: integrationVariableModel.listRowsForForm(settings?.app?.integrationVariables)
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -573,6 +575,9 @@ exports.updateAppSettings = async (req, res) => {
       || Object.prototype.hasOwnProperty.call(body, 'contactPageHeroSubtitle');
     const hasPublicMenuPayload = Object.prototype.hasOwnProperty.call(body, 'publicMenuJson')
       || Object.prototype.hasOwnProperty.call(body, 'publicHomePath');
+    const hasIntegrationVariablesPayload = Object.prototype.hasOwnProperty.call(body, 'integrationVarKey')
+      || Object.prototype.hasOwnProperty.call(body, 'integrationVarValue')
+      || Object.prototype.hasOwnProperty.call(body, 'integrationVarSecret');
 
     const hasHeaderBuyCoffeePresence = Object.prototype.hasOwnProperty.call(body, 'headerShowBuyMeACoffee_present');
     const hasHeaderBuyCoffeeToggle = hasHeaderBuyCoffeePresence
@@ -596,6 +601,10 @@ exports.updateAppSettings = async (req, res) => {
     if (timezoneParse.error) {
       throw new Error(timezoneParse.error);
     }
+
+    const integrationVariables = hasIntegrationVariablesPayload
+      ? integrationVariableModel.sanitizeIntegrationVariablesFromForm(body, existingApp.integrationVariables || [])
+      : (Array.isArray(existingApp.integrationVariables) ? existingApp.integrationVariables : []);
 
     const formData = {
       app: {
@@ -681,7 +690,8 @@ exports.updateAppSettings = async (req, res) => {
           processTitle: hasContactPagePayload ? req.body.contactPageProcessTitle : existingContactPage.processTitle,
           processImages: contactPageProcessImages
         },
-        publicMenu
+        publicMenu,
+        integrationVariables
       }
     };
 

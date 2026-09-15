@@ -5107,6 +5107,76 @@ async function applyClassEnrollmentStatusTransition(req, res) {
   }
 }
 
+async function previewUndoCloseClassEnrollmentPeriod(req, res) {
+  try {
+    const periodId = toPublicId(req.params?.periodId);
+    const period = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!period) throw new Error('Enrollment period not found.');
+    const { classData } = await getClassByIdWithOrgCheck(period.classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+    const preview = await schoolDataService.previewClassEnrollmentUndoClose(periodId, {
+      orgToday: resolveOrgTodayFromRequest(req)
+    });
+    return res.status(preview.canUndo ? 200 : 409).json({
+      status: preview.canUndo ? 'success' : 'blocked',
+      message: preview.canUndo
+        ? 'Undo close preview is ready.'
+        : (preview.blockers[0]?.message || 'This enrollment close cannot be undone.'),
+      preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
+  }
+}
+
+async function undoCloseClassEnrollmentPeriod(req, res) {
+  let guardKey = '';
+  try {
+    const periodId = toPublicId(req.params?.periodId || req.body?.periodId || '');
+    if (!periodId) throw new Error('periodId is required.');
+    const periodRow = await schoolDataService.getDataById('classEnrollmentPeriods', periodId, req.user);
+    if (!periodRow) throw new Error('Enrollment period not found.');
+    const { classData } = await getClassByIdWithOrgCheck(periodRow.classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) throw new Error('A reason is required to undo the enrollment close.');
+
+    guardKey = idempotencyGuardService.createGuardKey([
+      'class_enrollment_period_undo_close',
+      String(classData?.orgId || '').trim(),
+      String(classData?.id || '').trim(),
+      periodId,
+      { reason }
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 90000,
+      replayTtlMs: 15000
+    });
+    if (sendGuardedResponse(req, res, guardResult, 'Enrollment undo close is already in progress. Please wait.')) return;
+
+    const result = await schoolDataService.undoCloseClassEnrollmentPeriod(periodId, { reason }, req.user, {
+      orgToday: resolveOrgTodayFromRequest(req)
+    });
+
+    const payloadOut = {
+      status: 'success',
+      message: 'Enrollment restored to ' + (result.restorePreview?.status || 'active') + '.',
+      data: result
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    return res.json(payloadOut);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    return res.status(error.blockers?.length ? 409 : 400).json({
+      status: 'error',
+      message: error.message,
+      blockers: error.blockers || null
+    });
+  }
+}
+
 async function getEnrollmentPeriodSessionWindow(req, res) {
   try {
     const periodId = toPublicId(req.params?.periodId);
@@ -5341,6 +5411,8 @@ module.exports = {
   saveEnrollmentCompletionDecision,
   previewClassEnrollmentStatusTransition,
   applyClassEnrollmentStatusTransition,
+  previewUndoCloseClassEnrollmentPeriod,
+  undoCloseClassEnrollmentPeriod,
   getEnrollmentPeriodSessionWindow,
   previewEnrollmentHoldPeriod,
   applyEnrollmentHoldPeriod,

@@ -9,6 +9,7 @@
 
   let modalInstance = null;
   let currentContext = null;
+  let currentFocus = 'full';
   let emails = [];
   let phones = [];
   let addresses = [];
@@ -228,6 +229,64 @@
     if (saveBtn()) saveBtn().disabled = Boolean(isLoading);
   }
 
+  function normalizeFocus(value) {
+    const focus = String(value || '').trim().toLowerCase();
+    return focus === 'phones' || focus === 'addresses' ? focus : 'full';
+  }
+
+  function applyFocusUi(focus) {
+    currentFocus = normalizeFocus(focus);
+    const form = formEl();
+    if (!form) return;
+
+    const show = (selector, visible) => {
+      form.querySelectorAll(selector).forEach((node) => {
+        node.classList.toggle('d-none', !visible);
+      });
+    };
+
+    const isPhones = currentFocus === 'phones';
+    const isAddresses = currentFocus === 'addresses';
+    const isFull = currentFocus === 'full';
+
+    show('.school-person-profile-section-identity', isFull);
+    show('.school-person-profile-section-notes', isFull);
+    show('.school-person-profile-section-roles', isFull);
+    show('.school-person-profile-section-emails', isFull);
+    show('.school-person-profile-section-emails-divider', isFull);
+    show('.school-person-profile-section-phones', isFull || isPhones);
+    show('.school-person-profile-section-communication-col', isFull || isPhones);
+    show('.school-person-profile-section-addresses-col', isFull || isAddresses);
+
+    const addressesCol = form.querySelector('.school-person-profile-section-addresses-col');
+    if (addressesCol) {
+      addressesCol.classList.toggle('col-lg-12', isAddresses);
+      addressesCol.classList.toggle('col-lg-6', isFull);
+    }
+
+    const titleEl = document.getElementById('schoolPersonProfileEditModalLabel');
+    if (titleEl) {
+      if (isPhones) {
+        titleEl.innerHTML = '<i class="bi bi-telephone me-2"></i>Manage Phone Numbers';
+      } else if (isAddresses) {
+        titleEl.innerHTML = '<i class="bi bi-geo-alt me-2"></i>Manage Addresses';
+      } else {
+        titleEl.innerHTML = '<i class="bi bi-person-vcard me-2"></i>Edit Person Profile';
+      }
+    }
+
+    const saveButton = saveBtn();
+    if (saveButton) {
+      if (isPhones) {
+        saveButton.innerHTML = '<i class="bi bi-save me-1"></i>Save Phone Numbers';
+      } else if (isAddresses) {
+        saveButton.innerHTML = '<i class="bi bi-save me-1"></i>Save Addresses';
+      } else {
+        saveButton.innerHTML = '<i class="bi bi-save me-1"></i>Save Person Profile';
+      }
+    }
+  }
+
   function syncProfileTypeUi(profileType) {
     const isOrganization = String(profileType || '').trim().toLowerCase() === 'organization';
     const typeEl = document.getElementById('schoolPersonProfileType');
@@ -344,6 +403,7 @@
       populateForm(payload.data?.person || {});
       organizations = payload.data?.organizations || organizations;
       renderRoleSummary(document.getElementById('schoolPersonProfileRoleSummary'), organizations, organizationLookup);
+      applyFocusUi(currentContext?.focus || currentFocus);
     } catch (error) {
       await showUserMessage({
         title: 'Load Failed',
@@ -417,55 +477,19 @@
 
     const searchInput = document.getElementById('schoolPersonProfileAddressSearch');
     const suggestions = document.getElementById('schoolPersonProfileAddressSuggestions');
-    if (searchInput && suggestions) {
-      searchInput.addEventListener('input', () => {
-        const query = searchInput.value.trim();
-        clearTimeout(addressDebounceTimer);
-        if (!query) {
-          suggestions.style.display = 'none';
-          return;
-        }
-        addressDebounceTimer = setTimeout(async () => {
-          try {
-            suggestions.innerHTML = '<div class="list-group-item text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Searching...</div>';
-            suggestions.style.display = 'block';
-            const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&countrycodes=ca&addressdetails=1&limit=5';
-            const res = await fetch(url);
-            const data = await res.json();
-            suggestions.innerHTML = '';
-            if (!Array.isArray(data) || !data.length) {
-              suggestions.innerHTML = '<div class="list-group-item text-muted">No results found.</div>';
-              return;
-            }
-            data.forEach((item) => {
-              const addr = item.address || {};
-              const display = item.display_name || '';
-              const btn = document.createElement('button');
-              btn.type = 'button';
-              btn.className = 'list-group-item list-group-item-action text-start small';
-              btn.innerHTML = '<i class="bi bi-geo-alt me-2 text-primary"></i>' + safeHtml(display);
-              btn.addEventListener('click', () => {
-                addresses.push({
-                  type: 'home',
-                  line1: ((addr.house_number || '') + ' ' + (addr.road || '')).trim() || String(display).split(',')[0] || '',
-                  city: addr.city || addr.town || addr.village || '',
-                  province: addr.state || '',
-                  postalCode: addr.postcode || ''
-                });
-                renderAddresses();
-                searchInput.value = '';
-                suggestions.style.display = 'none';
-              });
-              suggestions.appendChild(btn);
-            });
-          } catch (_) {
-            suggestions.style.display = 'none';
-          }
-        }, 350);
-      });
-      document.addEventListener('click', (event) => {
-        if (!searchInput.contains(event.target) && !suggestions.contains(event.target)) {
-          suggestions.style.display = 'none';
+    if (searchInput && suggestions && global.CanadianAddressAutocomplete) {
+      global.CanadianAddressAutocomplete.attach({
+        inputEl: searchInput,
+        suggestionsEl: suggestions,
+        onSelect: (address) => {
+          addresses.push({
+            type: 'home',
+            line1: String(address?.line1 || '').trim(),
+            city: String(address?.city || '').trim(),
+            province: String(address?.province || '').trim(),
+            postalCode: String(address?.postalCode || '').trim()
+          });
+          renderAddresses();
         }
       });
     }
@@ -484,10 +508,12 @@
   function open(options = {}) {
     const personId = String(options.personId || '').trim();
     if (!personId) return;
+    currentFocus = normalizeFocus(options.focus);
     currentContext = {
       personId,
       linkType: String(options.linkType || '').trim().toLowerCase(),
       linkId: String(options.linkId || '').trim(),
+      focus: currentFocus,
       onSaved: typeof options.onSaved === 'function' ? options.onSaved : null
     };
     organizationLookup = (options.organizationLookup && typeof options.organizationLookup === 'object')
@@ -497,6 +523,7 @@
     const modal = ensureModal();
     if (!modal) return;
     setAlert('');
+    applyFocusUi(currentFocus);
     modal.show();
     loadProfile(personId).catch(() => {});
   }

@@ -6,6 +6,7 @@ const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSes
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const registrationIntegrityService = require('./registrationIntegrityService');
+const classEnrollmentUndoCloseService = require('./classEnrollmentUndoCloseService');
 const subjectPrerequisiteEngineService = require('./subjectPrerequisiteEngineService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
@@ -375,10 +376,17 @@ async function closePeriod(periodId, input = {}, requestingUser = null, options 
     OPEN_STATUSES.has(normalizeStatus(existing.status)) ? 'completed' : normalizeStatus(existing.status, 'completed')
   );
 
+  const transactionSummary = classEnrollmentUndoCloseService.withLastCloseSnapshot(existing, {
+    status: nextStatus,
+    endDate: closeDate,
+    reasonEnd: String(input.reasonEnd || existing.reasonEnd || '').trim()
+  }, requestingUser);
+
   const updated = await dependencies.repositories.classEnrollmentPeriods.update(normalizedPeriodId, {
     endDate: closeDate,
     status: nextStatus,
     reasonEnd: String(input.reasonEnd || existing.reasonEnd || '').trim(),
+    transactionSummary,
     updatedBy: actor
   }, options);
 

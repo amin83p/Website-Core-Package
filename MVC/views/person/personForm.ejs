@@ -236,7 +236,7 @@
                                     <i class="bi bi-search me-1"></i>Find Address (Canada)
                                 </label>
                                 <div class="input-group">
-                                    <input type="text" id="addressSearchInput" class="form-control size-md" placeholder="Type street name..." autocomplete="off">
+                                    <input type="text" id="addressSearchInput" class="form-control size-md" placeholder="Start typing a Canadian address..." autocomplete="off">
                                     <button class="btn btn-outline-secondary" type="button" id="addAddressManualBtn">Manual</button>
                                 </div>
                                 <div id="addressSuggestions" class="list-group position-absolute w-100 shadow-lg" style="z-index: 1000; top: 100%; display: none;"></div>
@@ -368,6 +368,7 @@
 
 <%- include('../partials/modal_GenericPicker') %>
 
+<script src="/scripts/canadianAddressAutocomplete.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -585,69 +586,19 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  // AUTOCOMPLETE LOGIC (OpenStreetMap)
-  if (addressSearchInput) {
-      addressSearchInput.addEventListener('input', (e) => {
-          const query = e.target.value.trim();
-          clearTimeout(debounceTimer);
-          
-          if (query.length < 3) {
-              addressSuggestions.style.display = 'none';
-              return;
-          }
-
-          debounceTimer = setTimeout(async () => {
-              try {
-                  addressSuggestions.innerHTML = '<div class="list-group-item text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Searching...</div>';
-                  addressSuggestions.style.display = 'block';
-
-                  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ca&addressdetails=1&limit=5`;
-                  const res = await fetch(url);
-                  const data = await res.json();
-
-                  addressSuggestions.innerHTML = '';
-                  if (data.length === 0) {
-                      addressSuggestions.innerHTML = '<div class="list-group-item text-muted">No results found.</div>';
-                      return;
-                  }
-
-                  data.forEach(item => {
-                      const addr = item.address;
-                      const display = item.display_name;
-                      
-                      const btn = document.createElement('button');
-                      btn.type = 'button';
-                      btn.className = 'list-group-item list-group-item-action text-start small';
-                      btn.innerHTML = `<i class="bi bi-geo-alt me-2 text-primary"></i>${display}`;
-                      
-                      btn.addEventListener('click', () => {
-                          const newAddr = {
-                              type: 'home',
-                              line1: `${addr.house_number || ''} ${addr.road || ''}`.trim() || display.split(',')[0],
-                              city: addr.city || addr.town || addr.village || '',
-                              province: addr.state || '',
-                              postalCode: addr.postcode || ''
-                          };
-                          
-                          addresses.push(newAddr);
-                          renderAddresses();
-                          
-                          addressSearchInput.value = '';
-                          addressSuggestions.style.display = 'none';
-                      });
-                      addressSuggestions.appendChild(btn);
-                  });
-
-              } catch (err) {
-                  console.error('API Error:', err);
-                  addressSuggestions.style.display = 'none';
-              }
-          }, 500);
-      });
-
-      document.addEventListener('click', (e) => {
-          if (!addressSearchInput.contains(e.target) && !addressSuggestions.contains(e.target)) {
-              addressSuggestions.style.display = 'none';
+  if (addressSearchInput && addressSuggestions && window.CanadianAddressAutocomplete) {
+      window.CanadianAddressAutocomplete.attach({
+          inputEl: addressSearchInput,
+          suggestionsEl: addressSuggestions,
+          onSelect: (address) => {
+              addresses.push({
+                  type: 'home',
+                  line1: String(address?.line1 || '').trim(),
+                  city: String(address?.city || '').trim(),
+                  province: String(address?.province || '').trim(),
+                  postalCode: String(address?.postalCode || '').trim()
+              });
+              renderAddresses();
           }
       });
   }

@@ -340,15 +340,34 @@ test('rolling enrollment view includes on-hold modal and menu action', () => {
   assert.match(viewSource, /btn-onhold-delete/);
   assert.doesNotMatch(viewSource, /id="onHold_previewBody"/);
   assert.doesNotMatch(viewSource, /Affected Sessions/);
+  assert.doesNotMatch(viewSource, /Apply Hold/);
   const onHoldModalBlock = viewSource.slice(
     viewSource.indexOf('id="enrollmentOnHoldModal"'),
     viewSource.indexOf('id="enrollmentChargeModal"')
   );
   assert.ok(onHoldModalBlock.indexOf('New On-Hold Period') < onHoldModalBlock.indexOf('Existing On-Hold Periods'));
+  assert.match(onHoldModalBlock, /id="onHold_newPeriodSection"[\s\S]*id="btn_previewOnHoldPeriod"/);
+  assert.match(onHoldModalBlock, /id="onHold_newPeriodSection"[\s\S]*id="btn_applyOnHoldPeriod"[^>]*>Save</);
+  assert.match(onHoldModalBlock, /on-hold-form-actions/);
+  assert.match(viewSource, /on-hold-row-actions/);
+  assert.match(viewSource, /on-hold-action-btn is-preview/);
+  assert.match(viewSource, /async function showConfirm\(/);
+  assert.doesNotMatch(onHoldModalBlock, /modal-footer[\s\S]*btn_previewOnHoldPeriod/);
   assert.match(routesSource, /\/on-hold\/preview/);
   assert.match(routesSource, /\/on-hold\/apply/);
   assert.match(routesSource, /\/on-hold\/:holdId\/update/);
   assert.match(routesSource, /\/on-hold\/:holdId\/revoke/);
+});
+
+test('session enrollment calendar supports on-hold preview whole-cycle view', () => {
+  const calendarSource = fs.readFileSync(
+    path.join(__dirname, '../public/scripts/sessionEnrollmentCalendarModal.js'),
+    'utf8'
+  );
+  assert.match(calendarSource, /function initOnHoldPreviewViewRange/);
+  assert.match(calendarSource, /isManageLikeMode\(\)/);
+  assert.match(calendarSource, /enrollmentOnHoldPreview/);
+  assert.match(calendarSource, /wholeCycle/);
 });
 
 test('edit enrollment modal uses modal-xl layout', () => {

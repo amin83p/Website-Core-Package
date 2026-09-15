@@ -8,6 +8,8 @@ const { buildSchoolListScope, SCOPE_MODES } = require('./schoolDataScopeBuilder'
 const { normalizeQueryOptions } = requireCoreModule('MVC/utils/queryOptionsAdapter');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
+const classEnrollmentUndoCloseService = require('./classEnrollmentUndoCloseService');
+
 function getClassEnrollmentPeriodService() {
   return require('./classEnrollmentPeriodService');
 }
@@ -668,6 +670,10 @@ const schoolDataService = {
   },
   closeClassEnrollmentPeriod: async (periodId, input, requestingUser, options = {}) =>
     getClassEnrollmentPeriodService().closePeriod(periodId, input, requestingUser, options),
+  previewClassEnrollmentUndoClose: async (periodId, options = {}) =>
+    classEnrollmentUndoCloseService.previewUndoClose(periodId, options),
+  undoCloseClassEnrollmentPeriod: async (periodId, input, requestingUser, options = {}) =>
+    classEnrollmentUndoCloseService.undoClosePeriod(periodId, input, requestingUser, options),
   reopenClassEnrollmentPeriodViaNewPeriod: async (periodId, input, requestingUser, options = {}) =>
     getClassEnrollmentPeriodService().reopenViaNewPeriod(periodId, input, requestingUser, options),
   checkClassEnrollmentPeriodOverlap: async (input, requestingUser, options = {}) =>

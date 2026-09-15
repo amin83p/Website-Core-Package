@@ -59,6 +59,16 @@ router.put('/api/:id/clb-level-history',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.putStudentClbLevelHistoryApi);
 
+router.get('/api/:id/claim-numbers',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getStudentClaimNumbersApi);
+
+router.put('/api/:id/claim-numbers',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.putStudentClaimNumbersApi);
+
 router.post('/recover/:id',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),

@@ -68,6 +68,9 @@
   const curatedTimezoneValues = tzOptions.map((row) => String(row?.value || '').trim()).filter(Boolean);
   const defaultTimezoneSelectValue = curatedTimezoneValues.includes(savedDefaultTimezone) ? savedDefaultTimezone : '__custom__';
   const defaultTimezoneCustomValue = defaultTimezoneSelectValue === '__custom__' ? savedDefaultTimezone : '';
+  const integrationVarFormRows = (typeof integrationVariableRows !== 'undefined' && Array.isArray(integrationVariableRows))
+    ? integrationVariableRows
+    : [{ key: '', isSecret: false, value: '', valueHint: '', hasStoredSecret: false }];
   const timezoneGroups = tzOptions.reduce((acc, row) => {
     const group = String(row?.group || 'Other').trim() || 'Other';
     if (!acc[group]) acc[group] = [];
@@ -99,6 +102,11 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link fw-semibold" id="app-operational-tab" data-bs-toggle="tab" data-bs-target="#app-operational-pane" type="button" role="tab" aria-controls="app-operational-pane" aria-selected="false">
             <i class="bi bi-sliders me-1"></i> Operational Defaults
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-integration-vars-tab" data-bs-toggle="tab" data-bs-target="#app-integration-vars-pane" type="button" role="tab" aria-controls="app-integration-vars-pane" aria-selected="false">
+            <i class="bi bi-key me-1"></i> Integration Variables
           </button>
         </li>
       </ul>
@@ -675,6 +683,47 @@
         </div>
       </div>
         </div>
+
+        <div class="tab-pane fade" id="app-integration-vars-pane" role="tabpanel" aria-labelledby="app-integration-vars-tab" tabindex="0">
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0">
+          <h5 class="fw-bold mb-1"><i class="bi bi-key text-primary me-2"></i>Integration Variables</h5>
+          <p class="text-muted small mb-0">Store API keys and integration settings in the database instead of environment files.</p>
+        </div>
+        <div class="card-body p-4">
+          <div class="alert alert-light border small mb-3">
+            Get your key from <a href="https://www.canadapost-postescanada.ca/ac/" target="_blank" rel="noopener">Canada Post AddressComplete</a> (not Google Places).
+            Suggested keys: <code>CANADA_POST_ADDRESS_API_KEY</code> (secret), <code>CANADA_POST_ADDRESS_COUNTRY</code> (<code>CAN</code>), <code>CANADA_POST_ADDRESS_MAX_SUGGESTIONS</code> (<code>7</code>).
+            Secret values are encrypted at rest. Leave a secret value blank to keep the current stored value.
+          </div>
+          <div data-integration-var-list>
+            <% integrationVarFormRows.forEach((row, rowIndex) => { %>
+            <div class="integration-var-row row g-2 align-items-center mb-2">
+              <div class="col-md-4">
+                <input type="text" name="integrationVarKey" class="form-control font-monospace" value="<%= String(row.key || '') %>" placeholder="CANADA_POST_ADDRESS_API_KEY">
+              </div>
+              <div class="col-md-5">
+                <input type="<%= row.isSecret ? 'password' : 'text' %>" name="integrationVarValue" class="form-control font-monospace" value="<%= row.isSecret ? '' : String(row.value || '') %>" placeholder="<%= row.isSecret && row.valueHint ? ('Stored: ' + row.valueHint) : 'Value' %>">
+              </div>
+              <div class="col-md-2">
+                <input type="hidden" name="integrationVarSecret" class="integration-var-secret-hidden" value="<%= row.isSecret ? 'true' : 'false' %>">
+                <div class="form-check">
+                  <input class="form-check-input integration-var-secret-toggle" type="checkbox" id="integrationVarSecret_<%= rowIndex %>" <%= row.isSecret ? 'checked' : '' %>>
+                  <label class="form-check-label small" for="integrationVarSecret_<%= rowIndex %>">Secret</label>
+                </div>
+              </div>
+              <div class="col-md-1 d-grid">
+                <button type="button" class="btn btn-outline-danger" data-remove-integration-var-row title="Remove variable"><i class="bi bi-trash"></i></button>
+              </div>
+            </div>
+            <% }); %>
+          </div>
+          <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-add-integration-var-row>
+            <i class="bi bi-plus-circle me-1"></i>Add variable
+          </button>
+        </div>
+      </div>
+        </div>
       </div>
 
       <div class="d-flex justify-content-end gap-2">
@@ -772,6 +821,64 @@ document.addEventListener('DOMContentLoaded', () => {
     const removeBtn = event.target.closest('[data-remove-contact-row]');
     if (!removeBtn) return;
     removeBtn.closest('.contact-repeat-row')?.remove();
+  });
+
+  function createIntegrationVarRow() {
+    const row = document.createElement('div');
+    row.className = 'integration-var-row row g-2 align-items-center mb-2';
+    row.innerHTML = `
+      <div class="col-md-4">
+        <input type="text" name="integrationVarKey" class="form-control font-monospace" placeholder="CANADA_POST_ADDRESS_API_KEY">
+      </div>
+      <div class="col-md-5">
+        <input type="text" name="integrationVarValue" class="form-control font-monospace" placeholder="Value">
+      </div>
+      <div class="col-md-2">
+        <input type="hidden" name="integrationVarSecret" class="integration-var-secret-hidden" value="false">
+        <div class="form-check">
+          <input class="form-check-input integration-var-secret-toggle" type="checkbox">
+          <label class="form-check-label small">Secret</label>
+        </div>
+      </div>
+      <div class="col-md-1 d-grid">
+        <button type="button" class="btn btn-outline-danger" data-remove-integration-var-row title="Remove variable"><i class="bi bi-trash"></i></button>
+      </div>
+    `;
+    return row;
+  }
+
+  document.querySelector('[data-add-integration-var-row]')?.addEventListener('click', () => {
+    const list = document.querySelector('[data-integration-var-list]');
+    const row = createIntegrationVarRow();
+    if (!list || !row) return;
+    list.appendChild(row);
+    row.querySelector('input[name="integrationVarKey"]')?.focus();
+  });
+
+  function syncIntegrationVarSecretRow(row) {
+    if (!row) return;
+    const secretCheckbox = row.querySelector('.integration-var-secret-toggle');
+    const secretHidden = row.querySelector('.integration-var-secret-hidden');
+    const valueInput = row.querySelector('input[name="integrationVarValue"]');
+    const isSecret = Boolean(secretCheckbox?.checked);
+    if (secretHidden) secretHidden.value = isSecret ? 'true' : 'false';
+    if (valueInput) valueInput.type = isSecret ? 'password' : 'text';
+  }
+
+  document.addEventListener('change', (event) => {
+    const secretCheckbox = event.target.closest('.integration-var-secret-toggle');
+    if (!secretCheckbox) return;
+    syncIntegrationVarSecretRow(secretCheckbox.closest('.integration-var-row'));
+  });
+
+  document.getElementById('appSettingsForm')?.addEventListener('submit', () => {
+    document.querySelectorAll('.integration-var-row').forEach((row) => syncIntegrationVarSecretRow(row));
+  });
+
+  document.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-integration-var-row]');
+    if (!removeBtn) return;
+    removeBtn.closest('.integration-var-row')?.remove();
   });
 
   const contactPageRowTemplates = {

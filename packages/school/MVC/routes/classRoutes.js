@@ -443,6 +443,19 @@ router.post('/api/enrollment-periods/:periodId/status/apply',
   }),
   rollingCtrl.applyClassEnrollmentStatusTransition);
 
+router.post('/api/enrollment-periods/:periodId/undo-close/preview',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, {
+    ...rollingEnrollmentMutationActionState,
+    requireToken: false
+  }),
+  rollingCtrl.previewUndoCloseClassEnrollmentPeriod);
+
+router.post('/api/enrollment-periods/:periodId/undo-close',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.undoCloseClassEnrollmentPeriod);
+
 router.post('/api/enrollment-periods/:periodId/reopen',
   requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),

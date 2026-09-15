@@ -1229,6 +1229,97 @@ exports.getStudentClbLevelHistoryApi = async (req, res) => {
     }
 };
 
+function resolveClaimNumbersForApi(student) {
+    const studentModel = require('../../models/school/studentModel');
+    let claimNumbers = studentModel.cleanClaimNumbers(student?.claimNumbers);
+    const legacyId = String(student?.studentIdAtFunder || '').trim();
+    if (!claimNumbers.length && legacyId) {
+        claimNumbers = studentModel.cleanClaimNumbers([{
+            id: `claim_legacy_${String(student.id || 'student')}`,
+            number: legacyId,
+            label: 'Legacy',
+            isPrimary: true
+        }]);
+    }
+    return claimNumbers;
+}
+
+exports.getStudentClaimNumbersApi = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const studentId = toPublicId(req.params.id);
+        if (!studentId) throw new Error('Student id is required.');
+
+        const student = await dataService.getDataById('students', studentId, req.user, routeAccess(req));
+        if (!student) throw new Error('Student not found.');
+        assertStudentOrgAccess(student, activeOrgId, req.user);
+
+        const claimNumbers = resolveClaimNumbersForApi(student);
+        const studentLabel = await resolveStudentLabelForApi(student, req.user);
+
+        return res.json({
+            status: 'success',
+            message: 'Claim numbers loaded.',
+            data: {
+                studentId,
+                studentLabel,
+                claimNumbers
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to load claim numbers.'
+        });
+    }
+};
+
+exports.putStudentClaimNumbersApi = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const studentId = toPublicId(req.params.id);
+        if (!studentId) throw new Error('Student id is required.');
+
+        const existingStudent = await dataService.getDataById('students', studentId, req.user, routeAccess(req));
+        if (!existingStudent) throw new Error('Student not found.');
+        assertStudentOrgAccess(existingStudent, activeOrgId, req.user);
+
+        let incomingClaimNumbers = req.body?.claimNumbers;
+        if (typeof incomingClaimNumbers === 'string') {
+            incomingClaimNumbers = parseJsonSafe(incomingClaimNumbers, null);
+        }
+        if (!Array.isArray(incomingClaimNumbers)) {
+            throw new Error('claimNumbers must be an array.');
+        }
+
+        const studentModel = require('../../models/school/studentModel');
+        const claimNumbers = studentModel.cleanClaimNumbers(incomingClaimNumbers);
+
+        const updatedStudent = await dataService.updateData(
+            'students',
+            studentId,
+            { ...existingStudent, claimNumbers },
+            req.user
+        );
+        const studentLabel = await resolveStudentLabelForApi(updatedStudent, req.user);
+
+        return res.json({
+            status: 'success',
+            message: 'Claim numbers saved.',
+            data: {
+                studentId,
+                studentLabel,
+                claimNumbers: resolveClaimNumbersForApi(updatedStudent)
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to save claim numbers.'
+        });
+    }
+};
+
 exports.putStudentClbLevelHistoryApi = async (req, res) => {
     try {
         const activeOrgId = getActiveOrgIdOrThrow(req.user);

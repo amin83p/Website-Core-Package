@@ -1,4 +1,5 @@
 const schoolRepositories = require('../../repositories/school');
+const classEnrollmentUndoCloseService = require('./classEnrollmentUndoCloseService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const registrationFinanceLifecycleService = require('./registrationFinanceLifecycleService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -313,6 +314,13 @@ async function applyTransition(input = {}, options = {}) {
     }
   }
 
+  if (preview.registrationType === 'class' && classEnrollmentUndoCloseService.UNDOABLE_CLOSE_STATUSES.has(preview.targetStatus)) {
+    summary = classEnrollmentUndoCloseService.withLastCloseSnapshot(registration, {
+      targetStatus: preview.targetStatus,
+      effectiveDate,
+      reason
+    }, options.requestingUser);
+  }
   summary = appendLifecycleHistory({
     ...summary,
     pendingTransition: null,

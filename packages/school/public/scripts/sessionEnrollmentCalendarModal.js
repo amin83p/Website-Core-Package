@@ -321,6 +321,29 @@
 
   const initManageModeViewRange = initDefaultViewRange;
 
+  function initOnHoldPreviewViewRange() {
+    if (!state) return;
+    const bounds = resolveEnrollmentWindowBounds();
+    const rangeStart = bounds.minDate || core.parseAnchorDate(state.anchorDate || state.startDate || '');
+    const rangeEnd = bounds.maxDate || rangeStart;
+    if (rangeStart && rangeEnd && rangeEnd >= rangeStart) {
+      state.viewPreset = 'wholeCycle';
+      state.anchorDate = core.clampAnchorDate(
+        core.parseAnchorDate(state.anchorDate || rangeStart),
+        rangeStart
+      );
+      state.viewRange = core.clampViewRangeToBounds(
+        core.computeWholeCycleViewRange({
+          startDate: rangeStart,
+          endDate: rangeEnd
+        }),
+        bounds
+      );
+      return;
+    }
+    initDefaultViewRange();
+  }
+
   function initPartialModeViewRange() {
     if (!state) return;
     state.viewPreset = 'custom';
@@ -427,7 +450,7 @@
       : 'Projected on-hold N/A';
     modalBody.innerHTML = ''
       + '<div class="session-enrollment-legend-items">'
-      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Other session</span></div>'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Other enrollment session</span></div>'
       +   `<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch ${kind === 'applied' ? 'is-na-saved' : 'is-na-projected'}" aria-hidden="true"></span><span>${projectedLabel}</span></div>`
       +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-blocked" aria-hidden="true"></span><span>Attendance conflict (cannot apply)</span></div>'
       + '</div>';
@@ -561,7 +584,8 @@
     annotateOnHoldPreviewEvents();
 
     if (!preserveViewRange) {
-      initManageModeViewRange();
+      if (isOnHoldPreviewMode()) initOnHoldPreviewViewRange();
+      else initManageModeViewRange();
     }
     syncPresetButtons();
     syncViewModeButtons();
@@ -2803,7 +2827,8 @@
     syncPresetButtons();
     renderCalendar();
     restoreScrollPositions(scrollSnapshot);
-    updateSummary();
+    if (isOnHoldPreviewMode()) updateOnHoldPreviewSummary();
+    else updateSummary();
   }
 
   function qs(id) {
@@ -2896,7 +2921,7 @@
   }
 
   async function fetchPickerData({ remote = false } = {}) {
-    if (isManageMode()) {
+    if (isManageLikeMode()) {
       await fetchSessionWindowData({ reload: remote });
       return;
     }
@@ -3648,12 +3673,14 @@
 
     getModal()?.show();
     if (mode === 'manageEnrollmentSessions' || mode === 'enrollmentOnHoldPreview') {
-      if (mode === 'enrollmentOnHoldPreview' && options.anchorDate) {
-        state.anchorDate = core.clampAnchorDate(
-          core.parseAnchorDate(options.anchorDate),
-          state.startDate
-        );
-        state.viewRange = core.computeViewRange(state.viewPreset, state.anchorDate);
+      if (mode === 'enrollmentOnHoldPreview') {
+        state.viewPreset = 'wholeCycle';
+        if (options.anchorDate) {
+          state.anchorDate = core.clampAnchorDate(
+            core.parseAnchorDate(options.anchorDate),
+            state.startDate
+          );
+        }
       }
       fetchSessionWindowData({ reload: true }).catch((err) => {
         if (hostEl) {

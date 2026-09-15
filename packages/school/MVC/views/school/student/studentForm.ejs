@@ -190,7 +190,7 @@
                              <i class="bi bi-search me-1"></i>Find Address (Canada)
                            </label>
                            <div class="input-group">
-                             <input type="text" id="newPersonAddressSearchInput" class="form-control size-md" placeholder="Type street name..." autocomplete="off">
+                             <input type="text" id="newPersonAddressSearchInput" class="form-control size-md" placeholder="Start typing a Canadian address..." autocomplete="off">
                              <button class="btn btn-outline-secondary" type="button" id="btnAddNewPersonAddressManual">Manual</button>
                            </div>
                            <div id="newPersonAddressSuggestions" class="list-group position-absolute w-100 shadow-lg" style="z-index: 1000; top: 100%; display: none;"></div>
@@ -594,6 +594,7 @@
 </div>
 
 <script src="/scripts/clbLevelValueParser.js"></script>
+<script src="/scripts/canadianAddressAutocomplete.js"></script>
 <script>
   window.__INIT_STUDENT_ATTACHMENTS__ = <%- initAttachmentsJson %>;
   window.__INIT_CLB_LEVEL_HISTORY__ = <%- initClbLevelHistoryJson %>;
@@ -2315,60 +2316,19 @@
         renderNewPersonAddresses();
       });
     }
-    if (newPersonAddressSearchInput && newPersonAddressSuggestions) {
-      newPersonAddressSearchInput.addEventListener('input', () => {
-        const query = newPersonAddressSearchInput.value.trim();
-        clearTimeout(newPersonAddressDebounceTimer);
-        if (query.length < 3) {
-          newPersonAddressSuggestions.style.display = 'none';
-          return;
-        }
-
-        newPersonAddressDebounceTimer = setTimeout(async () => {
-          try {
-            newPersonAddressSuggestions.innerHTML = '<div class="list-group-item text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Searching...</div>';
-            newPersonAddressSuggestions.style.display = 'block';
-
-            const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&countrycodes=ca&addressdetails=1&limit=5';
-            const res = await fetch(url);
-            const data = await res.json();
-
-            newPersonAddressSuggestions.innerHTML = '';
-            if (!Array.isArray(data) || !data.length) {
-              newPersonAddressSuggestions.innerHTML = '<div class="list-group-item text-muted">No results found.</div>';
-              return;
-            }
-
-            data.forEach((item) => {
-              const addr = item.address || {};
-              const display = item.display_name || '';
-              const btn = document.createElement('button');
-              btn.type = 'button';
-              btn.className = 'list-group-item list-group-item-action text-start small';
-              btn.innerHTML = '<i class="bi bi-geo-alt me-2 text-primary"></i>' + safeHtml(display);
-              btn.addEventListener('click', () => {
-                newPersonAddresses.push({
-                  type: 'home',
-                  line1: ((addr.house_number || '') + ' ' + (addr.road || '')).trim() || String(display).split(',')[0] || '',
-                  city: addr.city || addr.town || addr.village || '',
-                  province: addr.state || '',
-                  postalCode: addr.postcode || ''
-                });
-                renderNewPersonAddresses();
-                newPersonAddressSearchInput.value = '';
-                newPersonAddressSuggestions.style.display = 'none';
-              });
-              newPersonAddressSuggestions.appendChild(btn);
-            });
-          } catch (error) {
-            newPersonAddressSuggestions.style.display = 'none';
-          }
-        }, 500);
-      });
-
-      document.addEventListener('click', (e) => {
-        if (!newPersonAddressSearchInput.contains(e.target) && !newPersonAddressSuggestions.contains(e.target)) {
-          newPersonAddressSuggestions.style.display = 'none';
+    if (newPersonAddressSearchInput && newPersonAddressSuggestions && window.CanadianAddressAutocomplete) {
+      window.CanadianAddressAutocomplete.attach({
+        inputEl: newPersonAddressSearchInput,
+        suggestionsEl: newPersonAddressSuggestions,
+        onSelect: (address) => {
+          newPersonAddresses.push({
+            type: 'home',
+            line1: String(address?.line1 || '').trim(),
+            city: String(address?.city || '').trim(),
+            province: String(address?.province || '').trim(),
+            postalCode: String(address?.postalCode || '').trim()
+          });
+          renderNewPersonAddresses();
         }
       });
     }

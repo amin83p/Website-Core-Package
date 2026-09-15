@@ -258,9 +258,127 @@
     position: fixed;
     margin: 0;
   }
+  .rolling-enrollment-page .rolling-student-name-target {
+    display: inline-block;
+    max-width: 100%;
+    cursor: context-menu;
+    border-radius: 0.35rem;
+    padding: 0.05rem 0.15rem;
+    margin: -0.05rem -0.15rem;
+  }
+  .rolling-enrollment-page .rolling-student-name-target:hover {
+    background: rgba(13, 110, 253, 0.06);
+  }
+  #rollingStudentContextMenu {
+    position: fixed;
+    z-index: 1200;
+    min-width: 210px;
+    max-width: min(100vw - 1rem, 280px);
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1.15rem rgba(0, 0, 0, 0.16);
+    padding: 0.35rem;
+  }
+  #rollingStudentContextMenu .btn {
+    width: 100%;
+    text-align: left;
+    justify-content: flex-start;
+    margin-bottom: 0.25rem;
+  }
+  #rollingStudentContextMenu .btn:last-child {
+    margin-bottom: 0;
+  }
+  #rollingStudentClaimNumbersModal .claim-number-row-editor {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+  }
   .clb-level-value-warning {
     background-color: #f8d7da !important;
     border-color: #f1aeb5 !important;
+  }
+  #rollingStudentClbModal .rolling-clb-editor-shell {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.65rem;
+    padding: 1rem;
+    background: #fff;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up {
+    border: 1px solid #cfe2ff;
+    border-left: 4px solid #0d6efd;
+    border-radius: 0.55rem;
+    background: linear-gradient(180deg, #f8fbff 0%, #f3f8ff 100%);
+    padding: 0.85rem 0.95rem;
+    margin-bottom: 1rem;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__header i {
+    color: #0d6efd;
+    font-size: 1.1rem;
+    margin-top: 0.1rem;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__title {
+    font-weight: 700;
+    font-size: 0.88rem;
+    line-height: 1.2;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__subtitle {
+    font-size: 0.76rem;
+    color: #6c757d;
+    margin-top: 0.1rem;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    font-size: 0.78rem;
+    margin-bottom: 0.7rem;
+    color: #495057;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__dates span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #dbeafe;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__table {
+    background: #fff;
+    border-color: #dbeafe;
+    margin-bottom: 0.55rem;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__table thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    white-space: nowrap;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up-row-label {
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: #343a40;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__note {
+    font-size: 0.74rem;
+    color: #5c636a;
+    line-height: 1.35;
+  }
+  #rollingStudentClbModal .rolling-clb-editor-table thead th {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
   }
   .rolling-enrollment-page .rolling-student-gender-line {
     font-size: 0.62rem;
@@ -271,6 +389,119 @@
   .rolling-enrollment-page .rolling-student-id-line {
     font-size: 0.68rem;
     line-height: 1.15;
+  }
+  #enrollmentOnHoldModal .on-hold-context-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    background: var(--bs-light, #f8f9fa);
+    font-size: 0.84rem;
+    line-height: 1.35;
+  }
+  #enrollmentOnHoldModal .on-hold-context-banner i {
+    color: var(--bs-warning, #ffc107);
+    font-size: 1rem;
+    margin-top: 0.1rem;
+  }
+  #enrollmentOnHoldModal .on-hold-form-card {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+    background: #fff;
+  }
+  #enrollmentOnHoldModal .on-hold-form-card__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  #enrollmentOnHoldModal .on-hold-form-card__header i {
+    color: var(--bs-warning, #ffc107);
+  }
+  #enrollmentOnHoldModal .on-hold-form-hint {
+    margin-top: 0.75rem;
+    margin-bottom: 0;
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+  #enrollmentOnHoldModal .on-hold-form-hint.is-warning {
+    color: var(--bs-warning-text-emphasis, #664d03);
+  }
+  #enrollmentOnHoldModal .on-hold-form-hint.is-success {
+    color: var(--bs-success-text-emphasis, #0a3622);
+  }
+  #enrollmentOnHoldModal .on-hold-form-actions {
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.08));
+  }
+  #enrollmentOnHoldModal .on-hold-existing-section {
+    margin-top: 0.25rem;
+  }
+  #enrollmentOnHoldModal .on-hold-existing-section .section-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.65rem;
+  }
+  #enrollmentOnHoldModal .on-hold-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+  #enrollmentOnHoldModal .on-hold-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 0.22rem 0.62rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  #enrollmentOnHoldModal .on-hold-action-btn i {
+    font-size: 0.82rem;
+    line-height: 1;
+  }
+  #enrollmentOnHoldModal .on-hold-action-btn.is-preview {
+    color: #0d6efd;
+    background: #eef4ff;
+    border-color: #b6d4fe;
+  }
+  #enrollmentOnHoldModal .on-hold-action-btn.is-preview:hover {
+    color: #fff;
+    background: #0d6efd;
+    border-color: #0d6efd;
+  }
+  #enrollmentOnHoldModal .on-hold-action-btn.is-edit {
+    color: #495057;
+    background: #f8f9fa;
+    border-color: #ced4da;
+  }
+  #enrollmentOnHoldModal .on-hold-action-btn.is-edit:hover {
+    color: #212529;
+    background: #e9ecef;
+    border-color: #adb5bd;
+  }
+  #enrollmentOnHoldModal .on-hold-action-btn.is-delete {
+    color: #b02a37;
+    background: #fff5f5;
+    border-color: #f1aeb5;
+  }
+  #enrollmentOnHoldModal .on-hold-action-btn.is-delete:hover {
+    color: #fff;
+    background: #dc3545;
+    border-color: #dc3545;
   }
   .rolling-enrollment-page kbd {
     background: #f1f3f5;
@@ -774,7 +1005,10 @@
             </div>
             <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label" for="inp_claimNumber">Claim Number</label>
-              <input type="text" id="inp_claimNumber" class="form-control" maxlength="120" placeholder="Optional">
+              <select id="inp_claimNumber" class="form-select">
+                <option value="">— None —</option>
+                <option value="__add_new__">+ Add New...</option>
+              </select>
             </div>
           </div>
           <div class="row g-2 mt-1">
@@ -1066,7 +1300,10 @@
             </div>
             <div class="col-md-2">
               <label class="form-label" for="grp_claimNumber">Claim Number</label>
-              <input type="text" id="grp_claimNumber" class="form-control" maxlength="120" placeholder="Optional">
+              <select id="grp_claimNumber" class="form-select">
+                <option value="">— None —</option>
+                <option value="__add_new__">+ Add New...</option>
+              </select>
             </div>
             <div class="col-md-3">
               <label class="form-label" for="grp_reasonStart">Reason Start</label>
@@ -1642,11 +1879,12 @@
           </div>
         </div>
 
-        <div id="rollingClb_editorPanel" class="border rounded p-3 mt-3 bg-light d-none">
+        <div id="rollingClb_editorPanel" class="rolling-clb-editor-shell mt-3 d-none">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h6 class="fw-bold mb-0" id="rollingClb_editorTitle">CLB Entry</h6>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btn_rollingClbCancelEditor">Back to list</button>
           </div>
+          <div id="rollingClb_previousEntryHeadsUp" class="d-none"></div>
           <div class="row g-3 mb-3">
             <div class="col-md-4">
               <label class="form-label fw-bold small" for="inp_rolling_clbRecordedAt">Goal / Current Date *</label>
@@ -1659,7 +1897,7 @@
           </div>
           <div id="rollingClb_entryWarnings" class="alert alert-warning border py-2 px-3 small d-none mb-3"></div>
           <div class="table-responsive">
-            <table class="table table-sm table-bordered align-middle mb-3">
+            <table class="table table-sm table-bordered align-middle rolling-clb-editor-table mb-3">
               <thead class="table-light">
                 <tr>
                   <th style="width: 18%;">Row</th>
@@ -1707,6 +1945,90 @@
   </div>
 </div>
 
+<div id="rollingStudentContextMenu" class="d-none" role="menu" aria-hidden="true">
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-action="phones" id="rollingStudentContextMenuPhones">
+    <i class="bi bi-telephone me-2"></i>Manage Phone Numbers
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-action="addresses" id="rollingStudentContextMenuAddresses">
+    <i class="bi bi-geo-alt me-2"></i>Manage Addresses
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-action="claim-numbers" id="rollingStudentContextMenuClaimNumbers">
+    <i class="bi bi-card-checklist me-2"></i>Manage Claim Numbers
+  </button>
+</div>
+
+<div class="modal fade" id="rollingStudentClaimNumbersModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-card-checklist me-1"></i>Manage Claim Numbers</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-8">
+            <label class="form-label small fw-bold" for="rollingClaim_studentLabel">Student</label>
+            <input type="text" id="rollingClaim_studentLabel" class="form-control form-control-sm bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold" for="rollingClaim_studentId">Student ID</label>
+            <input type="text" id="rollingClaim_studentId" class="form-control form-control-sm bg-light font-monospace" readonly>
+          </div>
+        </div>
+        <div id="rollingClaim_alert" class="alert alert-danger border py-2 px-3 small d-none mb-3"></div>
+        <div id="rollingClaim_empty" class="text-muted small text-center py-3 border rounded bg-light">No claim numbers saved yet.</div>
+        <div id="rollingClaim_listWrap" class="d-none">
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Claim Number</th>
+                  <th style="width: 22%;">Label</th>
+                  <th style="width: 10%;" class="text-center">Primary</th>
+                  <th style="width: 12%;" class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rollingClaim_tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="rollingClaim_editorPanel" class="claim-number-row-editor mt-3 d-none">
+          <div class="fw-semibold small mb-2" id="rollingClaim_editorTitle">New Claim Number</div>
+          <div class="row g-2">
+            <div class="col-md-5">
+              <label class="form-label small fw-bold" for="rollingClaim_number">Claim Number *</label>
+              <input type="text" id="rollingClaim_number" class="form-control form-control-sm" maxlength="120">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold" for="rollingClaim_label">Label</label>
+              <input type="text" id="rollingClaim_label" class="form-control form-control-sm" maxlength="120" placeholder="Optional">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="rollingClaim_isPrimary">
+                <label class="form-check-label small" for="rollingClaim_isPrimary">Primary</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-bold" for="rollingClaim_notes">Notes</label>
+              <textarea id="rollingClaim_notes" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Optional"></textarea>
+            </div>
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="button" class="btn btn-sm btn-primary" id="btn_rollingClaimApplyEditor">Apply</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn_rollingClaimCancelEditor">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_rollingClaimAdd"><i class="bi bi-plus-lg me-1"></i>Add Claim Number</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn_rollingClaimSave"><i class="bi bi-save me-1"></i>Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="closePeriodModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -1741,6 +2063,49 @@
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewClosePeriod">Preview</button>
         <button type="button" class="btn btn-filled btn-danger btn-sm" id="btn_confirmClosePeriod" disabled>Apply Confirmed Change</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="undoClosePeriodModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Undo Enrollment Close</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="undo_close_periodId">
+        <div class="small text-muted mb-2" id="undo_close_studentLabel"></div>
+        <div class="mb-2">
+          <label class="form-label">Current Status</label>
+          <div id="undo_close_currentStatus" class="fw-semibold"></div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Current End Date</label>
+          <div id="undo_close_currentEndDate"></div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Restored Status</label>
+          <div id="undo_close_restoreStatus" class="fw-semibold text-success"></div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Restored End Date</label>
+          <div id="undo_close_restoreEndDate"></div>
+        </div>
+        <div>
+          <label class="form-label">Reason for Undo *</label>
+          <textarea id="undo_close_reason" class="form-control" rows="2"></textarea>
+        </div>
+        <div id="undo_close_preview" class="alert alert-light border mt-3 mb-0">
+          Preview eligibility before undoing this close.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewUndoClosePeriod">Preview</button>
+        <button type="button" class="btn btn-filled btn-success btn-sm" id="btn_confirmUndoClosePeriod" disabled>Undo Close</button>
       </div>
     </div>
   </div>
@@ -1882,7 +2247,10 @@
           </div>
           <div class="col-md-6">
             <label class="form-label" for="edit_claimNumber">Claim Number</label>
-            <input type="text" id="edit_claimNumber" class="form-control" maxlength="120" placeholder="Optional">
+            <select id="edit_claimNumber" class="form-select">
+              <option value="">— None —</option>
+              <option value="__add_new__">+ Add New...</option>
+            </select>
           </div>
           <div class="col-12">
             <label class="form-label">Reason Start</label>
@@ -1908,9 +2276,15 @@
       <div class="modal-body">
         <input type="hidden" id="onHold_periodId">
         <input type="hidden" id="onHold_editingHoldId" value="">
-        <div class="small text-muted mb-3" id="onHold_contextLabel"></div>
-        <div class="border rounded p-3 mb-3" id="onHold_newPeriodSection">
-          <div class="fw-semibold mb-2" id="onHold_formTitle">New On-Hold Period</div>
+        <div class="on-hold-context-banner" id="onHold_contextLabel">
+          <i class="bi bi-pause-circle" aria-hidden="true"></i>
+          <span id="onHold_contextText"></span>
+        </div>
+        <div class="on-hold-form-card" id="onHold_newPeriodSection">
+          <div class="on-hold-form-card__header">
+            <i class="bi bi-calendar-range" aria-hidden="true"></i>
+            <span id="onHold_formTitle">New On-Hold Period</span>
+          </div>
           <div class="row g-2">
             <div class="col-md-4">
               <label class="form-label" for="onHold_startDate">Start Date *</label>
@@ -1925,12 +2299,18 @@
               <textarea id="onHold_reason" class="form-control" rows="2" placeholder="Reason for placing this enrollment on hold"></textarea>
             </div>
           </div>
+          <div id="onHold_applyHint" class="on-hold-form-hint text-muted">Preview the on-hold period to see affected sessions on the calendar.</div>
+          <div class="on-hold-form-actions d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewOnHoldPeriod">Preview</button>
+            <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_applyOnHoldPeriod" disabled>Save</button>
+          </div>
         </div>
-        <div class="mb-0">
-          <div class="fw-semibold mb-2">Existing On-Hold Periods</div>
+        <hr class="my-3">
+        <div class="on-hold-existing-section mb-0">
+          <div class="section-title">Existing On-Hold Periods</div>
           <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-              <thead>
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
                 <tr>
                   <th>Start</th>
                   <th>End</th>
@@ -1947,11 +2327,8 @@
           </div>
         </div>
       </div>
-      <div class="modal-footer flex-wrap">
-        <div id="onHold_applyHint" class="small text-muted me-auto w-100 w-md-auto mb-2 mb-md-0">Preview the on-hold period to see affected sessions on the calendar.</div>
+      <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewOnHoldPeriod">Preview</button>
-        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_applyOnHoldPeriod" disabled>Apply Hold</button>
       </div>
     </div>
   </div>
@@ -2145,6 +2522,7 @@
 
 <%- include('partials/modal_GenericPicker') %>
 <%- include('school/partials/sessionEnrollmentCalendarModal') %>
+<%- include('school/partials/personProfileEditModal') %>
 
 <link rel="stylesheet" href="/styles/session-calendar.css">
 <script src="/scripts/sessionCalendarCore.js"></script>
@@ -2711,6 +3089,7 @@
   const periodCount = qs('lbl_periodCount');
   const addEnrollmentModalEl = qs('addEnrollmentPeriodModal');
   const closeModalEl = qs('closePeriodModal');
+  const undoCloseModalEl = qs('undoClosePeriodModal');
   const reentryModalEl = qs('reentryModal');
   const editModalEl = qs('editPeriodModal');
   const onHoldModalEl = qs('enrollmentOnHoldModal');
@@ -2723,7 +3102,9 @@
   const groupEnrollmentModalEl = qs('groupEnrollmentModal');
   const groupEnrollmentResultsModalEl = qs('groupEnrollmentResultsModal');
   const rollingStudentClbModalEl = qs('rollingStudentClbModal');
+  const rollingStudentClaimNumbersModalEl = qs('rollingStudentClaimNumbersModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
+  const CLAIM_NUMBER_ADD_NEW = '__add_new__';
   const ROLLING_CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
   const ROLLING_CLB_VALUE_GROUPS = ['goal', 'current', 'result'];
   let rollingClbLevelHistory = [];
@@ -2934,6 +3315,7 @@
 
   const addEnrollmentModal = createModalController(addEnrollmentModalEl);
   const closeModal = createModalController(closeModalEl);
+  const undoCloseModal = createModalController(undoCloseModalEl);
   const reentryModal = createModalController(reentryModalEl);
   const editModal = createModalController(editModalEl);
   const onHoldModal = createModalController(onHoldModalEl);
@@ -2946,6 +3328,11 @@
   const groupEnrollmentModal = createModalController(groupEnrollmentModalEl);
   const groupEnrollmentResultsModal = createModalController(groupEnrollmentResultsModalEl);
   const rollingStudentClbModal = createModalController(rollingStudentClbModalEl);
+  const rollingStudentClaimNumbersModal = createModalController(rollingStudentClaimNumbersModalEl);
+  let rollingClaimNumbers = [];
+  let rollingClaimEditingId = '';
+  let rollingClaimContext = { studentId: '', studentLabel: '', onSaved: null, selectAfterSave: '' };
+  let rollingStudentContextState = null;
   const addButton = qs('btn_addPeriod');
   let approvedCloseStatusPayload = null;
   let approvedEditCloseStatusPayload = null;
@@ -4582,6 +4969,7 @@
   function clearGroupEnrollmentEntryStudent() {
     if (qs('grp_studentId')) qs('grp_studentId').value = '';
     if (qs('grp_studentLabel')) qs('grp_studentLabel').value = '';
+    populateClaimNumberSelectOptions(qs('grp_claimNumber'), [], '');
   }
 
   function prefillGroupEnrollmentEntryForm(entry = {}) {
@@ -4591,7 +4979,7 @@
     if (qs('grp_targetHours')) qs('grp_targetHours').value = String(entry.targetHours || '');
     if (qs('grp_status')) qs('grp_status').value = String(entry.status || 'active');
     if (qs('grp_reasonStart')) qs('grp_reasonStart').value = String(entry.reasonStart || '');
-    if (qs('grp_claimNumber')) qs('grp_claimNumber').value = String(entry.claimNumber || '');
+    refreshClaimNumberSelect('grp_claimNumber', entry.id, String(entry.claimNumber || '').trim());
     setSessionCapacitySelectValue('grp_sessionCapacityType', entry.sessionCapacityType);
     if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = entry.autoResolveSubjects === true;
     setFunderSelectValue('grp_funder', {
@@ -4611,7 +4999,7 @@
       status: String(qs('grp_status')?.value || 'active').trim(),
       funderType: funder.funderType,
       funderId: funder.funderId,
-      claimNumber: String(qs('grp_claimNumber')?.value || '').trim(),
+      claimNumber: readClaimNumberSelectValue('grp_claimNumber'),
       reasonStart: String(qs('grp_reasonStart')?.value || '').trim(),
       targetSessionCount: hasTargetSessionCount('grp_targetSessionCount')
         ? String(qs('grp_targetSessionCount')?.value || '').trim()
@@ -4665,7 +5053,7 @@
     if (qs('grp_targetHours')) qs('grp_targetHours').value = '';
     if (qs('grp_status')) qs('grp_status').value = 'active';
     if (qs('grp_reasonStart')) qs('grp_reasonStart').value = '';
-    if (qs('grp_claimNumber')) qs('grp_claimNumber').value = '';
+    populateClaimNumberSelectOptions(qs('grp_claimNumber'), [], '');
     if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = false;
     setFunderSelectValue('grp_funder', { funderId: 'self', funderType: 'self' });
     setSessionCapacitySelectValue('grp_sessionCapacityType', 'group');
@@ -5121,6 +5509,83 @@
     return text || '—';
   }
 
+  function formatRollingClbDateLabel(value) {
+    return formatRollingClbCell(value);
+  }
+
+  function rollingClbEntryHasValues(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    return ROLLING_CLB_VALUE_GROUPS.some((group) =>
+      ROLLING_CLB_SKILLS.some((skill) => {
+        const text = String(entry?.[group]?.[skill] || '').trim();
+        return text && text !== '-';
+      })
+    );
+  }
+
+  function renderRollingClbSkillValueCell(value) {
+    const text = String(value || '').trim();
+    if (!text || text === '-') return '<span class="text-muted">—</span>';
+    return htmlEscape(text);
+  }
+
+  function renderRollingClbPreviousEntryHeadsUp() {
+    const panel = qs('rollingClb_previousEntryHeadsUp');
+    if (!panel) return;
+    const isNewEntry = !String(rollingClbEditingEntryId || '').trim();
+    const latest = isNewEntry ? getLatestRollingClbEntry() : null;
+    if (!isNewEntry || !latest || !rollingClbEntryHasValues(latest)) {
+      panel.classList.add('d-none');
+      panel.innerHTML = '';
+      return;
+    }
+    const skillHeaders = ROLLING_CLB_SKILLS.map((skill) => {
+      const label = skill.charAt(0).toUpperCase() + skill.slice(1);
+      return `<th class="text-center">${htmlEscape(label)}</th>`;
+    }).join('');
+    const rowLabels = {
+      goal: 'CLB Goal',
+      current: 'Current CLB Level',
+      result: 'CLB Result'
+    };
+    const rowsHtml = ROLLING_CLB_VALUE_GROUPS.map((group) => `
+      <tr>
+        <td class="rolling-clb-heads-up-row-label">${htmlEscape(rowLabels[group] || group)}</td>
+        ${ROLLING_CLB_SKILLS.map((skill) => `
+          <td class="text-center font-monospace">${renderRollingClbSkillValueCell(latest?.[group]?.[skill])}</td>
+        `).join('')}
+      </tr>
+    `).join('');
+    panel.classList.remove('d-none');
+    panel.innerHTML = `
+      <div class="rolling-clb-heads-up">
+        <div class="rolling-clb-heads-up__header">
+          <i class="bi bi-clock-history" aria-hidden="true"></i>
+          <div>
+            <div class="rolling-clb-heads-up__title">Previous CLB entry</div>
+            <div class="rolling-clb-heads-up__subtitle">Use this as a reference when entering the new goal, current, and result levels.</div>
+          </div>
+        </div>
+        <div class="rolling-clb-heads-up__dates">
+          <span><strong>Goal / Current date:</strong> ${htmlEscape(formatRollingClbDateLabel(latest.recordedAt))}</span>
+          <span><strong>Result date:</strong> ${htmlEscape(formatRollingClbDateLabel(latest.resultRecordedAt))}</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered rolling-clb-heads-up__table mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Row</th>
+                ${skillHeaders}
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+        <div class="rolling-clb-heads-up__note">Current CLB level fields below are prefilled from the previous result where available.</div>
+      </div>
+    `;
+  }
+
   function formatRollingClbSkillSummary(entry) {
     const parts = [];
     const labels = { goal: 'Goal', current: 'Current', result: 'Result' };
@@ -5147,6 +5612,7 @@
     qs('rollingClb_listPanel')?.classList.remove('d-none');
     qs('rollingClb_editorPanel')?.classList.add('d-none');
     rollingClbEditingEntryId = '';
+    renderRollingClbPreviousEntryHeadsUp();
   }
 
   function clearRollingClbEditor() {
@@ -5235,6 +5701,7 @@
     clearRollingClbEditor();
     prefillRollingClbCurrentFromLatest();
     showRollingClbEditorPanel();
+    renderRollingClbPreviousEntryHeadsUp();
     refreshRollingClbEditorWarnings();
   }
 
@@ -5260,6 +5727,7 @@
     if (saveBtn) saveBtn.textContent = 'Update CLB Entry';
     if (removeBtn) removeBtn.classList.toggle('d-none', !canEditStudentClb);
     showRollingClbEditorPanel();
+    renderRollingClbPreviousEntryHeadsUp();
     refreshRollingClbEditorWarnings();
   }
 
@@ -5367,7 +5835,11 @@
 
   async function removeRollingClbEntryFromEditor() {
     if (!canEditStudentClb || !rollingClbEditingEntryId) return;
-    const confirmed = window.confirm('Remove this CLB entry from the student profile?');
+    const confirmed = await showConfirm(
+      'Remove this CLB entry from the student profile?',
+      'Remove CLB Entry',
+      { icon: 'warning', confirmText: 'Remove', confirmClass: 'btn-danger' }
+    );
     if (!confirmed) return;
     rollingClbLevelHistory = rollingClbLevelHistory.filter((row) => String(row?.id || '') !== rollingClbEditingEntryId);
     try {
@@ -5379,6 +5851,347 @@
       await showMsg('Success', 'success', 'CLB entry removed.');
     } catch (error) {
       await showMsg('CLB Entry', 'error', error.message || 'Unable to remove CLB entry.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  function resolveStudentContactContext(studentId, fallbackLabel = '') {
+    const sid = String(studentId || '').trim();
+    const mapped = studentMap.get(sid)
+      || [...studentMap.values()].find((item) => String(item?.id || '') === sid)
+      || [...studentMap.values()].find((item) => String(item?.personId || '') === sid);
+    const rowDisplay = resolveStudentRowDisplay({ studentId: sid, studentLabel: fallbackLabel });
+    return {
+      studentId: sid,
+      studentLabel: String(mapped?.label || fallbackLabel || rowDisplay.label || sid).trim(),
+      personId: String(mapped?.personId || '').trim()
+    };
+  }
+
+  function syncRollingStudentContextMenuPermissions() {
+    const editable = canEditStudentClb === true;
+    ['rollingStudentContextMenuPhones', 'rollingStudentContextMenuAddresses', 'rollingStudentContextMenuClaimNumbers'].forEach((id) => {
+      const btn = qs(id);
+      if (!btn) return;
+      btn.disabled = !editable;
+      btn.classList.toggle('disabled', !editable);
+    });
+  }
+
+  function hideRollingStudentContextMenu() {
+    const menu = qs('rollingStudentContextMenu');
+    if (!menu) return;
+    menu.classList.add('d-none');
+    menu.setAttribute('aria-hidden', 'true');
+    rollingStudentContextState = null;
+  }
+
+  function showRollingStudentContextMenu(event, context) {
+    const menu = qs('rollingStudentContextMenu');
+    if (!menu || !context?.studentId) return;
+    rollingStudentContextState = { ...context };
+    syncRollingStudentContextMenuPermissions();
+    if (menu.parentElement !== document.body) document.body.appendChild(menu);
+    menu.classList.remove('d-none');
+    menu.setAttribute('aria-hidden', 'false');
+    menu.style.position = 'fixed';
+    menu.style.zIndex = '1200';
+    const menuWidth = menu.offsetWidth || 220;
+    const menuHeight = menu.offsetHeight || 120;
+    const left = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+    const top = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${Math.max(8, top)}px`;
+  }
+
+  function openRollingStudentPhonesModal(context) {
+    hideRollingStudentContextMenu();
+    if (!canEditStudentClb) {
+      showMsg('Permission', 'warning', 'You do not have permission to manage student contact details.');
+      return;
+    }
+    if (!context?.personId) {
+      showMsg('Phone Numbers', 'warning', 'This student does not have a linked person profile.');
+      return;
+    }
+    if (typeof window.SchoolPersonProfileModal?.open !== 'function') {
+      showMsg('Unavailable', 'warning', 'Person profile editor is not loaded on this page.');
+      return;
+    }
+    window.SchoolPersonProfileModal.open({
+      personId: context.personId,
+      linkType: 'student',
+      linkId: context.studentId,
+      focus: 'phones'
+    });
+  }
+
+  function openRollingStudentAddressesModal(context) {
+    hideRollingStudentContextMenu();
+    if (!canEditStudentClb) {
+      showMsg('Permission', 'warning', 'You do not have permission to manage student contact details.');
+      return;
+    }
+    if (!context?.personId) {
+      showMsg('Addresses', 'warning', 'This student does not have a linked person profile.');
+      return;
+    }
+    if (typeof window.SchoolPersonProfileModal?.open !== 'function') {
+      showMsg('Unavailable', 'warning', 'Person profile editor is not loaded on this page.');
+      return;
+    }
+    window.SchoolPersonProfileModal.open({
+      personId: context.personId,
+      linkType: 'student',
+      linkId: context.studentId,
+      focus: 'addresses'
+    });
+  }
+
+  function setRollingClaimAlert(message) {
+    const alertEl = qs('rollingClaim_alert');
+    if (!alertEl) return;
+    const text = String(message || '').trim();
+    if (!text) {
+      alertEl.classList.add('d-none');
+      alertEl.textContent = '';
+      return;
+    }
+    alertEl.textContent = text;
+    alertEl.classList.remove('d-none');
+  }
+
+  function formatClaimNumberOptionLabel(entry) {
+    const number = String(entry?.number || '').trim();
+    const label = String(entry?.label || '').trim();
+    if (!number) return '';
+    return label ? `${label} (${number})` : number;
+  }
+
+  function populateClaimNumberSelectOptions(selectEl, claimNumbers, selectedValue) {
+    if (!selectEl) return;
+    const selected = String(selectedValue || '').trim();
+    const rows = Array.isArray(claimNumbers) ? claimNumbers : [];
+    const numbers = rows.map((row) => String(row?.number || '').trim()).filter(Boolean);
+    const uniqueNumbers = Array.from(new Set(numbers));
+    const selectedInList = !selected || uniqueNumbers.includes(selected);
+    const options = ['<option value="">— None —</option>'];
+    uniqueNumbers.forEach((number) => {
+      const entry = rows.find((row) => String(row?.number || '').trim() === number);
+      const label = entry ? formatClaimNumberOptionLabel(entry) : number;
+      options.push(`<option value="${htmlEscape(number)}"${selected === number ? ' selected' : ''}>${htmlEscape(label)}</option>`);
+    });
+    if (selected && !selectedInList) {
+      options.push(`<option value="${htmlEscape(selected)}" selected>${htmlEscape(selected)} (not in profile)</option>`);
+    }
+    options.push(`<option value="${CLAIM_NUMBER_ADD_NEW}">+ Add New...</option>`);
+    selectEl.innerHTML = options.join('');
+    selectEl.dataset.previousValue = selected;
+  }
+
+  async function fetchStudentClaimNumbers(studentId) {
+    const sid = String(studentId || '').trim();
+    if (!sid) return [];
+    const result = await requestJson(`/school/students/api/${encodeURIComponent(sid)}/claim-numbers`);
+    return Array.isArray(result?.data?.claimNumbers) ? result.data.claimNumbers : [];
+  }
+
+  async function refreshClaimNumberSelect(selectElOrId, studentId, selectedValue) {
+    const selectEl = typeof selectElOrId === 'string' ? qs(selectElOrId) : selectElOrId;
+    if (!selectEl) return [];
+    const sid = String(studentId || '').trim();
+    if (!sid) {
+      populateClaimNumberSelectOptions(selectEl, [], selectedValue);
+      return [];
+    }
+    try {
+      const claimNumbers = await fetchStudentClaimNumbers(sid);
+      populateClaimNumberSelectOptions(selectEl, claimNumbers, selectedValue);
+      return claimNumbers;
+    } catch (_) {
+      populateClaimNumberSelectOptions(selectEl, [], selectedValue);
+      return [];
+    }
+  }
+
+  function readClaimNumberSelectValue(selectElOrId) {
+    const selectEl = typeof selectElOrId === 'string' ? qs(selectElOrId) : selectElOrId;
+    const value = String(selectEl?.value || '').trim();
+    if (!value || value === CLAIM_NUMBER_ADD_NEW) return '';
+    return value;
+  }
+
+  async function handleClaimNumberSelectChange(selectElOrId, studentId, studentLabel) {
+    const selectEl = typeof selectElOrId === 'string' ? qs(selectElOrId) : selectElOrId;
+    if (!selectEl) return;
+    const value = String(selectEl.value || '').trim();
+    if (value !== CLAIM_NUMBER_ADD_NEW) {
+      selectEl.dataset.previousValue = value;
+      return;
+    }
+    const previous = String(selectEl.dataset.previousValue || '').trim();
+    selectEl.value = previous;
+    const sid = String(studentId || '').trim();
+    if (!sid) {
+      await showMsg('Claim Number', 'warning', 'Select a student first.');
+      return;
+    }
+    await openRollingStudentClaimNumbersModal({
+      studentId: sid,
+      studentLabel,
+      openEditorOnShow: true,
+      onSaved: async (claimNumbers, preferredNumber) => {
+        await refreshClaimNumberSelect(selectEl, sid, preferredNumber || previous);
+      }
+    });
+  }
+
+  function hideRollingClaimEditor() {
+    rollingClaimEditingId = '';
+    qs('rollingClaim_editorPanel')?.classList.add('d-none');
+    setRollingClaimAlert('');
+  }
+
+  function showRollingClaimEditor(entry = null) {
+    const panel = qs('rollingClaim_editorPanel');
+    if (!panel) return;
+    rollingClaimEditingId = String(entry?.id || '').trim();
+    if (qs('rollingClaim_editorTitle')) {
+      qs('rollingClaim_editorTitle').textContent = rollingClaimEditingId ? 'Edit Claim Number' : 'New Claim Number';
+    }
+    if (qs('rollingClaim_number')) qs('rollingClaim_number').value = String(entry?.number || '').trim();
+    if (qs('rollingClaim_label')) qs('rollingClaim_label').value = String(entry?.label || '').trim();
+    if (qs('rollingClaim_notes')) qs('rollingClaim_notes').value = String(entry?.notes || '').trim();
+    if (qs('rollingClaim_isPrimary')) qs('rollingClaim_isPrimary').checked = entry ? entry.isPrimary === true : !rollingClaimNumbers.some((row) => row.isPrimary);
+    panel.classList.remove('d-none');
+    qs('rollingClaim_number')?.focus();
+  }
+
+  function renderRollingClaimList() {
+    const emptyEl = qs('rollingClaim_empty');
+    const wrapEl = qs('rollingClaim_listWrap');
+    const tbody = qs('rollingClaim_tbody');
+    if (!tbody || !emptyEl || !wrapEl) return;
+    if (!rollingClaimNumbers.length) {
+      emptyEl.classList.remove('d-none');
+      wrapEl.classList.add('d-none');
+      tbody.innerHTML = '';
+      return;
+    }
+    emptyEl.classList.add('d-none');
+    wrapEl.classList.remove('d-none');
+    tbody.innerHTML = rollingClaimNumbers.map((entry) => {
+      const id = String(entry?.id || '').trim();
+      const number = String(entry?.number || '').trim();
+      const label = String(entry?.label || '').trim();
+      const primaryBadge = entry?.isPrimary ? '<span class="badge text-bg-primary-subtle text-primary-emphasis border">Primary</span>' : '<span class="text-muted">—</span>';
+      return `
+        <tr data-claim-id="${htmlEscape(id)}">
+          <td class="font-monospace">${htmlEscape(number)}</td>
+          <td>${label ? htmlEscape(label) : '<span class="text-muted">—</span>'}</td>
+          <td class="text-center">${primaryBadge}</td>
+          <td class="text-end">
+            <button type="button" class="btn btn-sm btn-outline-secondary btn-rolling-claim-edit" data-claim-id="${htmlEscape(id)}"><i class="bi bi-pencil"></i></button>
+            <button type="button" class="btn btn-sm btn-outline-danger btn-rolling-claim-delete" data-claim-id="${htmlEscape(id)}"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function applyRollingClaimEditor() {
+    const number = String(qs('rollingClaim_number')?.value || '').trim();
+    if (!number) {
+      setRollingClaimAlert('Claim number is required.');
+      return;
+    }
+    const label = String(qs('rollingClaim_label')?.value || '').trim();
+    const notes = String(qs('rollingClaim_notes')?.value || '').trim();
+    const isPrimary = qs('rollingClaim_isPrimary')?.checked === true;
+    const entry = {
+      id: rollingClaimEditingId || `claim_${Date.now()}`,
+      number,
+      label,
+      notes,
+      isPrimary
+    };
+    if (rollingClaimEditingId) {
+      rollingClaimNumbers = rollingClaimNumbers.map((row) => (
+        String(row.id) === String(rollingClaimEditingId) ? { ...row, ...entry } : row
+      ));
+    } else {
+      rollingClaimNumbers.push(entry);
+    }
+    if (isPrimary) {
+      rollingClaimNumbers = rollingClaimNumbers.map((row) => ({
+        ...row,
+        isPrimary: String(row.id) === String(entry.id)
+      }));
+    }
+    hideRollingClaimEditor();
+    renderRollingClaimList();
+  }
+
+  async function saveRollingClaimNumbers(preferredNumber = '') {
+    const studentId = String(rollingClaimContext.studentId || '').trim();
+    if (!studentId) return null;
+    try {
+      showBusy('Saving claim numbers...');
+      const result = await requestJson(
+        `/school/students/api/${encodeURIComponent(studentId)}/claim-numbers`,
+        'PUT',
+        { claimNumbers: rollingClaimNumbers }
+      );
+      if (!result) return null;
+      rollingClaimNumbers = Array.isArray(result.data?.claimNumbers) ? result.data.claimNumbers : rollingClaimNumbers;
+      renderRollingClaimList();
+      const chosen = String(preferredNumber || rollingClaimContext.selectAfterSave || '').trim()
+        || String(rollingClaimNumbers.find((row) => row.isPrimary)?.number || rollingClaimNumbers[0]?.number || '').trim();
+      if (typeof rollingClaimContext.onSaved === 'function') {
+        await rollingClaimContext.onSaved(rollingClaimNumbers, chosen);
+      }
+      return chosen;
+    } catch (error) {
+      await showMsg('Claim Numbers', 'error', error.message || 'Unable to save claim numbers.');
+      return null;
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function openRollingStudentClaimNumbersModal(options = {}) {
+    hideRollingStudentContextMenu();
+    const studentId = String(options.studentId || '').trim();
+    if (!studentId) return;
+    if (!canEditStudentClb) {
+      await showMsg('Permission', 'warning', 'You do not have permission to manage claim numbers.');
+      return;
+    }
+    rollingClaimContext = {
+      studentId,
+      studentLabel: String(options.studentLabel || resolveStudentContactContext(studentId).studentLabel || studentId).trim(),
+      onSaved: typeof options.onSaved === 'function' ? options.onSaved : null,
+      selectAfterSave: String(options.selectAfterSave || '').trim()
+    };
+    rollingClaimNumbers = [];
+    rollingClaimEditingId = '';
+    hideRollingClaimEditor();
+    setRollingClaimAlert('');
+    if (qs('rollingClaim_studentLabel')) qs('rollingClaim_studentLabel').value = rollingClaimContext.studentLabel;
+    if (qs('rollingClaim_studentId')) qs('rollingClaim_studentId').value = studentId;
+    try {
+      showBusy('Loading claim numbers...');
+      const result = await requestJson(`/school/students/api/${encodeURIComponent(studentId)}/claim-numbers`);
+      if (!result) return;
+      rollingClaimNumbers = Array.isArray(result.data?.claimNumbers) ? result.data.claimNumbers : [];
+      rollingClaimContext.studentLabel = String(result.data?.studentLabel || rollingClaimContext.studentLabel || studentId).trim();
+      if (qs('rollingClaim_studentLabel')) qs('rollingClaim_studentLabel').value = rollingClaimContext.studentLabel;
+      renderRollingClaimList();
+      rollingStudentClaimNumbersModal?.show();
+      if (options.openEditorOnShow) showRollingClaimEditor(null);
+    } catch (error) {
+      await showMsg('Claim Numbers', 'error', error.message || 'Unable to load claim numbers.');
     } finally {
       hideBusy();
     }
@@ -5470,6 +6283,7 @@
         if (!id) return;
         if (qs('grp_studentId')) qs('grp_studentId').value = id;
         if (qs('grp_studentLabel')) qs('grp_studentLabel').value = formatGroupStudentLabel(item);
+        refreshClaimNumberSelect('grp_claimNumber', id, '');
       }
     }));
   }
@@ -5832,14 +6646,59 @@
     rollingBusyToken = null;
   }
 
-  async function showMsg(title, icon, message) {
+  function plainTextFromHtml(value = '') {
+    return String(value || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  async function showMsg(title, icon, message, options = {}) {
     // Busy overlay is z-index 20050; message modal must appear on top.
     while (rollingBusyDepth > 0) hideBusy();
+    const body = options.html ? String(message || '') : htmlEscape(String(message || ''));
     if (typeof window.showMessageModal === 'function') {
-      await window.showMessageModal({ title, icon, message });
+      const modalOptions = {
+        title,
+        icon,
+        message: body
+      };
+      if (Array.isArray(options.buttons) && options.buttons.length) {
+        modalOptions.buttons = options.buttons;
+      }
+      if (options.size) modalOptions.size = options.size;
+      await window.showMessageModal(modalOptions);
       return;
     }
-    console.log(title + ': ' + message);
+    const plain = options.html ? plainTextFromHtml(message) : String(message || '');
+    if (typeof window.alert === 'function') {
+      window.alert(plain || title);
+      return;
+    }
+    console.log(title + ': ' + (plain || title));
+  }
+
+  async function showConfirm(message, title = 'Confirm', options = {}) {
+    while (rollingBusyDepth > 0) hideBusy();
+    const cancelText = String(options.cancelText || 'Cancel').trim() || 'Cancel';
+    const confirmText = String(options.confirmText || 'Confirm').trim() || 'Confirm';
+    const icon = String(options.icon || 'warning').trim() || 'warning';
+    const body = options.html ? String(message || '') : htmlEscape(String(message || ''));
+    if (typeof window.showMessageModal === 'function') {
+      const result = await window.showMessageModal({
+        title,
+        icon,
+        message: body,
+        size: options.size || 'md',
+        buttons: [
+          { text: cancelText, class: String(options.cancelClass || 'btn-secondary').trim() || 'btn-secondary' },
+          { text: confirmText, class: String(options.confirmClass || (icon === 'warning' ? 'btn-warning' : 'btn-primary')).trim() || 'btn-primary' }
+        ]
+      });
+      return result === confirmText || result === true;
+    }
+    const plain = options.html ? plainTextFromHtml(message) : String(message || '');
+    if (typeof window.confirm === 'function') {
+      return window.confirm(plain || title);
+    }
+    return false;
   }
 
   /** @param {object|null|undefined} al */
@@ -5870,7 +6729,7 @@
       status: String(qs('inp_status')?.value || 'active').trim(),
       funderType: funder.funderType,
       funderId: funder.funderId,
-      claimNumber: String(qs('inp_claimNumber')?.value || '').trim(),
+      claimNumber: readClaimNumberSelectValue('inp_claimNumber'),
       reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
       sessionCountPolicy: 'all_non_na',
       sessionCapacityType: readSessionCapacityTypeFromSelect('inp_sessionCapacityType'),
@@ -6412,11 +7271,10 @@
     });
     if (rows.length > 5) msg += `<li>...and ${rows.length - 5} more.</li>`;
     msg += '</ul><br>Resolve conflicts before staging sessions or enrolling.';
-    if (typeof window.showMessageModal === 'function') {
-      await window.showMessageModal({ title: 'Scheduling Conflicts', icon: 'error', message: msg, buttons: [{ text: 'OK', class: 'btn-primary', value: true }] });
-    } else {
-      window.alert(msg.replace(/<[^>]+>/g, ' '));
-    }
+    await showMsg('Scheduling Conflicts', 'error', msg, {
+      html: true,
+      buttons: [{ text: 'OK', class: 'btn-primary', value: true }]
+    });
     return true;
   }
 
@@ -7769,23 +8627,12 @@
     if (needsCycleExtend) {
       lines.push(`The cycle end date will be extended from ${cycleEnd || 'not set'} to ${batchEnd} when enrollment completes.`);
     }
-    let confirmed = false;
-    if (typeof window.showMessageModal === 'function') {
-      const result = await window.showMessageModal({
-        title: 'Add Class Sessions',
-        icon: 'warning',
-        message: lines.join('<br><br>'),
-        buttons: [
-          { text: 'Cancel', class: 'btn-secondary', value: false },
-          { text: 'Stage Sessions', class: 'btn-warning', value: true }
-        ]
-      });
-      // showMessageModal resolves with button text, not btn.value
-      confirmed = result === true || String(result || '').trim() === 'Stage Sessions';
-    } else {
-      confirmed = window.confirm(lines.join('\n\n'));
-    }
-    return confirmed;
+    return showConfirm(lines.join('<br><br>'), 'Add Class Sessions', {
+      html: true,
+      icon: 'warning',
+      confirmText: 'Stage Sessions',
+      confirmClass: 'btn-warning'
+    });
   }
 
   function ensureGapBatchFormPopulated(body = {}) {
@@ -7958,7 +8805,7 @@
       status: String(qs('charge_status')?.value || 'draft').trim().toLowerCase() || 'draft',
       funderType: funderType === 'self' ? 'self' : 'funder',
       funderId: funderType === 'self' || !funderId ? 'self' : funderId,
-      claimNumber: String(pendingEnrollmentPayload?.claimNumber || qs('inp_claimNumber')?.value || '').trim(),
+      claimNumber: String(pendingEnrollmentPayload?.claimNumber || readClaimNumberSelectValue('inp_claimNumber') || '').trim(),
       reasonStart: String(qs('inp_reasonStart')?.value || pendingEnrollmentPayload?.reasonStart || '').trim(),
       targetSessionCount: String(pendingEnrollmentPayload?.targetSessionCount || '').trim(),
       targetHours: String(pendingEnrollmentPayload?.targetHours || '').trim(),
@@ -8620,6 +9467,10 @@
     tbody.innerHTML = rows.map((row) => {
       const studentId = String(row?.studentId || '');
       const studentDisplay = resolveStudentRowDisplay(row);
+      const studentContactContext = resolveStudentContactContext(studentId, studentDisplay.label);
+      const studentNameHtml = (typeof schoolRenderStudentNameHtml === 'function'
+        ? schoolRenderStudentNameHtml(studentDisplay.label, studentDisplay.recordId, { className: 'text-decoration-none fw-semibold' })
+        : htmlEscape(studentDisplay.label));
       const status = String(row?.status || '').trim().toLowerCase();
       const badgeClass = status === 'active' ? 'bg-success'
         : (status === 'to_be_confirmed' ? 'bg-info text-dark'
@@ -8629,6 +9480,9 @@
       const canOnHold = canManageEnrollmentOffice && ON_HOLD_ELIGIBLE_STATUSES.includes(status);
       const canArchive = ['completed', 'withdrawn', 'cancelled'].includes(status);
       const canReenter = ['completed', 'withdrawn', 'cancelled', 'archived'].includes(status);
+      const canUndoClose = canManageEnrollmentOffice
+        && ['withdrawn', 'completed', 'cancelled', 'archived'].includes(status)
+        && !enrollmentHasAttachedTransactions(row);
       const transactionSummary = row?.transactionSummary && typeof row.transactionSummary === 'object'
         ? row.transactionSummary
         : {};
@@ -8684,6 +9538,7 @@
                 ${canOnHold ? `<button type="button" class="btn btn-outline-warning btn-sm btn-row-on-hold" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pause-circle me-1"></i>On Hold</button>` : ''}
                 ${canManageEnrollmentOffice ? `<button type="button" class="btn btn-outline-success btn-sm btn-row-extension" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-plus-circle me-1"></i>Extension enrollment</button>` : ''}
                 ${canReviewDraft ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-review-draft" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-text me-1"></i>Review Draft</button>` : ''}
+                ${canUndoClose ? `<button type="button" class="btn btn-outline-success btn-sm btn-row-undo-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-counterclockwise me-1"></i>Undo Close</button>` : ''}
                 ${canReenter ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>` : ''}
                 ${canClose ? `<button type="button" class="btn btn-outline-danger btn-sm btn-row-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-x-circle me-1"></i>Close</button>` : ''}
                 ${canArchive ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-archive" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-archive me-1"></i>Archive</button>` : ''}
@@ -8693,7 +9548,7 @@
         <tr class="${rowClass}">
           <td class="ps-4" data-column="student" data-sort-value="${htmlEscape(studentSortValue)}">
             ${studentDisplay.gender ? `<div class="x-small text-muted font-monospace rolling-student-gender-line">${htmlEscape(studentDisplay.gender)}</div>` : ''}
-            <div class="fw-semibold">${(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(studentDisplay.label, studentDisplay.recordId, { className: 'text-decoration-none fw-semibold' }) : htmlEscape(studentDisplay.label))}</div>
+            <div class="fw-semibold rolling-student-name-target" data-student-id="${htmlEscape(studentContactContext.studentId || studentId)}" data-person-id="${htmlEscape(studentContactContext.personId)}" data-student-label="${htmlEscape(studentContactContext.studentLabel)}">${studentNameHtml}</div>
             <div class="x-small text-muted font-monospace rolling-student-id-line">${htmlEscape(studentDisplay.recordId || studentId)}</div>
           </td>
           <td data-column="startDate" data-sort-value="${htmlEscape(String(row?.startDate || ''))}">${htmlEscape(String(row?.startDate || '-'))}</td>
@@ -8736,6 +9591,7 @@
 
   function clearSelectedStudentForSearch() {
     if (qs('inp_studentId')) qs('inp_studentId').value = '';
+    populateClaimNumberSelectOptions(qs('inp_claimNumber'), [], '');
     pendingEnrollmentCapSnapshot = null;
     lastRollingEligibility = null;
     rollingEnrollmentWorkspace = null;
@@ -8768,6 +9624,7 @@
         const studentNum = String(item?.studentNumber || '').trim();
         qs('inp_studentId').value = id;
         qs('inp_studentLabel').value = studentNum ? `${personName} (${studentNum})` : (personName || id);
+        refreshClaimNumberSelect('inp_claimNumber', id, '');
         loadRollingEnrollmentWorkspace(id);
         qs('inp_startDate')?.focus();
       }
@@ -8784,6 +9641,7 @@
     syncSessionCapacityControlsForClass();
     setFunderSelectValue('inp_funder', { funderId: 'self', funderType: 'self' });
     qs('inp_reasonStart').value = '';
+    populateClaimNumberSelectOptions(qs('inp_claimNumber'), [], '');
     if (qs('inp_targetSessionCount')) {
       qs('inp_targetSessionCount').value = '';
       delete qs('inp_targetSessionCount').dataset.userEdited;
@@ -9011,6 +9869,98 @@
     }
   }
 
+  let undoClosePreviewReady = false;
+
+  function syncUndoCloseConfirmState() {
+    const periodId = String(qs('undo_close_periodId')?.value || '').trim();
+    const reason = String(qs('undo_close_reason')?.value || '').trim();
+    const confirmBtn = qs('btn_confirmUndoClosePeriod');
+    if (!confirmBtn) return;
+    confirmBtn.disabled = !(periodId && reason && undoClosePreviewReady);
+  }
+
+  async function openUndoCloseModal(periodId) {
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    if (!row || !undoCloseModal) return;
+    undoClosePreviewReady = false;
+    qs('undo_close_periodId').value = String(row.id || '');
+    const studentDisplay = resolveStudentRowDisplay(row);
+    qs('undo_close_studentLabel').textContent = studentDisplay?.label || '';
+    qs('undo_close_currentStatus').textContent = formatPeriodStatusLabel(String(row.status || ''));
+    qs('undo_close_currentEndDate').textContent = String(row.endDate || '—');
+    qs('undo_close_restoreStatus').textContent = '—';
+    qs('undo_close_restoreEndDate').textContent = '—';
+    qs('undo_close_reason').value = '';
+    qs('undo_close_preview').className = 'alert alert-light border mt-3 mb-0';
+    qs('undo_close_preview').textContent = 'Preview eligibility before undoing this close.';
+    qs('btn_confirmUndoClosePeriod').disabled = true;
+    undoCloseModal.show();
+    await previewUndoClose(periodId);
+  }
+
+  async function previewUndoClose(periodId) {
+    const resolvedPeriodId = String(periodId || qs('undo_close_periodId')?.value || '').trim();
+    if (!resolvedPeriodId) return;
+    try {
+      showBusy('Checking undo close eligibility...');
+      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(resolvedPeriodId)}/undo-close/preview`, 'POST', {});
+      if (!result) return;
+      const preview = result.preview || {};
+      undoClosePreviewReady = !!preview.canUndo;
+      if (preview.canUndo) {
+        qs('undo_close_restoreStatus').textContent = formatPeriodStatusLabel(String(preview.restorePreview?.status || 'active'));
+        qs('undo_close_restoreEndDate').textContent = String(preview.restorePreview?.endDate || 'Open');
+        qs('undo_close_preview').className = 'alert alert-info mt-3 mb-0';
+        qs('undo_close_preview').textContent = 'This enrollment can be restored to its prior open status.';
+      } else {
+        const blocker = (preview.blockers || [])[0]?.message || result.message || 'This enrollment close cannot be undone.';
+        qs('undo_close_preview').className = 'alert alert-warning mt-3 mb-0';
+        qs('undo_close_preview').textContent = blocker;
+      }
+      syncUndoCloseConfirmState();
+    } catch (error) {
+      undoClosePreviewReady = false;
+      qs('undo_close_preview').className = 'alert alert-danger mt-3 mb-0';
+      qs('undo_close_preview').textContent = error.message || 'Unable to preview undo close.';
+      syncUndoCloseConfirmState();
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function submitUndoClose() {
+    const periodId = String(qs('undo_close_periodId')?.value || '').trim();
+    const reason = String(qs('undo_close_reason')?.value || '').trim();
+    if (!periodId || !reason) {
+      await showMsg('Missing Fields', 'warning', 'Period and reason are required.');
+      return;
+    }
+    if (!undoClosePreviewReady) {
+      await showMsg('Preview Required', 'warning', 'Preview eligibility before undoing this close.');
+      return;
+    }
+    const restoreStatus = String(qs('undo_close_restoreStatus')?.textContent || 'active').trim();
+    const confirmed = await showConfirm(
+      'Restore this enrollment to ' + restoreStatus + '?',
+      'Undo Enrollment Close',
+      { confirmText: 'Undo Close', confirmClass: 'btn-success' }
+    );
+    if (!confirmed) return;
+    try {
+      showBusy('Undoing enrollment close...');
+      const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/undo-close`, 'POST', { reason });
+      if (!result) return;
+      undoCloseModal.hide();
+      await showMsg('Status Updated', 'success', result.message || 'Enrollment close undone.');
+      await loadRows();
+    } catch (error) {
+      await showMsg('Undo Close Failed', 'error', error.message || 'Unable to undo enrollment close.');
+      syncUndoCloseConfirmState();
+    } finally {
+      hideBusy();
+    }
+  }
+
   async function submitClosePeriod() {
     const periodId = String(qs('close_periodId')?.value || '').trim();
     const payload = readCloseStatusPayload();
@@ -9209,7 +10159,7 @@
     setFunderSelectValue('edit_funder', row);
     setEditFunderLocked(enrollmentHasAttachedTransactions(row));
     qs('edit_reasonStart').value = String(row?.reasonStart || '').trim();
-    if (qs('edit_claimNumber')) qs('edit_claimNumber').value = String(row?.claimNumber || '').trim();
+    await refreshClaimNumberSelect('edit_claimNumber', resolveEnrollmentPeriodStudentId(row), String(row?.claimNumber || '').trim());
     if (qs('edit_targetSessionCount')) qs('edit_targetSessionCount').value = row?.targetSessionCount ? String(row.targetSessionCount) : '';
     if (qs('edit_targetHours')) qs('edit_targetHours').value = row?.targetHours ? String(row.targetHours) : '';
     applyEnrollmentCapUi();
@@ -9388,7 +10338,7 @@
         status: priorStatus,
         funderType: funder.funderType,
         funderId: funder.funderId,
-        claimNumber: String(qs('edit_claimNumber')?.value || '').trim(),
+        claimNumber: readClaimNumberSelectValue('edit_claimNumber'),
         reasonStart: String(qs('edit_reasonStart')?.value || '').trim(),
         sessionCountPolicy: 'all_non_na',
         sessionCapacityType: readSessionCapacityTypeFromSelect('edit_sessionCapacityType')
@@ -9473,23 +10423,19 @@
     const actionLabel = isRollback ? 'Rollback Posted Enrollment' : 'Delete Draft Enrollment';
     const personLabel = String(row?.studentLabel || row?.studentId || periodId).trim();
 
-    let confirmed = false;
-    if (typeof window.showMessageModal === 'function') {
-      const result = await window.showMessageModal({
-        title: actionLabel,
+    const confirmText = isRollback ? 'Rollback' : 'Delete';
+    const confirmed = await showConfirm(
+      isRollback
+        ? `Rollback posted transactions for <b>${htmlEscape(personLabel)}</b>?`
+        : `Delete draft enrollment for <b>${htmlEscape(personLabel)}</b> before posting?`,
+      actionLabel,
+      {
+        html: true,
         icon: isRollback ? 'warning' : 'question',
-        message: isRollback
-          ? `Rollback posted transactions for <b>${htmlEscape(personLabel)}</b>?`
-          : `Delete draft enrollment for <b>${htmlEscape(personLabel)}</b> before posting?`,
-        buttons: [
-          { text: 'Cancel', class: 'btn-secondary' },
-          { text: isRollback ? 'Rollback' : 'Delete', class: 'btn-danger' }
-        ]
-      });
-      confirmed = result === (isRollback ? 'Rollback' : 'Delete');
-    } else {
-      confirmed = window.confirm(`${actionLabel} for ${personLabel}?`);
-    }
+        confirmText,
+        confirmClass: 'btn-danger'
+      }
+    );
     if (!confirmed) return;
 
     try {
@@ -9811,7 +10757,7 @@
       formTitle.textContent = editingHoldId ? 'Edit On-Hold Period' : 'New On-Hold Period';
     }
     if (applyBtn) {
-      applyBtn.textContent = editingHoldId ? 'Update Hold' : 'Apply Hold';
+      applyBtn.textContent = 'Save';
     }
   }
 
@@ -9836,10 +10782,16 @@
         <td class="text-center">${htmlEscape(String((hold?.sessionIds || []).length || 0))}</td>
         <td class="small text-muted">${htmlEscape(String(hold?.createdAt || '').slice(0, 10) || '-')}</td>
         <td>
-          <div class="btn-group btn-group-sm" role="group" aria-label="On-hold actions">
-            <button type="button" class="btn btn-outline-primary btn-onhold-preview" data-hold-id="${htmlEscape(String(hold?.id || ''))}">Preview</button>
-            <button type="button" class="btn btn-outline-secondary btn-onhold-edit" data-hold-id="${htmlEscape(String(hold?.id || ''))}">Edit</button>
-            <button type="button" class="btn btn-outline-danger btn-onhold-delete" data-hold-id="${htmlEscape(String(hold?.id || ''))}">Delete</button>
+          <div class="on-hold-row-actions" role="group" aria-label="On-hold actions">
+            <button type="button" class="on-hold-action-btn is-preview btn-onhold-preview" data-hold-id="${htmlEscape(String(hold?.id || ''))}" title="Preview sessions">
+              <i class="bi bi-eye" aria-hidden="true"></i><span>Preview</span>
+            </button>
+            <button type="button" class="on-hold-action-btn is-edit btn-onhold-edit" data-hold-id="${htmlEscape(String(hold?.id || ''))}" title="Edit on-hold period">
+              <i class="bi bi-pencil-square" aria-hidden="true"></i><span>Edit</span>
+            </button>
+            <button type="button" class="on-hold-action-btn is-delete btn-onhold-delete" data-hold-id="${htmlEscape(String(hold?.id || ''))}" title="Delete on-hold period">
+              <i class="bi bi-trash" aria-hidden="true"></i><span>Delete</span>
+            </button>
           </div>
         </td>
       </tr>
@@ -9860,7 +10812,8 @@
   function setOnHoldApplyHint(message = '', tone = 'muted') {
     const hint = qs('onHold_applyHint');
     if (!hint) return;
-    hint.className = `small me-auto w-100 w-md-auto mb-2 mb-md-0${tone === 'warning' ? ' text-warning' : tone === 'success' ? ' text-success' : ' text-muted'}`;
+    const toneClass = tone === 'warning' ? 'is-warning' : tone === 'success' ? 'is-success' : '';
+    hint.className = `on-hold-form-hint text-muted${toneClass ? ` ${toneClass}` : ''}`;
     hint.textContent = message || 'Preview the on-hold period to see affected sessions on the calendar.';
   }
 
@@ -9910,7 +10863,10 @@
     clearOnHoldEditMode();
     qs('onHold_periodId').value = String(row?.id || '').trim();
     const enrollmentEnd = String(row?.endDate || '').trim() || 'Open';
-    qs('onHold_contextLabel').textContent = `${row?.studentLabel || row?.studentId || ''} | Enrollment: ${row?.startDate || '?'} to ${enrollmentEnd}`;
+    const contextText = qs('onHold_contextText');
+    if (contextText) {
+      contextText.textContent = `${row?.studentLabel || row?.studentId || ''} · Enrollment: ${row?.startDate || '?'} to ${enrollmentEnd}`;
+    }
     qs('onHold_startDate').value = String(row?.startDate || '').trim();
     qs('onHold_endDate').value = String(row?.endDate || '').trim() || orgTodayFallback();
     qs('onHold_startDate').min = String(row?.startDate || '').trim();
@@ -10007,8 +10963,7 @@
       onHoldModalCurrentRow = null;
       approvedOnHoldPayload = null;
       clearOnHoldEditMode();
-      const successTitle = editingHoldId ? 'On Hold Updated' : 'On Hold Applied';
-      await showMsg(successTitle, 'success', result.message || 'On-hold period saved.');
+      await showMsg('On Hold Saved', 'success', result.message || 'On-hold period saved.');
       await loadRows();
     } catch (error) {
       await showMsg('Save Failed', 'error', error.message || 'Unable to save on-hold period.');
@@ -10032,8 +10987,10 @@
   async function deleteOnHoldPeriod(holdId) {
     const hold = findOnHoldPeriodById(holdId);
     if (!hold) return;
-    const confirmed = window.confirm(
-      `Remove the on-hold period from ${hold.startDate} to ${hold.endDate}?\n\nSafe N/A markings from this hold will be reverted.`
+    const confirmed = await showConfirm(
+      `Remove the on-hold period from <b>${htmlEscape(String(hold.startDate || ''))}</b> to <b>${htmlEscape(String(hold.endDate || ''))}</b>?<br><br>Safe N/A markings from this hold will be reverted.`,
+      'Delete On-Hold Period',
+      { html: true, icon: 'warning', confirmText: 'Delete', confirmClass: 'btn-danger' }
     );
     if (!confirmed) return;
     const periodId = String(qs('onHold_periodId')?.value || '').trim();
@@ -10390,6 +11347,13 @@
       return;
     }
 
+    const undoCloseBtn = event.target.closest('.btn-row-undo-close');
+    if (undoCloseBtn) {
+      closeAllActionMenus();
+      openUndoCloseModal(undoCloseBtn.getAttribute('data-period-id'));
+      return;
+    }
+
     const reviewBtn = event.target.closest('.btn-row-review-draft');
     if (reviewBtn) {
       closeAllActionMenus();
@@ -10641,6 +11605,9 @@
   });
   qs('btn_confirmClosePeriod')?.addEventListener('click', submitClosePeriod);
   qs('btn_previewClosePeriod')?.addEventListener('click', previewClosePeriod);
+  qs('btn_confirmUndoClosePeriod')?.addEventListener('click', submitUndoClose);
+  qs('btn_previewUndoClosePeriod')?.addEventListener('click', () => previewUndoClose());
+  qs('undo_close_reason')?.addEventListener('input', syncUndoCloseConfirmState);
   qs('close_status')?.addEventListener('change', syncCloseModalUi);
   qs('close_endDate')?.addEventListener('input', syncCloseModalWithdrawnConfirmState);
   qs('close_reasonEnd')?.addEventListener('input', syncCloseModalWithdrawnConfirmState);
@@ -10697,6 +11664,93 @@
   gapBatchCollapse?.addEventListener('hide.bs.collapse', () => {
     qs('btn_gapBatchCollapseToggle')?.setAttribute('aria-expanded', 'false');
   });
+
+  document.addEventListener('contextmenu', (event) => {
+    const target = event.target.closest('.rolling-student-name-target');
+    if (!target) return;
+    event.preventDefault();
+    showRollingStudentContextMenu(event, {
+      studentId: String(target.dataset.studentId || '').trim(),
+      personId: String(target.dataset.personId || '').trim(),
+      studentLabel: String(target.dataset.studentLabel || '').trim()
+    });
+  });
+  document.addEventListener('click', (event) => {
+    const menu = qs('rollingStudentContextMenu');
+    if (!menu || menu.classList.contains('d-none')) return;
+    if (event.target.closest('#rollingStudentContextMenu')) return;
+    hideRollingStudentContextMenu();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') hideRollingStudentContextMenu();
+  });
+  document.addEventListener('scroll', hideRollingStudentContextMenu, true);
+  qs('rollingStudentContextMenuPhones')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentPhonesModal(rollingStudentContextState);
+  });
+  qs('rollingStudentContextMenuAddresses')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentAddressesModal(rollingStudentContextState);
+  });
+  qs('rollingStudentContextMenuClaimNumbers')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentClaimNumbersModal({
+      studentId: rollingStudentContextState.studentId,
+      studentLabel: rollingStudentContextState.studentLabel
+    });
+  });
+  qs('inp_claimNumber')?.addEventListener('change', () => {
+    handleClaimNumberSelectChange('inp_claimNumber', qs('inp_studentId')?.value, qs('inp_studentLabel')?.value);
+  });
+  qs('grp_claimNumber')?.addEventListener('change', () => {
+    handleClaimNumberSelectChange('grp_claimNumber', qs('grp_studentId')?.value, qs('grp_studentLabel')?.value);
+  });
+  qs('edit_claimNumber')?.addEventListener('change', () => {
+    const row = editModalCurrentRow;
+    const studentId = row ? resolveEnrollmentPeriodStudentId(row) : '';
+    const studentLabel = row ? String(row.studentLabel || '').trim() : '';
+    handleClaimNumberSelectChange('edit_claimNumber', studentId, studentLabel);
+  });
+  qs('btn_rollingClaimAdd')?.addEventListener('click', () => showRollingClaimEditor(null));
+  qs('btn_rollingClaimApplyEditor')?.addEventListener('click', applyRollingClaimEditor);
+  qs('btn_rollingClaimCancelEditor')?.addEventListener('click', hideRollingClaimEditor);
+  qs('btn_rollingClaimSave')?.addEventListener('click', async () => {
+    const preferred = String(qs('rollingClaim_number')?.value || rollingClaimContext.selectAfterSave || '').trim();
+    const saved = await saveRollingClaimNumbers(preferred);
+    if (saved !== null) rollingStudentClaimNumbersModal?.hide();
+  });
+  qs('rollingClaim_tbody')?.addEventListener('click', async (event) => {
+    const editBtn = event.target.closest('.btn-rolling-claim-edit');
+    const deleteBtn = event.target.closest('.btn-rolling-claim-delete');
+    if (editBtn) {
+      const id = String(editBtn.dataset.claimId || '').trim();
+      const entry = rollingClaimNumbers.find((row) => String(row.id) === id);
+      if (entry) showRollingClaimEditor(entry);
+      return;
+    }
+    if (deleteBtn) {
+      const id = String(deleteBtn.dataset.claimId || '').trim();
+      const entry = rollingClaimNumbers.find((row) => String(row.id) === id);
+      const label = String(entry?.number || 'this claim number').trim();
+      const confirmed = await showConfirm(`Remove claim number "${label}"?`, 'Remove Claim Number', { confirmClass: 'btn-danger' });
+      if (!confirmed) return;
+      rollingClaimNumbers = rollingClaimNumbers.filter((row) => String(row.id) !== id);
+      if (rollingClaimNumbers.length && !rollingClaimNumbers.some((row) => row.isPrimary)) {
+        rollingClaimNumbers[0].isPrimary = true;
+      }
+      hideRollingClaimEditor();
+      renderRollingClaimList();
+    }
+  });
+  rollingStudentClaimNumbersModalEl?.addEventListener('hidden.bs.modal', () => {
+    rollingClaimNumbers = [];
+    rollingClaimEditingId = '';
+    rollingClaimContext = { studentId: '', studentLabel: '', onSaved: null, selectAfterSave: '' };
+    hideRollingClaimEditor();
+    setRollingClaimAlert('');
+  });
+  syncRollingStudentContextMenuPermissions();
 
   resetChargeModalState();
   applyTargetSessionCountUi();

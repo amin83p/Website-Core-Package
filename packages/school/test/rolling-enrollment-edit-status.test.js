@@ -105,3 +105,10 @@ test('closeClassEnrollmentPeriod supports withdrawn close workflow', () => {
   assert.match(controllerSource, /closeClassEnrollmentPeriod\(periodId, \{\s*status: 'withdrawn'/);
   assert.match(controllerSource, /Enrollment marked as withdrawn/);
 });
+
+test('rolling enrollment view includes undo close workflow', () => {
+  assert.match(viewSource, /id="undoClosePeriodModal"/);
+  assert.match(viewSource, /btn-row-undo-close/);
+  assert.match(viewSource, /undo-close\/preview/);
+  assert.match(viewSource, /undo-close/);
+});

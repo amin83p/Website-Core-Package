@@ -21,6 +21,7 @@ if (!fsSync.existsSync(dataPath)) {
 const ACADEMIC_STATUSES = new Set(['Active', 'Probation', 'Graduated', 'Withdrawn', 'Archived']);
 const CLB_SKILLS = CLB_SKILL_CODES;
 const CLB_LEVEL_HISTORY_MAX = 100;
+const CLAIM_NUMBERS_MAX = 50;
 
 function isPlainObject(v) {
     return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -124,6 +125,37 @@ function cleanClbLevelHistory(value) {
     return cleaned;
 }
 
+function cleanClaimNumbers(value) {
+    if (value === undefined || value === null || value === '') return [];
+    if (!Array.isArray(value)) throw new Error('claimNumbers must be an array.');
+    if (value.length > CLAIM_NUMBERS_MAX) throw new Error('Too many claim numbers.');
+
+    const cleaned = value.map((entry, index) => {
+        if (!isPlainObject(entry)) throw new Error('Invalid claim number entry.');
+        const number = cleanString(entry.number, { max: 120, allowEmpty: false });
+        if (!number) throw new Error(`Claim number entry ${index + 1} requires a number.`);
+        const id = cleanId(entry.id, { max: 64, allowEmpty: true }) || `claim_${Date.now()}_${index}`;
+        return {
+            id,
+            number,
+            label: cleanString(entry.label, { max: 120, allowEmpty: true }),
+            notes: cleanString(entry.notes, { max: 500, allowEmpty: true }),
+            isPrimary: cleanBoolean(entry.isPrimary)
+        };
+    });
+
+    let primarySet = false;
+    cleaned.forEach((entry) => {
+        if (entry.isPrimary) {
+            if (primarySet) entry.isPrimary = false;
+            else primarySet = true;
+        }
+    });
+    if (!primarySet && cleaned.length === 1) cleaned[0].isPrimary = true;
+
+    return cleaned;
+}
+
 function sanitizeStudentInput(input, { isUpdate = false } = {}) {
     if (!isPlainObject(input)) throw new Error('Invalid student payload.');
 
@@ -162,7 +194,8 @@ function sanitizeStudentInput(input, { isUpdate = false } = {}) {
         academicStatus,
         notes: cleanString(input.notes, { max: 5000, allowEmpty: true }),
         attachments: cleanAttachments(input.attachments),
-        clbLevelHistory: cleanClbLevelHistory(input.clbLevelHistory)
+        clbLevelHistory: cleanClbLevelHistory(input.clbLevelHistory),
+        claimNumbers: cleanClaimNumbers(input.claimNumbers)
     };
 
     // Optional id on create
@@ -319,6 +352,8 @@ module.exports = {
     purgeStudent,
     sanitizeStudentInput,
     cleanClbLevelHistory,
+    cleanClaimNumbers,
+    CLAIM_NUMBERS_MAX,
     CLB_SKILLS,
     ACADEMIC_STATUSES: Object.freeze([...ACADEMIC_STATUSES]),
     FEE_CATEGORIES

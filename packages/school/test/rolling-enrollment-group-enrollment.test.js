@@ -234,6 +234,9 @@ test('rolling enrollment row actions include CLB entries manager', () => {
   assert.match(viewSource, /id="rollingStudentClbModal"/);
   assert.match(viewSource, /async function openRollingStudentClbModal\(/);
   assert.match(viewSource, /function prefillRollingClbCurrentFromLatest\(/);
+  assert.match(viewSource, /function renderRollingClbPreviousEntryHeadsUp\(/);
+  assert.match(viewSource, /id="rollingClb_previousEntryHeadsUp"/);
+  assert.match(viewSource, /rolling-clb-heads-up/);
   assert.match(viewSource, /latest\?\.result\?\.\[skill\]/);
   assert.match(viewSource, /\/school\/students\/api\/\$\{encodeURIComponent\(studentId\)\}\/clb-level-history/);
   assert.match(viewSource, /canEditStudentClb/);
@@ -251,6 +254,26 @@ test('rolling enrollment row actions include CLB entries manager', () => {
   assert.match(renderRowsFn, /const isVoid = status === 'void'/);
   assert.match(renderRowsFn, /btn-row-clb-entries/);
   assert.match(renderRowsFn, /btn-row-details/);
+});
+
+test('rolling enrollment student name supports context menu and claim number management', () => {
+  assert.match(viewSource, /id="rollingStudentContextMenu"/);
+  assert.match(viewSource, /rolling-student-name-target/);
+  assert.match(viewSource, /Manage Phone Numbers/);
+  assert.match(viewSource, /Manage Addresses/);
+  assert.match(viewSource, /Manage Claim Numbers/);
+  assert.match(viewSource, /id="rollingStudentClaimNumbersModal"/);
+  assert.match(viewSource, /async function openRollingStudentClaimNumbersModal\(/);
+  assert.match(viewSource, /function refreshClaimNumberSelect\(/);
+  assert.match(viewSource, /CLAIM_NUMBER_ADD_NEW/);
+  assert.match(viewSource, /readClaimNumberSelectValue\(/);
+  assert.match(viewSource, /\/school\/students\/api\/\$\{encodeURIComponent\(studentId\)\}\/claim-numbers/);
+  assert.match(viewSource, /personProfileEditModal/);
+  assert.match(viewSource, /focus: 'phones'/);
+  assert.match(viewSource, /focus: 'addresses'/);
+  assert.match(viewSource, /<select id="inp_claimNumber"/);
+  assert.match(viewSource, /<select id="grp_claimNumber"/);
+  assert.match(viewSource, /<select id="edit_claimNumber"/);
 });
 
 test('rolling enrollment student column shows gender above name and id below', () => {
