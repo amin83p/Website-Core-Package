@@ -7,6 +7,7 @@ const dataService = require('../services/dataService');
 // const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 // ✅ Import the Setting Service to handle cache refreshing
 const settingService = require('../services/settingService');
+const appPublicUrlService = require('../services/appPublicUrlService');
 const appBrandingService = require('../services/appBrandingService');
 const dataBackendRuntimeService = require('../services/dataBackendRuntimeService');
 const { registerCoreEntityQueryExecutors } = require('../models/queryExecutorBootstrap');
@@ -602,6 +603,15 @@ exports.updateAppSettings = async (req, res) => {
       throw new Error(timezoneParse.error);
     }
 
+    const publicSiteUrlParse = appPublicUrlService.normalizePublicSiteUrl(
+      Object.prototype.hasOwnProperty.call(body, 'publicSiteUrl')
+        ? body.publicSiteUrl
+        : (existingApp.publicSiteUrl || '')
+    );
+    if (publicSiteUrlParse.error) {
+      throw new Error(publicSiteUrlParse.error);
+    }
+
     const integrationVariables = hasIntegrationVariablesPayload
       ? integrationVariableModel.sanitizeIntegrationVariablesFromForm(body, existingApp.integrationVariables || [])
       : (Array.isArray(existingApp.integrationVariables) ? existingApp.integrationVariables : []);
@@ -615,6 +625,7 @@ exports.updateAppSettings = async (req, res) => {
         requestCacheMaxEntries: parseInt(req.body.requestCacheMaxEntries, 10),
         buildVersionOverride: cleanFormText(req.body.buildVersionOverride, 120),
         defaultTimezone: timezoneParse.timeZone,
+        publicSiteUrl: publicSiteUrlParse.url,
         // Save raw string exactly as typed (e.g., "uploads" or "/app/uploads")
         uploadsPath: req.body.uploadsPath,
         brand: {

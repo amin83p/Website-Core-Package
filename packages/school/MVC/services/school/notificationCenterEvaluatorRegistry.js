@@ -156,25 +156,51 @@ function getEvaluator(ruleType = '') {
   return EVALUATORS[key] || null;
 }
 
-async function buildBatchPreview({ recipientPersonId, items = [], rule = {} }) {
+async function buildBatchPreview({
+  recipientPersonId,
+  items = [],
+  rule = {},
+  orgId = '',
+  baseUrl = '',
+  orgTimeZone = 'UTC',
+  orgName = ''
+} = {}) {
   const name = await personDisplayNameService.resolvePersonDisplayName(recipientPersonId, {
     fallback: recipientPersonId
   });
   const sessionEntries = items
     .filter((item) => item?.payload?.session)
-    .map((item) => item.payload);
-  const listText = sessionEntries.length
-    ? sessionUncompletedNotificationService.buildSessionListText(sessionEntries, { baseUrl: '' })
-    : items.map((item) => `- ${item.title}`).join('\n');
-  const listHtml = sessionEntries.length
-    ? sessionUncompletedNotificationService.buildSessionListHtml(sessionEntries, { baseUrl: '' })
-    : `<ul>${items.map((item) => `<li>${item.title}</li>`).join('')}</ul>`;
+    .map((item) => ({
+      ...(item.payload && typeof item.payload === 'object' ? item.payload : {}),
+      title: item.title
+    }));
+  if (sessionEntries.length) {
+    const emailContent = await sessionUncompletedNotificationService.buildTeacherReviewEmailContent({
+      teacherName: name,
+      orgName,
+      entries: sessionEntries,
+      baseUrl,
+      orgId,
+      orgTimeZone
+    });
+    return {
+      recipientPersonId,
+      recipientName: name,
+      subject: `${rule.label || 'School reminder'} (${items.length} item(s))`,
+      plainText: emailContent.plainText,
+      htmlBody: emailContent.htmlBody,
+      smsText: `${rule.label || 'Reminder'}: ${items.length} item(s) need attention.`
+    };
+  }
+  const listText = items.map((item) => `- ${item.title}`).join('\n');
+  const listHtml = `<ul>${items.map((item) => `<li>${item.title}</li>`).join('')}</ul>`;
+  const intro = `You have ${items.length} item(s) that need your attention. Please review and complete them when you are ready.`;
   return {
     recipientPersonId,
     recipientName: name,
     subject: `${rule.label || 'School reminder'} (${items.length} item(s))`,
-    plainText: `Hello ${name},\n\n${listText}\n`,
-    htmlBody: `<p>Hello ${name},</p>${listHtml}`,
+    plainText: `Hi ${name},\n\n${intro}\n\n${listText}\n\nThank you,\n${orgName || 'School'}\n`,
+    htmlBody: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;"><p>Hi ${name},</p><p>${intro}</p>${listHtml}<p>Thank you,<br>${orgName || 'School'}</p></div>`,
     smsText: `${rule.label || 'Reminder'}: ${items.length} item(s) need attention.`
   };
 }

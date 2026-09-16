@@ -9,6 +9,7 @@ const sessionStatusPolicyService = require('../packages/school/MVC/services/scho
 const attendanceMatrixPolicyModel = require('../packages/school/MVC/models/school/attendanceMatrixPolicyModel');
 const classEnrollmentSessionApplicabilityService = require('../packages/school/MVC/services/school/classEnrollmentSessionApplicabilityService');
 const adminChekersService = require('../MVC/services/adminChekersService');
+const adminAuthorityService = require('../MVC/services/adminAuthorityService');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -89,10 +90,11 @@ test('attendance controller uses shared session edit guard with makeup policy ch
 test('attendance matrix view blocks makeup-required sessions in allowEdit and comment controls', () => {
   const source = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
   assert.match(source, /const makeupRequired = record\.applicability === 'makeup_required'/);
-  assert.match(source, /const allowEdit = canEdit && !outsideEnrollmentWindow && !makeupRequired && \(!locked \|\| canOverride\)/);
+  assert.match(source, /const allowEditBase = canEdit && !outsideEnrollmentWindow && !makeupRequired && \(!locked \|\| canOverride\)/);
+  assert.match(source, /allowTimingEdit/);
   assert.match(source, /cell_modal_makeup_notice/);
-  assert.match(source, /\['inp_newComment', 'inp_newCommentFile', 'btn_saveComment', 'btn_mentionUser'\]/);
-  assert.match(source, /if \(el\) el\.disabled = !allowEdit/);
+  assert.match(source, /\['inp_newComment', 'btn_saveComment', 'btn_mentionUser'\]/);
+  assert.match(source, /if \(el\) el\.disabled = !allowNotesEdit/);
   assert.match(source, /make-up session required/);
 });
 
@@ -150,26 +152,30 @@ test('updateAttendanceRosterCell rejects locked session without admin override',
   })));
 });
 
-test('updateAttendanceRosterCell allows locked session with admin override', async () => {
+test('updateAttendanceRosterCell saves when user has canOverrideSessionLock and session is editable', async () => {
   const originals = {
     getDataById: schoolDataService.getDataById,
     getClassSessions: schoolDataService.getClassSessions,
     saveClassSessions: schoolDataService.saveClassSessions,
+    getClassEnrollmentPeriodsByClassId: schoolDataService.getClassEnrollmentPeriodsByClassId,
     getStatusMap: sessionStatusPolicyService.getStatusMap,
     shouldForceNotApplicableAttendanceByMap: sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap,
     isAdminForRequestAsync: adminChekersService.isAdminForRequestAsync,
+    isAdminForRequestAsyncAuthority: adminAuthorityService.isAdminForRequestAsync,
     getPolicyForOrg: attendanceMatrixPolicyModel.getPolicyForOrg,
     recompute: classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass
   };
 
   schoolDataService.getDataById = async () => sampleClass;
   schoolDataService.getClassSessions = async () => ([
-    { sessionId: 'SES-1', date: '2026-06-01', status: 'completed', locked: true, roster: [] }
+    { sessionId: 'SES-1', date: '2026-06-01', status: 'completed', locked: false, roster: [] }
   ]);
   schoolDataService.saveClassSessions = async () => {};
+  schoolDataService.getClassEnrollmentPeriodsByClassId = async () => [];
   sessionStatusPolicyService.getStatusMap = async () => new Map();
   sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap = () => false;
   adminChekersService.isAdminForRequestAsync = async () => true;
+  adminAuthorityService.isAdminForRequestAsync = async () => true;
   attendanceMatrixPolicyModel.getPolicyForOrg = async () => ({});
   classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = async () => {};
 
@@ -191,9 +197,11 @@ test('updateAttendanceRosterCell allows locked session with admin override', asy
     schoolDataService.getDataById = originals.getDataById;
     schoolDataService.getClassSessions = originals.getClassSessions;
     schoolDataService.saveClassSessions = originals.saveClassSessions;
+    schoolDataService.getClassEnrollmentPeriodsByClassId = originals.getClassEnrollmentPeriodsByClassId;
     sessionStatusPolicyService.getStatusMap = originals.getStatusMap;
     sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap = originals.shouldForceNotApplicableAttendanceByMap;
     adminChekersService.isAdminForRequestAsync = originals.isAdminForRequestAsync;
+    adminAuthorityService.isAdminForRequestAsync = originals.isAdminForRequestAsyncAuthority;
     attendanceMatrixPolicyModel.getPolicyForOrg = originals.getPolicyForOrg;
     classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = originals.recompute;
   }

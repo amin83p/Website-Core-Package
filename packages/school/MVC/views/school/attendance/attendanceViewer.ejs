@@ -429,6 +429,7 @@
                     <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_lock_notice">This session is locked. Attendance cannot be changed unless an administrator unlocks it or overrides the lock.</p>
                     <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_makeup_notice">This session requires a make-up session. Attendance and roster notes cannot be changed here. Create or open the make-up session instead.</p>
                     <p class="text-secondary small mb-0 mt-2 d-none" id="cell_modal_enrollment_notice">This student was not enrolled for this session date. Attendance and roster details are read-only.</p>
+                    <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_enrollment_na_lock_notice">This attendance is N/A due to enrollment on-hold or an enrollment office session exemption. Status and late/early timing are locked unless you have attendance administrator access. Student notes and admin discussion may still be edited.</p>
                 </div>
 
                 <fieldset id="fieldset_cell_attendance" class="border-0 p-0 m-0 mb-4">
@@ -3300,19 +3301,52 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     const locked = record.sessionLocked === true;
     const makeupRequired = record.applicability === 'makeup_required';
     const outsideEnrollmentWindow = record.withinEnrollmentWindow === false;
+    const enrollmentNaLocked = record.enrollmentNaLock === true
+        && record.status === 'not_applicable';
     const canEdit = window.CAN_EDIT_ATTENDANCE_ROSTER === true;
     const canUploadFiles = window.CAN_UPLOAD_ATTENDANCE_FILES === true;
     const canOverride = window.CAN_OVERRIDE_SESSION_LOCK === true;
-    const allowEdit = canEdit && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
+    const allowEditBase = canEdit && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
+    const allowStatusEdit = allowEditBase && (!enrollmentNaLocked || canOverride);
+    const allowTimingEdit = allowEditBase && (!enrollmentNaLocked || canOverride);
+    const allowNotesEdit = allowEditBase;
+    const allowSaveAttendance = allowStatusEdit || (enrollmentNaLocked && allowNotesEdit);
     const allowUpload = canUploadFiles && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
     const fs = document.getElementById('fieldset_cell_attendance');
-    if (fs) fs.disabled = !allowEdit;
+    if (!allowEditBase) {
+        if (fs) fs.disabled = true;
+    }
+    document.querySelectorAll('.modal-att-option').forEach((el) => {
+        el.disabled = !allowStatusEdit;
+    });
+    document.querySelectorAll('.modal-att-option + label').forEach((el) => {
+        if (allowStatusEdit) el.classList.remove('disabled');
+        else el.classList.add('disabled');
+    });
+    ['inp_cellLateMins', 'inp_cellLeaveMins'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !allowTimingEdit;
+    });
+    ['btn_cellLateExcused', 'btn_cellEarlyLeaveExcused', 'btn_cellAbsenceExcused', 'inp_cellAbsenceExcused'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !allowTimingEdit;
+    });
+    const rosterStudentNoteEl = document.getElementById('inp_rosterStudentNote');
+    if (rosterStudentNoteEl) rosterStudentNoteEl.disabled = !allowNotesEdit;
     const lockNotice = document.getElementById('cell_modal_lock_notice');
     const makeupNotice = document.getElementById('cell_modal_makeup_notice');
     const enrollmentNotice = document.getElementById('cell_modal_enrollment_notice');
+    const enrollmentNaLockNotice = document.getElementById('cell_modal_enrollment_na_lock_notice');
     if (enrollmentNotice) {
         if (outsideEnrollmentWindow) enrollmentNotice.classList.remove('d-none');
         else enrollmentNotice.classList.add('d-none');
+    }
+    if (enrollmentNaLockNotice) {
+        if (enrollmentNaLocked && !canOverride && canEdit && !makeupRequired && !outsideEnrollmentWindow) {
+            enrollmentNaLockNotice.classList.remove('d-none');
+        } else {
+            enrollmentNaLockNotice.classList.add('d-none');
+        }
     }
     if (makeupNotice) {
         if (makeupRequired && canEdit) makeupNotice.classList.remove('d-none');
@@ -3322,11 +3356,11 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     else lockNotice.classList.add('d-none');
     const saveAttBtn = document.getElementById('btn_saveAttendance');
     if (saveAttBtn) {
-        saveAttBtn.disabled = !allowEdit;
+        saveAttBtn.disabled = !allowSaveAttendance;
     }
     ['inp_newComment', 'btn_saveComment', 'btn_mentionUser'].forEach((id) => {
         const el = document.getElementById(id);
-        if (el) el.disabled = !allowEdit;
+        if (el) el.disabled = !allowNotesEdit;
     });
     ['inp_cellExcuseFile', 'inp_newCommentFile'].forEach((id) => {
         const el = document.getElementById(id);

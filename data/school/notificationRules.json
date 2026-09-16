@@ -1,0 +1,58 @@
+[
+  {
+    "orgId": "900000",
+    "label": "Uncompleted sessions",
+    "ruleType": "session_not_final",
+    "enabled": false,
+    "legacyKey": "legacy_session_not_final",
+    "criteria": {
+      "sessionDateRange": {
+        "type": "this_week",
+        "daysBeforeToday": null
+      },
+      "includeLockedSessions": false
+    },
+    "channels": {
+      "email": {
+        "enabled": true,
+        "sendWhen": "daily_all",
+        "prepareAtTime": "23:25",
+        "sendAtTime": "12:11",
+        "sessionDateRange": {
+          "type": "this_week",
+          "daysBeforeToday": null
+        },
+        "emailTemplateId": "194456",
+        "emailTemplateName": "",
+        "smsTemplateId": "",
+        "smsTemplateName": ""
+      },
+      "sms": {
+        "enabled": false,
+        "sendWhen": "daily_all",
+        "prepareAtTime": "23:46",
+        "sendAtTime": "07:00",
+        "sessionDateRange": {
+          "type": "this_week",
+          "daysBeforeToday": null
+        },
+        "emailTemplateId": "",
+        "emailTemplateName": "",
+        "smsTemplateId": "",
+        "smsTemplateName": ""
+      }
+    },
+    "schedule": {
+      "timezone": "",
+      "autoQueueOnSchedule": true
+    },
+    "alsoCreateTask": false,
+    "id": "SNCR-1789526891819-5666",
+    "audit": {
+      "createDateTime": "2026-09-16T02:48:11.819Z",
+      "createUserId": "legacy-sync",
+      "lastUpdateDateTime": "2026-09-16T05:04:17.128Z",
+      "lastUpdateUserId": "legacy-sync"
+    }
+  }
+]

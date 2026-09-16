@@ -624,6 +624,14 @@
             </div>
 
             <div class="mb-4">
+                <label class="form-label fw-bold" for="publicSiteUrl">Public website URL</label>
+                <input type="url" id="publicSiteUrl" name="publicSiteUrl" class="form-control font-monospace"
+                  value="<%= settings.app.publicSiteUrl || '' %>"
+                  placeholder="https://school.example.com">
+                <div class="form-text">Used for absolute links in outbound emails (Notification Centre, session reminders). Leave blank to infer from the current request when available.</div>
+            </div>
+
+            <div class="mb-4">
                 <label class="form-label fw-bold">Default Page Size</label>
                 <div class="input-group">
                     <input type="number" name="defaultPageSize" class="form-control" value="<%= settings.app.defaultPageSize %>" min="5" max="100">

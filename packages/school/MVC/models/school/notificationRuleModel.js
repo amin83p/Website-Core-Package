@@ -12,6 +12,24 @@ if (!fsSync.existsSync(dataPath)) {
   fsSync.writeFileSync(dataPath, '[]');
 }
 
+const SESSION_DATE_RANGE_TYPES = Object.freeze([
+  'this_week',
+  'two_weeks',
+  'this_month',
+  'days_before_today',
+  'timesheet_period'
+]);
+
+function formatNotificationTokenLabel(value) {
+  const text = cleanString(value, { max: 200, allowEmpty: true });
+  if (!text) return '';
+  return text
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 const NOTIFICATION_RULE_TYPES = Object.freeze([
   'session_not_final',
   'session_attendance_incomplete',
@@ -128,7 +146,7 @@ function sanitizeRuleInput(input, { isUpdate = false } = {}) {
     channels: normalizeChannels(input.channels),
     schedule: {
       timezone: cleanString(input.schedule?.timezone, { max: 80, allowEmpty: true }),
-      autoQueueOnSchedule: normalizeBoolean(input.schedule?.autoQueueOnSchedule, true)
+      autoQueueOnSchedule: normalizeBoolean(input.schedule?.autoQueueOnSchedule, false)
     },
     alsoCreateTask: normalizeBoolean(input.alsoCreateTask, false)
   };
@@ -225,6 +243,8 @@ async function listNotificationRulesByOrg(orgId) {
 
 module.exports = {
   NOTIFICATION_RULE_TYPES,
+  SESSION_DATE_RANGE_TYPES,
+  formatNotificationTokenLabel,
   LEGACY_SESSION_RULE_KEY,
   sanitizeRuleInput,
   normalizeChannels,

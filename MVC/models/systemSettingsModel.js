@@ -127,6 +127,7 @@ const DEFAULTS = {
     requestCacheMaxEntries: 500,
     buildVersionOverride: '',
     defaultTimezone: 'UTC',
+    publicSiteUrl: '',
     uploadsPath: 'uploads', // Store as string, resolve at runtime
     uploadFolders: uploadFolderSettingsService.getDefaultUploadFolders(),
     brand: DEFAULT_APP_BRAND,

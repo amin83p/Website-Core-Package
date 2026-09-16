@@ -100,7 +100,7 @@ async function queueChannelForBatch({
 
   const outboxService = channelName === 'email' ? emailOutboxService : smsOutboxService;
   const to = channelName === 'email'
-    ? cleanText(teacher?.email || teacher?.contactEmail)
+    ? cleanText(schoolPersonAccessService.readPersonEmail(teacher || {}))
     : cleanText(teacher?.mobile || teacher?.phone);
   if (!to) return { queued: 0, skipped: 1 };
 

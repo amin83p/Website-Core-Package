@@ -22,7 +22,11 @@ Consult this document when:
 - [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-2026-09-05.md)
 - [attendance-operation-scope-capabilities-2026-09-06.md](attendance-operation-scope-capabilities-2026-09-06.md)
 
-**Status:** Promoted with School Notification Centre MVP (rules, runs, preview, dispatch).
+**Status:** Manual workflow (no background prepare/dispatch tasks). Operators run rules, review findings, and schedule email only.
+
+**Navigation:** Primary entry is the **School dashboard** tile (`/school` → Notification Centre, grouped beside Reports). Package catalog nests section **445586** under **SCHOOL_REPORTS**. List UI follows [list-page-development-guide.md](../../packages/school/docs/list-page-development-guide.md) (Skills baseline).
+
+**Automation:** Notification Centre does **not** register active scheduled prepare/dispatch tasks. Legacy `school.notificationCenter` task definitions are disabled when rules are saved or the centre home loads.
 
 ---
 
@@ -30,10 +34,11 @@ Consult this document when:
 
 | Page / Where | What user can do and see |
 | --- | --- |
-| **Notification Centre** (`/school/notification-center`) | List rules, run history, trigger on-demand evaluation (preview). |
-| **Rule editor** (`/school/notification-center/rules/:id`) | Configure criteria, channels, schedule (**CONFIGURE**). |
-| **Run detail** (`/school/notification-center/runs/:id`) | Recipient batches, consolidated previews (**READ_ALL**). |
-| **Dispatch** (API) | Queue approved email/SMS for selected batches (**UPLOAD**). |
+| **Notification Centre** (`/school/notification-center`) | List rules, recent preview runs, link to scheduled emails. |
+| **Rule editor** (`/school/notification-center/rules/:id`) | Configure rule type, criteria, and whether email compose is allowed (**CONFIGURE**). |
+| **Run review** (`/school/notification-center/runs/:id`) | Teacher → class → session tree; select sessions; open compose (**READ_ALL**). |
+| **Compose / schedule** (`/school/notification-center/runs/:id/compose`) | Edit generated subject/body; set send datetime; queue to core email outbox (**UPLOAD**). |
+| **Scheduled emails** (`/school/notification-center/outbox`) | List NC outbox rows; cancel queued; delete cancelled/failed (**READ_ALL** / **UPLOAD** / **DELETE**). |
 
 ---
 
@@ -72,12 +77,18 @@ Consult this document when:
 | UPDATE | OWNER | No Access. |
 | UPDATE | DEPARTMENT / DIVISION / ORGANIZATION / ADMIN | Trigger on-demand evaluation (“Run now”, preview runs). |
 
-### UPLOAD (dispatch)
+### UPLOAD (schedule email)
 
 | Operation | Scope | What user can do and see |
 | --- | --- | --- |
 | UPLOAD | USER / OWNER / DEPARTMENT / DIVISION | No Access. |
-| UPLOAD | ORGANIZATION / ADMIN | Queue email/SMS for approved batches from a preview run. |
+| UPLOAD | ORGANIZATION / ADMIN | Compose and schedule email for selected sessions from a preview run; cancel queued NC outbox entries. |
+
+### DELETE (outbox cleanup)
+
+| Operation | Scope | What user can do and see |
+| --- | --- | --- |
+| DELETE | ORGANIZATION / ADMIN | Delete cancelled or failed NC outbox rows (not queued/sending). |
 
 ---
 

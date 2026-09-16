@@ -1,47 +1,716 @@
-<div class="container py-3">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+<%
+
+  const tree = presentationTree && presentationTree.teachers ? presentationTree : { teachers: [] };
+
+  const fmt = typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel : (v) => String(v || '');
+
+  const teachers = tree.teachers || [];
+
+%>
+
+
+
+<style>
+
+  .nc-run-review .nc-teacher-accordion .accordion-button {
+
+    background: linear-gradient(90deg, rgba(var(--bs-primary-rgb), 0.08), transparent);
+
+    border-left: 4px solid var(--bs-primary);
+
+    font-weight: 600;
+
+    padding-top: 0.85rem;
+
+    padding-bottom: 0.85rem;
+
+  }
+
+  .nc-run-review .nc-teacher-accordion .accordion-button:not(.collapsed) {
+
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+
+  }
+
+  .nc-run-review .nc-ribbon-meta {
+
+    font-size: 0.8125rem;
+
+    font-weight: 500;
+
+  }
+
+  .nc-run-review .nc-matrix-table thead th {
+
+    position: sticky;
+
+    top: 0;
+
+    z-index: 2;
+
+    background: var(--bs-light);
+
+    font-size: 0.75rem;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.04em;
+
+  }
+
+  .nc-run-review .nc-matrix-table tbody tr:nth-child(even) {
+
+    background: rgba(0, 0, 0, 0.02);
+
+  }
+
+  .nc-run-review .nc-class-cell {
+
+    background: rgba(var(--bs-secondary-rgb), 0.06);
+
+    vertical-align: top;
+
+    min-width: 9rem;
+
+    max-width: 12rem;
+
+  }
+
+  .nc-run-review .nc-days-badge--warn {
+
+    background: var(--bs-warning);
+
+    color: var(--bs-dark);
+
+  }
+
+  .nc-run-review .nc-status-pill {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 0.35rem;
+
+    font-size: 0.8125rem;
+
+  }
+
+  .nc-run-review .nc-teacher-actions {
+
+    flex-shrink: 0;
+
+  }
+
+</style>
+
+
+
+<div class="sections-page nc-run-review">
+
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+
     <div>
-      <h1 class="h4 mb-1"><%= title %></h1>
-      <div class="text-muted small">Status: <strong><%= run.status %></strong> · <%= run.findingCount || 0 %> finding(s) · <%= run.batchCount || 0 %> batch(es)</div>
+
+      <h1 class="page-heading size-md m-0"><i class="bi bi-clipboard-check me-2"></i><%= title %></h1>
+
+      <div class="small text-muted mt-1">
+
+        Status: <strong><%= fmt(run.status) %></strong>
+
+        · <%= run.findingCount || 0 %> finding(s)
+
+        · <%= run.batchCount || 0 %> teacher(s)
+
+        · As of <%= presentationTree.asOfDate || run.asOfDate || '' %>
+
+      </div>
+
     </div>
-    <div class="d-flex gap-2">
-      <a href="/school/notification-center" class="btn btn-outline-secondary btn-sm">Back</a>
-      <% if (access?.canDispatch && run.status === 'preview') { %>
-        <form method="post" action="/school/notification-center/runs/<%= run.id %>/dispatch">
-          <button type="submit" class="btn btn-primary btn-sm">Queue email/SMS</button>
-        </form>
+
+    <div class="d-flex gap-2 flex-wrap">
+
+      <a href="/school/notification-center" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back to List</a>
+
+      <% if (access?.canDispatch && rule?.channels?.email?.enabled !== false) { %>
+
+        <a href="/school/notification-center/outbox" class="btn btn-outline-primary btn-sm"><i class="bi bi-envelope-paper me-1"></i> Scheduled emails</a>
+
       <% } %>
+
     </div>
+
   </div>
 
-  <div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Recipient</th>
-            <th>Items</th>
-            <th>Preview</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% (run.batches || []).forEach((batch) => { %>
-            <tr>
-              <td class="fw-semibold"><%= batch.recipientName || batch.recipientPersonId %></td>
-              <td><%= batch.itemCount || 0 %></td>
-              <td>
-                <details>
-                  <summary class="text-primary" style="cursor:pointer">View</summary>
-                  <pre class="small mt-2 mb-0"><%= batch.preview?.plainText || '' %></pre>
-                </details>
-              </td>
-            </tr>
-          <% }); %>
-          <% if (!(run.batches || []).length) { %>
-            <tr><td colspan="3" class="text-center text-muted py-4">No recipient batches in this run.</td></tr>
-          <% } %>
-        </tbody>
-      </table>
+
+
+  <% if (!teachers.length) { %>
+
+    <div class="alert alert-light border">No matching items were found for this run.</div>
+
+  <% } else { %>
+
+    <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="ncSelectAllBtn"><i class="bi bi-check2-square me-1"></i> Select all</button>
+
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="ncClearSelectionBtn"><i class="bi bi-x-lg me-1"></i> Clear</button>
+
+      <span class="small text-muted" id="ncSelectionCount">0 session(s) selected</span>
+
     </div>
-  </div>
+
+
+
+    <div class="accordion nc-teacher-accordion" id="ncTeacherAccordion">
+
+      <% teachers.forEach((teacher, teacherIndex) => {
+
+        const collapseId = 'ncTeacherCollapse' + teacherIndex;
+
+        const headingId = 'ncTeacherHeading' + teacherIndex;
+
+        const isFirst = teacherIndex === 0;
+
+      %>
+
+        <div class="accordion-item border-0 shadow-sm mb-3 nc-teacher-block" data-teacher-id="<%= teacher.personId %>">
+
+          <h2 class="accordion-header" id="<%= headingId %>">
+
+            <button class="accordion-button <%= isFirst ? '' : 'collapsed' %> py-3" type="button"
+
+              data-bs-toggle="collapse"
+
+              data-bs-target="#<%= collapseId %>"
+
+              aria-expanded="<%= isFirst ? 'true' : 'false' %>"
+
+              aria-controls="<%= collapseId %>">
+
+              <span class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2 pe-2">
+
+                <span>
+
+                  <i class="bi bi-person-workspace me-2 text-primary"></i><%= teacher.name %>
+
+                  <span class="badge bg-light text-dark border ms-2"><%= teacher.sessionCount %> session(s)</span>
+
+                  <span class="badge bg-primary-subtle text-primary border ms-1 nc-teacher-selected-badge" data-teacher-id="<%= teacher.personId %>">0 selected</span>
+
+                </span>
+
+                <span class="nc-ribbon-meta text-muted d-none d-md-inline">Expand to review classes and sessions</span>
+
+              </span>
+
+            </button>
+
+          </h2>
+
+          <div id="<%= collapseId %>" class="accordion-collapse collapse <%= isFirst ? 'show' : '' %>" aria-labelledby="<%= headingId %>" data-bs-parent="#ncTeacherAccordion">
+
+            <div class="accordion-body p-0">
+
+              <% if (access?.canDispatch && rule?.channels?.email?.enabled !== false) { %>
+
+                <div class="px-3 py-2 border-bottom bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+
+                  <button type="button" class="btn btn-link btn-sm p-0 nc-select-teacher-btn" data-teacher-id="<%= teacher.personId %>">Select all for this teacher</button>
+
+                  <div class="nc-teacher-actions">
+
+                    <button type="button" class="btn btn-primary btn-sm nc-compose-teacher-btn" data-teacher-id="<%= teacher.personId %>">
+
+                      <i class="bi bi-envelope-plus me-1"></i> Schedule email for selection
+
+                    </button>
+
+                  </div>
+
+                </div>
+
+              <% } %>
+
+              <div class="table-responsive">
+
+                <table class="table table-hover align-middle mb-0 nc-matrix-table">
+
+                  <thead>
+
+                    <tr>
+
+                      <th class="ps-3" style="width: 2.5rem;"></th>
+
+                      <th>Class</th>
+
+                      <th>Session</th>
+
+                      <th>Date and time</th>
+
+                      <th>Status</th>
+
+                      <th>Days passed</th>
+
+                      <th class="text-end pe-3">Link</th>
+
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    <% (teacher.classes || []).forEach((cls) => {
+
+                      const sessions = cls.sessions || [];
+
+                      const rowSpan = sessions.length || 1;
+
+                      sessions.forEach((session, sessionIndex) => { %>
+
+                        <tr>
+
+                          <td class="ps-3">
+
+                            <input type="checkbox" class="form-check-input nc-session-checkbox"
+
+                              value="<%= session.selectionKey %>"
+
+                              data-teacher-id="<%= teacher.personId %>">
+
+                          </td>
+
+                          <% if (sessionIndex === 0) { %>
+
+                            <td class="nc-class-cell fw-semibold" rowspan="<%= rowSpan %>">
+
+                              <i class="bi bi-easel2 me-1 text-secondary"></i><%= cls.classTitle %>
+
+                            </td>
+
+                          <% } %>
+
+                          <td class="fw-semibold text-dark"><%= session.title %></td>
+
+                          <td>
+
+                            <div><%= session.sessionDate || '—' %></div>
+
+                            <% if (session.sessionTime) { %><div class="small text-muted"><%= session.sessionTime %></div><% } %>
+
+                          </td>
+
+                          <td>
+
+                            <span class="nc-status-pill">
+
+                              <% if (session.statusIsFinal) { %>
+
+                                <i class="bi bi-check-circle-fill text-success" title="<%= session.statusLabel %>"></i>
+
+                              <% } else { %>
+
+                                <i class="bi bi-exclamation-triangle-fill text-warning" title="<%= session.statusLabel %>"></i>
+
+                              <% } %>
+
+                              <span class="badge bg-light text-dark border"><%= session.statusLabel || fmt(session.statusCode) %></span>
+
+                            </span>
+
+                          </td>
+
+                          <td>
+
+                            <% const daysNum = session.daysPassed;
+
+                              const daysLabel = session.daysPassedLabel || '—';
+
+                              const warnDays = typeof daysNum === 'number' && daysNum >= 3;
+
+                            %>
+
+                            <span class="badge <%= warnDays ? 'nc-days-badge--warn' : 'bg-secondary-subtle text-secondary border' %>"><%= daysLabel %></span>
+
+                          </td>
+
+                          <td class="text-end pe-3">
+
+                            <% if (session.href) { %>
+
+                              <a href="<%= session.href %>" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">Open</a>
+
+                            <% } else { %>—<% } %>
+
+                          </td>
+
+                        </tr>
+
+                      <% });
+                    }); %>
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      <% }); %>
+
+    </div>
+
+  <% } %>
+
 </div>
+
+
+
+<% if (access?.canDispatch && rule?.channels?.email?.enabled !== false) { %>
+  <%- include('partials/composeEmailModal') %>
+<% } %>
+
+
+
+<script>
+
+document.addEventListener('DOMContentLoaded', () => {
+
+  const runId = <%- JSON.stringify(run.id) %>;
+
+  const actionStateId = <%- JSON.stringify(actionStateId || '') %>;
+
+  const composeModalEl = document.getElementById('ncScheduleEmailModal');
+
+  const composeModal = composeModalEl && window.bootstrap?.Modal ? window.bootstrap.Modal.getOrCreateInstance(composeModalEl) : null;
+
+  const composeForm = document.getElementById('ncScheduleEmailForm');
+
+  const composeLoading = document.getElementById('ncComposeLoading');
+
+  const composeError = document.getElementById('ncComposeError');
+
+  const composeSubmit = document.getElementById('ncScheduleEmailSubmit');
+
+  const previewFrame = document.getElementById('ncComposePreviewFrame');
+
+  function setComposePreviewHtml(html) {
+
+    if (!previewFrame) return;
+
+    previewFrame.srcdoc = String(html || '');
+
+  }
+
+  function resetComposeModal() {
+
+    composeError?.classList.add('d-none');
+
+    composeError.textContent = '';
+
+    composeForm?.classList.add('d-none');
+
+    composeLoading?.classList.remove('d-none');
+
+    composeSubmit.disabled = true;
+
+    setComposePreviewHtml('');
+
+  }
+
+  async function openScheduleEmailModal(teacherId, selectionKeys) {
+
+    if (!composeModal) {
+
+      window.location.href = `/school/notification-center/runs/${encodeURIComponent(runId)}/compose?recipientPersonId=${encodeURIComponent(teacherId)}&${selectionKeys.map((k) => `selectionKeys=${encodeURIComponent(k)}`).join('&')}`;
+
+      return;
+
+    }
+
+    resetComposeModal();
+
+    composeModal.show();
+
+    const params = new URLSearchParams();
+
+    params.set('recipientPersonId', teacherId);
+
+    selectionKeys.forEach((k) => params.append('selectionKeys', k));
+
+    try {
+
+      const response = await fetch(`/school/notification-center/runs/${encodeURIComponent(runId)}/compose?${params.toString()}`, {
+
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || payload.status !== 'ok') {
+
+        throw new Error(payload.message || 'Could not load email preview.');
+
+      }
+
+      const preview = payload.preview || {};
+
+      document.getElementById('ncComposeRecipientId').value = payload.recipientPersonId || teacherId;
+
+      const keysHost = document.getElementById('ncComposeSelectionKeys');
+
+      keysHost.innerHTML = '';
+
+      (payload.selectionKeys || selectionKeys).forEach((key) => {
+
+        const input = document.createElement('input');
+
+        input.type = 'hidden';
+
+        input.name = 'selectionKeys';
+
+        input.value = key;
+
+        keysHost.appendChild(input);
+
+      });
+
+      document.getElementById('ncComposeSubject').value = preview.subject || '';
+
+      document.getElementById('ncComposeBodyText').value = preview.plainText || '';
+
+      document.getElementById('ncComposeBodyHtml').value = preview.htmlBody || '';
+
+      document.getElementById('ncComposeSendAt').value = payload.defaultSendAtLocal || '';
+
+      document.getElementById('ncComposeTimeZoneHint').textContent = payload.timeZone
+
+        ? `Organization timezone: ${payload.timeZone}`
+
+        : '';
+
+      document.getElementById('ncComposeMeta').innerHTML = `<i class="bi bi-person-lines-fill me-1 text-primary"></i>To: <strong>${preview.recipientName || payload.recipientPersonId || teacherId}</strong> <span class="text-muted mx-1">·</span> <i class="bi bi-list-check me-1"></i>${(payload.selectionKeys || selectionKeys).length} session(s) selected`;
+
+      setComposePreviewHtml(preview.htmlBody || '');
+
+      composeLoading?.classList.add('d-none');
+
+      composeForm?.classList.remove('d-none');
+
+      composeSubmit.disabled = false;
+
+    } catch (error) {
+
+      composeLoading?.classList.add('d-none');
+
+      composeError.textContent = error.message || 'Could not load email preview.';
+
+      composeError.classList.remove('d-none');
+
+    }
+
+  }
+
+  composeSubmit?.addEventListener('click', async () => {
+
+    if (!composeForm || composeSubmit.disabled) return;
+
+    composeSubmit.disabled = true;
+
+    composeError?.classList.add('d-none');
+
+    const formData = new FormData(composeForm);
+
+    if (actionStateId && !formData.get('actionStateId')) formData.set('actionStateId', actionStateId);
+
+    const params = new URLSearchParams();
+
+    formData.forEach((value, key) => {
+
+      params.append(key, String(value ?? ''));
+
+    });
+
+    try {
+
+      const response = await fetch(`/school/notification-center/runs/${encodeURIComponent(runId)}/schedule-email`, {
+
+        method: 'POST',
+
+        headers: {
+
+          Accept: 'application/json',
+
+          'X-AJAX-Request': 'true',
+
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+
+        },
+
+        body: params.toString()
+
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || payload.status !== 'ok') {
+
+        throw new Error(payload.message || 'Could not schedule email.');
+
+      }
+
+      composeModal.hide();
+
+      window.showMessageModal?.({
+
+        title: 'Email scheduled',
+
+        icon: 'success',
+
+        message: 'The message was added to the scheduled outbox. <a href="/school/notification-center/outbox?scheduled=1">View scheduled emails</a>.',
+
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+
+      });
+
+    } catch (error) {
+
+      composeError.textContent = error.message || 'Could not schedule email.';
+
+      composeError.classList.remove('d-none');
+
+      composeSubmit.disabled = false;
+
+    }
+
+  });
+
+  document.getElementById('ncComposePreviewTab')?.addEventListener('shown.bs.tab', () => {
+
+    const html = document.getElementById('ncComposeBodyHtml')?.value || '';
+
+    setComposePreviewHtml(html);
+
+  });
+
+  const checkboxes = Array.from(document.querySelectorAll('.nc-session-checkbox'));
+
+  const countEl = document.getElementById('ncSelectionCount');
+
+
+
+  function updateCount() {
+
+    const total = checkboxes.filter((b) => b.checked).length;
+
+    if (countEl) countEl.textContent = `${total} session(s) selected`;
+
+    document.querySelectorAll('.nc-teacher-selected-badge').forEach((badge) => {
+
+      const teacherId = String(badge.getAttribute('data-teacher-id') || '');
+
+      const n = checkboxes.filter((b) => b.checked && String(b.getAttribute('data-teacher-id')) === teacherId).length;
+
+      badge.textContent = `${n} selected`;
+
+    });
+
+  }
+
+
+
+  checkboxes.forEach((box) => box.addEventListener('change', updateCount));
+
+  document.getElementById('ncSelectAllBtn')?.addEventListener('click', () => {
+
+    checkboxes.forEach((b) => { b.checked = true; });
+
+    updateCount();
+
+  });
+
+  document.getElementById('ncClearSelectionBtn')?.addEventListener('click', () => {
+
+    checkboxes.forEach((b) => { b.checked = false; });
+
+    updateCount();
+
+  });
+
+  document.querySelectorAll('.nc-select-teacher-btn').forEach((btn) => {
+
+    btn.addEventListener('click', (e) => {
+
+      e.preventDefault();
+
+      const teacherId = String(btn.getAttribute('data-teacher-id') || '');
+
+      checkboxes.forEach((b) => {
+
+        if (String(b.getAttribute('data-teacher-id')) === teacherId) b.checked = true;
+
+      });
+
+      updateCount();
+
+    });
+
+  });
+
+
+
+  document.querySelectorAll('.nc-compose-teacher-btn').forEach((btn) => {
+
+    btn.addEventListener('click', (e) => {
+
+      e.stopPropagation();
+
+      const teacherId = String(btn.getAttribute('data-teacher-id') || '');
+
+      const keys = checkboxes
+
+        .filter((b) => b.checked && String(b.getAttribute('data-teacher-id')) === teacherId)
+
+        .map((b) => String(b.value || ''))
+
+        .filter(Boolean);
+
+      if (!keys.length) {
+
+        window.showMessageModal?.({
+
+          title: 'No sessions selected',
+
+          icon: 'warning',
+
+          message: 'Select one or more sessions for this teacher before scheduling email.',
+
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+
+        });
+
+        return;
+
+      }
+
+      openScheduleEmailModal(teacherId, keys);
+
+    });
+
+  });
+
+
+
+  updateCount();
+
+});
+
+</script>
+
+

@@ -1,0 +1,50 @@
+<%
+  const fmt = typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel : (v) => String(v || '');
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-envelope-plus me-2"></i><%= title %></h1>
+      <div class="small text-muted mt-1">To: <strong><%= preview.recipientName || recipientPersonId %></strong> · <%= selectionKeys.length %> session(s)</div>
+    </div>
+    <a href="/school/notification-center/runs/<%= run.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back to run</a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 900px;">
+    <form method="post" action="/school/notification-center/runs/<%= run.id %>/schedule-email">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="recipientPersonId" value="<%= recipientPersonId %>">
+      <% (selectionKeys || []).forEach((key) => { %>
+        <input type="hidden" name="selectionKeys" value="<%= key %>">
+      <% }); %>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-bold" for="ncSubject">Subject</label>
+              <input class="form-control size-md" id="ncSubject" name="subject" value="<%= preview.subject || '' %>" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold" for="ncBodyText">Email body</label>
+              <textarea class="form-control size-md font-monospace" id="ncBodyText" name="bodyText" rows="14" required><%= preview.plainText || '' %></textarea>
+              <textarea class="d-none" name="bodyHtml" id="ncBodyHtml" aria-hidden="true"><%- preview.htmlBody || '' %></textarea>
+              <div class="form-text small">Plain-text version shown for editing; HTML with clickable session links is sent when you schedule.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="ncSendAtLocal">Send at</label>
+              <input class="form-control size-md" type="datetime-local" id="ncSendAtLocal" name="sendAtLocal" value="<%= defaultSendAtLocal || '' %>" required>
+              <div class="form-text small">Organization timezone: <%= timeZone || 'UTC' %></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-calendar-check me-1"></i> Add to scheduled outbox</button>
+        <a href="/school/notification-center/runs/<%= run.id %>" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>

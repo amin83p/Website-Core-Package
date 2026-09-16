@@ -267,6 +267,26 @@ const emailOutboxService = {
     return emailOutboxRepository.list({ ...options, query });
   },
 
+  async listByMetaSource(orgId, source = '', query = {}, options = {}) {
+    const orgKey = cleanText(orgId);
+    const sourceKey = cleanText(source);
+    if (!orgKey || !sourceKey) return [];
+    const rows = await emailOutboxRepository.list({
+      ...options,
+      query: {
+        orgId__eq: orgKey,
+        page: 1,
+        limit: 500,
+        sortBy: 'sendAt',
+        sortDir: 'desc',
+        ...(query && typeof query === 'object' ? query : {})
+      }
+    });
+    return (Array.isArray(rows) ? rows : []).filter(
+      (row) => cleanText(row?.meta?.source) === sourceKey
+    );
+  },
+
   async countEntries(query = {}, options = {}) {
     return emailOutboxRepository.count({ ...options, query });
   },

@@ -29,6 +29,7 @@
     "requestCacheMaxEntries": 500,
     "buildVersionOverride": "",
     "defaultTimezone": "UTC",
+    "publicSiteUrl": "https://equalizer.up.railway.app",
     "uploadsPath": "/app/uploads",
     "uploadFolders": {
       "core.fileManager": "misc",
@@ -260,6 +261,34 @@
         }
       ]
     },
+    "integrationVariables": [
+      {
+        "key": "CANADA_POST_ADDRESS_API_KEY",
+        "isSecret": true,
+        "valueEncrypted": "c077f7b65a0c7a668025ee80a8d36fba:b98194cc32dad55c514b4143de8ff791",
+        "valueHint": "***in@@"
+      },
+      {
+        "key": "CANADA_POST_ADDRESS_COUNTRY",
+        "isSecret": false,
+        "value": "CAN"
+      },
+      {
+        "key": "CANADA_POST_ADDRESS_MAX_SUGGESTIONS",
+        "isSecret": false,
+        "value": "7"
+      },
+      {
+        "key": "BUILD_DATA_CANADA",
+        "isSecret": false,
+        "value": "nb_live_XtmPJxyp48oMYH0R3VyK7b9e5uExRsn1L08bXKZF"
+      },
+      {
+        "key": "FIRST_REQUEST",
+        "isSecret": false,
+        "value": "curl -H 'X-API-Key: nb_live_XtmPJxyp48oMYH0R3VyK7b9e5uExRsn1L08bXKZF' \\   'https://api.builddata.ca/permit?municipality=toronto&limit=5'"
+      }
+    ],
     "schoolCanonicalEnrollmentRead": false,
     "schoolCanonicalEnrollmentWrite": false,
     "schoolIntentionalConflictMode": false,
@@ -270,6 +299,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-09-15T00:07:35.054Z"
+    "lastUpdateDateTime": "2026-09-16T04:56:34.421Z"
   }
 }

@@ -154,20 +154,9 @@ async function syncSessionAccessPolicyTasks(orgId = '', policy = null) {
 
   try {
     const notificationCenterRuleService = require('./notificationCenterRuleService');
-    const notificationCenterTaskSyncService = require('./notificationCenterTaskSyncService');
+    const { disableNotificationCenterScheduledTasks } = require('./notificationCenterTaskSyncService');
     await notificationCenterRuleService.syncLegacySessionNotFinalRule(orgKey, resolvedPolicy);
-    await notificationCenterTaskSyncService.syncOrgRules(orgKey);
-    const legacyRows = await scheduledTaskDefinitionRepository.list({
-      query: {
-        orgId__eq: orgKey,
-        source__eq: SOURCE,
-        page: 1,
-        limit: 20
-      }
-    });
-    for (const row of legacyRows) {
-      await scheduledTaskDefinitionRepository.update(row.id, { enabled: false });
-    }
+    await disableNotificationCenterScheduledTasks(orgKey);
   } catch (_err) {
     // Keep legacy tasks if notification centre sync is unavailable.
   }

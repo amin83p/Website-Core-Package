@@ -1,1 +1,56 @@
-[]
+[
+  {
+    "id": "ACL-1789528584597-9859",
+    "orgId": "ORG-1",
+    "classId": "CLS-1",
+    "sessionId": "SES-1",
+    "sessionDate": "2026-06-01",
+    "studentPersonId": "PER-1",
+    "source": "matrix_cell",
+    "changedAt": "2026-09-16T03:16:24.596Z",
+    "changedBy": {
+      "userId": "USR-1",
+      "username": "",
+      "displayName": "Test User"
+    },
+    "fromStatus": "",
+    "toStatus": "present",
+    "fromLateMinutes": 0,
+    "toLateMinutes": 0,
+    "fromEarlyLeaveMinutes": 0,
+    "toEarlyLeaveMinutes": 0,
+    "fromLateExcused": false,
+    "toLateExcused": false,
+    "fromEarlyLeaveExcused": false,
+    "toEarlyLeaveExcused": false,
+    "fromAbsenceExcused": false,
+    "toAbsenceExcused": false
+  },
+  {
+    "id": "ACL-1789529018164-8973",
+    "orgId": "ORG-1",
+    "classId": "CLS-1",
+    "sessionId": "SES-1",
+    "sessionDate": "2026-06-01",
+    "studentPersonId": "PER-1",
+    "source": "matrix_cell",
+    "changedAt": "2026-09-16T03:23:38.163Z",
+    "changedBy": {
+      "userId": "USR-1",
+      "username": "",
+      "displayName": "Test User"
+    },
+    "fromStatus": "",
+    "toStatus": "present",
+    "fromLateMinutes": 0,
+    "toLateMinutes": 0,
+    "fromEarlyLeaveMinutes": 0,
+    "toEarlyLeaveMinutes": 0,
+    "fromLateExcused": false,
+    "toLateExcused": false,
+    "fromEarlyLeaveExcused": false,
+    "toEarlyLeaveExcused": false,
+    "fromAbsenceExcused": false,
+    "toAbsenceExcused": false
+  }
+]

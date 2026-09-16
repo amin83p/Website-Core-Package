@@ -40,6 +40,7 @@ const {
 const attendanceAccessService = require('../../services/school/attendanceAccessService');
 const sessionManagementService = require('../../services/school/sessionManagementService');
 const attendanceOperationPolicyService = require('../../services/school/attendanceOperationPolicyService');
+const attendanceEnrollmentNaLockService = require('../../services/school/attendanceEnrollmentNaLockService');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
@@ -363,25 +364,35 @@ async function assertRollingCapacityOneBeforeRosterAdd({
     });
 }
 
-async function assertEnrollmentLockedAttendanceEditable(req, { classData, session, studentPersonId }) {
-    const canOverride = await adminAuthorityService.isAdminForRequestAsync(
-        req.user,
-        SECTIONS.SCHOOL_CLASSES,
-        OPERATIONS.UPDATE,
-        { section: { id: SECTIONS.SCHOOL_CLASSES } }
-    );
-    if (canOverride) return;
+async function assertEnrollmentLockedAttendanceEditable(req, {
+    classData,
+    session,
+    studentPersonId,
+    nextAttendance,
+    priorAttendance,
+    nextRow = null,
+    attendanceAccess: attendanceAccessOverride
+}) {
+    const attendanceAccess = attendanceAccessOverride || await resolveAttendanceAccessForRequest(req);
     const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, req.user);
-    const sessionId = toPublicId(session?.sessionId || session?.id);
-    const lock = enrollmentSessionMarksService.findLockedEnrollmentNaMark(
+    const existingRosterRecord = session.roster?.find((r) => idsEqual(r.personId, studentPersonId)) || null;
+    const prior = priorAttendance !== undefined
+        ? priorAttendance
+        : existingRosterRecord?.attendance;
+    attendanceEnrollmentNaLockService.assertCanLeaveEnrollmentNaLock({
+        attendanceAccess,
         periodRows,
-        classData?.id,
-        sessionId,
-        studentPersonId
-    );
-    if (lock) {
-        throw new Error('This session is locked as N/A by enrollment office and cannot be changed in attendance.');
-    }
+        classData,
+        session,
+        personId: studentPersonId,
+        rosterRow: existingRosterRecord,
+        nextAttendance: nextAttendance !== undefined ? nextAttendance : prior,
+        priorAttendance: prior,
+        nextRow: nextRow || {
+            ...(existingRosterRecord || {}),
+            attendance: nextAttendance !== undefined ? nextAttendance : prior
+        }
+    });
 }
 
 function isActiveAttendanceClass(row = {}) {
@@ -540,7 +551,10 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
         getApplicabilityForSession,
         getEnrollmentWindowForSession,
         forceNotApplicableSessionKeys,
-        userContactById
+        userContactById,
+        rollingPeriodRows,
+        classId,
+        registrationMode
     } = context;
 
     const rosterRecordRaw = matrixWindowService.rosterRecordForSession(rosterMaps, ses, stu.personId);
@@ -635,6 +649,18 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
         recordPolicy,
         enabledAttendanceStatuses
     );
+    record.enrollmentNaLock = false;
+    if (registrationMode === 'rolling'
+        && record.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+        && rosterRecord) {
+        record.enrollmentNaLock = attendanceEnrollmentNaLockService.isEnrollmentNaLockActive({
+            periodRows: rollingPeriodRows,
+            classId,
+            session: ses,
+            personId: stu.personId,
+            rosterRow: rosterRecord
+        });
+    }
     return record;
 }
 
@@ -871,7 +897,10 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
             getApplicabilityForSession,
             getEnrollmentWindowForSession,
             forceNotApplicableSessionKeys,
-            userContactById
+            userContactById,
+            rollingPeriodRows,
+            classId: classData.id,
+            registrationMode
         };
 
         const matrix = buildStudentList.map((stu) => {
@@ -1040,7 +1069,8 @@ async function addAttendanceComment(req, res) {
         await assertEnrollmentLockedAttendanceEditable(req, {
             classData,
             session,
-            studentPersonId
+            studentPersonId,
+            attendanceAccess
         });
 
         if (!session.roster) session.roster = [];
@@ -1222,14 +1252,38 @@ async function updateAttendanceRosterCell(req, res) {
             studentPersonId,
             reqUser: req.user
         });
-        await assertEnrollmentLockedAttendanceEditable(req, {
-            classData,
-            session,
-            studentPersonId
-        });
 
         const existingRosterRecord = session.roster?.find((r) => idsEqual(r.personId, studentPersonId)) || null;
         const previousAttendance = existingRosterRecord?.attendance;
+        const parseNonNegIntForLock = (v) => {
+            const n = Number(v);
+            return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+        };
+        const nextRowFromRequest = {
+            ...(existingRosterRecord || {}),
+            attendance: req.body?.attendance,
+            lateMinutes: req.body?.lateMinutes !== undefined
+                ? parseNonNegIntForLock(req.body.lateMinutes)
+                : existingRosterRecord?.lateMinutes,
+            earlyLeaveMinutes: req.body?.earlyLeaveMinutes !== undefined
+                ? parseNonNegIntForLock(req.body.earlyLeaveMinutes)
+                : existingRosterRecord?.earlyLeaveMinutes,
+            lateExcused: req.body?.lateExcused !== undefined
+                ? attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.lateExcused)
+                : existingRosterRecord?.lateExcused,
+            earlyLeaveExcused: req.body?.earlyLeaveExcused !== undefined
+                ? attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.earlyLeaveExcused)
+                : existingRosterRecord?.earlyLeaveExcused
+        };
+        await assertEnrollmentLockedAttendanceEditable(req, {
+            classData,
+            session,
+            studentPersonId,
+            priorAttendance: previousAttendance,
+            nextAttendance: req.body?.attendance,
+            nextRow: nextRowFromRequest,
+            attendanceAccess
+        });
         const previousSnapshot = attendanceChangeLogService.rosterAttendanceSnapshot(existingRosterRecord || {});
         const savedExcuseState = {
             lateExcused: Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(existingRosterRecord).lateExcused),

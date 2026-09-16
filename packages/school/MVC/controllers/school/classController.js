@@ -47,6 +47,7 @@ const academicSnapshotService = require('../../services/school/academicSnapshotS
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
+const attendanceEnrollmentNaLockService = require('../../services/school/attendanceEnrollmentNaLockService');
 const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const sessionNaVisibilityService = require('../../services/school/sessionNaVisibilityService');
 const sessionEnrollmentContextService = require('../../services/school/sessionEnrollmentContextService');
@@ -1475,47 +1476,46 @@ async function resolveSessionRosterPersonIds({
     };
 }
 
-async function assertSessionRosterEnrollmentWindows({ classData, session, incomingRoster, reqUser, existingRoster = [] }) {
+async function assertSessionRosterEnrollmentWindows({
+    classData,
+    session,
+    incomingRoster,
+    reqUser,
+    existingRoster = [],
+    reqIp = ''
+}) {
     if (getClassRegistrationModeKey(classData) !== 'rolling') return;
     const rows = Array.isArray(incomingRoster) ? incomingRoster : [];
     if (!rows.length) return;
 
-    const canOverride = await adminAuthorityService.isAdminForRequestAsync(
-        reqUser,
-        SECTIONS.SCHOOL_CLASSES,
-        OPERATIONS.UPDATE,
-        { section: { id: SECTIONS.SCHOOL_CLASSES } }
-    );
-
-    const [periodRows, students] = await Promise.all([
+    const [periodRows, students, attendanceAccess] = await Promise.all([
         schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id, reqUser),
-        schoolDataService.fetchAllData('students', {}, reqUser)
+        schoolDataService.fetchAllData('students', {}, reqUser),
+        attendanceEnrollmentNaLockService.buildAttendanceAccessForUser(reqUser, reqIp)
     ]);
-    const sessionId = toPublicId(session?.sessionId || session?.id);
     const existing = Array.isArray(existingRoster) ? existingRoster : [];
-    if (!canOverride && sessionId) {
-        const lockedRow = rows.find((row) => {
+    if (!attendanceAccess.canOverrideSessionLock) {
+        const blockedRow = rows.find((row) => {
             const personId = cleanPersonId(row?.personId);
             if (!personId) return false;
-            const lock = enrollmentSessionMarksService.findLockedEnrollmentNaMark(
+            const priorRec = existing.find((item) => idsEqual(item?.personId, personId)) || {};
+            const lockActive = attendanceEnrollmentNaLockService.isEnrollmentNaLockActive({
                 periodRows,
-                classData?.id,
-                sessionId,
-                personId
-            );
-            if (!lock) return false;
-            const prior = existing.find((item) => idsEqual(item?.personId, personId)) || {};
-            const nextAttendance = String(row?.attendance || '').trim().toLowerCase();
-            const priorAttendance = String(prior?.attendance || '').trim().toLowerCase();
-            if (nextAttendance !== priorAttendance) return true;
-            const nextLate = Number(row?.lateMinutes || 0);
-            const priorLate = Number(prior?.lateMinutes || 0);
-            const nextEarly = Number(row?.earlyLeaveMinutes || 0);
-            const priorEarly = Number(prior?.earlyLeaveMinutes || 0);
-            return nextLate !== priorLate || nextEarly !== priorEarly;
+                classId: classData?.id,
+                session,
+                personId,
+                rosterRow: priorRec
+            });
+            return attendanceEnrollmentNaLockService.requiresOverrideForEnrollmentNaLockedEdit({
+                lockActive,
+                priorAttendance: priorRec?.attendance,
+                nextAttendance: row?.attendance,
+                priorRow: priorRec,
+                nextRow: row
+            });
         });
-        if (lockedRow) {
-            throw new Error('One or more students have enrollment-locked N/A sessions that cannot be changed here.');
+        if (blockedRow) {
+            throw new Error(attendanceEnrollmentNaLockService.LEAVE_NA_ERROR);
         }
     }
     const studentToPersonMap = new Map(
@@ -4369,6 +4369,8 @@ async function manageSession(req, res) {
 
         // 3. Resolve effective session roster (same rules as Manage Session display)
         const rosterStart = Date.now();
+        const persistedSessionRoster = (Array.isArray(session?.roster) ? session.roster : [])
+            .map((row) => ({ ...row }));
         session.roster = await buildEnrichedSessionRosterForMutation({
             classData,
             session,
@@ -4571,20 +4573,22 @@ async function manageSession(req, res) {
         });
         const reportConductRoster = sessionConductService.buildReportConductRoster({
             personIds: reportConductPersonIds,
-            sessionRoster: session.roster,
+            sessionRoster: persistedSessionRoster,
             prefetchedStudents: rosterIdentityData.students,
             prefetchedPersons: rosterIdentityData.persons
         });
         const conductPrefillByPersonId = Object.fromEntries(
             sessionConductService.buildConductPrefillMap({
                 roster: reportConductRoster,
-                currentSession: sessions.find((row) => idsEqual(row?.sessionId, sessionId)) || session,
+                currentSession: {
+                    ...(sessions.find((row) => idsEqual(row?.sessionId, sessionId)) || session),
+                    roster: persistedSessionRoster
+                },
                 allSessions: sessions,
                 periodStart: sessionConductReportPeriod.startDate,
                 periodDue: sessionConductReportPeriod.dueDate
             })
         );
-
 
         const periodGradebookOtherWeightTotal = sumPeriodGradebookWeightsExcludingSession(
             sessions,
@@ -4631,16 +4635,12 @@ async function manageSession(req, res) {
         let enrollmentLockedAttendancePersonIds = [];
         if (isRollingClass) {
             const periodRows = Array.isArray(enrollmentPeriodRows) ? enrollmentPeriodRows : [];
-            const lockedSessionId = toPublicId(session.sessionId || session.id);
-            const locked = new Set();
-            periodRows.forEach((period) => {
-                enrollmentSessionMarksService.getMarksMap(period).forEach((mark, sid) => {
-                    if (sid === lockedSessionId && mark.locked && period.personId) {
-                        locked.add(toPublicId(period.personId));
-                    }
-                });
+            enrollmentLockedAttendancePersonIds = attendanceEnrollmentNaLockService.listEnrollmentNaLockedPersonIdsForSession({
+                periodRows,
+                classId,
+                session,
+                roster: persistedSessionRoster.length ? persistedSessionRoster : (session.roster || [])
             });
-            enrollmentLockedAttendancePersonIds = [...locked];
         }
 
         logManageSessionStep(req, 'total', manageSessionStart);
@@ -4735,6 +4735,7 @@ async function manageSession(req, res) {
             gradebookSkills: sessionSkillPolicy.renderCatalog,
             teachingOutlineContext,
             enrollmentLockedAttendancePersonIds,
+            canOverrideEnrollmentNaLock: Boolean(canOverrideAttendanceEdit),
             periodGradebookOtherWeightTotal,
             includeModal: true,  
             user: req.user,
@@ -5966,12 +5967,8 @@ async function saveSession(req, res) {
             canOverride
             || sessionDeliveryTeamService.isPersonSessionMainTeacher(originalSession, viewerPersonId)
         );
-        const canOverrideAttendanceEdit = canOverride || await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_ATTENDANCES,
-            OPERATIONS.UPDATE,
-            { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
-        );
+        const saveSessionAttendanceAccess = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
+        const canOverrideAttendanceEdit = canOverride || Boolean(saveSessionAttendanceAccess.canOverrideSessionLock);
         let completedSessionEditPolicy = null;
         let completedSessionTimesheetPeriod = undefined;
         if (wasCompletion) {
@@ -6186,7 +6183,8 @@ async function saveSession(req, res) {
                 session: sessionForAttendanceWindow,
                 incomingRoster,
                 reqUser: req.user,
-                existingRoster: existingRoster
+                existingRoster: existingRoster,
+                reqIp: req.ip
             });
             await assertRollingCapacityOneSessionRosterOrThrow({
                 classData,
@@ -6213,7 +6211,7 @@ async function saveSession(req, res) {
             await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster, {
                 canDeleteFiles: canDeleteAttendanceFilesSave
             });
-            originalSession.roster = incomingRoster.map((incRec) => {
+            const mergedSessionRoster = incomingRoster.map((incRec) => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 if (!incomingPersonId) return null;
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
@@ -6260,25 +6258,31 @@ async function saveSession(req, res) {
                         ? (incRec.classEffortPercent === undefined
                             ? existingClassEffort
                             : normalizeSessionRatingPercent(incRec.classEffortPercent, null))
-                        : existingClassEffort,
+                        : (incRec.classEffortPercent === undefined
+                            ? existingClassEffort
+                            : normalizeSessionRatingPercent(incRec.classEffortPercent, null)),
                     classParticipationPercent: canOverride
                         ? (incRec.classParticipationPercent === undefined
                             ? existingClassParticipation
                             : normalizeSessionRatingPercent(incRec.classParticipationPercent, null))
-                        : existingClassParticipation,
+                        : (incRec.classParticipationPercent === undefined
+                            ? existingClassParticipation
+                            : normalizeSessionRatingPercent(incRec.classParticipationPercent, null)),
                     respectsTeachersPercent: canOverride
                         ? (incRec.respectsTeachersPercent === undefined
                             ? existingRespectsTeachers
                             : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null))
-                        : existingRespectsTeachers,
+                        : (incRec.respectsTeachersPercent === undefined
+                            ? existingRespectsTeachers
+                            : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null)),
                     respectsStudentsPercent: canOverride
                         ? (incRec.respectsStudentsPercent === undefined
                             ? existingRespectsStudents
                             : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null))
-                        : existingRespectsStudents,
-                    conductSavedAt: canOverride
-                        ? resolveConductSavedAtForRosterMerge(incRec, existRec)
-                        : (existRec.conductSavedAt || null),
+                        : (incRec.respectsStudentsPercent === undefined
+                            ? existingRespectsStudents
+                            : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null)),
+                    conductSavedAt: resolveConductSavedAtForRosterMerge(incRec, existRec),
                     notes: existRec.notes || '',
                     comments: existRec.comments || []
                 };
@@ -6295,6 +6299,20 @@ async function saveSession(req, res) {
                     )
                 };
             }).filter(Boolean);
+            const incomingIdSet = new Set(
+                mergedSessionRoster.map((row) => cleanPersonId(row?.personId)).filter(Boolean)
+            );
+            const preservedConductRosterRows = [];
+            existingRoster.forEach((existRec) => {
+                const pid = cleanPersonId(existRec?.personId);
+                if (!pid || incomingIdSet.has(pid)) return;
+                if (!sessionConductService.rosterRowHasSavedConduct(existRec)
+                    && !sessionConductService.rosterRowHasRatedConduct(existRec)) {
+                    return;
+                }
+                preservedConductRosterRows.push({ ...existRec });
+            });
+            originalSession.roster = mergedSessionRoster.concat(preservedConductRosterRows);
             pendingAttendanceChangeLog = {
                 beforeRoster: existingRoster,
                 afterRoster: originalSession.roster,

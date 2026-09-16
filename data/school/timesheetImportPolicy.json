@@ -1,0 +1,49 @@
+{
+  "byOrgId": {
+    "ORG_POLICY_RT_1789361879252": {
+      "importActivityId": "",
+      "allowImportInTimesheetManagement": false,
+      "allowImportInMyTimesheets": false,
+      "importTargetStatus": "draft",
+      "importBaseStartTime": "08:30",
+      "saveImportedSessionsIntoOneWorkSession": true,
+      "importWorkSessionStartTime": "08:00",
+      "importWorkSessionEndTime": "20:00",
+      "classNameActivityMappings": [],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-14T04:57:59.264Z"
+      }
+    },
+    "ORG_POLICY_RT_1789361912583": {
+      "importActivityId": "",
+      "allowImportInTimesheetManagement": false,
+      "allowImportInMyTimesheets": false,
+      "importTargetStatus": "draft",
+      "importBaseStartTime": "08:30",
+      "saveImportedSessionsIntoOneWorkSession": true,
+      "importWorkSessionStartTime": "08:00",
+      "importWorkSessionEndTime": "20:00",
+      "classNameActivityMappings": [],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-14T04:58:32.602Z"
+      }
+    },
+    "ORG_POLICY_RT_1789361938371": {
+      "importActivityId": "",
+      "allowImportInTimesheetManagement": false,
+      "allowImportInMyTimesheets": false,
+      "importTargetStatus": "draft",
+      "importBaseStartTime": "08:30",
+      "saveImportedSessionsIntoOneWorkSession": true,
+      "importWorkSessionStartTime": "08:00",
+      "importWorkSessionEndTime": "20:00",
+      "classNameActivityMappings": [],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-14T04:58:58.383Z"
+      }
+    }
+  }
+}

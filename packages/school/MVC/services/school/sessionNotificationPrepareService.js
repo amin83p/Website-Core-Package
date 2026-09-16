@@ -19,6 +19,7 @@ const {
 } = requireCoreModule('MVC/utils/timezoneUtils');
 const emailOutboxService = requireCoreModule('MVC/services/emailOutboxService');
 const smsOutboxService = requireCoreModule('MVC/services/smsOutboxService');
+const appPublicUrlService = requireCoreModule('MVC/services/appPublicUrlService');
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -130,7 +131,7 @@ async function prepareDigestChannel({
   let prepared = 0;
   let skipped = 0;
   let teachers = 0;
-  const baseUrl = '';
+  const baseUrl = appPublicUrlService.getConfiguredPublicSiteUrl();
 
   for (const [teacherId, sessions] of grouped.entries()) {
     teachers += 1;

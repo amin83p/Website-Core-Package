@@ -7,6 +7,17 @@ const sessionAttendanceEditAccessService = require('./sessionAttendanceEditAcces
 const schoolDataService = require('./schoolDataService');
 const teacherIdentityService = require('./teacherIdentityService');
 const { SESSION_DATE_RANGE_TYPES } = require('./sessionAccessPolicyService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+
+function resolveAppDisplayName() {
+  try {
+    const appBrandingService = requireCoreModule('MVC/services/appBrandingService');
+    const brand = appBrandingService.getBrand?.() || {};
+    return cleanText(brand.appName || brand.appShortName) || 'School Portal';
+  } catch (_) {
+    return 'School Portal';
+  }
+}
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -155,58 +166,256 @@ function escapeHtml(value = '') {
     .replace(/"/g, '&quot;');
 }
 
-function buildSessionListText(entries = [], { baseUrl = '' } = {}) {
+const EMAIL_ICONS = Object.freeze({
+  header: '&#128203;',
+  greeting: '&#128075;',
+  class: '&#127979;',
+  session: '&#128197;',
+  link: '&#128279;',
+  clock: '&#9200;',
+  action: '&#9989;',
+  footer: '&#127891;'
+});
+
+function buildEmailIcon(iconKey = '') {
+  const entity = EMAIL_ICONS[iconKey] || '';
+  return entity
+    ? `<span style="font-size:1.1em;line-height:1;margin-right:6px;" aria-hidden="true">${entity}</span>`
+    : '';
+}
+
+function resolveAbsoluteSessionUrl(classData = {}, session = {}, baseUrl = '') {
   const origin = cleanText(baseUrl).replace(/\/$/, '');
-  return (Array.isArray(entries) ? entries : []).map((entry) => {
+  const relativePath = buildSessionManagerPath(classData, session);
+  if (!relativePath) return '';
+  return origin ? `${origin}${relativePath}` : relativePath;
+}
+
+function buildSessionBulletLabel(session = {}, entryTitle = '') {
+  const custom = cleanText(entryTitle);
+  if (custom) return custom;
+  return buildSessionName(session);
+}
+
+function groupEntriesByClassTitle(entries = []) {
+  const map = new Map();
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
     const classData = entry?.classData || {};
+    const className = cleanText(classData?.title || classData?.name || classData?.id) || 'General';
+    if (!map.has(className)) map.set(className, []);
+    map.get(className).push(entry);
+  });
+  return [...map.entries()].sort((left, right) => left[0].localeCompare(right[0]));
+}
+
+function formatDurationMs(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return '0 minutes';
+  const minutes = Math.ceil(ms / 60000);
+  if (minutes < 60) return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+  const hours = Math.floor(minutes / 60);
+  const remMin = minutes % 60;
+  if (hours < 48) {
+    if (remMin === 0) return hours === 1 ? '1 hour' : `${hours} hours`;
+    return `${hours}h ${remMin}m`;
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  if (remHours === 0) return days === 1 ? '1 day' : `${days} days`;
+  return `${days}d ${remHours}h`;
+}
+
+async function resolveSessionCompletionTiming({
+  orgId = '',
+  session = {},
+  orgTimeZone = 'UTC',
+  now = new Date(),
+  policy = null
+} = {}) {
+  const orgKey = cleanText(orgId);
+  if (!orgKey) {
+    return { timingLabel: 'Please review and complete this session when you are able.' };
+  }
+  const { requireCoreModule } = require('./schoolCoreContracts');
+  const { zonedWallClockToUtcMs, normalizeTimezoneToken } = requireCoreModule('MVC/utils/timezoneUtils');
+  const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
+  const resolvedPolicy = policy || await sessionAccessPolicyModel.getPolicyForOrg(orgKey);
+  const tz = normalizeTimezoneToken(orgTimeZone, 'UTC');
+  const sessionDate = cleanDateKey(session?.date);
+  const endTime = cleanText(session?.endTime || session?.startTime || '23:59').slice(0, 5);
+  const sessionEndMs = sessionDate ? zonedWallClockToUtcMs(sessionDate, endTime, tz) : NaN;
+  const nowMs = now.getTime();
+  const period = await sessionAttendanceEditAccessService.findTimesheetPeriodForSessionDate(orgKey, sessionDate);
+  const deadlineDateKey = sessionAttendanceEditAccessService.resolveDeadlineDateKey({
+    policy: resolvedPolicy,
+    session,
+    orgId: orgKey,
+    timesheetPeriod: period,
+    policyKey: 'completedSessionAttendanceEdit'
+  });
+  const deadlineAt = sessionAttendanceEditAccessService.resolveDeadlineInstant({
+    deadlineDateKey,
+    timeZone: tz
+  });
+  const deadlineMs = deadlineAt ? deadlineAt.getTime() : null;
+
+  let timingLabel = 'Please review and complete this session when you are able.';
+  if (Number.isFinite(sessionEndMs) && nowMs < sessionEndMs) {
+    timingLabel = `Session ends in ${formatDurationMs(sessionEndMs - nowMs)} (${sessionDate} ${endTime}) — complete it after the session finishes.`;
+  } else if (deadlineMs && nowMs <= deadlineMs) {
+    timingLabel = `Time remaining to complete (per your organization's session edit settings): ${formatDurationMs(deadlineMs - nowMs)} (through ${deadlineDateKey}).`;
+  } else if (deadlineDateKey) {
+    timingLabel = `The configured edit window ended on ${deadlineDateKey}. Please review and complete this session as soon as possible.`;
+  } else if (Number.isFinite(sessionEndMs) && nowMs >= sessionEndMs) {
+    timingLabel = 'This session has ended — please open it and mark it complete.';
+  }
+
+  return { timingLabel, deadlineDateKey, deadlineMs, sessionEndMs };
+}
+
+async function buildSessionTimingMap(entries = [], { orgId = '', orgTimeZone = 'UTC', now = new Date() } = {}) {
+  const map = new Map();
+  const list = Array.isArray(entries) ? entries : [];
+  for (const entry of list) {
     const session = entry?.session || {};
-    const className = cleanText(classData?.title || classData?.name || classData?.id);
-    const sessionLabel = buildSessionName(session);
-    const relativePath = buildSessionManagerPath(classData, session);
-    const sessionUrl = relativePath
-      ? (origin ? `${origin}${relativePath}` : relativePath)
-      : '';
-    const lines = [`- ${className} — ${sessionLabel}`];
-    if (sessionUrl) lines.push(`  ${sessionUrl}`);
+    const key = cleanText(session?.sessionId || session?.id);
+    if (!key || map.has(key)) continue;
+    // eslint-disable-next-line no-await-in-loop
+    map.set(key, await resolveSessionCompletionTiming({ orgId, session, orgTimeZone, now }));
+  }
+  return map;
+}
+
+function buildSessionListText(entries = [], { baseUrl = '', sessionTimingByKey = null } = {}) {
+  const timingMap = sessionTimingByKey instanceof Map ? sessionTimingByKey : null;
+  const groups = groupEntriesByClassTitle(entries);
+  if (!groups.length) return '';
+  return groups.map(([className, classEntries]) => {
+    const lines = [className];
+    classEntries.forEach((entry) => {
+      const session = entry?.session || {};
+      const sessionKey = cleanText(session?.sessionId || session?.id);
+      const label = buildSessionBulletLabel(session, entry?.title);
+      const sessionUrl = resolveAbsoluteSessionUrl(entry?.classData || {}, session, baseUrl);
+      const timing = timingMap?.get(sessionKey)?.timingLabel || '';
+      if (sessionUrl) {
+        lines.push(`  • ${label}`);
+        lines.push(`    ${sessionUrl}`);
+      } else {
+        lines.push(`  • ${label}`);
+      }
+      if (timing) lines.push(`    ${timing}`);
+    });
     return lines.join('\n');
   }).join('\n\n');
 }
 
-function buildSessionListHtml(entries = [], { baseUrl = '' } = {}) {
-  const origin = cleanText(baseUrl).replace(/\/$/, '');
-  const items = (Array.isArray(entries) ? entries : []).map((entry) => {
-    const classData = entry?.classData || {};
-    const session = entry?.session || {};
-    const className = cleanText(classData?.title || classData?.name || classData?.id);
-    const date = cleanText(session?.date);
-    const start = cleanText(session?.startTime).slice(0, 5);
-    const end = cleanText(session?.endTime).slice(0, 5);
-    const room = cleanText(session?.room);
-    const relativePath = buildSessionManagerPath(classData, session);
-    const sessionUrl = relativePath
-      ? (origin ? `${origin}${relativePath}` : relativePath)
-      : '';
-    const title = escapeHtml(className);
-    const details = [
-      date ? `Date: ${escapeHtml(date)}` : '',
-      (start || end) ? `Time: ${escapeHtml([start, end].filter(Boolean).join(' - '))}` : '',
-      room ? `Room: ${escapeHtml(room)}` : ''
-    ].filter(Boolean).join(' · ');
-    const link = sessionUrl
-      ? `<a href="${escapeHtml(sessionUrl)}" style="color:#0d6efd;text-decoration:none;font-weight:500;">Open session manager</a>`
-      : '';
-    return [
-      '<li style="margin:0 0 12px;padding:14px 16px;border:1px solid #dee2e6;border-radius:8px;background:#f8f9fa;">',
-      `<div style="font-weight:600;margin-bottom:4px;font-size:15px;">${title}</div>`,
-      details ? `<div style="font-size:14px;color:#495057;margin-bottom:8px;">${details}</div>` : '',
-      link ? `<div style="font-size:14px;">${link}</div>` : '',
-      '</li>'
-    ].join('');
-  }).join('');
-  if (!items) {
+function buildSessionListHtml(entries = [], { baseUrl = '', sessionTimingByKey = null, formal = false } = {}) {
+  const timingMap = sessionTimingByKey instanceof Map ? sessionTimingByKey : null;
+  const groups = groupEntriesByClassTitle(entries);
+  if (!groups.length) {
     return '<p style="margin:0;color:#6c757d;">No sessions listed.</p>';
   }
-  return `<ul style="margin:0;padding:0;list-style:none;">${items}</ul>`;
+  const blocks = groups.map(([className, classEntries]) => {
+    const rows = classEntries.map((entry) => {
+      const session = entry?.session || {};
+      const sessionKey = cleanText(session?.sessionId || session?.id);
+      const label = escapeHtml(buildSessionBulletLabel(session, entry?.title));
+      const sessionUrl = resolveAbsoluteSessionUrl(entry?.classData || {}, session, baseUrl);
+      const timing = escapeHtml(timingMap?.get(sessionKey)?.timingLabel || '');
+      const linkCell = sessionUrl
+        ? `<a href="${escapeHtml(sessionUrl)}" style="color:#1a4480;text-decoration:underline;font-weight:600;">${formal ? label : `${buildEmailIcon('link')}${label}`}</a>`
+        : `${formal ? label : `${buildEmailIcon('session')}${label}`}`;
+      return [
+        '<tr>',
+        `<td style="padding:10px 14px;border-bottom:1px solid #e9ecef;vertical-align:top;width:20px;color:#495057;font-weight:600;">&#8226;</td>`,
+        `<td style="padding:10px 14px;border-bottom:1px solid #e9ecef;vertical-align:top;">`,
+        `<div style="font-size:14px;line-height:1.5;color:#212529;">${linkCell}</div>`,
+        timing ? `<div style="font-size:13px;line-height:1.45;color:#5c6770;margin-top:6px;font-style:italic;">${formal ? timing : `${buildEmailIcon('clock')}${timing}`}</div>` : '',
+        '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    return [
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border:1px solid #ced4da;background:#ffffff;">`,
+      '<tr>',
+      `<td style="padding:10px 14px;background:#eef2f7;border-bottom:1px solid #ced4da;">`,
+      `<p style="margin:0;font-size:15px;font-weight:700;color:#1b1b1b;letter-spacing:0.01em;">${formal ? escapeHtml(className) : `${buildEmailIcon('class')}${escapeHtml(className)}`}</p>`,
+      '</td>',
+      '</tr>',
+      '<tr>',
+      '<td style="padding:0;">',
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">${rows}</table>`,
+      '</td>',
+      '</tr>',
+      '</table>'
+    ].join('');
+  }).join('');
+  return blocks;
+}
+
+async function buildTeacherReviewEmailContent({
+  teacherName = '',
+  orgName = '',
+  entries = [],
+  baseUrl = '',
+  orgId = '',
+  orgTimeZone = 'UTC',
+  now = new Date()
+} = {}) {
+  const list = Array.isArray(entries) ? entries : [];
+  const sessionCount = list.length;
+  const timingMap = orgId
+    ? await buildSessionTimingMap(list, { orgId, orgTimeZone, now })
+    : null;
+  const listText = buildSessionListText(list, { baseUrl, sessionTimingByKey: timingMap });
+  const listHtml = buildSessionListHtml(list, { baseUrl, sessionTimingByKey: timingMap, formal: true });
+  const name = cleanText(teacherName) || 'Colleague';
+  const org = cleanText(orgName) || 'School Administration';
+  const appName = resolveAppDisplayName();
+  const plainText = [
+    `Dear ${name},`,
+    '',
+    `This message is to inform you that ${sessionCount} session(s) under your responsibility require review and completion.`,
+    'Please open each session listed below, verify the details, and mark the session complete when appropriate.',
+    '',
+    listText,
+    '',
+    'Thank you for your prompt attention to this matter.',
+    '',
+    'Sincerely,',
+    org,
+    '',
+    appName
+  ].join('\n');
+  const htmlBody = [
+    '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eceff3;padding:28px 16px;">',
+    '<tr><td align="center">',
+    '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px;background:#ffffff;border:1px solid #ced4da;">',
+    '<tr>',
+    '<td style="padding:22px 28px;background:#1a4480;border-bottom:3px solid #0f2f5c;">',
+    '<p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#c9d7ef;">Official notice</p>',
+    '<h1 style="margin:0;font-size:20px;font-weight:700;line-height:1.35;color:#ffffff;font-family:Georgia,\'Times New Roman\',serif;">Session completion reminder</h1>',
+    '</td>',
+    '</tr>',
+    '<tr>',
+    '<td style="padding:28px;font-family:Georgia,\'Times New Roman\',Times,serif;font-size:15px;line-height:1.65;color:#1b1b1b;">',
+    `<p style="margin:0 0 18px;">Dear ${escapeHtml(name)},</p>`,
+    `<p style="margin:0 0 16px;">This message is to inform you that <strong>${sessionCount}</strong> session(s) under your responsibility require review and completion. Please review the classes and sessions listed below and use the provided links to open each session in the system.</p>`,
+    `<p style="margin:0 0 22px;">When you have verified attendance and related requirements, please mark each session complete in accordance with your organization&rsquo;s procedures.</p>`,
+    listHtml,
+    `<p style="margin:24px 0 0;">Thank you for your prompt attention to this matter.</p>`,
+    `<p style="margin:18px 0 0;">Sincerely,<br><strong>${escapeHtml(org)}</strong></p>`,
+    '</td>',
+    '</tr>',
+    '<tr>',
+    `<td style="padding:14px 28px;background:#f8f9fa;border-top:1px solid #dee2e6;text-align:center;font-family:Arial,Helvetica,sans-serif;">`,
+    `<p style="margin:0;font-size:12px;color:#5c6770;letter-spacing:0.03em;">This notification was sent by <strong style="color:#1b1b1b;">${escapeHtml(appName)}</strong></p>`,
+    '</td>',
+    '</tr>',
+    '</table>',
+    '</td></tr></table>'
+  ].join('');
+  return { plainText, htmlBody, sessionCount, listText, listHtml };
 }
 
 function groupSessionsByTeacher(entries = [], { teacherPersonMap = null } = {}) {
@@ -438,6 +647,9 @@ module.exports = {
   buildSessionManagerPath,
   buildSessionListText,
   buildSessionListHtml,
+  buildTeacherReviewEmailContent,
+  resolveSessionCompletionTiming,
+  groupEntriesByClassTitle,
   groupSessionsByTeacher,
   buildDigestContext,
   loadTeacherPersonMap,

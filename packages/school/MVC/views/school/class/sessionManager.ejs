@@ -1634,6 +1634,7 @@
     <% const attendanceUploadDisabledAttr = attendanceUploadReadOnly ? 'disabled' : ''; %>
     <% const sessionNotesDisabledAttr = sessionNotesReadOnly ? 'disabled' : ''; %>
     <% const canEditSessionMetadataPageFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true; %>
+    <% const canOverrideEnrollmentNaLockFlag = typeof canOverrideEnrollmentNaLock !== 'undefined' && canOverrideEnrollmentNaLock === true; %>
     <% const enrollmentLockedPersonIdSet = new Set((Array.isArray(enrollmentLockedAttendancePersonIds) ? enrollmentLockedAttendancePersonIds : []).map((id) => String(id || '').trim()).filter(Boolean)); %>
     <% function jsonForScript(value) {
         if (value === undefined) return 'undefined';
@@ -2474,8 +2475,10 @@
                                         <tr><td colspan="4" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
                                     <% } else { %>
                                         <% session.roster.forEach((student, i) => { %>
-                                            <% const rowDisabledAttr = (attendanceReadOnly || enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) ? 'disabled' : ''; %>
+                                            <% const enrollmentNaRowLocked = enrollmentLockedPersonIdSet.has(String(student.personId || '').trim()) && !canOverrideEnrollmentNaLockFlag; %>
+                                            <% const rowDisabledAttr = (attendanceReadOnly || enrollmentNaRowLocked) ? 'disabled' : ''; %>
                                             <tr class="roster-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>"
+                                                data-enrollment-na-locked="<%= enrollmentNaRowLocked ? 'true' : 'false' %>"
                                                 data-na-note="<%= (student.naNote || '').replace(/"/g, '&quot;') %>"
                                                 data-na-label="<%= (student.naLabel || '').replace(/"/g, '&quot;') %>"
                                                 data-na-reason="<%= (student.naReasonCode || '').replace(/"/g, '&quot;') %>">
@@ -2483,7 +2486,7 @@
                                                 <td class="ps-2 fw-bold align-middle">
                                                     <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                                                     <% if (enrollmentLockedPersonIdSet.has(String(student.personId || '').trim())) { %>
-                                                        <i class="bi bi-lock-fill text-secondary ms-1" title="Enrollment office locked this session as N/A"></i>
+                                                        <i class="bi bi-lock-fill text-secondary ms-1" title="Enrollment on-hold or office-exempt N/A — changing away from N/A requires attendance administrator access"></i>
                                                     <% } %>
                                                     <% if (student.comments && student.comments.length > 0) { %>
                                                         <i class="bi bi-chat-dots-fill text-primary ms-1" style="font-size: 0.75rem;" title="Notes Exist"></i>
@@ -4081,6 +4084,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag && !timesheetMetadataLockActiveFlag)) %>;
     const sessionAttendanceReadOnly = <%- jsonForScript(Boolean(attendanceReadOnly)) %>;
+    window.sessionAttendanceReadOnly = sessionAttendanceReadOnly;
     const sessionCanUploadAttendanceFiles = <%- jsonForScript(Boolean(typeof canUploadAttendanceFiles !== 'undefined' && canUploadAttendanceFiles)) %>;
     const sessionCanDeleteAttendanceFiles = <%- jsonForScript(Boolean(typeof canDeleteAttendanceFiles !== 'undefined' && canDeleteAttendanceFiles)) %>;
     const sessionNotesSectionReadOnly = <%- jsonForScript(Boolean(sessionNotesReadOnly)) %>;
@@ -7274,6 +7278,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openLateDetailsForRow(row) {
         if (!row) return;
+        if (row.dataset?.enrollmentNaLocked === 'true') return;
         const personId = row.getAttribute('data-personid');
         if (!personId) return;
         if (!row.dataset.lateModalPriorAttendance) {
@@ -8391,6 +8396,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 if (row) {
+                    const enrollmentNaLocked = row.dataset?.enrollmentNaLocked === 'true';
                     const details = getAttendanceDetails(personId);
                     const snapshotHadAttachment = Boolean(detailsModalSnapshot?.hasExcuseAttachment);
                     const attachmentRemovedWithoutAccess = snapshotHadAttachment
@@ -8407,6 +8413,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                         return;
                     }
+                    if (!enrollmentNaLocked) {
                     const selectedExcuseAttachment = await uploadSchoolSessionFile(document.getElementById('modalExcuseFile'), 'excuse', personId);
                     const excuseAttachment = selectedExcuseAttachment || details.excuseAttachment || null;
                     details.excuseAttachment = excuseAttachment || null;
@@ -8479,6 +8486,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         btn.className = 'btn btn-sm btn-details btn-outline-secondary';
                         icon.className = 'bi bi-three-dots';
+                    }
                     }
                 }
 
@@ -11093,6 +11101,20 @@ function openDetailsModal(personId, name) {
     document.getElementById('modalStudentName').innerText = name;
 
     const row = document.querySelector(`.roster-row[data-personid="${personId}"]`);
+    const enrollmentNaLocked = row?.dataset?.enrollmentNaLocked === 'true';
+    const timingDisabled = enrollmentNaLocked || window.sessionAttendanceReadOnly === true;
+    ['modalArrivalTime', 'modalLeaveTime', 'modalBreakLateMins', 'modalBreakEarlyMins'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = timingDisabled;
+    });
+    ['btn_modalLateExcused', 'btn_modalEarlyLeaveExcused', 'btn_modalAbsenceExcused'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = timingDisabled;
+    });
+    const modalExcuseRef = document.getElementById('modalExcuseRef');
+    if (modalExcuseRef) modalExcuseRef.disabled = timingDisabled;
+    const modalExcuseFile = document.getElementById('modalExcuseFile');
+    if (modalExcuseFile) modalExcuseFile.disabled = timingDisabled;
     if (row) {
         const savedLate = row.querySelector('.att-late')?.value || '';
         const savedEarly = row.querySelector('.att-leave')?.value || '';

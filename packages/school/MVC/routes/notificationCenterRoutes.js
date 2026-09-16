@@ -18,6 +18,27 @@ router.get('/',
   notificationCenterController.showHome
 );
 
+router.get('/outbox',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.READ_ALL),
+  trackActionState(SECTION, OPERATIONS.READ_ALL),
+  notificationCenterController.showOutbox
+);
+
+router.post('/outbox/:id/cancel',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.UPLOAD),
+  trackActionState(SECTION, OPERATIONS.UPLOAD, { requireToken: false, keepActive: true }),
+  notificationCenterController.cancelOutboxEntry
+);
+
+router.post('/outbox/:id/delete',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.DELETE),
+  trackActionState(SECTION, OPERATIONS.DELETE, { requireToken: false, keepActive: true }),
+  notificationCenterController.deleteOutboxEntry
+);
+
 router.get('/rules/:id',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.CONFIGURE),
@@ -46,11 +67,18 @@ router.get('/runs/:id',
   notificationCenterController.showRun
 );
 
-router.post('/runs/:id/dispatch',
+router.get('/runs/:id/compose',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.UPLOAD),
+  trackActionState(SECTION, OPERATIONS.UPLOAD),
+  notificationCenterController.showComposeEmail
+);
+
+router.post('/runs/:id/schedule-email',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.UPLOAD),
   trackActionState(SECTION, OPERATIONS.UPLOAD, { requireToken: false, keepActive: true }),
-  notificationCenterController.dispatchRun
+  notificationCenterController.scheduleEmail
 );
 
 module.exports = router;

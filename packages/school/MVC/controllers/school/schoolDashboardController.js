@@ -68,7 +68,13 @@ async function canAccessDashboardSection(user, sectionId, ipAddress) {
 
     const visibleOperationIds = sectionId === SECTIONS.SCHOOL_SETTINGS
         ? [OPERATIONS.READ_ALL]
-        : DASHBOARD_VISIBLE_OPERATION_IDS;
+        : (sectionId === SECTIONS.SCHOOL_NOTIFICATION_CENTER
+            ? [
+                ...DASHBOARD_VISIBLE_OPERATION_IDS,
+                OPERATIONS.CONFIGURE,
+                OPERATIONS.UPLOAD
+            ]
+            : DASHBOARD_VISIBLE_OPERATION_IDS);
     for (const operationId of visibleOperationIds) {
         try {
             const evaluation = await accessService.evaluateAccess({
@@ -397,10 +403,11 @@ async function showDashboard(req, res) {
                 buttonClass: 'btn btn-warning'
             },
             {
-                priority: 188,
+                priority: 136,
                 title: 'Notification Centre',
                 description: 'Configure reminder rules, preview consolidated digests, and queue email or SMS notifications.',
                 href: '/school/notification-center',
+                sectionId: SECTIONS.SCHOOL_NOTIFICATION_CENTER,
                 buttonLabel: 'Open Notification Centre',
                 icon: 'bi-megaphone',
                 subtleClass: 'bg-info-subtle text-info',

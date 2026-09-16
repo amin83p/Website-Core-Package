@@ -1,0 +1,197 @@
+<style>
+  .nc-schedule-email-modal .modal-dialog.nc-schedule-email-modal__dialog {
+    max-width: 920px;
+    width: calc(100% - 2rem);
+    height: calc(100vh - 2.5rem);
+    max-height: 900px;
+    margin: 1.25rem auto;
+  }
+  .nc-schedule-email-modal .modal-content {
+    height: 100%;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+  }
+  .nc-schedule-email-modal .modal-header {
+    background: linear-gradient(90deg, rgba(var(--bs-primary-rgb), 0.1), transparent);
+    border-bottom: 1px solid rgba(var(--bs-primary-rgb), 0.15);
+    padding: 1rem 1.25rem;
+  }
+  .nc-schedule-email-modal .modal-title {
+    font-weight: 700;
+    font-size: 1.125rem;
+  }
+  .nc-schedule-email-modal .modal-body {
+    padding: 1.25rem 1.5rem;
+    background: var(--bs-body-bg);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .nc-schedule-email-modal .modal-footer {
+    padding: 0.875rem 1.25rem;
+    background: #fff;
+    border-top: 1px solid var(--bs-border-color);
+  }
+  .nc-schedule-email-modal .nc-compose-meta-bar {
+    background: #fff;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 0.65rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .nc-schedule-email-modal .nc-compose-tabs {
+    background: var(--bs-light);
+    border-radius: 8px;
+    padding: 0.25rem;
+    border: 1px solid var(--bs-border-color);
+  }
+  .nc-schedule-email-modal .nc-compose-tabs .nav-link {
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--bs-secondary);
+    padding: 0.45rem 1rem;
+  }
+  .nc-schedule-email-modal .nc-compose-tabs .nav-link.active {
+    background: #fff;
+    color: var(--bs-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  .nc-schedule-email-modal #ncScheduleEmailForm {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .nc-schedule-email-modal .tab-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .nc-schedule-email-modal .tab-content > .tab-pane {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+  }
+  .nc-schedule-email-modal .tab-content > .tab-pane.active.show {
+    display: flex;
+  }
+  .nc-schedule-email-modal .nc-compose-panel {
+    background: #fff;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 10px;
+    padding: 1.25rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .nc-schedule-email-modal .nc-compose-preview-shell {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8f9fa;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .nc-schedule-email-modal #ncComposePreviewFrame {
+    display: block;
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 0;
+    background: #fff;
+  }
+  .nc-schedule-email-modal #ncComposeBodyText {
+    min-height: min(280px, 32vh);
+    resize: vertical;
+  }
+  @media (max-width: 576px) {
+    .nc-schedule-email-modal .modal-dialog.nc-schedule-email-modal__dialog {
+      height: calc(100vh - 1rem);
+      margin: 0.5rem auto;
+    }
+  }
+</style>
+
+<div class="modal fade nc-schedule-email-modal" id="ncScheduleEmailModal" tabindex="-1" aria-labelledby="ncScheduleEmailModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog nc-schedule-email-modal__dialog modal-dialog-centered">
+    <div class="modal-content d-flex flex-column">
+      <div class="modal-header border-bottom-0 flex-shrink-0">
+        <div>
+          <h5 class="modal-title mb-1" id="ncScheduleEmailModalLabel">
+            <i class="bi bi-envelope-plus me-2 text-primary"></i>Schedule email
+          </h5>
+          <p class="small text-muted mb-0">Review content, choose send time, then add to the outbox.</p>
+        </div>
+        <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body flex-grow-1 overflow-auto">
+        <div id="ncComposeLoading" class="text-center py-5 d-none">
+          <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+          <div class="small text-muted mt-2">Preparing email preview…</div>
+        </div>
+        <div id="ncComposeError" class="alert alert-danger d-none mb-3" role="alert"></div>
+        <form id="ncScheduleEmailForm" class="d-none d-flex flex-column h-100">
+          <input type="hidden" name="actionStateId" id="ncComposeActionStateId" value="<%= actionStateId || '' %>">
+          <input type="hidden" name="recipientPersonId" id="ncComposeRecipientId" value="">
+          <div id="ncComposeSelectionKeys"></div>
+          <textarea class="d-none" name="bodyHtml" id="ncComposeBodyHtml" aria-hidden="true"></textarea>
+
+          <div class="nc-compose-meta-bar small" id="ncComposeMeta"></div>
+
+          <ul class="nav nav-pills nc-compose-tabs mb-3 flex-shrink-0" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="ncComposeEditTab" data-bs-toggle="tab" data-bs-target="#ncComposeEditPane" type="button" role="tab">
+                <i class="bi bi-pencil-square me-1"></i>Edit
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="ncComposePreviewTab" data-bs-toggle="tab" data-bs-target="#ncComposePreviewPane" type="button" role="tab">
+                <i class="bi bi-eye me-1"></i>HTML preview
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content flex-grow-1 min-h-0">
+            <div class="tab-pane fade show active" id="ncComposeEditPane" role="tabpanel">
+              <div class="nc-compose-panel">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <label class="form-label fw-bold" for="ncComposeSubject"><i class="bi bi-chat-left-text me-1 text-primary"></i>Subject</label>
+                    <input class="form-control size-md" id="ncComposeSubject" name="subject" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label fw-bold" for="ncComposeSendAt"><i class="bi bi-calendar-event me-1 text-primary"></i>Send at</label>
+                    <input class="form-control size-md" type="datetime-local" id="ncComposeSendAt" name="sendAtLocal" required>
+                    <div class="form-text small" id="ncComposeTimeZoneHint"></div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label fw-bold" for="ncComposeBodyText"><i class="bi bi-file-text me-1 text-primary"></i>Plain-text body</label>
+                    <textarea class="form-control size-md font-monospace" id="ncComposeBodyText" name="bodyText" rows="16" required></textarea>
+                    <div class="form-text small">Recipients also receive a styled HTML email with class headers and clickable session links.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="ncComposePreviewPane" role="tabpanel">
+              <div class="nc-compose-preview-shell">
+                <iframe id="ncComposePreviewFrame" title="Email HTML preview"></iframe>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer flex-shrink-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" id="ncScheduleEmailSubmit" disabled>
+          <i class="bi bi-calendar-check me-1"></i>Add to scheduled outbox
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

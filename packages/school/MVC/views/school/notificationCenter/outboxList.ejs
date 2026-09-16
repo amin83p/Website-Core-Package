@@ -1,0 +1,68 @@
+<%
+  const fmt = typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel : (v) => String(v || '');
+  const rows = Array.isArray(data) ? data : [];
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  user,
+  tableName,
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/school/notification-center" class="school-navigator-dashboard btn btn-outline-secondary btn-md mb-2"><i class="bi bi-megaphone me-1"></i> Notification Centre</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<% if (scheduledFlash) { %>
+  <div class="alert alert-success border">Email queued for scheduled delivery.</div>
+<% } %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Send at</th>
+        <th>To</th>
+        <th>Subject</th>
+        <th>Status</th>
+        <th>Run</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!rows.length) { %>
+        <tr><td colspan="6" class="text-center py-5 text-muted">No scheduled emails from Notification Centre yet.</td></tr>
+      <% } %>
+      <% rows.forEach((row) => { %>
+        <tr>
+          <td class="ps-4"><%= row.sendAt || '' %></td>
+          <td><%= row.to %></td>
+          <td><%= row.subject %></td>
+          <td><span class="badge bg-light text-dark border"><%= fmt(row.status) %></span></td>
+          <td>
+            <% if (row.meta && row.meta.runId) { %>
+              <a href="/school/notification-center/runs/<%= row.meta.runId %>"><%= row.meta.runId %></a>
+            <% } else { %>—<% } %>
+          </td>
+          <td class="text-end pe-4">
+            <% if (canCancelOutbox && row.status === 'queued') { %>
+              <form method="post" action="/school/notification-center/outbox/<%= row.id %>/cancel" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-warning">Cancel</button>
+              </form>
+            <% } %>
+            <% if (canDeleteOutbox && (row.status === 'cancelled' || row.status === 'failed')) { %>
+              <form method="post" action="/school/notification-center/outbox/<%= row.id %>/delete" class="d-inline ms-1">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/tablePages-end') %>

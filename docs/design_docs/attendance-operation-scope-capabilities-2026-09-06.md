@@ -115,13 +115,14 @@ See [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-20
 | UPDATE | OWNER | **Matrix:** statuses, late/early mins, student note. Window: 3 months. **Manage Session:** statuses, late/early mins. |
 | UPDATE | DEPARTMENT / DIVISION | **Matrix:** `+` excuse notes, student note, files, admin discussion. **Manage Session:** same. |
 | UPDATE | ORGANIZATION | **Matrix:** `+` excuse flags (Late/Early, Absent, ACF); edit after completed-session deadline. **Manage Session:** same. |
-| UPDATE | ADMIN | **Matrix + Manage Session:** `+` edit attendance on locked session. |
+| UPDATE | ADMIN | **Matrix + Manage Session:** `+` edit attendance on locked session; `+` change attendance **away from N/A** when rolling enrollment placed the student on-hold or exempted the session (office session mark). |
 
 **Notes:**
 
 - Comments on shared endpoints: `SCHOOL_ATTENDANCES` UPDATE or `SCHOOL_SESSIONS` UPDATE.
 - **File uploads:** `SCHOOL_ATTENDANCES` UPLOAD only.
 - Locked sessions visible to all; lock blocks UPDATE only.
+- **Rolling enrollment N/A lock (on-hold period or office session exemption):** Users with UPDATE below ADMIN scope may still view N/A and edit **student roster notes** and **admin discussion** while status remains N/A, but **changing away from N/A** or adjusting **late/early minutes and arrival/leave times** requires bypass admin (Family A) or **UPDATE at ADMIN scope** — same capability as locked-session override (`canOverrideSessionLock`).
 
 ### DELETE
 
@@ -169,14 +170,15 @@ See [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-20
 | --- | --- |
 | **Manage Session matrix link** | Shown when user has `SCHOOL_ATTENDANCES` READ (or attendance section admin). Roster shown with READ_ALL; editable with UPDATE. Missing access: show alert to contact admin for `SCHOOL_ATTENDANCES` profile update. **Runtime:** link still checks UPDATE via `userCanOpenAttendanceMatrix` until READ promotion. |
 | **Rollups API** (`POST /api/rollups`) | Requires READ to call. Display requires READ_ALL with DEPARTMENT/DIVISION, ORGANIZATION, or ADMIN. **USER and OWNER: No Access.** |
+| **Rolling enrollment on-hold / office session exemption** | When attendance is N/A because of an applied on-hold period or a locked enrollment session mark, changing **away from N/A** or editing **late/early timing** requires bypass admin (Family A) or `SCHOOL_ATTENDANCES` UPDATE at ADMIN scope (Family B). **Student roster notes** and **admin discussion** may still be edited. Does not use `SCHOOL_CLASSES` admin. |
 
 ---
 
 ## Admin and other scope overrides
 
-Apply to **bypass admins (Family A)** only. Do not replace READ / READ_ALL / UPDATE rows.
+Apply to **bypass admins (Family A)** for rows marked bypass-only. **A9** also applies to Family B users with **UPDATE at ADMIN scope** (same as locked-session override). Do not replace READ / READ_ALL / UPDATE rows.
 
-Implementation: `schoolAdminAccessService.isAttendancesAdminViewerAsync`, `userCanOpenAttendanceMatrix`, `userCanMarkAttendanceExcused` (excuses follow ORGANIZATION UPDATE scope, not A6).
+Implementation: `schoolAdminAccessService.isAttendancesAdminViewerAsync`, `userCanOpenAttendanceMatrix`, `userCanMarkAttendanceExcused` (excuses follow ORGANIZATION UPDATE scope, not A6), `attendanceEnrollmentNaLockService` + `canOverrideSessionLock`.
 
 | # | Feature / override | Bypass admin? | In override form? |
 | --- | --- | --- | --- |
@@ -188,7 +190,7 @@ Implementation: `schoolAdminAccessService.isAttendancesAdminViewerAsync`, `userC
 | A6 | Mark excuse flags / excuse notes | N/A — scope at ORGANIZATION UPDATE | No |
 | A7 | Bypass enrollment window | No | Not attendance admin override |
 | A8 | Bypass makeup-required original session | No | Not attendance admin override |
-| A9 | Bypass enrollment-office N/A lock | No (`SCHOOL_CLASSES` admin) | Not attendance admin override |
+| A9 | Bypass rolling enrollment on-hold / office-exempt N/A (change away from N/A) | Yes | Yes |
 | A10 | Bypass rolling enrollment capacity | No | Not attendance admin override |
 | A11 | Lock / unlock session metadata | No (class/session admin) | Not attendance admin override |
 | A12 | Full field visibility regardless of scope | Optional bypass | Note only |
