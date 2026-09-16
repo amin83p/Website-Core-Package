@@ -22,20 +22,24 @@ const ACADEMIC_STATUSES = new Set(['Active', 'Probation', 'Graduated', 'Withdraw
 const CLB_SKILLS = CLB_SKILL_CODES;
 const CLB_LEVEL_HISTORY_MAX = 100;
 const CLAIM_NUMBERS_MAX = 50;
-const CLB_EVALUATION_TYPES = new Set(['referral', 'placement_test', 'teacher']);
+const CLB_EVALUATION_TYPES = new Set(['referral', 'placement_test', 'teacher', 'previous_enrollments']);
 const CLB_EVALUATION_LABELS = Object.freeze({
     referral: 'Referral',
     placement_test: 'Placement test',
-    teacher: 'Teacher'
+    teacher: 'Teacher',
+    previous_enrollments: 'Previous Enrollment(s)'
 });
 
 function sanitizeClbEvaluationType(value) {
     const raw = cleanString(value, { max: 40, allowEmpty: true }).toLowerCase();
-    const token = raw.replace(/[\s-]+/g, '_');
+    const token = raw.replace(/[\s-]+/g, '_').replace(/[()]/g, '');
     if (!token) return 'referral';
     if (token === 'referel' || token === 'referral') return 'referral';
     if (token === 'placement' || token === 'placementtest' || token === 'placement_test') return 'placement_test';
     if (token === 'teacher') return 'teacher';
+    if (token === 'previous_enrollment' || token === 'previous_enrollments' || token === 'previous_enrollment_s') {
+        return 'previous_enrollments';
+    }
     if (CLB_EVALUATION_TYPES.has(token)) return token;
     return 'referral';
 }

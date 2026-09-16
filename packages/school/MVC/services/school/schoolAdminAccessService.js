@@ -119,6 +119,10 @@ function isSchedulesAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL);
 }
 
+async function isSchedulesAdminViewerAsync(user) {
+  return isAdminForRequestAsync(user, SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL);
+}
+
 function isCalendarAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_CALENDAR, OPERATIONS.READ_ALL);
 }
@@ -162,6 +166,7 @@ module.exports = {
   isWorkSessionsAdminViewer,
   isWorkSessionsAdminViewerAsync,
   isSchedulesAdminViewer,
+  isSchedulesAdminViewerAsync,
   isCalendarAdminViewer,
   isExamsAdminViewer,
   isAttendancesAdminViewer,

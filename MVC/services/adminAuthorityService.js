@@ -102,30 +102,131 @@ function sectionHasCategory(section) {
 }
 
 async function resolveSectionForAuthority(sectionId, section) {
-  if (sectionHasCategory(section)) return section;
   const targetSectionId = getTargetSectionId(sectionId, section);
   if (!targetSectionId) return section || null;
   try {
     const resolvedSection = await resolveEntity('sections', targetSectionId);
-    return resolvedSection || section || null;
+    if (resolvedSection) return resolvedSection;
   } catch (_) {
-    return section || null;
+    // fall through to provided section context
+  }
+  return sectionHasCategory(section) ? section : (section || null);
+}
+
+const SECTIONS_CATALOG_CACHE_KEY = 'sections:catalog';
+const OPERATIONS_CATALOG_CACHE_KEY = 'operations:catalog';
+
+function getWarmSectionsCatalogSync() {
+  try {
+    const catalogCacheService = require('./cache/sectionsOperationsCatalogCacheService');
+    const cached = catalogCacheService._catalogCache?.get?.(SECTIONS_CATALOG_CACHE_KEY);
+    return Array.isArray(cached) ? cached : null;
+  } catch (_) {
+    return null;
   }
 }
 
-function getSectionConfig(rows, sectionId) {
-  if (!Array.isArray(rows) || !sectionId) return null;
+function findSectionInCatalogSync(identifier) {
+  const token = normalizeToken(identifier);
+  if (!token) return null;
+  const catalog = getWarmSectionsCatalogSync();
+  if (!catalog) return null;
+  const byId = catalog.find((row) => idsEqual(row?.id, token));
+  if (byId) return byId;
+  const upper = token.toUpperCase();
+  return catalog.find((row) => String(row?.name || '').trim().toUpperCase() === upper) || null;
+}
+
+function getWarmOperationsCatalogSync() {
+  try {
+    const catalogCacheService = require('./cache/sectionsOperationsCatalogCacheService');
+    const cached = catalogCacheService._catalogCache?.get?.(OPERATIONS_CATALOG_CACHE_KEY);
+    return Array.isArray(cached) ? cached : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function findOperationInCatalogSync(identifier) {
+  const token = normalizeToken(identifier);
+  if (!token) return null;
+  const catalog = getWarmOperationsCatalogSync();
+  if (!catalog) return null;
+  const byId = catalog.find((row) => idsEqual(row?.id, token));
+  if (byId) return byId;
+  const upper = token.toUpperCase();
+  return catalog.find((row) => String(row?.name || '').trim().toUpperCase() === upper) || null;
+}
+
+function buildOperationLookupTokens(operationId) {
+  const tokens = [];
+  const add = (value) => {
+    const token = normalizeToken(value);
+    if (!token) return;
+    if (tokens.some((item) => idsEqual(item, token))) return;
+    tokens.push(token);
+  };
+
+  add(operationId);
+  const resolved = findOperationInCatalogSync(operationId);
+  if (resolved) {
+    add(resolved.id);
+    add(resolved.name);
+  }
+
+  return tokens;
+}
+
+function buildSectionLookupTokens(sectionId, section) {
+  const tokens = [];
+  const add = (value) => {
+    const token = normalizeToken(value);
+    if (!token) return;
+    if (tokens.some((item) => idsEqual(item, token))) return;
+    tokens.push(token);
+  };
+
+  add(getTargetSectionId(sectionId, section));
+  add(sectionId);
+  if (section && typeof section === 'object') {
+    add(section.id);
+    add(section.sectionId);
+    add(section.name);
+  }
+
+  const resolved = findSectionInCatalogSync(getTargetSectionId(sectionId, section));
+  if (resolved) {
+    add(resolved.id);
+    add(resolved.name);
+  }
+
+  return tokens;
+}
+
+function resolveCanonicalSectionId(sectionId, section) {
+  const resolved = findSectionInCatalogSync(getTargetSectionId(sectionId, section));
+  if (resolved?.id) return normalizeToken(resolved.id);
+  const tokens = buildSectionLookupTokens(sectionId, section);
+  return tokens[0] || normalizeToken(sectionId);
+}
+
+function getSectionConfig(rows, sectionId, section = null) {
+  if (!Array.isArray(rows)) return null;
+  const lookupTokens = buildSectionLookupTokens(sectionId, section);
+  if (!lookupTokens.length) return null;
   return rows.find((row) => {
     const candidate = row?.sectionId || row?.id || row?.section || row?.sectionKey;
-    return idsEqual(candidate, sectionId);
+    return lookupTokens.some((token) => idsEqual(candidate, token));
   }) || null;
 }
 
 function getOperationConfig(rows, operationId) {
-  if (!Array.isArray(rows) || !operationId) return null;
+  if (!Array.isArray(rows)) return null;
+  const lookupTokens = buildOperationLookupTokens(operationId);
+  if (!lookupTokens.length) return null;
   return rows.find((row) => {
     const candidate = row?.operationId || row?.id || row?.operation || row?.operationKey;
-    return idsEqual(candidate, operationId);
+    return lookupTokens.some((token) => idsEqual(candidate, token));
   }) || null;
 }
 
@@ -151,9 +252,9 @@ function orgPolicySectionTargetsUser(sectionConfig = null, userId = '') {
   return targetUserIds.some((item) => idsEqual(item, targetUserId));
 }
 
-function getTargetedOrgPolicySection(orgPolicy = null, sectionId = '', userId = '') {
+function getTargetedOrgPolicySection(orgPolicy = null, sectionId = '', userId = '', section = null) {
   if (!orgPolicy || typeof orgPolicy !== 'object') return null;
-  const sectionConfig = getSectionConfig(orgPolicy.sections, sectionId);
+  const sectionConfig = getSectionConfig(orgPolicy.sections, sectionId, section);
   if (!sectionConfig) return null;
   return orgPolicySectionTargetsUser(sectionConfig, userId) ? sectionConfig : null;
 }
@@ -272,7 +373,7 @@ function resolveAdminAuthority({ user, sectionId, orgId, operationId, section } 
   const orgPolicy = getActiveOrgPolicy(user, orgId);
   const profileInScope = profileAppliesToOrg(profile, user, orgId);
   const policyInScope = policyAppliesToOrg(policy, user, orgId);
-  const targetSectionId = getTargetSectionId(sectionId, section);
+  const targetSectionId = resolveCanonicalSectionId(sectionId, section);
   const targetCategory = getTargetCategory(section);
   const targetOperationId = normalizeToken(operationId);
 
@@ -281,9 +382,9 @@ function resolveAdminAuthority({ user, sectionId, orgId, operationId, section } 
 
   let categoryAdmin = Boolean(profileInScope && targetCategory && hasAdminCategory(profile, targetCategory));
 
-  const profileSection = getSectionConfig(profileInScope ? profile?.sections : null, targetSectionId);
-  const policySection = getSectionConfig(policyInScope ? policy?.sections : null, targetSectionId);
-  const orgPolicySection = getTargetedOrgPolicySection(orgPolicy, targetSectionId, user?.id);
+  const profileSection = getSectionConfig(profileInScope ? profile?.sections : null, sectionId, section);
+  const policySection = getSectionConfig(policyInScope ? policy?.sections : null, sectionId, section);
+  const orgPolicySection = getTargetedOrgPolicySection(orgPolicy, sectionId, user?.id, section);
   const policySectionAccessType = normalizeAccessType(policySection?.accessType, policySection ? 'custom' : 'none');
   const policySectionIsBan = policySectionAccessType === 'full_ban';
   const policySectionIsFullAccess = policySectionAccessType === 'full_access';
@@ -368,11 +469,22 @@ async function resolveAdminAuthorityAsync({ user, sectionId, orgId, operationId,
   if (!user) return { ...EMPTY_AUTHORITY };
 
   const resolvedSection = await resolveSectionForAuthority(sectionId, section);
+  const operationToken = normalizeToken(operationId);
+  let resolvedOperation = null;
+  if (operationToken) {
+    try {
+      resolvedOperation = await resolveEntity('operations', operationToken);
+    } catch (_) {
+      resolvedOperation = null;
+    }
+  }
+  const authoritySectionId = normalizeToken(resolvedSection?.id || sectionId);
+  const authorityOperationId = normalizeToken(resolvedOperation?.id || operationId);
   const syncAuthority = resolveAdminAuthority({
     user,
-    sectionId,
+    sectionId: authoritySectionId,
     orgId,
-    operationId,
+    operationId: authorityOperationId,
     section: resolvedSection || section
   });
   if (syncAuthority.isSuperAdmin) return syncAuthority;
@@ -380,8 +492,8 @@ async function resolveAdminAuthorityAsync({ user, sectionId, orgId, operationId,
   const resolvedEffective = effectiveAccess
     || await effectiveAccessResolverService.resolveEffectiveAccess({
       user,
-      sectionId: syncAuthority.sectionId || sectionId,
-      operationId: syncAuthority.operationId || operationId,
+      sectionId: syncAuthority.sectionId || authoritySectionId || sectionId,
+      operationId: syncAuthority.operationId || authorityOperationId || operationId,
       orgId: orgId || user?.activeOrgId
     });
 

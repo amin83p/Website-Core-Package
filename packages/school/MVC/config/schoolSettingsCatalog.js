@@ -63,6 +63,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     description: 'Configure legacy Excel import activity and where import is allowed.',
     icon: 'bi-file-earmark-spreadsheet',
     order: 46
+  }),
+  Object.freeze({
+    key: 'duplicate-student-registrations',
+    title: 'Duplicate Student Profiles',
+    description: 'Find multiple student records linked to the same person in this organization.',
+    icon: 'bi-people',
+    order: 47
   })
 ]);
 

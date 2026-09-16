@@ -143,6 +143,28 @@ test('cleanClbLevelHistory clears teacher fields when evaluation is referral', (
   assert.equal(cleaned[0].evaluationTeacherLabel, '');
 });
 
+test('cleanClbLevelHistory stores previous_enrollments evaluation without teacher', () => {
+  const cleaned = studentModel.cleanClbLevelHistory([{
+    id: 'clb_prev',
+    recordedAt: '2026-01-01',
+    evaluationType: 'previous_enrollments',
+    evaluationTeacherId: 'PER_T1',
+    evaluationTeacherLabel: 'Should clear',
+    goal: { listening: '5' },
+    current: { listening: '4' },
+    result: { listening: '4' }
+  }]);
+  assert.equal(cleaned[0].evaluationType, 'previous_enrollments');
+  assert.equal(cleaned[0].evaluationTeacherId, '');
+  assert.equal(cleaned[0].evaluationTeacherLabel, '');
+});
+
+test('sanitizeClbEvaluationType accepts previous enrollment aliases and defaults unknown types', () => {
+  assert.equal(studentModel.sanitizeClbEvaluationType('previous_enrollment'), 'previous_enrollments');
+  assert.equal(studentModel.sanitizeClbEvaluationType('Previous Enrollment(s)'), 'previous_enrollments');
+  assert.equal(studentModel.sanitizeClbEvaluationType('bogus_type'), 'referral');
+});
+
 test('sanitizeStudentInput keeps legacy CLB entries without results backward compatible', () => {
   const out = studentModel.sanitizeStudentInput(baseStudentInput({
     clbLevelHistory: [{
@@ -420,11 +442,18 @@ test('student form includes CLB history UI and hidden JSON field', () => {
   assert.match(source, /btnPickClbEvaluationTeacher/);
   assert.match(source, /collectClbEditorEntry/);
   assert.match(source, /evaluationType/);
+  assert.match(source, /previous_enrollments/);
+  assert.match(source, /syncClbEvaluationTypeOptions/);
+  assert.match(source, /applyDefaultClbEvaluationTypeForNewEntry/);
+  assert.match(source, /clbLevelHistory\.length >= 1 \? 'previous_enrollments'/);
   const rollingSource = read('packages/school/MVC/views/school/class/rollingEnrollment.ejs');
   assert.match(rollingSource, /inp_rolling_clb_note/);
   assert.match(rollingSource, /inp_rolling_clb_evaluationType/);
   assert.match(rollingSource, /btnPickRollingClbEvaluationTeacher/);
   assert.match(rollingSource, /collectRollingClbEditorEntry/);
+  assert.match(rollingSource, /previous_enrollments/);
+  assert.match(rollingSource, /syncRollingClbEvaluationTypeOptions/);
+  assert.match(rollingSource, /applyDefaultRollingClbEvaluationTypeForNewEntry/);
 });
 
 test('student form create defaults cover DOB, email, admission, country, fee, and CLB dash', () => {

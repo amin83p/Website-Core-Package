@@ -1817,6 +1817,44 @@
           </form>
         </div>
       </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="duplicate-student-registrations" role="tabpanel" aria-labelledby="settings-tab-duplicate-student-registrations" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Duplicate Student Profiles</h2>
+              <p class="small text-muted mb-0">Find multiple student records linked to the same person in this organization.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted">
+            A duplicate registration means the same <strong>person</strong> was admitted more than once, creating multiple student profiles.
+            This scan is read-only; open each student record to review or correct data.
+          </p>
+          <div class="alert alert-danger d-none" id="duplicateStudentRegError" role="alert"></div>
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-md-8 col-lg-6">
+              <label class="form-label small fw-semibold" for="duplicateStudentRegSearch">Filter results (optional)</label>
+              <input type="search" class="form-control" id="duplicateStudentRegSearch" placeholder="Name, student ID, custom ID, or person ID" autocomplete="off">
+            </div>
+            <div class="col-md-4 col-lg-auto">
+              <button type="button" class="btn btn-primary w-100" id="btnScanDuplicateStudentRegistrations">
+                <i class="bi bi-search me-1"></i>Scan
+              </button>
+            </div>
+          </div>
+          <div class="small text-muted mb-3 d-none" id="duplicateStudentRegSummary"></div>
+          <div class="text-muted small text-center py-4 border rounded bg-light d-none" id="duplicateStudentRegEmpty">
+            No duplicate student profiles matched your filter.
+          </div>
+          <div class="text-muted small text-center py-4 border rounded bg-light" id="duplicateStudentRegPlaceholder">
+            Click <strong>Scan</strong> to search the active organization for duplicate student profiles.
+          </div>
+          <div id="duplicateStudentRegResults" class="d-none"></div>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -1845,6 +1883,25 @@
     background-color: #ffca28 !important;
     color: #212529;
     border-color: #ffb300 !important;
+  }
+  .duplicate-student-reg-group {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .duplicate-student-reg-group:last-child {
+    margin-bottom: 0;
+  }
+  .duplicate-student-reg-group-header {
+    background: var(--bs-light, #f8f9fa);
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+  }
+  .duplicate-student-reg-group-header .person-id {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.72rem;
+    color: #6c757d;
   }
 </style>
 <div class="modal fade" id="statutoryHolidayDayMappingPreviewModal" tabindex="-1" aria-labelledby="statutoryHolidayDayMappingPreviewModalLabel" aria-hidden="true">
@@ -4022,6 +4079,132 @@
   document.getElementById('btnClearSessionNotificationTestTeacher')?.addEventListener('click', clearSessionNotificationTestTeacher);
   document.getElementById('btnSendSessionNotificationTestEmail')?.addEventListener('click', sendSessionNotificationTestEmail);
   document.getElementById('btnConfirmSessionNotificationTestEmail')?.addEventListener('click', confirmSessionNotificationTestEmailSend);
+
+  const duplicateStudentRegSearch = document.getElementById('duplicateStudentRegSearch');
+  const duplicateStudentRegError = document.getElementById('duplicateStudentRegError');
+  const duplicateStudentRegSummary = document.getElementById('duplicateStudentRegSummary');
+  const duplicateStudentRegEmpty = document.getElementById('duplicateStudentRegEmpty');
+  const duplicateStudentRegPlaceholder = document.getElementById('duplicateStudentRegPlaceholder');
+  const duplicateStudentRegResults = document.getElementById('duplicateStudentRegResults');
+  const btnScanDuplicateStudentRegistrations = document.getElementById('btnScanDuplicateStudentRegistrations');
+  let duplicateStudentRegScanInProgress = false;
+
+  function setDuplicateStudentRegError(message) {
+    if (!duplicateStudentRegError) return;
+    const text = String(message || '').trim();
+    if (!text) {
+      duplicateStudentRegError.textContent = '';
+      duplicateStudentRegError.classList.add('d-none');
+      return;
+    }
+    duplicateStudentRegError.textContent = text;
+    duplicateStudentRegError.classList.remove('d-none');
+  }
+
+  function renderDuplicateStudentRegResults(groups) {
+    if (!duplicateStudentRegResults) return;
+    const rows = Array.isArray(groups) ? groups : [];
+    if (!rows.length) {
+      duplicateStudentRegResults.innerHTML = '';
+      duplicateStudentRegResults.classList.add('d-none');
+      return;
+    }
+    duplicateStudentRegResults.innerHTML = rows.map((group) => {
+      const personLabel = escapeHtml(group?.personLabel || 'Unknown person');
+      const personId = escapeHtml(group?.personId || '');
+      const studentRows = (Array.isArray(group?.students) ? group.students : []).map((student) => `
+        <tr>
+          <td class="font-monospace small">${escapeHtml(student?.studentId || '—')}</td>
+          <td class="font-monospace small">${escapeHtml(student?.customStudentId || '—')}</td>
+          <td>${escapeHtml(student?.academicStatus || '—')}</td>
+          <td>${escapeHtml(student?.enrollmentDate || '—')}</td>
+          <td class="text-end">
+            ${student?.editUrl
+        ? `<a class="btn btn-sm btn-outline-primary" href="${escapeHtml(student.editUrl)}">Open</a>`
+        : '<span class="text-muted">—</span>'}
+          </td>
+        </tr>
+      `).join('');
+      return `
+        <div class="duplicate-student-reg-group">
+          <div class="duplicate-student-reg-group-header">
+            <div class="fw-semibold">${personLabel}</div>
+            <div class="person-id">Person ID: ${personId || '—'}</div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0 school-settings-table">
+              <thead class="table-light">
+                <tr>
+                  <th>Student ID</th>
+                  <th>Custom ID</th>
+                  <th>Status</th>
+                  <th>Admission</th>
+                  <th class="text-end" style="width: 6rem;">Action</th>
+                </tr>
+              </thead>
+              <tbody>${studentRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }).join('');
+    duplicateStudentRegResults.classList.remove('d-none');
+  }
+
+  async function scanDuplicateStudentRegistrations() {
+    if (duplicateStudentRegScanInProgress || !btnScanDuplicateStudentRegistrations) return;
+    duplicateStudentRegScanInProgress = true;
+    setDuplicateStudentRegError('');
+    btnScanDuplicateStudentRegistrations.disabled = true;
+    const originalLabel = btnScanDuplicateStudentRegistrations.innerHTML;
+    btnScanDuplicateStudentRegistrations.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Scanning...';
+    try {
+      const params = new URLSearchParams();
+      const q = String(duplicateStudentRegSearch?.value || '').trim();
+      if (q) params.set('q', q);
+      const response = await fetch(`/school/settings/duplicate-student-registrations/scan?${params.toString()}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message || 'Unable to scan for duplicate student profiles.');
+      }
+      const summary = result.data?.summary || {};
+      const groups = Array.isArray(result.data?.groups) ? result.data.groups : [];
+      if (duplicateStudentRegPlaceholder) duplicateStudentRegPlaceholder.classList.add('d-none');
+      if (duplicateStudentRegSummary) {
+        duplicateStudentRegSummary.textContent = `${summary.duplicateGroupCount || 0} duplicate group(s), `
+          + `${summary.duplicateStudentCount || 0} student record(s) involved `
+          + `(${summary.scannedStudentCount || 0} student(s) scanned in this organization).`;
+        duplicateStudentRegSummary.classList.remove('d-none');
+      }
+      if (duplicateStudentRegEmpty) {
+        duplicateStudentRegEmpty.classList.toggle('d-none', groups.length > 0);
+      }
+      renderDuplicateStudentRegResults(groups);
+    } catch (error) {
+      setDuplicateStudentRegError(error?.message || 'Unable to scan for duplicate student profiles.');
+    } finally {
+      duplicateStudentRegScanInProgress = false;
+      btnScanDuplicateStudentRegistrations.disabled = false;
+      btnScanDuplicateStudentRegistrations.innerHTML = originalLabel;
+    }
+  }
+
+  btnScanDuplicateStudentRegistrations?.addEventListener('click', () => {
+    scanDuplicateStudentRegistrations().catch((error) => {
+      setDuplicateStudentRegError(error?.message || 'Unable to scan for duplicate student profiles.');
+    });
+  });
+  duplicateStudentRegSearch?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      scanDuplicateStudentRegistrations().catch((error) => {
+        setDuplicateStudentRegError(error?.message || 'Unable to scan for duplicate student profiles.');
+      });
+    }
+  });
 
   renderConductLevels();
   renderAttendanceMarks();

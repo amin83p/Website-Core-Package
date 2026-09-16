@@ -4566,7 +4566,7 @@ async function manageSession(req, res) {
         });
         const reportConductRoster = sessionConductService.buildReportConductRoster({
             personIds: reportConductPersonIds,
-            sessionRoster: persistedSessionRoster,
+            sessionRoster: session.roster,
             prefetchedStudents: rosterIdentityData.students,
             prefetchedPersons: rosterIdentityData.persons
         });

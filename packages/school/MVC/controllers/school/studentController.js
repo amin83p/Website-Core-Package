@@ -35,10 +35,12 @@ const schoolDeletionGuardService = require('../../services/school/schoolDeletion
 const studentSystemIdMigrationService = require('../../services/school/studentSystemIdMigrationService');
 const programRegistrationApplyService = require('../../services/school/programRegistrationApplyService');
 const programRegistrationViewService = require('../../services/school/programRegistrationViewService');
+const studentListSearchService = require('../../services/school/studentListSearchService');
 const reportService = require('../../services/school/reportService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
-const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
+const studentModel = require('../../models/school/studentModel');
+const { ACADEMIC_STATUSES } = studentModel;
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 const { normalizeProgramRegistrationSelections } = require('../../utils/programRegistrationSelectionUtils');
 
@@ -599,25 +601,14 @@ exports.listStudents = async (req, res) => {
 
         const searchedStudents = !searchTerm
             ? visibleStudents
-            : visibleStudents.filter((student) => {
-                const haystack = [
-                    student.id,
-                    student.customStudentId,
-                    student.personId,
-                    student.firstName,
-                    student.lastName,
-                    student.name,
-                    `${student.firstName || ''} ${student.lastName || ''}`.trim(),
-                    `${student.lastName || ''} ${student.firstName || ''}`.trim(),
-                    student.email,
-                    student.phone,
-                    student.feeCategory,
-                    student.studentAccountId
-                ].filter(Boolean).join(' ').toLowerCase();
-                return haystack.includes(searchTerm);
-            });
+            : visibleStudents.filter((student) => studentListSearchService.studentMatchesListSearch(student, {
+                q: searchTerm,
+                type: query.type,
+                searchFields: query.searchFields
+            }));
 
-        const searchableFields = await inferSearchableFields(searchedStudents, { exclude: ['audit', 'attachments'] });
+        const inferredSearchableFields = await inferSearchableFields(searchedStudents, { exclude: ['audit', 'attachments'] });
+        const searchableFields = studentListSearchService.mergeStudentListSearchableFields(inferredSearchableFields);
         const { data, pagination } = paginate(searchedStudents, query);
 
         if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
@@ -897,6 +888,16 @@ exports.saveStudent = async (req, res) => {
             try { parsedClbLevelHistory = JSON.parse(req.body.clbLevelHistory); } catch (e) { parsedClbLevelHistory = []; }
         }
 
+        let parsedClaimNumbers = null;
+        if (!id && req.body.claimNumbers) {
+            try {
+                const raw = JSON.parse(req.body.claimNumbers);
+                parsedClaimNumbers = studentModel.cleanClaimNumbers(raw);
+            } catch (error) {
+                throw new Error(error?.message || 'Invalid claim numbers payload.');
+            }
+        }
+
         const commentsRaw = req.body.newFileComments;
         const newFileComments = Array.isArray(commentsRaw) ? commentsRaw : (commentsRaw ? [commentsRaw] : []);
 
@@ -979,7 +980,10 @@ exports.saveStudent = async (req, res) => {
             academicStatus: req.body.academicStatus || 'Active',
             notes: (req.body.notes || '').trim(),
             attachments: parsedAttachments,
-            clbLevelHistory: parsedClbLevelHistory
+            clbLevelHistory: parsedClbLevelHistory,
+            claimNumbers: id
+                ? (existingStudent?.claimNumbers || [])
+                : (parsedClaimNumbers || [])
         };
 
         const accessibleAccounts = !id

@@ -48,6 +48,7 @@
       <!-- Existing attachments JSON (updated live when comments or deletions happen) -->
       <input type="hidden" name="attachments" id="hid_attachments" value="[]">
       <input type="hidden" name="clbLevelHistory" id="hid_clbLevelHistory" value="[]">
+      <input type="hidden" name="claimNumbers" id="hid_claimNumbers" value="[]">
 
       <!-- ActionState anti-tamper token (required for edit/update when middleware is enabled) -->
       <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
@@ -316,6 +317,7 @@
                            <option value="referral">Referral</option>
                            <option value="placement_test">Placement test</option>
                            <option value="teacher">Teacher</option>
+                           <option value="previous_enrollments" id="opt_clb_eval_previous_enrollments">Previous Enrollment(s)</option>
                          </select>
                        </div>
                        <div class="col-md-7 col-lg-6 d-none" id="clbTeacherPickCol">
@@ -378,17 +380,20 @@
                <div class="card border-secondary shadow-sm mb-3">
                  <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
                    <span class="fw-bold"><i class="bi bi-card-checklist me-2"></i>Claim Numbers</span>
-                   <% if (isEdit && canEditStudentClbFlag) { %>
+                   <% if (canEditStudentClbFlag) { %>
                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="btnManageStudentClaimNumbers">
                      <i class="bi bi-pencil-square me-1"></i>Manage Claim Numbers
                    </button>
                    <% } %>
                  </div>
                  <div class="card-body">
-                   <% if (!isEdit) { %>
-                   <p class="small text-muted mb-0">Save the student first to manage claim numbers.</p>
-                   <% } else { %>
+                   <% if (canEditStudentClbFlag) { %>
                    <div id="studentClaimNumbersSummary"></div>
+                   <% if (!isEdit) { %>
+                   <p class="small text-muted mb-0 mt-2">Claim numbers are stored when you save the new student profile.</p>
+                   <% } %>
+                   <% } else { %>
+                   <p class="small text-muted mb-0">You do not have permission to manage claim numbers.</p>
                    <% } %>
                  </div>
                </div>
@@ -736,7 +741,8 @@
   const CLB_EVALUATION_LABELS = {
     referral: 'Referral',
     placement_test: 'Placement test',
-    teacher: 'Teacher'
+    teacher: 'Teacher',
+    previous_enrollments: 'Previous Enrollment(s)'
   };
   let clbLevelHistory = (Array.isArray(window.__INIT_CLB_LEVEL_HISTORY__) ? window.__INIT_CLB_LEVEL_HISTORY__ : [])
     .map((entry, index) => ({
@@ -1814,6 +1820,21 @@
     `;
   }
 
+  function syncClbEvaluationTypeOptions() {
+    const opt = document.getElementById('opt_clb_eval_previous_enrollments');
+    if (!opt || !inpClbEvaluationType) return;
+    opt.removeAttribute('hidden');
+    opt.removeAttribute('disabled');
+    opt.hidden = false;
+    opt.disabled = false;
+  }
+
+  function applyDefaultClbEvaluationTypeForNewEntry() {
+    if (!inpClbEvaluationType || editingClbEntryId) return;
+    inpClbEvaluationType.value = clbLevelHistory.length >= 1 ? 'previous_enrollments' : 'referral';
+    syncClbTeacherPickRow();
+  }
+
   function syncClbTeacherPickRow() {
     const isTeacher = String(inpClbEvaluationType?.value || '').trim() === 'teacher';
     clbTeacherPickCol?.classList.toggle('d-none', !isTeacher);
@@ -1854,6 +1875,7 @@
       clbHistoryWrap.classList.add('d-none');
       clbHistoryTbody.innerHTML = '';
       syncClbHiddenField();
+      syncClbEvaluationTypeOptions();
       return;
     }
 
@@ -1896,6 +1918,8 @@
         </tr>
       `;
     });
+
+    syncClbEvaluationTypeOptions();
 
     clbHistoryTbody.querySelectorAll('.btn-edit-clb-entry').forEach((btn) => {
       btn.addEventListener('click', () => showClbEditorForEdit(btn.getAttribute('data-entry-id') || ''));
@@ -1983,6 +2007,8 @@
   function showClbEditor() {
     resetClbEditorMode();
     clearClbEditor();
+    syncClbEvaluationTypeOptions();
+    applyDefaultClbEvaluationTypeForNewEntry();
     if (clbEntryEditor) clbEntryEditor.classList.remove('d-none');
     refreshClbEditorWarnings();
   }
@@ -1990,14 +2016,15 @@
   function showClbEditorForEdit(entryId) {
     const entry = clbLevelHistory.find((row) => String(row?.id || '') === String(entryId || ''));
     if (!entry) return;
-    clearClbEditor();
     editingClbEntryId = String(entry.id || '');
+    clearClbEditor();
     if (inpClbRecordedAt) inpClbRecordedAt.value = String(entry.recordedAt || '');
     if (inpClbResultRecordedAt) inpClbResultRecordedAt.value = String(entry.resultRecordedAt || '');
     if (inpClbNote) inpClbNote.value = String(entry.note || '');
     if (inpClbEvaluationType) inpClbEvaluationType.value = String(entry.evaluationType || 'referral');
     if (inpClbEvaluationTeacherId) inpClbEvaluationTeacherId.value = String(entry.evaluationTeacherId || '');
     if (inpClbEvaluationTeacherLabel) inpClbEvaluationTeacherLabel.value = String(entry.evaluationTeacherLabel || '');
+    syncClbEvaluationTypeOptions();
     syncClbTeacherPickRow();
     CLB_VALUE_GROUPS.forEach((group) => {
       CLB_SKILLS.forEach((skill) => {
@@ -2656,6 +2683,9 @@
 
         syncHiddenAttachments();
         syncClbHiddenField();
+        if (typeof window.syncStudentClaimNumbersHiddenField === 'function') {
+          window.syncStudentClaimNumbersHiddenField();
+        }
         syncNewPersonHiddenState();
         syncProgramRegistrationSelections();
 
@@ -2823,12 +2853,20 @@
     const mgr = window.StudentClaimNumbersManager;
     const summaryEl = document.getElementById('studentClaimNumbersSummary');
     const btnManage = document.getElementById('btnManageStudentClaimNumbers');
+    const hidClaimNumbers = document.getElementById('hid_claimNumbers');
     const studentId = String(studentRouteId || '').trim();
-    if (!mgr || !summaryEl || !studentId) return;
+    const isDraftStudent = !studentId;
+    if (!mgr || !summaryEl || !btnManage) return;
 
     let claimNumbers = Array.isArray(window.__INIT_STUDENT_CLAIM_NUMBERS__)
       ? window.__INIT_STUDENT_CLAIM_NUMBERS__.slice()
       : [];
+
+    const syncClaimNumbersHiddenField = () => {
+      if (!isDraftStudent || !hidClaimNumbers) return;
+      hidClaimNumbers.value = JSON.stringify(claimNumbers);
+    };
+    window.syncStudentClaimNumbersHiddenField = syncClaimNumbersHiddenField;
 
     const renderSummary = () => mgr.renderSummaryTable(summaryEl, claimNumbers);
 
@@ -2864,14 +2902,21 @@
     });
 
     renderSummary();
+    syncClaimNumbersHiddenField();
 
-    btnManage?.addEventListener('click', () => {
+    btnManage.addEventListener('click', () => {
+      const studentLabel = document.querySelector('.page-heading')?.textContent?.trim()
+        || document.getElementById('inp_personName')?.value?.trim()
+        || (isDraftStudent ? 'New student' : studentId);
       mgr.open({
-        studentId,
-        studentLabel: document.querySelector('.page-heading')?.textContent?.trim() || studentId,
+        studentId: isDraftStudent ? '' : studentId,
+        persistMode: isDraftStudent ? 'local' : 'api',
+        claimNumbers: claimNumbers.slice(),
+        studentLabel,
         onSaved: async (rows) => {
           claimNumbers = Array.isArray(rows) ? rows : claimNumbers;
           renderSummary();
+          syncClaimNumbersHiddenField();
         }
       });
     });

@@ -122,6 +122,9 @@ test('student form and rolling enrollment use shared claim UI and claimNumberId 
   assert.match(studentForm, /studentClaimNumbersModal/);
   assert.match(studentForm, /studentClaimNumbersManager\.js/);
   assert.match(studentForm, /btnManageStudentClaimNumbers/);
+  assert.match(studentForm, /hid_claimNumbers/);
+  assert.match(studentForm, /persistMode:\s*isDraftStudent\s*\?\s*'local'\s*:\s*'api'/);
+  assert.match(manager, /persistMode === 'local'/);
   assert.match(rolling, /studentClaimNumbersManager\.js/);
   assert.match(rolling, /readEnrollmentClaimPayload/);
   assert.match(rolling, /claimNumberId/);

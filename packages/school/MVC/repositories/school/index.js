@@ -916,7 +916,7 @@ const schoolRepositories = {
       const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
       return generateStudentSystemIdCandidate(new Set(rows.map((row) => String(row.id || ''))));
     },
-    defaultSearchFields: ['id', 'customStudentId', 'personId', 'studentCode', 'status'],
+    defaultSearchFields: ['id', 'customStudentId', 'personId', 'studentCode', 'status', 'claimNumbers.number', 'claimNumbers.label'],
     assignmentScopeKind: 'personId'
   }),
   programs: createSchoolRepository({

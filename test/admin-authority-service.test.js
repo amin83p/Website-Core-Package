@@ -103,6 +103,58 @@ async function run() {
   }
 
   {
+    const catalogCacheService = require('../MVC/services/cache/sectionsOperationsCatalogCacheService');
+    catalogCacheService._catalogCache.set('sections:catalog', [{
+      id: '938980',
+      name: 'SCHOOL_SCHEDULES',
+      category: 'SCHOOL'
+    }], 60_000);
+
+    const authority = adminAuthorityService.resolveAdminAuthority({
+      user: userWithProfile({
+        sections: [{ sectionId: '938980', adminAccess: true }]
+      }),
+      sectionId: 'SCHOOL_SCHEDULES',
+      operationId: 'READ_ALL',
+      section: { id: 'SCHOOL_SCHEDULES', category: 'SCHOOL' }
+    });
+    assert.strictEqual(authority.isGrantAdminAccessForSection, true);
+    assert.strictEqual(authority.isRequestAdmin, true);
+    assert.strictEqual(authority.sectionId, '938980');
+    assert.ok(authority.reasons.includes('SECTION_ADMIN:938980'));
+    catalogCacheService.invalidateSectionsCatalog();
+  }
+
+  {
+    const catalogCacheService = require('../MVC/services/cache/sectionsOperationsCatalogCacheService');
+    catalogCacheService._catalogCache.set('sections:catalog', [{
+      id: '332230',
+      name: 'SCHOOL_STUDENTS',
+      category: 'SCHOOL'
+    }], 60_000);
+    catalogCacheService._catalogCache.set('operations:catalog', [{
+      id: 'OP1005',
+      name: 'UPDATE'
+    }], 60_000);
+
+    const authority = await adminAuthorityService.resolveAdminAuthorityAsync({
+      user: userWithProfile({
+        sections: [{
+          sectionId: '332230',
+          adminAccess: false,
+          operations: [{ operationId: 'OP1005', scopeId: 'SCP_ADMIN' }]
+        }]
+      }),
+      sectionId: 'SCHOOL_STUDENTS',
+      operationId: 'UPDATE',
+      section: { id: 'SCHOOL_STUDENTS', category: 'SCHOOL' }
+    });
+    assert.strictEqual(authority.isOperationAdminForRequest, true);
+    assert.strictEqual(authority.isRequestAdmin, true);
+    catalogCacheService.invalidateAllCatalogs();
+  }
+
+  {
     const authority = adminAuthorityService.resolveAdminAuthority({
       user: userWithProfile({
         sections: [{

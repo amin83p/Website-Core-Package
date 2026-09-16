@@ -2100,6 +2100,7 @@
                 <option value="referral">Referral</option>
                 <option value="placement_test">Placement test</option>
                 <option value="teacher">Teacher</option>
+                <option value="previous_enrollments" id="opt_rolling_clb_eval_previous_enrollments">Previous Enrollment(s)</option>
               </select>
             </div>
             <div class="col-md-7 col-lg-6 d-none" id="rollingClbTeacherPickCol">
@@ -3575,7 +3576,8 @@
   const ROLLING_CLB_EVALUATION_LABELS = {
     referral: 'Referral',
     placement_test: 'Placement test',
-    teacher: 'Teacher'
+    teacher: 'Teacher',
+    previous_enrollments: 'Previous Enrollment(s)'
   };
   let rollingClbLevelHistory = [];
   let rollingClbContext = { studentId: '', studentLabel: '' };
@@ -6123,6 +6125,23 @@
     `;
   }
 
+  function syncRollingClbEvaluationTypeOptions() {
+    const opt = document.getElementById('opt_rolling_clb_eval_previous_enrollments');
+    const selectEl = qs('inp_rolling_clb_evaluationType');
+    if (!opt || !selectEl) return;
+    opt.removeAttribute('hidden');
+    opt.removeAttribute('disabled');
+    opt.hidden = false;
+    opt.disabled = false;
+  }
+
+  function applyDefaultRollingClbEvaluationTypeForNewEntry() {
+    const selectEl = qs('inp_rolling_clb_evaluationType');
+    if (!selectEl || rollingClbEditingEntryId) return;
+    selectEl.value = rollingClbLevelHistory.length >= 1 ? 'previous_enrollments' : 'referral';
+    syncRollingClbTeacherPickRow();
+  }
+
   function syncRollingClbTeacherPickRow() {
     const isTeacher = String(qs('inp_rolling_clb_evaluationType')?.value || '').trim() === 'teacher';
     qs('rollingClbTeacherPickCol')?.classList.toggle('d-none', !isTeacher);
@@ -6184,6 +6203,7 @@
     if (qs('inp_rolling_clb_evaluationType')) qs('inp_rolling_clb_evaluationType').value = 'referral';
     if (qs('inp_rolling_clb_evaluationTeacherId')) qs('inp_rolling_clb_evaluationTeacherId').value = '';
     if (qs('inp_rolling_clb_evaluationTeacherLabel')) qs('inp_rolling_clb_evaluationTeacherLabel').value = '';
+    syncRollingClbEvaluationTypeOptions();
     syncRollingClbTeacherPickRow();
     ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
       ROLLING_CLB_SKILLS.forEach((skill) => {
@@ -6261,6 +6281,8 @@
     resetRollingClbEditorMode();
     clearRollingClbEditor();
     prefillRollingClbCurrentFromLatest();
+    syncRollingClbEvaluationTypeOptions();
+    applyDefaultRollingClbEvaluationTypeForNewEntry();
     showRollingClbEditorPanel();
     renderRollingClbPreviousEntryHeadsUp();
     refreshRollingClbEditorWarnings();
@@ -6269,8 +6291,8 @@
   function openRollingClbEditorForEntry(entryId) {
     const entry = rollingClbLevelHistory.find((row) => String(row?.id || '') === String(entryId || ''));
     if (!entry) return;
-    clearRollingClbEditor();
     rollingClbEditingEntryId = String(entry.id || '');
+    clearRollingClbEditor();
     const recordedAt = qs('inp_rolling_clbRecordedAt');
     const resultRecordedAt = qs('inp_rolling_clbResultRecordedAt');
     if (recordedAt) recordedAt.value = String(entry.recordedAt || '');
@@ -6279,6 +6301,7 @@
     if (qs('inp_rolling_clb_evaluationType')) qs('inp_rolling_clb_evaluationType').value = String(entry.evaluationType || 'referral');
     if (qs('inp_rolling_clb_evaluationTeacherId')) qs('inp_rolling_clb_evaluationTeacherId').value = String(entry.evaluationTeacherId || '');
     if (qs('inp_rolling_clb_evaluationTeacherLabel')) qs('inp_rolling_clb_evaluationTeacherLabel').value = String(entry.evaluationTeacherLabel || '');
+    syncRollingClbEvaluationTypeOptions();
     syncRollingClbTeacherPickRow();
     ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
       ROLLING_CLB_SKILLS.forEach((skill) => {
@@ -6365,6 +6388,7 @@
       emptyEl.classList.remove('d-none');
       wrapEl.classList.add('d-none');
       tbody.innerHTML = '';
+      syncRollingClbEvaluationTypeOptions();
       return;
     }
 
@@ -6397,6 +6421,7 @@
       `);
     });
     tbody.innerHTML = blocks.join('');
+    syncRollingClbEvaluationTypeOptions();
   }
 
   async function saveRollingClbEntryFromEditor() {
@@ -12827,7 +12852,10 @@
   });
   qs('inp_rolling_clb_evaluationType')?.addEventListener('change', syncRollingClbTeacherPickRow);
   qs('btnPickRollingClbEvaluationTeacher')?.addEventListener('click', pickRollingClbEvaluationTeacher);
-  qs('btn_rollingClbAddEntry')?.addEventListener('click', openRollingClbEditorForNewEntry);
+  qs('btn_rollingClbAddEntry')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openRollingClbEditorForNewEntry();
+  });
   qs('btn_rollingClbCancelEditor')?.addEventListener('click', () => {
     showRollingClbListPanel();
     renderRollingClbList();

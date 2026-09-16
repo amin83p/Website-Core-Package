@@ -91,3 +91,15 @@ test('buildReportConductRoster resolves synthetic row names from person records'
   assert.equal(roster[0].personId, '474361');
   assert.equal(roster[0].name, 'Jane Example');
 });
+
+test('buildReportConductRoster enriches session roster rows missing display names', () => {
+  const roster = sessionConductService.buildReportConductRoster({
+    personIds: ['474361'],
+    sessionRoster: [{ personId: '474361', classEffortPercent: null }],
+    prefetchedStudents: [{ id: 'REG-474361', personId: '474361', name: 'Report Student' }],
+    prefetchedPersons: [{ id: '474361', name: { first: 'Jane', last: 'Example' } }]
+  });
+  assert.equal(roster.length, 1);
+  assert.equal(roster[0].personId, '474361');
+  assert.equal(roster[0].name, 'Jane Example');
+});

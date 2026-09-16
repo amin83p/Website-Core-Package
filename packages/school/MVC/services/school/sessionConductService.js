@@ -262,7 +262,19 @@ function buildReportConductRoster({
     seen.add(pid);
     const rosterRow = sessionRosterByPerson.get(pid);
     if (rosterRow) {
-      result.push(rosterRow);
+      const student = studentsByPerson.get(pid);
+      const person = personsByPerson.get(pid);
+      const resolvedName = schoolPersonAccessService.formatPersonName(
+        person,
+        String(rosterRow?.name || student?.name || student?.firstName || '').trim()
+      );
+      const displayName = resolvedName || pid;
+      result.push({
+        ...rosterRow,
+        personId: pid,
+        name: displayName,
+        studentRecordId: String(rosterRow?.studentRecordId || student?.id || '').trim() || undefined
+      });
       return;
     }
     const student = studentsByPerson.get(pid);

@@ -44,6 +44,7 @@ const overallReportService = require('../../services/school/overallReportService
 const { listSchoolSettingsGroups } = require('../../config/schoolSettingsCatalog');
 const { listAutosaveSections } = require('../../config/autosaveSectionCatalog');
 const { userCanUpdateSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
+const studentDuplicateProfileService = require('../../services/school/studentDuplicateProfileService');
 
 const CONDUCT_LEVEL_CODES = Object.freeze(
   (conductRatingScalePolicyModel.DEFAULT_POLICY?.levels || []).map((row) => String(row.code))
@@ -1005,6 +1006,24 @@ async function mapStatutoryHolidayDays(req, res) {
   }
 }
 
+async function scanDuplicateStudentProfilesApi(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const q = String(req.query?.q || '').trim();
+    const data = await studentDuplicateProfileService.findDuplicateStudentProfileGroups({
+      orgId: activeOrgId,
+      reqUser: req.user,
+      q
+    });
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      ok: false,
+      message: error?.message || 'Failed to scan for duplicate student profiles.'
+    });
+  }
+}
+
 async function saveAutosavePolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -1051,6 +1070,7 @@ module.exports = {
   previewStatutoryHolidayDayMapping,
   mapStatutoryHolidayDays,
   saveTimesheetImportPolicy,
+  scanDuplicateStudentProfilesApi,
   saveAutosavePolicy,
   saveSessionAccessPolicy,
   previewSessionAccessTestNotification,

@@ -21,7 +21,7 @@
 
   let claimNumbers = [];
   let editingId = '';
-  let context = { studentId: '', studentLabel: '', onSaved: null, selectAfterSave: '' };
+  let context = { studentId: '', studentLabel: '', onSaved: null, selectAfterSave: '', persistMode: 'api' };
   let modalController = null;
   let wired = false;
 
@@ -229,11 +229,21 @@
   }
 
   async function saveClaimNumbers(preferredClaimId = '') {
+    const persistMode = String(context.persistMode || 'api').trim().toLowerCase() === 'local' ? 'local' : 'api';
     const studentId = String(context.studentId || '').trim();
-    if (!studentId) return null;
+    if (persistMode === 'api' && !studentId) return null;
     try {
-      if (deps.showBusy) deps.showBusy('Saving claim numbers...');
+      if (deps.showBusy) deps.showBusy(persistMode === 'local' ? 'Updating claim numbers...' : 'Saving claim numbers...');
       setBlockersPanel([]);
+      if (persistMode === 'local') {
+        renderClaimList();
+        const chosen = String(preferredClaimId || context.selectAfterSave || '').trim()
+          || String(claimNumbers.find((row) => row.isPrimary)?.id || claimNumbers[0]?.id || '').trim();
+        if (typeof context.onSaved === 'function') {
+          await context.onSaved(claimNumbers, chosen);
+        }
+        return chosen;
+      }
       const result = await putClaimNumbers();
       if (!result) return null;
       claimNumbers = Array.isArray(result.data?.claimNumbers) ? result.data.claimNumbers : claimNumbers;
@@ -342,15 +352,18 @@
 
   async function open(options = {}) {
     wireEventsOnce();
+    const persistMode = String(options.persistMode || 'api').trim().toLowerCase() === 'local' ? 'local' : 'api';
     const studentId = String(options.studentId || '').trim();
-    if (!studentId) return;
+    if (persistMode === 'api' && !studentId) return;
     if (!deps.canEdit) {
       if (deps.showMsg) await deps.showMsg('Permission', 'warning', 'You do not have permission to manage claim numbers.');
       return;
     }
+    const studentLabel = String(options.studentLabel || studentId || 'New student').trim();
     context = {
       studentId,
-      studentLabel: String(options.studentLabel || studentId).trim(),
+      studentLabel,
+      persistMode,
       onSaved: typeof options.onSaved === 'function' ? options.onSaved : null,
       selectAfterSave: String(options.selectAfterSave || '').trim()
     };
@@ -359,13 +372,21 @@
     hideEditor();
     setRollingClaimAlert('');
     setBlockersPanel([]);
-    if (qs('rollingClaim_studentLabel')) qs('rollingClaim_studentLabel').value = context.studentLabel;
-    if (qs('rollingClaim_studentId')) qs('rollingClaim_studentId').value = studentId;
+    if (qs('rollingClaim_studentLabel')) qs('rollingClaim_studentLabel').value = studentLabel;
+    if (qs('rollingClaim_studentId')) {
+      qs('rollingClaim_studentId').value = persistMode === 'local'
+        ? 'New student (unsaved)'
+        : studentId;
+    }
     const modalEl = typeof deps.getModalEl === 'function' ? deps.getModalEl() : qs('rollingStudentClaimNumbersModal');
     try {
-      if (deps.showBusy) deps.showBusy('Loading claim numbers...');
-      const rows = await fetchStudentClaimNumbers(studentId);
-      claimNumbers = rows;
+      if (deps.showBusy) deps.showBusy(persistMode === 'local' ? 'Preparing claim numbers...' : 'Loading claim numbers...');
+      if (persistMode === 'local') {
+        claimNumbers = Array.isArray(options.claimNumbers) ? options.claimNumbers.slice() : [];
+      } else {
+        const rows = await fetchStudentClaimNumbers(studentId);
+        claimNumbers = rows;
+      }
       renderClaimList();
       if (deps.mountModal) deps.mountModal(modalEl);
       if (typeof deps.showModal === 'function') {

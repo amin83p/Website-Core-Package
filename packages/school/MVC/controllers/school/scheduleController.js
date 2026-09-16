@@ -101,8 +101,8 @@ function normalizeId(value) {
     return String(value || '').trim();
 }
 
-function isScheduleAdminViewer(reqUser) {
-    return schoolAdminAccessService.isSchedulesAdminViewer(reqUser);
+async function isScheduleAdminViewer(reqUser) {
+    return schoolAdminAccessService.isSchedulesAdminViewerAsync(reqUser);
 }
 
 function normalizeTime(value) {
@@ -1830,7 +1830,7 @@ async function buildPersonScheduleEventsForSessions({
 
 async function showMySchedulePage(req, res) {
     try {
-        const isAdminViewer = isScheduleAdminViewer(req.user);
+        const isAdminViewer = await isScheduleAdminViewer(req.user);
         const queryPersonId = normalizeId(req.query.personId);
         const queryPersonName = String(req.query.personName || '').trim();
 
@@ -1874,7 +1874,7 @@ async function showMySchedulePage(req, res) {
 
 async function getMyScheduleData(req, res) {
     try {
-        const isAdminViewer = isScheduleAdminViewer(req.user);
+        const isAdminViewer = await isScheduleAdminViewer(req.user);
         const requestedPersonId = normalizeId(req.query.personId);
         const selfPersonId = getUserPersonId(req.user);
         const targetPersonId = isAdminViewer ? requestedPersonId : selfPersonId;

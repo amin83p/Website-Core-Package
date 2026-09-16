@@ -101,4 +101,9 @@ router.post('/timesheet-import',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveTimesheetImportPolicy);
 
+router.get('/duplicate-student-registrations/scan',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.scanDuplicateStudentProfilesApi);
+
 module.exports = router;
