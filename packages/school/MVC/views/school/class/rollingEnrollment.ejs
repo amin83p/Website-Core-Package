@@ -221,6 +221,69 @@
     width: 0;
     transition: width 0.25s ease;
   }
+  #classMoveWizardModal .enroll-wizard-guide {
+    margin-bottom: 1rem;
+  }
+  #classMoveWizardModal .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #classMoveWizardModal .wizard-step-rail::-webkit-scrollbar {
+    display: none;
+  }
+  #classMoveWizardModal .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    transition: all 0.2s ease;
+    pointer-events: none;
+  }
+  #classMoveWizardModal .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #classMoveWizardModal .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #classMoveWizardModal .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #classMoveWizardModal .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  #classMoveWizardModal .class-move-context-strip {
+    border: 1px solid #d0d7de;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.875rem;
+  }
+  #classMoveWizardModal .class-move-students-table th {
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
   .rolling-enrollment-page .rolling-row-actions-wrap {
     position: relative;
     display: inline-block;
@@ -272,28 +335,92 @@
   #rollingStudentContextMenu {
     position: fixed;
     z-index: 1200;
-    min-width: 210px;
-    max-width: min(100vw - 1rem, 280px);
+    min-width: 240px;
+    max-width: min(100vw - 1rem, 300px);
     background: #fff;
     border: 1px solid #d0d7de;
-    border-radius: 0.5rem;
-    box-shadow: 0 0.5rem 1.15rem rgba(0, 0, 0, 0.16);
-    padding: 0.35rem;
+    border-radius: 0.55rem;
+    box-shadow: 0 0.55rem 1.25rem rgba(23, 50, 77, 0.18);
+    padding: 0.35rem 0;
+    overflow: hidden;
   }
-  #rollingStudentContextMenu .btn {
-    width: 100%;
-    text-align: left;
-    justify-content: flex-start;
+  #rollingStudentContextMenu .rolling-student-context-menu-header {
+    padding: 0.45rem 0.75rem 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #5c6b7a;
+    border-bottom: 1px solid #e8edf3;
     margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  #rollingStudentContextMenu .btn:last-child {
-    margin-bottom: 0;
+  #rollingStudentContextMenu .rolling-student-context-menu-divider {
+    height: 1px;
+    margin: 0.3rem 0.5rem;
+    background: #e8edf3;
+  }
+  #rollingStudentContextMenu .rolling-student-context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.875rem;
+    color: #17324d;
+    border-radius: 0;
+  }
+  #rollingStudentContextMenu .rolling-student-context-menu-item:hover:not(:disabled),
+  #rollingStudentContextMenu .rolling-student-context-menu-item:focus-visible:not(:disabled) {
+    background: rgba(23, 50, 77, 0.06);
+    color: #17324d;
+  }
+  #rollingStudentContextMenu .rolling-student-context-menu-item:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  #rollingStudentContextMenu .rolling-student-context-menu-item i {
+    width: 1.1rem;
+    text-align: center;
+    color: #2f5d8a;
+  }
+  #rollingStudentClaimNumbersModal.rolling-student-manage-modal .modal-header {
+    border-bottom: 1px solid #e8edf3;
+    background: #f8fafc;
+  }
+  #rollingStudentClaimNumbersModal .rolling-student-manage-summary {
+    border: 1px solid #e8edf3;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 1rem;
   }
   #rollingStudentClaimNumbersModal .claim-number-row-editor {
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: 0.5rem;
     padding: 0.75rem;
     background: #f8fafc;
+  }
+  #rollingStudentClaimNumbersModal .rolling-claim-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    white-space: nowrap;
+  }
+  #rollingStudentClaimNumbersModal .rolling-claim-actions .btn {
+    flex: 0 0 auto;
+  }
+  #rollingStudentClaimNumbersModal th.rolling-claim-actions-col,
+  #rollingStudentClaimNumbersModal td.rolling-claim-actions-col {
+    width: 1%;
+    white-space: nowrap;
   }
   .clb-level-value-warning {
     background-color: #f8d7da !important;
@@ -376,6 +503,57 @@
   }
   #rollingStudentClbModal .rolling-clb-editor-table thead th {
     font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .rolling-clb-history-spacer td {
+    height: 0.85rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap tr.rolling-clb-history-entry-block > td {
+    background-color: #fff;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap tr.rolling-clb-history-entry-block:first-of-type > td {
+    border-top: 2px solid #ced4da;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .rolling-clb-history-row {
+    cursor: pointer;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .rolling-clb-history-row:hover > td {
+    background-color: #f8f9fa;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .clb-history-row-label {
+    font-size: 0.78rem;
+    color: #495057;
+    white-space: nowrap;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .clb-history-skill {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .clb-history-date {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .clb-history-dates {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .clb-history-date-line {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .clb-history-date-label {
+    font-size: 0.68rem;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: #6c757d;
@@ -755,7 +933,8 @@
   ];
   const rollingOptionalBtnsBeforePrint = [
     `<button type="button" id="btn_openAddEnrollmentModal" class="btn btn-filled btn-add btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-plus-circle me-1"></i>New Enrollment</button>`,
-    `<button type="button" id="btn_openGroupEnrollmentModal" class="btn btn-filled btn-primary btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-people-fill me-1"></i>Group Enrollment</button>`
+    `<button type="button" id="btn_openGroupEnrollmentModal" class="btn btn-filled btn-primary btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-people-fill me-1"></i>Group Enrollment</button>`,
+    `<button type="button" id="btn_openClassMoveWizard" class="btn btn-outline-primary btn-md me-2 mb-2"${isRolling && (typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice) ? '' : ' disabled'}><i class="bi bi-arrow-left-right me-1"></i>Move Class</button>`
   ];
 %>
 
@@ -1869,9 +2048,12 @@
             <table class="table table-sm table-bordered align-middle mb-0">
               <thead class="table-light">
                 <tr>
-                  <th style="width: 14%;">Goal / Current Date</th>
-                  <th style="width: 14%;">Result Date</th>
-                  <th>Summary</th>
+                  <th style="width: 13%;">Dates</th>
+                  <th style="width: 14%;">Row</th>
+                  <th class="text-center">Listening</th>
+                  <th class="text-center">Speaking</th>
+                  <th class="text-center">Reading</th>
+                  <th class="text-center">Writing</th>
                 </tr>
               </thead>
               <tbody id="rollingClb_historyTbody"></tbody>
@@ -1885,14 +2067,38 @@
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btn_rollingClbCancelEditor">Back to list</button>
           </div>
           <div id="rollingClb_previousEntryHeadsUp" class="d-none"></div>
-          <div class="row g-3 mb-3">
-            <div class="col-md-4">
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
               <label class="form-label fw-bold small" for="inp_rolling_clbRecordedAt">Goal / Current Date *</label>
               <input type="date" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clbRecordedAt">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label fw-bold small" for="inp_rolling_clbResultRecordedAt">Result Date</label>
               <input type="date" class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clbResultRecordedAt">
+            </div>
+          </div>
+          <div class="row g-3 align-items-end mb-2">
+            <div class="col-md-7 col-lg-6 d-none" id="rollingClbTeacherPickCol">
+              <label class="form-label fw-bold small" for="inp_rolling_clb_evaluationTeacherLabel">Teacher *</label>
+              <div class="input-group input-group-sm">
+                <input type="hidden" id="inp_rolling_clb_evaluationTeacherId">
+                <input type="text" class="form-control bg-white rolling-clb-editor-input" id="inp_rolling_clb_evaluationTeacherLabel" readonly placeholder="Select teacher...">
+                <button type="button" class="btn btn-outline-secondary" id="btnPickRollingClbEvaluationTeacher" title="Select Teacher"><i class="bi bi-person"></i></button>
+              </div>
+            </div>
+            <div class="col-md-5 col-lg-4">
+              <label class="form-label fw-bold small" for="inp_rolling_clb_evaluationType">Evaluation</label>
+              <select class="form-select form-select-sm rolling-clb-editor-input" id="inp_rolling_clb_evaluationType">
+                <option value="referral">Referral</option>
+                <option value="placement_test">Placement test</option>
+                <option value="teacher">Teacher</option>
+              </select>
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-12">
+              <label class="form-label fw-bold small" for="inp_rolling_clb_note">Note</label>
+              <textarea class="form-control form-control-sm rolling-clb-editor-input" id="inp_rolling_clb_note" rows="2" maxlength="500" placeholder="Optional note about this assessment"></textarea>
             </div>
           </div>
           <div id="rollingClb_entryWarnings" class="alert alert-warning border py-2 px-3 small d-none mb-3"></div>
@@ -1946,88 +2152,26 @@
 </div>
 
 <div id="rollingStudentContextMenu" class="d-none" role="menu" aria-hidden="true">
-  <button type="button" class="btn btn-sm btn-outline-secondary" data-action="phones" id="rollingStudentContextMenuPhones">
-    <i class="bi bi-telephone me-2"></i>Manage Phone Numbers
+  <div class="rolling-student-context-menu-header" id="rollingStudentContextMenuHeader">Student</div>
+  <button type="button" class="rolling-student-context-menu-item" data-action="phones" id="rollingStudentContextMenuPhones">
+    <i class="bi bi-telephone"></i><span>Manage Phone Numbers</span>
   </button>
-  <button type="button" class="btn btn-sm btn-outline-secondary" data-action="addresses" id="rollingStudentContextMenuAddresses">
-    <i class="bi bi-geo-alt me-2"></i>Manage Addresses
+  <button type="button" class="rolling-student-context-menu-item" data-action="addresses" id="rollingStudentContextMenuAddresses">
+    <i class="bi bi-geo-alt"></i><span>Manage Addresses</span>
   </button>
-  <button type="button" class="btn btn-sm btn-outline-secondary" data-action="claim-numbers" id="rollingStudentContextMenuClaimNumbers">
-    <i class="bi bi-card-checklist me-2"></i>Manage Claim Numbers
+  <button type="button" class="rolling-student-context-menu-item" data-action="emails" id="rollingStudentContextMenuEmails">
+    <i class="bi bi-envelope"></i><span>Manage Email Addresses</span>
+  </button>
+  <button type="button" class="rolling-student-context-menu-item" data-action="gender" id="rollingStudentContextMenuGender">
+    <i class="bi bi-gender-ambiguous"></i><span>Manage Gender</span>
+  </button>
+  <div class="rolling-student-context-menu-divider" aria-hidden="true"></div>
+  <button type="button" class="rolling-student-context-menu-item" data-action="claim-numbers" id="rollingStudentContextMenuClaimNumbers">
+    <i class="bi bi-card-checklist"></i><span>Manage Claim Numbers</span>
   </button>
 </div>
 
-<div class="modal fade" id="rollingStudentClaimNumbersModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-card-checklist me-1"></i>Manage Claim Numbers</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-2 mb-3">
-          <div class="col-md-8">
-            <label class="form-label small fw-bold" for="rollingClaim_studentLabel">Student</label>
-            <input type="text" id="rollingClaim_studentLabel" class="form-control form-control-sm bg-light" readonly>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small fw-bold" for="rollingClaim_studentId">Student ID</label>
-            <input type="text" id="rollingClaim_studentId" class="form-control form-control-sm bg-light font-monospace" readonly>
-          </div>
-        </div>
-        <div id="rollingClaim_alert" class="alert alert-danger border py-2 px-3 small d-none mb-3"></div>
-        <div id="rollingClaim_empty" class="text-muted small text-center py-3 border rounded bg-light">No claim numbers saved yet.</div>
-        <div id="rollingClaim_listWrap" class="d-none">
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Claim Number</th>
-                  <th style="width: 22%;">Label</th>
-                  <th style="width: 10%;" class="text-center">Primary</th>
-                  <th style="width: 12%;" class="text-end">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="rollingClaim_tbody"></tbody>
-            </table>
-          </div>
-        </div>
-        <div id="rollingClaim_editorPanel" class="claim-number-row-editor mt-3 d-none">
-          <div class="fw-semibold small mb-2" id="rollingClaim_editorTitle">New Claim Number</div>
-          <div class="row g-2">
-            <div class="col-md-5">
-              <label class="form-label small fw-bold" for="rollingClaim_number">Claim Number *</label>
-              <input type="text" id="rollingClaim_number" class="form-control form-control-sm" maxlength="120">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-bold" for="rollingClaim_label">Label</label>
-              <input type="text" id="rollingClaim_label" class="form-control form-control-sm" maxlength="120" placeholder="Optional">
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="rollingClaim_isPrimary">
-                <label class="form-check-label small" for="rollingClaim_isPrimary">Primary</label>
-              </div>
-            </div>
-            <div class="col-12">
-              <label class="form-label small fw-bold" for="rollingClaim_notes">Notes</label>
-              <textarea id="rollingClaim_notes" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Optional"></textarea>
-            </div>
-          </div>
-          <div class="d-flex flex-wrap gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-primary" id="btn_rollingClaimApplyEditor">Apply</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn_rollingClaimCancelEditor">Cancel</button>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer flex-wrap gap-2">
-        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_rollingClaimAdd"><i class="bi bi-plus-lg me-1"></i>Add Claim Number</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary btn-sm" id="btn_rollingClaimSave"><i class="bi bi-save me-1"></i>Save</button>
-      </div>
-    </div>
-  </div>
-</div>
+<%- include('../partials/studentClaimNumbersModal') %>
 
 <div class="modal fade" id="closePeriodModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -2236,6 +2380,124 @@
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewMoveEnrollment">Preview</button>
         <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_applyMoveEnrollment" disabled>Apply Move</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="classMoveWizardModal" tabindex="-1" aria-labelledby="classMoveWizardModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="classMoveWizardModalLabel"><i class="bi bi-arrow-left-right me-1"></i>Move Class</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="enroll-wizard-guide" id="classMoveWizardStepIndicator" aria-hidden="false">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div class="fw-bold text-primary small">Move class wizard</div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-light text-dark border" id="classMoveWizardStepBadge">Step 1 of 4</span>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="classMoveWizardProgressPct">25%</span>
+            </div>
+          </div>
+          <div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="classMoveWizardProgressBar"></div></div>
+          <div class="wizard-step-rail" id="classMoveWizardStepPills"></div>
+        </div>
+        <div class="small text-muted mb-3 d-none" id="classMoveWizardStepLabel" aria-hidden="true"></div>
+        <div id="classMove_step1">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="classMove_closeDate">Closing date *</label>
+              <input type="date" id="classMove_closeDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Close status</label>
+              <input type="text" class="form-control bg-light" value="Completed" readonly>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label" for="classMove_closeReason">Reason *</label>
+              <textarea id="classMove_closeReason" class="form-control" rows="2" placeholder="Why are these enrollments being closed and moved?"></textarea>
+            </div>
+          </div>
+        </div>
+        <div id="classMove_step2" class="d-none">
+          <div class="class-move-context-strip mb-3" id="classMove_step2Context">
+            <div class="d-flex flex-wrap gap-3 align-items-center">
+              <span><span class="text-muted">Closing date:</span> <strong id="classMove_contextCloseDate">—</strong></span>
+              <span><span class="text-muted">Close status:</span> <strong>Completed</strong></span>
+              <span class="text-muted small">New enrollment start date matches the closing date for all selected students.</span>
+            </div>
+          </div>
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_classMoveSelectAll">Select all</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_classMoveClearAll">Clear all</button>
+          </div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0 class-move-students-table">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-2" style="width:2.5rem;"><input type="checkbox" class="form-check-input" id="classMove_checkAll" aria-label="Select all"></th>
+                  <th>Student</th>
+                  <th>End</th>
+                  <th>Sessions</th>
+                  <th>Hours</th>
+                  <th>Funder</th>
+                  <th>Status</th>
+                  <th>Session capacity</th>
+                  <th>Claim number</th>
+                </tr>
+              </thead>
+              <tbody id="classMove_candidatesTbody">
+                <tr><td colspan="9" class="text-center text-muted py-4">Load students using Next.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div id="classMove_step3" class="d-none">
+          <div class="class-move-context-strip mb-3" id="classMove_step3Context">
+            <div class="d-flex flex-wrap gap-3 align-items-center">
+              <span><span class="text-muted">Closing date:</span> <strong id="classMove_contextCloseDateStep3">—</strong></span>
+              <span><span class="text-muted">Close status:</span> <strong>Completed</strong></span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Target rolling class *</label>
+            <div class="input-group">
+              <input type="hidden" id="classMove_targetClassId">
+              <input type="text" id="classMove_targetClassLabel" class="form-control bg-white" placeholder="Pick target class..." readonly>
+              <button type="button" class="btn btn-outline-primary" id="btn_classMovePickTarget"><i class="bi bi-search"></i></button>
+            </div>
+          </div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light"><tr><th>Student</th><th>End</th><th>Sessions</th><th>Hours</th><th>Capacity</th><th>Claim</th></tr></thead>
+              <tbody id="classMove_selectedSummaryTbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="classMove_step4" class="d-none">
+          <div class="alert alert-light border small mb-3" id="classMove_previewHint">Click Preview to validate each selected student.</div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:2.5rem;"></th>
+                  <th>Student</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody id="classMove_previewTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btn_classMoveBack">Back</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn_classMoveNext">Next</button>
+        <button type="button" class="btn btn-outline-primary btn-sm d-none" id="btn_classMovePreview">Preview</button>
+        <button type="button" class="btn btn-filled btn-primary btn-sm d-none" id="btn_classMoveApply" disabled>Apply moves</button>
       </div>
     </div>
   </div>
@@ -2683,6 +2945,8 @@
 <script src="/scripts/rollingEnrollmentAlignmentClient.js"></script>
 <script src="/scripts/clbLevelValueParser.js"></script>
 <script src="/scripts/wizardStepRail.js"></script>
+<script src="/scripts/schoolMessageUi.js"></script>
+<script src="/scripts/studentClaimNumbersManager.js"></script>
 <div class="modal fade" id="studentConflictModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -3253,6 +3517,7 @@
   const undoCloseModalEl = qs('undoClosePeriodModal');
   const reentryModalEl = qs('reentryModal');
   const moveEnrollmentModalEl = qs('moveEnrollmentModal');
+  const classMoveWizardModalEl = qs('classMoveWizardModal');
   const editModalEl = qs('editPeriodModal');
   const onHoldModalEl = qs('enrollmentOnHoldModal');
   const enrollmentNoteModalEl = qs('enrollmentNoteModal');
@@ -3270,6 +3535,11 @@
   const CLAIM_NUMBER_ADD_NEW = '__add_new__';
   const ROLLING_CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
   const ROLLING_CLB_VALUE_GROUPS = ['goal', 'current', 'result'];
+  const ROLLING_CLB_EVALUATION_LABELS = {
+    referral: 'Referral',
+    placement_test: 'Placement test',
+    teacher: 'Teacher'
+  };
   let rollingClbLevelHistory = [];
   let rollingClbContext = { studentId: '', studentLabel: '' };
   let rollingClbEditingEntryId = '';
@@ -3422,6 +3692,7 @@
       document.getElementById('sessionEnrollmentCalendarModal'),
       groupEnrollmentModalEl,
       groupEnrollmentResultsModalEl,
+      classMoveWizardModalEl,
       document.getElementById('genericPickerModal')
     ].filter(Boolean);
   }
@@ -3512,6 +3783,7 @@
   const undoCloseModal = createModalController(undoCloseModalEl);
   const reentryModal = createModalController(reentryModalEl);
   const moveEnrollmentModal = createModalController(moveEnrollmentModalEl);
+  const classMoveWizardModal = createModalController(classMoveWizardModalEl);
   const editModal = createModalController(editModalEl);
   const enrollmentNoteModal = createModalController(enrollmentNoteModalEl);
   const onHoldModal = createModalController(onHoldModalEl);
@@ -3525,9 +3797,6 @@
   const groupEnrollmentResultsModal = createModalController(groupEnrollmentResultsModalEl);
   const rollingStudentClbModal = createModalController(rollingStudentClbModalEl);
   const rollingStudentClaimNumbersModal = createModalController(rollingStudentClaimNumbersModalEl);
-  let rollingClaimNumbers = [];
-  let rollingClaimEditingId = '';
-  let rollingClaimContext = { studentId: '', studentLabel: '', onSaved: null, selectAfterSave: '' };
   let rollingStudentContextState = null;
   const addButton = qs('btn_addPeriod');
   let approvedCloseStatusPayload = null;
@@ -5179,7 +5448,7 @@
     if (qs('grp_targetHours')) qs('grp_targetHours').value = String(entry.targetHours || '');
     if (qs('grp_status')) qs('grp_status').value = String(entry.status || 'active');
     if (qs('grp_reasonStart')) qs('grp_reasonStart').value = String(entry.reasonStart || '');
-    refreshClaimNumberSelect('grp_claimNumber', entry.id, String(entry.claimNumber || '').trim());
+    refreshClaimNumberSelect('grp_claimNumber', entry.id, resolveClaimSelectToken(entry));
     setSessionCapacitySelectValue('grp_sessionCapacityType', entry.sessionCapacityType);
     if (qs('grp_autoResolveSubjects')) qs('grp_autoResolveSubjects').checked = entry.autoResolveSubjects === true;
     setFunderSelectValue('grp_funder', {
@@ -5199,7 +5468,7 @@
       status: String(qs('grp_status')?.value || 'active').trim(),
       funderType: funder.funderType,
       funderId: funder.funderId,
-      claimNumber: readClaimNumberSelectValue('grp_claimNumber'),
+      ...readEnrollmentClaimPayload('grp_claimNumber'),
       reasonStart: String(qs('grp_reasonStart')?.value || '').trim(),
       targetSessionCount: hasTargetSessionCount('grp_targetSessionCount')
         ? String(qs('grp_targetSessionCount')?.value || '').trim()
@@ -5285,6 +5554,7 @@
       status: settings.status,
       funderType: settings.funderType,
       funderId: settings.funderId,
+      claimNumberId: settings.claimNumberId,
       claimNumber: settings.claimNumber,
       reasonStart: settings.reasonStart,
       sessionCountPolicy: 'all_non_na',
@@ -5786,16 +6056,65 @@
     `;
   }
 
-  function formatRollingClbSkillSummary(entry) {
-    const parts = [];
-    const labels = { goal: 'Goal', current: 'Current', result: 'Result' };
-    ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
-      const values = ROLLING_CLB_SKILLS
-        .map((skill) => String(entry?.[group]?.[skill] || '').trim())
-        .filter(Boolean);
-      if (values.length) parts.push(`${labels[group]}: ${values.join('/')}`);
-    });
-    return parts.join(' · ') || '—';
+  function renderRollingClbHistorySkillCell(value) {
+    const text = String(value || '').trim();
+    if (!text || text === '-') return '<span class="text-muted">—</span>';
+    return `<span class="clb-history-skill d-inline-block">${htmlEscape(text)}</span>`;
+  }
+
+  function renderRollingClbHistoryDateCell(value) {
+    const text = formatRollingClbDateLabel(value);
+    return (text && text !== '—')
+      ? `<span class="clb-history-date fw-semibold">${htmlEscape(text)}</span>`
+      : '<span class="text-muted">—</span>';
+  }
+
+  function renderRollingClbHistoryDatesCell(entry) {
+    const goalCurrent = renderRollingClbHistoryDateCell(entry?.recordedAt);
+    const result = renderRollingClbHistoryDateCell(entry?.resultRecordedAt);
+    return `
+      <div class="clb-history-dates">
+        <div class="clb-history-date-line">
+          <span class="clb-history-date-label">Goal / Current</span>
+          ${goalCurrent}
+        </div>
+        <div class="clb-history-date-line">
+          <span class="clb-history-date-label">Result</span>
+          ${result}
+        </div>
+      </div>
+    `;
+  }
+
+  function syncRollingClbTeacherPickRow() {
+    const isTeacher = String(qs('inp_rolling_clb_evaluationType')?.value || '').trim() === 'teacher';
+    qs('rollingClbTeacherPickCol')?.classList.toggle('d-none', !isTeacher);
+    if (!isTeacher) {
+      if (qs('inp_rolling_clb_evaluationTeacherId')) qs('inp_rolling_clb_evaluationTeacherId').value = '';
+      if (qs('inp_rolling_clb_evaluationTeacherLabel')) qs('inp_rolling_clb_evaluationTeacherLabel').value = '';
+    }
+  }
+
+  function pickRollingClbEvaluationTeacher() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showMsg('Picker Unavailable', 'warning', 'Teacher picker is not loaded on this page.');
+      return;
+    }
+    GenericPicker.open(GenericPickerPresets.teacher({
+      title: 'Select Teacher',
+      multiselect: false,
+      context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: (selected) => {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        if (!item) return;
+        const teacherId = String(item.personId || item.id || '').trim();
+        const teacherName = String(item.displayName || item.name || item.label || teacherId).trim();
+        if (qs('inp_rolling_clb_evaluationTeacherId')) qs('inp_rolling_clb_evaluationTeacherId').value = teacherId;
+        if (qs('inp_rolling_clb_evaluationTeacherLabel')) qs('inp_rolling_clb_evaluationTeacherLabel').value = teacherName;
+      }
+    }));
   }
 
   function syncRollingClbEditPermissions() {
@@ -5824,6 +6143,11 @@
         : String(orgToday || '');
     }
     if (resultRecordedAt) resultRecordedAt.value = '';
+    if (qs('inp_rolling_clb_note')) qs('inp_rolling_clb_note').value = '';
+    if (qs('inp_rolling_clb_evaluationType')) qs('inp_rolling_clb_evaluationType').value = 'referral';
+    if (qs('inp_rolling_clb_evaluationTeacherId')) qs('inp_rolling_clb_evaluationTeacherId').value = '';
+    if (qs('inp_rolling_clb_evaluationTeacherLabel')) qs('inp_rolling_clb_evaluationTeacherLabel').value = '';
+    syncRollingClbTeacherPickRow();
     ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
       ROLLING_CLB_SKILLS.forEach((skill) => {
         const input = getRollingClbEditorInput(group, skill);
@@ -5914,6 +6238,11 @@
     const resultRecordedAt = qs('inp_rolling_clbResultRecordedAt');
     if (recordedAt) recordedAt.value = String(entry.recordedAt || '');
     if (resultRecordedAt) resultRecordedAt.value = String(entry.resultRecordedAt || '');
+    if (qs('inp_rolling_clb_note')) qs('inp_rolling_clb_note').value = String(entry.note || '');
+    if (qs('inp_rolling_clb_evaluationType')) qs('inp_rolling_clb_evaluationType').value = String(entry.evaluationType || 'referral');
+    if (qs('inp_rolling_clb_evaluationTeacherId')) qs('inp_rolling_clb_evaluationTeacherId').value = String(entry.evaluationTeacherId || '');
+    if (qs('inp_rolling_clb_evaluationTeacherLabel')) qs('inp_rolling_clb_evaluationTeacherLabel').value = String(entry.evaluationTeacherLabel || '');
+    syncRollingClbTeacherPickRow();
     ROLLING_CLB_VALUE_GROUPS.forEach((group) => {
       ROLLING_CLB_SKILLS.forEach((skill) => {
         const input = getRollingClbEditorInput(group, skill);
@@ -5947,10 +6276,21 @@
         throw new Error(`Enter at least one value for ${labels[group]}.`);
       }
     });
+    const evaluationType = String(qs('inp_rolling_clb_evaluationType')?.value || 'referral').trim() || 'referral';
+    const note = String(qs('inp_rolling_clb_note')?.value || '').trim();
+    const evaluationTeacherId = String(qs('inp_rolling_clb_evaluationTeacherId')?.value || '').trim();
+    const evaluationTeacherLabel = String(qs('inp_rolling_clb_evaluationTeacherLabel')?.value || '').trim();
+    if (evaluationType === 'teacher' && !evaluationTeacherId) {
+      throw new Error('Select a teacher for Teacher evaluation.');
+    }
     return {
       id: rollingClbEditingEntryId || createRollingClbEntryId(rollingClbLevelHistory.length),
       recordedAt,
       resultRecordedAt,
+      note,
+      evaluationType,
+      evaluationTeacherId: evaluationType === 'teacher' ? evaluationTeacherId : '',
+      evaluationTeacherLabel: evaluationType === 'teacher' ? evaluationTeacherLabel : '',
       goal: values.goal,
       current: values.current,
       result: values.result
@@ -5993,16 +6333,33 @@
 
     emptyEl.classList.add('d-none');
     wrapEl.classList.remove('d-none');
-    tbody.innerHTML = rollingClbLevelHistory.map((entry) => {
+    const blocks = [];
+    rollingClbLevelHistory.forEach((entry, entryIndex) => {
       const entryId = htmlEscape(String(entry?.id || ''));
-      return `
-        <tr class="rolling-clb-history-row" data-entry-id="${entryId}" role="button" tabindex="0">
-          <td class="fw-semibold">${htmlEscape(formatRollingClbCell(entry?.recordedAt))}</td>
-          <td>${htmlEscape(formatRollingClbCell(entry?.resultRecordedAt))}</td>
-          <td class="small">${htmlEscape(formatRollingClbSkillSummary(entry))}</td>
+      const rowAttrs = `class="rolling-clb-history-row rolling-clb-history-entry-block" data-entry-id="${entryId}" role="button" tabindex="0"`;
+      const goalCells = ROLLING_CLB_SKILLS.map((skill) => `<td class="align-middle">${renderRollingClbHistorySkillCell(entry?.goal?.[skill])}</td>`).join('');
+      const currentCells = ROLLING_CLB_SKILLS.map((skill) => `<td class="align-middle">${renderRollingClbHistorySkillCell(entry?.current?.[skill])}</td>`).join('');
+      const resultCells = ROLLING_CLB_SKILLS.map((skill) => `<td class="align-middle">${renderRollingClbHistorySkillCell(entry?.result?.[skill])}</td>`).join('');
+      if (entryIndex > 0) {
+        blocks.push('<tr class="rolling-clb-history-spacer"><td colspan="6"></td></tr>');
+      }
+      blocks.push(`
+        <tr ${rowAttrs}>
+          <td rowspan="3" class="align-middle">${renderRollingClbHistoryDatesCell(entry)}</td>
+          <td class="clb-history-row-label fw-semibold">CLB Goal</td>
+          ${goalCells}
         </tr>
-      `;
-    }).join('');
+        <tr ${rowAttrs}>
+          <td class="clb-history-row-label fw-semibold">Current CLB Level</td>
+          ${currentCells}
+        </tr>
+        <tr ${rowAttrs}>
+          <td class="clb-history-row-label fw-semibold">CLB Result</td>
+          ${resultCells}
+        </tr>
+      `);
+    });
+    tbody.innerHTML = blocks.join('');
   }
 
   async function saveRollingClbEntryFromEditor() {
@@ -6071,7 +6428,13 @@
 
   function syncRollingStudentContextMenuPermissions() {
     const editable = canEditStudentClb === true;
-    ['rollingStudentContextMenuPhones', 'rollingStudentContextMenuAddresses', 'rollingStudentContextMenuClaimNumbers'].forEach((id) => {
+    [
+      'rollingStudentContextMenuPhones',
+      'rollingStudentContextMenuAddresses',
+      'rollingStudentContextMenuEmails',
+      'rollingStudentContextMenuGender',
+      'rollingStudentContextMenuClaimNumbers'
+    ].forEach((id) => {
       const btn = qs(id);
       if (!btn) return;
       btn.disabled = !editable;
@@ -6091,6 +6454,10 @@
     const menu = qs('rollingStudentContextMenu');
     if (!menu || !context?.studentId) return;
     rollingStudentContextState = { ...context };
+    const header = qs('rollingStudentContextMenuHeader');
+    if (header) {
+      header.textContent = String(context.studentLabel || context.studentId || 'Student').trim() || 'Student';
+    }
     syncRollingStudentContextMenuPermissions();
     if (menu.parentElement !== document.body) document.body.appendChild(menu);
     menu.classList.remove('d-none');
@@ -6149,254 +6516,126 @@
     });
   }
 
-  function setRollingClaimAlert(message) {
-    const alertEl = qs('rollingClaim_alert');
-    if (!alertEl) return;
-    const text = String(message || '').trim();
-    if (!text) {
-      alertEl.classList.add('d-none');
-      alertEl.textContent = '';
+  function openRollingStudentEmailsModal(context) {
+    hideRollingStudentContextMenu();
+    if (!canEditStudentClb) {
+      showMsg('Permission', 'warning', 'You do not have permission to manage student contact details.');
       return;
     }
-    alertEl.textContent = text;
-    alertEl.classList.remove('d-none');
-  }
-
-  function formatClaimNumberOptionLabel(entry) {
-    const number = String(entry?.number || '').trim();
-    const label = String(entry?.label || '').trim();
-    if (!number) return '';
-    return label ? `${label} (${number})` : number;
-  }
-
-  function populateClaimNumberSelectOptions(selectEl, claimNumbers, selectedValue) {
-    if (!selectEl) return;
-    const selected = String(selectedValue || '').trim();
-    const rows = Array.isArray(claimNumbers) ? claimNumbers : [];
-    const numbers = rows.map((row) => String(row?.number || '').trim()).filter(Boolean);
-    const uniqueNumbers = Array.from(new Set(numbers));
-    const selectedInList = !selected || uniqueNumbers.includes(selected);
-    const options = ['<option value="">— None —</option>'];
-    uniqueNumbers.forEach((number) => {
-      const entry = rows.find((row) => String(row?.number || '').trim() === number);
-      const label = entry ? formatClaimNumberOptionLabel(entry) : number;
-      options.push(`<option value="${htmlEscape(number)}"${selected === number ? ' selected' : ''}>${htmlEscape(label)}</option>`);
+    if (!context?.personId) {
+      showMsg('Email Addresses', 'warning', 'This student does not have a linked person profile.');
+      return;
+    }
+    if (typeof window.SchoolPersonProfileModal?.open !== 'function') {
+      showMsg('Unavailable', 'warning', 'Person profile editor is not loaded on this page.');
+      return;
+    }
+    window.SchoolPersonProfileModal.open({
+      personId: context.personId,
+      linkType: 'student',
+      linkId: context.studentId,
+      focus: 'emails'
     });
-    if (selected && !selectedInList) {
-      options.push(`<option value="${htmlEscape(selected)}" selected>${htmlEscape(selected)} (not in profile)</option>`);
-    }
-    options.push(`<option value="${CLAIM_NUMBER_ADD_NEW}">+ Add New...</option>`);
-    selectEl.innerHTML = options.join('');
-    selectEl.dataset.previousValue = selected;
   }
 
-  async function fetchStudentClaimNumbers(studentId) {
+  function patchRollingStudentGenderOnGrid(studentId, genderToken) {
     const sid = String(studentId || '').trim();
-    if (!sid) return [];
-    const result = await requestJson(`/school/students/api/${encodeURIComponent(sid)}/claim-numbers`);
-    return Array.isArray(result?.data?.claimNumbers) ? result.data.claimNumbers : [];
+    if (!sid) return;
+    const genderLabel = formatStudentGenderLabel(genderToken);
+    periodRows = (Array.isArray(periodRows) ? periodRows : []).map((row) => {
+      const rowStudentId = String(resolveEnrollmentPeriodStudentId(row) || row?.studentId || '').trim();
+      if (rowStudentId !== sid) return row;
+      return { ...row, studentGender: String(genderToken || '').trim().toLowerCase() };
+    });
+    document.querySelectorAll('.rolling-student-name-target').forEach((node) => {
+      if (String(node.dataset.studentId || '').trim() !== sid) return;
+      const genderLine = node.parentElement?.querySelector('.rolling-student-gender-line');
+      if (genderLabel) {
+        if (genderLine) genderLine.textContent = genderLabel;
+        else {
+          const line = document.createElement('div');
+          line.className = 'x-small text-muted font-monospace rolling-student-gender-line';
+          line.textContent = genderLabel;
+          node.insertAdjacentElement('afterend', line);
+        }
+      } else if (genderLine) {
+        genderLine.remove();
+      }
+    });
   }
 
-  async function refreshClaimNumberSelect(selectElOrId, studentId, selectedValue) {
-    const selectEl = typeof selectElOrId === 'string' ? qs(selectElOrId) : selectElOrId;
-    if (!selectEl) return [];
-    const sid = String(studentId || '').trim();
-    if (!sid) {
-      populateClaimNumberSelectOptions(selectEl, [], selectedValue);
-      return [];
+  function openRollingStudentGenderModal(context) {
+    hideRollingStudentContextMenu();
+    if (!canEditStudentClb) {
+      showMsg('Permission', 'warning', 'You do not have permission to manage student profile details.');
+      return;
     }
-    try {
-      const claimNumbers = await fetchStudentClaimNumbers(sid);
-      populateClaimNumberSelectOptions(selectEl, claimNumbers, selectedValue);
-      return claimNumbers;
-    } catch (_) {
-      populateClaimNumberSelectOptions(selectEl, [], selectedValue);
-      return [];
+    if (!context?.personId) {
+      showMsg('Gender', 'warning', 'This student does not have a linked person profile.');
+      return;
     }
+    if (typeof window.SchoolPersonProfileModal?.open !== 'function') {
+      showMsg('Unavailable', 'warning', 'Person profile editor is not loaded on this page.');
+      return;
+    }
+    const studentId = String(context.studentId || '').trim();
+    window.SchoolPersonProfileModal.open({
+      personId: context.personId,
+      linkType: 'student',
+      linkId: studentId,
+      focus: 'gender',
+      onSaved: (result) => {
+        const genderToken = String(result?.gender || '').trim();
+        patchRollingStudentGenderOnGrid(studentId, genderToken);
+        loadRows().catch((error) => console.error('Unable to refresh rolling enrollment rows after gender save.', error));
+      }
+    });
+  }
+
+  function claimNumbersManager() {
+    return window.StudentClaimNumbersManager;
+  }
+
+  function populateClaimNumberSelectOptions(selectEl, claimRows, selectedToken) {
+    return claimNumbersManager()?.populateClaimNumberSelectOptions(selectEl, claimRows, selectedToken);
+  }
+
+  async function refreshClaimNumberSelect(selectElOrId, studentId, selectedToken) {
+    const mgr = claimNumbersManager();
+    if (!mgr) return [];
+    return mgr.refreshClaimNumberSelect(selectElOrId, studentId, selectedToken);
   }
 
   function readClaimNumberSelectValue(selectElOrId) {
-    const selectEl = typeof selectElOrId === 'string' ? qs(selectElOrId) : selectElOrId;
-    const value = String(selectEl?.value || '').trim();
-    if (!value || value === CLAIM_NUMBER_ADD_NEW) return '';
-    return value;
+    const mgr = claimNumbersManager();
+    return mgr ? mgr.readClaimNumberSelectValue(selectElOrId) : '';
+  }
+
+  function readEnrollmentClaimPayload(selectElOrId) {
+    const claimNumberId = readClaimNumberSelectValue(selectElOrId);
+    return { claimNumberId, claimNumber: '' };
+  }
+
+  function resolveClaimSelectToken(row) {
+    return String(row?.claimNumberId || row?.claimNumber || '').trim();
   }
 
   async function handleClaimNumberSelectChange(selectElOrId, studentId, studentLabel) {
-    const selectEl = typeof selectElOrId === 'string' ? qs(selectElOrId) : selectElOrId;
-    if (!selectEl) return;
-    const value = String(selectEl.value || '').trim();
-    if (value !== CLAIM_NUMBER_ADD_NEW) {
-      selectEl.dataset.previousValue = value;
-      return;
-    }
-    const previous = String(selectEl.dataset.previousValue || '').trim();
-    selectEl.value = previous;
-    const sid = String(studentId || '').trim();
-    if (!sid) {
-      await showMsg('Claim Number', 'warning', 'Select a student first.');
-      return;
-    }
-    await openRollingStudentClaimNumbersModal({
-      studentId: sid,
-      studentLabel,
-      openEditorOnShow: true,
-      onSaved: async (claimNumbers, preferredNumber) => {
-        await refreshClaimNumberSelect(selectEl, sid, preferredNumber || previous);
-      }
-    });
-  }
-
-  function hideRollingClaimEditor() {
-    rollingClaimEditingId = '';
-    qs('rollingClaim_editorPanel')?.classList.add('d-none');
-    setRollingClaimAlert('');
-  }
-
-  function showRollingClaimEditor(entry = null) {
-    const panel = qs('rollingClaim_editorPanel');
-    if (!panel) return;
-    rollingClaimEditingId = String(entry?.id || '').trim();
-    if (qs('rollingClaim_editorTitle')) {
-      qs('rollingClaim_editorTitle').textContent = rollingClaimEditingId ? 'Edit Claim Number' : 'New Claim Number';
-    }
-    if (qs('rollingClaim_number')) qs('rollingClaim_number').value = String(entry?.number || '').trim();
-    if (qs('rollingClaim_label')) qs('rollingClaim_label').value = String(entry?.label || '').trim();
-    if (qs('rollingClaim_notes')) qs('rollingClaim_notes').value = String(entry?.notes || '').trim();
-    if (qs('rollingClaim_isPrimary')) qs('rollingClaim_isPrimary').checked = entry ? entry.isPrimary === true : !rollingClaimNumbers.some((row) => row.isPrimary);
-    panel.classList.remove('d-none');
-    qs('rollingClaim_number')?.focus();
-  }
-
-  function renderRollingClaimList() {
-    const emptyEl = qs('rollingClaim_empty');
-    const wrapEl = qs('rollingClaim_listWrap');
-    const tbody = qs('rollingClaim_tbody');
-    if (!tbody || !emptyEl || !wrapEl) return;
-    if (!rollingClaimNumbers.length) {
-      emptyEl.classList.remove('d-none');
-      wrapEl.classList.add('d-none');
-      tbody.innerHTML = '';
-      return;
-    }
-    emptyEl.classList.add('d-none');
-    wrapEl.classList.remove('d-none');
-    tbody.innerHTML = rollingClaimNumbers.map((entry) => {
-      const id = String(entry?.id || '').trim();
-      const number = String(entry?.number || '').trim();
-      const label = String(entry?.label || '').trim();
-      const primaryBadge = entry?.isPrimary ? '<span class="badge text-bg-primary-subtle text-primary-emphasis border">Primary</span>' : '<span class="text-muted">—</span>';
-      return `
-        <tr data-claim-id="${htmlEscape(id)}">
-          <td class="font-monospace">${htmlEscape(number)}</td>
-          <td>${label ? htmlEscape(label) : '<span class="text-muted">—</span>'}</td>
-          <td class="text-center">${primaryBadge}</td>
-          <td class="text-end">
-            <button type="button" class="btn btn-sm btn-outline-secondary btn-rolling-claim-edit" data-claim-id="${htmlEscape(id)}"><i class="bi bi-pencil"></i></button>
-            <button type="button" class="btn btn-sm btn-outline-danger btn-rolling-claim-delete" data-claim-id="${htmlEscape(id)}"><i class="bi bi-trash"></i></button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  function applyRollingClaimEditor() {
-    const number = String(qs('rollingClaim_number')?.value || '').trim();
-    if (!number) {
-      setRollingClaimAlert('Claim number is required.');
-      return;
-    }
-    const label = String(qs('rollingClaim_label')?.value || '').trim();
-    const notes = String(qs('rollingClaim_notes')?.value || '').trim();
-    const isPrimary = qs('rollingClaim_isPrimary')?.checked === true;
-    const entry = {
-      id: rollingClaimEditingId || `claim_${Date.now()}`,
-      number,
-      label,
-      notes,
-      isPrimary
-    };
-    if (rollingClaimEditingId) {
-      rollingClaimNumbers = rollingClaimNumbers.map((row) => (
-        String(row.id) === String(rollingClaimEditingId) ? { ...row, ...entry } : row
-      ));
-    } else {
-      rollingClaimNumbers.push(entry);
-    }
-    if (isPrimary) {
-      rollingClaimNumbers = rollingClaimNumbers.map((row) => ({
-        ...row,
-        isPrimary: String(row.id) === String(entry.id)
-      }));
-    }
-    hideRollingClaimEditor();
-    renderRollingClaimList();
-  }
-
-  async function saveRollingClaimNumbers(preferredNumber = '') {
-    const studentId = String(rollingClaimContext.studentId || '').trim();
-    if (!studentId) return null;
-    try {
-      showBusy('Saving claim numbers...');
-      const result = await requestJson(
-        `/school/students/api/${encodeURIComponent(studentId)}/claim-numbers`,
-        'PUT',
-        { claimNumbers: rollingClaimNumbers }
-      );
-      if (!result) return null;
-      rollingClaimNumbers = Array.isArray(result.data?.claimNumbers) ? result.data.claimNumbers : rollingClaimNumbers;
-      renderRollingClaimList();
-      const chosen = String(preferredNumber || rollingClaimContext.selectAfterSave || '').trim()
-        || String(rollingClaimNumbers.find((row) => row.isPrimary)?.number || rollingClaimNumbers[0]?.number || '').trim();
-      if (typeof rollingClaimContext.onSaved === 'function') {
-        await rollingClaimContext.onSaved(rollingClaimNumbers, chosen);
-      }
-      return chosen;
-    } catch (error) {
-      await showMsg('Claim Numbers', 'error', error.message || 'Unable to save claim numbers.');
-      return null;
-    } finally {
-      hideBusy();
-    }
+    const mgr = claimNumbersManager();
+    if (!mgr) return;
+    return mgr.handleClaimNumberSelectChange(selectElOrId, studentId, studentLabel);
   }
 
   async function openRollingStudentClaimNumbersModal(options = {}) {
     hideRollingStudentContextMenu();
+    const mgr = claimNumbersManager();
+    if (!mgr) return;
     const studentId = String(options.studentId || '').trim();
-    if (!studentId) return;
-    if (!canEditStudentClb) {
-      await showMsg('Permission', 'warning', 'You do not have permission to manage claim numbers.');
-      return;
-    }
-    rollingClaimContext = {
+    return mgr.open({
+      ...options,
       studentId,
-      studentLabel: String(options.studentLabel || resolveStudentContactContext(studentId).studentLabel || studentId).trim(),
-      onSaved: typeof options.onSaved === 'function' ? options.onSaved : null,
-      selectAfterSave: String(options.selectAfterSave || '').trim()
-    };
-    rollingClaimNumbers = [];
-    rollingClaimEditingId = '';
-    hideRollingClaimEditor();
-    setRollingClaimAlert('');
-    if (qs('rollingClaim_studentLabel')) qs('rollingClaim_studentLabel').value = rollingClaimContext.studentLabel;
-    if (qs('rollingClaim_studentId')) qs('rollingClaim_studentId').value = studentId;
-    try {
-      showBusy('Loading claim numbers...');
-      const result = await requestJson(`/school/students/api/${encodeURIComponent(studentId)}/claim-numbers`);
-      if (!result) return;
-      rollingClaimNumbers = Array.isArray(result.data?.claimNumbers) ? result.data.claimNumbers : [];
-      rollingClaimContext.studentLabel = String(result.data?.studentLabel || rollingClaimContext.studentLabel || studentId).trim();
-      if (qs('rollingClaim_studentLabel')) qs('rollingClaim_studentLabel').value = rollingClaimContext.studentLabel;
-      renderRollingClaimList();
-      mountRollingModalToBody(rollingStudentClaimNumbersModalEl);
-      rollingStudentClaimNumbersModal?.show();
-      raiseRollingModalAboveStack(rollingStudentClaimNumbersModalEl);
-      if (options.openEditorOnShow) showRollingClaimEditor(null);
-    } catch (error) {
-      await showMsg('Claim Numbers', 'error', error.message || 'Unable to load claim numbers.');
-    } finally {
-      hideBusy();
-    }
+      studentLabel: String(options.studentLabel || resolveStudentContactContext(studentId).studentLabel || studentId).trim()
+    });
   }
 
   async function openRollingStudentClbModal(periodId) {
@@ -6790,6 +7029,10 @@
     return useHtml ? formatRichServerMessageHtml(message) : htmlEscape(String(message || ''));
   }
 
+  window.SchoolMessageUi?.configure({
+    formatMessageBody: (message, options) => resolveMessageBodyHtml(message, options)
+  });
+
   let rollingBusyDepth = 0;
   let rollingBusyToken = null;
   let enrollmentModalBusy = false;
@@ -6893,32 +7136,28 @@
   }
 
   async function showMsg(title, icon, message, options = {}) {
-    // Busy overlay is z-index 20050; message modal must appear on top.
     while (rollingBusyDepth > 0) hideBusy();
+    if (window.SchoolMessageUi) {
+      await window.SchoolMessageUi.showAlert(title, icon, message, options);
+      return;
+    }
     const body = resolveMessageBodyHtml(message, options);
     if (typeof window.showMessageModal === 'function') {
-      const modalOptions = {
-        title,
-        icon,
-        message: body
-      };
-      if (Array.isArray(options.buttons) && options.buttons.length) {
-        modalOptions.buttons = options.buttons;
-      }
+      const modalOptions = { title, icon, message: body };
+      if (Array.isArray(options.buttons) && options.buttons.length) modalOptions.buttons = options.buttons;
       if (options.size) modalOptions.size = options.size;
       await window.showMessageModal(modalOptions);
       return;
     }
     const plain = options.html ? plainTextFromHtml(message) : String(message || '');
-    if (typeof window.alert === 'function') {
-      window.alert(plain || title);
-      return;
-    }
-    console.log(title + ': ' + (plain || title));
+    if (typeof window.alert === 'function') window.alert(plain || title);
   }
 
   async function showConfirm(message, title = 'Confirm', options = {}) {
     while (rollingBusyDepth > 0) hideBusy();
+    if (window.SchoolMessageUi) {
+      return window.SchoolMessageUi.showConfirm(message, title, options);
+    }
     const cancelText = String(options.cancelText || 'Cancel').trim() || 'Cancel';
     const confirmText = String(options.confirmText || 'Confirm').trim() || 'Confirm';
     const icon = String(options.icon || 'warning').trim() || 'warning';
@@ -6937,9 +7176,7 @@
       return result === confirmText || result === true;
     }
     const plain = options.html ? plainTextFromHtml(message) : String(message || '');
-    if (typeof window.confirm === 'function') {
-      return window.confirm(plain || title);
-    }
+    if (typeof window.confirm === 'function') return window.confirm(plain || title);
     return false;
   }
 
@@ -6971,7 +7208,7 @@
       status: String(qs('inp_status')?.value || 'active').trim(),
       funderType: funder.funderType,
       funderId: funder.funderId,
-      claimNumber: readClaimNumberSelectValue('inp_claimNumber'),
+      ...readEnrollmentClaimPayload('inp_claimNumber'),
       reasonStart: String(qs('inp_reasonStart')?.value || '').trim(),
       sessionCountPolicy: 'all_non_na',
       sessionCapacityType: readSessionCapacityTypeFromSelect('inp_sessionCapacityType'),
@@ -7022,6 +7259,7 @@
       status: base.status,
       funderType: base.funderType,
       funderId: base.funderId,
+      claimNumberId: base.claimNumberId,
       claimNumber: base.claimNumber,
       reasonStart: base.reasonStart,
       sessionCountPolicy: base.sessionCountPolicy,
@@ -9047,7 +9285,8 @@
       status: String(qs('charge_status')?.value || 'draft').trim().toLowerCase() || 'draft',
       funderType: funderType === 'self' ? 'self' : 'funder',
       funderId: funderType === 'self' || !funderId ? 'self' : funderId,
-      claimNumber: String(pendingEnrollmentPayload?.claimNumber || readClaimNumberSelectValue('inp_claimNumber') || '').trim(),
+      claimNumberId: String(pendingEnrollmentPayload?.claimNumberId || readClaimNumberSelectValue('inp_claimNumber') || '').trim(),
+      claimNumber: String(pendingEnrollmentPayload?.claimNumber || '').trim(),
       reasonStart: String(qs('inp_reasonStart')?.value || pendingEnrollmentPayload?.reasonStart || '').trim(),
       targetSessionCount: String(pendingEnrollmentPayload?.targetSessionCount || '').trim(),
       targetHours: String(pendingEnrollmentPayload?.targetHours || '').trim(),
@@ -9607,6 +9846,25 @@
     return result;
   }
 
+  window.StudentClaimNumbersManager?.configure({
+    requestJson,
+    showBusy,
+    hideBusy,
+    showMsg,
+    showConfirm,
+    canEdit: canEditStudentClb === true,
+    mountModal: mountRollingModalToBody,
+    showModal: () => {
+      mountRollingModalToBody(rollingStudentClaimNumbersModalEl);
+      rollingStudentClaimNumbersModal?.show();
+      raiseRollingModalAboveStack(rollingStudentClaimNumbersModalEl);
+    },
+    raiseModal: raiseRollingModalAboveStack,
+    clearModalStack: clearRollingModalStackZIndex,
+    formatRichHtml: formatRichServerMessageHtml,
+    getModalEl: () => rollingStudentClaimNumbersModalEl
+  });
+
   function formatStudentGenderLabel(gender) {
     const token = String(gender || '').trim().toLowerCase();
     if (!token) return '';
@@ -10152,7 +10410,7 @@
         notes: String(qs('move_notes')?.value || '').trim(),
         status: String(qs('move_status')?.value || 'active').trim().toLowerCase() || 'active',
         sessionCapacityType: readSessionCapacityTypeFromSelect('move_sessionCapacityType'),
-        claimNumber: readClaimNumberSelectValue('move_claimNumber'),
+        ...readEnrollmentClaimPayload('move_claimNumber'),
         sessionCountPolicy: String(moveSourcePeriodRow?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na'
       }
     };
@@ -10274,7 +10532,7 @@
     }
     setSessionCapacitySelectValue('move_sessionCapacityType', row?.sessionCapacityType || 'group');
     clearMoveTargetClassPicker();
-    await refreshClaimNumberSelect('move_claimNumber', row.studentId, String(row?.claimNumber || '').trim());
+    await refreshClaimNumberSelect('move_claimNumber', row.studentId, resolveClaimSelectToken(row));
     moveEnrollmentModal.show();
   }
 
@@ -10383,6 +10641,514 @@
     } finally {
       hideBusy();
     }
+  }
+
+  const CLASS_MOVE_WIZARD_STEPS = [
+    { id: 'close', label: 'Close' },
+    { id: 'students', label: 'Students' },
+    { id: 'target', label: 'Target class' },
+    { id: 'preview', label: 'Preview' }
+  ];
+
+  const classMoveWizardState = {
+    step: 1,
+    closeEffectiveDate: '',
+    candidates: [],
+    rowEdits: {},
+    previewItems: [],
+    batchPreviewHash: '',
+    targetClassId: '',
+    targetClassTitle: ''
+  };
+
+  function getClassMoveCloseDate() {
+    return String(
+      classMoveWizardState.closeEffectiveDate
+      || qs('classMove_closeDate')?.value
+      || ''
+    ).trim();
+  }
+
+  function renderClassMoveWizardStepIndicator() {
+    const pillHost = qs('classMoveWizardStepPills');
+    if (!pillHost) return;
+    const step = Number(classMoveWizardState.step) || 1;
+    const activeIdx = Math.max(0, Math.min(CLASS_MOVE_WIZARD_STEPS.length - 1, step - 1));
+    const progress = ((activeIdx + 1) / CLASS_MOVE_WIZARD_STEPS.length) * 100;
+    const badge = qs('classMoveWizardStepBadge');
+    const progressPct = qs('classMoveWizardProgressPct');
+    const progressBar = qs('classMoveWizardProgressBar');
+    if (badge) badge.textContent = `Step ${activeIdx + 1} of ${CLASS_MOVE_WIZARD_STEPS.length}`;
+    if (progressPct) progressPct.textContent = `${Math.round(progress)}%`;
+    if (progressBar) progressBar.style.width = `${progress.toFixed(2)}%`;
+    pillHost.innerHTML = CLASS_MOVE_WIZARD_STEPS.map((row, idx) => {
+      const stateClass = idx === activeIdx ? 'active' : (idx < activeIdx ? 'completed' : '');
+      return `<button type="button" class="wizard-step-pill ${stateClass}" tabindex="-1" aria-disabled="true">${idx + 1}. ${htmlEscape(row.label)}</button>`;
+    }).join('');
+    if (window.WizardStepRail) window.WizardStepRail.sync(pillHost);
+  }
+
+  function renderClassMoveContextDates() {
+    const closeDate = getClassMoveCloseDate();
+    if (qs('classMove_contextCloseDate')) qs('classMove_contextCloseDate').textContent = closeDate || '—';
+    if (qs('classMove_contextCloseDateStep3')) qs('classMove_contextCloseDateStep3').textContent = closeDate || '—';
+  }
+
+  function enrichClassMoveCandidatesFromPeriodRows() {
+    const gridRows = Array.isArray(periodRows) ? periodRows : [];
+    (classMoveWizardState.candidates || []).forEach((candidate) => {
+      const periodId = String(candidate.periodId || '').trim();
+      const studentId = String(candidate.studentId || '').trim();
+      const gridRow = gridRows.find((row) => {
+        const rowPeriodId = String(row?.id || row?.periodId || '').trim();
+        return rowPeriodId && rowPeriodId === periodId;
+      });
+      const labelFromGrid = gridRow
+        ? String(resolveStudentRowDisplay(gridRow).label || gridRow.studentLabel || '').trim()
+        : '';
+      const currentLabel = String(candidate.studentLabel || '').trim();
+      if (labelFromGrid && (!currentLabel || currentLabel === studentId)) {
+        candidate.studentLabel = labelFromGrid;
+      }
+    });
+  }
+
+  function resetClassMoveWizard() {
+    classMoveWizardState.step = 1;
+    classMoveWizardState.closeEffectiveDate = '';
+    classMoveWizardState.candidates = [];
+    classMoveWizardState.rowEdits = {};
+    classMoveWizardState.previewItems = [];
+    classMoveWizardState.batchPreviewHash = '';
+    classMoveWizardState.targetClassId = '';
+    classMoveWizardState.targetClassTitle = '';
+    if (qs('classMove_closeDate')) qs('classMove_closeDate').value = orgTodayFallback();
+    if (qs('classMove_closeReason')) qs('classMove_closeReason').value = '';
+    if (qs('classMove_targetClassId')) qs('classMove_targetClassId').value = '';
+    if (qs('classMove_targetClassLabel')) qs('classMove_targetClassLabel').value = '';
+    renderClassMoveWizardStep();
+  }
+
+  function buildClassMoveFunderOptionsHtml(selectedId = 'self') {
+    const selected = String(selectedId || 'self').trim() || 'self';
+    const rows = Array.isArray(funderOptions) ? funderOptions : [];
+    return rows.map((row) => {
+      const id = String(row?.id || '').trim();
+      if (!id) return '';
+      const label = htmlEscape(String(row?.label || id));
+      return `<option value="${htmlEscape(id)}"${id === selected ? ' selected' : ''}>${label}</option>`;
+    }).join('');
+  }
+
+  function getClassMoveRowEdit(periodId, candidate) {
+    const key = String(periodId || '').trim();
+    if (!classMoveWizardState.rowEdits[key]) {
+      const def = candidate?.defaultPayload || {};
+      classMoveWizardState.rowEdits[key] = {
+        selected: true,
+        targetEndDate: String(def?.target?.endDate || '').trim(),
+        targetSessionCount: Number(def?.target?.targetSessionCount || 0) || '',
+        targetHours: Number(def?.target?.targetHours || 0) || '',
+        funderId: String(def?.target?.funder?.funderId || 'self').trim() || 'self',
+        targetStatus: String(def?.target?.status || 'active').trim() || 'active',
+        sessionCapacityType: normalizeSessionCapacityTypeValue(
+          candidate?.sessionCapacityType || def?.target?.sessionCapacityType || 'group'
+        ),
+        claimNumberId: String(
+          candidate?.claimNumberId || def?.target?.claimNumberId || candidate?.claimNumber || def?.target?.claimNumber || ''
+        ).trim()
+      };
+    }
+    return classMoveWizardState.rowEdits[key];
+  }
+
+  function buildClassMoveStatusOptionsHtml(selectedStatus = 'active') {
+    const selected = String(selectedStatus || 'active').trim().toLowerCase();
+    const options = [
+      { value: 'active', label: 'Active' },
+      { value: 'to_be_confirmed', label: 'To be Confirmed' },
+      { value: 'waiting_list', label: 'Waiting list' }
+    ];
+    return options.map((row) => (
+      `<option value="${row.value}"${selected === row.value ? ' selected' : ''}>${htmlEscape(row.label)}</option>`
+    )).join('');
+  }
+
+  function buildClassMoveCapacityOptionsHtml(selectedValue = 'group') {
+    const selected = normalizeSessionCapacityTypeValue(selectedValue);
+    return `<option value="group"${selected === 'group' ? ' selected' : ''}>Group</option>`
+      + `<option value="one_on_one"${selected === 'one_on_one' ? ' selected' : ''}>1 On 1</option>`;
+  }
+
+  function buildClassMovePayloadForRow(candidate, edit) {
+    const closeDate = getClassMoveCloseDate();
+    const funderRow = (Array.isArray(funderOptions) ? funderOptions : []).find((row) => String(row?.id || '') === String(edit.funderId || ''));
+    const sessionCount = normalizeTargetSessionCountValue(edit.targetSessionCount);
+    const targetHours = normalizeTargetHoursValue(edit.targetHours);
+    const periodToken = String(candidate?.periodId || '').trim();
+    const claimSelect = periodToken
+      ? classMoveWizardModalEl?.querySelector(`.class-move-claim-select[data-period-id="${periodToken.replace(/"/g, '')}"]`)
+      : null;
+    const claimFields = claimSelect
+      ? readEnrollmentClaimPayload(claimSelect)
+      : { claimNumberId: String(edit.claimNumberId || '').trim(), claimNumber: '' };
+    return {
+      close: {
+        effectiveDate: closeDate,
+        targetStatus: 'completed'
+      },
+      target: {
+        studentId: String(candidate?.studentId || '').trim(),
+        startDate: closeDate,
+        endDate: String(edit.targetEndDate || '').trim(),
+        targetSessionCount: sessionCount,
+        targetHours,
+        funder: {
+          funderId: String(edit.funderId || 'self').trim() || 'self',
+          funderType: String(funderRow?.funderType || funderRow?.type || edit.funderId || 'self').trim() || 'self'
+        },
+        status: String(edit.targetStatus || 'active').trim().toLowerCase() || 'active',
+        sessionCountPolicy: String(candidate?.defaultPayload?.target?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na',
+        sessionCapacityType: normalizeSessionCapacityTypeValue(edit.sessionCapacityType || 'group'),
+        claimNumberId: claimFields.claimNumberId,
+        claimNumber: claimFields.claimNumber,
+        reasonStart: String(candidate?.defaultPayload?.target?.reasonStart || '').trim()
+      }
+    };
+  }
+
+  async function hydrateClassMoveClaimSelects() {
+    const tbody = qs('classMove_candidatesTbody');
+    if (!tbody) return;
+    const candidateByPeriod = new Map((classMoveWizardState.candidates || []).map((row) => [
+      String(row.periodId || '').trim(),
+      row
+    ]));
+    const selects = [...tbody.querySelectorAll('.class-move-claim-select')];
+    await Promise.all(selects.map(async (selectEl) => {
+      const periodId = String(selectEl.getAttribute('data-period-id') || '').trim();
+      const candidate = candidateByPeriod.get(periodId);
+      const studentId = String(candidate?.studentId || selectEl.getAttribute('data-student-id') || '').trim();
+      const edit = classMoveWizardState.rowEdits[periodId];
+      await refreshClaimNumberSelect(selectEl, studentId, String(edit?.claimNumberId || '').trim());
+    }));
+  }
+
+  function renderClassMoveCandidatesTable() {
+    const tbody = qs('classMove_candidatesTbody');
+    if (!tbody) return;
+    const rows = Array.isArray(classMoveWizardState.candidates) ? classMoveWizardState.candidates : [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No eligible enrollments for the selected closing date.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map((candidate) => {
+      const periodId = String(candidate.periodId || '').trim();
+      const studentId = String(candidate.studentId || '').trim();
+      const edit = getClassMoveRowEdit(periodId, candidate);
+      const studentLabel = String(candidate.studentLabel || studentId || '').trim();
+      return `<tr data-class-move-period="${htmlEscape(periodId)}">
+        <td class="ps-2"><input type="checkbox" class="form-check-input class-move-row-check" data-period-id="${htmlEscape(periodId)}" ${edit.selected ? 'checked' : ''}></td>
+        <td><div class="fw-semibold">${htmlEscape(studentLabel)}</div><div class="small text-muted">${htmlEscape(candidate.periodStartDate || '')}${candidate.periodEndDate ? ' – ' + htmlEscape(candidate.periodEndDate) : ''}</div></td>
+        <td><input type="date" class="form-control form-control-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="targetEndDate" value="${htmlEscape(edit.targetEndDate)}"></td>
+        <td><input type="number" min="0" step="1" class="form-control form-control-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="targetSessionCount" value="${htmlEscape(edit.targetSessionCount)}"></td>
+        <td><input type="number" min="0" step="0.25" class="form-control form-control-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="targetHours" value="${htmlEscape(edit.targetHours)}"></td>
+        <td><select class="form-select form-select-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="funderId">${buildClassMoveFunderOptionsHtml(edit.funderId)}</select></td>
+        <td><select class="form-select form-select-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="targetStatus">${buildClassMoveStatusOptionsHtml(edit.targetStatus)}</select></td>
+        <td><select class="form-select form-select-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="sessionCapacityType">${buildClassMoveCapacityOptionsHtml(edit.sessionCapacityType)}</select></td>
+        <td><select class="form-select form-select-sm class-move-claim-select" data-period-id="${htmlEscape(periodId)}" data-student-id="${htmlEscape(studentId)}" data-student-label="${htmlEscape(studentLabel)}"><option value="">— None —</option><option value="${CLAIM_NUMBER_ADD_NEW}">+ Add New...</option></select></td>
+      </tr>`;
+    }).join('');
+    hydrateClassMoveClaimSelects().catch((error) => console.error('Unable to load claim numbers for class move.', error));
+  }
+
+  function renderClassMoveSelectedSummary() {
+    const tbody = qs('classMove_selectedSummaryTbody');
+    if (!tbody) return;
+    renderClassMoveContextDates();
+    const selected = getSelectedClassMoveCandidates();
+    tbody.innerHTML = selected.length
+      ? selected.map(({ candidate, edit }) => {
+        const claimSelect = document.querySelector(`.class-move-claim-select[data-period-id="${CSS.escape(String(candidate.periodId || '').trim())}"]`);
+        const claimLabel = claimSelect
+          ? String(claimSelect.selectedOptions?.[0]?.textContent || readClaimNumberSelectValue(claimSelect) || '—').trim()
+          : String(edit.claimNumber || '—');
+        return `<tr><td>${htmlEscape(candidate.studentLabel || '')}</td><td>${htmlEscape(edit.targetEndDate || '—')}</td><td>${htmlEscape(edit.targetSessionCount || '—')}</td><td>${htmlEscape(edit.targetHours || '—')}</td><td>${htmlEscape(formatSessionCapacityTypeLabel(edit.sessionCapacityType))}</td><td>${htmlEscape(claimLabel || '—')}</td></tr>`;
+      }).join('')
+      : '<tr><td colspan="6" class="text-center text-muted py-3">No students selected.</td></tr>';
+  }
+
+  function renderClassMovePreviewTable() {
+    const tbody = qs('classMove_previewTbody');
+    if (!tbody) return;
+    const items = Array.isArray(classMoveWizardState.previewItems) ? classMoveWizardState.previewItems : [];
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">Run Preview to see results.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map((item) => {
+      const periodId = String(item.periodId || '').trim();
+      const blocked = item.canApply !== true;
+      const msg = blocked
+        ? (item.blockers || []).map((row) => formatRichServerMessageHtml(row.message || '')).join('<br>')
+        : (item.summaryLines || []).map((line) => htmlEscape(line)).join('<br>');
+      return `<tr class="${blocked ? 'table-warning' : ''}">
+        <td><input type="checkbox" class="form-check-input class-move-preview-check" data-period-id="${htmlEscape(periodId)}" ${blocked ? '' : 'checked'} ${blocked ? 'disabled' : ''}></td>
+        <td class="fw-semibold">${htmlEscape(item.studentLabel || item.studentId || '')}</td>
+        <td class="small">${msg || (blocked ? 'Blocked' : 'Ready')}</td>
+      </tr>`;
+    }).join('');
+    const applyBtn = qs('btn_classMoveApply');
+    if (applyBtn) {
+      applyBtn.disabled = !items.some((row) => row.canApply === true);
+    }
+  }
+
+  function renderClassMoveWizardStep() {
+    const step = Number(classMoveWizardState.step) || 1;
+    renderClassMoveWizardStepIndicator();
+    renderClassMoveContextDates();
+    ['classMove_step1', 'classMove_step2', 'classMove_step3', 'classMove_step4'].forEach((id, index) => {
+      const el = qs(id);
+      if (el) el.classList.toggle('d-none', index + 1 !== step);
+    });
+    qs('btn_classMoveBack')?.classList.toggle('d-none', step <= 1);
+    qs('btn_classMoveNext')?.classList.toggle('d-none', step >= 4);
+    qs('btn_classMovePreview')?.classList.toggle('d-none', step !== 4);
+    qs('btn_classMoveApply')?.classList.toggle('d-none', step !== 4);
+    if (step === 2) renderClassMoveCandidatesTable();
+    if (step === 3) renderClassMoveSelectedSummary();
+    if (step === 4) renderClassMovePreviewTable();
+  }
+
+  function getSelectedClassMoveCandidates() {
+    const rows = Array.isArray(classMoveWizardState.candidates) ? classMoveWizardState.candidates : [];
+    return rows
+      .map((candidate) => {
+        const periodId = String(candidate.periodId || '').trim();
+        const edit = getClassMoveRowEdit(periodId, candidate);
+        return edit.selected ? { candidate, edit } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function syncClassMoveFieldFromDom(event) {
+    const input = event.target;
+    if (!input?.classList?.contains('class-move-field')
+      && !input?.classList?.contains('class-move-row-check')
+      && !input?.classList?.contains('class-move-claim-select')) return;
+    const periodId = String(input.getAttribute('data-period-id') || '').trim();
+    if (!periodId || !classMoveWizardState.rowEdits[periodId]) return;
+    if (input.classList.contains('class-move-row-check')) {
+      classMoveWizardState.rowEdits[periodId].selected = input.checked === true;
+      return;
+    }
+    if (input.classList.contains('class-move-claim-select')) {
+      classMoveWizardState.rowEdits[periodId].claimNumberId = readClaimNumberSelectValue(input);
+      classMoveWizardState.batchPreviewHash = '';
+      classMoveWizardState.previewItems = [];
+      return;
+    }
+    const field = String(input.getAttribute('data-field') || '').trim();
+    if (!field) return;
+    classMoveWizardState.rowEdits[periodId][field] = input.value;
+    classMoveWizardState.batchPreviewHash = '';
+    classMoveWizardState.previewItems = [];
+  }
+
+  async function handleClassMoveClaimSelectChange(selectEl) {
+    if (!selectEl) return;
+    const periodId = String(selectEl.getAttribute('data-period-id') || '').trim();
+    const studentId = String(selectEl.getAttribute('data-student-id') || '').trim();
+    const studentLabel = String(selectEl.getAttribute('data-student-label') || '').trim();
+    await handleClaimNumberSelectChange(selectEl, studentId, studentLabel);
+    if (periodId && classMoveWizardState.rowEdits[periodId]) {
+      classMoveWizardState.rowEdits[periodId].claimNumberId = readClaimNumberSelectValue(selectEl);
+      classMoveWizardState.batchPreviewHash = '';
+      classMoveWizardState.previewItems = [];
+    }
+  }
+
+  async function loadClassMoveCandidates() {
+    const closeEffectiveDate = getClassMoveCloseDate();
+    if (!closeEffectiveDate) throw new Error('Closing date is required.');
+    const result = await requestJson(`/school/classes/api/${encodeURIComponent(classId)}/class-move/candidates`, 'POST', { closeEffectiveDate });
+    classMoveWizardState.candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+    enrichClassMoveCandidatesFromPeriodRows();
+    classMoveWizardState.rowEdits = {};
+    classMoveWizardState.previewItems = [];
+    classMoveWizardState.batchPreviewHash = '';
+    renderClassMoveCandidatesTable();
+  }
+
+  async function openClassMoveTargetPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      await showMsg('Picker Unavailable', 'warning', 'Class picker is not loaded on this page.');
+      return;
+    }
+    GenericPicker.open(GenericPickerPresets.class({
+      title: 'Select target class',
+      icon: 'bi-book',
+      placeholder: 'Search rolling classes...',
+      context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      itemFilter: (item) => {
+        const itemId = String(item?.id || '').trim();
+        if (!itemId || itemId === String(classId || '').trim()) return false;
+        return String(item?.registrationMode || '').trim().toLowerCase() === 'rolling';
+      },
+      onSelect: (item) => {
+        const nextId = String(item?.id || '').trim();
+        const nextTitle = String(item?.title || item?.label || nextId).trim();
+        classMoveWizardState.targetClassId = nextId;
+        classMoveWizardState.targetClassTitle = nextTitle;
+        if (qs('classMove_targetClassId')) qs('classMove_targetClassId').value = nextId;
+        if (qs('classMove_targetClassLabel')) qs('classMove_targetClassLabel').value = nextTitle;
+        classMoveWizardState.batchPreviewHash = '';
+        classMoveWizardState.previewItems = [];
+      }
+    }));
+  }
+
+  async function previewClassMoveBatchAction() {
+    const closeReason = String(qs('classMove_closeReason')?.value || '').trim();
+    const targetClassId = String(classMoveWizardState.targetClassId || qs('classMove_targetClassId')?.value || '').trim();
+    if (!closeReason || !targetClassId) {
+      await showMsg('Missing Fields', 'warning', 'Close reason and target class are required.');
+      return;
+    }
+    const selected = getSelectedClassMoveCandidates();
+    if (!selected.length) {
+      await showMsg('No Students', 'warning', 'Select at least one student to preview.');
+      return;
+    }
+    const rows = selected.map(({ candidate, edit }) => ({
+      periodId: candidate.periodId,
+      studentLabel: candidate.studentLabel,
+      payload: buildClassMovePayloadForRow(candidate, edit)
+    }));
+    try {
+      showBusy('Previewing class move...');
+      const result = await requestJson(`/school/classes/api/${encodeURIComponent(classId)}/class-move/preview`, 'POST', {
+        targetClassId,
+        closeReason,
+        rows
+      });
+      const preview = result?.preview || {};
+      classMoveWizardState.batchPreviewHash = String(preview.batchPreviewHash || '').trim();
+      classMoveWizardState.previewItems = Array.isArray(preview.items) ? preview.items : [];
+      if (qs('classMove_previewHint')) {
+        qs('classMove_previewHint').textContent = preview.canApplyAny
+          ? 'Review results below. Blocked students are unchecked automatically.'
+          : 'No students can be moved with the current settings. Adjust selections or fix blockers.';
+      }
+      renderClassMovePreviewTable();
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function applyClassMoveBatchAction() {
+    if (!classMoveWizardState.batchPreviewHash) {
+      await showMsg('Preview Required', 'warning', 'Preview before applying.');
+      return;
+    }
+    const targetClassId = String(classMoveWizardState.targetClassId || '').trim();
+    const previewMap = new Map((classMoveWizardState.previewItems || []).map((row) => [String(row.periodId || '').trim(), row]));
+    const rows = [];
+    document.querySelectorAll('.class-move-preview-check:checked:not(:disabled)').forEach((input) => {
+      const periodId = String(input.getAttribute('data-period-id') || '').trim();
+      const previewRow = previewMap.get(periodId);
+      if (!previewRow?.canApply || !previewRow.previewHash || !previewRow.payload) return;
+      rows.push({
+        periodId,
+        previewHash: previewRow.previewHash,
+        payload: previewRow.payload
+      });
+    });
+    if (!rows.length) {
+      await showMsg('Nothing to Apply', 'warning', 'Select at least one student that passed preview.');
+      return;
+    }
+    const confirmed = await showConfirm(`Apply move for ${rows.length} student(s)?`, 'Move Class', {
+      confirmText: 'Apply',
+      confirmClass: 'btn-primary'
+    });
+    if (!confirmed) return;
+    try {
+      showBusy('Applying class moves...');
+      const result = await requestJson(`/school/classes/api/${encodeURIComponent(classId)}/class-move/apply`, 'POST', {
+        batchPreviewHash: classMoveWizardState.batchPreviewHash,
+        targetClassId,
+        rows
+      });
+      classMoveWizardModal?.hide();
+      await loadRows();
+      const summary = result?.result || {};
+      await showMsg('Class Move Finished', summary.failed > 0 ? 'warning' : 'success', result?.message || 'Class move completed.');
+    } catch (error) {
+      await showMsg('Class Move Failed', 'error', error.message || 'Unable to apply class move.');
+    } finally {
+      hideBusy();
+    }
+  }
+
+  async function classMoveWizardNext() {
+    const step = Number(classMoveWizardState.step) || 1;
+    if (step === 1) {
+      const closeDate = String(qs('classMove_closeDate')?.value || '').trim();
+      const closeReason = String(qs('classMove_closeReason')?.value || '').trim();
+      if (!closeDate || !closeReason) {
+        await showMsg('Missing Fields', 'warning', 'Closing date and reason are required.');
+        return;
+      }
+      const closeDateChanged = classMoveWizardState.closeEffectiveDate
+        && classMoveWizardState.closeEffectiveDate !== closeDate;
+      classMoveWizardState.closeEffectiveDate = closeDate;
+      if (closeDateChanged) {
+        classMoveWizardState.candidates = [];
+        classMoveWizardState.rowEdits = {};
+        classMoveWizardState.previewItems = [];
+        classMoveWizardState.batchPreviewHash = '';
+      }
+      try {
+        showBusy('Loading eligible students...');
+        await loadClassMoveCandidates();
+      } catch (error) {
+        await showMsg('Unable to load students', 'error', error.message || 'Failed to load candidates.');
+        return;
+      } finally {
+        hideBusy();
+      }
+    }
+    if (step === 2) {
+      if (!getSelectedClassMoveCandidates().length) {
+        await showMsg('No Students', 'warning', 'Select at least one student to continue.');
+        return;
+      }
+    }
+    if (step === 3) {
+      const targetClassId = String(classMoveWizardState.targetClassId || qs('classMove_targetClassId')?.value || '').trim();
+      if (!targetClassId) {
+        await showMsg('Target Class', 'warning', 'Pick a target rolling class.');
+        return;
+      }
+      classMoveWizardState.previewItems = [];
+      classMoveWizardState.batchPreviewHash = '';
+    }
+    classMoveWizardState.step = Math.min(4, step + 1);
+    renderClassMoveWizardStep();
+  }
+
+  function classMoveWizardBack() {
+    classMoveWizardState.step = Math.max(1, (Number(classMoveWizardState.step) || 1) - 1);
+    renderClassMoveWizardStep();
+  }
+
+  function openClassMoveWizard() {
+    resetClassMoveWizard();
+    classMoveWizardModal?.show();
   }
 
   function openCloseModal(periodId, targetStatus = 'completed') {
@@ -10728,7 +11494,7 @@
     setFunderSelectValue('edit_funder', row);
     setEditFunderLocked(enrollmentHasAttachedTransactions(row));
     qs('edit_reasonStart').value = String(row?.reasonStart || '').trim();
-    await refreshClaimNumberSelect('edit_claimNumber', resolveEnrollmentPeriodStudentId(row), String(row?.claimNumber || '').trim());
+    await refreshClaimNumberSelect('edit_claimNumber', resolveEnrollmentPeriodStudentId(row), resolveClaimSelectToken(row));
     if (qs('edit_targetSessionCount')) qs('edit_targetSessionCount').value = row?.targetSessionCount ? String(row.targetSessionCount) : '';
     if (qs('edit_targetHours')) qs('edit_targetHours').value = row?.targetHours ? String(row.targetHours) : '';
     applyEnrollmentCapUi();
@@ -10907,7 +11673,7 @@
         status: priorStatus,
         funderType: funder.funderType,
         funderId: funder.funderId,
-        claimNumber: readClaimNumberSelectValue('edit_claimNumber'),
+        ...readEnrollmentClaimPayload('edit_claimNumber'),
         reasonStart: String(qs('edit_reasonStart')?.value || '').trim(),
         sessionCountPolicy: 'all_non_na',
         sessionCapacityType: readSessionCapacityTypeFromSelect('edit_sessionCapacityType')
@@ -12020,6 +12786,8 @@
   document.getElementById('rollingClb_editorPanel')?.addEventListener('input', (event) => {
     if (event.target?.closest('.rolling-clb-editor-input')) refreshRollingClbEditorWarnings();
   });
+  qs('inp_rolling_clb_evaluationType')?.addEventListener('change', syncRollingClbTeacherPickRow);
+  qs('btnPickRollingClbEvaluationTeacher')?.addEventListener('click', pickRollingClbEvaluationTeacher);
   qs('btn_rollingClbAddEntry')?.addEventListener('click', openRollingClbEditorForNewEntry);
   qs('btn_rollingClbCancelEditor')?.addEventListener('click', () => {
     showRollingClbListPanel();
@@ -12060,6 +12828,51 @@
     });
   });
   qs('btn_openGroupEnrollmentModal')?.addEventListener('click', openGroupEnrollmentModal);
+  qs('btn_openClassMoveWizard')?.addEventListener('click', openClassMoveWizard);
+  qs('btn_classMoveNext')?.addEventListener('click', () => { classMoveWizardNext().catch((error) => console.error(error)); });
+  qs('btn_classMoveBack')?.addEventListener('click', classMoveWizardBack);
+  qs('btn_classMovePickTarget')?.addEventListener('click', () => { openClassMoveTargetPicker().catch((error) => console.error(error)); });
+  qs('btn_classMovePreview')?.addEventListener('click', () => { previewClassMoveBatchAction().catch((error) => console.error(error)); });
+  qs('btn_classMoveApply')?.addEventListener('click', () => { applyClassMoveBatchAction().catch((error) => console.error(error)); });
+  qs('btn_classMoveSelectAll')?.addEventListener('click', () => {
+    (classMoveWizardState.candidates || []).forEach((candidate) => {
+      const periodId = String(candidate.periodId || '').trim();
+      if (classMoveWizardState.rowEdits[periodId]) classMoveWizardState.rowEdits[periodId].selected = true;
+    });
+    renderClassMoveCandidatesTable();
+  });
+  qs('btn_classMoveClearAll')?.addEventListener('click', () => {
+    (classMoveWizardState.candidates || []).forEach((candidate) => {
+      const periodId = String(candidate.periodId || '').trim();
+      if (classMoveWizardState.rowEdits[periodId]) classMoveWizardState.rowEdits[periodId].selected = false;
+    });
+    renderClassMoveCandidatesTable();
+  });
+  qs('classMove_checkAll')?.addEventListener('change', (event) => {
+    const checked = event.target?.checked === true;
+    (classMoveWizardState.candidates || []).forEach((candidate) => {
+      const periodId = String(candidate.periodId || '').trim();
+      if (classMoveWizardState.rowEdits[periodId]) classMoveWizardState.rowEdits[periodId].selected = checked;
+    });
+    renderClassMoveCandidatesTable();
+  });
+  classMoveWizardModalEl?.addEventListener('change', (event) => {
+    const target = event.target;
+    if (target?.classList?.contains('class-move-claim-select')) {
+      handleClassMoveClaimSelectChange(target).catch((error) => console.error(error));
+      return;
+    }
+    syncClassMoveFieldFromDom(event);
+  });
+  qs('classMove_closeDate')?.addEventListener('change', () => {
+    classMoveWizardState.closeEffectiveDate = String(qs('classMove_closeDate')?.value || '').trim();
+    classMoveWizardState.candidates = [];
+    classMoveWizardState.rowEdits = {};
+    classMoveWizardState.previewItems = [];
+    classMoveWizardState.batchPreviewHash = '';
+    renderClassMoveContextDates();
+  });
+  classMoveWizardModalEl?.addEventListener('hidden.bs.modal', resetClassMoveWizard);
   qs('btn_pickGroupEntryStudent')?.addEventListener('click', () => pickGroupEntryStudent(qs('grp_studentLabel')?.value || ''));
   qs('btn_addGroupEnrollmentEntry')?.addEventListener('click', addGroupEnrollmentEntry);
   qs('btn_completeGroupEnrollment')?.addEventListener('click', runGroupEnrollment);
@@ -12346,6 +13159,14 @@
     if (!rollingStudentContextState) return;
     openRollingStudentAddressesModal(rollingStudentContextState);
   });
+  qs('rollingStudentContextMenuEmails')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentEmailsModal(rollingStudentContextState);
+  });
+  qs('rollingStudentContextMenuGender')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentGenderModal(rollingStudentContextState);
+  });
   qs('rollingStudentContextMenuClaimNumbers')?.addEventListener('click', () => {
     if (!rollingStudentContextState) return;
     openRollingStudentClaimNumbersModal({
@@ -12364,48 +13185,6 @@
     const studentId = row ? resolveEnrollmentPeriodStudentId(row) : '';
     const studentLabel = row ? String(row.studentLabel || '').trim() : '';
     handleClaimNumberSelectChange('edit_claimNumber', studentId, studentLabel);
-  });
-  qs('btn_rollingClaimAdd')?.addEventListener('click', () => showRollingClaimEditor(null));
-  qs('btn_rollingClaimApplyEditor')?.addEventListener('click', applyRollingClaimEditor);
-  qs('btn_rollingClaimCancelEditor')?.addEventListener('click', hideRollingClaimEditor);
-  qs('btn_rollingClaimSave')?.addEventListener('click', async () => {
-    const preferred = String(qs('rollingClaim_number')?.value || rollingClaimContext.selectAfterSave || '').trim();
-    const saved = await saveRollingClaimNumbers(preferred);
-    if (saved !== null) rollingStudentClaimNumbersModal?.hide();
-  });
-  qs('rollingClaim_tbody')?.addEventListener('click', async (event) => {
-    const editBtn = event.target.closest('.btn-rolling-claim-edit');
-    const deleteBtn = event.target.closest('.btn-rolling-claim-delete');
-    if (editBtn) {
-      const id = String(editBtn.dataset.claimId || '').trim();
-      const entry = rollingClaimNumbers.find((row) => String(row.id) === id);
-      if (entry) showRollingClaimEditor(entry);
-      return;
-    }
-    if (deleteBtn) {
-      const id = String(deleteBtn.dataset.claimId || '').trim();
-      const entry = rollingClaimNumbers.find((row) => String(row.id) === id);
-      const label = String(entry?.number || 'this claim number').trim();
-      const confirmed = await showConfirm(`Remove claim number "${label}"?`, 'Remove Claim Number', { confirmClass: 'btn-danger' });
-      if (!confirmed) return;
-      rollingClaimNumbers = rollingClaimNumbers.filter((row) => String(row.id) !== id);
-      if (rollingClaimNumbers.length && !rollingClaimNumbers.some((row) => row.isPrimary)) {
-        rollingClaimNumbers[0].isPrimary = true;
-      }
-      hideRollingClaimEditor();
-      renderRollingClaimList();
-    }
-  });
-  rollingStudentClaimNumbersModalEl?.addEventListener('shown.bs.modal', () => {
-    raiseRollingModalAboveStack(rollingStudentClaimNumbersModalEl);
-  });
-  rollingStudentClaimNumbersModalEl?.addEventListener('hidden.bs.modal', () => {
-    rollingClaimNumbers = [];
-    rollingClaimEditingId = '';
-    rollingClaimContext = { studentId: '', studentLabel: '', onSaved: null, selectAfterSave: '' };
-    hideRollingClaimEditor();
-    setRollingClaimAlert('');
-    clearRollingModalStackZIndex(rollingStudentClaimNumbersModalEl);
   });
   syncRollingStudentContextMenuPermissions();
 

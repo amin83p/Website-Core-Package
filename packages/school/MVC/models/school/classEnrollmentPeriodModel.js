@@ -306,6 +306,7 @@ function sanitizePeriodInput(input, { isUpdate = false } = {}) {
     funderId: cleanId(input.funderId, { max: 80, allowEmpty: true }),
     authorizationRef: cleanString(input.authorizationRef, { max: 120, allowEmpty: true }),
     claimNumber: cleanString(input.claimNumber, { max: 120, allowEmpty: true }),
+    claimNumberId: cleanId(input.claimNumberId, { max: 64, allowEmpty: true }) || '',
     reasonStart: cleanString(input.reasonStart, { max: 300, allowEmpty: true }),
     reasonEnd: cleanString(input.reasonEnd, { max: 300, allowEmpty: true }),
     notes: cleanString(input.notes, { max: 1000, allowEmpty: true }),

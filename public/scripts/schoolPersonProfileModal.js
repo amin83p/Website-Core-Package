@@ -229,14 +229,17 @@
     if (saveBtn()) saveBtn().disabled = Boolean(isLoading);
   }
 
+  const FOCUSED_PROFILE_MODES = new Set(['phones', 'addresses', 'emails', 'gender']);
+
   function normalizeFocus(value) {
     const focus = String(value || '').trim().toLowerCase();
-    return focus === 'phones' || focus === 'addresses' ? focus : 'full';
+    return FOCUSED_PROFILE_MODES.has(focus) ? focus : 'full';
   }
 
   function applyFocusUi(focus) {
     currentFocus = normalizeFocus(focus);
     const form = formEl();
+    const modalRoot = modalEl();
     if (!form) return;
 
     const show = (selector, visible) => {
@@ -247,16 +250,44 @@
 
     const isPhones = currentFocus === 'phones';
     const isAddresses = currentFocus === 'addresses';
+    const isEmails = currentFocus === 'emails';
+    const isGender = currentFocus === 'gender';
+    const isFocused = FOCUSED_PROFILE_MODES.has(currentFocus);
     const isFull = currentFocus === 'full';
 
-    show('.school-person-profile-section-identity', isFull);
+    if (modalRoot) {
+      modalRoot.setAttribute('data-focus-mode', currentFocus);
+    }
+
+    const dialog = modalRoot?.querySelector('.modal-dialog');
+    if (dialog) {
+      dialog.classList.toggle('modal-xl', isFull);
+      dialog.classList.toggle('modal-lg', isFocused);
+      dialog.classList.toggle('modal-dialog-centered', isFocused);
+      dialog.classList.toggle('school-person-profile-dialog-focused', isFocused);
+    }
+
+    show('.school-person-profile-section-identity', isFull || isGender);
+    show('.school-person-profile-section-identity-header', isFull);
+    show('.school-person-profile-identity-names', isFull);
+    show('.school-person-profile-section-gender', isFull || isGender);
+    show('.school-person-profile-identity-dob', isFull);
+    show('.school-person-profile-identity-active', isFull);
+    show('.school-person-organization-fields', isFull);
     show('.school-person-profile-section-notes', isFull);
     show('.school-person-profile-section-roles', isFull);
-    show('.school-person-profile-section-emails', isFull);
+    show('.school-person-profile-section-contact-row', isFull || isPhones || isEmails || isAddresses);
+    show('.school-person-profile-section-emails', isFull || isEmails);
     show('.school-person-profile-section-emails-divider', isFull);
     show('.school-person-profile-section-phones', isFull || isPhones);
-    show('.school-person-profile-section-communication-col', isFull || isPhones);
+    show('.school-person-profile-section-communication-col', isFull || isPhones || isEmails);
     show('.school-person-profile-section-addresses-col', isFull || isAddresses);
+
+    const commCol = form.querySelector('.school-person-profile-section-communication-col');
+    if (commCol) {
+      commCol.classList.toggle('col-lg-12', isPhones || isEmails);
+      commCol.classList.toggle('col-lg-6', isFull);
+    }
 
     const addressesCol = form.querySelector('.school-person-profile-section-addresses-col');
     if (addressesCol) {
@@ -270,6 +301,10 @@
         titleEl.innerHTML = '<i class="bi bi-telephone me-2"></i>Manage Phone Numbers';
       } else if (isAddresses) {
         titleEl.innerHTML = '<i class="bi bi-geo-alt me-2"></i>Manage Addresses';
+      } else if (isEmails) {
+        titleEl.innerHTML = '<i class="bi bi-envelope me-2"></i>Manage Email Addresses';
+      } else if (isGender) {
+        titleEl.innerHTML = '<i class="bi bi-gender-ambiguous me-2"></i>Manage Gender';
       } else {
         titleEl.innerHTML = '<i class="bi bi-person-vcard me-2"></i>Edit Person Profile';
       }
@@ -281,6 +316,10 @@
         saveButton.innerHTML = '<i class="bi bi-save me-1"></i>Save Phone Numbers';
       } else if (isAddresses) {
         saveButton.innerHTML = '<i class="bi bi-save me-1"></i>Save Addresses';
+      } else if (isEmails) {
+        saveButton.innerHTML = '<i class="bi bi-save me-1"></i>Save Email Addresses';
+      } else if (isGender) {
+        saveButton.innerHTML = '<i class="bi bi-save me-1"></i>Save Gender';
       } else {
         saveButton.innerHTML = '<i class="bi bi-save me-1"></i>Save Person Profile';
       }
@@ -442,7 +481,8 @@
       if (typeof currentContext.onSaved === 'function') {
         currentContext.onSaved({
           displayName: data.displayName || '',
-          organizations: data.organizations || []
+          organizations: data.organizations || [],
+          gender: String(data.gender || body.gender || '').trim()
         });
       }
       modalInstance?.hide();

@@ -2032,7 +2032,11 @@ async function buildReportDocxCollections({ instance, assignment, reqUser }) {
         clb_result_listening: String(entry?.result?.listening || ''),
         clb_result_speaking: String(entry?.result?.speaking || ''),
         clb_result_reading: String(entry?.result?.reading || ''),
-        clb_result_writing: String(entry?.result?.writing || '')
+        clb_result_writing: String(entry?.result?.writing || ''),
+        clb_note: String(entry?.note || '').trim(),
+        clb_evaluation_type: String(entry?.evaluationType || 'referral').trim(),
+        clb_evaluation_teacher_id: String(entry?.evaluationTeacherId || '').trim(),
+        clb_evaluation_teacher_label: String(entry?.evaluationTeacherLabel || '').trim()
       });
     });
   });

@@ -80,8 +80,67 @@ test('sanitizeStudentInput accepts valid CLB history and sorts newest first', ()
   assert.equal(out.clbLevelHistory[0].current.writing, '5+');
   assert.equal(out.clbLevelHistory[0].result.reading, '6');
   assert.equal(out.clbLevelHistory[0].resultRecordedAt, '2026-08-15');
+  assert.equal(out.clbLevelHistory[0].evaluationType, 'referral');
   assert.equal(out.clbLevelHistory[1].result.listening, '4');
   assert.equal(out.clbLevelHistory[1].resultRecordedAt, '');
+  assert.equal(out.clbLevelHistory[1].evaluationType, 'referral');
+});
+
+test('cleanClbLevelHistory defaults legacy entries to referral evaluation', () => {
+  const cleaned = studentModel.cleanClbLevelHistory([{
+    id: 'clb_legacy',
+    recordedAt: '2026-01-01',
+    goal: { listening: '5' },
+    current: { listening: '4' },
+    result: { listening: '4' }
+  }]);
+  assert.equal(cleaned[0].evaluationType, 'referral');
+  assert.equal(cleaned[0].evaluationTeacherId, '');
+  assert.equal(cleaned[0].note, '');
+});
+
+test('cleanClbLevelHistory requires teacher when evaluation is teacher', () => {
+  assert.throws(() => studentModel.cleanClbLevelHistory([{
+    id: 'clb_teacher',
+    recordedAt: '2026-01-01',
+    evaluationType: 'teacher',
+    goal: { listening: '5' },
+    current: { listening: '4' },
+    result: { listening: '4' }
+  }]), /select a teacher/i);
+});
+
+test('cleanClbLevelHistory stores teacher evaluation fields', () => {
+  const cleaned = studentModel.cleanClbLevelHistory([{
+    id: 'clb_teacher',
+    recordedAt: '2026-01-01',
+    evaluationType: 'teacher',
+    evaluationTeacherId: 'PER_T1',
+    evaluationTeacherLabel: 'Jane Instructor',
+    note: 'Placement follow-up',
+    goal: { listening: '5' },
+    current: { listening: '4' },
+    result: { listening: '4' }
+  }]);
+  assert.equal(cleaned[0].evaluationType, 'teacher');
+  assert.equal(cleaned[0].evaluationTeacherId, 'PER_T1');
+  assert.equal(cleaned[0].evaluationTeacherLabel, 'Jane Instructor');
+  assert.equal(cleaned[0].note, 'Placement follow-up');
+});
+
+test('cleanClbLevelHistory clears teacher fields when evaluation is referral', () => {
+  const cleaned = studentModel.cleanClbLevelHistory([{
+    id: 'clb_ref',
+    recordedAt: '2026-01-01',
+    evaluationType: 'referral',
+    evaluationTeacherId: 'PER_T1',
+    evaluationTeacherLabel: 'Should clear',
+    goal: { listening: '5' },
+    current: { listening: '4' },
+    result: { listening: '4' }
+  }]);
+  assert.equal(cleaned[0].evaluationTeacherId, '');
+  assert.equal(cleaned[0].evaluationTeacherLabel, '');
 });
 
 test('sanitizeStudentInput keeps legacy CLB entries without results backward compatible', () => {
@@ -356,6 +415,16 @@ test('student form includes CLB history UI and hidden JSON field', () => {
   assert.match(source, /choice === true .*=== 'delete'/);
   assert.doesNotMatch(source, /text: 'Delete'.*onClick/);
   assert.match(reportTemplateSource, /student_clb_entries/);
+  assert.match(source, /inp_clb_note/);
+  assert.match(source, /inp_clb_evaluationType/);
+  assert.match(source, /btnPickClbEvaluationTeacher/);
+  assert.match(source, /collectClbEditorEntry/);
+  assert.match(source, /evaluationType/);
+  const rollingSource = read('packages/school/MVC/views/school/class/rollingEnrollment.ejs');
+  assert.match(rollingSource, /inp_rolling_clb_note/);
+  assert.match(rollingSource, /inp_rolling_clb_evaluationType/);
+  assert.match(rollingSource, /btnPickRollingClbEvaluationTeacher/);
+  assert.match(rollingSource, /collectRollingClbEditorEntry/);
 });
 
 test('student form create defaults cover DOB, email, admission, country, fee, and CLB dash', () => {

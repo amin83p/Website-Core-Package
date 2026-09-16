@@ -80,6 +80,7 @@ async function createExtensionEnrollment({
     funderId: String(source.funderId || '').trim(),
     authorizationRef: String(source.authorizationRef || '').trim(),
     claimNumber: String(source.claimNumber || '').trim(),
+    claimNumberId: String(source.claimNumberId || '').trim(),
     enrollmentKind: 'extension',
     extensionOfPeriodId: source.id,
     reasonStart: `Extension (${kind}): ${note}`,

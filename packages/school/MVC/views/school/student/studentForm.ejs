@@ -17,6 +17,8 @@
   const initAttachmentsJson = JSON.stringify(s.attachments || []).replace(/</g, '\\u003c');
   const initClbLevelHistoryJson = JSON.stringify(s.clbLevelHistory || []).replace(/</g, '\\u003c');
   const initProgramRegistrationsJson = JSON.stringify(typeof existingProgramRegistrations !== 'undefined' ? (existingProgramRegistrations || []) : []).replace(/</g, '\\u003c');
+  const initClaimNumbersJson = JSON.stringify(typeof claimNumbersForView !== 'undefined' ? (claimNumbersForView || []) : []).replace(/</g, '\\u003c');
+  const canEditStudentClbFlag = typeof canEditStudentClb !== 'undefined' && canEditStudentClb === true;
   const routeIdJson = JSON.stringify(routeId).replace(/</g, '\\u003c');
   const initPersonOrganizationsJson = JSON.stringify(typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []).replace(/</g, '\\u003c');
   const initOrganizationLookupJson = JSON.stringify(typeof organizationLookup !== 'undefined' ? (organizationLookup || {}) : {}).replace(/</g, '\\u003c');
@@ -278,13 +280,12 @@
                        <table class="table table-sm table-bordered align-middle mb-0" id="clbHistoryTable">
                          <thead class="table-light">
                            <tr>
-                             <th style="width: 12%;">Goal / Current Date</th>
-                             <th style="width: 12%;">Result Date</th>
+                             <th style="width: 13%;">Dates</th>
                              <th style="width: 14%;">Row</th>
-                             <th>Listening</th>
-                             <th>Speaking</th>
-                             <th>Reading</th>
-                             <th>Writing</th>
+                             <th class="text-center">Listening</th>
+                             <th class="text-center">Speaking</th>
+                             <th class="text-center">Reading</th>
+                             <th class="text-center">Writing</th>
                              <th style="width: 8%;" class="text-end">Actions</th>
                            </tr>
                          </thead>
@@ -298,14 +299,38 @@
                        <h6 class="fw-bold mb-0">New CLB Entry</h6>
                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCancelClbEntry">Cancel</button>
                      </div>
-                     <div class="row g-3 mb-3">
-                       <div class="col-md-4">
+                     <div class="row g-3 mb-2">
+                       <div class="col-md-6">
                          <label class="form-label fw-bold small" for="inp_clbRecordedAt">Goal / Current Date *</label>
                          <input type="date" class="form-control form-control-sm" id="inp_clbRecordedAt">
                        </div>
-                       <div class="col-md-4">
+                       <div class="col-md-6">
                          <label class="form-label fw-bold small" for="inp_clbResultRecordedAt">Result Date</label>
                          <input type="date" class="form-control form-control-sm" id="inp_clbResultRecordedAt">
+                       </div>
+                     </div>
+                     <div class="row g-3 align-items-end mb-2">
+                       <div class="col-md-7 col-lg-6 d-none" id="clbTeacherPickCol">
+                         <label class="form-label fw-bold small" for="inp_clb_evaluationTeacherLabel">Teacher *</label>
+                         <div class="input-group input-group-sm">
+                           <input type="hidden" id="inp_clb_evaluationTeacherId">
+                           <input type="text" class="form-control bg-white" id="inp_clb_evaluationTeacherLabel" readonly placeholder="Select teacher...">
+                           <button type="button" class="btn btn-outline-secondary" id="btnPickClbEvaluationTeacher" title="Select Teacher"><i class="bi bi-person"></i></button>
+                         </div>
+                       </div>
+                       <div class="col-md-5 col-lg-4" id="clbEvaluationTypeCol">
+                         <label class="form-label fw-bold small" for="inp_clb_evaluationType">Evaluation</label>
+                         <select class="form-select form-select-sm" id="inp_clb_evaluationType">
+                           <option value="referral">Referral</option>
+                           <option value="placement_test">Placement test</option>
+                           <option value="teacher">Teacher</option>
+                         </select>
+                       </div>
+                     </div>
+                     <div class="row g-3 mb-3">
+                       <div class="col-12">
+                         <label class="form-label fw-bold small" for="inp_clb_note">Note</label>
+                         <textarea class="form-control form-control-sm" id="inp_clb_note" rows="2" maxlength="500" placeholder="Optional note about this assessment"></textarea>
                        </div>
                      </div>
                      <div id="clbEntryWarnings" class="alert alert-warning border py-2 px-3 small d-none mb-3"></div>
@@ -347,6 +372,24 @@
                      </div>
                      <button type="button" class="btn btn-sm btn-primary fw-bold" id="btnSaveClbEntry">Save CLB Entry</button>
                    </div>
+                 </div>
+               </div>
+
+               <div class="card border-secondary shadow-sm mb-3">
+                 <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                   <span class="fw-bold"><i class="bi bi-card-checklist me-2"></i>Claim Numbers</span>
+                   <% if (isEdit && canEditStudentClbFlag) { %>
+                   <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="btnManageStudentClaimNumbers">
+                     <i class="bi bi-pencil-square me-1"></i>Manage Claim Numbers
+                   </button>
+                   <% } %>
+                 </div>
+                 <div class="card-body">
+                   <% if (!isEdit) { %>
+                   <p class="small text-muted mb-0">Save the student first to manage claim numbers.</p>
+                   <% } else { %>
+                   <div id="studentClaimNumbersSummary"></div>
+                   <% } %>
                  </div>
                </div>
            </div>
@@ -556,6 +599,51 @@
     background-color: #f8d7da !important;
     border-color: #f1aeb5 !important;
   }
+  #clbHistoryTable .clb-history-entry-spacer td {
+    height: 0.85rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+  #clbHistoryTable tr.clb-history-entry-block > td {
+    background-color: #fff;
+  }
+  #clbHistoryTable tr.clb-history-entry-block:first-of-type > td {
+    border-top: 2px solid #ced4da;
+  }
+  #clbHistoryTable .clb-history-row-label {
+    font-size: 0.78rem;
+    color: #495057;
+    white-space: nowrap;
+  }
+  #clbHistoryTable .clb-history-skill {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  #clbHistoryTable .clb-history-date {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+  #clbHistoryTable .clb-history-dates {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+  #clbHistoryTable .clb-history-date-line {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  #clbHistoryTable .clb-history-date-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+  }
 </style>
 
 <div class="modal fade" id="studentSaveProgressModal" tabindex="-1" aria-labelledby="studentSaveProgressTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -593,13 +681,19 @@
   </div>
 </div>
 
+<%- include('../partials/studentClaimNumbersModal') %>
+
 <script src="/scripts/clbLevelValueParser.js"></script>
+<script src="/scripts/schoolMessageUi.js"></script>
+<script src="/scripts/studentClaimNumbersManager.js"></script>
 <script src="/scripts/canadianAddressAutocomplete.js"></script>
 <script>
   window.__INIT_STUDENT_ATTACHMENTS__ = <%- initAttachmentsJson %>;
   window.__INIT_CLB_LEVEL_HISTORY__ = <%- initClbLevelHistoryJson %>;
   window.__INIT_STUDENT_PROGRAM_REGISTRATIONS__ = <%- initProgramRegistrationsJson %>;
   window.__STUDENT_ROUTE_ID__ = <%- routeIdJson %>;
+  window.__INIT_STUDENT_CLAIM_NUMBERS__ = <%- initClaimNumbersJson %>;
+  window.__CAN_EDIT_STUDENT_CLB__ = <%= canEditStudentClbFlag ? 'true' : 'false' %>;
 </script>
 
 <script>
@@ -639,6 +733,11 @@
   let existingAttachments = Array.isArray(window.__INIT_STUDENT_ATTACHMENTS__) ? window.__INIT_STUDENT_ATTACHMENTS__ : [];
   const CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
   const CLB_VALUE_GROUPS = ['goal', 'current', 'result'];
+  const CLB_EVALUATION_LABELS = {
+    referral: 'Referral',
+    placement_test: 'Placement test',
+    teacher: 'Teacher'
+  };
   let clbLevelHistory = (Array.isArray(window.__INIT_CLB_LEVEL_HISTORY__) ? window.__INIT_CLB_LEVEL_HISTORY__ : [])
     .map((entry, index) => ({
       ...(entry && typeof entry === 'object' ? entry : {}),
@@ -655,6 +754,12 @@
   const clbEntryEditorTitle = clbEntryEditor?.querySelector('h6') || null;
   const inpClbRecordedAt = document.getElementById('inp_clbRecordedAt');
   const inpClbResultRecordedAt = document.getElementById('inp_clbResultRecordedAt');
+  const inpClbNote = document.getElementById('inp_clb_note');
+  const inpClbEvaluationType = document.getElementById('inp_clb_evaluationType');
+  const inpClbEvaluationTeacherId = document.getElementById('inp_clb_evaluationTeacherId');
+  const inpClbEvaluationTeacherLabel = document.getElementById('inp_clb_evaluationTeacherLabel');
+  const clbTeacherPickCol = document.getElementById('clbTeacherPickCol');
+  const btnPickClbEvaluationTeacher = document.getElementById('btnPickClbEvaluationTeacher');
   let editingClbEntryId = '';
   let newFileObjectUrls = [];
   let currentWizardStep = 0;
@@ -1185,8 +1290,24 @@
   }
 
   function showMsg(opts) {
-    if (typeof showMessageModal === 'function') return showMessageModal(opts);
-    alert(opts?.message || 'Done');
+    const payload = opts && typeof opts === 'object' ? opts : { message: String(opts || '') };
+    const ui = window.SchoolMessageUi;
+    if (ui) {
+      return ui.showAlert(
+        payload.title || 'Message',
+        payload.icon || payload.type || 'info',
+        payload.message || '',
+        {
+          buttons: payload.buttons,
+          size: payload.size,
+          html: payload.html,
+          okText: payload.okText,
+          buttonClass: payload.buttonClass
+        }
+      );
+    }
+    if (typeof showMessageModal === 'function') return showMessageModal(payload);
+    alert(payload.message || 'Done');
     return Promise.resolve();
   }
 
@@ -1655,14 +1776,73 @@
     }
   }
 
+  function formatClbDisplayDate(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+    return text;
+  }
+
   function renderClbCell(value) {
     const text = String(value || '').trim();
-    return text ? safeHtml(text) : '<span class="text-muted">—</span>';
+    if (!text || text === '-') return '<span class="text-muted">—</span>';
+    return `<span class="clb-history-skill d-inline-block">${safeHtml(text)}</span>`;
   }
 
   function renderClbDateCell(value) {
-    const text = String(value || '').trim();
-    return text ? safeHtml(text) : '<span class="text-muted">—</span>';
+    const text = formatClbDisplayDate(value);
+    return text
+      ? `<span class="clb-history-date fw-semibold">${safeHtml(text)}</span>`
+      : '<span class="text-muted">—</span>';
+  }
+
+  function renderClbHistoryDatesCell(entry) {
+    const goalCurrent = renderClbDateCell(entry?.recordedAt);
+    const result = renderClbDateCell(entry?.resultRecordedAt);
+    return `
+      <div class="clb-history-dates">
+        <div class="clb-history-date-line">
+          <span class="clb-history-date-label">Goal / Current</span>
+          ${goalCurrent}
+        </div>
+        <div class="clb-history-date-line">
+          <span class="clb-history-date-label">Result</span>
+          ${result}
+        </div>
+      </div>
+    `;
+  }
+
+  function syncClbTeacherPickRow() {
+    const isTeacher = String(inpClbEvaluationType?.value || '').trim() === 'teacher';
+    clbTeacherPickCol?.classList.toggle('d-none', !isTeacher);
+    if (!isTeacher) {
+      if (inpClbEvaluationTeacherId) inpClbEvaluationTeacherId.value = '';
+      if (inpClbEvaluationTeacherLabel) inpClbEvaluationTeacherLabel.value = '';
+    }
+  }
+
+  function pickClbEvaluationTeacher() {
+    if (typeof GenericPicker === 'undefined' || !GenericPicker.open || typeof GenericPickerPresets === 'undefined') {
+      showMsg({ title: 'Picker Unavailable', icon: 'warning', message: 'Teacher picker is not loaded on this page.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+    GenericPicker.open(GenericPickerPresets.teacher({
+      title: 'Select Teacher',
+      multiselect: false,
+      context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: (selected) => {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        if (!item) return;
+        const teacherId = String(item.personId || item.id || '').trim();
+        const teacherName = String(item.displayName || item.name || item.label || teacherId).trim();
+        if (inpClbEvaluationTeacherId) inpClbEvaluationTeacherId.value = teacherId;
+        if (inpClbEvaluationTeacherLabel) inpClbEvaluationTeacherLabel.value = teacherName;
+      }
+    }));
   }
 
   function renderClbHistoryTable() {
@@ -1681,16 +1861,19 @@
     clbHistoryWrap.classList.remove('d-none');
     clbHistoryTbody.innerHTML = '';
 
-    clbLevelHistory.forEach((entry) => {
+    clbLevelHistory.forEach((entry, entryIndex) => {
       const entryId = String(entry?.id || '');
-      const goalCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.goal?.[skill])}</td>`).join('');
-      const currentCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.current?.[skill])}</td>`).join('');
-      const resultCells = CLB_SKILLS.map((skill) => `<td>${renderClbCell(entry?.result?.[skill])}</td>`).join('');
+      const goalCells = CLB_SKILLS.map((skill) => `<td class="align-middle">${renderClbCell(entry?.goal?.[skill])}</td>`).join('');
+      const currentCells = CLB_SKILLS.map((skill) => `<td class="align-middle">${renderClbCell(entry?.current?.[skill])}</td>`).join('');
+      const resultCells = CLB_SKILLS.map((skill) => `<td class="align-middle">${renderClbCell(entry?.result?.[skill])}</td>`).join('');
+      const spacerRow = entryIndex > 0
+        ? '<tr class="clb-history-entry-spacer"><td colspan="7"></td></tr>'
+        : '';
       clbHistoryTbody.innerHTML += `
-        <tr>
-          <td rowspan="2" class="align-middle fw-semibold">${renderClbDateCell(entry?.recordedAt)}</td>
-          <td></td>
-          <td class="fw-bold small">CLB Goal</td>
+        ${spacerRow}
+        <tr class="clb-history-entry-block">
+          <td rowspan="3" class="align-middle">${renderClbHistoryDatesCell(entry)}</td>
+          <td class="clb-history-row-label fw-semibold">CLB Goal</td>
           ${goalCells}
           <td rowspan="3" class="text-end align-middle">
             <div class="d-flex flex-column gap-1 align-items-end">
@@ -1703,15 +1886,12 @@
             </div>
           </td>
         </tr>
-        <tr>
-          <td></td>
-          <td class="fw-bold small">Current CLB Level</td>
+        <tr class="clb-history-entry-block">
+          <td class="clb-history-row-label fw-semibold">Current CLB Level</td>
           ${currentCells}
         </tr>
-        <tr>
-          <td></td>
-          <td class="align-middle fw-semibold">${renderClbDateCell(entry?.resultRecordedAt)}</td>
-          <td class="fw-bold small">CLB Result</td>
+        <tr class="clb-history-entry-block">
+          <td class="clb-history-row-label fw-semibold">CLB Result</td>
           ${resultCells}
         </tr>
       `;
@@ -1738,6 +1918,11 @@
   function clearClbEditor() {
     if (inpClbRecordedAt && window.AppOrgDateTime && AppOrgDateTime.today) inpClbRecordedAt.value = String(AppOrgDateTime.today);
     if (inpClbResultRecordedAt) inpClbResultRecordedAt.value = '';
+    if (inpClbNote) inpClbNote.value = '';
+    if (inpClbEvaluationType) inpClbEvaluationType.value = 'referral';
+    if (inpClbEvaluationTeacherId) inpClbEvaluationTeacherId.value = '';
+    if (inpClbEvaluationTeacherLabel) inpClbEvaluationTeacherLabel.value = '';
+    syncClbTeacherPickRow();
     CLB_VALUE_GROUPS.forEach((group) => {
       CLB_SKILLS.forEach((skill) => {
         const input = getClbEditorInput(group, skill);
@@ -1809,6 +1994,11 @@
     editingClbEntryId = String(entry.id || '');
     if (inpClbRecordedAt) inpClbRecordedAt.value = String(entry.recordedAt || '');
     if (inpClbResultRecordedAt) inpClbResultRecordedAt.value = String(entry.resultRecordedAt || '');
+    if (inpClbNote) inpClbNote.value = String(entry.note || '');
+    if (inpClbEvaluationType) inpClbEvaluationType.value = String(entry.evaluationType || 'referral');
+    if (inpClbEvaluationTeacherId) inpClbEvaluationTeacherId.value = String(entry.evaluationTeacherId || '');
+    if (inpClbEvaluationTeacherLabel) inpClbEvaluationTeacherLabel.value = String(entry.evaluationTeacherLabel || '');
+    syncClbTeacherPickRow();
     CLB_VALUE_GROUPS.forEach((group) => {
       CLB_SKILLS.forEach((skill) => {
         const input = getClbEditorInput(group, skill);
@@ -1843,10 +2033,21 @@
         throw new Error(`Enter at least one value for ${labels[group]}.`);
       }
     });
+    const evaluationType = String(inpClbEvaluationType?.value || 'referral').trim() || 'referral';
+    const note = String(inpClbNote?.value || '').trim();
+    const evaluationTeacherId = String(inpClbEvaluationTeacherId?.value || '').trim();
+    const evaluationTeacherLabel = String(inpClbEvaluationTeacherLabel?.value || '').trim();
+    if (evaluationType === 'teacher' && !evaluationTeacherId) {
+      throw new Error('Select a teacher for Teacher evaluation.');
+    }
     return {
       id: editingClbEntryId || createClbEntryId(clbLevelHistory.length),
       recordedAt,
       resultRecordedAt,
+      note,
+      evaluationType,
+      evaluationTeacherId: evaluationType === 'teacher' ? evaluationTeacherId : '',
+      evaluationTeacherLabel: evaluationType === 'teacher' ? evaluationTeacherLabel : '',
       goal: values.goal,
       current: values.current,
       result: values.result
@@ -1869,6 +2070,8 @@
   function wireClbLevelHistoryUi() {
     if (btnAddClbEntry) btnAddClbEntry.addEventListener('click', showClbEditor);
     if (btnCancelClbEntry) btnCancelClbEntry.addEventListener('click', hideClbEditor);
+    inpClbEvaluationType?.addEventListener('change', syncClbTeacherPickRow);
+    btnPickClbEvaluationTeacher?.addEventListener('click', pickClbEvaluationTeacher);
     clbEntryEditor?.addEventListener('input', (event) => {
       if (event.target?.closest('.clb-editor-input')) refreshClbEditorWarnings();
     });
@@ -2612,7 +2815,66 @@
     syncPersonModeUI();
     syncNewPersonHiddenState();
     wireClbLevelHistoryUi();
+    wireStudentClaimNumbersUi();
     refreshEditPersonButton();
   });
+
+  function wireStudentClaimNumbersUi() {
+    const mgr = window.StudentClaimNumbersManager;
+    const summaryEl = document.getElementById('studentClaimNumbersSummary');
+    const btnManage = document.getElementById('btnManageStudentClaimNumbers');
+    const studentId = String(studentRouteId || '').trim();
+    if (!mgr || !summaryEl || !studentId) return;
+
+    let claimNumbers = Array.isArray(window.__INIT_STUDENT_CLAIM_NUMBERS__)
+      ? window.__INIT_STUDENT_CLAIM_NUMBERS__.slice()
+      : [];
+
+    const renderSummary = () => mgr.renderSummaryTable(summaryEl, claimNumbers);
+
+    async function requestJson(url, method = 'GET', payload = null) {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: payload ? JSON.stringify(payload) : undefined
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || String(result.status || '').toLowerCase() === 'error') {
+        const err = new Error(result?.message || 'Request failed.');
+        if (Array.isArray(result.blockers)) err.blockers = result.blockers;
+        throw err;
+      }
+      return result;
+    }
+
+    mgr.configure({
+      requestJson,
+      canEdit: window.__CAN_EDIT_STUDENT_CLB__ === true,
+      showModal: () => {
+        const modalEl = document.getElementById('rollingStudentClaimNumbersModal');
+        if (!modalEl) return;
+        const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
+        if (bootstrapApi?.Modal) {
+          bootstrapApi.Modal.getOrCreateInstance(modalEl).show();
+        }
+      }
+    });
+
+    renderSummary();
+
+    btnManage?.addEventListener('click', () => {
+      mgr.open({
+        studentId,
+        studentLabel: document.querySelector('.page-heading')?.textContent?.trim() || studentId,
+        onSaved: async (rows) => {
+          claimNumbers = Array.isArray(rows) ? rows : claimNumbers;
+          renderSummary();
+        }
+      });
+    });
+  }
 })();
 </script>

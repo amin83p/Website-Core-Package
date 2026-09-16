@@ -50,6 +50,8 @@ const enrollmentHoldService = require('../../services/school/enrollmentHoldServi
 const rollingEnrollmentAttendanceReportService = require('../../services/school/rollingEnrollmentAttendanceReportService');
 const extensionEnrollmentService = require('../../services/school/extensionEnrollmentService');
 const enrollmentMoveService = require('../../services/school/enrollmentMoveService');
+const enrollmentClassMoveService = require('../../services/school/enrollmentClassMoveService');
+const studentClaimNumberService = require('../../services/school/studentClaimNumberService');
 const sessionEnrollmentPickerService = require('../../services/school/sessionEnrollmentPickerService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const classCycleEnrollmentPolicyService = require('../../services/school/classCycleEnrollmentPolicyService');
@@ -956,6 +958,49 @@ function buildRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
 }
 
+async function mergeResolvedClaimFieldsIntoPayload(enrollmentPayload, req) {
+    const studentId = toPublicId(enrollmentPayload?.studentId);
+    if (!studentId) return enrollmentPayload;
+    const body = req.body || {};
+    if (body.claimNumberId === undefined && body.claimNumber === undefined) {
+        return enrollmentPayload;
+    }
+    const resolved = await studentClaimNumberService.resolveEnrollmentClaimFieldsForStudent(
+        studentId,
+        {
+            claimNumberId: body.claimNumberId,
+            claimNumber: body.claimNumber
+        },
+        req.user,
+        buildRouteAccessContext(req)
+    );
+    return { ...enrollmentPayload, ...resolved };
+}
+
+async function resolveClaimPatchFromRequest(req, studentId, periodRow = null) {
+    const sid = toPublicId(studentId);
+    const body = req.body || {};
+    if (!sid) return {};
+    if (body.claimNumberId === undefined && body.claimNumber === undefined) return {};
+    const resolved = await studentClaimNumberService.resolveEnrollmentClaimFieldsForStudent(
+        sid,
+        {
+            claimNumberId: body.claimNumberId !== undefined
+                ? body.claimNumberId
+                : (periodRow?.claimNumberId || ''),
+            claimNumber: body.claimNumber !== undefined
+                ? body.claimNumber
+                : (periodRow?.claimNumber || '')
+        },
+        req.user,
+        buildRouteAccessContext(req)
+    );
+    return {
+        claimNumberId: resolved.claimNumberId,
+        claimNumber: resolved.claimNumber
+    };
+}
+
 async function getClassByIdWithOrgCheck(classId, reqUser, accessContext = {}) {
     const activeOrgId = getActiveOrgIdOrThrow(reqUser);
     const classData = await schoolDataService.getDataById('classes', classId, reqUser, accessContext);
@@ -1259,6 +1304,7 @@ async function resolveEnrollmentFunderBillingContext({
 }
 
 async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user, students = null) {
+  const studentClaimNumberService = require('../../services/school/studentClaimNumberService');
   const effectiveStudents = Array.isArray(students)
     ? students
     : await schoolDataService.fetchAllData('students', {}, user);
@@ -1267,10 +1313,17 @@ async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user, stude
     personIds: (Array.isArray(effectiveStudents) ? effectiveStudents : []).map((student) => student.personId)
   });
   const lookup = buildEnrollmentPeriodStudentLabelLookup(effectiveStudents, personById);
+  const studentById = new Map(
+    (Array.isArray(effectiveStudents) ? effectiveStudents : [])
+      .map((student) => [toPublicId(student?.id), student])
+      .filter(([id]) => id)
+  );
   return (Array.isArray(periodRows) ? periodRows : []).map((row) => {
     const display = resolveEnrollmentPeriodStudentDisplay(row?.studentId, lookup);
+    const studentRow = studentById.get(toPublicId(row?.studentId));
+    const enriched = studentClaimNumberService.enrichPeriodClaimFields(row, studentRow);
     return {
-      ...row,
+      ...enriched,
       studentLabel: display.studentLabel,
       studentRecordId: display.studentRecordId,
       studentGender: display.studentGender
@@ -2608,6 +2661,7 @@ function buildClassEnrollmentCreatePayloadFromRequest(classData, req) {
     funderType: funder.funderType,
     funderId: funder.funderId,
     claimNumber: String(req.body?.claimNumber || '').trim(),
+    claimNumberId: String(req.body?.claimNumberId || '').trim(),
     reasonStart: String(req.body?.reasonStart || '').trim(),
     reasonEnd: String(req.body?.reasonEnd || '').trim(),
     targetSessionCount,
@@ -3437,7 +3491,8 @@ async function createClassEnrollmentWithTransactions(req, res) {
       throw new Error('Student organization does not match the class organization.');
     }
 
-    const enrollmentPayload = buildClassEnrollmentCreatePayloadFromRequest(classData, req);
+    let enrollmentPayload = buildClassEnrollmentCreatePayloadFromRequest(classData, req);
+    enrollmentPayload = await mergeResolvedClaimFieldsIntoPayload(enrollmentPayload, req);
     if (!enrollmentPayload.studentId) throw new Error('studentId is required.');
     if (!enrollmentPayload.startDate) throw new Error('startDate is required.');
 
@@ -3596,15 +3651,15 @@ async function saveClassEnrollmentDraft(req, res) {
       await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
     }
 
+    const draftClaimPatch = await resolveClaimPatchFromRequest(req, period?.studentId, period);
+
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate: nextStartDate,
       endDate: nextEndDate,
       status: nextStatus,
       funderType: funderSelection.funderType,
       funderId: funderSelection.funderId,
-      ...(req.body?.claimNumber !== undefined
-        ? { claimNumber: String(req.body.claimNumber || '').trim() }
-        : {}),
+      ...(Object.keys(draftClaimPatch).length ? draftClaimPatch : {}),
       reasonStart: String(req.body?.reasonStart || period?.reasonStart || '').trim(),
       targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || period?.targetSessionCount),
       targetHours: classEnrollmentSessionApplicabilityService.normalizeTargetHours(req.body?.targetHours || period?.targetHours),
@@ -4020,6 +4075,8 @@ async function approveClassEnrollmentDraft(req, res) {
       ? requestedApproveStatus
       : 'active';
 
+    const approveClaimPatch = await resolveClaimPatchFromRequest(req, period?.studentId, period);
+
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate: String(req.body?.startDate || period?.startDate || '').trim(),
       endDate: String(req.body?.endDate || period?.endDate || '').trim(),
@@ -4028,9 +4085,7 @@ async function approveClassEnrollmentDraft(req, res) {
       termId: termIdToStore,
       funderType: funderSelection.funderType,
       funderId: funderSelection.funderId,
-      ...(req.body?.claimNumber !== undefined
-        ? { claimNumber: String(req.body.claimNumber || '').trim() }
-        : {}),
+      ...(Object.keys(approveClaimPatch).length ? approveClaimPatch : {}),
       reasonStart: String(req.body?.reasonStart || period?.reasonStart || '').trim(),
       targetSessionCount: classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(req.body?.targetSessionCount || period?.targetSessionCount),
       targetHours: classEnrollmentSessionApplicabilityService.normalizeTargetHours(req.body?.targetHours || period?.targetHours),
@@ -4352,15 +4407,20 @@ async function editClassEnrollmentPeriod(req, res) {
       await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
     }
 
+    const periodClaimPatch = (req.body?.claimNumber !== undefined || req.body?.claimNumberId !== undefined)
+      ? await resolveClaimPatchFromRequest(req, periodRow?.studentId, periodRow)
+      : {
+        claimNumber: String(periodRow?.claimNumber || '').trim(),
+        claimNumberId: String(periodRow?.claimNumberId || '').trim()
+      };
+
     const updated = await schoolDataService.updateClassEnrollmentPeriod(periodId, {
       startDate,
       endDate,
       status,
       funderType: funderSelection.funderType,
       funderId: funderSelection.funderId,
-      claimNumber: req.body?.claimNumber !== undefined
-        ? String(req.body.claimNumber || '').trim()
-        : String(periodRow?.claimNumber || '').trim(),
+      ...periodClaimPatch,
       reasonStart: String(req.body?.reasonStart || periodRow?.reasonStart || '').trim(),
       targetSessionCount,
       targetHours,
@@ -4616,7 +4676,8 @@ async function createClassEnrollmentPeriod(req, res) {
       throw new Error('Student organization does not match the class organization.');
     }
     await applyRollingEnrollmentResolutionFromRegistrations(req, classData, studentRow);
-    const enrollmentPayload = buildClassEnrollmentCreatePayloadFromRequest(classData, req);
+    let enrollmentPayload = buildClassEnrollmentCreatePayloadFromRequest(classData, req);
+    enrollmentPayload = await mergeResolvedClaimFieldsIntoPayload(enrollmentPayload, req);
     if (!rollingEnrollmentFunderService.isSelfFund(enrollmentPayload.funderId)) {
       await loadFunderRecordOrThrow(req.user, classData.orgId, enrollmentPayload.funderId);
     }
@@ -4755,13 +4816,26 @@ async function reopenClassEnrollmentPeriod(req, res) {
       await loadFunderRecordOrThrow(req.user, classData.orgId, funderSelection.funderId);
     }
 
+    const reopenClaimFields = await studentClaimNumberService.resolveEnrollmentClaimFieldsForStudent(
+      periodRow.studentId,
+      {
+        claimNumberId: req.body?.claimNumberId,
+        claimNumber: req.body?.claimNumber !== undefined
+          ? req.body.claimNumber
+          : (periodRow?.claimNumber || '')
+      },
+      req.user,
+      buildRouteAccessContext(req)
+    );
+
     const result = await schoolDataService.reopenClassEnrollmentPeriodViaNewPeriod(periodId, {
       startDate: String(req.body?.startDate || '').trim(),
       endDate: String(req.body?.endDate || '').trim(),
       status: 'draft',
       funderType: funderSelection.funderType,
       funderId: funderSelection.funderId,
-      claimNumber: String(req.body?.claimNumber || '').trim(),
+      claimNumber: reopenClaimFields.claimNumber,
+      claimNumberId: reopenClaimFields.claimNumberId,
       reasonStart: String(req.body?.reasonStart || '').trim(),
       reasonEnd: String(req.body?.reasonEnd || '').trim(),
       closeReason: String(req.body?.closeReason || '').trim(),
@@ -5569,6 +5643,104 @@ async function previewEnrollmentMove(req, res) {
   }
 }
 
+async function listClassMoveCandidates(req, res) {
+  try {
+    const classId = toPublicId(req.params?.classId || '');
+    if (!classId) throw new Error('classId is required.');
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+    assertEnrollmentOfficeAccess(req);
+    const closeEffectiveDate = String(req.body?.closeEffectiveDate || '').trim();
+    const candidates = await enrollmentClassMoveService.listEligibleMoveCandidates({
+      classId: classData.id,
+      closeEffectiveDate,
+      reqUser: req.user,
+      orgId: getActiveOrgIdOrThrow(req.user),
+      sourceClassTitle: classData?.title || classData?.name || ''
+    });
+    return res.json({ status: 'success', candidates });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function previewClassMoveBatch(req, res) {
+  try {
+    const classId = toPublicId(req.params?.classId || '');
+    if (!classId) throw new Error('classId is required.');
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+    assertEnrollmentOfficeAccess(req);
+    const targetClassId = toPublicId(req.body?.targetClassId || '');
+    const closeUserReason = String(req.body?.closeReason || req.body?.closeUserReason || '').trim();
+    if (!closeUserReason) throw new Error('Close reason is required.');
+    const { classData: targetClassData } = targetClassId
+      ? await getClassByIdWithOrgCheck(targetClassId, req.user, buildRouteAccessContext(req))
+      : { classData: null };
+    if (targetClassData) assertRollingWorkflowEnabledForClass(req, targetClassData);
+    const preview = await enrollmentClassMoveService.previewClassMoveBatch({
+      sourceClassId: classData.id,
+      targetClassId,
+      closeUserReason,
+      targetClassTitle: String(targetClassData?.title || targetClassData?.name || '').trim(),
+      rows: Array.isArray(req.body?.rows) ? req.body.rows : [],
+      reqUser: req.user,
+      orgId: getActiveOrgIdOrThrow(req.user),
+      options: {
+        ...buildMoveEnrollmentServiceOptions(req, {
+          targetClassData,
+          sourcePeriod: { classId: classData.id }
+        }),
+        sourceClassTitle: String(classData?.title || classData?.name || '').trim()
+      }
+    });
+    return res.json({
+      status: preview.canApplyAny ? 'success' : 'blocked',
+      message: preview.canApplyAny
+        ? 'Class move preview is ready.'
+        : 'Some selected students cannot be moved. Review preview results.',
+      preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function applyClassMoveBatch(req, res) {
+  try {
+    const classId = toPublicId(req.params?.classId || '');
+    if (!classId) throw new Error('classId is required.');
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+    assertEnrollmentOfficeAccess(req);
+    const targetClassId = toPublicId(req.body?.targetClassId || '');
+    const { classData: targetClassData } = targetClassId
+      ? await getClassByIdWithOrgCheck(targetClassId, req.user, buildRouteAccessContext(req))
+      : { classData: null };
+    if (targetClassData) {
+      assertRollingWorkflowEnabledForClass(req, targetClassData);
+    }
+    const result = await enrollmentClassMoveService.applyClassMoveBatch({
+      batchPreviewHash: String(req.body?.batchPreviewHash || '').trim(),
+      rows: Array.isArray(req.body?.rows) ? req.body.rows : [],
+      reqUser: req.user,
+      orgId: getActiveOrgIdOrThrow(req.user),
+      engineHooks: targetClassData ? buildRollingEnrollmentEngineHooks(req, targetClassData) : {},
+      options: buildMoveEnrollmentServiceOptions(req, {
+        targetClassData,
+        sourcePeriod: { classId: classData.id }
+      })
+    });
+    return res.json({
+      status: 'success',
+      message: `Class move finished. Applied: ${result.applied}, failed: ${result.failed}, skipped: ${result.skipped}.`,
+      result
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function applyEnrollmentMove(req, res) {
   try {
     const sourcePeriodId = toPublicId(req.params?.periodId || '');
@@ -5655,6 +5827,9 @@ module.exports = {
   applyEnrollmentPeriodSessionMarks,
   createExtensionEnrollmentPeriod,
   listEnrollmentMoveTargetClasses,
+  listClassMoveCandidates,
+  previewClassMoveBatch,
+  applyClassMoveBatch,
   previewEnrollmentMove,
   applyEnrollmentMove,
   postEnrollmentSessionAlignment,

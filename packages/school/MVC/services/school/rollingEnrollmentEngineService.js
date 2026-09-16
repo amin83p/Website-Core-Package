@@ -10,6 +10,7 @@ const sessionConflictDetectionService = require('./sessionConflictDetectionServi
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const classSessionCapacityService = require('./classSessionCapacityService');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
+const studentClaimNumberService = require('./studentClaimNumberService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -153,6 +154,7 @@ function normalizeEnrollmentEngineRequest(input = {}, classData = null) {
     reasonStart: String(input.reasonStart || '').trim(),
     reasonEnd: String(input.reasonEnd || '').trim(),
     claimNumber: String(input.claimNumber || '').trim(),
+    claimNumberId: String(input.claimNumberId || '').trim(),
     sessionCountPolicy: classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(input.sessionCountPolicy),
     notes: String(input.notes || '').trim(),
     enrollmentSource: String(input.enrollmentSource || 'rolling_enrollment').trim(),
@@ -242,6 +244,7 @@ function buildEnrollmentPayloadForStudent(classData, normalized, student, studen
     funderType: normalized.funder.funderType,
     funderId: normalized.funder.funderId,
     claimNumber: normalized.claimNumber,
+    claimNumberId: normalized.claimNumberId,
     reasonStart: normalized.reasonStart,
     reasonEnd: normalized.reasonEnd,
     targetSessionCount: normalized.targetSessionCount,
@@ -702,17 +705,29 @@ async function execute({
 
       await assertEnrollmentAlignmentForCreate(classDataCurrent, normalized, reqUser);
 
+      const claimFields = await studentClaimNumberService.resolveEnrollmentClaimFieldsForStudent(
+        studentId,
+        {
+          claimNumberId: studentEntry.claimNumberId || normalized.claimNumberId,
+          claimNumber: studentEntry.claimNumber || normalized.claimNumber
+        },
+        reqUser
+      );
+
       const enrollmentPayload = await augmentEnrollmentPayloadForSessionCapacity({
         classData: classDataCurrent,
         normalized,
         studentEntry,
-        enrollmentPayload: buildEnrollmentPayloadForStudent(
-          classDataCurrent,
-          normalized,
-          student,
-          studentEntry,
-          resolution
-        ),
+        enrollmentPayload: {
+          ...buildEnrollmentPayloadForStudent(
+            classDataCurrent,
+            normalized,
+            student,
+            studentEntry,
+            resolution
+          ),
+          ...claimFields
+        },
         reqUser
       });
 

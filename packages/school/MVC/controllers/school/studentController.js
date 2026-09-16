@@ -58,6 +58,10 @@ async function canChangeStudentSystemIdForUser(reqUser) {
     ));
 }
 
+async function canEditStudentClaimNumbersForUser(reqUser) {
+    return canChangeStudentSystemIdForUser(reqUser);
+}
+
 function getActiveOrgIdOrThrow(reqUser) {
     return getActiveOrgIdOrThrowShared(reqUser);
 }
@@ -737,6 +741,11 @@ exports.showForm = async (req, res) => {
             linkType: 'student',
             isEdit
         });
+        const canEditStudentClb = await canEditStudentClaimNumbersForUser(req.user);
+        const studentModel = require('../../models/school/studentModel');
+        const claimNumbersForView = isEdit
+            ? studentModel.cleanClaimNumbers(student?.claimNumbers || [])
+            : [];
 
         res.render('school/student/studentForm', {
             title: isEdit ? `Edit Student: ${editFormDisplayName} (${editFormRecordId})` : 'Admit New Student',
@@ -753,7 +762,9 @@ exports.showForm = async (req, res) => {
             canEditLinkedPerson,
             linkedPersonLinkType: 'student',
             linkedPersonLinkId: isEdit ? editFormRecordId : '',
-            existingProgramRegistrations
+            existingProgramRegistrations,
+            canEditStudentClb,
+            claimNumbersForView
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -1293,7 +1304,25 @@ exports.putStudentClaimNumbersApi = async (req, res) => {
         }
 
         const studentModel = require('../../models/school/studentModel');
+        const studentClaimNumberService = require('../../services/school/studentClaimNumberService');
         const claimNumbers = studentModel.cleanClaimNumbers(incomingClaimNumbers);
+        const previousClaims = resolveClaimNumbersForApi(existingStudent);
+        const removedClaims = studentClaimNumberService.detectRemovedClaims(previousClaims, claimNumbers);
+        if (removedClaims.length) {
+            const blockers = await studentClaimNumberService.findClaimUsagesForStudent({
+                studentId,
+                removedClaims,
+                reqUser: req.user,
+                options: routeAccess(req)
+            });
+            if (blockers.length) {
+                return res.status(409).json({
+                    status: 'blocked',
+                    message: 'One or more claim numbers cannot be removed because they are used on enrollments.',
+                    blockers
+                });
+            }
+        }
 
         const updatedStudent = await dataService.updateData(
             'students',
@@ -1302,6 +1331,11 @@ exports.putStudentClaimNumbersApi = async (req, res) => {
             req.user
         );
         const studentLabel = await resolveStudentLabelForApi(updatedStudent, req.user);
+        await studentClaimNumberService.backfillClaimNumberIdsForStudent(
+            studentId,
+            req.user,
+            routeAccess(req)
+        );
 
         return res.json({
             status: 'success',
@@ -1313,6 +1347,14 @@ exports.putStudentClaimNumbersApi = async (req, res) => {
             }
         });
     } catch (error) {
+        const blockers = Array.isArray(error?.blockers) ? error.blockers : [];
+        if (blockers.length) {
+            return res.status(409).json({
+                status: 'blocked',
+                message: error.message || 'Unable to save claim numbers.',
+                blockers
+            });
+        }
         return res.status(400).json({
             status: 'error',
             message: error.message || 'Unable to save claim numbers.'

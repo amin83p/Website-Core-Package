@@ -22,6 +22,23 @@ const ACADEMIC_STATUSES = new Set(['Active', 'Probation', 'Graduated', 'Withdraw
 const CLB_SKILLS = CLB_SKILL_CODES;
 const CLB_LEVEL_HISTORY_MAX = 100;
 const CLAIM_NUMBERS_MAX = 50;
+const CLB_EVALUATION_TYPES = new Set(['referral', 'placement_test', 'teacher']);
+const CLB_EVALUATION_LABELS = Object.freeze({
+    referral: 'Referral',
+    placement_test: 'Placement test',
+    teacher: 'Teacher'
+});
+
+function sanitizeClbEvaluationType(value) {
+    const raw = cleanString(value, { max: 40, allowEmpty: true }).toLowerCase();
+    const token = raw.replace(/[\s-]+/g, '_');
+    if (!token) return 'referral';
+    if (token === 'referel' || token === 'referral') return 'referral';
+    if (token === 'placement' || token === 'placementtest' || token === 'placement_test') return 'placement_test';
+    if (token === 'teacher') return 'teacher';
+    if (CLB_EVALUATION_TYPES.has(token)) return token;
+    return 'referral';
+}
 
 function isPlainObject(v) {
     return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -106,10 +123,25 @@ function cleanClbLevelHistory(value) {
         if (!recordedAt) throw new Error(`CLB level history entry ${index + 1} requires a valid recordedAt date.`);
         const resultRecordedAt = cleanDateISO(entry.resultRecordedAt, { allowEmpty: true }) || '';
         const id = cleanId(entry.id, { max: 64, allowEmpty: true }) || `clb_${Date.now()}_${index}`;
+        const evaluationType = sanitizeClbEvaluationType(entry.evaluationType);
+        const note = cleanString(entry.note, { max: 500, allowEmpty: true });
+        let evaluationTeacherId = '';
+        let evaluationTeacherLabel = '';
+        if (evaluationType === 'teacher') {
+            evaluationTeacherId = cleanId(entry.evaluationTeacherId, { max: 80, allowEmpty: true }) || '';
+            evaluationTeacherLabel = cleanString(entry.evaluationTeacherLabel, { max: 200, allowEmpty: true });
+            if (!evaluationTeacherId) {
+                throw new Error(`CLB level history entry ${index + 1}: select a teacher for Teacher evaluation.`);
+            }
+        }
         return {
             id,
             recordedAt,
             resultRecordedAt,
+            note,
+            evaluationType,
+            evaluationTeacherId,
+            evaluationTeacherLabel,
             goal: cleanClbSkillLevels(entry.goal),
             current: cleanClbSkillLevels(entry.current),
             result: cleanClbSkillLevels(entry.result)
@@ -355,6 +387,9 @@ module.exports = {
     cleanClaimNumbers,
     CLAIM_NUMBERS_MAX,
     CLB_SKILLS,
+    CLB_EVALUATION_TYPES: Object.freeze([...CLB_EVALUATION_TYPES]),
+    CLB_EVALUATION_LABELS,
+    sanitizeClbEvaluationType,
     ACADEMIC_STATUSES: Object.freeze([...ACADEMIC_STATUSES]),
     FEE_CATEGORIES
 };

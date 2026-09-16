@@ -3293,6 +3293,7 @@ async function getClassTemplate(req, res) {
       id: String(classData.id || ''),
       title: String(classData.title || '').trim(),
       status: String(classData.status || 'draft').trim().toLowerCase() || 'draft',
+      registrationMode: getClassRegistrationModeKey(classData),
       billingMode: normalizeClassBillingMode(classData.billingMode),
       credits: normalizeCredits(classData.credits),
       deliveryDepartmentId: String(classData.deliveryDepartmentId || '').trim(),
@@ -3323,14 +3324,6 @@ async function getClassTemplate(req, res) {
           termName: String(row?.termName || '').trim(),
           notes: String(row?.notes || '').trim()
         })).filter((row) => row.programId && (String(classData.registrationMode || '').trim().toLowerCase() === 'rolling' || row.termId))
-        : [],
-      instructors: Array.isArray(classData.instructors)
-        ? classData.instructors.map((instructor) => ({
-          personId: cleanPersonId(instructor?.personId),
-          name: String(instructor?.name || instructor?.personId || '').trim(),
-          role: String(instructor?.role || 'Primary').trim(),
-          status: String(instructor?.status || 'active').trim().toLowerCase()
-        })).filter((instructor) => instructor.personId)
         : [],
       enrollment: {
         maxCapacity: Number(classData?.enrollment?.maxCapacity || 30)

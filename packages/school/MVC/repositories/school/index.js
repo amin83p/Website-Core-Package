@@ -150,17 +150,10 @@ function isRecordAccessibleByAssignment(record = {}, scope = {}, options = {}) {
 
   if (kind === 'instructor') {
     const instructors = Array.isArray(record?.instructors) ? record.instructors : [];
-    if (instructors.some((row) => idsEqual(row?.personId, personId))) return true;
-    const aliasIds = new Set(
-      [personId, ...(Array.isArray(scope?.delivererAliasIds) ? scope.delivererAliasIds : [])]
-        .map((id) => toPublicId(id))
-        .filter(Boolean)
-    );
-    const sessions = Array.isArray(record?.sessions) ? record.sessions : [];
-    return sessions.some((session) => {
-      const deliveredBy = toPublicId(session?.delivery?.deliveredBy);
-      return deliveredBy && [...aliasIds].some((id) => idsEqual(id, deliveredBy));
-    });
+    return instructors.some((row) => (
+      idsEqual(row?.personId, personId)
+      && String(row?.status || 'active').trim().toLowerCase() !== 'inactive'
+    ));
   }
 
   if (kind === 'assignees') {
@@ -256,23 +249,19 @@ function buildAssignmentScopeFilter(scope = {}, options = {}) {
   if (!personId) return { id: '__NO_MATCH__' };
 
   if (kind === 'instructor') {
-    const aliasIds = [...new Set(
-      [personId, ...(Array.isArray(scope?.delivererAliasIds) ? scope.delivererAliasIds : [])]
-        .map((id) => toPublicId(id))
-        .filter(Boolean)
-    )];
-    const deliveredByClause = aliasIds.length === 1
-      ? { 'sessions.delivery.deliveredBy': aliasIds[0] }
-      : { 'sessions.delivery.deliveredBy': { $in: aliasIds } };
-    const coTeacherClause = aliasIds.length === 1
-      ? { 'sessions.delivery.coTeachers.personId': aliasIds[0] }
-      : { 'sessions.delivery.coTeachers.personId': { $in: aliasIds } };
+    // Class lists use the class instructor roster only (not session main/co-teacher).
     return {
-      $or: [
-        { 'instructors.personId': personId },
-        deliveredByClause,
-        coTeacherClause
-      ]
+      instructors: {
+        $elemMatch: {
+          personId,
+          $or: [
+            { status: { $exists: false } },
+            { status: null },
+            { status: '' },
+            { status: { $not: { $regex: '^inactive$', $options: 'i' } } }
+          ]
+        }
+      }
     };
   }
   if (kind === 'assignees') {
@@ -1559,6 +1548,7 @@ const schoolRepositories = {
       'funderId',
       'authorizationRef',
       'claimNumber',
+      'claimNumberId',
       'reasonStart',
       'reasonEnd'
     ]

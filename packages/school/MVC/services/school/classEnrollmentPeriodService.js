@@ -339,6 +339,7 @@ async function createPeriod(input = {}, requestingUser = null, options = {}) {
     funderId: String(input.funderId || '').trim(),
     authorizationRef: String(input.authorizationRef || '').trim(),
     claimNumber: String(input.claimNumber || '').trim(),
+    claimNumberId: String(input.claimNumberId || '').trim(),
     reasonStart: String(input.reasonStart || '').trim(),
     reasonEnd: String(input.reasonEnd || '').trim(),
     notes: String(input.notes || '').trim(),
@@ -425,6 +426,7 @@ async function reopenViaNewPeriod(periodId, input = {}, requestingUser = null, o
     funderId: String(input.funderId || existing.funderId || '').trim(),
     authorizationRef: String(input.authorizationRef || existing.authorizationRef || '').trim(),
     claimNumber: String(input.claimNumber || existing.claimNumber || '').trim(),
+    claimNumberId: String(input.claimNumberId || existing.claimNumberId || '').trim(),
     reasonStart: String(input.reasonStart || `Reopened after period ${existing.id}.`).trim(),
     reasonEnd: String(input.reasonEnd || '').trim(),
     allowOverlap: input.allowOverlap === true
@@ -533,6 +535,7 @@ async function updatePeriod(periodId, input = {}, requestingUser = null, options
   if (input.funderId !== undefined) patch.funderId = String(input.funderId || '').trim();
   if (input.authorizationRef !== undefined) patch.authorizationRef = String(input.authorizationRef || '').trim();
   if (input.claimNumber !== undefined) patch.claimNumber = String(input.claimNumber || '').trim();
+  if (input.claimNumberId !== undefined) patch.claimNumberId = String(input.claimNumberId || '').trim();
   if (input.reasonStart !== undefined) patch.reasonStart = String(input.reasonStart || '').trim();
   if (input.reasonEnd !== undefined) patch.reasonEnd = String(input.reasonEnd || '').trim();
   if (input.notes !== undefined) patch.notes = String(input.notes || '').trim();

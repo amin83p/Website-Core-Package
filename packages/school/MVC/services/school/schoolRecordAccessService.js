@@ -124,7 +124,6 @@ function isClassAccessible(classRow, access = {}) {
   }
   if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
     return isActiveInstructor(access.personId, classRow)
-      || classHasSessionDeliveredByPerson(classRow, access.personId)
       || isRecordOwnedByUser(classRow, access.userId);
   }
   return true;

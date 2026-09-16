@@ -264,10 +264,20 @@ test('rolling enrollment row actions include CLB entries manager', () => {
 });
 
 test('rolling enrollment student name supports context menu and claim number management', () => {
+  const profileModalSource = fs.readFileSync(
+    path.join(__dirname, '../../../public/scripts/schoolPersonProfileModal.js'),
+    'utf8'
+  );
   assert.match(viewSource, /id="rollingStudentContextMenu"/);
   assert.match(viewSource, /rolling-student-name-target/);
   assert.match(viewSource, /Manage Phone Numbers/);
   assert.match(viewSource, /Manage Addresses/);
+  assert.match(viewSource, /Manage Email Addresses/);
+  assert.match(viewSource, /Manage Gender/);
+  assert.match(viewSource, /id="rollingStudentContextMenuEmails"/);
+  assert.match(viewSource, /id="rollingStudentContextMenuGender"/);
+  assert.match(viewSource, /function openRollingStudentEmailsModal\(/);
+  assert.match(viewSource, /function openRollingStudentGenderModal\(/);
   assert.match(viewSource, /Manage Claim Numbers/);
   assert.match(viewSource, /id="rollingStudentClaimNumbersModal"/);
   assert.match(viewSource, /async function openRollingStudentClaimNumbersModal\(/);
@@ -278,6 +288,11 @@ test('rolling enrollment student name supports context menu and claim number man
   assert.match(viewSource, /personProfileEditModal/);
   assert.match(viewSource, /focus: 'phones'/);
   assert.match(viewSource, /focus: 'addresses'/);
+  assert.match(viewSource, /focus: 'emails'/);
+  assert.match(viewSource, /focus: 'gender'/);
+  assert.match(profileModalSource, /FOCUSED_PROFILE_MODES/);
+  assert.match(profileModalSource, /isEmails/);
+  assert.match(profileModalSource, /isGender/);
   assert.match(viewSource, /<select id="inp_claimNumber"/);
   assert.match(viewSource, /<select id="grp_claimNumber"/);
   assert.match(viewSource, /<select id="edit_claimNumber"/);

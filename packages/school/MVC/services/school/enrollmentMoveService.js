@@ -67,6 +67,9 @@ function normalizeMovePayload(raw = {}, sourcePeriod = {}) {
   const targetNotes = String(raw?.target?.notes || raw?.notes || '').trim();
   const targetStatus = String(raw?.target?.status || raw?.targetStatus || 'active').trim().toLowerCase() || 'active';
   const claimNumber = String(raw?.target?.claimNumber || raw?.claimNumber || sourcePeriod?.claimNumber || '').trim();
+  const claimNumberId = String(
+    raw?.target?.claimNumberId || raw?.claimNumberId || sourcePeriod?.claimNumberId || ''
+  ).trim();
   const sessionCountPolicy = classEnrollmentSessionApplicabilityService.normalizeSessionCountPolicy(
     raw?.target?.sessionCountPolicy || raw?.sessionCountPolicy || sourcePeriod?.sessionCountPolicy || 'all_non_na'
   );
@@ -89,6 +92,7 @@ function normalizeMovePayload(raw = {}, sourcePeriod = {}) {
       notes: targetNotes,
       status: targetStatus,
       claimNumber,
+      claimNumberId,
       sessionCountPolicy,
       programId: toPublicId(raw?.target?.programId || raw?.programId || sourcePeriod?.programId || ''),
       termId: toPublicId(raw?.target?.termId || raw?.termId || sourcePeriod?.termId || ''),
@@ -226,6 +230,7 @@ async function previewTargetEnrollment(normalized, sourcePeriod, targetClass, re
     programRegistrationId: target.programRegistrationId,
     sessionCapacityType: target.sessionCapacityType,
     claimNumber: target.claimNumber,
+    claimNumberId: target.claimNumberId,
     sessionCountPolicy: target.sessionCountPolicy,
     enrollmentSource: 'enrollment_move'
   };
@@ -461,6 +466,7 @@ async function applyMoveEnrollment({
       programRegistrationId: normalized.target.programRegistrationId,
       sessionCapacityType: normalized.target.sessionCapacityType,
       claimNumber: normalized.target.claimNumber,
+      claimNumberId: normalized.target.claimNumberId,
       sessionCountPolicy: normalized.target.sessionCountPolicy,
       enrollmentSource: 'enrollment_move'
     },

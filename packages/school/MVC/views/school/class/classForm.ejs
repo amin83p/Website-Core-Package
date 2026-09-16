@@ -422,10 +422,11 @@
               </div>
            </div>
            <hr>
-           <h6 class="fw-bold text-primary mb-3">Assigned Teacher</h6>
+           <h6 class="fw-bold text-primary mb-3">Class instructors</h6>
+           <p class="text-muted small mb-3">Teachers listed here can see this class in class pickers. Session-only or co-teachers must be added below. The primary instructor is the default in the session builder.</p>
            <div class="row">
               <div class="col-md-6 mb-3">
-                 <label class="form-label">Assigned Teacher</label>
+                 <label class="form-label">Primary instructor</label>
                  <div class="input-group">
                     <input type="hidden" id="inp_instructorId" required>
                     <input type="text" id="inp_instructorName" class="form-control size-md bg-white" placeholder="Select Instructor..." readonly required>
@@ -438,9 +439,14 @@
               </div>
            </div>
            <div class="mb-3" id="additionalInstructorsSection">
-              <label class="form-label">Additional instructors</label>
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                 <label class="form-label mb-0">Additional instructors</label>
+                 <button type="button" class="btn btn-outline-primary btn-sm" id="btn_addAdditionalInstructor">
+                    <i class="bi bi-person-plus me-1"></i>Add instructor
+                 </button>
+              </div>
               <div id="additionalInstructorsList" class="border rounded p-2 bg-light small" style="min-height: 2.5rem;"></div>
-              <div class="form-text">Remove former or extra teachers from the class roster. The assigned teacher above cannot be removed here.</div>
+              <div class="form-text">Add co-teachers or others who need class-picker access. The primary instructor above cannot be removed here.</div>
            </div>
         </div>
 
@@ -1370,8 +1376,46 @@ document.addEventListener('DOMContentLoaded', () => {
     syncEnabledAttendanceStatusesHidden();
     document.getElementById('inp_wFin').value = dEval.weights?.finalExam || 30;
 
+    function resolveJanFirstOfOrgYear() {
+        const today = String(orgTodayFallback() || '').trim();
+        const yearMatch = /^\d{4}/.exec(today);
+        const year = yearMatch ? Number(yearMatch[0]) : new Date().getFullYear();
+        const safeYear = Number.isFinite(year) && year > 0 ? year : new Date().getFullYear();
+        return `${safeYear}-01-01`;
+    }
+
+    function resetRollingLifecycleFieldsForNewCopy() {
+        if (cycleNoInput) cycleNoInput.value = '1';
+        if (cycleGroupIdInput) cycleGroupIdInput.value = '';
+        if (cycleEndDateInput) cycleEndDateInput.value = '';
+        if (isClosedEnrollmentInput) isClosedEnrollmentInput.checked = false;
+        if (cycleStartDateInput) cycleStartDateInput.value = resolveJanFirstOfOrgYear();
+    }
+
+    function applyRegistrationModeFromTemplate(sourceRegistrationMode) {
+        const mode = String(sourceRegistrationMode || 'term_based').trim().toLowerCase() === 'rolling'
+            ? 'rolling'
+            : 'term_based';
+        if (registrationModeInput) registrationModeInput.value = mode;
+        if (mode === 'rolling') {
+            resetRollingLifecycleFieldsForNewCopy();
+        } else if (cycleStartDateInput) cycleStartDateInput.value = '';
+        if (cycleEndDateInput && mode !== 'rolling') cycleEndDateInput.value = '';
+    }
+
+    function clearClassInstructorFields() {
+        document.getElementById('inp_instructorId').value = '';
+        document.getElementById('inp_instructorName').value = '';
+        document.getElementById('inp_instructorRole').value = 'Primary';
+        document.getElementById('bg_teacherId').value = '';
+        document.getElementById('bg_teacherName').value = '';
+    }
+
     function refreshLifecycleModeUi() {
         const rolling = isRollingMode();
+        if (rolling && cycleStartDateInput && !String(cycleStartDateInput.value || '').trim()) {
+            cycleStartDateInput.value = resolveJanFirstOfOrgYear();
+        }
         if (rollingFieldsWrap) rollingFieldsWrap.style.display = rolling ? '' : 'none';
         if (termLifecycleHint) termLifecycleHint.style.display = rolling ? 'none' : '';
         if (lifecycleModeBadge) {
@@ -2807,6 +2851,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const maxCapacity = Number(source?.enrollment?.maxCapacity || source?.maxCapacity || 30);
         document.getElementById('inp_capacity').value = Number.isFinite(maxCapacity) && maxCapacity > 0 ? Math.round(maxCapacity) : 30;
 
+        applyRegistrationModeFromTemplate(source?.registrationMode);
+        refreshLifecycleModeUi();
+
         const copiedSkillIds = new Set(
             (Array.isArray(source?.skillIds) ? source.skillIds : [])
                 .map((value) => String(value || '').trim().toLowerCase())
@@ -2868,23 +2915,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })).filter((row) => row.programId && (isRollingMode() || row.termId))
             : [];
 
-        const copiedInstructors = Array.isArray(source?.instructors) ? source.instructors : [];
-        const primaryInstructor = copiedInstructors.find((inst) => String(inst?.status || '').trim().toLowerCase() === 'active') || copiedInstructors[0] || null;
-        if (primaryInstructor) {
-            const teacherId = String(primaryInstructor?.personId || '').trim();
-            const teacherName = String(primaryInstructor?.name || teacherId).trim();
-            document.getElementById('inp_instructorId').value = teacherId;
-            document.getElementById('inp_instructorName').value = teacherName;
-            document.getElementById('inp_instructorRole').value = String(primaryInstructor?.role || 'Primary').trim();
-            document.getElementById('bg_teacherId').value = teacherId;
-            document.getElementById('bg_teacherName').value = teacherName;
-        } else {
-            document.getElementById('inp_instructorId').value = '';
-            document.getElementById('inp_instructorName').value = '';
-            document.getElementById('inp_instructorRole').value = 'Primary';
-            document.getElementById('bg_teacherId').value = '';
-            document.getElementById('bg_teacherName').value = '';
-        }
+        clearClassInstructorFields();
 
         const copiedEval = source?.evaluation && typeof source.evaluation === 'object' ? source.evaluation : {};
         const copiedWeights = copiedEval?.weights && typeof copiedEval.weights === 'object' ? copiedEval.weights : {};
@@ -2909,6 +2940,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAllowedProgramTerms();
         renderBillingMode();
         renderSubjects();
+        renderSubjectWeights();
+        syncPricingHidden();
         renderSessions();
 
         _prevRollingModeForEval = null;
@@ -2996,6 +3029,15 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('bg_teacherId').value = teacher.personId;
         document.getElementById('bg_teacherName').value = teacher.displayName;
         getInstructorRowsForSubmit();
+        renderAdditionalInstructors();
+    }, {
+        renderer: teacherPickerRenderer,
+        context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+    });
+
+    setupPicker('btn_addAdditionalInstructor', '/school/teachers', 'Add Class Instructor', 'bi-person-plus', (item) => {
+        const teacher = resolveTeacherPickerSelection(item);
+        addAdditionalInstructorFromPicker(teacher);
     }, {
         renderer: teacherPickerRenderer,
         context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
@@ -4452,6 +4494,24 @@ function removeInstructorFromRoster(personId) {
     const primaryId = String(document.getElementById('inp_instructorId')?.value || '').trim();
     if (!id || (primaryId && id === primaryId)) return;
     const rows = parseInstructorRowsFromHidden().filter((row) => String(row?.personId || '').trim() !== id);
+    writeInstructorRowsToHidden(rows);
+}
+
+function addAdditionalInstructorFromPicker(teacher) {
+    const personId = String(teacher?.personId || '').trim();
+    if (!personId) return;
+    const primaryId = String(document.getElementById('inp_instructorId')?.value || '').trim();
+    if (primaryId && personId === primaryId) return;
+    const rows = parseInstructorRowsFromHidden();
+    if (rows.some((row) => String(row?.personId || '').trim() === personId)) return;
+    rows.push({
+        personId,
+        name: String(teacher?.displayName || teacher?.name || personId).trim(),
+        role: 'Instructor',
+        status: 'active',
+        assignedAt: new Date().toISOString(),
+        unassignedAt: null
+    });
     writeInstructorRowsToHidden(rows);
 }
 

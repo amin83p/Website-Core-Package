@@ -534,6 +534,24 @@ router.post('/api/enrollment-periods/:periodId/move/apply',
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.applyEnrollmentMove);
 
+router.post('/api/:classId/class-move/candidates',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, { keepActive: true }),
+  rollingCtrl.listClassMoveCandidates);
+
+router.post('/api/:classId/class-move/preview',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, {
+    ...rollingEnrollmentMutationActionState,
+    requireToken: false
+  }),
+  rollingCtrl.previewClassMoveBatch);
+
+router.post('/api/:classId/class-move/apply',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  rollingCtrl.applyClassMoveBatch);
+
 router.post('/api/:classId/cycles/close',
   requireAccess(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_CLASS_CYCLES, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
