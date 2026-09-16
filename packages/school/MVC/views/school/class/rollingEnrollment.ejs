@@ -568,6 +568,22 @@
     font-size: 0.68rem;
     line-height: 1.15;
   }
+  .rolling-enrollment-page .rolling-funder-cell {
+    line-height: 1.25;
+    min-width: 7.5rem;
+  }
+  .rolling-enrollment-page .rolling-funder-name-line {
+    font-weight: 600;
+    font-size: 0.84rem;
+  }
+  .rolling-enrollment-page .rolling-funder-claim-line {
+    margin-top: 0.2rem;
+    font-size: 0.68rem;
+    line-height: 1.2;
+    color: #6c757d;
+    font-family: var(--bs-font-monospace);
+    word-break: break-word;
+  }
   #enrollmentOnHoldModal .on-hold-context-banner {
     display: flex;
     align-items: flex-start;
@@ -2078,14 +2094,6 @@
             </div>
           </div>
           <div class="row g-3 align-items-end mb-2">
-            <div class="col-md-7 col-lg-6 d-none" id="rollingClbTeacherPickCol">
-              <label class="form-label fw-bold small" for="inp_rolling_clb_evaluationTeacherLabel">Teacher *</label>
-              <div class="input-group input-group-sm">
-                <input type="hidden" id="inp_rolling_clb_evaluationTeacherId">
-                <input type="text" class="form-control bg-white rolling-clb-editor-input" id="inp_rolling_clb_evaluationTeacherLabel" readonly placeholder="Select teacher...">
-                <button type="button" class="btn btn-outline-secondary" id="btnPickRollingClbEvaluationTeacher" title="Select Teacher"><i class="bi bi-person"></i></button>
-              </div>
-            </div>
             <div class="col-md-5 col-lg-4">
               <label class="form-label fw-bold small" for="inp_rolling_clb_evaluationType">Evaluation</label>
               <select class="form-select form-select-sm rolling-clb-editor-input" id="inp_rolling_clb_evaluationType">
@@ -2093,6 +2101,14 @@
                 <option value="placement_test">Placement test</option>
                 <option value="teacher">Teacher</option>
               </select>
+            </div>
+            <div class="col-md-7 col-lg-6 d-none" id="rollingClbTeacherPickCol">
+              <label class="form-label fw-bold small" for="inp_rolling_clb_evaluationTeacherLabel">Teacher *</label>
+              <div class="input-group input-group-sm">
+                <input type="hidden" id="inp_rolling_clb_evaluationTeacherId">
+                <input type="text" class="form-control bg-white rolling-clb-editor-input" id="inp_rolling_clb_evaluationTeacherLabel" readonly placeholder="Select teacher...">
+                <button type="button" class="btn btn-outline-secondary" id="btnPickRollingClbEvaluationTeacher" title="Select Teacher"><i class="bi bi-person"></i></button>
+              </div>
             </div>
           </div>
           <div class="row g-3 mb-3">
@@ -3084,6 +3100,27 @@
       return 'Self Fund';
     }
     return [funderType, funderId].filter(Boolean).join(' / ') || 'Self Fund';
+  }
+
+  function resolveClaimNumberDisplayLabel(row) {
+    const number = String(row?.claimNumber || '').trim();
+    if (number) return number;
+    const claimNumberId = String(row?.claimNumberId || '').trim();
+    return claimNumberId || '';
+  }
+
+  function renderRollingFunderCellHtml(row) {
+    const funderLabel = resolveFunderDisplayLabel(row);
+    const claimLabel = resolveClaimNumberDisplayLabel(row);
+    const claimHtml = claimLabel
+      ? `<div class="rolling-funder-claim-line" title="Claim number">${htmlEscape(claimLabel)}</div>`
+      : '';
+    return `
+      <div class="rolling-funder-cell">
+        <div class="rolling-funder-name-line">${htmlEscape(funderLabel)}</div>
+        ${claimHtml}
+      </div>
+    `;
   }
   let pendingEnrollmentPayload = null;
   let pendingDraftTransactionItems = [];
@@ -10005,6 +10042,8 @@
       const canSyncAcademicLedger = hasPostedTransactions || status === 'active';
       const removeLabel = hasPostedTransactions ? 'Rollback' : 'Delete';
       const funderLabel = resolveFunderDisplayLabel(row);
+      const claimNumberLabel = resolveClaimNumberDisplayLabel(row);
+      const funderSortValue = `${String(funderLabel || '').trim()} ${String(claimNumberLabel || '').trim()}`.trim().toLowerCase();
       const sessionCapacityLabel = formatSessionCapacityTypeLabel(row?.sessionCapacityType);
       const sessionCapacitySortValue = normalizeSessionCapacityTypeValue(row?.sessionCapacityType);
       const explicitTargetSessionCount = normalizeTargetSessionCountValue(row?.targetSessionCount);
@@ -10067,7 +10106,7 @@
           <td class="text-center small" data-column="sessionCapacity" data-sort-value="${htmlEscape(sessionCapacitySortValue)}">
             <span class="badge text-bg-light border">${htmlEscape(sessionCapacityLabel)}</span>
           </td>
-          <td data-column="funder" data-sort-value="${htmlEscape(String(funderLabel || '').toLowerCase())}">${htmlEscape(funderLabel)}</td>
+          <td data-column="funder" data-sort-value="${htmlEscape(funderSortValue)}">${renderRollingFunderCellHtml(row)}</td>
           <td class="text-end table-actions pe-4" data-column="col_10">
             <div class="rolling-row-actions-wrap">
               <button type="button" class="btn btn-secondary btn-sm rolling-row-actions-toggle" data-period-id="${htmlEscape(String(row?.id || ''))}">

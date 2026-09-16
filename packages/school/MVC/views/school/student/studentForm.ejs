@@ -310,14 +310,6 @@
                        </div>
                      </div>
                      <div class="row g-3 align-items-end mb-2">
-                       <div class="col-md-7 col-lg-6 d-none" id="clbTeacherPickCol">
-                         <label class="form-label fw-bold small" for="inp_clb_evaluationTeacherLabel">Teacher *</label>
-                         <div class="input-group input-group-sm">
-                           <input type="hidden" id="inp_clb_evaluationTeacherId">
-                           <input type="text" class="form-control bg-white" id="inp_clb_evaluationTeacherLabel" readonly placeholder="Select teacher...">
-                           <button type="button" class="btn btn-outline-secondary" id="btnPickClbEvaluationTeacher" title="Select Teacher"><i class="bi bi-person"></i></button>
-                         </div>
-                       </div>
                        <div class="col-md-5 col-lg-4" id="clbEvaluationTypeCol">
                          <label class="form-label fw-bold small" for="inp_clb_evaluationType">Evaluation</label>
                          <select class="form-select form-select-sm" id="inp_clb_evaluationType">
@@ -325,6 +317,14 @@
                            <option value="placement_test">Placement test</option>
                            <option value="teacher">Teacher</option>
                          </select>
+                       </div>
+                       <div class="col-md-7 col-lg-6 d-none" id="clbTeacherPickCol">
+                         <label class="form-label fw-bold small" for="inp_clb_evaluationTeacherLabel">Teacher *</label>
+                         <div class="input-group input-group-sm">
+                           <input type="hidden" id="inp_clb_evaluationTeacherId">
+                           <input type="text" class="form-control bg-white" id="inp_clb_evaluationTeacherLabel" readonly placeholder="Select teacher...">
+                           <button type="button" class="btn btn-outline-secondary" id="btnPickClbEvaluationTeacher" title="Select Teacher"><i class="bi bi-person"></i></button>
+                         </div>
                        </div>
                      </div>
                      <div class="row g-3 mb-3">
