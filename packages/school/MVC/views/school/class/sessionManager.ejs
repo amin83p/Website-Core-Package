@@ -6867,10 +6867,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return (Array.isArray(studentCasesState) ? studentCasesState : []).find((row) => String(row.id) === String(id)) || null;
     }
 
-    const sessionCaseRoster = <%- jsonForScript((session.roster || []).map((student) => ({
-        personId: String(student.personId || '').trim(),
-        name: String(student.name || '').trim()
-    })).filter((student) => student.personId)) %>;
+    const sessionCaseRoster = <%- jsonForScript(
+        typeof sessionStudentCaseRoster !== 'undefined' && Array.isArray(sessionStudentCaseRoster) && sessionStudentCaseRoster.length
+            ? sessionStudentCaseRoster
+            : (session.roster || []).map((student) => ({
+                personId: String(student.personId || '').trim(),
+                name: String(student.name || '').trim()
+            })).filter((student) => student.personId)
+    ) %>;
 
     window.SessionStudentCaseModal.init({
         apiMode: 'session',

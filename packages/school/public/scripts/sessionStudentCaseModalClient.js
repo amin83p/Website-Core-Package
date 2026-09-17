@@ -267,14 +267,22 @@
     }).join('');
   }
 
+  function rosterRowMatchesSearch(row, query) {
+    const needle = String(query || '').trim().toLowerCase();
+    if (!needle) return true;
+    const haystack = String(row?.searchText || '').trim().toLowerCase();
+    if (haystack) return haystack.includes(needle);
+    return String(row.name || '').toLowerCase().includes(needle)
+      || String(row.personId || '').toLowerCase().includes(needle)
+      || String(row.studentRecordId || '').toLowerCase().includes(needle)
+      || String(row.customStudentId || '').toLowerCase().includes(needle);
+  }
+
   function renderStudentPicker(filterText = '') {
     const host = document.getElementById('studentCaseStudentPicker');
     if (!host) return;
-    const query = String(filterText || '').trim().toLowerCase();
-    const rows = getRosterRows().filter((row) => {
-      if (!query) return true;
-      return String(row.name || '').toLowerCase().includes(query) || String(row.personId || '').toLowerCase().includes(query);
-    });
+    const query = String(filterText || '').trim();
+    const rows = getRosterRows().filter((row) => rosterRowMatchesSearch(row, query));
     if (!rows.length) {
       host.innerHTML = '<div class="text-muted small text-center py-3">No students match this search.</div>';
       return;

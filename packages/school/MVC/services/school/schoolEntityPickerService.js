@@ -1,6 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
+const { buildStudentListSearchHaystack } = require('./studentListSearchService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { SECTIONS } = require('../../../config/accessConstants');
 
@@ -420,12 +421,21 @@ function createSchoolEntityPickerService(dependencies = {}) {
       const person = personById.get(toPublicId(student.personId));
       const label = formatPersonName(person, normalizeToken(student.name || student.id || 'Student'));
       const email = readPersonEmail(person);
+      const firstName = normalizeToken(person?.name?.first || person?.firstName || student?.firstName);
+      const lastName = normalizeToken(person?.name?.last || person?.lastName || student?.lastName);
       const subtitle = [
         normalizeToken(student.customStudentId || student.localId || student.id),
         email,
         normalizeToken(student.feeCategory),
         getStudentStatus(student)
       ].filter(Boolean).join(' | ');
+      const searchHaystack = buildStudentListSearchHaystack({
+        ...student,
+        firstName,
+        lastName,
+        name: label,
+        email
+      });
       return {
         id: toPublicId(student.id),
         type: 'student',
@@ -447,15 +457,7 @@ function createSchoolEntityPickerService(dependencies = {}) {
             classTitle
           }]
         },
-        searchText: buildSearchText([
-          student.id,
-          student.customStudentId,
-          student.localId,
-          student.feeCategory,
-          student.academicStatus,
-          label,
-          email
-        ])
+        searchText: searchHaystack
       };
     }).filter((row) => matchesSearch(row, query.q)).sort(sortByLabel);
   }

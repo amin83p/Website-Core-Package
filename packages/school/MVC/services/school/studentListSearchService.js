@@ -3,9 +3,10 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const {
   recordMatchesMultiFieldSearch
 } = requireCoreModule('MVC/utils/multiFieldSearch');
-
-const CANONICAL_STUDENT_PICKER_SEARCH_FIELDS = 'id,customStudentId,firstName,lastName,name,name.first,name.last,studentNumber,personId';
-const LEGACY_STUDENT_PICKER_SEARCH_FIELDS = 'id,firstName,lastName,name.first,name.last,studentNumber,personId';
+const {
+  CANONICAL_STUDENT_PICKER_SEARCH_FIELDS,
+  LEGACY_STUDENT_PICKER_SEARCH_FIELDS
+} = require('../../../config/studentPickerSearchFields');
 
 const STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS = Object.freeze([
   'claimNumbers.number',
@@ -126,12 +127,70 @@ function mergeStudentListSearchableFields(inferredFields = []) {
   return [...new Set([...base, ...STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS])];
 }
 
+function buildSessionStudentCaseRosterEntries(rosterRows = [], { students = [], persons = [] } = {}) {
+  const studentById = new Map(
+    (Array.isArray(students) ? students : [])
+      .map((row) => [String(row?.id || '').trim(), row])
+      .filter(([id]) => id)
+  );
+  const personById = new Map(
+    (Array.isArray(persons) ? persons : [])
+      .map((row) => [String(row?.id || '').trim(), row])
+      .filter(([id]) => id)
+  );
+  const studentByPersonId = new Map();
+  (Array.isArray(students) ? students : []).forEach((row) => {
+    const personId = String(row?.personId || '').trim();
+    if (personId && !studentByPersonId.has(personId)) {
+      studentByPersonId.set(personId, row);
+    }
+  });
+
+  return (Array.isArray(rosterRows) ? rosterRows : [])
+    .map((row) => {
+      const personId = String(row?.personId || '').trim();
+      if (!personId) return null;
+      const person = personById.get(personId) || null;
+      const studentRecord = studentByPersonId.get(personId)
+        || studentById.get(String(row?.studentRecordId || '').trim())
+        || null;
+      const firstName = String(
+        person?.name?.first || person?.firstName || row?.firstName || ''
+      ).trim();
+      const lastName = String(
+        person?.name?.last || person?.lastName || row?.lastName || ''
+      ).trim();
+      const name = String(
+        row?.name || row?.studentName || `${firstName} ${lastName}`.trim() || personId
+      ).trim();
+      const searchText = buildStudentListSearchHaystack({
+        ...(studentRecord && typeof studentRecord === 'object' ? studentRecord : {}),
+        id: String(studentRecord?.id || row?.studentRecordId || '').trim(),
+        personId,
+        firstName,
+        lastName,
+        name,
+        customStudentId: String(studentRecord?.customStudentId || row?.customStudentId || '').trim(),
+        claimNumbers: Array.isArray(studentRecord?.claimNumbers) ? studentRecord.claimNumbers : []
+      });
+      return {
+        personId,
+        name,
+        studentRecordId: String(studentRecord?.id || row?.studentRecordId || '').trim(),
+        customStudentId: String(studentRecord?.customStudentId || '').trim(),
+        searchText
+      };
+    })
+    .filter(Boolean);
+}
+
 module.exports = {
   CANONICAL_STUDENT_PICKER_SEARCH_FIELDS,
   LEGACY_STUDENT_PICKER_SEARCH_FIELDS,
   isLegacyStudentPickerSearchFields,
   STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS,
   buildStudentListSearchHaystack,
+  buildSessionStudentCaseRosterEntries,
   studentMatchesListSearch,
   mergeStudentListSearchableFields
 };

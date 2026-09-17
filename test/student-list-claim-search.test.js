@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const {
   buildStudentListSearchHaystack,
+  buildSessionStudentCaseRosterEntries,
   studentMatchesListSearch,
   mergeStudentListSearchableFields,
   STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS,
@@ -12,6 +13,8 @@ const {
   LEGACY_STUDENT_PICKER_SEARCH_FIELDS,
   isLegacyStudentPickerSearchFields
 } = require('../packages/school/MVC/services/school/studentListSearchService');
+
+const CONFIG_FIELDS = require('../packages/school/config/studentPickerSearchFields');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -51,6 +54,21 @@ test('buildStudentListSearchHaystack includes claim number, label, and notes', (
   assert.match(haystack, /winter intake/);
 });
 
+test('buildSessionStudentCaseRosterEntries adds searchText with claim and customStudentId', () => {
+  const roster = [{ personId: 'PER-1', name: 'Jane Doe' }];
+  const students = [baseStudent({
+    personId: 'PER-1',
+    customStudentId: 'CUST-ROSTER',
+    claimNumbers: [{ id: 'c1', number: 'CLM-ROSTER-1', label: 'Primary', isPrimary: true }]
+  })];
+  const entries = buildSessionStudentCaseRosterEntries(roster, { students, persons: [] });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].personId, 'PER-1');
+  assert.equal(entries[0].customStudentId, 'CUST-ROSTER');
+  assert.match(entries[0].searchText, /clm-roster-1/);
+  assert.match(entries[0].searchText, /cust-roster/);
+});
+
 test('studentMatchesListSearch matches all-fields and field-specific claim number', () => {
   const student = baseStudent({
     claimNumbers: [{ id: 'c1', number: 'ENROLL-42', label: 'Main', isPrimary: true }]
@@ -78,6 +96,32 @@ test('studentMatchesListSearch matches generic picker multi-field searchFields b
   assert.equal(studentMatchesListSearch(student, { q: 'aisling', searchFields: pickerFields }), true);
   assert.equal(studentMatchesListSearch(student, { q: 'murphy', searchFields: pickerFields }), true);
   assert.equal(studentMatchesListSearch(student, { q: 'stu-999', searchFields: pickerFields }), true);
+});
+
+test('canonical picker searchFields match config and support name, id, customStudentId, and claim number', () => {
+  assert.equal(CANONICAL_STUDENT_PICKER_SEARCH_FIELDS, CONFIG_FIELDS.CANONICAL_STUDENT_PICKER_SEARCH_FIELDS);
+  const student = baseStudent({
+    id: 'STU-42',
+    customStudentId: 'EXT-42',
+    firstName: 'Sam',
+    lastName: 'Patel',
+    name: 'Sam Patel',
+    claimNumbers: [{ id: 'c1', number: 'CLM-777', label: 'Primary', isPrimary: true }]
+  });
+  const fields = CANONICAL_STUDENT_PICKER_SEARCH_FIELDS;
+  assert.equal(studentMatchesListSearch(student, { q: 'sam', searchFields: fields }), true);
+  assert.equal(studentMatchesListSearch(student, { q: 'patel', searchFields: fields }), true);
+  assert.equal(studentMatchesListSearch(student, { q: 'sam patel', searchFields: fields }), true);
+  assert.equal(studentMatchesListSearch(student, { q: 'stu-42', searchFields: fields }), true);
+  assert.equal(studentMatchesListSearch(student, { q: 'ext-42', searchFields: fields }), true);
+  assert.equal(studentMatchesListSearch(student, { q: 'clm-777', searchFields: fields }), true);
+});
+
+test('empty searchFields uses haystack including claims (student directory all-fields mode)', () => {
+  const student = baseStudent({
+    claimNumbers: [{ id: 'c1', number: 'HAY-001', label: 'X', isPrimary: true }]
+  });
+  assert.equal(studentMatchesListSearch(student, { q: 'hay-001' }), true);
 });
 
 test('studentMatchesListSearch matches claim label field', () => {

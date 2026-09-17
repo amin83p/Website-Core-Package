@@ -426,12 +426,16 @@ test('review service exposes review context and capability checks', () => {
 
 test('manage session uses shared student case modal assets and capability flags', () => {
   const sessionManagerSource = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  const classControllerSource = read('packages/school/MVC/controllers/school/classController.js');
   assert.match(sessionManagerSource, /sessionStudentCaseModalAssets/);
   assert.match(sessionManagerSource, /SessionStudentCaseModal\.init/);
   assert.match(sessionManagerSource, /studentCaseCapabilities/);
   assert.match(sessionManagerSource, /canCreateStudentCases/);
   assert.match(sessionManagerSource, /canResolveStudentCases/);
   assert.match(sessionManagerSource, /studentCaseCapabilities\.canRead/);
+  assert.match(sessionManagerSource, /sessionStudentCaseRoster/);
+  assert.match(classControllerSource, /buildSessionStudentCaseRosterEntries/);
+  assert.match(classControllerSource, /sessionStudentCaseRoster,/);
   assert.doesNotMatch(sessionManagerSource, /studentCaseCapabilities\.canRead \|\| studentCaseCapabilities\.canReadAll\)[\s\S]{0,40}Student Cases/);
   assert.match(sessionManagerSource, /showStudentCaseAccessAlert/);
   assert.match(sessionManagerSource, /canViewStudentCases/);
@@ -548,4 +552,7 @@ test('review context enriches capabilities with canViewResultNote', () => {
   const reviewSource = read('packages/school/MVC/services/school/sessionStudentCaseReviewService.js');
   assert.match(reviewSource, /enrichCapabilities/);
   assert.match(reviewSource, /redactCaseForViewer/);
+  assert.match(reviewSource, /buildSessionStudentCaseRosterEntries/);
+  assert.match(reviewSource, /async function buildRoster/);
+  assert.match(reviewSource, /roster: await buildRoster/);
 });

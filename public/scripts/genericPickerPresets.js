@@ -1,7 +1,7 @@
 (function registerGenericPickerPresets(global) {
   const contexts = global.GenericPickerContexts || {};
 
-  const CANONICAL_STUDENT_PICKER_SEARCH_FIELDS = 'id,customStudentId,firstName,lastName,name,name.first,name.last,studentNumber,personId';
+  const CANONICAL_STUDENT_PICKER_SEARCH_FIELDS = 'id,customStudentId,firstName,lastName,name,name.first,name.last,studentNumber,personId,claimNumbers.number,claimNumbers.label';
   const LEGACY_STUDENT_PICKER_SEARCH_FIELDS = 'id,firstName,lastName,name.first,name.last,studentNumber,personId';
 
   function normalizePickerSearchFieldsToken(searchFields) {

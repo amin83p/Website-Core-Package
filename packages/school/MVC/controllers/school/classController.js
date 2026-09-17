@@ -103,6 +103,7 @@ const teachingOutlineCatalogService = require('../../services/school/teachingOut
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
 const { userCanOpenAttendanceMatrix, getAttendanceAccessForRequest } = require('../../services/school/attendanceMatrixAccessService');
 const attendanceAccessService = require('../../services/school/attendanceAccessService');
+const studentListSearchService = require('../../services/school/studentListSearchService');
 const { userCanViewSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
 
 function isSafeChildPath(basePath, targetPath) {
@@ -4647,6 +4648,10 @@ async function manageSession(req, res) {
             sessionStatusMeta,
             { allowAdminStatuses, capacityMode: sessionCapacityMode }
         );
+        const sessionStudentCaseRoster = studentListSearchService.buildSessionStudentCaseRosterEntries(
+            session.roster || [],
+            rosterIdentityData
+        );
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,
@@ -4705,6 +4710,7 @@ async function manageSession(req, res) {
             canUndoSessionMerge,
             canViewSchoolSettings,
             canDeleteStudentCases: Boolean(studentCaseCapabilities?.canDelete),
+            sessionStudentCaseRoster,
             studentCaseCapabilities,
             canDeleteSession,
             sessionCoTeachers,

@@ -2,8 +2,10 @@ const schoolRepositories = require('../../repositories/school');
 const schoolDataService = require('./schoolDataService');
 const sessionStudentCaseWorkspaceService = require('./sessionStudentCaseWorkspaceService');
 const sessionStudentCaseAccessService = require('./sessionStudentCaseAccessService');
+const { buildSessionStudentCaseRosterEntries } = require('./studentListSearchService');
 const { getPresetConfig } = require('./sessionStudentCasePresetService');
 const sessionStudentCaseResultVisibilityService = require('./sessionStudentCaseResultVisibilityService');
+const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -52,13 +54,17 @@ function buildSessionLabel(session = {}) {
   return date || normalizeText(session.sessionId || session.id);
 }
 
-function buildRoster(session = {}) {
-  return (Array.isArray(session.roster) ? session.roster : [])
-    .map((row) => ({
-      personId: toPublicId(row?.personId),
-      name: normalizeText(row?.name || row?.studentName || row?.personId)
-    }))
-    .filter((row) => row.personId);
+async function buildRoster(session = {}, reqUser) {
+  const rawRows = Array.isArray(session.roster) ? session.roster : [];
+  const [persons, students] = await Promise.all([
+    schoolIdentityLookupService.listSchoolPersonRecords({
+      reqUser,
+      requireSchoolRole: false,
+      query: { limit: 2000 }
+    }).then((payload) => payload.allRows || payload.rows || []),
+    schoolDataService.fetchAllData('students', {}, reqUser)
+  ]);
+  return buildSessionStudentCaseRosterEntries(rawRows, { students, persons });
 }
 
 async function getReviewContext(req, caseId) {
@@ -83,7 +89,7 @@ async function getReviewContext(req, caseId) {
     sessionId,
     classTitle: normalizeText(existing.classTitle || classData.title || classData.name || classId),
     sessionLabel: buildSessionLabel(session),
-    roster: buildRoster(session),
+    roster: await buildRoster(session, req.user),
     presets: getPresetConfig(),
     capabilities,
     manageSessionHref

@@ -51,6 +51,7 @@ python scripts/design_docs/generate_design_doc_docx.py INPUT.md OUTPUT.docx --te
 | --- | --- |
 | [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-2026-09-05.md) | Bypass admins vs Access Profile ADMIN scope; developer API for admin checks |
 | [attendance-operation-scope-capabilities-2026-09-06.md](attendance-operation-scope-capabilities-2026-09-06.md) | `SCHOOL_ATTENDANCES` and `SCHOOL_ATTENDANCE_REPORT` operation/scope matrix (target spec for app implementation) |
+| [student-picker-search-matrix-2026-09-17.md](student-picker-search-matrix-2026-09-17.md) | Student picker/search surfaces, claim-aware field contract, regression tests, manual QA checklist |
 | [student-case-operation-scope-capabilities-2026-09-06.md](student-case-operation-scope-capabilities-2026-09-06.md) | `SCHOOL_SESSION_STUDENT_CASES` operation/scope matrix (**promoted**); READ vs READ_ALL, locked-case lifecycle, ADMIN override |
 
 ## MongoDB catalog (runtime source of truth)
