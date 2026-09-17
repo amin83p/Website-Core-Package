@@ -164,6 +164,15 @@ function toFieldDto(field = {}, extra = {}) {
           label: clean(option?.label || option?.value)
         }))
       : [],
+    conversionRule: field?.conversionRule && typeof field.conversionRule === 'object'
+      ? {
+          enabled: field.conversionRule.enabled === true || String(field.conversionRule.enabled || '').toLowerCase() === 'true',
+          expression: clean(field.conversionRule.expression),
+          onError: clean(field.conversionRule.onError || 'use_raw').toLowerCase() === 'empty' ? 'empty' : 'use_raw',
+          applyOnReadOnlyDisplay: field.conversionRule.applyOnReadOnlyDisplay === true
+            || String(field.conversionRule.applyOnReadOnlyDisplay || '').toLowerCase() === 'true'
+        }
+      : { enabled: false, expression: '', onError: 'use_raw', applyOnReadOnlyDisplay: false },
     ...extra
   };
 }

@@ -713,10 +713,10 @@
               </div>
               <div class="form-check mt-2">
                 <input class="form-check-input" type="checkbox" id="fieldEditorConversionDisplayReadOnly">
-                <label class="form-check-label" for="fieldEditorConversionDisplayReadOnly">Show converted value on report (view-only fields)</label>
+                <label class="form-check-label" for="fieldEditorConversionDisplayReadOnly">Show converted value on report (read-only fields)</label>
               </div>
-              <div class="form-text">When enabled, conversion also applies to the displayed value on report instances and the fill-reports matrix (view-only fields only). Export/DOCX always uses conversion when enabled above. Stored answers stay unchanged.</div>
-              <div class="form-text">Branching examples: <code>ifelse(num(value) >= 90, "A", "B")</code> or <code>caseof(value, "excellent", 4, "good", 3, "fair", 2, 0)</code>.</div>
+              <div class="form-text">When enabled, conversion also applies to the displayed value on report instances and the fill-reports matrix for read-only fields (including always calculated). Export/DOCX always uses conversion when enabled above. Stored answers stay unchanged.</div>
+              <div class="form-text">Branching examples: <code>ifelse(num(value) &gt;= 90, "A", "B")</code>; equality lookup <code>caseof(value, "excellent", 4, "good", 3, 0)</code>; numeric bands <code>casewhen(num(value) &lt; 40, "U", num(value) &lt; 64, "NI", "S")</code>. In conversion rules, <code>value</code> is this field&apos;s stored/calculated answer.</div>
               <div class="d-flex flex-wrap gap-2 mt-2">
                 <button type="button" class="btn btn-sm btn-outline-primary" id="btnInsertCatalogKeyConversion"><i class="bi bi-search me-1"></i>Insert Catalog Key</button>
               </div>
@@ -1728,7 +1728,8 @@ num(value) <= 95</code></pre>
       if (fieldEditorConversionOnErrorInput) fieldEditorConversionOnErrorInput.disabled = visualOnly;
       const conversionEnabled = fieldEditorConversionEnabledInput?.checked === true;
       const viewOnly = fieldEditorReadonlyInput?.checked === true;
-      const canShowDisplayConversion = !visualOnly && !calculatedMode && viewOnly && conversionEnabled
+      const readOnlyForDisplay = viewOnly || calculatedMode;
+      const canShowDisplayConversion = !visualOnly && readOnlyForDisplay && conversionEnabled
         && Boolean(String(fieldEditorConversionExpressionInput?.value || '').trim());
       if (fieldEditorConversionDisplayReadOnlyInput) {
         fieldEditorConversionDisplayReadOnlyInput.disabled = !canShowDisplayConversion;

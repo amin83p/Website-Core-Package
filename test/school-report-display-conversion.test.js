@@ -76,6 +76,45 @@ describe('report read-only display conversion', () => {
     assert.equal(result.value, 80);
   });
 
+  it('resolveFieldDisplayValue converts calculated read-only field when flag set', () => {
+    const field = {
+      id: 'score',
+      readOnly: true,
+      valueMode: 'calculated',
+      calculationRule: { enabled: true, expression: 'num(value)', onError: 'keep_last' },
+      conversionRule: {
+        enabled: true,
+        expression: 'str(value) + "%"',
+        onError: 'use_raw',
+        applyOnReadOnlyDisplay: true
+      }
+    };
+    const result = reportRuleEngineService.resolveFieldDisplayValue({
+      field,
+      value: 85,
+      answers: { score: 85 },
+      prefill: {}
+    });
+    assert.equal(result.value, '85%');
+  });
+
+  it('casewhen helper maps numeric bands in conversion', () => {
+    const field = {
+      id: 'overall',
+      readOnly: true,
+      valueMode: 'calculated',
+      conversionRule: {
+        enabled: true,
+        expression: 'casewhen(num(value) == 0, "-", num(value) < 40, "U", num(value) < 64, "NI", num(value) < 85, "Sat", "S")',
+        onError: 'use_raw',
+        applyOnReadOnlyDisplay: true
+      }
+    };
+    assert.equal(reportRuleEngineService.resolveFieldDisplayValue({ field, value: 0, answers: { overall: 0 }, prefill: {} }).value, '-');
+    assert.equal(reportRuleEngineService.resolveFieldDisplayValue({ field, value: 50, answers: { overall: 50 }, prefill: {} }).value, 'NI');
+    assert.equal(reportRuleEngineService.resolveFieldDisplayValue({ field, value: 90, answers: { overall: 90 }, prefill: {} }).value, 'S');
+  });
+
   it('applyReadOnlyDisplayConversions only transforms flagged view-only fields', () => {
     const template = {
       schema: {

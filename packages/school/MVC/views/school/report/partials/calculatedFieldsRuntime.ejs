@@ -83,6 +83,14 @@
           if (value == branches[index]) return branches[index + 1]; // eslint-disable-line eqeqeq
         }
         return hasDefault ? branches[branches.length - 1] : value;
+      },
+      casewhen() {
+        const branches = Array.from(arguments);
+        for (let index = 0; index < branches.length - 1; index += 2) {
+          if (branches[index]) return branches[index + 1];
+        }
+        if (branches.length % 2 === 1) return branches[branches.length - 1];
+        return '';
       }
     };
   }
@@ -371,10 +379,48 @@
     return { answers: nextAnswers, diagnostics, orderedIds: plan.orderedIds };
   }
 
+  function normalizeConversionRule(rawRule) {
+    const rule = rawRule && typeof rawRule === 'object' ? rawRule : {};
+    return {
+      enabled: rule.enabled === true || String(rule.enabled || '').trim().toLowerCase() === 'true',
+      expression: String(rule.expression || '').trim(),
+      onError: String(rule.onError || 'use_raw').trim().toLowerCase() === 'empty' ? 'empty' : 'use_raw',
+      applyOnReadOnlyDisplay: rule.applyOnReadOnlyDisplay === true
+        || String(rule.applyOnReadOnlyDisplay || '').trim().toLowerCase() === 'true'
+    };
+  }
+
+  function shouldApplyReadOnlyDisplayConversion(field) {
+    if (!field || field.readOnly !== true) return false;
+    const rule = normalizeConversionRule(field.conversionRule);
+    return rule.enabled && Boolean(rule.expression) && rule.applyOnReadOnlyDisplay;
+  }
+
+  function applyReadOnlyDisplayConversions({ fields = [], answers = {}, prefill = {} } = {}) {
+    const nextAnswers = answers && typeof answers === 'object' ? { ...answers } : {};
+    const safePrefill = prefill && typeof prefill === 'object' ? prefill : {};
+    (Array.isArray(fields) ? fields : []).forEach((field) => {
+      if (!field?.id || !shouldApplyReadOnlyDisplayConversion(field)) return;
+      const rule = normalizeConversionRule(field.conversionRule);
+      try {
+        nextAnswers[field.id] = evaluateExpression(rule.expression, {
+          value: nextAnswers[field.id],
+          answers: nextAnswers,
+          prefill: safePrefill
+        });
+      } catch (_) {
+        nextAnswers[field.id] = rule.onError === 'empty' ? '' : nextAnswers[field.id];
+      }
+    });
+    return { answers: nextAnswers };
+  }
+
   return {
     evaluateExpression,
     buildCalculatedFieldPlan,
     recomputeCalculatedAnswers,
+    applyReadOnlyDisplayConversions,
+    shouldApplyReadOnlyDisplayConversion,
     isCalculatedField
   };
 }));

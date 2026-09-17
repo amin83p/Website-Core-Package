@@ -346,6 +346,7 @@
 
   <form method="POST" action="/school/reports/instances/edit/<%= instance.id %>">
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+    <input type="hidden" name="submitAction" id="reportInstanceSubmitAction" value="">
 
     <% if ((validation.errors || []).length || (validation.warnings || []).length) { %>
     <div class="card border-0 shadow-sm mb-4" id="validationSummaryCard">
@@ -662,7 +663,6 @@
           <button
             class="btn btn-primary btn-sm"
             type="submit"
-            name="submitAction"
             value="save"
             <%= saveDraftDisabled ? 'disabled' : '' %>
             title="<%= isSubmitted ? 'Submitted reports cannot be saved as draft. Reopen for teacher first, or use Submit / Lock.' : (isLocked ? 'Locked reports cannot be saved.' : 'Save as draft') %>"
@@ -670,7 +670,6 @@
           <button
             class="btn btn-success btn-sm"
             type="submit"
-            name="submitAction"
             value="submit"
             <%= submitDisabled ? 'disabled' : '' %>
             title="<%= isLocked ? 'Locked reports cannot be submitted.' : (isReadOnly ? 'This report is read-only until an administrator reopens it.' : 'Submit report') %>"
@@ -1388,6 +1387,14 @@
           }
           if (hasDefault) return branches[branches.length - 1];
           return value;
+        },
+        casewhen() {
+          const branches = Array.from(arguments);
+          for (let i = 0; i < branches.length - 1; i += 2) {
+            if (branches[i]) return branches[i + 1];
+          }
+          if (branches.length % 2 === 1) return branches[branches.length - 1];
+          return '';
         }
       };
     }
@@ -1670,6 +1677,11 @@
           return;
         }
         const n = Number(nextValue);
+        const readOnlyControl = input.readOnly === true || String(input.type || '').toLowerCase() === 'text';
+        if (readOnlyControl && !Number.isFinite(n)) {
+          input.value = String(nextValue);
+          return;
+        }
         input.value = Number.isFinite(n) ? String(n) : '';
         return;
       }
@@ -1842,9 +1854,16 @@
       const prefill = parseJsonScript(prefillDataEl, {});
       const userAnswers = collectAnswers(fields, mergedBefore);
       const mergedAnswers = recomputeCalculatedAnswers(fields, userAnswers, prefill);
+      const displayAnswers = window.SchoolReportCalculatedFields?.applyReadOnlyDisplayConversions
+        ? window.SchoolReportCalculatedFields.applyReadOnlyDisplayConversions({
+          fields,
+          answers: mergedAnswers,
+          prefill
+        }).answers
+        : mergedAnswers;
       (Array.isArray(fields) ? fields : []).forEach((field) => {
         if (!isCalculatedField(field) || !field?.id) return;
-        writeFieldValue(field, mergedAnswers[field.id]);
+        writeFieldValue(field, displayAnswers[field.id]);
       });
       const summary = validateFields(fields, mergedAnswers, prefill);
       Object.keys(summary.issuesByField).forEach((fieldId) => {
@@ -1903,7 +1922,7 @@
         });
         runClientValidation();
 
-        formEl.querySelectorAll('button[type="submit"][name="submitAction"][value="submit"]').forEach((btn) => {
+        formEl.querySelectorAll('button[type="submit"][value="submit"]').forEach((btn) => {
           btn.addEventListener('click', async (event) => {
             const summary = runClientValidation();
             if (!summary.errors.length) return;
@@ -1919,7 +1938,9 @@
 
         formEl.addEventListener('submit', async (event) => {
           const submitter = event.submitter || null;
-          const submitAction = String(submitter?.value || '').trim().toLowerCase();
+          const submitAction = String(submitter?.value || 'save').trim().toLowerCase();
+          const submitActionField = document.getElementById('reportInstanceSubmitAction');
+          if (submitActionField) submitActionField.value = submitAction;
           rememberValidationSummaryFocus(submitAction);
           if (!getReportInstanceActionStateId()) {
             event.preventDefault();

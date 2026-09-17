@@ -1489,9 +1489,10 @@ async function saveInstance(req, res) {
     });
     const validationSummary = saveResult.validationSummary;
 
+    const savedAsSubmitted = String(saveResult?.nextStatus || '').toLowerCase() === 'submitted';
     const payloadOut = {
       status: 'success',
-      message: 'Report saved successfully.',
+      message: savedAsSubmitted ? 'Report submitted successfully.' : 'Report saved successfully.',
       validation: {
         errorCount: validationSummary.errors.length,
         warningCount: validationSummary.warnings.length

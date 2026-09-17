@@ -144,6 +144,13 @@ function createHelperSet() {
       if (hasDefault) return branches[branches.length - 1];
       return value;
     },
+    casewhen(...branches) {
+      for (let i = 0; i < branches.length - 1; i += 2) {
+        if (branches[i]) return branches[i + 1];
+      }
+      if (branches.length % 2 === 1) return branches[branches.length - 1];
+      return '';
+    },
     digits(value) {
       const text = value === undefined || value === null ? '' : String(value);
       const matches = text.match(/\d/g);
@@ -786,7 +793,7 @@ function finalizeConversionRuleForField(conversionRule, field = {}) {
 }
 
 function shouldApplyReadOnlyDisplayConversion(field) {
-  if (!field || field.readOnly !== true || isCalculatedField(field)) return false;
+  if (!field || field.readOnly !== true) return false;
   const rule = normalizeConversionRule(field?.conversionRule || {});
   return rule.enabled && Boolean(String(rule.expression || '').trim()) && rule.applyOnReadOnlyDisplay;
 }

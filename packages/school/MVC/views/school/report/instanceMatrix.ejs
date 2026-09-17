@@ -1398,10 +1398,17 @@
         answers,
         prefill: rowState.calculationPrefill || {}
       });
+      const displayResult = window.SchoolReportCalculatedFields.applyReadOnlyDisplayConversions
+        ? window.SchoolReportCalculatedFields.applyReadOnlyDisplayConversions({
+          fields: allMatrixFields(),
+          answers: result.answers,
+          prefill: rowState.calculationPrefill || {}
+        })
+        : { answers: result.answers };
       rowState.answers = result.answers;
       (matrixState.tableFields || []).filter((field) => field.calculated).forEach((field) => {
         const selector = `.js-matrix-row-field[data-field-id="${CSS.escape(field.id)}"]`;
-        writeControl(row.querySelector(selector), result.answers[field.id]);
+        writeControl(row.querySelector(selector), displayResult.answers[field.id]);
       });
     }
 
