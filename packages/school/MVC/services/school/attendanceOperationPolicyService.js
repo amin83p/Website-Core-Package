@@ -113,6 +113,22 @@ async function applyOperationPolicy({
     };
   }
 
+  if (evalSectionId === SECTIONS.SCHOOL_ATTENDANCE_REPORT
+    && await schoolAdminAccessService.isAdminForRequestAsync(
+      user,
+      SECTIONS.SCHOOL_ATTENDANCE_REPORT,
+      normalizedOperationId
+    )) {
+    return {
+      allowed: true,
+      operationId: normalizedOperationId,
+      evaluation,
+      scopeId: evaluation.scopeId || null,
+      adminBypass: true,
+      sectionId: evalSectionId
+    };
+  }
+
   if (!evaluation?.allowed) {
     return {
       allowed: false,

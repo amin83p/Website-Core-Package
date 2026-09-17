@@ -5,6 +5,7 @@ const attendanceOperationPolicyService = require('./attendanceOperationPolicySer
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const accessService = requireCoreModule('MVC/services/security/index');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 
 async function evaluateAttendanceOperation(user, operationId, ipAddress, sectionId = SECTIONS.SCHOOL_ATTENDANCES) {
   if (!user) {
@@ -105,6 +106,15 @@ async function buildAttendanceReportAccess(user, ipAddress) {
       canOpenReport: false,
       canGenerateReport: false,
       canExportReport: false
+    };
+  }
+
+  if (schoolAdminAccessService.isSuperAdmin(user)) {
+    return {
+      canOpenReport: true,
+      canGenerateReport: true,
+      canExportReport: true,
+      evaluations: { superAdminBypass: true }
     };
   }
 

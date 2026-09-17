@@ -317,6 +317,24 @@ async function buildEphemeralAssignmentContext(params = {}, reqUser) {
   const targetType = sessionId ? 'session' : 'date';
   const taskStartTime = String(params.taskStartTime || '09:00').trim();
   const taskEndTime = String(params.taskEndTime || '10:00').trim();
+  const reportScope = params.reportScope || 'each_student';
+  const scopeTargetStudentIds = Array.isArray(params.targetStudentIds) ? params.targetStudentIds : [];
+
+  const targetRow = {
+    targetType,
+    sessionId,
+    sessionDate,
+    dueDate: targetType === 'date' ? dueDate : '',
+    reportStartDate,
+    reportDueDate,
+    taskStartTime,
+    taskEndTime,
+    teacherId,
+    status: 'active'
+  };
+  if (reportScope === 'selected_students' && scopeTargetStudentIds.length) {
+    targetRow.targetStudentIds = scopeTargetStudentIds;
+  }
 
   const sanitized = reportAssignmentModel.sanitizeAssignment({
     id: EPHEMERAL_ASSIGNMENT_ID,
@@ -324,23 +342,12 @@ async function buildEphemeralAssignmentContext(params = {}, reqUser) {
     classId,
     templateId,
     templateVersion: template.version || 1,
-    reportScope: params.reportScope || 'each_student',
-    targetStudentIds: Array.isArray(params.targetStudentIds) ? params.targetStudentIds : [],
+    reportScope,
+    targetStudentIds: scopeTargetStudentIds,
     teacherIds: [teacherId],
     sharedAnswers: params.sharedAnswers && typeof params.sharedAnswers === 'object' ? params.sharedAnswers : {},
     status: 'active',
-    targetRows: [{
-      targetType,
-      sessionId,
-      sessionDate,
-      dueDate: targetType === 'date' ? dueDate : '',
-      reportStartDate,
-      reportDueDate,
-      taskStartTime,
-      taskEndTime,
-      teacherId,
-      status: 'active'
-    }]
+    targetRows: [targetRow]
   });
 
   const assignment = reportAssignmentModel.applyTargetRowToAssignment(

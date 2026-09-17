@@ -2305,7 +2305,7 @@
             showReportMessage({ icon: 'error', message: formatSarFetchError(error, 'Could not load export options.') });
         } finally {
             loadingEl?.classList.add('d-none');
-            if (exportBtn && canGenerateReport) exportBtn.disabled = false;
+            if (exportBtn && canGenerateReport && canExportReport) exportBtn.disabled = false;
         }
     }
 
