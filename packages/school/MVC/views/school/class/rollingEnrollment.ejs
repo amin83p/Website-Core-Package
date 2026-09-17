@@ -6776,7 +6776,6 @@
       title: 'Select Student',
       searchTerm,
       placeholder: 'Search students, then select one...',
-      searchFields: 'id,firstName,lastName,name.first,name.last,studentNumber,personId',
       context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
         ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
         : undefined,
@@ -10176,7 +10175,6 @@
     GenericPicker.open(GenericPickerPresets.student({
       title: 'Select Student',
       multiselect: false,
-      searchFields: 'id,firstName,lastName,name.first,name.last,studentNumber,personId',
       initialSearchTerm: term,
       context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
         ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })

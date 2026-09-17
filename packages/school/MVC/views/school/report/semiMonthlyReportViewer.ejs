@@ -1,0 +1,706 @@
+<style>
+    .student-report-wrapper { max-height: 520px; overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; }
+    .student-report-table th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 2;
+        font-size: 0.72rem;
+        white-space: nowrap;
+    }
+    .student-report-table th.matrix-sticky-rollup,
+    .student-report-table td.matrix-sticky-rollup {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        border-right: 1px solid #dee2e6;
+        background-color: #f8f9fa;
+        width: 96px;
+        min-width: 96px;
+        max-width: 96px;
+        vertical-align: middle;
+    }
+    .student-report-table td.matrix-sticky-rollup { background-color: #fff; z-index: 2; }
+    .student-report-table th.matrix-sticky-class,
+    .student-report-table td.matrix-sticky-class {
+        position: sticky;
+        left: 96px;
+        z-index: 3;
+        background-color: #f8f9fa;
+        min-width: 180px;
+        max-width: 220px;
+        border-right: 2px solid #dee2e6;
+        box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
+    }
+    .student-report-table td.matrix-sticky-class { background-color: #fff; z-index: 1; }
+    .student-summary-chip { font-size: 0.82rem; }
+    .sar-selected-students-menu {
+        min-width: 320px;
+        max-width: min(420px, 100vw - 24px);
+        max-height: min(360px, calc(100vh - 120px));
+        overflow-y: auto;
+    }
+    .sar-selected-student-row {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: #fff;
+        padding: 0.35rem 0.5rem;
+        margin-bottom: 0.35rem;
+    }
+    .sar-selected-student-row:last-child { margin-bottom: 0; }
+    .sar-collapse-chevron {
+        transition: transform 0.2s ease;
+        font-size: 0.9rem;
+    }
+    .sar-collapse-toggle[aria-expanded="true"] .sar-collapse-chevron {
+        transform: rotate(180deg);
+    }
+    .schedule-shell .filter-panel {
+        background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+        border: 1px solid #dce9ff;
+        border-radius: 14px;
+    }
+    .schedule-shell .range-chip.active {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+    }
+    .smmr-instance-list { display: flex; flex-direction: column; gap: 0.35rem; min-width: 240px; }
+    .smmr-instance-item {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 0.35rem 0.55rem;
+        background: #f8fafc;
+    }
+    .smmr-instances-col { min-width: 280px; vertical-align: top; }
+</style>
+
+<%
+  const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
+    ? schoolSectionDashboardHref
+    : '/dashboard/section-nav/SCHOOL';
+  const manageBtns = [
+    '<a href="/school/reports" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-file-earmark-richtext me-1"></i> Reports Hub</a>',
+    '<a href="/school/reports/instances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-file-earmark-text me-1"></i> Report Instances</a>',
+    '<a href="/school/settings#school-semi-monthly-report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> Semi-Monthly Settings</a>'
+  ];
+  const optionalBtnsBeforePrint = [
+    '<button type="button" id="btn_copyReportLink" class="btn btn-outline-primary btn-md me-2 mb-2" title="Copy a shareable link with the current students and date range"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>'
+  ];
+  const initialStudentsJson = JSON.stringify(typeof initialStudents !== 'undefined' ? initialStudents : []).replace(/</g, '\\u003c');
+  const initialStudentIdsJson = JSON.stringify(typeof initialStudentIds !== 'undefined' ? initialStudentIds : []).replace(/</g, '\\u003c');
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: typeof tableName !== 'undefined' ? tableName : 'School_Semi_Monthly_Report',
+  btn_export: false,
+  print: false,
+  optionalBtnsBeforePrint,
+  headerManageBtns: [
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_REPORTS" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-file-earmark-richtext me-1"></i> School Reports</a>'
+  ],
+  manageBtns
+}) %>
+
+<div class="schedule-shell">
+    <p class="text-muted small mb-3">
+        Review enrolled classes and matching report instances for one or more students.
+        Configure which templates are included in
+        <a href="/school/settings#school-semi-monthly-report">School Settings</a>
+        (<%= typeof configuredTemplateCount !== 'undefined' ? configuredTemplateCount : 0 %> selected).
+    </p>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+            <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Semi-Monthly Report</div>
+            <button id="smmrFilterToggleBtn" type="button" class="btn btn-outline-secondary btn-sm px-2" data-bs-toggle="collapse" data-bs-target="#smmrFilterCollapse" aria-expanded="true" aria-controls="smmrFilterCollapse" aria-label="Close filters">
+                <i id="smmrFilterToggleIcon" class="bi bi-chevron-up"></i>
+            </button>
+        </div>
+        <div class="collapse show" id="smmrFilterCollapse">
+            <div class="card-body filter-panel p-3" id="smmrFilterForm">
+                <div class="row g-3 align-items-end">
+                    <div class="col-lg-5 col-md-6">
+                        <label class="form-label">Students</label>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btn_openStudentPicker">
+                                <i class="bi bi-people me-1"></i> Select Students
+                            </button>
+                            <button type="button" class="btn btn-outline-success btn-sm" id="btn_openSchoolStudentPicker" title="Browse students by department and class">
+                                <i class="bi bi-diagram-3 me-1"></i> Browse Classes
+                            </button>
+                            <div class="dropdown" id="selectedStudentsDropdown">
+                                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" id="btn_selectedStudentsMenu" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" disabled>
+                                    <span id="selectedStudentsMenuLabel">No students selected</span>
+                                </button>
+                                <div class="dropdown-menu sar-selected-students-menu p-2" id="selectedStudentsMenu" aria-labelledby="btn_selectedStudentsMenu">
+                                    <div class="small text-muted px-1 pb-2">Order sets report precedence. Use arrows to reorder.</div>
+                                    <div id="selectedStudentsList"></div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_clearStudents" title="Clear students"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-md-3">
+                        <label class="form-label" for="filter_startDate">Start Date</label>
+                        <input type="date" id="filter_startDate" class="form-control size-md">
+                    </div>
+                    <div class="col-lg-2 col-md-3">
+                        <label class="form-label" for="filter_endDate">End Date</label>
+                        <input type="date" id="filter_endDate" class="form-control size-md">
+                    </div>
+                    <div class="col-12 col-lg-3 d-flex justify-content-lg-end gap-2 pt-lg-2 flex-wrap">
+                        <button type="button" id="btn_loadData" class="btn btn-filled btn-primary btn-md"><i class="bi bi-funnel me-1"></i> Apply</button>
+                        <button type="button" id="btn_reset" class="btn btn-outline-secondary btn-md">Reset</button>
+                    </div>
+                </div>
+                <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
+                    <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="today">Today</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="twoWeeks">Two Weeks</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="thisWeek">This Week</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="prevWeek">Prev Week</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="thisMonth">This Month</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="prevMonth">Prev Month</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="smmrConfigAlert" class="alert alert-warning d-none" role="alert"></div>
+
+    <div class="card border-0 shadow-sm d-none" id="resultsContainer">
+        <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="fw-semibold text-muted small">School Semi-Monthly Report</div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_expandAllStudents">Expand All</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_collapseAllStudents">Collapse All</button>
+            </div>
+        </div>
+        <div class="card-body" id="studentReportSections"></div>
+    </div>
+</div>
+
+<%- include('partials/modal_GenericPicker') %>
+<%- include('school/partials/modal_SchoolEntityPicker') %>
+<%- include('partials/tablePages-end') %>
+
+<script>
+(function () {
+  const initialStartDate = '<%= typeof initialStartDate !== "undefined" ? initialStartDate : "" %>';
+  const initialEndDate = '<%= typeof initialEndDate !== "undefined" ? initialEndDate : "" %>';
+  const initialStudents = <%- initialStudentsJson %>;
+  const initialStudentIds = <%- initialStudentIdsJson %>;
+
+  let selectedStudents = [];
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function startOfLocalDay(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function formatLocalDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function setDateRange(start, end) {
+    document.getElementById('filter_startDate').value = formatLocalDate(start);
+    document.getElementById('filter_endDate').value = formatLocalDate(end);
+  }
+
+  function setActiveRangeChip(range) {
+    document.querySelectorAll('.btn-range').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+    });
+  }
+
+  function applyQuickRange(range) {
+    const today = startOfLocalDay(new Date());
+    let start = new Date(today);
+    let end = new Date(today);
+    if (range === 'today') {
+      // start/end already today
+    } else if (range === 'twoWeeks') {
+      end.setDate(today.getDate() + 13);
+    } else if (range === 'thisWeek') {
+      const day = today.getDay() || 7;
+      start.setDate(today.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'prevWeek') {
+      const day = today.getDay() || 7;
+      start.setDate(today.getDate() - (day - 1) - 7);
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'thisMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (range === 'prevMonth') {
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+    }
+    setDateRange(start, end);
+    setActiveRangeChip(range);
+    syncShareUrl();
+  }
+
+  function studentDisplayName(item) {
+    const first = String(item?.firstName || item?.name?.first || '').trim();
+    const last = String(item?.lastName || item?.name?.last || '').trim();
+    return `${first} ${last}`.trim() || String(item?.name || item?.displayName || item?.label || item?.id || '').trim();
+  }
+
+  function normalizeSelectedStudentItems(items) {
+    const list = Array.isArray(items) ? items : (items ? [items] : []);
+    return list.map((item) => {
+      const studentRecordId = String(item?.studentRecordId || item?.studentId || item?.id || '').trim();
+      return {
+        id: studentRecordId,
+        studentRecordId,
+        personId: String(item?.personId || item?.meta?.personId || '').trim(),
+        name: studentDisplayName(item)
+      };
+    }).filter((row) => row.studentRecordId);
+  }
+
+  function renderSelectedStudents() {
+    const menuLabel = document.getElementById('selectedStudentsMenuLabel');
+    const menuBtn = document.getElementById('btn_selectedStudentsMenu');
+    const listEl = document.getElementById('selectedStudentsList');
+    if (!menuLabel || !menuBtn || !listEl) return;
+    if (!selectedStudents.length) {
+      menuLabel.textContent = 'No students selected';
+      menuBtn.disabled = true;
+      listEl.innerHTML = '<div class="text-muted small px-1">No students selected.</div>';
+      return;
+    }
+    menuLabel.textContent = `${selectedStudents.length} student${selectedStudents.length === 1 ? '' : 's'} selected`;
+    menuBtn.disabled = false;
+    listEl.innerHTML = selectedStudents.map((student, index) => {
+      const studentId = String(student.studentRecordId || student.id || '').trim();
+      return `
+        <div class="sar-selected-student-row">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary">${index + 1}</span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-semibold small text-truncate">${escapeHtml(student.name || studentId)}</div>
+              <div class="text-muted x-small font-monospace">${escapeHtml(studentId)}</div>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" data-move-student-up="${index}" ${index > 0 ? '' : 'disabled'}><i class="bi bi-arrow-up"></i></button>
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" data-move-student-down="${index}" ${index < selectedStudents.length - 1 ? '' : 'disabled'}><i class="bi bi-arrow-down"></i></button>
+              <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1" data-remove-student-index="${index}"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    listEl.querySelectorAll('[data-move-student-up]').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        moveSelectedStudent(Number(btn.getAttribute('data-move-student-up')), -1);
+      });
+    });
+    listEl.querySelectorAll('[data-move-student-down]').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        moveSelectedStudent(Number(btn.getAttribute('data-move-student-down')), 1);
+      });
+    });
+    listEl.querySelectorAll('[data-remove-student-index]').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const index = Number(btn.getAttribute('data-remove-student-index'));
+        selectedStudents.splice(index, 1);
+        renderSelectedStudents();
+      });
+    });
+    syncShareUrl();
+  }
+
+  function moveSelectedStudent(index, delta) {
+    const toIndex = index + delta;
+    if (index < 0 || toIndex < 0 || index >= selectedStudents.length || toIndex >= selectedStudents.length) return;
+    const [row] = selectedStudents.splice(index, 1);
+    selectedStudents.splice(toIndex, 0, row);
+    renderSelectedStudents();
+  }
+
+  function openStudentPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Select Students',
+      placeholder: 'Search students, select one or more...',
+      multiselect: true,
+      selectedItems: selectedStudents.map((row) => ({
+        id: row.studentRecordId || row.id,
+        studentRecordId: row.studentRecordId || row.id,
+        personId: row.personId,
+        firstName: row.name,
+        name: row.name
+      })),
+      onSelect: (items) => {
+        selectedStudents = normalizeSelectedStudentItems(items);
+        renderSelectedStudents();
+      }
+    }));
+  }
+
+  function openHierarchicalStudentPicker() {
+    if (!window.SchoolEntityPicker || typeof window.SchoolEntityPicker.open !== 'function') return;
+    const referenceDate = document.getElementById('filter_startDate')?.value
+      || document.getElementById('filter_endDate')?.value
+      || '';
+    window.SchoolEntityPicker.open({
+      target: 'students',
+      title: 'Browse Students by Class',
+      multiselect: true,
+      referenceDate,
+      selectedItems: selectedStudents.map((row) => ({
+        id: row.studentRecordId || row.id,
+        studentId: row.studentRecordId || row.id,
+        studentRecordId: row.studentRecordId || row.id,
+        personId: row.personId,
+        label: row.name,
+        name: row.name
+      })),
+      onSelect: (items) => {
+        selectedStudents = normalizeSelectedStudentItems(items);
+        renderSelectedStudents();
+      }
+    });
+  }
+
+  function statusBadgeClass(status) {
+    const token = String(status || '').toLowerCase();
+    if (token === 'submitted') return 'bg-success';
+    if (token === 'locked') return 'bg-secondary';
+    if (token === 'archived') return 'bg-dark';
+    return 'bg-warning text-dark';
+  }
+
+  function summarizeStudentReport(student = {}) {
+    const classes = Array.isArray(student.classes) ? student.classes : [];
+    const summary = { classes: classes.length, instances: 0, submitted: 0, draft: 0, locked: 0 };
+    classes.forEach((classRow) => {
+      (Array.isArray(classRow.instances) ? classRow.instances : []).forEach((row) => {
+        summary.instances += 1;
+        const status = String(row?.status || '').trim().toLowerCase();
+        if (status === 'submitted') summary.submitted += 1;
+        else if (status === 'locked') summary.locked += 1;
+        else if (status === 'draft') summary.draft += 1;
+      });
+    });
+    return summary;
+  }
+
+  async function confirmOpenAttendanceMatrix(url = '') {
+    const targetUrl = String(url || '').trim();
+    if (!targetUrl) return;
+    const openLabel = 'Open in New Tab';
+    let confirmed = false;
+    if (window.ReportMessaging?.confirmReportAction) {
+      confirmed = await window.ReportMessaging.confirmReportAction({
+        title: 'Attendance Matrix',
+        message: 'Open this class in the Attendance Matrix page in a new tab?',
+        confirmText: openLabel,
+        cancelText: 'Cancel',
+        confirmClass: 'btn-primary',
+        icon: 'question'
+      });
+    } else {
+      confirmed = window.confirm('Open this class in the Attendance Matrix page in a new tab?');
+    }
+    if (confirmed) window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  function buildClassReportRollupCellHtml(instances = []) {
+    const list = Array.isArray(instances) ? instances : [];
+    const submitted = list.filter((row) => String(row?.status || '').toLowerCase() === 'submitted').length;
+    const draft = list.filter((row) => String(row?.status || '').toLowerCase() === 'draft').length;
+    const locked = list.filter((row) => String(row?.status || '').toLowerCase() === 'locked').length;
+    const total = list.length;
+    const pct = total ? Math.round((submitted / total) * 100) : null;
+    const pctStr = total ? `${pct}%` : '—';
+    const rollupTitle = [
+      `Submitted: ${submitted}`,
+      `Draft: ${draft}`,
+      locked ? `Locked: ${locked}` : null,
+      `Total: ${total}`
+    ].filter(Boolean).join(' · ');
+    return `<td class="matrix-sticky-rollup px-2 py-2 text-center small" title="${escapeHtml(rollupTitle)}">
+      <div><span class="text-success fw-semibold">${submitted}</span><span class="text-muted"> / </span><span class="text-warning fw-semibold">${draft}</span>${locked ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${locked}</span>` : ''}</div>
+      <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${escapeHtml(pctStr)}</div>
+    </td>`;
+  }
+
+  function buildInstanceListHtml(instances = []) {
+    if (!instances.length) {
+      return '<span class="text-muted small">No matching report instances in this period.</span>';
+    }
+    return `<div class="smmr-instance-list">${instances.map((row) => `
+      <div class="smmr-instance-item">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div class="min-w-0">
+            <a href="${escapeHtml(row.editUrl || '#')}" class="fw-semibold small text-decoration-none" target="_blank" rel="noopener noreferrer">${escapeHtml(row.templateLabel || row.id)}</a>
+            <div class="text-muted" style="font-size:0.72rem;">${escapeHtml(row.sessionDate || '')}${row.assignmentId ? ` · ${escapeHtml(row.assignmentId)}` : ''}</div>
+          </div>
+          <span class="badge ${statusBadgeClass(row.status)} text-uppercase">${escapeHtml(row.status || 'draft')}</span>
+        </div>
+      </div>
+    `).join('')}</div>`;
+  }
+
+  function buildStudentSection(student, startDate, endDate) {
+    const personId = String(student?.personId || '').trim();
+    const collapseId = `student-report-${personId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    const summary = summarizeStudentReport(student);
+    const studentNameHtml = typeof schoolRenderStudentNameHtml === 'function'
+      ? schoolRenderStudentNameHtml(student.name, student.studentRecordId, { className: 'text-decoration-none fw-bold' })
+      : escapeHtml(student.name || personId);
+
+    let classRows = '';
+    (student.classes || []).forEach((classRow) => {
+      const classId = String(classRow.classId || '').trim();
+      const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
+      classRows += `
+        <tr>
+          ${buildClassReportRollupCellHtml(classRow.instances)}
+          <td class="matrix-sticky-class px-3 py-2 small fw-semibold">
+            <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold sar-matrix-link" data-sar-matrix-url="${escapeHtml(matrixUrl)}">${escapeHtml(classRow.className || classId)}</button>
+            ${classRow.teacherName ? `<div class="text-muted" style="font-size:0.72rem;">${escapeHtml(classRow.teacherName)}</div>` : ''}
+          </td>
+          <td class="px-3 py-2 smmr-instances-col">${buildInstanceListHtml(classRow.instances)}</td>
+        </tr>`;
+    });
+
+    if (!classRows) {
+      classRows = `<tr><td class="matrix-sticky-class px-3 py-2 text-muted small" colspan="3">No enrolled classes in this date range.</td></tr>`;
+    }
+
+    return `
+      <div class="card border shadow-sm mb-3 student-report-card" data-person-id="${escapeHtml(personId)}" data-student-record-id="${escapeHtml(String(student.studentRecordId || '').trim())}">
+        <div class="card-header bg-white py-2">
+          <button
+            class="btn btn-link text-decoration-none text-dark w-100 text-start p-0 sar-collapse-toggle"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#${escapeHtml(collapseId)}"
+            aria-expanded="false"
+            aria-controls="${escapeHtml(collapseId)}">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <div class="d-flex align-items-center gap-2 fw-bold">
+                <i class="bi bi-chevron-down sar-collapse-chevron"></i>
+                <span>${studentNameHtml}</span>
+              </div>
+              <div class="d-flex flex-wrap gap-2 student-summary-chip">
+                <span><span class="text-primary fw-semibold">Classes</span> ${Number(summary.classes || 0)}</span>
+                <span><span class="text-primary fw-semibold">Instances</span> ${Number(summary.instances || 0)}</span>
+                <span><span class="text-success fw-semibold">Submitted</span> ${Number(summary.submitted || 0)}</span>
+                <span><span class="text-warning fw-semibold">Draft</span> ${Number(summary.draft || 0)}</span>
+                <span><span class="text-secondary fw-semibold">Locked</span> ${Number(summary.locked || 0)}</span>
+              </div>
+            </div>
+          </button>
+        </div>
+        <div id="${escapeHtml(collapseId)}" class="collapse student-report-collapse">
+          <div class="card-body p-0">
+            <div class="student-report-wrapper">
+              <table class="table table-sm table-hover mb-0 student-report-table">
+                <thead>
+                  <tr>
+                    <th class="matrix-sticky-rollup text-center small px-2 py-2" title="Report instance rollup">
+                      <div class="fw-bold text-secondary">Rollup</div>
+                      <div class="text-muted" style="font-size: 0.68rem; line-height: 1.2;">Sub / Dr / %</div>
+                    </th>
+                    <th class="matrix-sticky-class px-3 py-2">Class</th>
+                    <th class="px-3 py-2">Report instances</th>
+                  </tr>
+                </thead>
+                <tbody>${classRows}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function showConfigWarning(message) {
+    const el = document.getElementById('smmrConfigAlert');
+    if (!el) return;
+    if (!message) {
+      el.classList.add('d-none');
+      el.textContent = '';
+      return;
+    }
+    el.textContent = message;
+    el.classList.remove('d-none');
+  }
+
+  async function loadSemiMonthlyReport() {
+    const startDate = String(document.getElementById('filter_startDate').value || '').trim();
+    const endDate = String(document.getElementById('filter_endDate').value || '').trim();
+    const studentIds = selectedStudents.map((row) => String(row.studentRecordId || row.id || '').trim()).filter(Boolean);
+    if (!studentIds.length) {
+      alert('Select at least one student.');
+      return;
+    }
+    if (!startDate || !endDate) {
+      alert('Start date and end date are required.');
+      return;
+    }
+
+    const loadBtn = document.getElementById('btn_loadData');
+    const loadBtnHtml = loadBtn?.innerHTML;
+    if (loadBtn) {
+      loadBtn.disabled = true;
+      loadBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+    }
+
+    try {
+      const params = new URLSearchParams();
+      params.set('startDate', startDate);
+      params.set('endDate', endDate);
+      params.set('studentIds', studentIds.join(','));
+      const response = await fetch(`/school/reports/semi-monthly/api/data?${params.toString()}`, {
+        headers: { 'X-AJAX-Request': 'true' }
+      });
+      const payload = await response.json();
+      if (payload.status !== 'success') {
+        throw new Error(payload.message || 'Could not load semi-monthly report.');
+      }
+      showConfigWarning(payload.configurationWarning || '');
+      const students = Array.isArray(payload.students) ? payload.students : [];
+      const container = document.getElementById('studentReportSections');
+      container.innerHTML = students.length
+        ? students.map((student) => buildStudentSection(student, payload.startDate || startDate, payload.endDate || endDate)).join('')
+        : '<p class="text-muted mb-0">No enrolled classes found for the selected students and date range.</p>';
+      document.getElementById('resultsContainer').classList.remove('d-none');
+      syncShareUrl();
+    } catch (error) {
+      alert(error.message || 'Load failed.');
+    } finally {
+      if (loadBtn) {
+        loadBtn.disabled = false;
+        if (loadBtnHtml) loadBtn.innerHTML = loadBtnHtml;
+      }
+    }
+  }
+
+  function getFilterParams() {
+    return {
+      startDate: String(document.getElementById('filter_startDate').value || '').trim(),
+      endDate: String(document.getElementById('filter_endDate').value || '').trim(),
+      studentIds: selectedStudents.map((row) => String(row.studentRecordId || row.id || '').trim()).filter(Boolean)
+    };
+  }
+
+  function syncShareUrl() {
+    if (!window.history?.replaceState) return;
+    const { startDate, endDate, studentIds } = getFilterParams();
+    const url = new URL(window.location.pathname, window.location.origin);
+    if (startDate) url.searchParams.set('startDate', startDate);
+    if (endDate) url.searchParams.set('endDate', endDate);
+    if (studentIds.length) url.searchParams.set('studentIds', studentIds.join(','));
+    const nextUrl = url.pathname + url.search;
+    if (window.location.pathname + window.location.search !== nextUrl) {
+      window.history.replaceState({}, document.title, nextUrl);
+    }
+  }
+
+  async function copyShareLink() {
+    const { studentIds, startDate, endDate } = getFilterParams();
+    if (!studentIds.length || !startDate || !endDate) {
+      alert('Select students and a date range before copying a link.');
+      return;
+    }
+    const url = new URL('/school/reports/semi-monthly', window.location.origin);
+    url.searchParams.set('startDate', startDate);
+    url.searchParams.set('endDate', endDate);
+    url.searchParams.set('studentIds', studentIds.join(','));
+    syncShareUrl();
+    await navigator.clipboard.writeText(url.toString());
+    alert('Link copied to clipboard.');
+  }
+
+  function setAllStudentSectionsExpanded(expanded) {
+    document.querySelectorAll('.student-report-card .student-report-collapse').forEach((sectionEl) => {
+      if (window.bootstrap?.Collapse) {
+        const collapse = window.bootstrap.Collapse.getOrCreateInstance(sectionEl, { toggle: false });
+        if (expanded) collapse.show();
+        else collapse.hide();
+      } else {
+        sectionEl.classList.toggle('show', expanded);
+      }
+      const toggleBtn = document.querySelector(`[data-bs-target="#${sectionEl.id}"]`);
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    });
+  }
+
+  document.getElementById('studentReportSections')?.addEventListener('click', (event) => {
+    const matrixTrigger = event.target.closest('[data-sar-matrix-url]');
+    if (!matrixTrigger) return;
+    event.preventDefault();
+    confirmOpenAttendanceMatrix(matrixTrigger.getAttribute('data-sar-matrix-url'));
+  });
+
+  document.getElementById('btn_openStudentPicker')?.addEventListener('click', openStudentPicker);
+  document.getElementById('btn_openSchoolStudentPicker')?.addEventListener('click', openHierarchicalStudentPicker);
+  document.getElementById('btn_clearStudents')?.addEventListener('click', () => {
+    selectedStudents = [];
+    renderSelectedStudents();
+    document.getElementById('studentReportSections').innerHTML = '';
+    document.getElementById('resultsContainer').classList.add('d-none');
+    showConfigWarning('');
+  });
+  document.getElementById('btn_loadData')?.addEventListener('click', () => loadSemiMonthlyReport());
+  document.getElementById('btn_copyReportLink')?.addEventListener('click', () => copyShareLink().catch(() => alert('Could not copy link.')));
+  document.getElementById('btn_expandAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(true));
+  document.getElementById('btn_collapseAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(false));
+  document.getElementById('btn_reset')?.addEventListener('click', () => {
+    document.getElementById('filter_startDate').value = '';
+    document.getElementById('filter_endDate').value = '';
+    document.querySelectorAll('.btn-range').forEach((btn) => btn.classList.remove('active'));
+  });
+  document.querySelectorAll('.btn-range').forEach((btn) => {
+    btn.addEventListener('click', () => applyQuickRange(btn.getAttribute('data-range')));
+  });
+  document.getElementById('filter_startDate')?.addEventListener('change', syncShareUrl);
+  document.getElementById('filter_endDate')?.addEventListener('change', syncShareUrl);
+
+  if (initialStartDate) document.getElementById('filter_startDate').value = initialStartDate;
+  if (initialEndDate) document.getElementById('filter_endDate').value = initialEndDate;
+  if (initialStudents.length) {
+    selectedStudents = initialStudents.map((row) => ({
+      id: String(row.studentRecordId || '').trim(),
+      studentRecordId: String(row.studentRecordId || '').trim(),
+      personId: String(row.personId || '').trim(),
+      name: String(row.name || row.studentRecordId || '').trim()
+    })).filter((row) => row.studentRecordId);
+  } else if (initialStudentIds.length) {
+    selectedStudents = initialStudentIds.map((id) => ({ id, studentRecordId: id, name: `Student ${id}` }));
+  }
+  renderSelectedStudents();
+  syncShareUrl();
+
+  if ((initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate) {
+    loadSemiMonthlyReport();
+  }
+})();
+</script>

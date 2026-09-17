@@ -384,6 +384,20 @@ function buildCatalog() {
       }
     },
     {
+      key: 'school.semiMonthlyReportPolicy',
+      domain: 'School',
+      section: 'School Semi-Monthly Report Policy',
+      source: 'school/semiMonthlyReportPolicy.json',
+      collection: 'schoolSemiMonthlyReportPolicy',
+      sourceFormat: 'single_object',
+      transformRecord: (record) => ({ ...(record || {}), id: 'semi-monthly-report-policy' }),
+      inverseTransformRecord: (record) => {
+        const next = { ...(record || {}) };
+        if (next.id === 'semi-monthly-report-policy') delete next.id;
+        return next;
+      }
+    },
+    {
       key: 'school.timesheetParametersPolicy',
       domain: 'School',
       section: 'Timesheet Parameters Policy',

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/reportController');
+const semiMonthlyCtrl = require('../controllers/school/semiMonthlyReportController');
 const overallCtrl = require('../controllers/school/overallReportController');
 const overallMgmtCtrl = require('../controllers/school/overallReportManagementController');
 const { requireCoreModule } = require('../services/school/schoolCoreContracts');
@@ -20,6 +21,7 @@ const REPORT_INSTANCE_SECTION = SECTIONS.SCHOOL_REPORTS_INSTANCES;
 const OVERALL_REPORT_TEMPLATE_SECTION = SECTIONS.SCHOOL_REPORTS_OVERALL_TEMPLATE;
 const OVERALL_REPORT_INSTANCE_SECTION = SECTIONS.SCHOOL_REPORTS_OVERALL_INSTANCES;
 const OVERALL_REPORT_MANAGEMENT_SECTION = SECTIONS.SCHOOL_REPORTS_OVERALL_MANAGEMENT;
+const SEMI_MONTHLY_REPORT_SECTION = SECTIONS.SCHOOL_SEMI_MONTHLY_REPORT;
 const reportAssignmentMutationActionState = {
   requireToken: true,
   allowOperationTokenFallback: true,
@@ -184,6 +186,16 @@ router.get('/',
   requireAccess(REPORT_NAV_SECTION, OPERATIONS.READ_ALL),
   trackActionState(REPORT_NAV_SECTION, OPERATIONS.READ_ALL),
   ctrl.showHome);
+
+router.get('/semi-monthly',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.showSemiMonthlyReportPage);
+
+router.get('/semi-monthly/api/data',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.getSemiMonthlyReportData);
 
 // Template Designer
 router.get('/templates',

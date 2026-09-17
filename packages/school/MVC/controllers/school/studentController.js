@@ -599,6 +599,12 @@ exports.listStudents = async (req, res) => {
             return st !== 'archived';
         });
 
+        if (searchTerm && studentListSearchService.isLegacyStudentPickerSearchFields(query.searchFields)) {
+            console.warn('[school/students] Legacy student picker searchFields; update client picker to canonical fields.', {
+                searchFields: query.searchFields
+            });
+        }
+
         const searchedStudents = !searchTerm
             ? visibleStudents
             : visibleStudents.filter((student) => studentListSearchService.studentMatchesListSearch(student, {

@@ -2282,6 +2282,9 @@
         },
         {
           "id": "445586"
+        },
+        {
+          "id": "446108"
         }
       ],
       "related": [],
@@ -2546,6 +2549,86 @@
         },
         {
           "id": "OP1012",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446108",
+      "name": "SCHOOL_SEMI_MONTHLY_REPORT",
+      "category": "SCHOOL",
+      "description": "Student-centric semi-monthly report listing enrolled classes and matching report instances for a selected date range.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/reports/semi-monthly",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1006",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1010",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1022",
           "sessionAttempts": 10,
           "sessionTime": 30,
           "active": true
@@ -4232,6 +4315,18 @@
       "tags": [
         "SCHOOL_SESSION_STUDENT_CASES",
         "778771"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_136",
+      "name": "SCHOOL_SEMI_MONTHLY_REPORT",
+      "type": "class",
+      "value": "bi bi-calendar2-range",
+      "tags": [
+        "SCHOOL_SEMI_MONTHLY_REPORT",
+        "446108"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true

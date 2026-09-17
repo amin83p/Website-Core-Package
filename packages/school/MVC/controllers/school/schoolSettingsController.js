@@ -27,10 +27,12 @@ const {
   resolveOrganizationTimezoneFromRow
 } = requireCoreModule('MVC/utils/timezoneUtils');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
+const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyReportPolicyModel');
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
 const timesheetImportPolicyModel = require('../../models/school/timesheetImportPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
+const semiMonthlyReportPolicyService = require('../../services/school/semiMonthlyReportPolicyService');
 const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
 const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
 const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
@@ -263,6 +265,20 @@ async function resolveStudentAttendanceReportLabels(policy = {}, reqUser) {
   };
 }
 
+async function resolveSemiMonthlyReportTemplateLabels(policy = {}, reqUser) {
+  const templateIds = semiMonthlyReportPolicyService.normalizeIdList(policy.reportTemplateIds);
+  const reportTemplateLabels = [];
+  for (const templateId of templateIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
+    reportTemplateLabels.push({
+      id: templateId,
+      label: semiMonthlyReportPolicyService.formatTemplateLabel(template, templateId)
+    });
+  }
+  return { reportTemplateLabels };
+}
+
 function emailTemplateHasBodyContentSlot(template = {}) {
   return validateSessionNotificationEmailWrapperTemplate(template).hasBodyContentSlot;
 }
@@ -366,6 +382,7 @@ async function loadSettingsPageData(req) {
     autosavePolicy,
     sessionAccessPolicy,
     studentAttendanceReportPolicy,
+    semiMonthlyReportPolicy,
     timesheetParametersPolicy,
     timesheetImportPolicy,
     canUpdate
@@ -377,12 +394,17 @@ async function loadSettingsPageData(req) {
     autosavePolicyModel.getPolicyForOrg(activeOrgId),
     sessionAccessPolicyModel.getPolicyForOrg(activeOrgId),
     studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId),
+    semiMonthlyReportPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetImportPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
   const studentAttendanceReportLabels = await resolveStudentAttendanceReportLabels(
     studentAttendanceReportPolicy,
+    req.user
+  );
+  const semiMonthlyReportLabels = await resolveSemiMonthlyReportTemplateLabels(
+    semiMonthlyReportPolicy,
     req.user
   );
   const enrichedSessionAccessPolicy = await enrichSessionAccessPolicyForView(sessionAccessPolicy, req.user);
@@ -449,6 +471,7 @@ async function loadSettingsPageData(req) {
       .uncompletedSessionNotification.channels.email.bodyTemplate,
     autosaveSections: listAutosaveSections(),
     studentAttendanceReportPolicy,
+    semiMonthlyReportPolicy,
     timesheetParametersPolicy,
     timesheetImportPolicy,
     timesheetImportActivityOptions,
@@ -460,7 +483,8 @@ async function loadSettingsPageData(req) {
     studentAttendanceReportTemplateLabel: studentAttendanceReportLabels.reportTemplateLabel,
     studentAttendanceReportTemplateCapabilities: studentAttendanceReportLabels.reportTemplateCapabilities,
     studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel,
-    studentAttendanceReportOverallLabels: studentAttendanceReportLabels.overallReportTemplateLabels
+    studentAttendanceReportOverallLabels: studentAttendanceReportLabels.overallReportTemplateLabels,
+    semiMonthlyReportTemplateLabels: semiMonthlyReportLabels.reportTemplateLabels
   };
 }
 
@@ -637,6 +661,30 @@ async function saveStudentAttendanceReportSettings(req, res) {
     return res.status(Number(error?.statusCode) || 500).json({
       status: 'error',
       message: error?.message || 'Failed to save Student Attendance Report settings.'
+    });
+  }
+}
+
+async function saveSemiMonthlyReportSettings(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const normalized = await semiMonthlyReportPolicyService.validatePolicyInput(req.body || {}, req.user);
+    const policy = await semiMonthlyReportPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      normalized,
+      req.user?.id
+    );
+    const labels = await resolveSemiMonthlyReportTemplateLabels(policy, req.user);
+    return res.json({
+      status: 'success',
+      message: 'School Semi-Monthly Report settings were updated.',
+      policy,
+      reportTemplateLabels: labels.reportTemplateLabels
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save School Semi-Monthly Report settings.'
     });
   }
 }
@@ -1066,6 +1114,7 @@ module.exports = {
   saveAttendanceMatrix,
   saveAttendanceRollupFormula,
   saveStudentAttendanceReportSettings,
+  saveSemiMonthlyReportSettings,
   saveTimesheetParametersPolicy,
   previewStatutoryHolidayDayMapping,
   mapStatutoryHolidayDays,

@@ -7,7 +7,10 @@ const {
   buildStudentListSearchHaystack,
   studentMatchesListSearch,
   mergeStudentListSearchableFields,
-  STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS
+  STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS,
+  CANONICAL_STUDENT_PICKER_SEARCH_FIELDS,
+  LEGACY_STUDENT_PICKER_SEARCH_FIELDS,
+  isLegacyStudentPickerSearchFields
 } = require('../packages/school/MVC/services/school/studentListSearchService');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -69,6 +72,14 @@ test('studentMatchesListSearch matches all-fields and field-specific claim numbe
   }), false);
 });
 
+test('studentMatchesListSearch matches generic picker multi-field searchFields by name', () => {
+  const student = baseStudent({ firstName: 'Aisling', lastName: 'Murphy', id: 'STU-999' });
+  const pickerFields = 'id,firstName,lastName,name.first,name.last,studentNumber,personId';
+  assert.equal(studentMatchesListSearch(student, { q: 'aisling', searchFields: pickerFields }), true);
+  assert.equal(studentMatchesListSearch(student, { q: 'murphy', searchFields: pickerFields }), true);
+  assert.equal(studentMatchesListSearch(student, { q: 'stu-999', searchFields: pickerFields }), true);
+});
+
 test('studentMatchesListSearch matches claim label field', () => {
   const student = baseStudent({
     claimNumbers: [{ id: 'c1', number: 'N-1', label: 'Secondary Claim', isPrimary: true }]
@@ -96,4 +107,23 @@ test('listStudents wires student list claim search helper', () => {
 test('students repository defaultSearchFields include claim number paths', () => {
   const repo = read('packages/school/MVC/repositories/school/index.js');
   assert.match(repo, /students: createSchoolRepository\([\s\S]*claimNumbers\.number[\s\S]*claimNumbers\.label/);
+});
+
+test('isLegacyStudentPickerSearchFields detects legacy picker field lists', () => {
+  assert.equal(isLegacyStudentPickerSearchFields(LEGACY_STUDENT_PICKER_SEARCH_FIELDS), true);
+  assert.equal(isLegacyStudentPickerSearchFields(CANONICAL_STUDENT_PICKER_SEARCH_FIELDS), false);
+  assert.equal(isLegacyStudentPickerSearchFields(''), false);
+});
+
+test('genericPickerPresets student preset uses canonical searchFields', () => {
+  const presetSource = read('public/scripts/genericPickerPresets.js');
+  assert.match(presetSource, /CANONICAL_STUDENT_PICKER_SEARCH_FIELDS/);
+  assert.match(presetSource, new RegExp(`searchFields:\\s*CANONICAL_STUDENT_PICKER_SEARCH_FIELDS`));
+  assert.match(presetSource, /warnLegacyStudentPickerSearchFields/);
+});
+
+test('listStudents warns on legacy student picker searchFields', () => {
+  const controller = read('packages/school/MVC/controllers/school/studentController.js');
+  assert.match(controller, /isLegacyStudentPickerSearchFields/);
+  assert.match(controller, /Legacy student picker searchFields/);
 });

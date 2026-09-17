@@ -51,6 +51,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     order: 40
   }),
   Object.freeze({
+    key: 'school-semi-monthly-report',
+    title: 'School Semi-Monthly Report',
+    description: 'Choose which report templates appear on the School Semi-Monthly Report viewer.',
+    icon: 'bi-calendar2-range',
+    order: 41
+  }),
+  Object.freeze({
     key: 'timesheet-parameters',
     title: 'Timesheet Parameters',
     description: 'Configure how class sessions with no student enrollment appear on timesheets.',

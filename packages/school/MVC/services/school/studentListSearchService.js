@@ -1,9 +1,36 @@
 const studentModel = require('../../models/school/studentModel');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const {
+  recordMatchesMultiFieldSearch
+} = requireCoreModule('MVC/utils/multiFieldSearch');
+
+const CANONICAL_STUDENT_PICKER_SEARCH_FIELDS = 'id,customStudentId,firstName,lastName,name,name.first,name.last,studentNumber,personId';
+const LEGACY_STUDENT_PICKER_SEARCH_FIELDS = 'id,firstName,lastName,name.first,name.last,studentNumber,personId';
 
 const STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS = Object.freeze([
   'claimNumbers.number',
   'claimNumbers.label'
 ]);
+
+function normalizeSearchFieldsToken(searchFields) {
+  return String(searchFields || '')
+    .split(',')
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean)
+    .join(',');
+}
+
+function isLegacyStudentPickerSearchFields(searchFields) {
+  const raw = String(searchFields || '').trim();
+  if (!raw) return false;
+  const normalized = normalizeSearchFieldsToken(raw);
+  if (normalized === normalizeSearchFieldsToken(LEGACY_STUDENT_PICKER_SEARCH_FIELDS)) {
+    return true;
+  }
+  const tokens = normalized.split(',').filter(Boolean);
+  if (!tokens.length) return false;
+  return !tokens.includes('customstudentid');
+}
 
 function safeClaimEntries(student) {
   try {
@@ -57,21 +84,18 @@ function buildStudentListSearchHaystack(student) {
     .join(' ');
 }
 
-function normalizeSearchType(type) {
-  return String(type || 'contains').trim().toLowerCase().replace(/_/g, '');
-}
-
-function valueMatchesQuery(rawValue, qLower, normalizedType) {
-  const value = String(rawValue ?? '').trim().toLowerCase();
-  if (!value) return false;
-  if (normalizedType === 'exactmatch') return value === qLower;
-  if (normalizedType === 'startswith') return value.startsWith(qLower);
-  return value.includes(qLower);
-}
-
 function readStudentSearchFieldValues(student, fieldToken) {
   const field = String(fieldToken || '').trim();
   if (!field) return [];
+  if (field === 'name.first') {
+    return [student?.firstName, student?.name?.first].filter((v) => v !== undefined && v !== null && String(v).trim());
+  }
+  if (field === 'name.last') {
+    return [student?.lastName, student?.name?.last].filter((v) => v !== undefined && v !== null && String(v).trim());
+  }
+  if (field === 'studentNumber') {
+    return [student?.studentNumber, student?.customStudentId].filter((v) => v !== undefined && v !== null && String(v).trim());
+  }
   if (field === 'claimNumbers.number') {
     return safeClaimEntries(student).map((entry) => entry.number).filter(Boolean);
   }
@@ -91,19 +115,10 @@ function readStudentSearchFieldValues(student, fieldToken) {
 }
 
 function studentMatchesListSearch(student, { q, type, searchFields } = {}) {
-  const qLower = String(q || '').trim().toLowerCase();
-  if (!qLower) return true;
-
-  const normalizedType = normalizeSearchType(type);
-  const fieldToken = String(searchFields || '').trim().split(',')[0].trim();
-  const useAll = !fieldToken || fieldToken === 'all';
-
-  if (useAll) {
-    return buildStudentListSearchHaystack(student).includes(qLower);
-  }
-
-  const values = readStudentSearchFieldValues(student, fieldToken);
-  return values.some((raw) => valueMatchesQuery(raw, qLower, normalizedType));
+  return recordMatchesMultiFieldSearch(student, { q, type, searchFields }, {
+    getHaystack: (row) => buildStudentListSearchHaystack(row),
+    readFieldValues: readStudentSearchFieldValues
+  });
 }
 
 function mergeStudentListSearchableFields(inferredFields = []) {
@@ -112,6 +127,9 @@ function mergeStudentListSearchableFields(inferredFields = []) {
 }
 
 module.exports = {
+  CANONICAL_STUDENT_PICKER_SEARCH_FIELDS,
+  LEGACY_STUDENT_PICKER_SEARCH_FIELDS,
+  isLegacyStudentPickerSearchFields,
   STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS,
   buildStudentListSearchHaystack,
   studentMatchesListSearch,

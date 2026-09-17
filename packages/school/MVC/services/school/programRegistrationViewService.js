@@ -7,6 +7,7 @@ const programRegistrationDraftService = require('./programRegistrationDraftServi
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { normalizeTransactionSummary } = require('../../models/school/registrationTransactionSummary');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { recordMatchesMultiFieldSearch } = requireCoreModule('MVC/utils/multiFieldSearch');
 
 const {
   normalizeDraftTransactionItems,
@@ -37,14 +38,8 @@ const PROGRAM_REGISTRATION_LIST_SEARCHABLE_FIELDS = Object.freeze([
   'registrationDate'
 ]);
 
-function rowMatchesQuery(row, query, type, searchField) {
-  const q = String(query || '').trim();
-  if (!q) return true;
-  const normalizedType = String(type || 'contains').trim().toLowerCase().replace(/_/g, '');
-  const fieldToken = String(searchField || '').trim().split(',')[0].trim();
-  const useAll = !fieldToken || fieldToken === 'all';
-
-  const defaultHaystack = [
+function buildProgramRegistrationSearchHaystack(row) {
+  return [
     row.id,
     row.studentId,
     row.studentName,
@@ -55,17 +50,21 @@ function rowMatchesQuery(row, query, type, searchField) {
     row.status,
     row.verificationStatus,
     row.registrationDate
-  ];
-  const values = useAll
-    ? defaultHaystack
-    : [row[fieldToken]];
+  ]
+    .map((value) => String(value ?? '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+}
 
-  return values.some((raw) => {
-    const value = String(raw ?? '').toLowerCase();
-    const qLower = q.toLowerCase();
-    if (normalizedType === 'exactmatch') return value === qLower;
-    if (normalizedType === 'startswith') return value.startsWith(qLower);
-    return value.includes(qLower);
+function rowMatchesQuery(row, query, type, searchField) {
+  return recordMatchesMultiFieldSearch(row, { q: query, type, searchFields: searchField }, {
+    getHaystack: (record) => buildProgramRegistrationSearchHaystack(record),
+    readFieldValues: (record, fieldToken) => {
+      if (Object.prototype.hasOwnProperty.call(record || {}, fieldToken)) {
+        return [record[fieldToken]];
+      }
+      return [];
+    }
   });
 }
 
@@ -421,6 +420,7 @@ async function buildBatchPreview(studentIds, programId, reqUser, requestBody = {
 
 module.exports = {
   PROGRAM_REGISTRATION_LIST_SEARCHABLE_FIELDS,
+  rowMatchesQuery,
   normalizeDraftTransactionItems,
   buildDraftPreviewRowsFromItems,
   buildRegistrationSummaries,

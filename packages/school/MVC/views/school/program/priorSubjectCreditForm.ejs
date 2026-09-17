@@ -240,7 +240,6 @@
     window.GenericPicker.open(window.GenericPickerPresets.student({
       title: 'Select Student',
       multiselect: false,
-      searchFields: 'id,firstName,lastName,name.first,name.last,studentNumber,personId',
       context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
         ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
         : undefined,

@@ -1,6 +1,31 @@
 (function registerGenericPickerPresets(global) {
   const contexts = global.GenericPickerContexts || {};
 
+  const CANONICAL_STUDENT_PICKER_SEARCH_FIELDS = 'id,customStudentId,firstName,lastName,name,name.first,name.last,studentNumber,personId';
+  const LEGACY_STUDENT_PICKER_SEARCH_FIELDS = 'id,firstName,lastName,name.first,name.last,studentNumber,personId';
+
+  function normalizePickerSearchFieldsToken(searchFields) {
+    return String(searchFields || '')
+      .split(',')
+      .map((token) => token.trim().toLowerCase())
+      .filter(Boolean)
+      .join(',');
+  }
+
+  function warnLegacyStudentPickerSearchFields(overrides) {
+    if (!Object.prototype.hasOwnProperty.call(overrides || {}, 'searchFields')) return;
+    const raw = String(overrides.searchFields || '').trim();
+    if (!raw) return;
+    const normalized = normalizePickerSearchFieldsToken(raw);
+    const legacyNormalized = normalizePickerSearchFieldsToken(LEGACY_STUDENT_PICKER_SEARCH_FIELDS);
+    const tokens = normalized.split(',').filter(Boolean);
+    const isLegacy = normalized === legacyNormalized || (tokens.length > 0 && !tokens.includes('customstudentid'));
+    if (!isLegacy) return;
+    console.warn('[GenericPicker] Legacy student searchFields; remove override or include customStudentId and name.', {
+      searchFields: raw
+    });
+  }
+
   const presetMap = {
     accessProfile: {
       title: 'Select Access Profile',
@@ -190,7 +215,8 @@
       title: 'Select Student',
       icon: 'bi-person-vcard',
       apiEndpoint: '/school/students',
-      placeholder: 'Search students...'
+      placeholder: 'Search students...',
+      searchFields: CANONICAL_STUDENT_PICKER_SEARCH_FIELDS
     },
     subject: {
       title: 'Select Subject',
@@ -376,6 +402,9 @@
   }
 
   function byName(name, overrides) {
+    if (String(name || '').trim().toLowerCase() === 'student') {
+      warnLegacyStudentPickerSearchFields(overrides || {});
+    }
     const mergedWithGuardrails = applySchoolIdentityGuardrails(name, merge(presetMap[name] || {}, overrides), overrides);
     const merged = applyPickerDefaults(name, mergedWithGuardrails);
     if (!Object.prototype.hasOwnProperty.call(overrides || {}, 'context') && !merged.context) {

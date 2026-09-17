@@ -64,6 +64,7 @@ const LABEL_FIELDS = Object.freeze({
   autosavePolicy: ['orgId'],
   sessionAccessPolicy: ['orgId'],
   studentAttendanceReportPolicy: ['orgId'],
+  semiMonthlyReportPolicy: ['orgId'],
   timesheetParametersPolicy: ['orgId'],
   studentEnrollments: ['key'],
   teacherSchedules: ['key']
@@ -130,6 +131,7 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'autosavePolicy', label: 'Autosave Policies', group: 'operations', collectionName: 'schoolAutosavePolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'autosave' },
   { entityType: 'sessionAccessPolicy', label: 'Session Access Policies', group: 'operations', collectionName: 'schoolSessionAccessPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'sessionAccess' },
   { entityType: 'studentAttendanceReportPolicy', label: 'Student Attendance Report Policies', group: 'operations', collectionName: 'schoolStudentAttendanceReportPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'studentAttendanceReport' },
+  { entityType: 'semiMonthlyReportPolicy', label: 'School Semi-Monthly Report Policies', group: 'operations', collectionName: 'schoolSemiMonthlyReportPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'semiMonthlyReport' },
   { entityType: 'timesheetParametersPolicy', label: 'Timesheet Parameters Policies', group: 'operations', collectionName: 'schoolTimesheetParametersPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'timesheetParameters' },
   { entityType: 'leaveRequests', label: 'Leave Requests', group: 'operations', collectionName: 'schoolLeaveRequests', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'tasks', label: 'Tasks', group: 'operations', collectionName: 'schoolTasks', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },

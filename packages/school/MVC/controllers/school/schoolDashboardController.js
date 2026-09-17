@@ -26,6 +26,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/students(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_STUDENTS },
     { pattern: /^\/school\/teachers(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TEACHERS },
     { pattern: /^\/school\/staff(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_STAFF },
+    { pattern: /^\/school\/reports\/semi-monthly(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SEMI_MONTHLY_REPORT },
     { pattern: /^\/school\/reports(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_REPORTS },
     { pattern: /^\/school\/calendar(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_CALENDAR },
     { pattern: /^\/school\/schedules(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SCHEDULES },

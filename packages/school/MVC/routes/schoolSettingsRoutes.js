@@ -81,6 +81,11 @@ router.post('/student-attendance-report',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveStudentAttendanceReportSettings);
 
+router.post('/semi-monthly-report',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
+  ctrl.saveSemiMonthlyReportSettings);
+
 router.post('/timesheet-parameters',
   requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),

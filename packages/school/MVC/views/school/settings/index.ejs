@@ -23,6 +23,8 @@
   const studentAttendanceReportPolicyJson = JSON.stringify(typeof studentAttendanceReportPolicy !== 'undefined' ? studentAttendanceReportPolicy : { reportTemplateId: '', overallReportTemplateId: '', overallReportTemplateIds: [], templateExportFormats: { report: {}, overall: {} } }).replace(/</g, '\\u003c');
   const studentAttendanceReportTemplateCapabilitiesJson = JSON.stringify(typeof studentAttendanceReportTemplateCapabilities !== 'undefined' ? studentAttendanceReportTemplateCapabilities : { hasDocx: false, hasPdf: false }).replace(/</g, '\\u003c');
   const studentAttendanceReportOverallLabelsJson = JSON.stringify(typeof studentAttendanceReportOverallLabels !== 'undefined' ? studentAttendanceReportOverallLabels : []).replace(/</g, '\\u003c');
+  const semiMonthlyReportPolicyJson = JSON.stringify(typeof semiMonthlyReportPolicy !== 'undefined' ? semiMonthlyReportPolicy : { reportTemplateIds: [] }).replace(/</g, '\\u003c');
+  const semiMonthlyReportTemplateLabelsJson = JSON.stringify(typeof semiMonthlyReportTemplateLabels !== 'undefined' ? semiMonthlyReportTemplateLabels : []).replace(/</g, '\\u003c');
   const timesheetParametersPolicyJson = JSON.stringify(typeof timesheetParametersPolicy !== 'undefined' ? timesheetParametersPolicy : { emptyEnrollmentSessions: 'hide' }).replace(/</g, '\\u003c');
   const emptyEnrollmentSessionsValue = String(
     (typeof timesheetParametersPolicy !== 'undefined' && timesheetParametersPolicy?.emptyEnrollmentSessions)
@@ -1379,6 +1381,65 @@
         </div>
       </section>
 
+      <section class="school-settings-panel card border-0 shadow-sm" id="school-semi-monthly-report" role="tabpanel" aria-labelledby="settings-tab-school-semi-monthly-report" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-calendar2-range" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">School Semi-Monthly Report</h2>
+              <p class="small text-muted mb-0">Choose report templates whose instances appear on the semi-monthly report viewer.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted mb-3">
+            Only report instances matching these templates (and the selected date range) are listed beside each enrolled class.
+          </p>
+          <div class="alert alert-danger d-none js-settings-error" id="semiMonthlyReportSettingsError" role="alert"></div>
+          <form id="semiMonthlyReportSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <div>
+                <label class="form-label fw-semibold mb-1" for="smmrReportTemplateIds">Report templates</label>
+                <div class="form-text mt-0">Add one or more templates. Order is preserved for reference in settings.</div>
+              </div>
+              <% if (canUpdateFlag) { %>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-outline-secondary btn-sm" type="button" id="btnPickSmmrReportTemplate">
+                    <i class="bi bi-search me-1"></i>Add Template
+                  </button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" id="btnClearSmmrReportTemplates" title="Clear templates">
+                    <i class="bi bi-x-lg me-1"></i>Clear
+                  </button>
+                </div>
+              <% } %>
+            </div>
+            <input type="hidden" name="reportTemplateIds" id="smmrReportTemplateIds" value="">
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0 school-settings-table" id="smmrReportTemplatesTable">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 56px;">Order</th>
+                    <th>Report template</th>
+                    <% if (canUpdateFlag) { %><th class="text-end" style="width: 190px;">Actions</th><% } %>
+                  </tr>
+                </thead>
+                <tbody id="smmrReportTemplatesBody">
+                  <tr><td colspan="<%= canUpdateFlag ? 3 : 2 %>" class="text-muted small py-3">No report templates selected.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end mt-4">
+                <button class="btn btn-primary" type="submit" id="btnSaveSemiMonthlyReportSettings">
+                  <i class="bi bi-save me-1"></i>Save Semi-Monthly Report Settings
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+
       <section class="school-settings-panel card border-0 shadow-sm" id="timesheet-parameters" role="tabpanel" aria-labelledby="settings-tab-timesheet-parameters" tabindex="0" hidden>
         <header class="school-settings-panel-header card-header px-4 py-3">
           <div class="d-flex align-items-center gap-3">
@@ -1962,6 +2023,9 @@
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
   let sarReportTemplateCapabilities = <%- studentAttendanceReportTemplateCapabilitiesJson %>;
   let sarOverallTemplates = [];
+  let semiMonthlyReportPolicy = <%- semiMonthlyReportPolicyJson %>;
+  const semiMonthlyReportTemplateLabelsInit = <%- semiMonthlyReportTemplateLabelsJson %>;
+  let smmrReportTemplates = [];
   let attendanceThresholdsEnabled = <%= attendanceThresholdsEnabledFlag ? 'true' : 'false' %>;
   let rollupFormula = <%- rollupFormulaJson %>;
   let attendanceMarkAppearancePolicy = <%- attendanceMarkAppearancePolicyJson %>;
@@ -2915,6 +2979,133 @@
     }
     if (Array.isArray(result.overallReportTemplateLabels)) initializeSarOverallTemplates(result.overallReportTemplateLabels);
     renderSarReportExportFormatControls();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
+  function normalizeSmmrTemplateRows(rows = []) {
+    const seen = new Set();
+    return (Array.isArray(rows) ? rows : []).map((row) => {
+      const id = String(row?.id || '').trim();
+      if (!id || seen.has(id)) return null;
+      seen.add(id);
+      return {
+        id,
+        label: String(row?.label || row?.title || id).trim()
+      };
+    }).filter(Boolean);
+  }
+
+  function syncSmmrTemplateInputs() {
+    const ids = smmrReportTemplates.map((row) => row.id).filter(Boolean);
+    const listInput = document.getElementById('smmrReportTemplateIds');
+    if (listInput) listInput.value = JSON.stringify(ids);
+    semiMonthlyReportPolicy.reportTemplateIds = ids;
+  }
+
+  function renderSmmrReportTemplates() {
+    const body = document.getElementById('smmrReportTemplatesBody');
+    if (!body) return;
+    syncSmmrTemplateInputs();
+    if (!smmrReportTemplates.length) {
+      body.innerHTML = `<tr><td colspan="${canUpdate ? 3 : 2}" class="text-muted small py-3">No report templates selected.</td></tr>`;
+      return;
+    }
+    body.innerHTML = smmrReportTemplates.map((row, index) => {
+      const canMoveUp = index > 0;
+      const canMoveDown = index < smmrReportTemplates.length - 1;
+      return `
+        <tr data-smmr-template-index="${index}">
+          <td><span class="badge bg-secondary">${index + 1}</span></td>
+          <td>
+            <div class="fw-semibold">${escapeHtml(row.label || row.id)}</div>
+            <div class="small text-muted font-monospace">${escapeHtml(row.id)}</div>
+          </td>
+          ${canUpdate ? `
+            <td class="text-end text-nowrap">
+              <button type="button" class="btn btn-outline-secondary btn-sm js-smmr-template-up" data-index="${index}" ${canMoveUp ? '' : 'disabled'} title="Move up"><i class="bi bi-arrow-up"></i></button>
+              <button type="button" class="btn btn-outline-secondary btn-sm js-smmr-template-down" data-index="${index}" ${canMoveDown ? '' : 'disabled'} title="Move down"><i class="bi bi-arrow-down"></i></button>
+              <button type="button" class="btn btn-outline-danger btn-sm js-smmr-template-remove" data-index="${index}" title="Remove"><i class="bi bi-x-lg"></i></button>
+            </td>
+          ` : ''}
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function initializeSmmrReportTemplates(labels = semiMonthlyReportTemplateLabelsInit) {
+    const labelMap = new Map(normalizeSmmrTemplateRows(labels).map((row) => [row.id, row]));
+    const ids = Array.isArray(semiMonthlyReportPolicy?.reportTemplateIds)
+      ? semiMonthlyReportPolicy.reportTemplateIds
+      : [];
+    smmrReportTemplates = normalizeSmmrTemplateRows(ids.map((id) => {
+      const cleanId = String(id || '').trim();
+      return labelMap.get(cleanId) || { id: cleanId, label: cleanId };
+    }));
+    renderSmmrReportTemplates();
+  }
+
+  function addSmmrReportTemplate(item = {}) {
+    const id = String(item?.id || '').trim();
+    if (!id) return;
+    const label = formatSarTemplateLabel(item, id);
+    if (smmrReportTemplates.some((row) => row.id === id)) return;
+    smmrReportTemplates = normalizeSmmrTemplateRows([...smmrReportTemplates, { id, label }]);
+    renderSmmrReportTemplates();
+  }
+
+  document.getElementById('btnPickSmmrReportTemplate')?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.normalizeConfig({
+      title: 'Select Report Template',
+      icon: 'bi-journal-text',
+      apiEndpoint: '/school/reports/templates',
+      placeholder: 'Search templates...',
+      onSelect: (item) => {
+        addSmmrReportTemplate(item);
+      }
+    }));
+  });
+
+  document.getElementById('btnClearSmmrReportTemplates')?.addEventListener('click', () => {
+    smmrReportTemplates = [];
+    renderSmmrReportTemplates();
+  });
+
+  document.getElementById('smmrReportTemplatesBody')?.addEventListener('click', (event) => {
+    const up = event.target.closest('.js-smmr-template-up');
+    const down = event.target.closest('.js-smmr-template-down');
+    const remove = event.target.closest('.js-smmr-template-remove');
+    if (up || down) {
+      const index = Number((up || down).getAttribute('data-index'));
+      const delta = up ? -1 : 1;
+      const nextIndex = index + delta;
+      if (nextIndex < 0 || nextIndex >= smmrReportTemplates.length) return;
+      const [row] = smmrReportTemplates.splice(index, 1);
+      smmrReportTemplates.splice(nextIndex, 0, row);
+      renderSmmrReportTemplates();
+      return;
+    }
+    if (remove) {
+      const index = Number(remove.getAttribute('data-index'));
+      if (index < 0 || index >= smmrReportTemplates.length) return;
+      smmrReportTemplates.splice(index, 1);
+      renderSmmrReportTemplates();
+    }
+  });
+
+  document.getElementById('semiMonthlyReportSettingsForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveSemiMonthlyReportSettings');
+    if (!button) return;
+    const result = await postSettings('/school/settings/semi-monthly-report', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      reportTemplateIds: document.getElementById('smmrReportTemplateIds')?.value || '[]'
+    }, button, 'semiMonthlyReportSettingsError');
+    if (!result) return;
+    semiMonthlyReportPolicy = result.policy && typeof result.policy === 'object'
+      ? result.policy
+      : semiMonthlyReportPolicy;
+    if (Array.isArray(result.reportTemplateLabels)) initializeSmmrReportTemplates(result.reportTemplateLabels);
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 
@@ -4214,6 +4405,7 @@
   renderAutosaveSections();
   renderSessionAccessSettings();
   initializeSarOverallTemplates();
+  initializeSmmrReportTemplates();
   renderSarReportExportFormatControls();
 })();
 </script>
