@@ -23,7 +23,10 @@ function orgKey(activeOrgId) {
 function pickStoredPolicyFields(row) {
   if (!row || typeof row !== 'object') return {};
   return {
-    reportTemplateIds: row.reportTemplateIds
+    reportTemplateIds: row.reportTemplateIds,
+    overallReportTemplateId: row.overallReportTemplateId,
+    overallReportTemplateIds: row.overallReportTemplateIds,
+    templateExportFormats: row.templateExportFormats
   };
 }
 

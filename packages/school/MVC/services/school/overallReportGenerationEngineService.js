@@ -1,5 +1,7 @@
 const schoolDataService = require('./schoolDataService');
 const reportGenerationEngineService = require('./reportGenerationEngineService');
+const reportIntegrityService = require('./reportIntegrityService');
+const reportViewService = require('./reportViewService');
 const overallReportService = require('./overallReportService');
 const reportDocxRenderService = require('./reportDocxRenderService');
 const reportPdfRenderService = require('./reportPdfRenderService');
@@ -576,6 +578,71 @@ async function generateOverallFromSourceBatch(request = {}, reqUser) {
   return result;
 }
 
+async function generateSourceBatchFromStoredInstances(request = {}, reqUser) {
+  const sourceRuns = Array.isArray(request?.sourceRuns) ? request.sourceRuns : [];
+  if (!sourceRuns.length) throw new Error('Add at least one source run.');
+
+  const warnings = [];
+  const results = [];
+
+  for (const run of sourceRuns) {
+    const instanceId = clean(run.instanceId);
+    if (!instanceId) {
+      throw new Error('Each source run must include instanceId.');
+    }
+    const studentId = clean(run.studentId);
+    const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(instanceId, reqUser);
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', instance.templateId, reqUser),
+      schoolDataService.getDataById('reportAssignments', instance.assignmentId, reqUser)
+    ]);
+    if (!template) {
+      throw new Error(`Report template not found for instance ${instanceId}.`);
+    }
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
+    const payload = await reportGenerationEngineService.buildStudentPayload({
+      template,
+      assignment: effectiveAssignment,
+      instance,
+      reqUser,
+      options: { format: 'json' }
+    });
+    (payload.warnings || []).forEach((warning) => warnings.push(warning));
+    const rowStudentId = studentId || clean(instance.studentId);
+    const engineResult = {
+      format: 'json',
+      templateId: template.id,
+      templateTitle: template.title,
+      classId: instance.classId,
+      rows: [{
+        studentId: rowStudentId,
+        studentName: payload.studentName,
+        instance,
+        payload
+      }],
+      warnings: payload.warnings || []
+    };
+    results.push({
+      slotKey: clean(run.slotKey).toUpperCase(),
+      templateId: clean(run.templateId) || template.id,
+      classId: clean(run.classId) || instance.classId,
+      instanceId,
+      engineResult
+    });
+  }
+
+  return {
+    filterStartDate: clean(request?.filterStartDate),
+    filterEndDate: clean(request?.filterEndDate),
+    sourceRuns: results,
+    students: collectStudentsFromSourceBatch({ sourceRuns: results }),
+    warnings
+  };
+}
+
 async function generateOverallPipeline(request = {}, reqUser) {
   const sourceBatch = await generateSourceBatch({
     filterStartDate: request?.filterStartDate,
@@ -605,6 +672,7 @@ module.exports = {
   buildSourceValuesFromStudentPayload,
   buildOverallVirtualInstance,
   generateSourceBatch,
+  generateSourceBatchFromStoredInstances,
   generateOverallFromSourceBatch,
   generateOverallPipeline
 };

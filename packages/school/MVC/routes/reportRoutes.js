@@ -197,6 +197,16 @@ router.get('/semi-monthly/api/data',
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
   semiMonthlyCtrl.getSemiMonthlyReportData);
 
+router.get('/semi-monthly/api/export-plan',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.getExportPlan);
+
+router.post('/semi-monthly/api/export',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.exportSelections);
+
 // Template Designer
 router.get('/templates',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.READ_ALL),

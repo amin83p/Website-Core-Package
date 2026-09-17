@@ -981,6 +981,55 @@ function recomputeCalculatedAnswers({ template, mergedAnswers = {}, prefill = {}
   };
 }
 
+function isFieldReadOnlyForLiveEdit(field = {}) {
+  if (field?.readOnly === true) return true;
+  return isCalculatedField(field);
+}
+
+function mergeEditableAnswersIntoCalculation({
+  fields = [],
+  calculationAnswers = {},
+  editableAnswers = {}
+} = {}) {
+  const base = calculationAnswers && typeof calculationAnswers === 'object'
+    ? { ...calculationAnswers }
+    : {};
+  const fieldList = Array.isArray(fields) ? fields : [];
+  const fieldById = new Map();
+  fieldList.forEach((field) => {
+    const fieldId = String(field?.id || '').trim();
+    if (fieldId) fieldById.set(fieldId, field);
+  });
+  const editable = editableAnswers && typeof editableAnswers === 'object' ? editableAnswers : {};
+  Object.entries(editable).forEach(([fieldId, value]) => {
+    const cleanId = String(fieldId || '').trim();
+    if (!cleanId) return;
+    const field = fieldById.get(cleanId);
+    if (field && isFieldReadOnlyForLiveEdit(field)) return;
+    if (field && field.calculated === true) return;
+    base[cleanId] = value;
+  });
+  return base;
+}
+
+function prepareReportAnswersForUI({ template, mergedAnswers = {}, prefill = {} } = {}) {
+  const recalculated = recomputeCalculatedAnswers({ template, mergedAnswers, prefill });
+  const calculationAnswers = recalculated.answers && typeof recalculated.answers === 'object'
+    ? recalculated.answers
+    : (mergedAnswers && typeof mergedAnswers === 'object' ? { ...mergedAnswers } : {});
+  const displayAnswers = applyReadOnlyDisplayConversions({
+    template,
+    mergedAnswers: calculationAnswers,
+    prefill
+  });
+  return {
+    calculationAnswers,
+    displayAnswers,
+    diagnostics: recalculated.diagnostics || [],
+    orderedIds: recalculated.orderedIds || []
+  };
+}
+
 function evaluateFieldValidations({ field, value, answers = {}, prefill = {} }) {
   const fieldId = String(field?.id || '').trim();
   const label = String(field?.label || fieldId || 'Field').trim();
@@ -1168,6 +1217,9 @@ module.exports = {
   applyReadOnlyDisplayConversions,
   buildCalculatedFieldPlan,
   recomputeCalculatedAnswers,
+  mergeEditableAnswersIntoCalculation,
+  prepareReportAnswersForUI,
+  isFieldReadOnlyForLiveEdit,
   validateExpressionSyntax,
   validateExpressionSymbols,
   validateCalculatedFieldExpressions,

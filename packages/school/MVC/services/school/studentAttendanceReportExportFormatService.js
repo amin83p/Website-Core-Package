@@ -85,6 +85,40 @@ function sanitizeTemplateExportFormats(input = {}, normalizedPolicy = {}) {
   return { report, overall };
 }
 
+function sanitizeSmmrTemplateExportFormats(input = {}, normalizedPolicy = {}) {
+  const parsed = parseTemplateExportFormatsInput(input);
+  const reportIn = parsed.report && typeof parsed.report === 'object' ? parsed.report : {};
+  const overallIn = parsed.overall && typeof parsed.overall === 'object' ? parsed.overall : {};
+  const reportIds = Array.isArray(normalizedPolicy.reportTemplateIds)
+    ? normalizedPolicy.reportTemplateIds
+    : [];
+  const overallIds = Array.isArray(normalizedPolicy.overallReportTemplateIds)
+    ? normalizedPolicy.overallReportTemplateIds
+    : [];
+
+  const report = {};
+  reportIds.forEach((templateId) => {
+    const id = clean(templateId);
+    if (!id) return;
+    report[id] = sanitizeExportFormatFlags(
+      reportIn[id] || reportIn[id.toLowerCase()] || {},
+      { kind: 'report' }
+    );
+  });
+
+  const overall = {};
+  overallIds.forEach((templateId) => {
+    const id = clean(templateId);
+    if (!id) return;
+    overall[id] = sanitizeExportFormatFlags(
+      overallIn[id] || overallIn[id.toLowerCase()] || {},
+      { kind: 'overall' }
+    );
+  });
+
+  return { report, overall };
+}
+
 function resolveTemplateExportFormats(policy = {}, kind = 'report', templateId = '') {
   const id = clean(templateId);
   if (!id) {
@@ -140,6 +174,7 @@ module.exports = {
   DEFAULT_OVERALL_EXPORT_FORMATS,
   sanitizeExportFormatFlags,
   sanitizeTemplateExportFormats,
+  sanitizeSmmrTemplateExportFormats,
   resolveTemplateExportFormats,
   isSarExportFormatEnabled,
   resolveEffectiveClassExportFlags,

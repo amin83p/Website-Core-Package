@@ -2,27 +2,68 @@
 
 const schoolDataService = require('./schoolDataService');
 const studentAttendanceReportPolicyService = require('./studentAttendanceReportPolicyService');
+const studentAttendanceReportExportFormatService = require('./studentAttendanceReportExportFormatService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
-const { normalizeIdList, assertReportTemplateAccessible, formatTemplateLabel } = studentAttendanceReportPolicyService;
+const {
+  normalizeIdList,
+  assertReportTemplateAccessible,
+  assertOverallTemplatesAccessible,
+  formatTemplateLabel
+} = studentAttendanceReportPolicyService;
 
 const DEFAULT_POLICY = Object.freeze({
-  reportTemplateIds: Object.freeze([])
+  reportTemplateIds: Object.freeze([]),
+  overallReportTemplateId: '',
+  overallReportTemplateIds: Object.freeze([]),
+  templateExportFormats: Object.freeze({
+    report: Object.freeze({}),
+    overall: Object.freeze({})
+  })
 });
 
 function normalizePolicyFromStored(input = {}) {
+  const reportTemplateIds = normalizeIdList(input.reportTemplateIds);
+  const overallReportTemplateIds = normalizeIdList(
+    input.overallReportTemplateIds,
+    input.overallReportTemplateId
+  );
+  const base = {
+    reportTemplateIds,
+    overallReportTemplateId: overallReportTemplateIds[0] || '',
+    overallReportTemplateIds
+  };
   return {
-    reportTemplateIds: normalizeIdList(input.reportTemplateIds)
+    ...base,
+    templateExportFormats: studentAttendanceReportExportFormatService.sanitizeSmmrTemplateExportFormats(
+      input.templateExportFormats,
+      base
+    )
   };
 }
 
 function normalizePolicyFromForm(input = {}) {
-  let source = input.reportTemplateIds;
-  if (source === undefined || source === null) {
-    source = input.reportTemplateIdsJson;
+  let reportSource = input.reportTemplateIds;
+  if (reportSource === undefined || reportSource === null) {
+    reportSource = input.reportTemplateIdsJson;
   }
-  return normalizePolicyFromStored({ reportTemplateIds: source });
+  let overallSource = input.overallReportTemplateIds;
+  if (overallSource === undefined || overallSource === null) {
+    overallSource = input.overallReportTemplateIdsJson;
+  }
+  const base = normalizePolicyFromStored({
+    reportTemplateIds: reportSource,
+    overallReportTemplateId: input.overallReportTemplateId,
+    overallReportTemplateIds: overallSource
+  });
+  return {
+    ...base,
+    templateExportFormats: studentAttendanceReportExportFormatService.sanitizeSmmrTemplateExportFormats(
+      input.templateExportFormats,
+      base
+    )
+  };
 }
 
 function resolvePolicy(input = {}) {
@@ -42,6 +83,7 @@ async function assertReportTemplatesAccessible(templateIds = [], reqUser) {
 async function validatePolicyInput(input = {}, reqUser) {
   const normalized = normalizePolicyFromForm(input);
   await assertReportTemplatesAccessible(normalized.reportTemplateIds, reqUser);
+  await assertOverallTemplatesAccessible(normalized.overallReportTemplateIds, reqUser);
   return normalized;
 }
 
@@ -52,5 +94,6 @@ module.exports = {
   resolvePolicy,
   normalizeIdList,
   validatePolicyInput,
-  formatTemplateLabel
+  formatTemplateLabel,
+  assertOverallTemplatesAccessible
 };

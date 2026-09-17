@@ -1302,6 +1302,12 @@
       (matrixState.rows || []).forEach((rowState) => {
         if (rowState.locked) return;
         rowState.answers = { ...(rowState.answers || {}), [cleanFieldId]: value };
+        rowState.calculationAnswers = {
+          ...(rowState.calculationAnswers && typeof rowState.calculationAnswers === 'object'
+            ? rowState.calculationAnswers
+            : rowState.answers || {}),
+          [cleanFieldId]: value
+        };
         dirtyStudents.add(String(rowState.studentId || ''));
         applied += 1;
       });
@@ -1382,33 +1388,39 @@
       ];
     }
 
-    function recalculateRow(row) {
-      if (!row || !window.SchoolReportCalculatedFields?.recomputeCalculatedAnswers) return;
-      const studentId = String(row.dataset.studentId || '');
-      const rowState = (matrixState.rows || []).find((item) => String(item.studentId || '') === studentId);
-      if (!rowState) return;
-      const answers = {
-        ...(rowState.answers || {}),
+    function collectMatrixEditableAnswers(row) {
+      return {
         ...collectControls(document, '#reportMatrixCommonFields [data-field-id]'),
         ...collectControls(document, '.js-matrix-shared-field'),
         ...collectControls(row, '.js-matrix-row-field')
       };
-      const result = window.SchoolReportCalculatedFields.recomputeCalculatedAnswers({
-        fields: allMatrixFields(),
+    }
+
+    function recalculateRow(row) {
+      const api = window.SchoolReportCalculatedFields;
+      if (!row || !api?.prepareReportAnswersForUI) return;
+      const studentId = String(row.dataset.studentId || '');
+      const rowState = (matrixState.rows || []).find((item) => String(item.studentId || '') === studentId);
+      if (!rowState) return;
+      const fields = allMatrixFields();
+      const calculationBase = rowState.calculationAnswers && typeof rowState.calculationAnswers === 'object'
+        ? rowState.calculationAnswers
+        : (rowState.answers || {});
+      const answers = api.mergeEditableAnswersIntoCalculation({
+        fields,
+        calculationAnswers: calculationBase,
+        editableAnswers: collectMatrixEditableAnswers(row)
+      });
+      const prepared = api.prepareReportAnswersForUI({
+        fields,
         answers,
         prefill: rowState.calculationPrefill || {}
       });
-      const displayResult = window.SchoolReportCalculatedFields.applyReadOnlyDisplayConversions
-        ? window.SchoolReportCalculatedFields.applyReadOnlyDisplayConversions({
-          fields: allMatrixFields(),
-          answers: result.answers,
-          prefill: rowState.calculationPrefill || {}
-        })
-        : { answers: result.answers };
-      rowState.answers = result.answers;
+      rowState.calculationAnswers = prepared.calculationAnswers;
+      rowState.answers = prepared.displayAnswers;
       (matrixState.tableFields || []).filter((field) => field.calculated).forEach((field) => {
         const selector = `.js-matrix-row-field[data-field-id="${CSS.escape(field.id)}"]`;
-        writeControl(row.querySelector(selector), displayResult.answers[field.id]);
+        writeControl(row.querySelector(selector), prepared.displayAnswers[field.id]);
       });
     }
 

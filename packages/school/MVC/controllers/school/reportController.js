@@ -1332,22 +1332,18 @@ async function buildInstanceEditorRenderContext(req) {
     }
   }
   const mergedBeforeCalculation = reportService.mergeTemplateData(template, latestInstance, effectiveAssignment);
-  const calculatedForRender = reportService.recomputeCalculatedAnswers({
+  const preparedForRender = reportRuleEngineService.prepareReportAnswersForUI({
     template,
     mergedAnswers: mergedBeforeCalculation,
     prefill: latestInstance?.prefillSnapshot || {}
   });
-  const mergedDataForValidation = calculatedForRender.answers;
+  const mergedDataForValidation = preparedForRender.calculationAnswers;
   const validationSummary = reportRuleEngineService.evaluateTemplateValidations({
     template,
     mergedAnswers: mergedDataForValidation,
     prefill: latestInstance?.prefillSnapshot || {}
   });
-  const mergedData = reportRuleEngineService.applyReadOnlyDisplayConversions({
-    template,
-    mergedAnswers: mergedDataForValidation,
-    prefill: latestInstance?.prefillSnapshot || {}
-  });
+  const mergedData = preparedForRender.displayAnswers;
 
   const studentPersonId = String(latestInstance.studentId || '').trim();
   const [classSessions, teacherPerson, studentRowsByPerson, studentPersonDirect] = await Promise.all([

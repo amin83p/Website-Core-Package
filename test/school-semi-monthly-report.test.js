@@ -86,6 +86,31 @@ test('semi-monthly report viewer wires picker and data API', () => {
   assert.match(view, /sar-matrix-link/);
   assert.match(view, /include\('partials\/modal_GenericPicker'\)/);
   assert.match(view, /include\('school\/partials\/modal_SchoolEntityPicker'\)/);
+  assert.match(view, /id="btn_exportSmmr"/);
+  assert.match(view, /id="smmrExportModal"/);
+  assert.match(view, /\/school\/reports\/semi-monthly\/api\/export-plan/);
+});
+
+test('semi-monthly export routes are registered', () => {
+  const routes = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/routes/reportRoutes.js'),
+    'utf8'
+  );
+  assert.match(routes, /\/semi-monthly\/api\/export-plan/);
+  assert.match(routes, /\/semi-monthly\/api\/export/);
+  assert.match(routes, /semiMonthlyCtrl\.getExportPlan/);
+  assert.match(routes, /semiMonthlyCtrl\.exportSelections/);
+});
+
+test('school settings semi-monthly panel includes overall templates and export toggles', () => {
+  const settings = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/settings/index.ejs'),
+    'utf8'
+  );
+  assert.match(settings, /id="smmrOverallTemplatesTable"/);
+  assert.match(settings, /js-smmr-report-export-docx/);
+  assert.match(settings, /js-smmr-overall-export-docx/);
+  assert.match(settings, /initializeSmmrOverallTemplates/);
 });
 
 test('school settings catalog includes semi-monthly report group', () => {

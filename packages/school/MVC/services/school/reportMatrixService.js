@@ -294,22 +294,13 @@ async function buildStudentMatrixRow({
   }
   const mergedAnswers = reportService.mergeTemplateData(template, effectiveInstance, assignment);
   const prefill = effectiveInstance.prefillSnapshot || {};
-  // Recompute once more from the values that will be rendered in the matrix.
-  // This keeps calculated, read-only student fields visible even when an older
-  // instance stored an empty/stale calculated answer.
-  const recalculated = reportService.recomputeCalculatedAnswers({
+  const prepared = reportRuleEngineService.prepareReportAnswersForUI({
     template,
     mergedAnswers,
     prefill
   });
-  const renderedAnswersRaw = recalculated && recalculated.answers && typeof recalculated.answers === 'object'
-    ? recalculated.answers
-    : mergedAnswers;
-  const renderedAnswers = reportRuleEngineService.applyReadOnlyDisplayConversions({
-    template,
-    mergedAnswers: renderedAnswersRaw,
-    prefill
-  });
+  const renderedAnswersRaw = prepared.calculationAnswers;
+  const renderedAnswers = prepared.displayAnswers;
   const studentName = clean(
     renderedAnswers.student_full_name
     || prefill.student_full_name
@@ -328,6 +319,7 @@ async function buildStudentMatrixRow({
     status,
     locked: status === 'locked' || (status === 'submitted' && treatSubmittedAsLocked),
     answers: renderedAnswers,
+    calculationAnswers: renderedAnswersRaw,
     calculationPrefill: buildCalculationPrefill(template, prefill),
     editHref: instanceId ? `/school/reports/instances/edit-v2/${encodeURIComponent(instanceId)}` : ''
   };
@@ -886,8 +878,14 @@ async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherI
     const nextAnswers = { ...(instance.answers || {}) };
     changes.forEach((change) => { nextPrefill[change.prefillKey] = change.newRawValue; (change.fields || []).forEach((field) => { nextAnswers[field.fieldId] = field.newValue; }); });
     const merged = reportService.mergeTemplateData(source.template, { ...instance, prefillSnapshot: nextPrefill, answers: nextAnswers }, source.assignment);
-    const recalculated = reportService.recomputeCalculatedAnswers({ template: source.template, mergedAnswers: merged, prefill: nextPrefill });
-    (Array.isArray(source.template?.schema?.fields) ? source.template.schema.fields : []).filter((field) => isCalculatedField(field) && field.id).forEach((field) => { nextAnswers[field.id] = recalculated.answers[field.id]; });
+    const prepared = reportRuleEngineService.prepareReportAnswersForUI({
+      template: source.template,
+      mergedAnswers: merged,
+      prefill: nextPrefill
+    });
+    (Array.isArray(source.template?.schema?.fields) ? source.template.schema.fields : [])
+      .filter((field) => isCalculatedField(field) && field.id)
+      .forEach((field) => { nextAnswers[field.id] = prepared.calculationAnswers[field.id]; });
     await schoolDataService.updateData('reportInstances', instance.id, { prefillSnapshot: nextPrefill, answers: nextAnswers, audit: { lastUpdateUser: reqUser?.id || '', lastUpdateDateTime: new Date().toISOString(), prefillRefreshedAt: new Date().toISOString() } }, reqUser);
     results.push({ studentId, status: 'success', appliedCount: changes.length });
   }

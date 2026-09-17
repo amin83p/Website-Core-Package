@@ -273,10 +273,27 @@ async function resolveSemiMonthlyReportTemplateLabels(policy = {}, reqUser) {
     const template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
     reportTemplateLabels.push({
       id: templateId,
-      label: semiMonthlyReportPolicyService.formatTemplateLabel(template, templateId)
+      label: semiMonthlyReportPolicyService.formatTemplateLabel(template, templateId),
+      hasDocx: reportFunderDocxService.templateHasAnyDocx(template),
+      hasPdf: reportFunderPdfService.templateHasAnyPdf(template)
     });
   }
-  return { reportTemplateLabels };
+  const overallIds = semiMonthlyReportPolicyService.normalizeIdList(
+    policy.overallReportTemplateIds,
+    policy.overallReportTemplateId
+  );
+  const overallReportTemplateLabels = [];
+  for (const overallId of overallIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const template = await schoolDataService.getDataById('overallReportTemplates', overallId, reqUser);
+    overallReportTemplateLabels.push({
+      id: overallId,
+      label: semiMonthlyReportPolicyService.formatTemplateLabel(template, overallId),
+      hasDocx: overallReportService.templateHasAttachedDocx(template),
+      hasPdf: overallReportService.templateHasAttachedPdf(template)
+    });
+  }
+  return { reportTemplateLabels, overallReportTemplateLabels };
 }
 
 function emailTemplateHasBodyContentSlot(template = {}) {
@@ -484,7 +501,8 @@ async function loadSettingsPageData(req) {
     studentAttendanceReportTemplateCapabilities: studentAttendanceReportLabels.reportTemplateCapabilities,
     studentAttendanceReportOverallLabel: studentAttendanceReportLabels.overallReportTemplateLabel,
     studentAttendanceReportOverallLabels: studentAttendanceReportLabels.overallReportTemplateLabels,
-    semiMonthlyReportTemplateLabels: semiMonthlyReportLabels.reportTemplateLabels
+    semiMonthlyReportTemplateLabels: semiMonthlyReportLabels.reportTemplateLabels,
+    semiMonthlyReportOverallLabels: semiMonthlyReportLabels.overallReportTemplateLabels
   };
 }
 
@@ -679,7 +697,8 @@ async function saveSemiMonthlyReportSettings(req, res) {
       status: 'success',
       message: 'School Semi-Monthly Report settings were updated.',
       policy,
-      reportTemplateLabels: labels.reportTemplateLabels
+      reportTemplateLabels: labels.reportTemplateLabels,
+      overallReportTemplateLabels: labels.overallReportTemplateLabels
     });
   } catch (error) {
     return res.status(Number(error?.statusCode) || 500).json({

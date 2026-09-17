@@ -77,16 +77,18 @@ test('report pages load and wire the shared live calculation runtime', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'packages/school/package.manifest.json'), 'utf8'));
 
   assert.match(instanceEditor, /include\('partials\/calculatedFieldsRuntime'\)/);
-  assert.match(instanceEditor, /SchoolReportCalculatedFields\?\.recomputeCalculatedAnswers/);
+  assert.match(instanceEditor, /SchoolReportCalculatedFields\?\.prepareReportAnswersForUI/);
   assert.match(matrixEditor, /include\('partials\/calculatedFieldsRuntime'\)/);
   assert.match(matrixEditor, /function recalculateRow\(row\)/);
+  assert.match(matrixEditor, /prepareReportAnswersForUI/);
+  assert.match(matrixEditor, /mergeEditableAnswersIntoCalculation/);
   assert.match(matrixEditor, /function recalculateAllRows\(\)/);
   assert.match(matrixEditor, /control\.addEventListener\('input',[\s\S]*recalculateRow\(row\)/);
   assert.match(matrixEditor, /js-matrix-shared-field'[\s\S]*recalculateAllRows\(\)/);
-  assert.match(controller, /const calculatedForRender = reportService\.recomputeCalculatedAnswers/);
-  assert.match(controller, /const mergedData = calculatedForRender\.answers/);
+  assert.match(controller, /prepareReportAnswersForUI/);
+  assert.match(controller, /mergedData = preparedForRender\.displayAnswers/);
   assert.match(controller, /validateCalculatedFieldExpressions\(payload,\s*\{ strict: true \}\)/);
   assert.match(templateModel, /validateCalculatedFieldExpressions\(\{ schema: \{ fields \} \},\s*\{ strict: true \}\)/);
   assert.equal(manifest.assets.publicPath, '/scripts');
-  assert.equal(manifest.assets.metadataOnly, true);
+  assert.equal(manifest.assets.metadataOnly, false);
 });

@@ -415,11 +415,64 @@
     return { answers: nextAnswers };
   }
 
+  function isFieldReadOnlyForLiveEdit(field) {
+    if (!field) return false;
+    if (field.readOnly === true) return true;
+    if (field.calculated === true) return true;
+    return isCalculatedField(field);
+  }
+
+  function mergeEditableAnswersIntoCalculation({
+    fields = [],
+    calculationAnswers = {},
+    editableAnswers = {}
+  } = {}) {
+    const base = calculationAnswers && typeof calculationAnswers === 'object'
+      ? { ...calculationAnswers }
+      : {};
+    const fieldList = Array.isArray(fields) ? fields : [];
+    const fieldById = new Map();
+    fieldList.forEach((field) => {
+      const fieldId = String(field?.id || '').trim();
+      if (fieldId) fieldById.set(fieldId, field);
+    });
+    const editable = editableAnswers && typeof editableAnswers === 'object' ? editableAnswers : {};
+    Object.entries(editable).forEach(([fieldId, value]) => {
+      const cleanId = String(fieldId || '').trim();
+      if (!cleanId) return;
+      const field = fieldById.get(cleanId);
+      if (field && isFieldReadOnlyForLiveEdit(field)) return;
+      base[cleanId] = value;
+    });
+    return base;
+  }
+
+  function prepareReportAnswersForUI({ fields = [], answers = {}, prefill = {} } = {}) {
+    const recalculated = recomputeCalculatedAnswers({ fields, answers, prefill });
+    const calculationAnswers = recalculated.answers && typeof recalculated.answers === 'object'
+      ? recalculated.answers
+      : (answers && typeof answers === 'object' ? { ...answers } : {});
+    const displayResult = applyReadOnlyDisplayConversions({
+      fields,
+      answers: calculationAnswers,
+      prefill
+    });
+    return {
+      calculationAnswers,
+      displayAnswers: displayResult.answers,
+      diagnostics: recalculated.diagnostics || [],
+      orderedIds: recalculated.orderedIds || []
+    };
+  }
+
   return {
     evaluateExpression,
     buildCalculatedFieldPlan,
     recomputeCalculatedAnswers,
     applyReadOnlyDisplayConversions,
+    mergeEditableAnswersIntoCalculation,
+    prepareReportAnswersForUI,
+    isFieldReadOnlyForLiveEdit,
     shouldApplyReadOnlyDisplayConversion,
     isCalculatedField
   };

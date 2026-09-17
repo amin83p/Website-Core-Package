@@ -71,6 +71,21 @@
         background: #f8fafc;
     }
     .smmr-instances-col { min-width: 280px; vertical-align: top; }
+    .smmr-export-table-wrap { max-height: min(480px, 55vh); overflow: auto; border: 1px solid #e9ecef; border-radius: 10px; }
+    .smmr-export-table th.smmr-export-student-col,
+    .smmr-export-table td.smmr-export-student-col {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        min-width: 160px;
+        background: #fff;
+        border-right: 1px solid #e9ecef;
+    }
+    .smmr-export-table thead th.smmr-export-student-col { z-index: 3; background: #f8f9fa; }
+    .smmr-export-instance-row { border: 1px solid #e9ecef; border-radius: 8px; padding: 0.45rem 0.55rem; margin-bottom: 0.45rem; background: #f8fafc; }
+    .smmr-export-instance-row:last-child { margin-bottom: 0; }
+    .smmr-export-bulk-panel { border: 1px solid #dce9ff; border-radius: 10px; padding: 0.75rem 0.9rem; background: #f8fbff; }
+    .smmr-export-bulk-toolbar { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 </style>
 
 <%
@@ -82,8 +97,11 @@
     '<a href="/school/reports/instances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-file-earmark-text me-1"></i> Report Instances</a>',
     '<a href="/school/settings#school-semi-monthly-report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> Semi-Monthly Settings</a>'
   ];
+  const smmrCanExport = typeof canExportReport !== 'undefined' && canExportReport;
+  const smmrTemplateCount = typeof configuredTemplateCount !== 'undefined' ? Number(configuredTemplateCount) : 0;
   const optionalBtnsBeforePrint = [
-    '<button type="button" id="btn_copyReportLink" class="btn btn-outline-primary btn-md me-2 mb-2" title="Copy a shareable link with the current students and date range"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>'
+    '<button type="button" id="btn_copyReportLink" class="btn btn-outline-primary btn-md me-2 mb-2" title="Copy a shareable link with the current students and date range"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>',
+    '<button type="button" id="btn_exportSmmr" class="btn btn-filled btn-success btn-md me-2 mb-2"' + (smmrCanExport && smmrTemplateCount > 0 ? '' : ' disabled') + ' title="Export report instances and overall reports"><i class="bi bi-cloud-download me-1"></i> Export</button>'
   ];
   const initialStudentsJson = JSON.stringify(typeof initialStudents !== 'undefined' ? initialStudents : []).replace(/</g, '\\u003c');
   const initialStudentIdsJson = JSON.stringify(typeof initialStudentIds !== 'undefined' ? initialStudentIds : []).replace(/</g, '\\u003c');
@@ -186,6 +204,52 @@
     </div>
 </div>
 
+<div class="modal fade" id="smmrExportModal" tabindex="-1" aria-labelledby="smmrExportModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-3">
+        <div>
+          <h5 class="modal-title fw-bold" id="smmrExportModalLabel"><i class="bi bi-download me-2 text-primary"></i>Export Reports</h5>
+          <div class="small text-muted mt-1" id="smmrExportDateRange">Select students and a date range, then choose exports.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div id="smmrExportLoading" class="text-center text-muted py-5 d-none">
+          <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
+          Loading export options…
+        </div>
+        <div id="smmrExportEmpty" class="text-center text-muted py-5 d-none">No exportable report instances found for the current filters.</div>
+        <div class="d-none" id="smmrExportTableWrap">
+          <div class="table-responsive smmr-export-table-wrap">
+            <table class="table table-sm align-middle smmr-export-table mb-0" id="smmrExportTable">
+              <thead class="table-light">
+                <tr>
+                  <th class="smmr-export-student-col ps-3">Student</th>
+                  <th><i class="bi bi-file-earmark-text me-1"></i>Report instances</th>
+                  <th id="smmrExportOverallHeader" class="d-none"><i class="bi bi-layers me-1"></i>Overall report</th>
+                </tr>
+              </thead>
+              <tbody id="smmrExportTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="smmr-export-bulk-panel mt-3 d-none" id="smmrExportOverallBulkPanel">
+          <div class="fw-semibold small mb-2"><i class="bi bi-layers me-1"></i>Overall reports (bulk)</div>
+          <div class="smmr-export-bulk-toolbar">
+            <button type="button" class="btn btn-outline-primary btn-sm js-smmr-bulk-export" data-format="docx" data-export-scope="overall">DOCX</button>
+            <button type="button" class="btn btn-outline-danger btn-sm js-smmr-bulk-export" data-format="pdf" data-export-scope="overall">PDF</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm js-smmr-bulk-export" data-format="json" data-export-scope="overall">Payload</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal_GenericPicker') %>
 <%- include('school/partials/modal_SchoolEntityPicker') %>
 <%- include('partials/tablePages-end') %>
@@ -196,8 +260,12 @@
   const initialEndDate = '<%= typeof initialEndDate !== "undefined" ? initialEndDate : "" %>';
   const initialStudents = <%- initialStudentsJson %>;
   const initialStudentIds = <%- initialStudentIdsJson %>;
+  const canExportReport = <%= (typeof canExportReport !== 'undefined' && canExportReport) ? 'true' : 'false' %>;
+  const smmrActionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+  const configuredTemplateCount = <%= typeof configuredTemplateCount !== 'undefined' ? Number(configuredTemplateCount) : 0 %>;
 
   let selectedStudents = [];
+  let smmrExportPlan = null;
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -410,6 +478,28 @@
     return summary;
   }
 
+  async function showReportMessage({ title = 'School Semi-Monthly Report', icon = 'info', message = '' } = {}) {
+    const safeMessage = String(message || '').trim() || 'Operation could not be completed.';
+    if (window.ReportMessaging?.showReportMessage) {
+      return window.ReportMessaging.showReportMessage({
+        title,
+        icon,
+        message: safeMessage,
+        buttonClass: icon === 'error' ? 'btn-danger' : 'btn-primary'
+      });
+    }
+    if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      return window.showMessageModal({
+        title,
+        icon,
+        message: safeMessage,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+    }
+    console.error('Message modal is unavailable on this page.');
+    return 'OK';
+  }
+
   async function confirmOpenAttendanceMatrix(url = '') {
     const targetUrl = String(url || '').trim();
     if (!targetUrl) return;
@@ -424,8 +514,17 @@
         confirmClass: 'btn-primary',
         icon: 'question'
       });
-    } else {
-      confirmed = window.confirm('Open this class in the Attendance Matrix page in a new tab?');
+    } else if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      const result = await window.showMessageModal({
+        title: 'Attendance Matrix',
+        icon: 'question',
+        message: 'Open this class in the Attendance Matrix page in a new tab?',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: openLabel, class: 'btn-primary' }
+        ]
+      });
+      confirmed = result === openLabel;
     }
     if (confirmed) window.open(targetUrl, '_blank', 'noopener,noreferrer');
   }
@@ -436,8 +535,6 @@
     const draft = list.filter((row) => String(row?.status || '').toLowerCase() === 'draft').length;
     const locked = list.filter((row) => String(row?.status || '').toLowerCase() === 'locked').length;
     const total = list.length;
-    const pct = total ? Math.round((submitted / total) * 100) : null;
-    const pctStr = total ? `${pct}%` : '—';
     const rollupTitle = [
       `Submitted: ${submitted}`,
       `Draft: ${draft}`,
@@ -446,7 +543,6 @@
     ].filter(Boolean).join(' · ');
     return `<td class="matrix-sticky-rollup px-2 py-2 text-center small" title="${escapeHtml(rollupTitle)}">
       <div><span class="text-success fw-semibold">${submitted}</span><span class="text-muted"> / </span><span class="text-warning fw-semibold">${draft}</span>${locked ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${locked}</span>` : ''}</div>
-      <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${escapeHtml(pctStr)}</div>
     </td>`;
   }
 
@@ -527,7 +623,7 @@
                   <tr>
                     <th class="matrix-sticky-rollup text-center small px-2 py-2" title="Report instance rollup">
                       <div class="fw-bold text-secondary">Rollup</div>
-                      <div class="text-muted" style="font-size: 0.68rem; line-height: 1.2;">Sub / Dr / %</div>
+                      <div class="text-muted" style="font-size: 0.68rem; line-height: 1.2;">Sub / Dr</div>
                     </th>
                     <th class="matrix-sticky-class px-3 py-2">Class</th>
                     <th class="px-3 py-2">Report instances</th>
@@ -558,11 +654,11 @@
     const endDate = String(document.getElementById('filter_endDate').value || '').trim();
     const studentIds = selectedStudents.map((row) => String(row.studentRecordId || row.id || '').trim()).filter(Boolean);
     if (!studentIds.length) {
-      alert('Select at least one student.');
+      showReportMessage({ icon: 'warning', message: 'Select at least one student.' });
       return;
     }
     if (!startDate || !endDate) {
-      alert('Start date and end date are required.');
+      showReportMessage({ icon: 'warning', message: 'Start date and end date are required.' });
       return;
     }
 
@@ -594,7 +690,7 @@
       document.getElementById('resultsContainer').classList.remove('d-none');
       syncShareUrl();
     } catch (error) {
-      alert(error.message || 'Load failed.');
+      showReportMessage({ icon: 'error', message: error.message || 'Load failed.' });
     } finally {
       if (loadBtn) {
         loadBtn.disabled = false;
@@ -609,6 +705,225 @@
       endDate: String(document.getElementById('filter_endDate').value || '').trim(),
       studentIds: selectedStudents.map((row) => String(row.studentRecordId || row.id || '').trim()).filter(Boolean)
     };
+  }
+
+  function validateSmmrFilters() {
+    const filters = getFilterParams();
+    if (!filters.studentIds.length) {
+      showReportMessage({ icon: 'warning', message: 'Select at least one student.' });
+      return null;
+    }
+    if (!filters.startDate || !filters.endDate) {
+      showReportMessage({ icon: 'warning', message: 'Start date and end date are required.' });
+      return null;
+    }
+    return filters;
+  }
+
+  function findSmmrExportStudent(personId) {
+    return (smmrExportPlan?.students || []).find((row) => String(row.personId || '').trim() === String(personId || '').trim()) || null;
+  }
+
+  function getSmmrOverallOptions(student = {}) {
+    if (Array.isArray(student.overallOptions) && student.overallOptions.length) return student.overallOptions;
+    return student.overall ? [student.overall] : [];
+  }
+
+  function buildSmmrFormatButtons(row = {}, exportType = 'instance') {
+    const personId = String(row.personId || row.studentId || '').trim();
+    const instanceId = String(row.instanceId || '').trim();
+    const overallTemplateId = String(row.templateId || '').trim();
+    const idAttr = exportType === 'overall'
+      ? `data-overall-template-id="${escapeHtml(overallTemplateId)}"`
+      : `data-instance-id="${escapeHtml(instanceId)}"`;
+    const parts = [];
+    if (row.hasDocx) parts.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-smmr-row-export" data-format="docx" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}>DOCX</button>`);
+    if (row.hasPdf) parts.push(`<button type="button" class="btn btn-outline-danger btn-sm py-0 js-smmr-row-export" data-format="pdf" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}>PDF</button>`);
+    if (row.hasPayload !== false) parts.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-smmr-row-export" data-format="json" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}>JSON</button>`);
+    return parts.length ? `<div class="d-flex flex-wrap gap-1 mt-1">${parts.join('')}</div>` : '';
+  }
+
+  function renderSmmrExportPlan(plan = {}) {
+    smmrExportPlan = plan;
+    const students = Array.isArray(plan.students) ? plan.students : [];
+    const hasOverall = Array.isArray(plan.overallReportTemplates) && plan.overallReportTemplates.length > 0;
+    const exportableCount = students.reduce((sum, student) => sum + (student.instances || []).filter((row) => row.exportable).length, 0);
+    document.getElementById('smmrExportEmpty')?.classList.toggle('d-none', exportableCount > 0 || hasOverall);
+    document.getElementById('smmrExportTableWrap')?.classList.toggle('d-none', !students.length);
+    document.getElementById('smmrExportOverallHeader')?.classList.toggle('d-none', !hasOverall);
+    document.getElementById('smmrExportOverallBulkPanel')?.classList.toggle('d-none', !hasOverall);
+    const body = document.getElementById('smmrExportTableBody');
+    if (!body) return;
+    body.innerHTML = students.map((student) => {
+      const personId = String(student.personId || '').trim();
+      const instanceBlocks = (student.instances || []).map((row) => {
+        if (!row.exportable) return '';
+        const label = `${row.className || row.classId} · ${row.templateTitle || row.templateId} · ${row.sessionDate || '—'}`;
+        return `
+          <div class="smmr-export-instance-row">
+            <div class="d-flex gap-2 align-items-start">
+              <input type="checkbox" class="form-check-input mt-1 js-smmr-export-check" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(row.instanceId)}" checked>
+              <div class="flex-grow-1 min-w-0">
+                <div class="small fw-semibold">${escapeHtml(label)}</div>
+                ${buildSmmrFormatButtons({ ...row, personId }, 'instance')}
+              </div>
+            </div>
+          </div>`;
+      }).join('') || '<div class="small text-muted py-2">No exportable instances.</div>';
+
+      const overallCell = hasOverall ? (() => {
+        const options = getSmmrOverallOptions(student).filter((opt) => opt?.defined);
+        const eligible = options.filter((opt) => opt.eligible);
+        const selected = eligible[0] || options[0] || null;
+        const selectHtml = eligible.length
+          ? eligible.map((opt) => `<option value="${escapeHtml(opt.templateId)}">${escapeHtml(opt.templateTitle || opt.templateId)}</option>`).join('')
+          : '<option value="">No eligible overall template</option>';
+        return `
+          <td class="align-top js-smmr-overall-cell" data-student-id="${escapeHtml(personId)}">
+            <div class="d-flex gap-2 align-items-start">
+              <input type="checkbox" class="form-check-input mt-1 js-smmr-export-check" data-export-type="overall" data-student-id="${escapeHtml(personId)}" data-overall-template-id="${escapeHtml(selected?.templateId || '')}" ${selected?.eligible ? 'checked' : 'disabled'}>
+              <div class="flex-grow-1">
+                <select class="form-select form-select-sm js-smmr-overall-template-select mb-1" data-student-id="${escapeHtml(personId)}" ${eligible.length <= 1 ? 'disabled' : ''}>${selectHtml}</select>
+                ${selected?.eligible ? buildSmmrFormatButtons({ ...selected, personId, studentId: personId }, 'overall') : `<div class="small text-warning">${escapeHtml((selected?.warnings || []).join(' ') || 'Overall not available.')}</div>`}
+              </div>
+            </div>
+          </td>`;
+      })() : '';
+
+      return `
+        <tr data-student-id="${escapeHtml(personId)}">
+          <td class="smmr-export-student-col ps-3 fw-semibold align-top">${escapeHtml(student.name || personId)}</td>
+          <td class="align-top">${instanceBlocks}</td>
+          ${overallCell}
+        </tr>`;
+    }).join('');
+  }
+
+  function gatherSmmrExportTargets(format = '', scope = 'all') {
+    const root = document.getElementById('smmrExportModal');
+    if (!root) return [];
+    const normalizedFormat = String(format || '').trim().toLowerCase();
+    const normalizedScope = String(scope || 'all').trim().toLowerCase();
+    const targets = [];
+    const includeInstance = normalizedScope === 'all' || normalizedScope === 'instance';
+    const includeOverall = normalizedScope === 'all' || normalizedScope === 'overall';
+
+    if (includeInstance) {
+      root.querySelectorAll('.js-smmr-export-check[data-export-type="instance"]:checked').forEach((checkbox) => {
+        const studentId = String(checkbox.getAttribute('data-student-id') || '').trim();
+        const instanceId = String(checkbox.getAttribute('data-instance-id') || '').trim();
+        const student = findSmmrExportStudent(studentId);
+        const row = (student?.instances || []).find((item) => String(item.instanceId || '').trim() === instanceId);
+        if (!studentId || !instanceId || !row) return;
+        if (normalizedFormat === 'docx' && !row.hasDocx) return;
+        if (normalizedFormat === 'pdf' && !row.hasPdf) return;
+        if (normalizedFormat === 'json' && row.hasPayload === false) return;
+        targets.push({ type: 'instance', studentId, instanceId });
+      });
+    }
+
+    if (includeOverall) {
+      root.querySelectorAll('.js-smmr-export-check[data-export-type="overall"]:checked:not(:disabled)').forEach((checkbox) => {
+        const studentId = String(checkbox.getAttribute('data-student-id') || '').trim();
+        const cell = checkbox.closest('.js-smmr-overall-cell');
+        const overallTemplateId = String(cell?.querySelector('.js-smmr-overall-template-select')?.value || checkbox.getAttribute('data-overall-template-id') || '').trim();
+        const student = findSmmrExportStudent(studentId);
+        const option = getSmmrOverallOptions(student).find((row) => String(row.templateId || '').trim() === overallTemplateId);
+        if (!overallTemplateId || !option?.eligible) return;
+        if (normalizedFormat === 'docx' && !option.hasDocx) return;
+        if (normalizedFormat === 'pdf' && !option.hasPdf) return;
+        if (normalizedFormat === 'json' && option.hasPayload === false) return;
+        targets.push({ type: 'overall', studentId, overallTemplateId });
+      });
+    }
+    return targets;
+  }
+
+  async function runSmmrExport(format, targets = []) {
+    const filters = validateSmmrFilters();
+    if (!filters) return;
+    if (!targets.length) {
+      showReportMessage({ icon: 'warning', message: 'Select at least one export that supports this format.' });
+      return;
+    }
+    const loadingToken = typeof window.showLoading === 'function'
+      ? window.showLoading({ title: 'Exporting Reports', note: 'Generating files…', operation: 'Export' })
+      : null;
+    try {
+      const response = await fetch('/school/reports/semi-monthly/api/export', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/octet-stream, application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams({
+          actionStateId: smmrActionStateId,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          studentIds: filters.studentIds.join(','),
+          format: String(format || 'json'),
+          targets: JSON.stringify(targets)
+        }).toString()
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || `Export failed (${response.status}).`);
+      }
+      const blob = await response.blob();
+      if (!blob || blob.size === 0) throw new Error('Export returned an empty file.');
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
+      const fileName = fileNameMatch?.[1] || `semi_monthly_export_${filters.startDate}_${filters.endDate}`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showReportMessage({ icon: 'success', message: 'Export downloaded successfully.' });
+    } catch (error) {
+      showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
+    } finally {
+      if (loadingToken && typeof window.hideLoading === 'function') window.hideLoading(loadingToken);
+    }
+  }
+
+  async function openSmmrExportPanel() {
+    if (!canExportReport || configuredTemplateCount <= 0) return;
+    const filters = validateSmmrFilters();
+    if (!filters) return;
+    const modalEl = document.getElementById('smmrExportModal');
+    if (!modalEl || !window.bootstrap?.Modal) return;
+    window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    document.getElementById('smmrExportLoading')?.classList.remove('d-none');
+    document.getElementById('smmrExportEmpty')?.classList.add('d-none');
+    document.getElementById('smmrExportTableWrap')?.classList.add('d-none');
+    const dateRangeEl = document.getElementById('smmrExportDateRange');
+    if (dateRangeEl) dateRangeEl.textContent = `${filters.startDate} → ${filters.endDate} · loading…`;
+    try {
+      const params = new URLSearchParams();
+      params.set('startDate', filters.startDate);
+      params.set('endDate', filters.endDate);
+      params.set('studentIds', filters.studentIds.join(','));
+      const response = await fetch(`/school/reports/semi-monthly/api/export-plan?${params.toString()}`, {
+        credentials: 'same-origin',
+        headers: { 'X-AJAX-Request': 'true' }
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Could not load export options.');
+      }
+      if (dateRangeEl) dateRangeEl.textContent = `${filters.startDate} → ${filters.endDate}`;
+      renderSmmrExportPlan(payload.plan || {});
+    } catch (error) {
+      showReportMessage({ icon: 'error', message: error.message || 'Could not load export options.' });
+    } finally {
+      document.getElementById('smmrExportLoading')?.classList.add('d-none');
+    }
   }
 
   function syncShareUrl() {
@@ -626,8 +941,12 @@
 
   async function copyShareLink() {
     const { studentIds, startDate, endDate } = getFilterParams();
-    if (!studentIds.length || !startDate || !endDate) {
-      alert('Select students and a date range before copying a link.');
+    if (!studentIds.length) {
+      showReportMessage({ icon: 'warning', message: 'Select at least one student before copying a link.' });
+      return;
+    }
+    if (!startDate || !endDate) {
+      showReportMessage({ icon: 'warning', message: 'Set a start and end date before copying a link.' });
       return;
     }
     const url = new URL('/school/reports/semi-monthly', window.location.origin);
@@ -635,8 +954,27 @@
     url.searchParams.set('endDate', endDate);
     url.searchParams.set('studentIds', studentIds.join(','));
     syncShareUrl();
-    await navigator.clipboard.writeText(url.toString());
-    alert('Link copied to clipboard.');
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url.toString());
+      } else {
+        const input = document.createElement('textarea');
+        input.value = url.toString();
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.left = '-9999px';
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        input.remove();
+      }
+      showReportMessage({
+        icon: 'success',
+        message: 'Shareable link copied. Anyone with access can open it to view the same students and date range.'
+      });
+    } catch (error) {
+      showReportMessage({ icon: 'error', message: error.message || 'Could not copy the link.' });
+    }
   }
 
   function setAllStudentSectionsExpanded(expanded) {
@@ -669,8 +1007,61 @@
     document.getElementById('resultsContainer').classList.add('d-none');
     showConfigWarning('');
   });
-  document.getElementById('btn_loadData')?.addEventListener('click', () => loadSemiMonthlyReport());
-  document.getElementById('btn_copyReportLink')?.addEventListener('click', () => copyShareLink().catch(() => alert('Could not copy link.')));
+  document.getElementById('btn_loadData')?.addEventListener('click', () => {
+    loadSemiMonthlyReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
+  });
+  document.getElementById('btn_copyReportLink')?.addEventListener('click', () => {
+    copyShareLink().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Could not copy link.' }));
+  });
+  document.getElementById('btn_exportSmmr')?.addEventListener('click', () => {
+    openSmmrExportPanel().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Export failed.' }));
+  });
+  document.getElementById('smmrExportModal')?.addEventListener('click', (event) => {
+    const rowBtn = event.target.closest('.js-smmr-row-export');
+    if (rowBtn) {
+      event.preventDefault();
+      const format = String(rowBtn.getAttribute('data-format') || 'json').trim().toLowerCase();
+      const exportType = String(rowBtn.getAttribute('data-export-type') || '').trim().toLowerCase();
+      const studentId = String(rowBtn.getAttribute('data-student-id') || '').trim();
+      const targets = [];
+      if (exportType === 'instance') {
+        const instanceId = String(rowBtn.getAttribute('data-instance-id') || '').trim();
+        if (studentId && instanceId) targets.push({ type: 'instance', studentId, instanceId });
+      } else if (exportType === 'overall') {
+        const cell = rowBtn.closest('.js-smmr-overall-cell');
+        const overallTemplateId = String(
+          rowBtn.getAttribute('data-overall-template-id')
+          || cell?.querySelector('.js-smmr-overall-template-select')?.value
+          || ''
+        ).trim();
+        if (studentId && overallTemplateId) targets.push({ type: 'overall', studentId, overallTemplateId });
+      }
+      runSmmrExport(format, targets);
+      return;
+    }
+    const bulkBtn = event.target.closest('.js-smmr-bulk-export');
+    if (bulkBtn) {
+      event.preventDefault();
+      const format = String(bulkBtn.getAttribute('data-format') || 'json').trim().toLowerCase();
+      const scope = String(bulkBtn.getAttribute('data-export-scope') || 'all').trim().toLowerCase();
+      runSmmrExport(format, gatherSmmrExportTargets(format, scope));
+    }
+  });
+  document.getElementById('smmrExportModal')?.addEventListener('change', (event) => {
+    const select = event.target.closest('.js-smmr-overall-template-select');
+    if (!select) return;
+    const studentId = String(select.getAttribute('data-student-id') || '').trim();
+    const cell = select.closest('.js-smmr-overall-cell');
+    const checkbox = cell?.querySelector('.js-smmr-export-check[data-export-type="overall"]');
+    const templateId = String(select.value || '').trim();
+    const student = findSmmrExportStudent(studentId);
+    const option = getSmmrOverallOptions(student).find((row) => String(row.templateId || '').trim() === templateId);
+    if (checkbox) {
+      checkbox.setAttribute('data-overall-template-id', templateId);
+      checkbox.disabled = !option?.eligible;
+      checkbox.checked = Boolean(option?.eligible);
+    }
+  });
   document.getElementById('btn_expandAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(true));
   document.getElementById('btn_collapseAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(false));
   document.getElementById('btn_reset')?.addEventListener('click', () => {

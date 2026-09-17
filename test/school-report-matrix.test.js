@@ -308,6 +308,7 @@ test('matrix rows expose calculated read-only values', async () => {
     await withPatched(schoolDataService, { fetchData: async () => [{ id: 'INS-CALC', assignmentId: 'ASN-CALC', assignmentRowId: 'ROW-CALC', teacherId: 'TEACHER-1', studentId: 'STU-1', targetKey: 'student:STU-1', status: 'draft', answers: { score_a: 80, score_b: 90 }, prefillSnapshot: {} }] }, async () => {
       const matrix = await reportMatrixService.buildMatrixContext({ assignmentId: 'ASN-CALC', assignmentRowId: 'ROW-CALC', teacherId: 'TEACHER-1', reqUser: { id: 'USER-1', personId: 'TEACHER-1', activeOrgId: '900000' } });
       assert.equal(matrix.rows[0].answers.average, 85);
+      assert.equal(matrix.rows[0].calculationAnswers.average, 85);
       assert.equal(matrix.tableFields.find((field) => field.id === 'average').calculated, true);
       assert.equal(matrix.tableFields.find((field) => field.id === 'average').calculationRule.expression, '(num(answers.score_a)+num(answers.score_b))/2');
       assert.deepEqual(matrix.tableFields.find((field) => field.id === 'average').calculationDependencies, ['score_a', 'score_b']);

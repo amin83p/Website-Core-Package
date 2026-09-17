@@ -1853,19 +1853,17 @@
       const mergedBefore = parseJsonScript(mergedDataEl, {});
       const prefill = parseJsonScript(prefillDataEl, {});
       const userAnswers = collectAnswers(fields, mergedBefore);
-      const mergedAnswers = recomputeCalculatedAnswers(fields, userAnswers, prefill);
-      const displayAnswers = window.SchoolReportCalculatedFields?.applyReadOnlyDisplayConversions
-        ? window.SchoolReportCalculatedFields.applyReadOnlyDisplayConversions({
-          fields,
-          answers: mergedAnswers,
-          prefill
-        }).answers
-        : mergedAnswers;
+      const prepared = window.SchoolReportCalculatedFields?.prepareReportAnswersForUI
+        ? window.SchoolReportCalculatedFields.prepareReportAnswersForUI({ fields, answers: userAnswers, prefill })
+        : {
+          calculationAnswers: recomputeCalculatedAnswers(fields, userAnswers, prefill),
+          displayAnswers: recomputeCalculatedAnswers(fields, userAnswers, prefill)
+        };
       (Array.isArray(fields) ? fields : []).forEach((field) => {
         if (!isCalculatedField(field) || !field?.id) return;
-        writeFieldValue(field, displayAnswers[field.id]);
+        writeFieldValue(field, prepared.displayAnswers[field.id]);
       });
-      const summary = validateFields(fields, mergedAnswers, prefill);
+      const summary = validateFields(fields, prepared.calculationAnswers, prefill);
       Object.keys(summary.issuesByField).forEach((fieldId) => {
         setFieldIssues(fieldId, summary.issuesByField[fieldId]);
       });

@@ -211,6 +211,21 @@ function createDocxWithTokens(tokens) {
   return { dir, filePath };
 }
 
+test('buildDocxPayloadDetailed mirrors legacy uppercase S shortcuts for source slots', () => {
+  const payload = overallReportService.buildDocxPayloadDetailed({
+    answers: {},
+    sourceValues: {
+      T1: { s121: 'note-a', s111: 'val-111' },
+      T2: { s111: 'val-t2' }
+    },
+    templateSnapshot: { schema: { fields: [] } }
+  });
+  assert.equal(payload.placeholders['T1.s121'], 'note-a');
+  assert.equal(payload.placeholders['T1.S121'], 'note-a');
+  assert.equal(payload.placeholders['T2.s111'], 'val-t2');
+  assert.equal(payload.placeholders['T2.S111'], 'val-t2');
+});
+
 test('buildDocxPayloadDetailed emits legacy DOCX aliases for renamed shortcuts', () => {
   const payload = overallReportService.buildDocxPayloadDetailed({
     answers: { report_date: '2026-07-15', day01_yn: 'Y', day01_note: 'Present' },

@@ -53,6 +53,25 @@ function listDocxPlaceholderAliases(field = {}) {
   return [...aliases];
 }
 
+function formatSourceSlotTokenHint(token, placeholders = {}) {
+  const match = String(token || '').match(/^(T\d+)\.(.+)$/i);
+  if (!match) return '';
+  const slot = match[1].toUpperCase();
+  const suffix = match[2];
+  const lowerToken = `${slot}.${suffix.toLowerCase()}`;
+  if (Object.prototype.hasOwnProperty.call(placeholders, lowerToken)) {
+    return `${token} (stored as {{${lowerToken}}}; replace uppercase shortcut in Word or use lowercase)`;
+  }
+  const suffixLower = suffix.toLowerCase();
+  const otherSlots = Object.keys(placeholders || {})
+    .filter((key) => key.toLowerCase().endsWith(`.${suffixLower}`) && key.toLowerCase() !== lowerToken)
+    .slice(0, 3);
+  if (otherSlots.length) {
+    return `${token} (no value for this slot; similar keys: ${otherSlots.join(', ')})`;
+  }
+  return `${token} (no source value for slot ${slot}; check Key Catalog docx shortcut)`;
+}
+
 function formatMissingDocxTokenError(template, missingTokens = [], placeholders = {}) {
   const hints = missingTokens.map((token) => {
     const legacyAlias = String(token || '').replace(/^O\./, '');
@@ -63,9 +82,32 @@ function formatMissingDocxTokenError(template, missingTokens = [], placeholders 
       const hasCurrent = Object.prototype.hasOwnProperty.call(placeholders, currentToken);
       return `${token} (field "${field.label || field.id}" now uses ${currentToken}${hasCurrent ? '' : ', value missing'})`;
     }
+    if (/^T\d+\./i.test(String(token || ''))) {
+      const slotHint = formatSourceSlotTokenHint(token, placeholders);
+      if (slotHint) return slotHint;
+    }
     return token;
   });
   return `DOCX export cancelled. Missing stored values for: ${hints.join(', ')}. Update the Word template shortcuts or add previous shortcuts under legacy DOCX aliases on the overall fields.`;
+}
+
+function expandLegacySourceSlotDocxPlaceholders(placeholders = {}) {
+  Object.keys({ ...placeholders }).forEach((token) => {
+    const match = String(token).match(/^(T\d+)\.(.+)$/i);
+    if (!match) return;
+    const slot = match[1].toUpperCase();
+    const suffix = match[2];
+    const lowerToken = `${slot}.${suffix.toLowerCase()}`;
+    if (!Object.prototype.hasOwnProperty.call(placeholders, lowerToken)) {
+      placeholders[lowerToken] = placeholders[token];
+    }
+    const serial = suffix.toLowerCase().match(/^s(\d+)$/);
+    if (!serial) return;
+    const legacyToken = `${slot}.S${serial[1]}`;
+    if (!Object.prototype.hasOwnProperty.call(placeholders, legacyToken)) {
+      placeholders[legacyToken] = placeholders[lowerToken];
+    }
+  });
 }
 
 function snapshotDocxAliases(template = {}) {
@@ -954,6 +996,7 @@ function buildDocxPayloadDetailed(instance) {
       placeholders[`${slotKey}.${key}`] = value;
     });
   });
+  expandLegacySourceSlotDocxPlaceholders(placeholders);
   const template = instance.templateSnapshot || {};
   getDataFields(template).forEach((field) => {
     const conversion = reportRuleEngineService.convertFieldValueForExport({
