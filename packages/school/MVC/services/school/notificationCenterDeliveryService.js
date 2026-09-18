@@ -179,24 +179,29 @@ async function dispatchRunBatches({ orgId, rule, run, user, logger } = {}) {
 async function prepareScheduledRule({ orgId, ruleId, logger, now = new Date() } = {}) {
   const notificationCenterRunService = require('./notificationCenterRunService');
   const notificationCenterRuleService = require('./notificationCenterRuleService');
+  const notificationRuleModel = require('../../models/school/notificationRuleModel');
   const orgKey = cleanText(orgId);
-  const rule = await notificationCenterRuleService.getRule(orgKey, ruleId);
+  const rule = await notificationCenterRuleService.getRule(orgKey, ruleId, { activeOrgId: orgKey, id: 'scheduled-task' });
   if (!rule || rule.enabled !== true) return { prepared: 0, skipped: 0 };
-  const autoQueue = rule.schedule?.autoQueueOnSchedule !== false;
+  const orgTimeZone = await resolveOrgTimeZone(orgKey);
+  const todayKey = getTodayDateKeyInTimezone(orgTimeZone, now.getTime());
+  if (!notificationRuleModel.isRuleScheduledEvaluationAllowed(rule, todayKey)) {
+    return { prepared: 0, skipped: 1, reason: 'outside_activity_window' };
+  }
   const run = await notificationCenterRunService.executeRun({
     orgId: orgKey,
     ruleId: rule.id,
     user: { activeOrgId: orgKey, id: 'scheduled-task' },
     trigger: 'scheduled',
     asOfDate: cleanText(now.toISOString().slice(0, 10)),
-    queueDelivery: autoQueue
+    queueDelivery: false
   });
   if (!run) return { prepared: 0, skipped: 1 };
   return {
     prepared: run.batchCount || 0,
     skipped: 0,
     runId: run.id,
-    mode: autoQueue ? 'queued' : 'preview'
+    mode: 'preview'
   };
 }
 

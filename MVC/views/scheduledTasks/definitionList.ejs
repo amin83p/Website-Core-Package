@@ -135,6 +135,10 @@
           <td>
             <% if (row.scheduleType === 'interval') { %>
               Every <%= row.input?.intervalMinutes || 5 %> min
+            <% } else if (row.scheduleType === 'weekly') { %>
+              Weekly <%= row.runAtTime %> (<%= taskTimezone %>)
+              <% const dayLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const picked = (Array.isArray(row.input?.daysOfWeek) ? row.input.daysOfWeek : []).map((d) => dayLabels[Number(d)]).filter(Boolean); %>
+              <% if (picked.length) { %><div class="x-small text-muted mt-1"><%= picked.join(' · ') %></div><% } %>
             <% } else { %>
               Daily <%= row.runAtTime %> (<%= taskTimezone %>)
               <% if (row.source === 'school.sessionAccessPolicy' && row.input) { %>

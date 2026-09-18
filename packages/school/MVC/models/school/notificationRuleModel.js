@@ -96,6 +96,101 @@ function normalizeChannels(raw = {}) {
   };
 }
 
+function normalizeDaysOfWeek(raw) {
+  let values = [];
+  if (Array.isArray(raw)) {
+    values = raw;
+  } else if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+    values = [raw];
+  }
+  return [...new Set(
+    values
+      .map((value) => Number.parseInt(String(value), 10))
+      .filter((day) => Number.isFinite(day) && day >= 0 && day <= 6)
+  )].sort((a, b) => a - b);
+}
+
+function normalizeSchedule(raw = {}, { allowLegacyAllDays = true } = {}) {
+  const input = isPlainObject(raw) ? raw : {};
+  const scheduleEnabled = normalizeBoolean(input.scheduleEnabled, false);
+  let runAtTime = cleanString(input.runAtTime, { max: 8, allowEmpty: true }).slice(0, 5);
+  if (scheduleEnabled && !/^\d{2}:\d{2}$/.test(runAtTime)) {
+    runAtTime = '08:00';
+  }
+  const hadExplicitDays = input.daysOfWeek !== undefined && input.daysOfWeek !== null && input.daysOfWeek !== '';
+  let daysOfWeek = normalizeDaysOfWeek(input.daysOfWeek);
+  if (scheduleEnabled && !daysOfWeek.length && allowLegacyAllDays && !hadExplicitDays) {
+    daysOfWeek = [0, 1, 2, 3, 4, 5, 6];
+  }
+  if (scheduleEnabled && !daysOfWeek.length) {
+    throw new Error('Select at least one weekday for scheduled evaluation.');
+  }
+  return {
+    autoQueueOnSchedule: normalizeBoolean(input.autoQueueOnSchedule, false),
+    scheduleEnabled,
+    runAtTime,
+    daysOfWeek
+  };
+}
+
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function normalizeDateKey(value, { required = false } = {}) {
+  const text = cleanString(value, { max: 12, allowEmpty: !required });
+  if (!text) {
+    if (required) throw new Error('Date is required.');
+    return '';
+  }
+  if (!DATE_KEY_PATTERN.test(text)) throw new Error('Invalid date format. Use YYYY-MM-DD.');
+  return text;
+}
+
+function normalizeActivityDateWindow(raw = {}) {
+  const input = isPlainObject(raw) ? raw : {};
+  const enabled = normalizeBoolean(input.enabled, false);
+  if (!enabled) {
+    return { enabled: false, startDate: '', endDate: '' };
+  }
+  const startDate = normalizeDateKey(input.startDate, { required: true });
+  const endDate = normalizeDateKey(input.endDate, { required: true });
+  if (startDate > endDate) {
+    throw new Error('Activity date window start date must be on or before end date.');
+  }
+  return { enabled: true, startDate, endDate };
+}
+
+function isActivityDateWindowConfigured(window = {}) {
+  if (!isPlainObject(window) || window.enabled !== true) return false;
+  const startDate = cleanString(window.startDate, { max: 12, allowEmpty: true });
+  const endDate = cleanString(window.endDate, { max: 12, allowEmpty: true });
+  return DATE_KEY_PATTERN.test(startDate) && DATE_KEY_PATTERN.test(endDate);
+}
+
+function isDateWithinActivityWindow(window = {}, dateKey = '') {
+  if (!isActivityDateWindowConfigured(window)) return true;
+  const key = cleanString(dateKey, { max: 12, allowEmpty: true });
+  if (!DATE_KEY_PATTERN.test(key)) return false;
+  return key >= window.startDate && key <= window.endDate;
+}
+
+function isRuleScheduleConfigured(rule = {}) {
+  if (rule.enabled !== true) return false;
+  const schedule = rule.schedule && typeof rule.schedule === 'object' ? rule.schedule : {};
+  if (schedule.scheduleEnabled !== true) return false;
+  const runAtTime = cleanString(schedule.runAtTime, { max: 8, allowEmpty: true }).slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(runAtTime)) return false;
+  const hadExplicitDays = schedule.daysOfWeek !== undefined && schedule.daysOfWeek !== null && schedule.daysOfWeek !== '';
+  const days = normalizeDaysOfWeek(schedule.daysOfWeek);
+  if (days.length) return true;
+  if (!hadExplicitDays) return true;
+  return false;
+}
+
+function isRuleScheduledEvaluationAllowed(rule = {}, dateKey = '') {
+  if (!isRuleScheduleConfigured(rule)) return false;
+  return isDateWithinActivityWindow(rule.activityDateWindow, dateKey);
+}
+
 function normalizeCriteria(raw = {}, ruleType = 'session_not_final') {
   const input = isPlainObject(raw) ? raw : {};
   const base = {
@@ -125,6 +220,14 @@ function normalizeCriteria(raw = {}, ruleType = 'session_not_final') {
   };
 }
 
+function resolveAuditUserId(auditUserIdOrOptions = '') {
+  if (typeof auditUserIdOrOptions === 'string') return auditUserIdOrOptions;
+  if (!auditUserIdOrOptions || typeof auditUserIdOrOptions !== 'object') return '';
+  const user = auditUserIdOrOptions.requestingUser || auditUserIdOrOptions;
+  const id = user?.id || user?.userId || user?._id;
+  return cleanString(id, { max: 120, allowEmpty: true });
+}
+
 function generateRuleId(existingIds = new Set()) {
   for (let i = 0; i < 50; i++) {
     const candidate = `SNCR-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -144,10 +247,8 @@ function sanitizeRuleInput(input, { isUpdate = false } = {}) {
     legacyKey: cleanString(input.legacyKey, { max: 80, allowEmpty: true }),
     criteria: normalizeCriteria(input.criteria, ruleType),
     channels: normalizeChannels(input.channels),
-    schedule: {
-      timezone: cleanString(input.schedule?.timezone, { max: 80, allowEmpty: true }),
-      autoQueueOnSchedule: normalizeBoolean(input.schedule?.autoQueueOnSchedule, false)
-    },
+    schedule: normalizeSchedule(input.schedule),
+    activityDateWindow: normalizeActivityDateWindow(input.activityDateWindow),
     alsoCreateTask: normalizeBoolean(input.alsoCreateTask, false)
   };
   if (!isUpdate && !out.orgId) throw new Error('Organization is required.');
@@ -182,7 +283,8 @@ async function getNotificationRuleById(id) {
   return all.find((row) => idsEqual(row?.id, id)) || null;
 }
 
-async function addNotificationRule(input, auditUserId = '') {
+async function addNotificationRule(input, auditUserIdOrOptions = '') {
+  const auditUserId = resolveAuditUserId(auditUserIdOrOptions);
   const sanitized = sanitizeRuleInput(input, { isUpdate: false });
   const all = await getAllNotificationRules();
   const existingIds = new Set(all.map((row) => String(row?.id || '')));
@@ -202,7 +304,8 @@ async function addNotificationRule(input, auditUserId = '') {
   return row;
 }
 
-async function updateNotificationRule(id, input, auditUserId = '') {
+async function updateNotificationRule(id, input, auditUserIdOrOptions = '') {
+  const auditUserId = resolveAuditUserId(auditUserIdOrOptions);
   const targetId = cleanId(id, { max: 120, allowEmpty: false });
   const sanitized = sanitizeRuleInput({ ...input, id: targetId }, { isUpdate: true });
   const all = await getAllNotificationRules();
@@ -247,8 +350,16 @@ module.exports = {
   formatNotificationTokenLabel,
   LEGACY_SESSION_RULE_KEY,
   sanitizeRuleInput,
+  normalizeDaysOfWeek,
+  normalizeActivityDateWindow,
+  isActivityDateWindowConfigured,
+  isDateWithinActivityWindow,
+  isRuleScheduleConfigured,
+  isRuleScheduledEvaluationAllowed,
+  generateRuleId,
   normalizeChannels,
   normalizeCriteria,
+  normalizeSchedule,
   getAllNotificationRules,
   getNotificationRuleById,
   addNotificationRule,

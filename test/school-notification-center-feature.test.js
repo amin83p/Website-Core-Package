@@ -39,14 +39,26 @@ test('School notification centre routes, services, repositories, and views are w
 
   const routes = readText('packages/school/MVC/routes/notificationCenterRoutes.js');
   const controller = readText('packages/school/MVC/controllers/school/notificationCenterController.js');
+  const accessService = readText('packages/school/MVC/services/school/notificationCenterAccessService.js');
+  const policyService = readText('packages/school/MVC/services/school/notificationCenterOperationPolicyService.js');
+  const runScopeService = readText('packages/school/MVC/services/school/notificationCenterRunScopeService.js');
   assert.match(routes, /SECTIONS\.SCHOOL_NOTIFICATION_CENTER/);
+  assert.match(accessService, /notificationCenterOperationPolicyService/);
+  assert.match(accessService, /OPERATIONS\.DELETE/);
+  assert.match(policyService, /canDeleteOutbox/);
+  assert.match(policyService, /RUN_NOW_SCOPES/);
+  assert.match(runScopeService, /filterRunForViewer/);
+  assert.match(controller, /notificationCenterRunScopeService/);
+  assert.match(controller, /canDeleteOutbox/);
   assert.match(routes, /router\.get\('\/'/);
   assert.match(routes, /router\.post\('\/rules\/:id\/run'/);
   assert.match(routes, /schedule-email/);
   assert.match(routes, /\/outbox'/);
   assert.match(routes, /\/outbox\/:id\/cancel'/);
+  assert.match(routes, /router\.post\('\/runs\/:id\/delete'/);
   assert.doesNotMatch(routes, /runs\/:id\/dispatch/);
-  assert.match(controller, /disableNotificationCenterScheduledTasks/);
+  assert.match(controller, /syncAllRulesForOrg/);
+  assert.doesNotMatch(controller, /disableNotificationCenterScheduledTasks/);
   assert.match(controller, /notificationCenterComposeService/);
   assert.match(controller, /applyGenericFilter/);
   assert.match(controller, /paginate\(/);
@@ -69,9 +81,19 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(dataService, /notificationRules: \{ repository: schoolRepositories\.notificationRules \}/);
   assert.match(dataService, /notificationRuns: \{ repository: schoolRepositories\.notificationRuns \}/);
 
+  const ruleService = readText('packages/school/MVC/services/school/notificationCenterRuleService.js');
+  const runService = readText('packages/school/MVC/services/school/notificationCenterRunService.js');
+  assert.match(ruleService, /schoolDataService/);
+  assert.match(runService, /schoolDataService/);
+  assert.doesNotMatch(ruleService, /listNotificationRulesByOrg/);
+  assert.doesNotMatch(runService, /listNotificationRunsByOrg/);
+  assert.doesNotMatch(controller, /7429\/ingest/);
+
   const repo = readText('packages/school/MVC/repositories/school/index.js');
   assert.match(repo, /collectionName: 'schoolNotificationRules'/);
   assert.match(repo, /collectionName: 'schoolNotificationRuns'/);
+  assert.match(repo, /notificationRules:[\s\S]*normalizePayload:[\s\S]*sanitizeRuleInput/);
+  assert.match(repo, /notificationRuns:[\s\S]*normalizePayload:[\s\S]*sanitizeRunInput/);
 
   const listView = readText('packages/school/MVC/views/school/notificationCenter/list.ejs');
   const runView = readText('packages/school/MVC/views/school/notificationCenter/runDetail.ejs');
@@ -81,6 +103,22 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(listView, /formatNotificationTokenLabel|rule\.ruleType/);
   assert.match(listView, /notification-center/);
   assert.match(listView, /Scheduled emails/);
+  assert.match(listView, /Recent runs/);
+  assert.match(listView, /runs\/<%= run\.id %>\/delete/);
+  assert.match(listView, /js-nc-delete-run-form/);
+  assert.match(listView, /X-AJAX-Request/);
+  assert.match(listView, /id="nc-recent-runs-table"/);
+  assert.match(listView, /runRuleLoadingScript/);
+  assert.match(listView, /js-nc-run-rule-form/);
+  const runRulePartial = readText('packages/school/MVC/views/school/notificationCenter/partials/runRuleLoadingScript.ejs');
+  assert.match(runRulePartial, /showLoading/);
+  assert.match(runRulePartial, /hideLoading/);
+  assert.match(listView, /bi-envelope-fill/);
+  assert.match(ruleForm, /scheduleEnabled/);
+  assert.match(ruleForm, /Scheduled evaluation/);
+  assert.match(ruleForm, /daysOfWeek/);
+  assert.match(ruleForm, /nc-weekday-toggle/);
+  assert.doesNotMatch(ruleForm, /scheduleTimezone/);
   assert.match(runView, /ncTeacherAccordion/);
   assert.match(runView, /nc-matrix-table/);
   assert.match(runView, /Days passed/);

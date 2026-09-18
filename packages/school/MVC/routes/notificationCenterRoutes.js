@@ -67,6 +67,13 @@ router.get('/runs/:id',
   notificationCenterController.showRun
 );
 
+router.post('/runs/:id/delete',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.UPDATE),
+  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  notificationCenterController.deleteRun
+);
+
 router.get('/runs/:id/compose',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.UPLOAD),

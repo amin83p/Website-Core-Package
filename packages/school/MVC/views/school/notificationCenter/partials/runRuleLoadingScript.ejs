@@ -1,0 +1,59 @@
+<script>
+(function initNotificationCenterRunRuleLoading() {
+  function resolveCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+  }
+
+  function showRunRuleWaitingModal() {
+    if (typeof window.showLoading !== 'function') return null;
+    return window.showLoading({
+      title: 'Running evaluation',
+      note: 'Please wait while this rule is evaluated. You will be taken to the results when finished.',
+      operation: 'Notification Centre'
+    });
+  }
+
+  function hideRunRuleWaitingModal(token) {
+    if (typeof window.hideLoading !== 'function') return;
+    if (token) window.hideLoading(token);
+    else window.hideLoading({ force: true });
+  }
+
+  document.querySelectorAll('.js-nc-run-rule-form').forEach((form) => {
+    if (form.dataset.ncRunBound === '1') return;
+    form.dataset.ncRunBound = '1';
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const loadingToken = showRunRuleWaitingModal();
+      const csrfToken = resolveCsrfToken();
+      const headers = {
+        Accept: 'application/json',
+        'X-AJAX-Request': '1'
+      };
+      if (csrfToken) {
+        headers['x-csrf-token'] = csrfToken;
+        headers['csrf-token'] = csrfToken;
+      }
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers,
+          credentials: 'same-origin'
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status !== 'ok' || !payload.run?.id) {
+          hideRunRuleWaitingModal(loadingToken);
+          const message = payload.message || 'Could not run this rule.';
+          await showMessageModal({ title: 'Run failed', message, icon: 'error', size: 'md' });
+          return;
+        }
+        window.location.href = '/school/notification-center/runs/' + encodeURIComponent(payload.run.id);
+      } catch (error) {
+        hideRunRuleWaitingModal(loadingToken);
+        const message = error?.message || 'Could not run this rule.';
+        await showMessageModal({ title: 'Run failed', message, icon: 'error', size: 'md' });
+      }
+    });
+  });
+})();
+</script>

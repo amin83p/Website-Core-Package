@@ -1,126 +1,280 @@
-<%
-  const row = rule || {};
-  const editing = typeof isEdit !== 'undefined' ? isEdit === true : !!row.id;
-  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
-  const formatLabel = typeof formatNotificationTokenLabel === 'function'
-    ? formatNotificationTokenLabel
-    : (value) => String(value || '');
-  const dateRangeTypes = Array.isArray(sessionDateRangeTypes) && sessionDateRangeTypes.length
-    ? sessionDateRangeTypes
-    : ['this_week', 'two_weeks', 'this_month', 'days_before_today', 'timesheet_period'];
-  const types = Array.isArray(ruleTypes) && ruleTypes.length ? ruleTypes : [];
-%>
-
-<div class="sections-page">
-  <div class="d-flex align-items-center justify-content-between mb-4">
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <h1 class="page-heading size-md m-0">
-        <i class="bi bi-megaphone me-2"></i><%= title %>
-      </h1>
-      <% if (editing && row.id) { %>
-        <span class="badge bg-primary border font-monospace">ID: <%= row.id %></span>
-      <% } %>
-      <% if (row.label) { %>
-        <span class="badge bg-light text-dark border"><%= row.label %></span>
-      <% } %>
-    </div>
-    <div class="d-flex gap-2">
-      <a href="/school/notification-center" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrow-left me-1"></i> Back to List
-      </a>
-    </div>
-  </div>
-
-  <div class="form-container wide" style="max-width: 1400px;">
-    <form id="notificationRuleForm" method="post" action="/school/notification-center/rules/save">
-      <input type="hidden" name="actionStateId" value="<%= asid %>">
-      <input type="hidden" name="rule[id]" value="<%= row.id || '' %>">
-      <input type="hidden" name="rule[schedule][autoQueueOnSchedule]" value="false">
-
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white border-bottom">
-          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-sliders me-2"></i>Rule definition</h6>
-          <div class="small text-muted mt-1">Saved rules define what to find when you run them manually. Nothing sends automatically.</div>
-        </div>
-        <div class="card-body p-4">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label fw-bold" for="ruleLabel">Label *</label>
-              <input class="form-control size-md" id="ruleLabel" name="rule[label]" value="<%= row.label || '' %>" placeholder="e.g. Weekly session finalization reminders" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-bold" for="ruleType">Rule type *</label>
-              <select class="form-select size-md" id="ruleType" name="rule[ruleType]" <%= row.legacyKey ? 'disabled' : '' %>>
-                <% types.forEach((type) => { %>
-                  <option value="<%= type %>" <%= row.ruleType === type ? 'selected' : '' %>><%= formatLabel(type) %></option>
-                <% }); %>
-              </select>
-              <% if (row.legacyKey) { %>
-                <input type="hidden" name="rule[ruleType]" value="<%= row.ruleType %>">
-                <div class="form-text small">Legacy session rule type is managed from School Settings.</div>
-              <% } %>
-            </div>
-            <div class="col-12">
-              <div class="border rounded p-3 bg-light-subtle">
-                <div class="d-flex justify-content-between gap-3 align-items-start">
-                  <div>
-                    <label class="fw-semibold mb-1" for="ruleEnabled">Enabled</label>
-                    <div class="small text-muted">Paused rules cannot be run from Notification Centre.</div>
-                  </div>
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="ruleEnabled" name="rule[enabled]" value="true" <%= row.enabled !== false ? 'checked' : '' %>>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white border-bottom">
-          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-envelope-paper me-2"></i>Email compose</h6>
-          <div class="small text-muted mt-1">When enabled, operators can schedule emails from run results for this rule.</div>
-        </div>
-        <div class="card-body p-4">
-          <div class="border rounded p-3 bg-light-subtle">
-            <div class="d-flex justify-content-between gap-3 align-items-start">
-              <div>
-                <label class="fw-semibold mb-1" for="emailChannelEnabled">Allow email scheduling</label>
-                <div class="small text-muted">Send time is chosen when you compose mail after reviewing a run.</div>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="emailChannelEnabled" name="rule[channels][email][enabled]" value="true" <%= row.channels?.email?.enabled !== false ? 'checked' : '' %>>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white border-bottom">
-          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-calendar-range me-2"></i>Criteria</h6>
-          <div class="small text-muted mt-1">Limit which sessions or periods are included when the rule runs.</div>
-        </div>
-        <div class="card-body p-4">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label fw-bold" for="sessionDateRange">Session date range</label>
-              <select class="form-select size-md" id="sessionDateRange" name="rule[criteria][sessionDateRange][type]">
-                <% dateRangeTypes.forEach((opt) => { %>
-                  <option value="<%= opt %>" <%= (row.criteria?.sessionDateRange?.type || 'this_week') === opt ? 'selected' : '' %>><%= formatLabel(opt) %></option>
-                <% }); %>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="button-row mt-4 pt-3 border-top">
-        <button type="submit" class="btn btn-filled btn-primary btn-md"><%= editing ? 'Save Changes' : 'Create Rule' %></button>
-        <a href="/school/notification-center" class="btn btn-filled btn-secondary btn-md">Cancel</a>
-      </div>
-    </form>
-  </div>
-</div>
-
+<%
+  const row = rule || {};
+  const editing = typeof isEdit !== 'undefined' ? isEdit === true : !!row.id;
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const formatLabel = typeof formatNotificationTokenLabel === 'function'
+    ? formatNotificationTokenLabel
+    : (value) => String(value || '');
+  const dateRangeTypes = Array.isArray(sessionDateRangeTypes) && sessionDateRangeTypes.length
+    ? sessionDateRangeTypes
+    : ['this_week', 'two_weeks', 'this_month', 'days_before_today', 'timesheet_period'];
+  const types = Array.isArray(ruleTypes) && ruleTypes.length ? ruleTypes : [];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0">
+        <i class="bi bi-megaphone me-2"></i><%= title %>
+      </h1>
+      <% if (editing && row.id) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= row.id %></span>
+      <% } %>
+      <% if (row.label) { %>
+        <span class="badge bg-light text-dark border"><%= row.label %></span>
+      <% } %>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/school/notification-center" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Back to List
+      </a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="notificationRuleForm" method="post" action="/school/notification-center/rules/save">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <input type="hidden" name="rule[id]" value="<%= row.id || '' %>">
+      <input type="hidden" name="rule[schedule][autoQueueOnSchedule]" value="false">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-sliders me-2"></i>Rule definition</h6>
+          <div class="small text-muted mt-1">Saved rules define what to find when you run them manually or on a daily schedule. Email is only sent after you review a run and schedule mail.</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="ruleLabel">Label *</label>
+              <input class="form-control size-md" id="ruleLabel" name="rule[label]" value="<%= row.label || '' %>" placeholder="e.g. Weekly session finalization reminders" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="ruleType">Rule type *</label>
+              <select class="form-select size-md" id="ruleType" name="rule[ruleType]" <%= row.legacyKey ? 'disabled' : '' %>>
+                <% types.forEach((type) => { %>
+                  <option value="<%= type %>" <%= row.ruleType === type ? 'selected' : '' %>><%= formatLabel(type) %></option>
+                <% }); %>
+              </select>
+              <% if (row.legacyKey) { %>
+                <input type="hidden" name="rule[ruleType]" value="<%= row.ruleType %>">
+                <div class="form-text small">Legacy session rule type is managed from School Settings.</div>
+              <% } %>
+            </div>
+            <div class="col-12">
+              <div class="border rounded p-3 bg-light-subtle">
+                <div class="d-flex justify-content-between gap-3 align-items-start">
+                  <div>
+                    <label class="fw-semibold mb-1" for="ruleEnabled">Enabled</label>
+                    <div class="small text-muted">Paused rules cannot be run from Notification Centre.</div>
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ruleEnabled" name="rule[enabled]" value="true" <%= row.enabled !== false ? 'checked' : '' %>>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-envelope-paper me-2"></i>Email compose</h6>
+          <div class="small text-muted mt-1">When enabled, operators can schedule emails from run results for this rule.</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="border rounded p-3 bg-light-subtle">
+            <div class="d-flex justify-content-between gap-3 align-items-start">
+              <div>
+                <label class="fw-semibold mb-1" for="emailChannelEnabled">Allow email scheduling</label>
+                <div class="small text-muted">Send time is chosen when you compose mail after reviewing a run.</div>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="emailChannelEnabled" name="rule[channels][email][enabled]" value="true" <%= row.channels?.email?.enabled !== false ? 'checked' : '' %>>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-alarm me-2"></i>Scheduled evaluation</h6>
+          <div class="small text-muted mt-1">Optional scheduled runs create a Scheduled Tasks entry. Run time uses your organization timezone (same as uncompleted session notifications in School Settings). Pause or cancel that task, or disable this rule, to stop automatic runs.</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="border rounded p-3 bg-light-subtle mb-3">
+            <div class="d-flex justify-content-between gap-3 align-items-start">
+              <div>
+                <label class="fw-semibold mb-1" for="scheduleEnabled">Enable scheduled evaluation</label>
+                <div class="small text-muted">Preview results are stored for later review; email is still scheduled manually from a run.</div>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="scheduleEnabled" name="rule[schedule][scheduleEnabled]" value="true" <%= row.schedule?.scheduleEnabled === true ? 'checked' : '' %>>
+              </div>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="scheduleRunAtTime">Run at time</label>
+              <input class="form-control size-md" type="time" id="scheduleRunAtTime" name="rule[schedule][runAtTime]" value="<%= row.schedule?.runAtTime || '08:00' %>">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold d-block">Weekdays</label>
+              <div class="d-flex flex-wrap gap-2" id="ncScheduleWeekdays">
+                <%
+                  const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                  let selectedDays = Array.isArray(row.schedule?.daysOfWeek) ? row.schedule.daysOfWeek.map((d) => Number(d)) : [];
+                  if (row.schedule?.scheduleEnabled === true && !selectedDays.length) {
+                    selectedDays = [0, 1, 2, 3, 4, 5, 6];
+                  }
+                  const selectedSet = new Set(selectedDays.filter((d) => Number.isFinite(d)));
+                  weekdayLabels.forEach((label, idx) => { %>
+                  <label class="btn btn-outline-secondary btn-sm nc-weekday-toggle <%= selectedSet.has(idx) ? 'active' : '' %>">
+                    <input type="checkbox" class="d-none nc-weekday-input" name="rule[schedule][daysOfWeek][]" value="<%= idx %>" <%= selectedSet.has(idx) ? 'checked' : '' %>>
+                    <%= label %>
+                  </label>
+                <% }); %>
+              </div>
+              <div class="form-text">Select at least one day when scheduled evaluation is enabled.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+      (function () {
+        const form = document.getElementById('notificationRuleForm');
+        const enabled = document.getElementById('scheduleEnabled');
+        const weekdayWrap = document.getElementById('ncScheduleWeekdays');
+        if (!form || !enabled || !weekdayWrap) return;
+
+        weekdayWrap.querySelectorAll('.nc-weekday-toggle').forEach((label) => {
+          label.addEventListener('click', (event) => {
+            event.preventDefault();
+            const input = label.querySelector('.nc-weekday-input');
+            if (!input) return;
+            input.checked = !input.checked;
+            label.classList.toggle('active', input.checked);
+          });
+        });
+
+        form.addEventListener('submit', (event) => {
+          if (!enabled.checked) return;
+          const checked = weekdayWrap.querySelectorAll('.nc-weekday-input:checked');
+          if (!checked.length) {
+            event.preventDefault();
+            showMessageModal({
+              title: 'Weekdays required',
+              message: 'Select at least one weekday for scheduled evaluation.',
+              icon: 'warning',
+              size: 'md'
+            });
+          }
+        });
+      })();
+      </script>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-calendar-event me-2"></i>Activity date window</h6>
+          <div class="small text-muted mt-1">When enabled, scheduled evaluation runs only between the start and end dates (organization calendar). Manual <strong>Run now</strong> is not limited by this window.</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="border rounded p-3 bg-light-subtle mb-3">
+            <div class="d-flex justify-content-between gap-3 align-items-start">
+              <div>
+                <label class="fw-semibold mb-1" for="activityDateWindowEnabled">Limit scheduled evaluation to a date range</label>
+                <div class="small text-muted">Outside this range, the linked scheduled task is disabled until the window includes today.</div>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="activityDateWindowEnabled" name="rule[activityDateWindow][enabled]" value="true" <%= row.activityDateWindow?.enabled === true ? 'checked' : '' %>>
+              </div>
+            </div>
+          </div>
+          <div class="row g-3" id="activityDateWindowFields">
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="activityDateWindowStart">Start date</label>
+              <input class="form-control size-md" type="date" id="activityDateWindowStart" name="rule[activityDateWindow][startDate]" value="<%= row.activityDateWindow?.startDate || '' %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="activityDateWindowEnd">End date</label>
+              <input class="form-control size-md" type="date" id="activityDateWindowEnd" name="rule[activityDateWindow][endDate]" value="<%= row.activityDateWindow?.endDate || '' %>">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+      (function () {
+        const form = document.getElementById('notificationRuleForm');
+        const windowEnabled = document.getElementById('activityDateWindowEnabled');
+        const startInput = document.getElementById('activityDateWindowStart');
+        const endInput = document.getElementById('activityDateWindowEnd');
+        if (!form || !windowEnabled || !startInput || !endInput) return;
+
+        function refreshActivityWindowFields() {
+          const on = windowEnabled.checked;
+          startInput.disabled = !on;
+          endInput.disabled = !on;
+          startInput.required = on;
+          endInput.required = on;
+        }
+
+        windowEnabled.addEventListener('change', refreshActivityWindowFields);
+        refreshActivityWindowFields();
+
+        form.addEventListener('submit', (event) => {
+          if (!windowEnabled.checked) return;
+          const start = String(startInput.value || '').trim();
+          const end = String(endInput.value || '').trim();
+          if (!start || !end) {
+            event.preventDefault();
+            showMessageModal({
+              title: 'Dates required',
+              message: 'Enter both start and end dates for the activity date window.',
+              icon: 'warning',
+              size: 'md'
+            });
+            return;
+          }
+          if (start > end) {
+            event.preventDefault();
+            showMessageModal({
+              title: 'Invalid date range',
+              message: 'Activity date window start date must be on or before the end date.',
+              icon: 'warning',
+              size: 'md'
+            });
+          }
+        });
+      })();
+      </script>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-calendar-range me-2"></i>Criteria</h6>
+          <div class="small text-muted mt-1">Limit which sessions or periods are included when the rule runs.</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="sessionDateRange">Session date range</label>
+              <select class="form-select size-md" id="sessionDateRange" name="rule[criteria][sessionDateRange][type]">
+                <% dateRangeTypes.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= (row.criteria?.sessionDateRange?.type || 'this_week') === opt ? 'selected' : '' %>><%= formatLabel(opt) %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><%= editing ? 'Save Changes' : 'Create Rule' %></button>
+        <a href="/school/notification-center" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+

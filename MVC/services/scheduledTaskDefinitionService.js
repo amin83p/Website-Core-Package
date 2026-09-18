@@ -16,12 +16,25 @@ function parsePositiveInt(value, fallback) {
   return parsed;
 }
 
+function normalizeDaysOfWeekKey(days = []) {
+  return [...new Set(
+    (Array.isArray(days) ? days : [])
+      .map((value) => Number.parseInt(String(value), 10))
+      .filter((day) => Number.isFinite(day) && day >= 0 && day <= 6)
+  )].sort((a, b) => a - b).join(',');
+}
+
 function hasScheduleFieldsChanged(existing = {}, payload = {}) {
   const existingInterval = parsePositiveInt(existing?.input?.intervalMinutes, 0);
   const payloadInterval = parsePositiveInt(payload?.input?.intervalMinutes, 0);
+  const existingDays = normalizeDaysOfWeekKey(existing?.input?.daysOfWeek);
+  const payloadDays = normalizeDaysOfWeekKey(payload?.input?.daysOfWeek);
   return cleanText(existing.runAtTime) !== cleanText(payload.runAtTime)
     || cleanText(existing.scheduleType) !== cleanText(payload.scheduleType)
-    || (cleanText(payload.scheduleType) === 'interval' && existingInterval !== payloadInterval);
+    || cleanText(existing.timezone) !== cleanText(payload.timezone)
+    || (cleanText(payload.scheduleType) === 'interval' && existingInterval !== payloadInterval)
+    || (cleanText(payload.scheduleType) === 'weekly' && existingDays !== payloadDays)
+    || (existingDays !== payloadDays);
 }
 
 async function upsertDefinition({
@@ -62,7 +75,9 @@ async function upsertDefinition({
     taskKey: key,
     label: cleanText(label) || key,
     description: cleanText(description),
-    scheduleType: scheduleType === 'interval' ? 'interval' : 'daily',
+    scheduleType: scheduleType === 'interval'
+      ? 'interval'
+      : (scheduleType === 'weekly' ? 'weekly' : 'daily'),
     runAtTime: cleanText(runAtTime).slice(0, 5),
     timezone: tz,
     enabled: enabled === true,

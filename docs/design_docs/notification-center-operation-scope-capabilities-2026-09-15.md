@@ -1,5 +1,7 @@
 # Notification Centre Operation and Scope Capabilities
 
+> **Superseded:** Use [notification-center-operation-scope-capabilities-2026-09-16.md](notification-center-operation-scope-capabilities-2026-09-16.md).
+
 Access Profile reference | 15 September 2026
 
 ## Agent usage

@@ -5,6 +5,11 @@ const scheduledTaskDefinitionService = require('./scheduledTaskDefinitionService
 const scheduledTaskRunService = require('./scheduledTaskRunService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const { idsEqual } = require('../utils/idAdapter');
+const {
+  formatInstantInTimezone,
+  resolveActiveOrgTimezoneFromUser,
+  resolveDefaultTimezone
+} = require('../utils/timezoneUtils');
 
 const MANAGER_SECTIONS = Object.freeze([
   SECTIONS.SCHEDULED_TASK_MANAGER,
@@ -81,8 +86,26 @@ function buildDefinitionMap(definitions = []) {
   return map;
 }
 
+function resolveDefinitionTimezone(definition = {}, user = null) {
+  return cleanText(definition.timezone, 80)
+    || (user ? resolveActiveOrgTimezoneFromUser(user) : '')
+    || resolveDefaultTimezone();
+}
+
+function formatManagerInstant(value, timeZone = '') {
+  if (!value) return '—';
+  return formatInstantInTimezone(value, timeZone || resolveDefaultTimezone(), {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
 function enrichUpcomingItem(row = {}, definitionMap = new Map(), user, nowMs, windowMs) {
   const definition = definitionMap.get(String(row.definitionId || '')) || {};
+  const schedulingTimezone = resolveDefinitionTimezone(definition, user);
   const scheduledFor = cleanText(row.scheduledFor || row.nextRunAt);
   const scheduledMs = new Date(scheduledFor).getTime();
   const remainingMs = Number.isFinite(scheduledMs) ? Math.max(0, scheduledMs - nowMs) : 0;
@@ -104,6 +127,8 @@ function enrichUpcomingItem(row = {}, definitionMap = new Map(), user, nowMs, wi
     orgId,
     orgName: resolveOrgName(orgId, user),
     scheduledFor,
+    schedulingTimezone,
+    scheduledForDisplay: formatManagerInstant(scheduledFor, schedulingTimezone),
     remainingMs,
     remainingLabel: formatRemainingLabel(remainingMs),
     progressPct,
@@ -114,6 +139,7 @@ function enrichUpcomingItem(row = {}, definitionMap = new Map(), user, nowMs, wi
 
 function enrichCompletedItem(row = {}, definitionMap = new Map(), user) {
   const definition = definitionMap.get(String(row.definitionId || '')) || {};
+  const schedulingTimezone = resolveDefinitionTimezone(definition, user);
   const startedMs = new Date(row.startedAt || '').getTime();
   const finishedMs = new Date(row.finishedAt || '').getTime();
   const durationMs = Number.isFinite(startedMs) && Number.isFinite(finishedMs)
@@ -133,7 +159,9 @@ function enrichCompletedItem(row = {}, definitionMap = new Map(), user) {
     orgId,
     orgName: resolveOrgName(orgId, user),
     scheduledFor: cleanText(row.scheduledFor),
+    schedulingTimezone,
     finishedAt: cleanText(row.finishedAt),
+    finishedAtDisplay: formatManagerInstant(row.finishedAt, schedulingTimezone),
     durationMs,
     durationLabel: formatDurationMs(durationMs),
     status,
@@ -248,10 +276,14 @@ async function getManagerWindow(user, options = {}) {
     .filter((row) => COMPLETED_STATUSES.includes(cleanText(row.status).toLowerCase()))
     .map((row) => enrichCompletedItem(row, definitionMap, user));
 
+  const viewerTimezone = user ? resolveActiveOrgTimezoneFromUser(user) : resolveDefaultTimezone();
+
   return {
     upcoming,
     completed,
     generatedAt: nowIso,
+    generatedAtDisplay: formatManagerInstant(nowIso, viewerTimezone),
+    viewerTimezone,
     windowHours,
     counts: {
       upcoming: upcoming.length,

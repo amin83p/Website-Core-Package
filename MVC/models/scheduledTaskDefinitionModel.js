@@ -15,7 +15,7 @@ if (!fsSync.existsSync(DATA_PATH)) {
   fsSync.writeFileSync(DATA_PATH, '[]');
 }
 
-const SCHEDULE_TYPES = Object.freeze(['daily']);
+const SCHEDULE_TYPES = Object.freeze(['daily', 'weekly', 'interval']);
 const STATUSES = Object.freeze(['active', 'paused', 'disabled']);
 
 function cleanText(value, { max = 4000, allowEmpty = true } = {}) {

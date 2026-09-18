@@ -53,6 +53,7 @@ python scripts/design_docs/generate_design_doc_docx.py INPUT.md OUTPUT.docx --te
 | [attendance-operation-scope-capabilities-2026-09-06.md](attendance-operation-scope-capabilities-2026-09-06.md) | `SCHOOL_ATTENDANCES` and `SCHOOL_ATTENDANCE_REPORT` operation/scope matrix (target spec for app implementation) |
 | [student-picker-search-matrix-2026-09-17.md](student-picker-search-matrix-2026-09-17.md) | Student picker/search surfaces, claim-aware field contract, regression tests, manual QA checklist |
 | [student-case-operation-scope-capabilities-2026-09-06.md](student-case-operation-scope-capabilities-2026-09-06.md) | `SCHOOL_SESSION_STUDENT_CASES` operation/scope matrix (**promoted**); READ vs READ_ALL, locked-case lifecycle, ADMIN override |
+| [notification-center-operation-scope-capabilities-2026-09-16.md](notification-center-operation-scope-capabilities-2026-09-16.md) | `SCHOOL_NOTIFICATION_CENTER` operation/scope matrix (target spec); rules, runs, compose, outbox |
 
 ## MongoDB catalog (runtime source of truth)
 

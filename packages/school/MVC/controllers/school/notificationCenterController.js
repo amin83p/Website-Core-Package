@@ -3,8 +3,9 @@ const notificationCenterRuleService = require('../../services/school/notificatio
 const notificationCenterRunService = require('../../services/school/notificationCenterRunService');
 
 const notificationCenterAccessService = require('../../services/school/notificationCenterAccessService');
+const notificationCenterRunScopeService = require('../../services/school/notificationCenterRunScopeService');
 
-const { disableNotificationCenterScheduledTasks } = require('../../services/school/notificationCenterTaskSyncService');
+const { syncAllRulesForOrg } = require('../../services/school/notificationCenterTaskSyncService');
 
 const notificationCenterRunPresentationService = require('../../services/school/notificationCenterRunPresentationService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
@@ -27,7 +28,13 @@ const settingService = requireCoreModule('MVC/services/settingService');
 
 const emailOutboxService = requireCoreModule('MVC/services/emailOutboxService');
 
-const { formatMsToDateTimeLocalInput } = requireCoreModule('MVC/utils/timezoneUtils');
+const {
+  formatInstantInTimezone,
+  formatMsToDateTimeLocalInput,
+  getTodayDateKeyInTimezone,
+  resolveActiveOrgTimezoneFromUser,
+  resolveDefaultTimezone
+} = requireCoreModule('MVC/utils/timezoneUtils');
 
 
 
@@ -70,6 +77,15 @@ function parseSelectionKeys(body = {}) {
 async function baseView(req, res, extra = {}) {
 
   const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
+  const orgTimeZone = String(
+    req.orgTimeZone || req.user?.activeOrgTimeZone || resolveActiveOrgTimezoneFromUser(req.user) || resolveDefaultTimezone()
+  ).trim() || resolveDefaultTimezone();
+  const formatOrgDateTime = (value, opts = {}) => formatInstantInTimezone(value, orgTimeZone, opts);
+  const orgToday = String(req.orgToday || req.user?.orgToday || getTodayDateKeyInTimezone(orgTimeZone)).trim();
+  const isRuleOutsideActivityWindow = (rule = {}) => (
+    notificationRuleModel.isActivityDateWindowConfigured(rule.activityDateWindow)
+    && !notificationRuleModel.isDateWithinActivityWindow(rule.activityDateWindow, orgToday)
+  );
 
   return {
 
@@ -87,7 +103,17 @@ async function baseView(req, res, extra = {}) {
 
     formatNotificationTokenLabel,
 
+    orgTimeZone,
+
+    orgToday,
+
+    formatOrgDateTime,
+
+    isRuleOutsideActivityWindow,
+
     access,
+
+    isRunViewedByUser: notificationCenterRunService.isRunViewedByUser,
 
     ...extra
 
@@ -103,9 +129,7 @@ async function showHome(req, res) {
 
     const orgId = getActiveOrgIdOrThrow(req.user);
 
-    await notificationCenterRuleService.syncLegacySessionNotFinalRule(orgId);
-
-    await disableNotificationCenterScheduledTasks(orgId);
+    await notificationCenterRuleService.syncLegacySessionNotFinalRule(orgId, null, req.user);
 
     const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
 
@@ -119,7 +143,7 @@ async function showHome(req, res) {
 
 
 
-    let rows = await notificationCenterRuleService.listRulesForOrg(orgId);
+    let rows = await notificationCenterRuleService.listRulesForOrg(orgId, req.user);
 
     rows = (Array.isArray(rows) ? rows : []).slice().sort((a, b) => {
 
@@ -143,11 +167,13 @@ async function showHome(req, res) {
 
     const runs = access.canViewRuns
 
-      ? await notificationCenterRunService.listRuns(orgId, { limit: 20 })
+      ? notificationCenterRunScopeService.filterRunsForViewer(
+        await notificationCenterRunService.listRuns(orgId, { limit: 20 }, req.user),
+        req.user,
+        access
+      )
 
       : [];
-
-
 
     if (isAjax(req)) {
 
@@ -209,7 +235,7 @@ async function showRuleForm(req, res) {
 
       ? { id: '', orgId, enabled: true, ruleType: 'session_not_final', label: '', criteria: {}, channels: { email: { enabled: true }, sms: {} }, schedule: { autoQueueOnSchedule: false } }
 
-      : await notificationCenterRuleService.getRule(orgId, ruleId);
+      : await notificationCenterRuleService.getRule(orgId, ruleId, req.user);
 
     if (!rule) throw new Error('Notification rule not found.');
 
@@ -266,10 +292,35 @@ async function saveRule(req, res) {
     payload.schedule = payload.schedule && typeof payload.schedule === 'object' ? payload.schedule : {};
 
     payload.schedule.autoQueueOnSchedule = false;
+    payload.schedule.scheduleEnabled = payload.schedule.scheduleEnabled === 'true' || payload.schedule.scheduleEnabled === true;
+    payload.schedule.runAtTime = String(payload.schedule.runAtTime || '').trim().slice(0, 5);
+    const rawDays = payload.schedule.daysOfWeek;
+    if (rawDays !== undefined && rawDays !== null) {
+      payload.schedule.daysOfWeek = Array.isArray(rawDays) ? rawDays : [rawDays];
+    } else if (payload.schedule.scheduleEnabled) {
+      payload.schedule.daysOfWeek = [];
+    }
 
-    const saved = await notificationCenterRuleService.saveRule(orgId, payload, req.user?.id);
+    payload.activityDateWindow = payload.activityDateWindow && typeof payload.activityDateWindow === 'object'
+      ? payload.activityDateWindow
+      : {};
+    payload.activityDateWindow.enabled = payload.activityDateWindow.enabled === 'true'
+      || payload.activityDateWindow.enabled === true;
+    payload.activityDateWindow.startDate = String(payload.activityDateWindow.startDate || '').trim().slice(0, 10);
+    payload.activityDateWindow.endDate = String(payload.activityDateWindow.endDate || '').trim().slice(0, 10);
 
-    await disableNotificationCenterScheduledTasks(orgId);
+    const saved = await notificationCenterRuleService.saveRule(orgId, payload, req.user);
+
+    const actor = {
+      actor: {
+        userId: String(req.user?.id || req.user?.userId || '').trim(),
+        displayName: String(req.user?.displayName || req.user?.name || req.user?.email || 'Notification Centre').trim()
+      }
+    };
+    await syncAllRulesForOrg(orgId, req.user, {
+      ...actor,
+      schedulingTimezone: String(req.orgTimeZone || req.user?.activeOrgTimeZone || '').trim()
+    });
 
     if (wantsJson(req)) return res.json({ status: 'ok', rule: saved });
 
@@ -339,11 +390,19 @@ async function showRun(req, res) {
 
     if (!access.canViewRuns) throw new Error('Not authorized to view notification runs.');
 
-    const run = await notificationCenterRunService.getRun(orgId, req.params.id);
+    const runRaw = await notificationCenterRunService.getRun(orgId, req.params.id, req.user);
 
-    if (!run) throw new Error('Notification run not found.');
+    if (!runRaw) throw new Error('Notification run not found.');
 
-    const rule = await notificationCenterRuleService.getRule(orgId, run.ruleId);
+    const run = notificationCenterRunScopeService.filterRunForViewer(runRaw, req.user, access);
+
+    if (!access.isAdminViewer && !(Array.isArray(run.batches) && run.batches.length)) {
+      throw new Error('Not authorized to view this notification run.');
+    }
+
+    const rule = await notificationCenterRuleService.getRule(orgId, run.ruleId, req.user);
+
+    await notificationCenterRunService.markRunViewed(orgId, run.id, req.user);
 
     const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
 
@@ -389,11 +448,17 @@ async function showComposeEmail(req, res) {
 
     if (!access.canDispatch) throw new Error('Not authorized to schedule notification emails.');
 
-    const run = await notificationCenterRunService.getRun(orgId, req.params.id);
+    const runRaw = await notificationCenterRunService.getRun(orgId, req.params.id, req.user);
 
-    if (!run) throw new Error('Notification run not found.');
+    if (!runRaw) throw new Error('Notification run not found.');
 
-    const rule = await notificationCenterRuleService.getRule(orgId, run.ruleId);
+    const run = notificationCenterRunScopeService.filterRunForViewer(runRaw, req.user, access);
+
+    if (!access.isAdminViewer && !(Array.isArray(run.batches) && run.batches.length)) {
+      throw new Error('Not authorized to view this notification run.');
+    }
+
+    const rule = await notificationCenterRuleService.getRule(orgId, run.ruleId, req.user);
 
     if (!rule) throw new Error('Notification rule not found.');
 
@@ -475,11 +540,11 @@ async function scheduleEmail(req, res) {
 
     if (!access.canDispatch) throw new Error('Not authorized to schedule notification emails.');
 
-    const run = await notificationCenterRunService.getRun(orgId, req.params.id);
+    const run = await notificationCenterRunService.getRun(orgId, req.params.id, req.user);
 
     if (!run) throw new Error('Notification run not found.');
 
-    const rule = await notificationCenterRuleService.getRule(orgId, run.ruleId);
+    const rule = await notificationCenterRuleService.getRule(orgId, run.ruleId, req.user);
 
     if (!rule) throw new Error('Notification rule not found.');
 
@@ -531,6 +596,34 @@ async function scheduleEmail(req, res) {
 
 
 
+async function deleteRun(req, res) {
+
+  try {
+
+    const orgId = getActiveOrgIdOrThrow(req.user);
+
+    const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
+
+    if (!access.canRunNow) throw new Error('Not authorized to delete notification runs.');
+
+    await notificationCenterRunService.deleteRun(orgId, req.params.id, req.user);
+
+    if (wantsJson(req)) return res.json({ status: 'ok' });
+
+    return res.redirect('/school/notification-center?runDeleted=1');
+
+  } catch (error) {
+
+    if (wantsJson(req)) return res.status(400).json({ status: 'error', message: error.message });
+
+    return res.status(400).render('error', { title: 'Error', message: error.message, error, user: req.user });
+
+  }
+
+}
+
+
+
 async function showOutbox(req, res) {
 
   try {
@@ -539,7 +632,7 @@ async function showOutbox(req, res) {
 
     const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
 
-    if (!access.canViewRuns && !access.canDispatch) {
+    if (!access.canViewRuns) {
 
       throw new Error('Not authorized to view notification outbox.');
 
@@ -563,7 +656,7 @@ async function showOutbox(req, res) {
 
       canCancelOutbox: access.canDispatch,
 
-      canDeleteOutbox: access.canDispatch,
+      canDeleteOutbox: access.canDeleteOutbox,
 
       scheduledFlash: String(req.query.scheduled || '') === '1'
 
@@ -625,7 +718,7 @@ async function deleteOutboxEntry(req, res) {
 
     const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
 
-    if (!access.canDispatch) throw new Error('Not authorized to delete outbox entries.');
+    if (!access.canDeleteOutbox) throw new Error('Not authorized to delete outbox entries.');
 
     const row = await emailOutboxService.getById(req.params.id);
 
@@ -675,7 +768,9 @@ module.exports = {
 
   cancelOutboxEntry,
 
-  deleteOutboxEntry
+  deleteOutboxEntry,
+
+  deleteRun
 
 };
 

@@ -1681,6 +1681,15 @@ const schoolRepositories = {
     create: notificationRuleModel.addNotificationRule,
     update: notificationRuleModel.updateNotificationRule,
     remove: notificationRuleModel.deleteNotificationRule,
+    normalizePayload: (data, id) => notificationRuleModel.sanitizeRuleInput(
+      id ? { ...(data || {}), id } : (data || {}),
+      { isUpdate: Boolean(id) }
+    ),
+    generateMongoCreateId: async (collection) => {
+      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
+      const existingIds = new Set(rows.map((row) => String(row.id || '')));
+      return notificationRuleModel.generateRuleId(existingIds);
+    },
     defaultSearchFields: ['id', 'orgId', 'label', 'ruleType', 'legacyKey'],
     dateFields: ['audit.createDateTime', 'audit.lastUpdateDateTime']
   }),
@@ -1691,7 +1700,20 @@ const schoolRepositories = {
     getById: notificationRunModel.getNotificationRunById,
     create: notificationRunModel.createNotificationRun,
     update: notificationRunModel.updateNotificationRun,
-    remove: async () => { throw new Error('Notification runs cannot be deleted.'); },
+    remove: notificationRunModel.deleteNotificationRun,
+    normalizePayload: (data, id) => {
+      if (!id) return notificationRunModel.sanitizeRunInput(data || {}, { isUpdate: false });
+      const patch = { ...(data || {}) };
+      if (Array.isArray(patch.batches)) {
+        patch.batches = patch.batches.map(notificationRunModel.sanitizeBatchRow);
+      }
+      return patch;
+    },
+    generateMongoCreateId: async (collection) => {
+      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
+      const existingIds = new Set(rows.map((row) => String(row.id || '')));
+      return notificationRunModel.generateRunId(existingIds);
+    },
     defaultSearchFields: ['id', 'orgId', 'ruleId', 'ruleType', 'status', 'trigger'],
     dateFields: ['startedAt', 'completedAt', 'audit.createDateTime']
   })

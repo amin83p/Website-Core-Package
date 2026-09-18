@@ -2802,7 +2802,7 @@ a .spinner-border.spinner-border-sm,
   top: 72px;
   right: 16px;
   margin: 0;
-  width: min(520px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 96px);
 }
 
@@ -2854,11 +2854,22 @@ a .spinner-border.spinner-border-sm,
   opacity: 0.55;
 }
 
+.scheduled-task-manager-toolbar {
+  flex-wrap: wrap;
+}
+
+.scheduled-task-manager-tabs {
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
 .scheduled-task-manager-tabs .nav-link {
   border-radius: 999px;
-  padding: 0.45rem 0.9rem;
+  padding: 0.45rem 0.75rem;
   font-weight: 600;
+  font-size: 0.8125rem;
   color: #64748b;
+  white-space: nowrap;
 }
 
 .scheduled-task-manager-tabs .nav-link.active {
@@ -2872,9 +2883,11 @@ a .spinner-border.spinner-border-sm,
   gap: 0.75rem;
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 52vh;
-  overflow: auto;
-  padding-right: 0.15rem;
+  max-height: min(52vh, 28rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .scheduled-task-manager-pane.stm-pane-active:not([hidden]) {
@@ -2899,6 +2912,7 @@ a .spinner-border.spinner-border-sm,
   background: #fff;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .scheduled-task-manager-card-accent {
@@ -2908,10 +2922,117 @@ a .spinner-border.spinner-border-sm,
   bottom: 0;
   width: 4px;
   background: #94a3b8;
+  pointer-events: none;
 }
 
 .scheduled-task-manager-card-body {
-  padding: 0.9rem 1rem 0.95rem 1.1rem;
+  padding: 0.85rem 0.9rem 0.9rem 1rem;
+}
+
+.stm-card-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.stm-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.stm-card-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem 0.5rem;
+}
+
+.stm-card-title {
+  flex: 1 1 8rem;
+  min-width: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0f172a;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.stm-card-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.3em 0.55em;
+  white-space: nowrap;
+}
+
+.stm-card-task-key {
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.stm-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.5rem;
+  min-width: 0;
+}
+
+.stm-card-organizer {
+  font-size: 0.8125rem;
+  color: #1e293b;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.stm-card-org-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stm-card-schedule {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #64748b;
+  word-break: break-word;
+}
+
+.stm-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.stm-card-footer-time {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.stm-card-footer-duration {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .scheduled-task-manager-status-icon {
@@ -2949,12 +3070,20 @@ a .spinner-border.spinner-border-sm,
   background: linear-gradient(90deg, #38bdf8, #2563eb);
 }
 
-.scheduled-task-manager-result {
+.scheduled-task-manager-result,
+.stm-card-result {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 0.55rem 0.7rem;
   color: #334155;
+  margin-top: 0.5rem;
+  max-height: 5.5rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 
 .stm-countdown-badge {
@@ -3010,6 +3139,17 @@ a .spinner-border.spinner-border-sm,
   }
 
   .scheduled-task-manager-pane {
-    max-height: 58vh;
+    max-height: min(58vh, 24rem);
+  }
+
+  .stm-card-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stm-card-pill {
+    align-self: flex-start;
+    white-space: normal;
+    text-align: left;
   }
 }

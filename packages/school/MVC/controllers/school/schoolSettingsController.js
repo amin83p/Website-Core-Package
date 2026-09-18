@@ -727,7 +727,9 @@ async function saveSessionAccessPolicy(req, res) {
       req.body || {},
       req.user?.id
     );
-    await sessionAccessPolicyTaskSyncService.syncSessionAccessPolicyTasks(activeOrgId, policy);
+    await sessionAccessPolicyTaskSyncService.syncSessionAccessPolicyTasks(activeOrgId, policy, {
+      schedulingTimezone: String(req.orgTimeZone || req.user?.activeOrgTimeZone || '').trim()
+    });
     const enrichedPolicy = await enrichSessionAccessPolicyForView(policy, req.user);
     return res.json({
       status: 'success',

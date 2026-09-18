@@ -5,7 +5,8 @@ const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolic
 const scheduledTaskDefinitionService = requireCoreModule('MVC/services/scheduledTaskDefinitionService');
 const scheduledTaskDefinitionRepository = requireCoreModule('MVC/repositories/scheduledTaskDefinitionRepository');
 const {
-  resolveDefaultTimezone
+  resolveDefaultTimezone,
+  resolveOrganizationTimezoneFromRow
 } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const EMAIL_PREPARE_TASK_KEY = 'school.uncompletedSessionEmail.prepare';
@@ -20,7 +21,16 @@ function cleanText(value) {
   return String(value || '').trim();
 }
 
-async function resolveTaskTimezone() {
+async function resolveTaskTimezone(orgId = '') {
+  const orgKey = cleanText(orgId);
+  if (!orgKey) return resolveDefaultTimezone();
+  try {
+    const organizationModel = requireCoreModule('MVC/models/organizationModel');
+    const row = await organizationModel.getOrganizationById(orgKey);
+    if (row) return resolveOrganizationTimezoneFromRow(row);
+  } catch (_) {
+    // fall through
+  }
   return resolveDefaultTimezone();
 }
 
@@ -114,13 +124,13 @@ async function disableOrphanPolicyTasks(orgId, activeSourceRefs = []) {
   return disabled;
 }
 
-async function syncSessionAccessPolicyTasks(orgId = '', policy = null) {
+async function syncSessionAccessPolicyTasks(orgId = '', policy = null, options = {}) {
   const orgKey = cleanText(orgId);
   if (!orgKey) return null;
 
   const resolvedPolicy = policy || await sessionAccessPolicyModel.getPolicyForOrg(orgKey);
   const notification = resolvedPolicy?.uncompletedSessionNotification || {};
-  const timezone = await resolveTaskTimezone();
+  const timezone = cleanText(options.schedulingTimezone) || await resolveTaskTimezone(orgKey);
 
   const emailTasks = await upsertChannelTasks({
     orgId: orgKey,
@@ -154,11 +164,9 @@ async function syncSessionAccessPolicyTasks(orgId = '', policy = null) {
 
   try {
     const notificationCenterRuleService = require('./notificationCenterRuleService');
-    const { disableNotificationCenterScheduledTasks } = require('./notificationCenterTaskSyncService');
     await notificationCenterRuleService.syncLegacySessionNotFinalRule(orgKey, resolvedPolicy);
-    await disableNotificationCenterScheduledTasks(orgKey);
   } catch (_err) {
-    // Keep legacy tasks if notification centre sync is unavailable.
+    // Keep notification centre legacy rule sync optional when unavailable.
   }
 
   return {

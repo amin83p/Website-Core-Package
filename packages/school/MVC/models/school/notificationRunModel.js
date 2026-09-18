@@ -46,6 +46,33 @@ function normalizeTrigger(value, fallback = 'manual') {
   return RUN_TRIGGERS.includes(token) ? token : fallback;
 }
 
+function sanitizeRunInput(input = {}, { isUpdate = false } = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  const now = new Date().toISOString();
+  const out = {
+    orgId: cleanString(source.orgId, { max: 120 }),
+    ruleId: cleanString(source.ruleId, { max: 120 }),
+    ruleType: cleanString(source.ruleType, { max: 80 }),
+    ruleLabel: cleanString(source.ruleLabel, { max: 160 }),
+    trigger: normalizeTrigger(source.trigger, 'manual'),
+    status: normalizeStatus(source.status, 'pending'),
+    asOfDate: cleanString(source.asOfDate, { max: 12 }),
+    findingCount: Number(source.findingCount) || 0,
+    batchCount: Number(source.batchCount) || 0,
+    batches: Array.isArray(source.batches) ? source.batches.map(sanitizeBatchRow) : [],
+    errorMessage: cleanString(source.errorMessage, { max: 2000, allowEmpty: true }),
+    startedAt: source.startedAt || now,
+    completedAt: cleanString(source.completedAt, { max: 40, allowEmpty: true })
+  };
+  if (!isUpdate) {
+    out.audit = {
+      createDateTime: now,
+      createUserId: cleanString(source.auditUserId, { max: 120 })
+    };
+  }
+  return out;
+}
+
 function sanitizeBatchRow(raw = {}) {
   const input = raw && typeof raw === 'object' ? raw : {};
   return {
@@ -85,26 +112,9 @@ async function getNotificationRunById(id) {
 async function createNotificationRun(input = {}) {
   const all = await getAllNotificationRuns();
   const existingIds = new Set(all.map((row) => String(row?.id || '')));
-  const now = new Date().toISOString();
   const row = {
-    id: generateRunId(existingIds),
-    orgId: cleanString(input.orgId, { max: 120 }),
-    ruleId: cleanString(input.ruleId, { max: 120 }),
-    ruleType: cleanString(input.ruleType, { max: 80 }),
-    ruleLabel: cleanString(input.ruleLabel, { max: 160 }),
-    trigger: normalizeTrigger(input.trigger, 'manual'),
-    status: normalizeStatus(input.status, 'pending'),
-    asOfDate: cleanString(input.asOfDate, { max: 12 }),
-    findingCount: Number(input.findingCount) || 0,
-    batchCount: Number(input.batchCount) || 0,
-    batches: Array.isArray(input.batches) ? input.batches.map(sanitizeBatchRow) : [],
-    errorMessage: cleanString(input.errorMessage, { max: 2000, allowEmpty: true }),
-    startedAt: input.startedAt || now,
-    completedAt: input.completedAt || '',
-    audit: {
-      createDateTime: now,
-      createUserId: cleanString(input.auditUserId, { max: 120 })
-    }
+    ...sanitizeRunInput(input, { isUpdate: false }),
+    id: generateRunId(existingIds)
   };
   all.push(row);
   await saveAll(all);
@@ -128,6 +138,15 @@ async function updateNotificationRun(id, patch = {}) {
   return row;
 }
 
+async function deleteNotificationRun(id) {
+  const targetId = cleanId(id);
+  const all = await getAllNotificationRuns();
+  const next = all.filter((row) => !idsEqual(row?.id, targetId));
+  if (next.length === all.length) throw new Error('Notification run not found.');
+  await saveAll(next);
+  return true;
+}
+
 async function listNotificationRunsByOrg(orgId, { ruleId = '', limit = 50 } = {}) {
   const key = cleanString(orgId, { max: 120 });
   const all = await getAllNotificationRuns();
@@ -141,10 +160,13 @@ async function listNotificationRunsByOrg(orgId, { ruleId = '', limit = 50 } = {}
 module.exports = {
   RUN_STATUSES,
   RUN_TRIGGERS,
+  sanitizeRunInput,
+  generateRunId,
   getAllNotificationRuns,
   getNotificationRunById,
   createNotificationRun,
   updateNotificationRun,
+  deleteNotificationRun,
   listNotificationRunsByOrg,
   sanitizeBatchRow
 };

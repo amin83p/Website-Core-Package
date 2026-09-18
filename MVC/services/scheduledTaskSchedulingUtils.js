@@ -86,11 +86,97 @@ function computeIntervalNextRunAt({
   return new Date(baseMs + (minutes * 60 * 1000)).toISOString();
 }
 
+const WEEKDAY_SHORT_TO_INDEX = Object.freeze({
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6
+});
+
+function normalizeDaysOfWeekList(raw = []) {
+  const values = Array.isArray(raw) ? raw : [raw];
+  return [...new Set(
+    values
+      .map((value) => Number.parseInt(String(value), 10))
+      .filter((day) => Number.isFinite(day) && day >= 0 && day <= 6)
+  )];
+}
+
+function addDaysToDateKey(dateKey, days = 1, timeZone = '') {
+  const tz = cleanText(timeZone) || resolveDefaultTimezone();
+  const ms = zonedDateTimeToUtcMs({ dateKey, hour: 12, minute: 0, timeZone: tz });
+  if (!Number.isFinite(ms)) return '';
+  const next = new Date(ms);
+  next.setUTCDate(next.getUTCDate() + days);
+  const parts = getDateTimePartsInTimezone(next.getTime(), tz);
+  return buildDateKeyFromParts(parts);
+}
+
+function getWeekdayInTimezone(dateKey, timeZone = '') {
+  const tz = cleanText(timeZone) || resolveDefaultTimezone();
+  const ms = zonedDateTimeToUtcMs({ dateKey, hour: 12, minute: 0, timeZone: tz });
+  if (!Number.isFinite(ms)) return NaN;
+  try {
+    const short = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(new Date(ms));
+    return WEEKDAY_SHORT_TO_INDEX[short] ?? NaN;
+  } catch (_) {
+    return NaN;
+  }
+}
+
+function computeNextWeeklyRunAt({
+  runAtTime = '',
+  timeZone = '',
+  daysOfWeek = [],
+  from = new Date()
+} = {}) {
+  const parsed = parseRunAtTime(runAtTime);
+  const allowed = normalizeDaysOfWeekList(daysOfWeek);
+  if (!parsed || !allowed.length) return '';
+  const tz = cleanText(timeZone) || resolveDefaultTimezone();
+  const baseMs = from instanceof Date ? from.getTime() : new Date(from).getTime();
+  const baseParts = getDateTimePartsInTimezone(baseMs, tz);
+  if (!baseParts) return '';
+
+  const startDateKey = buildDateKeyFromParts(baseParts);
+  for (let offset = 0; offset < 14; offset += 1) {
+    const dateKey = offset === 0
+      ? startDateKey
+      : addDaysToDateKey(startDateKey, offset, tz);
+    if (!dateKey) continue;
+    const weekday = getWeekdayInTimezone(dateKey, tz);
+    if (!allowed.includes(weekday)) continue;
+    const candidateMs = zonedDateTimeToUtcMs({
+      dateKey,
+      hour: parsed.hour,
+      minute: parsed.minute,
+      timeZone: tz
+    });
+    if (!Number.isFinite(candidateMs)) continue;
+    if (candidateMs > baseMs) {
+      return new Date(candidateMs).toISOString();
+    }
+  }
+  return '';
+}
+
 function computeNextRunAt(definition = {}, from = new Date()) {
   const scheduleType = cleanText(definition.scheduleType) || 'daily';
   if (scheduleType === 'interval') {
     return computeIntervalNextRunAt({
       intervalMinutes: definition.input?.intervalMinutes || definition.intervalMinutes || 5,
+      from
+    });
+  }
+  const weeklyDays = normalizeDaysOfWeekList(definition.input?.daysOfWeek);
+  if (scheduleType === 'weekly' || weeklyDays.length) {
+    return computeNextWeeklyRunAt({
+      runAtTime: definition.runAtTime,
+      timeZone: definition.timezone,
+      daysOfWeek: weeklyDays.length ? weeklyDays : [0, 1, 2, 3, 4, 5, 6],
       from
     });
   }
@@ -104,6 +190,9 @@ function computeNextRunAt(definition = {}, from = new Date()) {
 module.exports = {
   parseRunAtTime,
   computeNextDailyRunAt,
+  computeNextWeeklyRunAt,
   computeIntervalNextRunAt,
-  computeNextRunAt
+  computeNextRunAt,
+  getWeekdayInTimezone,
+  normalizeDaysOfWeekList
 };

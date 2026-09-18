@@ -103,13 +103,29 @@ function registerSchoolScheduledTasks() {
 
   registerPackageScheduledTaskHandler('SCHOOL', {
     taskKey: NC_PREPARE_TASK_KEY,
-    label: 'Prepare notification centre rule (disabled)',
-    description: 'Notification centre uses manual runs only.',
+    label: 'Prepare notification centre rule',
+    description: 'Evaluates a notification rule on schedule and stores preview results for review.',
     scope: 'org',
-    handler: async () => ({
-      resultSummary: 'Notification centre scheduled prepare is disabled; run rules manually from Notification Centre.',
-      metrics: { skipped: 1 }
-    })
+    handler: async ({ orgId, input = {}, logger, now }) => {
+      const notificationCenterDeliveryService = require('./notificationCenterDeliveryService');
+      const ruleId = cleanText(input.ruleId);
+      if (!ruleId) {
+        return {
+          resultSummary: 'Skipped: missing ruleId in task input.',
+          metrics: { skipped: 1 }
+        };
+      }
+      const metrics = await notificationCenterDeliveryService.prepareScheduledRule({
+        orgId,
+        ruleId,
+        logger,
+        now
+      });
+      return {
+        resultSummary: `Prepared preview run${metrics.runId ? ` (${metrics.runId})` : ''}; batches ${metrics.prepared || 0}.`,
+        metrics
+      };
+    }
   });
 
   registerPackageScheduledTaskHandler('SCHOOL', {

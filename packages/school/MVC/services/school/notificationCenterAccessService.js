@@ -1,6 +1,7 @@
 'use strict';
 
 const { requireCoreModule } = require('./schoolCoreContracts');
+const notificationCenterOperationPolicyService = require('./notificationCenterOperationPolicyService');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
@@ -21,20 +22,59 @@ async function evaluateOperation(user, operationId, ipAddress) {
 }
 
 async function buildAccessFlags(user, ipAddress) {
-  const [read, readAll, update, configure, upload] = await Promise.all([
+  if (!user) {
+    return {
+      ...notificationCenterOperationPolicyService.EMPTY_ACCESS_FLAGS,
+      evaluations: {}
+    };
+  }
+
+  const [read, readAll, update, configure, upload, del] = await Promise.all([
     evaluateOperation(user, OPERATIONS.READ, ipAddress),
     evaluateOperation(user, OPERATIONS.READ_ALL, ipAddress),
     evaluateOperation(user, OPERATIONS.UPDATE, ipAddress),
     evaluateOperation(user, OPERATIONS.CONFIGURE, ipAddress),
-    evaluateOperation(user, OPERATIONS.UPLOAD, ipAddress)
+    evaluateOperation(user, OPERATIONS.UPLOAD, ipAddress),
+    evaluateOperation(user, OPERATIONS.DELETE, ipAddress)
   ]);
+
+  const [
+    readPolicy,
+    readAllPolicy,
+    updatePolicy,
+    configurePolicy,
+    uploadPolicy,
+    deletePolicy
+  ] = await Promise.all([
+    notificationCenterOperationPolicyService.applyOperationPolicy({ user, operationId: OPERATIONS.READ, evaluation: read }),
+    notificationCenterOperationPolicyService.applyOperationPolicy({ user, operationId: OPERATIONS.READ_ALL, evaluation: readAll }),
+    notificationCenterOperationPolicyService.applyOperationPolicy({ user, operationId: OPERATIONS.UPDATE, evaluation: update }),
+    notificationCenterOperationPolicyService.applyOperationPolicy({ user, operationId: OPERATIONS.CONFIGURE, evaluation: configure }),
+    notificationCenterOperationPolicyService.applyOperationPolicy({ user, operationId: OPERATIONS.UPLOAD, evaluation: upload }),
+    notificationCenterOperationPolicyService.applyOperationPolicy({ user, operationId: OPERATIONS.DELETE, evaluation: del })
+  ]);
+
+  const adminFlags = {
+    read: readPolicy.adminBypass === true,
+    readAll: readAllPolicy.adminBypass === true,
+    update: updatePolicy.adminBypass === true,
+    configure: configurePolicy.adminBypass === true,
+    upload: uploadPolicy.adminBypass === true,
+    delete: deletePolicy.adminBypass === true
+  };
+
+  const evaluations = {
+    read: readPolicy,
+    readAll: readAllPolicy,
+    update: updatePolicy,
+    configure: configurePolicy,
+    upload: uploadPolicy,
+    del: deletePolicy
+  };
+
   return {
-    canOpen: read.allowed === true,
-    canViewRuns: readAll.allowed === true,
-    canRunNow: update.allowed === true,
-    canConfigure: configure.allowed === true,
-    canDispatch: upload.allowed === true,
-    isAdminViewer: schoolAdminAccessService.isAdminForRequest(user, SECTIONS.SCHOOL_NOTIFICATION_CENTER, OPERATIONS.READ_ALL)
+    ...notificationCenterOperationPolicyService.deriveAccessFlags(evaluations, adminFlags),
+    evaluations
   };
 }
 

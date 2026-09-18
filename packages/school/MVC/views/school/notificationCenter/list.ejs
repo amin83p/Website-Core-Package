@@ -1,120 +1,470 @@
 <%- include('partials/tablePages-start', {
+
   title,
+
   newUrl: 'school/notification-center',
+
   newHref: access?.canConfigure ? '/school/notification-center/rules/new' : null,
+
   newLabel: access?.canConfigure ? 'New rule' : null,
+
   user,
+
   tableName,
+
   btn_export: true,
+
   print: true,
+
   exportDataBaseUrl: 'school/notification-center',
+
   headerManageBtns: [
+
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>'
+
   ],
-  manageBtns: access?.canViewRuns || access?.canDispatch
+
+  manageBtns: access?.canViewRuns
+
     ? ['<a href="/school/notification-center/outbox" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-envelope-paper me-1"></i> Scheduled emails</a>']
+
     : [],
+
 }) %>
+
+
 
 <%- include('partials/tablePages-search', {
+
   placeholder: 'Search rules by label or type...'
+
 }) %>
+
+
 
 <div class="table-scroll-wrapper" data-floating-row-actions="true">
+
   <table class="table-responsive size-md" id="first-table">
+
     <thead>
+
       <tr>
+
         <th class="draggable ps-4" data-column="label">Label</th>
+
         <th class="draggable" data-column="ruleType">Type</th>
+
         <th class="draggable" data-column="enabled">Status</th>
+
         <th class="draggable" data-column="legacyKey">Source</th>
+
         <th class="text-end pe-4">Actions</th>
+
       </tr>
+
     </thead>
+
     <tbody>
+
       <% if (!data || data.length === 0) { %>
+
         <tr><td colspan="5" class="text-center py-5 text-muted">No rules found.<% if (access?.canConfigure) { %> Create a rule or save session notification settings to import the legacy rule.<% } %></td></tr>
+
       <% } %>
+
       <% (data || []).forEach((rule) => { %>
+
         <tr data-entity-row-id="<%= rule.id %>">
+
           <td class="ps-4">
+
             <div class="fw-semibold text-dark"><%= rule.label %></div>
+
             <% if (rule.id) { %><div class="x-small text-muted font-monospace"><%= rule.id %></div><% } %>
+
           </td>
+
           <td><span class="text-dark"><%= typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel(rule.ruleType) : rule.ruleType %></span></td>
+
           <td data-sort-value="<%= rule.enabled ? '1' : '0' %>">
+
             <% if (rule.enabled) { %><span class="badge bg-success">Enabled</span><% } else { %><span class="badge bg-secondary">Paused</span><% } %>
-          </td>
-          <td data-sort-value="<%= rule.legacyKey ? 'legacy' : 'custom' %>">
-            <% if (rule.legacyKey) { %><span class="badge bg-light text-muted border">Legacy sync</span><% } else { %><span class="text-muted small">Custom</span><% } %>
-          </td>
-          <td class="table-actions text-end pe-4">
-            <% if (access?.canConfigure || access?.canRunNow) { %>
-            <div class="row-actions-wrap">
-              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= rule.id %>" title="Rule actions">
-                <i class="bi bi-three-dots-vertical"></i>
-              </button>
-              <div class="row-actions-menu d-none" data-row-actions-id="<%= rule.id %>">
-                <% if (access?.canConfigure) { %>
-                  <a href="/school/notification-center/rules/<%= rule.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
-                <% } %>
-                <% if (access?.canRunNow) { %>
-                  <form method="post" action="/school/notification-center/rules/<%= rule.id %>/run" class="d-inline">
-                    <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-play-fill me-2"></i>Run now</button>
-                  </form>
-                <% } %>
-              </div>
-            </div>
+            <% if (typeof isRuleOutsideActivityWindow === 'function' && isRuleOutsideActivityWindow(rule)) { %>
+              <div class="x-small text-muted mt-1">Scheduled evaluation paused (outside activity date window)</div>
             <% } %>
+
           </td>
+
+          <td data-sort-value="<%= rule.legacyKey ? 'legacy' : 'custom' %>">
+
+            <% if (rule.legacyKey) { %><span class="badge bg-light text-muted border">Legacy sync</span><% } else { %><span class="text-muted small">Custom</span><% } %>
+
+          </td>
+
+          <td class="table-actions text-end pe-4">
+
+            <% if (access?.canConfigure || access?.canRunNow) { %>
+
+            <div class="row-actions-wrap">
+
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= rule.id %>" title="Rule actions">
+
+                <i class="bi bi-three-dots-vertical"></i>
+
+              </button>
+
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= rule.id %>">
+
+                <% if (access?.canConfigure) { %>
+
+                  <a href="/school/notification-center/rules/<%= rule.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+
+                <% } %>
+
+                <% if (access?.canRunNow) { %>
+
+                  <form method="post" action="/school/notification-center/rules/<%= rule.id %>/run" class="d-inline js-nc-run-rule-form">
+
+                    <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-play-fill me-2"></i>Run now</button>
+
+                  </form>
+
+                <% } %>
+
+              </div>
+
+            </div>
+
+            <% } %>
+
+          </td>
+
         </tr>
+
       <% }) %>
+
     </tbody>
+
   </table>
+
 </div>
 
+
+
 <%- include('partials/pagination', {
+
   pagination,
+
   filters,
+
   baseUrlPath: newUrl
+
 }) %>
 
+
+
 <% if (access?.canViewRuns) { %>
+
   <div class="mt-4 mb-2">
+
     <h2 class="h5 fw-bold text-dark mb-0"><i class="bi bi-clock-history me-2"></i>Recent runs</h2>
-    <p class="small text-muted mb-0">Preview and dispatch results from the latest evaluations.</p>
+
+    <p class="small text-muted mb-0">Preview results from manual and scheduled evaluations. Open a run to review findings.</p>
+
   </div>
-  <div class="table-scroll-wrapper mt-2">
-    <table class="table-responsive size-md">
+
+  <div class="table-scroll-wrapper mt-2" data-floating-row-actions="true">
+
+    <table class="table-responsive size-md" id="nc-recent-runs-table">
+
       <thead>
+
         <tr>
-          <th class="ps-4">Rule</th>
-          <th>Status</th>
-          <th>Batches</th>
-          <th>Findings</th>
-          <th>Started</th>
+
+          <th class="ps-4 text-center" data-column="review" style="width:3rem;">Review</th>
+
+          <th class="draggable" data-column="ruleLabel">Rule <span class="sort-icon"></span></th>
+
+          <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+
+          <th class="draggable" data-column="batchCount">Batches <span class="sort-icon"></span></th>
+
+          <th class="draggable" data-column="findingCount">Findings <span class="sort-icon"></span></th>
+
+          <th class="draggable" data-column="startedAt">Started <span class="sort-icon"></span></th>
+
           <th class="text-end pe-4">Actions</th>
+
         </tr>
+
       </thead>
+
       <tbody>
+
         <% if (!(runs || []).length) { %>
-          <tr><td colspan="6" class="text-center py-4 text-muted">No runs yet.</td></tr>
+
+          <tr data-nc-empty-runs="1"><td colspan="7" class="text-center py-4 text-muted">No runs yet.</td></tr>
+
         <% } %>
-        <% (runs || []).forEach((run) => { %>
-          <tr>
-            <td class="ps-4 fw-semibold"><%= run.ruleLabel || run.ruleType %></td>
-            <td><span class="badge bg-light text-dark border"><%= typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel(run.status) : run.status %></span></td>
-            <td><%= run.batchCount || 0 %></td>
-            <td><%= run.findingCount || 0 %></td>
-            <td><%= run.startedAt || '' %></td>
-            <td class="text-end pe-4">
-              <a class="btn btn-sm btn-outline-primary" href="/school/notification-center/runs/<%= run.id %>">View</a>
+
+        <% (runs || []).forEach((run) => {
+
+          const runHref = '/school/notification-center/runs/' + encodeURIComponent(run.id);
+
+          const viewed = typeof isRunViewedByUser === 'function' ? isRunViewedByUser(run, user) : false;
+
+        %>
+
+          <tr class="nc-run-row" data-run-href="<%= runHref %>">
+
+            <td class="ps-4 text-center" data-sort-value="<%= viewed ? '1' : '0' %>">
+
+              <% if (viewed) { %>
+
+                <i class="bi bi-envelope-open text-success" title="Opened"></i>
+
+              <% } else { %>
+
+                <i class="bi bi-envelope-fill text-primary" title="Not opened yet"></i>
+
+              <% } %>
+
             </td>
+
+            <td data-sort-value="<%= run.ruleLabel || run.ruleType || '' %>">
+
+              <a href="<%= runHref %>" class="fw-semibold text-dark text-decoration-none"><%= run.ruleLabel || run.ruleType %></a>
+
+            </td>
+
+            <td data-sort-value="<%= run.status || '' %>"><span class="badge bg-light text-dark border"><%= typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel(run.status) : run.status %></span></td>
+
+            <td data-sort-value="<%= run.batchCount || 0 %>"><%= run.batchCount || 0 %></td>
+
+            <td data-sort-value="<%= run.findingCount || 0 %>"><%= run.findingCount || 0 %></td>
+
+            <td data-sort-value="<%= run.startedAt || '' %>"><%= run.startedAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(run.startedAt) : run.startedAt) : '—' %></td>
+
+            <td class="table-actions text-end pe-4">
+
+              <% if (access?.canViewRuns || access?.canRunNow) { %>
+
+              <div class="row-actions-wrap">
+
+                <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="run-<%= run.id %>" title="Run actions">
+
+                  <i class="bi bi-three-dots-vertical"></i>
+
+                </button>
+
+                <div class="row-actions-menu d-none" data-row-actions-id="run-<%= run.id %>">
+
+                  <% if (access?.canViewRuns) { %>
+
+                    <a href="<%= runHref %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye me-2"></i>View</a>
+
+                  <% } %>
+
+                  <% if (access?.canRunNow) { %>
+
+                    <form method="post" action="/school/notification-center/runs/<%= run.id %>/delete" class="d-inline js-nc-delete-run-form">
+
+                      <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-2"></i>Delete</button>
+
+                    </form>
+
+                  <% } %>
+
+                </div>
+
+              </div>
+
+              <% } %>
+
+            </td>
+
           </tr>
+
         <% }); %>
+
       </tbody>
+
     </table>
+
   </div>
+
 <% } %>
 
+
+
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/table-draggable-sort.js') : '/scripts/table-draggable-sort.js' %>"></script>
+
+<%- include('school/notificationCenter/partials/runRuleLoadingScript') %>
+
+<script>
+
+(function () {
+
+  function resolveCsrfToken() {
+
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+  }
+
+  function ensureRecentRunsEmptyState(tbody) {
+
+    if (!tbody) return;
+
+    if (tbody.querySelector('tr.nc-run-row')) return;
+
+    if (tbody.querySelector('tr[data-nc-empty-runs]')) return;
+
+    const row = document.createElement('tr');
+
+    row.setAttribute('data-nc-empty-runs', '1');
+
+    row.innerHTML = '<td colspan="7" class="text-center py-4 text-muted">No runs yet.</td>';
+
+    tbody.appendChild(row);
+
+  }
+
+  document.querySelectorAll('.js-nc-delete-run-form').forEach((form) => {
+
+    if (form.dataset.ncDeleteBound === '1') return;
+
+    form.dataset.ncDeleteBound = '1';
+
+    form.addEventListener('submit', async (event) => {
+
+      event.preventDefault();
+
+      const choice = await showMessageModal({
+
+        title: 'Delete run',
+
+        icon: 'warning',
+
+        message: 'Delete this notification run? This cannot be undone.',
+
+        size: 'md',
+
+        buttons: [
+
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+
+          { text: 'Delete', class: 'btn-danger btn-md' }
+
+        ]
+
+      });
+
+      if (choice !== 'Delete') return;
+
+      const row = form.closest('tr.nc-run-row');
+
+      const tbody = row?.closest('tbody');
+
+      const csrfToken = resolveCsrfToken();
+
+      const headers = {
+
+        Accept: 'application/json',
+
+        'X-AJAX-Request': '1'
+
+      };
+
+      if (csrfToken) {
+
+        headers['x-csrf-token'] = csrfToken;
+
+        headers['csrf-token'] = csrfToken;
+
+      }
+
+      const submitButton = form.querySelector('button[type="submit"]');
+
+      if (submitButton) submitButton.disabled = true;
+
+      try {
+
+        const response = await fetch(form.action, {
+
+          method: 'POST',
+
+          headers,
+
+          credentials: 'same-origin'
+
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || payload.status !== 'ok') {
+
+          throw new Error(payload.message || 'Could not delete this run.');
+
+        }
+
+        if (row) {
+
+          row.remove();
+
+          ensureRecentRunsEmptyState(tbody);
+
+        }
+
+      } catch (error) {
+
+        const message = error?.message || 'Could not delete this run.';
+
+        await showMessageModal({ title: 'Delete failed', message, icon: 'error', size: 'md' });
+
+      } finally {
+
+        if (submitButton) submitButton.disabled = false;
+
+      }
+
+    });
+
+  });
+
+
+
+  const runsTable = document.getElementById('nc-recent-runs-table');
+
+  if (runsTable && typeof window.initDraggableTableSort === 'function') {
+
+    window.initDraggableTableSort(runsTable, { enableColumnReorder: false });
+
+  }
+
+
+
+  document.querySelectorAll('tr.nc-run-row[data-run-href]').forEach((row) => {
+
+    row.addEventListener('click', (event) => {
+
+      if (event.target.closest('a, button, form, .row-actions-wrap')) return;
+
+      const href = row.getAttribute('data-run-href');
+
+      if (href) window.location.href = href;
+
+    });
+
+    row.style.cursor = 'pointer';
+
+  });
+
+})();
+
+</script>
+
+
+
 <%- include('partials/tablePages-end') %>
+
+

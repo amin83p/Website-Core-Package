@@ -21,17 +21,20 @@
     return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
   }
 
-  function formatDateTime(iso) {
+  function formatDateTime(iso, timeZone) {
     if (!iso) return '—';
     try {
       const date = new Date(iso);
       if (Number.isNaN(date.getTime())) return iso;
-      return date.toLocaleString(undefined, {
+      const options = {
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit'
-      });
+      };
+      const tz = String(timeZone || '').trim();
+      if (tz) options.timeZone = tz;
+      return date.toLocaleString('en-US', options);
     } catch (_) {
       return iso;
     }
@@ -56,27 +59,26 @@
 
   function renderUpcomingCard(item) {
     const meta = statusMeta(item.status);
+    const runLabel = escapeHtml(item.scheduledForDisplay || formatDateTime(item.scheduledFor, item.schedulingTimezone));
     return `<article class="scheduled-task-manager-card" data-stm-scheduled-for="${escapeHtml(item.scheduledFor || '')}">
       <div class="scheduled-task-manager-card-accent ${meta.className}"></div>
       <div class="scheduled-task-manager-card-body">
-        <div class="d-flex align-items-start gap-3">
-          <div class="scheduled-task-manager-status-icon ${meta.className}">
+        <div class="stm-card-layout">
+          <div class="scheduled-task-manager-status-icon ${meta.className}" aria-hidden="true">
             <i class="bi ${meta.icon}"></i>
           </div>
-          <div class="flex-grow-1 min-w-0">
-            <div class="d-flex align-items-start justify-content-between gap-2">
-              <div class="min-w-0">
-                <div class="fw-semibold text-dark text-truncate">${escapeHtml(item.label || item.taskKey)}</div>
-                <div class="small text-muted font-monospace text-truncate">${escapeHtml(item.taskKey || '')}</div>
-              </div>
-              <span class="badge rounded-pill stm-countdown-badge">${escapeHtml(item.remainingLabel || 'Due now')}</span>
+          <div class="stm-card-main">
+            <div class="stm-card-title-row">
+              <h6 class="stm-card-title mb-0">${escapeHtml(item.label || item.taskKey)}</h6>
+              <span class="badge rounded-pill stm-countdown-badge stm-card-pill flex-shrink-0">${escapeHtml(item.remainingLabel || 'Due now')}</span>
             </div>
-            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-              <span class="scheduled-task-manager-avatar">${escapeHtml(initialsFromName(item.organizedByDisplayName))}</span>
-              <span class="small text-dark">${escapeHtml(item.organizedByDisplayName || 'System')}</span>
-              <span class="badge bg-light text-secondary border">${escapeHtml(item.orgName || 'System')}</span>
+            ${item.taskKey ? `<div class="stm-card-task-key">${escapeHtml(item.taskKey)}</div>` : ''}
+            <div class="stm-card-meta">
+              <span class="scheduled-task-manager-avatar flex-shrink-0">${escapeHtml(initialsFromName(item.organizedByDisplayName))}</span>
+              <span class="stm-card-organizer">${escapeHtml(item.organizedByDisplayName || 'System')}</span>
+              <span class="badge bg-light text-secondary border stm-card-org-badge">${escapeHtml(item.orgName || 'System')}</span>
             </div>
-            <div class="small text-muted mt-2">Runs ${escapeHtml(formatDateTime(item.scheduledFor))}</div>
+            <div class="stm-card-schedule"><i class="bi bi-clock me-1"></i>Runs ${runLabel}</div>
             <div class="progress scheduled-task-manager-progress mt-2" role="progressbar" aria-valuenow="${Number(item.progressPct || 0)}" aria-valuemin="0" aria-valuemax="100">
               <div class="progress-bar" style="width: ${Math.max(0, Math.min(100, Number(item.progressPct || 0)))}%"></div>
             </div>
@@ -91,30 +93,29 @@
     const result = item.status === 'failed'
       ? (item.errorMessage || item.resultSummary || 'Failed.')
       : (item.resultSummary || 'Completed.');
+    const finishedLabel = escapeHtml(item.finishedAtDisplay || formatDateTime(item.finishedAt, item.schedulingTimezone));
     return `<article class="scheduled-task-manager-card">
       <div class="scheduled-task-manager-card-accent ${meta.className}"></div>
       <div class="scheduled-task-manager-card-body">
-        <div class="d-flex align-items-start gap-3">
-          <div class="scheduled-task-manager-status-icon ${meta.className}">
+        <div class="stm-card-layout">
+          <div class="scheduled-task-manager-status-icon ${meta.className}" aria-hidden="true">
             <i class="bi ${meta.icon}"></i>
           </div>
-          <div class="flex-grow-1 min-w-0">
-            <div class="d-flex align-items-start justify-content-between gap-2">
-              <div class="min-w-0">
-                <div class="fw-semibold text-dark text-truncate">${escapeHtml(item.label || item.taskKey)}</div>
-                <div class="small text-muted font-monospace text-truncate">${escapeHtml(item.taskKey || '')}</div>
-              </div>
-              <span class="badge rounded-pill ${meta.className} border">${escapeHtml(meta.label)}</span>
+          <div class="stm-card-main">
+            <div class="stm-card-title-row">
+              <h6 class="stm-card-title mb-0">${escapeHtml(item.label || item.taskKey)}</h6>
+              <span class="badge rounded-pill stm-card-pill ${meta.className} border flex-shrink-0">${escapeHtml(meta.label)}</span>
             </div>
-            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-              <span class="scheduled-task-manager-avatar">${escapeHtml(initialsFromName(item.organizedByDisplayName))}</span>
-              <span class="small text-dark">${escapeHtml(item.organizedByDisplayName || 'System')}</span>
-              <span class="badge bg-light text-secondary border">${escapeHtml(item.orgName || 'System')}</span>
+            ${item.taskKey ? `<div class="stm-card-task-key">${escapeHtml(item.taskKey)}</div>` : ''}
+            <div class="stm-card-meta">
+              <span class="scheduled-task-manager-avatar flex-shrink-0">${escapeHtml(initialsFromName(item.organizedByDisplayName))}</span>
+              <span class="stm-card-organizer">${escapeHtml(item.organizedByDisplayName || 'System')}</span>
+              <span class="badge bg-light text-secondary border stm-card-org-badge">${escapeHtml(item.orgName || 'System')}</span>
             </div>
-            <div class="scheduled-task-manager-result mt-2 small">${escapeHtml(result)}</div>
-            <div class="d-flex justify-content-between gap-2 mt-2 small text-muted flex-wrap">
-              <span>Finished ${escapeHtml(formatDateTime(item.finishedAt))}</span>
-              <span>${escapeHtml(item.durationLabel || '')}</span>
+            <div class="scheduled-task-manager-result stm-card-result small">${escapeHtml(result)}</div>
+            <div class="stm-card-footer text-muted">
+              <span class="stm-card-footer-time"><i class="bi bi-check2-circle me-1"></i>Finished ${finishedLabel}</span>
+              ${item.durationLabel ? `<span class="stm-card-footer-duration">${escapeHtml(item.durationLabel)}</span>` : ''}
             </div>
           </div>
         </div>
@@ -214,7 +215,7 @@
 
     const generatedAtEl = document.querySelector('[data-stm-generated-at]');
     if (generatedAtEl && payload?.generatedAt) {
-      generatedAtEl.textContent = `Updated ${formatDateTime(payload.generatedAt)}`;
+      generatedAtEl.textContent = `Updated ${payload.generatedAtDisplay || formatDateTime(payload.generatedAt, payload.viewerTimezone)}`;
     }
 
     const badgeEl = document.getElementById('scheduledTaskManagerHeaderBadge');
