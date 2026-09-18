@@ -513,6 +513,8 @@ app.use(requestPerfTracer.wrapMiddleware('app-locals', (req, res, next) => {
   res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
   res.locals.buildVersionCommitAt = String(req.app?.locals?.buildVersionCommitAt || '').trim();
   res.locals.buildVersionStartedAt = String(req.app?.locals?.buildVersionStartedAt || APP_STARTED_AT).trim();
+  res.locals.buildVersionSource = String(req.app?.locals?.buildVersion?.source || '').trim();
+  res.locals.buildVersionCommitAtSource = String(req.app?.locals?.buildVersion?.commitAtSource || '').trim();
   res.locals.buildVersionCommitAtLabel = formatBuildVersionTimestamp(
     res.locals.buildVersionCommitAt,
     res.locals.formatOrgDateTime

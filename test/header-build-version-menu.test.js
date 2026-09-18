@@ -44,9 +44,11 @@ test('header shows committed and running-since labels in About modal when provid
   assert.match(html, /id="aboutAppModal"/);
   assert.match(html, /<code>abc123<\/code>/);
   assert.match(html, />Committed</);
-  assert.match(html, />Aug 25, 2026 4:35 PM</);
+  assert.match(html, /Aug 25, 2026 4:35 PM/);
   assert.match(html, />Running since</);
-  assert.match(html, />Aug 25, 2026 4:40 PM</);
+  assert.match(html, /Aug 25, 2026 4:40 PM/);
+  assert.match(html, /What this platform delivers/);
+  assert.match(html, /Copy support snapshot/);
 });
 
 test('header hides committed label in About modal when commit label is empty', () => {
@@ -58,7 +60,7 @@ test('header hides committed label in About modal when commit label is empty', (
 
   assert.equal(html.includes('>Committed<'), false);
   assert.match(html, />Running since</);
-  assert.match(html, />Aug 25, 2026 4:40 PM</);
+  assert.match(html, /Aug 25, 2026 4:40 PM/);
 });
 
 test('header hides About the app menu item and modal when buildVersionShort is empty', () => {

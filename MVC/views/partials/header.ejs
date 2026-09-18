@@ -258,86 +258,109 @@
                     <div class="vr mx-1 text-muted opacity-25" style="height: 32px;"></div>
 
                     <div class="dropdown">
-                        <button class="d-flex align-items-center gap-2 border-0 bg-transparent p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button class="header-user-menu-trigger d-flex align-items-center gap-2 border-0 bg-transparent p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu">
                             <div class="text-end d-none d-md-block" style="line-height: 1.2;">
                                 <div class="fw-bold text-dark small text-truncate" style="max-width: 120px;"><%= headerShortName %></div>
                                 <div class="text-muted x-small visually-hidden">ID: <%= user.id %></div>
                             </div>
                             <% if (headerAvatarUrl) { %>
-                                <img src="<%= headerAvatarUrl %>" alt="<%= displayName %>" class="rounded-circle border border-2 border-white shadow-sm header-avatar" style="width: 42px; height: 42px; object-fit: cover;">
+                                <span class="header-avatar-shell">
+                                    <img src="<%= headerAvatarUrl %>" alt="<%= displayName %>" class="rounded-circle header-avatar">
+                                </span>
                             <% } else { %>
-                                <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center text-secondary fw-bold border border-2 border-white shadow-sm header-avatar" style="width: 42px; height: 42px; font-size: 1.1rem;">
-                                    <%= avatarInitial %>
-                                </div>
+                                <span class="header-avatar-shell">
+                                    <span class="rounded-circle d-flex align-items-center justify-content-center fw-bold header-avatar header-avatar--placeholder" aria-hidden="true">
+                                        <%= avatarInitial %>
+                                    </span>
+                                </span>
                             <% } %>
                         </button>
 
-                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-0" style="width: 300px; overflow: hidden;">
-                            <li class="px-3 py-3 bg-light border-bottom">
-                                <div class="fw-bold text-dark"><%= user.name || user.username %></div>
-                                <div class="small text-muted text-truncate"><%= user.email %></div>
-                                <div class="text-muted x-small">ID: <%= user.id %></div>
+                        <ul class="dropdown-menu dropdown-menu-end header-user-menu mt-2 p-0" role="menu" aria-label="Account menu">
+                            <li class="header-user-menu-hero" role="none">
+                                <div class="header-user-menu-hero-inner">
+                                    <% if (headerAvatarUrl) { %>
+                                        <img src="<%= headerAvatarUrl %>" alt="" class="header-user-menu-hero-avatar rounded-circle" aria-hidden="true">
+                                    <% } else { %>
+                                        <span class="header-user-menu-hero-avatar header-user-menu-hero-avatar--placeholder rounded-circle d-flex align-items-center justify-content-center fw-bold" aria-hidden="true">
+                                            <%= avatarInitial %>
+                                        </span>
+                                    <% } %>
+                                    <div class="header-user-menu-hero-text min-w-0">
+                                        <div class="header-user-menu-name text-truncate"><%= user.name || user.username %></div>
+                                        <div class="header-user-menu-email text-truncate"><%= user.email %></div>
+                                        <div class="header-user-menu-meta">
+                                            <span class="header-user-menu-id-pill">ID <%= user.id %></span>
+                                        </div>
+                                    </div>
+                                </div>
                             </li>
 
-                            <li class="p-2">
-                                <h6 class="dropdown-header x-small text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Active Organization:</h6>
-                                <div class="px-2 mb-2">
+                            <li class="header-user-menu-section" role="none">
+                                <div class="header-user-menu-section-label">Active organization</div>
+                                <div class="header-user-menu-section-body">
                                     <%- include('../partials/orgSwitcher') %>
                                 </div>
 
                                 <% if (user.canSwitchProfile) { %>
                                     <% const isSystemMode = (user.currentProfileMode === 'SYSTEM'); %>
-                                    <div class="px-2">
-                                        <button type="button" id="profileModeSwitchBtn" 
-                                             class="btn btn-sm w-100 d-flex align-items-center justify-content-between border bg-white shadow-sm py-2 px-3"
+                                    <div class="header-user-menu-section-body mt-2">
+                                        <button type="button" id="profileModeSwitchBtn"
+                                                class="header-user-menu-card-btn w-100 d-flex align-items-center justify-content-between"
                                                 onclick="event.stopPropagation(); toggleProfileMode('<%= isSystemMode ? 'LOCAL' : 'SYSTEM' %>')">
-                                              <div class="d-flex align-items-center overflow-hidden">
-                                                <i class="bi <%= isSystemMode ? 'bi-shield-lock-fill text-danger' : 'bi-person-badge-fill text-info' %> me-2"></i>
-                                                <span class="fw-bold text-dark text-truncate" style="font-size: 0.85rem; max-width: 180px;">
-                                                    <%= isSystemMode ? 'System Admin' : 'Local Member' %> 
+                                            <div class="d-flex align-items-center overflow-hidden min-w-0">
+                                                <span class="header-user-menu-card-icon <%= isSystemMode ? 'is-system' : 'is-local' %>" aria-hidden="true">
+                                                    <i class="bi <%= isSystemMode ? 'bi-shield-lock-fill' : 'bi-person-badge-fill' %>"></i>
                                                 </span>
-                                               </div>
-                                            <i class="bi bi-arrow-repeat text-muted ms-2"></i>
+                                                <span class="header-user-menu-card-text text-truncate">
+                                                    <%= isSystemMode ? 'System Admin' : 'Local Member' %>
+                                                </span>
+                                            </div>
+                                            <i class="bi bi-arrow-repeat header-user-menu-card-action" aria-hidden="true"></i>
                                         </button>
-                                     </div>
+                                    </div>
                                 <% } %>
                             </li>
-                             
-                            <li><hr class="dropdown-divider m-0"></li>
 
-                            <li class="p-2">
-                                 <a class="dropdown-item rounded py-2" href="/profile/">
-                                    <i class="bi bi-person me-2 text-secondary"></i> My Profile
+                            <li class="header-user-menu-divider" role="separator" aria-hidden="true"></li>
+
+                            <li class="header-user-menu-nav" role="none">
+                                <a class="header-user-menu-item" href="/profile/" role="menuitem">
+                                    <span class="header-user-menu-item-icon" aria-hidden="true"><i class="bi bi-person"></i></span>
+                                    <span class="header-user-menu-item-label">My Profile</span>
                                 </a>
-                                <a class="dropdown-item rounded py-2" href="/sessions/mysessions">
-                                    <i class="bi bi-laptop me-2 text-secondary"></i> My Sessions (Devices)
+                                <a class="header-user-menu-item" href="/sessions/mysessions" role="menuitem">
+                                    <span class="header-user-menu-item-icon" aria-hidden="true"><i class="bi bi-laptop"></i></span>
+                                    <span class="header-user-menu-item-label">My Sessions (Devices)</span>
                                 </a>
                                 <% if (typeof canUseAdminAuthenticator !== 'undefined' && canUseAdminAuthenticator) { %>
-                                <a class="dropdown-item rounded py-2" href="/profile/authenticator">
-                                    <i class="bi bi-shield-lock me-2 text-secondary"></i> Authenticator
+                                <a class="header-user-menu-item" href="/profile/authenticator" role="menuitem">
+                                    <span class="header-user-menu-item-icon" aria-hidden="true"><i class="bi bi-shield-lock"></i></span>
+                                    <span class="header-user-menu-item-label">Authenticator</span>
                                 </a>
                                 <% } %>
                             </li>
 
-	                            <li><hr class="dropdown-divider m-0"></li>
+                            <% if (typeof buildVersionShort !== 'undefined' && buildVersionShort) { %>
+                            <li class="header-user-menu-divider" role="separator" aria-hidden="true"></li>
+                            <li class="header-user-menu-nav" role="none">
+                                <button type="button"
+                                        class="header-user-menu-item w-100 border-0 bg-transparent text-start"
+                                        role="menuitem"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#aboutAppModal">
+                                    <span class="header-user-menu-item-icon" aria-hidden="true"><i class="bi bi-info-circle"></i></span>
+                                    <span class="header-user-menu-item-label">About the app</span>
+                                </button>
+                            </li>
+                            <% } %>
 
-	                            <% if (typeof buildVersionShort !== 'undefined' && buildVersionShort) { %>
-	                              <li class="p-2">
-	                                <button
-	                                  type="button"
-	                                  class="dropdown-item rounded py-2"
-	                                  data-bs-toggle="modal"
-	                                  data-bs-target="#aboutAppModal"
-	                                >
-	                                  <i class="bi bi-info-circle me-2 text-secondary"></i>About the app
-	                                </button>
-	                              </li>
-	                              <li><hr class="dropdown-divider m-0"></li>
-	                            <% } %>
+                            <li class="header-user-menu-divider" role="separator" aria-hidden="true"></li>
 
-	                            <li class="p-2">
-	                                 <a class="dropdown-item rounded py-2 text-danger fw-bold" href="/logout">
-	                                    <i class="bi bi-box-arrow-right me-2"></i> Sign Out
+                            <li class="header-user-menu-footer" role="none">
+                                <a class="header-user-menu-item header-user-menu-item--danger" href="/logout" role="menuitem">
+                                    <span class="header-user-menu-item-icon" aria-hidden="true"><i class="bi bi-box-arrow-right"></i></span>
+                                    <span class="header-user-menu-item-label">Sign Out</span>
                                 </a>
                             </li>
                         </ul>
@@ -486,53 +509,241 @@
         const aboutAppEnvironment = String(
           (typeof appEnvironment !== 'undefined' && appEnvironment) ? appEnvironment : 'development'
         ).trim();
+        const aboutAppName = String(headerBrand.appName || 'Website Core').trim();
+        const aboutAppShortName = String(headerBrand.appShortName || headerBrand.ownerDisplayName || 'Platform').trim();
+        const aboutAppSummaryTagline = String(headerTagline || headerBrand.tagline || 'Learn, work, and thrive in new places.').trim();
+        const aboutAppPlatformSummary = 'This workspace unifies day-to-day school work in one signed-in place: run classes and academic records, coordinate schedules and notifications, and communicate through organization-scoped chat. Permissions follow your active organization, and the system is built for clarity, traceability, and dependable use when real teams depend on it every day.';
+        const aboutAppNodeVersion = typeof process !== 'undefined' && process.version ? process.version : '';
+        const aboutAppPlatform = typeof process !== 'undefined' && process.platform ? process.platform : '';
+        const aboutBuildSourceRaw = (typeof buildVersionSource !== 'undefined' && buildVersionSource)
+          ? String(buildVersionSource).trim()
+          : '';
+        const aboutBuildSourceLabel = (() => {
+          if (!aboutBuildSourceRaw) return 'Unknown';
+          if (aboutBuildSourceRaw.includes('buildVersionOverride')) return 'Configured release label';
+          if (aboutBuildSourceRaw.startsWith('repo:')) return 'Repository build metadata';
+          if (aboutBuildSourceRaw.startsWith('env:')) return 'Deployment environment';
+          if (aboutBuildSourceRaw === 'git') return 'Git commit (local)';
+          return aboutBuildSourceRaw;
+        })();
+        const aboutCommitSourceRaw = (typeof buildVersionCommitAtSource !== 'undefined' && buildVersionCommitAtSource)
+          ? String(buildVersionCommitAtSource).trim()
+          : '';
+        const aboutRequestId = (typeof requestId !== 'undefined' && requestId) ? String(requestId).trim() : '';
+        let aboutAppActiveOrgLabel = '';
+        if (typeof user !== 'undefined' && user) {
+          const aboutOrgs = Array.isArray(user.allowedOrgs) ? user.allowedOrgs : [];
+          const aboutActiveOrg = aboutOrgs.find((org) => String(org?.orgId || '') === String(user.activeOrgId || ''));
+          if (aboutActiveOrg) {
+            aboutAppActiveOrgLabel = String(
+              aboutActiveOrg.name || aboutActiveOrg.orgName || aboutActiveOrg.organizationName || ''
+            ).trim();
+          } else if (user.activeOrgId) {
+            aboutAppActiveOrgLabel = `Organization ${user.activeOrgId}`;
+          } else {
+            aboutAppActiveOrgLabel = 'System / Global';
+          }
+        }
+        let aboutAppUptimeLabel = '';
+        const aboutStartedRaw = (typeof buildVersionStartedAt !== 'undefined' && buildVersionStartedAt)
+          ? String(buildVersionStartedAt).trim()
+          : '';
+        const aboutStartedLabelRaw = (typeof buildVersionStartedAtLabel !== 'undefined' && buildVersionStartedAtLabel)
+          ? String(buildVersionStartedAtLabel).trim()
+          : '';
+        const aboutStartedMs = Date.parse(aboutStartedRaw || aboutStartedLabelRaw);
+        if (!Number.isNaN(aboutStartedMs)) {
+          const uptimeMs = Math.max(0, Date.now() - aboutStartedMs);
+          const uptimeMinutes = Math.floor(uptimeMs / 60000);
+          const uptimeHours = Math.floor(uptimeMinutes / 60);
+          const uptimeDays = Math.floor(uptimeHours / 24);
+          if (uptimeDays > 0) {
+            aboutAppUptimeLabel = `${uptimeDays} day${uptimeDays === 1 ? '' : 's'}, ${uptimeHours % 24} hr`;
+          } else if (uptimeHours > 0) {
+            aboutAppUptimeLabel = `${uptimeHours} hr, ${uptimeMinutes % 60} min`;
+          } else {
+            aboutAppUptimeLabel = `${Math.max(uptimeMinutes, 1)} min`;
+          }
+        }
+        const aboutAppFeaturePills = [
+          'School operations',
+          'Academic ledger',
+          'Secure chat',
+          'Notifications',
+          'Scheduling',
+          'Reporting'
+        ];
+        const aboutSupportSnapshot = [
+          `App: ${aboutAppName}`,
+          `Build: ${buildVersionShort}`,
+          aboutAppEnvironment ? `Environment: ${aboutAppEnvironment}` : '',
+          aboutAppBackendMode ? `Backend: ${aboutAppBackendMode}${aboutAppBackendRecovery ? ' (recovery)' : ''}` : '',
+          (typeof buildVersionCommitAtLabel !== 'undefined' && buildVersionCommitAtLabel)
+            ? `Committed: ${buildVersionCommitAtLabel}`
+            : '',
+          (typeof buildVersionStartedAtLabel !== 'undefined' && buildVersionStartedAtLabel)
+            ? `Running since: ${buildVersionStartedAtLabel}`
+            : '',
+          aboutRequestId ? `Request: ${aboutRequestId}` : ''
+        ].filter(Boolean).join(' | ');
       %>
       <div class="modal fade" id="aboutAppModal" tabindex="-1" aria-labelledby="aboutAppModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content border-0 shadow-lg rounded-3">
-            <div class="modal-header bg-light border-bottom">
-              <h5 class="modal-title fw-bold text-dark mb-0" id="aboutAppModalLabel">
-                <i class="bi bi-info-circle me-2" aria-hidden="true"></i><%= headerBrand.appName || 'Website Core' %>
-              </h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable about-app-modal-dialog">
+          <div class="modal-content about-app-modal border-0">
+            <div class="about-app-modal-hero">
+              <div class="about-app-modal-hero-glow" aria-hidden="true"></div>
+              <div class="about-app-modal-hero-inner">
+                <div class="about-app-modal-brand">
+                  <div class="about-app-modal-logo-wrap">
+                    <img src="<%= headerLogoUrl %>" alt="" class="about-app-modal-logo" aria-hidden="true">
+                  </div>
+                  <div class="about-app-modal-brand-text">
+                    <p class="about-app-modal-eyebrow mb-1"><%= aboutAppShortName %></p>
+                    <h2 class="about-app-modal-title mb-0" id="aboutAppModalLabel"><%= aboutAppName %></h2>
+                    <p class="about-app-modal-tagline mb-0"><%= aboutAppSummaryTagline %></p>
+                  </div>
+                </div>
+                <button type="button" class="btn-close about-app-modal-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
             </div>
-            <div class="modal-body">
-              <% if (headerTagline) { %>
-                <p class="text-muted mb-3"><%= headerTagline %></p>
-              <% } %>
-              <dl class="row mb-0 small about-app-details">
-                <dt class="col-sm-4 text-muted">Build</dt>
-                <dd class="col-sm-8 mb-2"><code><%= buildVersionShort %></code></dd>
-                <% if (typeof buildVersionCommitAtLabel !== 'undefined' && buildVersionCommitAtLabel) { %>
-                  <dt class="col-sm-4 text-muted">Committed</dt>
-                  <dd class="col-sm-8 mb-2"><%= buildVersionCommitAtLabel %></dd>
-                <% } %>
-                <% if (typeof buildVersionStartedAtLabel !== 'undefined' && buildVersionStartedAtLabel) { %>
-                  <dt class="col-sm-4 text-muted">Running since</dt>
-                  <dd class="col-sm-8 mb-2"><%= buildVersionStartedAtLabel %></dd>
-                <% } %>
-                <% if (aboutAppBackendMode) { %>
-                  <dt class="col-sm-4 text-muted">Data backend</dt>
-                  <dd class="col-sm-8 mb-2">
-                    <%= aboutAppBackendMode %>
+
+            <div class="modal-body about-app-modal-body">
+              <section class="about-app-modal-summary" aria-labelledby="aboutAppSummaryHeading">
+                <div class="about-app-modal-summary-icon" aria-hidden="true">
+                  <i class="bi bi-stars"></i>
+                </div>
+                <div>
+                  <h3 class="about-app-modal-summary-title" id="aboutAppSummaryHeading">What this platform delivers</h3>
+                  <p class="about-app-modal-summary-text mb-0"><%= aboutAppPlatformSummary %></p>
+                </div>
+              </section>
+
+              <div class="about-app-modal-pills" aria-label="Platform capabilities">
+                <% aboutAppFeaturePills.forEach((pill) => { %>
+                  <span class="about-app-modal-pill"><%= pill %></span>
+                <% }); %>
+              </div>
+
+              <div class="about-app-modal-stats">
+                <article class="about-app-modal-stat">
+                  <span class="about-app-modal-stat-label">Build</span>
+                  <strong class="about-app-modal-stat-value"><code><%= buildVersionShort %></code></strong>
+                  <span class="about-app-modal-stat-meta"><%= aboutBuildSourceLabel %></span>
+                </article>
+                <article class="about-app-modal-stat">
+                  <span class="about-app-modal-stat-label">Environment</span>
+                  <strong class="about-app-modal-stat-value"><%= aboutAppEnvironment %></strong>
+                  <% if (aboutAppNodeVersion) { %>
+                    <span class="about-app-modal-stat-meta">Node <%= aboutAppNodeVersion %><% if (aboutAppPlatform) { %> · <%= aboutAppPlatform %><% } %></span>
+                  <% } %>
+                </article>
+                <article class="about-app-modal-stat">
+                  <span class="about-app-modal-stat-label">Data backend</span>
+                  <strong class="about-app-modal-stat-value">
+                    <%= aboutAppBackendMode || '—' %>
                     <% if (aboutAppBackendRecovery) { %>
-                      <span class="badge text-bg-warning ms-1">recovery</span>
+                      <span class="badge rounded-pill about-app-modal-badge-warn ms-1">Recovery</span>
                     <% } %>
-                  </dd>
-                <% } %>
-                <% if (aboutAppEnvironment) { %>
-                  <dt class="col-sm-4 text-muted">Environment</dt>
-                  <dd class="col-sm-8 mb-2"><%= aboutAppEnvironment %></dd>
-                <% } %>
-              </dl>
-              <p class="small text-muted mb-0 mt-3">
-                Build info helps support diagnose which version is running.
-                <a href="/about" class="ms-1">Learn more</a>
-              </p>
+                  </strong>
+                  <span class="about-app-modal-stat-meta"><%= aboutAppBackendRecovery ? 'Fallback storage active' : 'Primary storage path' %></span>
+                </article>
+                <article class="about-app-modal-stat">
+                  <span class="about-app-modal-stat-label">Process uptime</span>
+                  <strong class="about-app-modal-stat-value"><%= aboutAppUptimeLabel || '—' %></strong>
+                  <% if (typeof buildVersionStartedAtLabel !== 'undefined' && buildVersionStartedAtLabel) { %>
+                    <span class="about-app-modal-stat-meta">Since <%= buildVersionStartedAtLabel %></span>
+                  <% } %>
+                </article>
+              </div>
+
+              <section class="about-app-modal-details" aria-labelledby="aboutAppDetailsHeading">
+                <h3 class="about-app-modal-details-title" id="aboutAppDetailsHeading">Runtime details</h3>
+                <dl class="about-app-modal-spec about-app-details">
+                  <% if (typeof buildVersionCommitAtLabel !== 'undefined' && buildVersionCommitAtLabel) { %>
+                    <div class="about-app-modal-spec-row">
+                      <dt>Committed</dt>
+                      <dd>
+                        <%= buildVersionCommitAtLabel %>
+                        <% if (aboutCommitSourceRaw) { %>
+                          <span class="about-app-modal-spec-note"><%= aboutCommitSourceRaw.replace(/^repo:|^env:/, '') %></span>
+                        <% } %>
+                      </dd>
+                    </div>
+                  <% } %>
+                  <% if (typeof buildVersionStartedAtLabel !== 'undefined' && buildVersionStartedAtLabel) { %>
+                    <div class="about-app-modal-spec-row">
+                      <dt>Running since</dt>
+                      <dd><%= buildVersionStartedAtLabel %></dd>
+                    </div>
+                  <% } %>
+                  <% if (aboutAppActiveOrgLabel) { %>
+                    <div class="about-app-modal-spec-row">
+                      <dt>Active organization</dt>
+                      <dd><%= aboutAppActiveOrgLabel %></dd>
+                    </div>
+                  <% } %>
+                  <% if (aboutRequestId) { %>
+                    <div class="about-app-modal-spec-row">
+                      <dt>Request ID</dt>
+                      <dd><code class="about-app-modal-mono"><%= aboutRequestId %></code></dd>
+                    </div>
+                  <% } %>
+                </dl>
+              </section>
+            </div>
+
+            <div class="modal-footer about-app-modal-footer border-0">
+              <button
+                type="button"
+                class="btn btn-outline-secondary about-app-modal-copy-btn"
+                id="aboutAppCopySupportBtn"
+                data-about-copy="<%= aboutSupportSnapshot %>"
+              >
+                <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>Copy support snapshot
+              </button>
+              <a href="/about" class="btn btn-primary about-app-modal-cta">
+                Explore the full story <i class="bi bi-arrow-up-right ms-1" aria-hidden="true"></i>
+              </a>
             </div>
           </div>
         </div>
       </div>
+      <script>
+        (function initAboutAppModalCopy() {
+          const btn = document.getElementById('aboutAppCopySupportBtn');
+          if (!btn || btn.dataset.aboutCopyBound === '1') return;
+          btn.dataset.aboutCopyBound = '1';
+          btn.addEventListener('click', async function onCopySupportSnapshot() {
+            const text = String(btn.getAttribute('data-about-copy') || '').trim();
+            if (!text) return;
+            const original = btn.innerHTML;
+            try {
+              if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(text);
+              } else {
+                const area = document.createElement('textarea');
+                area.value = text;
+                area.setAttribute('readonly', '');
+                area.style.position = 'absolute';
+                area.style.left = '-9999px';
+                document.body.appendChild(area);
+                area.select();
+                document.execCommand('copy');
+                document.body.removeChild(area);
+              }
+              btn.innerHTML = '<i class="bi bi-check2 me-1" aria-hidden="true"></i>Copied';
+              window.setTimeout(function restoreAboutCopyBtn() {
+                btn.innerHTML = original;
+              }, 1800);
+            } catch (_) {
+              btn.innerHTML = '<i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Copy failed';
+              window.setTimeout(function restoreAboutCopyBtn() {
+                btn.innerHTML = original;
+              }, 1800);
+            }
+          });
+        })();
+      </script>
     <% } %>
 
     <style>
