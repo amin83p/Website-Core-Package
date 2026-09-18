@@ -420,15 +420,32 @@ document.addEventListener('DOMContentLoaded', function () {
     }).join('') + '</dl>';
   }
 
-  function renderTable(headers, rows, rowRenderer) {
+  function renderTable(headers, rows, rowRenderer, emptyHint) {
     if (!rows.length) {
-      return '<div class="text-muted small py-3 text-center">No records found.</div>';
+      const hint = String(emptyHint || '').trim();
+      return '<div class="text-muted small py-3 text-center">No records found.'
+        + (hint ? '<div class="mt-1">' + escapeHtml(hint) + '</div>' : '')
+        + '</div>';
     }
     return '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr>'
       + headers.map(function (header) { return '<th>' + escapeHtml(header) + '</th>'; }).join('')
       + '</tr></thead><tbody>'
       + rows.map(rowRenderer).join('')
       + '</tbody></table></div>';
+  }
+
+  function renderOverviewExternalLink(url, label) {
+    const href = String(url || '').trim();
+    if (!href) return '<span class="text-muted">—</span>';
+    return '<a href="' + escapeHtml(href) + '" class="small text-decoration-none" target="_blank" rel="noopener noreferrer">'
+      + escapeHtml(label || 'Open') + ' <i class="bi bi-box-arrow-up-right"></i></a>';
+  }
+
+  function renderOverviewSectionHeader(title, url, linkLabel) {
+    return '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">'
+      + '<div class="fw-bold">' + escapeHtml(title) + '</div>'
+      + '<div>' + renderOverviewExternalLink(url, linkLabel) + '</div>'
+      + '</div>';
   }
 
   function renderTermRegistrationModal(payload) {
@@ -512,27 +529,43 @@ document.addEventListener('DOMContentLoaded', function () {
       + '<div class="small text-muted">Final: ' + formatValue(gradebook.finalPercent != null ? gradebook.finalPercent + '%' : '-') + '</div>'
       + '</div></div></div></div>';
 
-    const attendanceHtml = '<div class="fw-bold mb-2">Attendance History</div>'
+    const matrixLinks = payload.matrixLinks || {};
+    const attendanceRows = Array.isArray(payload.attendanceHistory) ? payload.attendanceHistory : [];
+    const gradebookActivities = Array.isArray(gradebook.activities) ? gradebook.activities : [];
+
+    const attendanceHtml = renderOverviewSectionHeader(
+      'Attendance History',
+      matrixLinks.attendanceMatrixUrl,
+      'Open in Attendance Matrix'
+    )
       + renderTable(
         ['Date', 'Status', 'Late Min', 'Early Leave Min'],
-        Array.isArray(payload.attendanceHistory) ? payload.attendanceHistory : [],
+        attendanceRows,
         function (row) {
           return '<tr><td>' + formatValue(row.date) + '</td><td>' + formatValue(row.status) + '</td>'
             + '<td>' + formatValue(row.lateMinutes) + '</td><td>' + formatValue(row.earlyLeaveMinutes) + '</td></tr>';
-        }
+        },
+        matrixLinks.attendanceMatrixUrl ? 'Open the attendance matrix for the full roster view.' : ''
       );
 
-    const gradebookHtml = '<div class="fw-bold mb-2 mt-4">Gradebook History</div>'
+    const gradebookHtml = '<div class="mt-4">'
+      + renderOverviewSectionHeader(
+        'Gradebook History',
+        matrixLinks.gradesMatrixUrl,
+        'Open in Grades Matrix'
+      )
       + renderTable(
         ['Date', 'Activity', 'Score', 'Percent', 'Attendance'],
-        Array.isArray(gradebook.activities) ? gradebook.activities : [],
+        gradebookActivities,
         function (row) {
           return '<tr><td>' + formatValue(row.date) + '</td><td>' + formatValue(row.label) + '</td>'
             + '<td>' + formatValue(row.score) + (row.totalScore != null ? ' / ' + escapeHtml(row.totalScore) : '') + '</td>'
             + '<td>' + formatValue(row.percent != null ? row.percent + '%' : '-') + '</td>'
             + '<td>' + formatValue(row.attendanceStatus) + '</td></tr>';
-        }
-      );
+        },
+        matrixLinks.gradesMatrixUrl ? 'Open the grades matrix for the full class view.' : ''
+      )
+      + '</div>';
 
     const relatedHtml = '<div class="fw-bold mb-2 mt-4">Related Academic Records</div>'
       + renderTable(

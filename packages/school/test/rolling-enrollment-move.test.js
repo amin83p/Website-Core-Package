@@ -277,7 +277,7 @@ test('previewMoveEnrollment succeeds for valid cross-class move payload', async 
   }
 });
 
-test('previewMoveEnrollment rejects same-class target', async () => {
+test('previewMoveEnrollment allows same-class target for close-and-re-enroll', async () => {
   const mocks = buildMocks();
   enrollmentMoveService.__setDependenciesForTest(mocks);
   try {
@@ -292,8 +292,7 @@ test('previewMoveEnrollment rejects same-class target', async () => {
       reqUser: { id: 'USR_1' },
       orgId: 'ORG_001'
     });
-    assert.equal(preview.canApply, false);
-    assert.match(preview.blockers[0].message, /different from the current class/i);
+    assert.equal(preview.blockers.some((row) => row.code === 'SAME_CLASS'), false);
   } finally {
     enrollmentMoveService.__resetDependenciesForTest();
   }
@@ -434,7 +433,8 @@ test('rolling enrollment view wires move menu and modal', () => {
   assert.match(viewSource, /id="move_status"/);
   assert.match(viewSource, /id="move_sessionCapacityType"/);
   assert.match(viewSource, /id="move_claimNumber"/);
-  assert.match(viewSource, /value="Moved" readonly/);
+  assert.match(viewSource, /Move\/New Enrollment/);
+  assert.match(viewSource, /Completed \(moved\)/);
   assert.match(viewSource, /targetStatus: 'completed'/);
   assert.match(viewSource, /function formatMoveScheduleConflictLines/);
   assert.match(viewSource, /scheduleConflicts/);

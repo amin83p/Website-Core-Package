@@ -3153,3 +3153,5 @@ a .spinner-border.spinner-border-sm,
     text-align: left;
   }
 }
+
+@import url('pages/error.css');

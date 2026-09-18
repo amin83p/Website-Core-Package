@@ -56,15 +56,19 @@ function normalizeScopeMode(scopeId) {
   return chatContactScopeService.normalizeChatScopeMode(scopeId) || '';
 }
 
+function parseProfileLimitNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 function getUpdateLimits(scopeId, profileLimits = {}) {
   const mode = normalizeScopeMode(scopeId) || 'owner';
   const defaults = DEFAULT_UPDATE_LIMITS[mode] || DEFAULT_UPDATE_LIMITS[''];
-  const maxMessages = Number.isFinite(Number(profileLimits?.maxAttempts))
-    ? Number(profileLimits.maxAttempts)
-    : defaults.maxMessages;
-  const maxFileSizeKB = Number.isFinite(Number(profileLimits?.maxVolumeKB))
-    ? Number(profileLimits.maxVolumeKB)
-    : defaults.maxFileSizeKB;
+  const attempts = parseProfileLimitNumber(profileLimits?.maxAttempts);
+  const volumeKb = parseProfileLimitNumber(profileLimits?.maxVolumeKB);
+  const maxMessages = attempts === null ? defaults.maxMessages : Math.max(0, Math.floor(attempts));
+  const maxFileSizeKB = volumeKb === null ? defaults.maxFileSizeKB : Math.max(0, Math.floor(volumeKb));
   return {
     maxMessages: maxMessages == null ? null : Math.max(0, Math.floor(maxMessages)),
     maxFileSizeKB: maxFileSizeKB == null ? null : Math.max(0, Math.floor(maxFileSizeKB)),
@@ -201,7 +205,9 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     updateScopeId: update.scopeId || null,
     deleteScopeId: del.scopeId || deleteAll.scopeId || null,
     downloadScopeId: download.scopeId || null,
-    updateLimits: getUpdateLimits(update.scopeId, update.limits || {}),
+    updateLimits: adminFlags.update
+      ? { maxMessages: null, maxFileSizeKB: null, scopeMode: 'global' }
+      : getUpdateLimits(update.scopeId, update.limits || {}),
     canUse: Boolean(
       canReadInbox || canReadMessageContent || canCreate || canUpdate
       || canDelete || canDeleteAll || canBroadcast || canDownloadFile || canManageConversationList
@@ -209,9 +215,13 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
   };
 }
 
-async function filterConversationsForReviewList(user, conversations = [], scopeId) {
+async function filterConversationsForReviewList(user, conversations = [], scopeId, options = {}) {
   const rows = Array.isArray(conversations) ? conversations.filter(Boolean) : [];
   if (!rows.length) return [];
+
+  if (options.adminBypass === true) {
+    return rows;
+  }
 
   const mode = normalizeScopeMode(scopeId);
   if (mode === 'global') return rows;
@@ -227,7 +237,10 @@ async function filterConversationsForReviewList(user, conversations = [], scopeI
   return filtered;
 }
 
-async function canReviewConversation(user, conversation, scopeId) {
+async function canReviewConversation(user, conversation, scopeId, options = {}) {
+  if (options.adminBypass === true) {
+    return { allowed: true, scopeMode: 'global' };
+  }
   const mode = normalizeScopeMode(scopeId);
   if (mode === 'global') {
     return { allowed: true, scopeMode: mode };
@@ -249,8 +262,12 @@ async function assertUpdateWithinLimits({
   limits = {},
   pendingCount = 1,
   fileSizeBytes = 0,
-  countSentMessages
+  countSentMessages,
+  adminBypass = false
 } = {}) {
+  if (adminBypass === true) {
+    return { allowed: true, limits: getUpdateLimits(scopeId, limits), adminBypass: true };
+  }
   const updateLimits = getUpdateLimits(scopeId, limits);
   if (updateLimits.maxFileSizeKB != null && fileSizeBytes > 0) {
     const maxBytes = updateLimits.maxFileSizeKB * 1024;

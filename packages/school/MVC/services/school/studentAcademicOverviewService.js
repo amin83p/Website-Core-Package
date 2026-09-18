@@ -115,6 +115,14 @@ function buildRegistrationSummary(period, registrationMeta, termRowById) {
   return [status, startDate].filter(Boolean).join(' · ') || registrationMeta.registrationLabel;
 }
 
+function resolveClassTeacherName(classData = {}) {
+  const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
+  const primary = instructors.find((row) => row && (row.primary === true || row.isPrimary === true))
+    || instructors[0]
+    || null;
+  return String(primary?.name || primary?.displayName || '').trim();
+}
+
 function buildEnrollmentDetailApiUrl(studentId, enrollmentId) {
   const normalizedStudentId = toPublicId(studentId);
   const normalizedEnrollmentId = toPublicId(enrollmentId);
@@ -155,6 +163,7 @@ async function buildClassEnrollmentRows({
         enrollmentId: period.id,
         classId,
         classTitle: String(classRow?.title || classId || '').trim(),
+        teacherName: resolveClassTeacherName(classRow),
         subjectLabel: resolveClassSubjectLabel(classRow, subjectMap),
         programId,
         programLabel: buildProgramLabel(program, programId),
@@ -246,6 +255,7 @@ module.exports = {
   buildStudentAcademicOverview,
   buildClassEnrollmentRows,
   buildEnrollmentDetailApiUrl,
+  resolveClassTeacherName,
   resolveRegistrationSource,
   registrationSortRank,
   sortRegistrationRows

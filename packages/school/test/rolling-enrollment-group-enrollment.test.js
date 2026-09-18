@@ -15,6 +15,10 @@ const routesSource = fs.readFileSync(
   path.join(__dirname, '../MVC/routes/classRoutes.js'),
   'utf8'
 );
+const rollingControllerSource = fs.readFileSync(
+  path.join(__dirname, '../MVC/controllers/school/classRollingEnrollmentController.js'),
+  'utf8'
+);
 
 test('rolling enrollment view includes group enrollment entry and modals', () => {
   assert.match(viewSource, /id="btn_openGroupEnrollmentModal"/);
@@ -279,12 +283,34 @@ test('rolling enrollment student name supports context menu and claim number man
   assert.match(viewSource, /function openRollingStudentEmailsModal\(/);
   assert.match(viewSource, /function openRollingStudentGenderModal\(/);
   assert.match(viewSource, /Manage Claim Numbers/);
-  assert.match(viewSource, /id="rollingStudentClaimNumbersModal"/);
+  assert.match(viewSource, /studentClaimNumbersModal/);
+  assert.match(viewSource, /#rollingStudentClaimNumbersModal/);
+  assert.match(viewSource, /Academic Timeline/);
+  assert.match(viewSource, /id="rollingStudentContextMenuAcademicTimeline"/);
+  assert.match(viewSource, /Student Attendance Report/);
+  assert.match(viewSource, /id="rollingStudentContextMenuAttendanceReport"/);
+  assert.match(viewSource, /canOpenStudentAttendanceReport/);
+  assert.match(viewSource, /function buildRollingStudentAttendanceReportUrl\(/);
+  assert.match(viewSource, /function openRollingStudentAttendanceReportTab\(/);
+  assert.match(viewSource, /\/school\/attendances\/report/);
+  assert.match(viewSource, /searchParams\.set\('studentIds'/);
+  assert.match(viewSource, /window\.open\(reportUrl, '_blank', 'noopener,noreferrer'\)/);
+  assert.match(rollingControllerSource, /canOpenStudentAttendanceReport:/);
+  assert.match(rollingControllerSource, /buildAttendanceReportAccess\(req\.user, req\.ip\)\)\.canOpenReport/);
+  assert.match(viewSource, /id="rollingStudentAcademicTimelineModal"/);
+  assert.match(viewSource, /canViewStudentAcademicOverview/);
+  assert.match(viewSource, /student-overview\/\$\{encodeURIComponent\(sid\)\}\/data/);
+  assert.match(viewSource, /function openEnrollmentDetailByIds\(/);
+  assert.match(viewSource, /renderEnrollmentDetailSectionHeader/);
+  assert.match(viewSource, /Open in Attendance Matrix/);
+  assert.match(viewSource, /Open in Grades Matrix/);
+  assert.match(viewSource, /matrixLinks\.attendanceMatrixUrl/);
+  assert.match(viewSource, /Teacher<\/th>/);
   assert.match(viewSource, /async function openRollingStudentClaimNumbersModal\(/);
   assert.match(viewSource, /function refreshClaimNumberSelect\(/);
   assert.match(viewSource, /CLAIM_NUMBER_ADD_NEW/);
   assert.match(viewSource, /readClaimNumberSelectValue\(/);
-  assert.match(viewSource, /\/school\/students\/api\/\$\{encodeURIComponent\(studentId\)\}\/claim-numbers/);
+  assert.match(viewSource, /StudentClaimNumbersManager/);
   assert.match(viewSource, /personProfileEditModal/);
   assert.match(viewSource, /focus: 'phones'/);
   assert.match(viewSource, /focus: 'addresses'/);
@@ -309,6 +335,7 @@ test('rolling enrollment student column shows gender above name and id below', (
   assert.match(viewSource, /studentDisplay\.gender/);
   assert.match(controllerSource, /studentGender/);
   assert.match(controllerSource, /resolveStudentGenderToken/);
+  assert.match(controllerSource, /canViewStudentAcademicOverview/);
 });
 
 test('edit enrollment modal gates waiting list and to be confirmed by attendance markings', () => {

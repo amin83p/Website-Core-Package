@@ -1,118 +1,140 @@
-<div class="d-flex align-items-center justify-content-center ">
+<%
+  const loginBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+  const loginLogoUrl = loginBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
+  const loginAppName = loginBrand.appName || 'Amin Paknejad';
+  const loginTagline = loginBrand.tagline || 'Learn, work, and thrive in new places.';
+  const loginLogoAlt = loginBrand.footerLogoAlt || loginBrand.ownerDisplayName || loginAppName;
+%>
 
-  <div class="bg-light rounded-4 p-4 p-md-5" style="width: 100%; max-width: 950px;">
-    
-    <div class="card border-0 shadow-lg overflow-hidden" 
-         style="border-radius: 16px; animation: slideUp 0.5s ease-out;">
-      
-      <div class="row g-0">
-        
-        <div class="col-md-6 d-none d-md-flex flex-column align-items-center justify-content-center p-4 text-white text-center"
-             style="background: linear-gradient(135deg, var(--color-primary) 0%, #0d47a1 100%);">
-          
-          <div class="mb-4 rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center" 
-               style="width: 80px; height: 80px; backdrop-filter: blur(5px);">
-             <i class="bi bi-shield-lock-fill fs-2 text-white"></i>
+<div class="login-scene">
+  <div class="login-card">
+    <aside class="login-hero">
+      <div class="login-hero-inner">
+        <div class="login-logo-shell">
+          <span class="login-logo-ring" aria-hidden="true"></span>
+          <div class="login-logo-frame">
+            <img
+              src="<%= loginLogoUrl %>"
+              alt="<%= loginLogoAlt %>"
+              class="login-hero-logo"
+              onerror="this.closest('.login-logo-frame').classList.add('d-none')"
+            >
           </div>
-          
-          <h3 class="fw-bold mb-2">Secure Access</h3>
-          <p class="text-white text-opacity-75 small mx-3">
-            Welcome to your workspace.<br>Please verify your identity.
-          </p>
+        </div>
+        <p class="login-hero-eyebrow"><i class="bi bi-stars"></i> Welcome back</p>
+        <h1 class="login-hero-title"><%= loginAppName %></h1>
+        <p class="login-hero-tagline"><%= loginTagline %></p>
+        <ul class="login-hero-features">
+          <li><i class="bi bi-shield-lock-fill"></i><span>Secure sign-in with session protection and optional CAPTCHA.</span></li>
+          <li><i class="bi bi-grid-1x2-fill"></i><span>One workspace for classes, reports, and your organization tools.</span></li>
+          <li><i class="bi bi-lightning-charge-fill"></i><span>Pick up where you left off across devices.</span></li>
+        </ul>
+      </div>
+    </aside>
+
+    <section class="login-panel">
+      <div class="login-panel-mobile-brand">
+        <img src="<%= loginLogoUrl %>" alt="<%= loginLogoAlt %>" class="login-mobile-logo">
+        <div class="fw-bold text-dark"><%= loginAppName %></div>
+      </div>
+
+      <header class="login-panel-header">
+        <h2>Sign in</h2>
+        <p>Enter your credentials to access your account.</p>
+      </header>
+
+      <form id="loginForm">
+        <div class="mb-3">
+          <label class="form-label" for="loginUsername">Username</label>
+          <div class="input-group">
+            <span class="input-group-text border-end-0 ps-3">
+              <i class="bi bi-person"></i>
+            </span>
+            <input
+              type="text"
+              id="loginUsername"
+              name="username"
+              class="form-control size-md border-start-0"
+              placeholder="Username or email"
+              required
+              autofocus
+              autocomplete="username"
+            >
+          </div>
         </div>
 
-        <div class="col-md-6 bg-white p-4">
-          
-          <div class="d-flex align-items-center mb-4">
-              <div class="d-md-none me-3 text-primary">
-                  <i class="bi bi-shield-lock-fill fs-2"></i>
-              </div>
-              <div>
-                  <h4 class="fw-bold text-dark mb-0">Login</h4>
-                  <p class="text-muted small mb-0">Enter your credentials</p>
-              </div>
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center gap-2">
+            <label class="form-label mb-0" for="loginPassword">Password</label>
+            <a href="/password-reset" class="small text-decoration-none fw-semibold text-primary">Forgot password?</a>
           </div>
+          <div class="input-group mt-1">
+            <span class="input-group-text border-end-0 ps-3">
+              <i class="bi bi-key"></i>
+            </span>
+            <input
+              type="password"
+              id="loginPassword"
+              name="password"
+              class="form-control size-md border-start-0"
+              placeholder="••••••••"
+              required
+              autocomplete="current-password"
+            >
+          </div>
+        </div>
 
-          <form id="loginForm">
-            
-            <div class="mb-3">
-              <label class="form-label x-small fw-bold text-secondary text-uppercase">Username</label>
-              <div class="input-group">
-                <span class="input-group-text bg-light border-end-0 ps-3 text-muted">
-                  <i class="bi bi-person"></i>
-                </span>
-                <input type="text" name="username" class="form-control size-md bg-light border-start-0" 
-                       placeholder="Username" required autofocus autocomplete="username" style="height: 45px;">
+        <div id="captchaContainer" class="mb-4 d-none login-fade-in">
+          <label class="form-label text-danger">Security check</label>
+          <div class="login-captcha-card p-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="border rounded bg-white overflow-hidden" style="height: 50px;">
+                <img id="captchaImage" src="" alt="CAPTCHA" style="height: 100%; width: auto;">
               </div>
-            </div>
-
-            <div class="mb-4">
-              <div class="d-flex justify-content-between">
-                  <label class="form-label x-small fw-bold text-secondary text-uppercase">Password</label>
-                  <a href="/password-reset" class="small text-decoration-none fw-semibold text-primary">Forgot password?</a>
-              </div>
-              <div class="input-group">
-                <span class="input-group-text bg-light border-end-0 ps-3 text-muted">
-                  <i class="bi bi-key"></i>
-                </span>
-                <input type="password" name="password" class="form-control size-md bg-light border-start-0" 
-                       placeholder="••••••••" required autocomplete="current-password" style="height: 45px;">
-              </div>
-            </div>
-
-            <div id="captchaContainer" class="mb-4 d-none" style="animation: fadeIn 0.3s ease;">
-               <label class="form-label x-small fw-bold text-danger text-uppercase">Security Check</label>
-               <div class="card bg-light border-0 p-3">
-                  <div class="d-flex align-items-center justify-content-between mb-2">
-                      <div class="border rounded bg-white overflow-hidden" style="height: 50px;">
-                          <img id="captchaImage" src="" alt="CAPTCHA" style="height: 100%; width: auto;">
-                      </div>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshCaptcha()" title="Refresh Image">
-                          <i class="bi bi-arrow-clockwise"></i>
-                      </button>
-                  </div>
-                  <input type="text" name="captcha" id="captchaInput" class="form-control text-center fw-bold letter-spacing-2" 
-                         placeholder="Enter Code" maxlength="6" autocomplete="off">
-               </div>
-            </div>
-
-            <div class="d-grid mb-4">
-              <button type="submit" class="btn btn-primary btn-filled py-2 shadow-sm fw-bold">
-                Sign In
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshCaptcha()" title="Refresh image">
+                <i class="bi bi-arrow-clockwise"></i>
               </button>
             </div>
-
-            <% if (typeof microsoftAuthEnabled !== 'undefined' && microsoftAuthEnabled) { %>
-              <div class="d-flex align-items-center gap-2 mb-3">
-                <div class="border-top flex-grow-1"></div>
-                <span class="text-muted small">or</span>
-                <div class="border-top flex-grow-1"></div>
-              </div>
-              <div class="d-grid mb-4">
-                <a href="/auth/microsoft" class="btn btn-outline-secondary py-2 fw-semibold">
-                  <i class="bi bi-microsoft me-2"></i>Continue with Microsoft
-                </a>
-              </div>
-            <% } %>
-
-            <div class="text-center border-top pt-3">
-               <a href="/" class="text-decoration-none text-muted small me-3">Cancel</a>
-               <span class="text-muted small">|</span>
-               <a href="persons/join" class="text-decoration-none fw-bold text-primary small ms-3">Create Account</a>
-            </div>
-
-          </form>
+            <input
+              type="text"
+              name="captcha"
+              id="captchaInput"
+              class="form-control text-center fw-bold login-letter-spacing"
+              placeholder="Enter code"
+              maxlength="6"
+              autocomplete="off"
+            >
+          </div>
         </div>
 
-      </div>
-    </div>
-  
-  </div> </div>
+        <div class="d-grid mb-3">
+          <button type="submit" class="btn btn-primary btn-filled login-submit-btn">
+            Sign in
+          </button>
+        </div>
+
+        <% if (typeof microsoftAuthEnabled !== 'undefined' && microsoftAuthEnabled) { %>
+          <div class="login-divider" role="presentation"><span>or continue with</span></div>
+          <div class="d-grid mb-3">
+            <a href="/auth/microsoft" class="btn btn-outline-secondary py-2 fw-semibold">
+              <i class="bi bi-microsoft me-2"></i>Microsoft
+            </a>
+          </div>
+        <% } %>
+
+        <div class="login-footer-links">
+          <a href="/" class="text-muted">Cancel</a>
+          <span class="text-muted mx-2">·</span>
+          <a href="/persons/join" class="fw-bold text-primary">Create account</a>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
 
 <script id="microsoftSessionLimitJson" type="application/json"><%- JSON.stringify((typeof microsoftSessionLimit !== 'undefined' && microsoftSessionLimit) ? microsoftSessionLimit : null).replace(/</g, '\\u003c') %></script>
 
 <script>
-// 1. CAPTCHA LOGIC
 function refreshCaptcha() {
     const img = document.getElementById('captchaImage');
     img.src = '/captcha?' + Date.now();
@@ -122,14 +144,14 @@ function refreshCaptcha() {
 function showCaptcha() {
     const container = document.getElementById('captchaContainer');
     const input = document.getElementById('captchaInput');
-    
+
     if (container.classList.contains('d-none')) {
         container.classList.remove('d-none');
         refreshCaptcha();
         input.setAttribute('required', 'true');
     }
-    container.classList.add('shake-element');
-    setTimeout(() => container.classList.remove('shake-element'), 500);
+    container.classList.add('login-shake-element');
+    setTimeout(() => container.classList.remove('login-shake-element'), 500);
 }
 
 function parseJsonScript(id, fallback) {
@@ -221,7 +243,6 @@ function showSessionLimitModal(result) {
     });
 }
 
-// 2. GLOBAL HANDLERS
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('warning') && typeof showMessageModal === 'function') {
@@ -235,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 3. LOGIN SUBMISSION
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('loginForm');
 
@@ -243,16 +263,15 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const btn = form.querySelector('button[type="submit"]');
     const originalText = btn.innerHTML;
-    
+
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Checking...';
 
-    // Gather Data
     const payload = {
         username: form.querySelector('input[name="username"]').value,
         password: form.querySelector('input[name="password"]').value
     };
-    
+
     const captchaVal = document.getElementById('captchaInput').value;
     if (!document.getElementById('captchaContainer').classList.contains('d-none')) {
         payload.captcha = captchaVal;
@@ -262,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
       const response = await fetch('/login', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-AJAX-Request': 'true',
           'csrf-token': csrfToken
@@ -275,8 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (response.ok) {
         window.location.href = result.redirectUrl || '/dashboard';
       } else {
-        
-        // A. CAPTCHA REQUIRED
         if (result.status === 'captcha_required') {
             showCaptcha();
             showMessageModal({
@@ -287,11 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
               buttons: [{ text: "OK", class: "btn-secondary" }]
             });
         }
-        // B. SESSION LIMIT
         else if (result.status === 'session_limit_exceeded' && result.activeSessions) {
              showSessionLimitModal(result);
-        } 
-        // C. STANDARD ERROR
+        }
         else {
             showMessageModal({
               title: 'Login Failed',
@@ -342,7 +357,7 @@ window.killSessionAndLogin = async function(sessionId, authProvider = 'password'
         const res = await fetch('/force-login', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
               'X-AJAX-Request': 'true',
               'csrf-token': csrfToken
@@ -371,17 +386,3 @@ window.killSessionAndLogin = async function(sessionId, authProvider = 'password'
     }
 };
 </script>
-
-<style>
-@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-.shake-element { animation: shake 0.5s; }
-@keyframes shake {
-  0% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  50% { transform: translateX(5px); }
-  75% { transform: translateX(-5px); }
-  100% { transform: translateX(0); }
-}
-.letter-spacing-2 { letter-spacing: 3px; }
-.x-small { font-size: 0.75rem; }
-</style>

@@ -3,12 +3,17 @@ const assert = require('node:assert/strict');
 
 const {
   resolveRegistrationSource,
-  buildEnrollmentDetailApiUrl
+  buildEnrollmentDetailApiUrl,
+  resolveClassTeacherName
 } = require('../MVC/services/school/studentAcademicOverviewService');
 const {
   buildTermRegistrationModalPayload,
   buildGradebookActivities,
-  buildAttendanceHistoryFromMatrix
+  buildAttendanceHistoryFromMatrix,
+  buildAttendanceHistoryFromAttendanceRecords,
+  findMatrixRowForStudent,
+  buildEnrollmentMatrixLinks,
+  resolveAttendanceHistoryForMatrixRow
 } = require('../MVC/services/school/studentEnrollmentDetailService');
 
 test('resolveRegistrationSource detects term registration from enrollmentSource', () => {
@@ -63,9 +68,37 @@ test('resolveRegistrationSource defaults to class enrollment', () => {
   assert.equal(result.registrationLabel, 'Class Enrollment');
 });
 
+test('resolveClassTeacherName prefers primary instructor', () => {
+  const name = resolveClassTeacherName({
+    instructors: [
+      { name: 'Secondary', isPrimary: false },
+      { displayName: 'Primary Teacher', primary: true }
+    ]
+  });
+  assert.equal(name, 'Primary Teacher');
+});
+
+test('resolveClassTeacherName falls back to first instructor', () => {
+  const name = resolveClassTeacherName({
+    instructors: [{ name: 'Only Teacher' }]
+  });
+  assert.equal(name, 'Only Teacher');
+});
+
 test('buildEnrollmentDetailApiUrl encodes student and enrollment ids', () => {
   const url = buildEnrollmentDetailApiUrl('STU/1', 'CEP:9');
   assert.equal(url, '/school/academic-ledger/student-overview/STU%2F1/enrollment-detail/CEP%3A9');
+});
+
+test('academic ledger exposes student overview data API', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const routes = fs.readFileSync(path.join(__dirname, '../MVC/routes/academicLedgerRoutes.js'), 'utf8');
+  const controller = fs.readFileSync(path.join(__dirname, '../MVC/controllers/school/academicLedgerController.js'), 'utf8');
+  assert.match(routes, /student-overview\/:studentId\/data/);
+  assert.match(routes, /getStudentOverviewData/);
+  assert.match(controller, /exports\.getStudentOverviewData/);
+  assert.match(controller, /buildStudentAcademicOverview/);
 });
 
 test('buildTermRegistrationModalPayload condenses linked class enrollment', () => {
@@ -136,4 +169,65 @@ test('buildAttendanceHistoryFromMatrix deduplicates by session', () => {
   assert.equal(rows.length, 2);
   assert.equal(rows[0].sessionId, 'SES-1');
   assert.equal(rows[1].status, 'absent');
+});
+
+test('buildAttendanceHistoryFromAttendanceRecords maps roster attendance rows', () => {
+  const rows = buildAttendanceHistoryFromAttendanceRecords([
+    { sessionId: 'SES-1', date: '2026-02-01', status: 'late', lateMinutes: 5, earlyLeaveMinutes: 0 },
+    { sessionId: 'SES-2', date: '2026-02-08', status: 'present', lateMinutes: 0, earlyLeaveMinutes: 3 }
+  ]);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].lateMinutes, 5);
+  assert.equal(rows[1].earlyLeaveMinutes, 3);
+});
+
+test('findMatrixRowForStudent matches studentRecordId when personId differs', () => {
+  const matrix = [
+    { personId: 'PER-1', studentRecordId: 'STU-9', cells: [] },
+    { personId: 'PER-2', studentRecordId: 'STU-2', cells: [] }
+  ];
+  const row = findMatrixRowForStudent(matrix, { personId: 'PER-OTHER', studentId: 'STU-9' });
+  assert.equal(row.studentRecordId, 'STU-9');
+});
+
+test('buildEnrollmentMatrixLinks encodes class dates and attendance studentId', () => {
+  const links = buildEnrollmentMatrixLinks({
+    classId: 'CLS/1',
+    startDate: '2026-01-01',
+    endDate: '2026-03-01',
+    personId: 'PER-1'
+  });
+  assert.match(links.attendanceMatrixUrl, /^\/school\/attendances\?/);
+  assert.match(links.attendanceMatrixUrl, /classId=CLS/);
+  assert.match(links.attendanceMatrixUrl, /studentId=PER-1/);
+  assert.match(links.attendanceMatrixUrl, /range=allTime/);
+  assert.match(links.gradesMatrixUrl, /^\/school\/grades-matrix\?/);
+  assert.match(links.gradesMatrixUrl, /startDate=2026-01-01/);
+  assert.doesNotMatch(links.gradesMatrixUrl, /studentId=/);
+});
+
+test('resolveAttendanceHistoryForMatrixRow prefers attendance records over cells', () => {
+  const history = resolveAttendanceHistoryForMatrixRow(
+    {
+      _attendanceRecords: [{ sessionId: 'SES-1', date: '2026-02-01', status: 'present', lateMinutes: 2, earlyLeaveMinutes: 0 }],
+      cells: [{ attendanceStatus: 'absent' }]
+    },
+    [{ sessionId: 'SES-1', date: '2026-02-01' }],
+    [{ attendanceStatus: 'absent' }]
+  );
+  assert.equal(history.length, 1);
+  assert.equal(history[0].status, 'present');
+  assert.equal(history[0].lateMinutes, 2);
+});
+
+test('class enrollment detail loads full grades matrix window', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(
+    path.join(__dirname, '../MVC/services/school/studentEnrollmentDetailService.js'),
+    'utf8'
+  );
+  assert.match(source, /fullMatrix:\s*'1'/);
+  assert.match(source, /matrixLinks/);
+  assert.match(source, /findMatrixRowForStudent/);
 });

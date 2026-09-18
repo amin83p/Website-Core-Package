@@ -22,9 +22,11 @@ test('deriveAccessFlags enforces NC scope tiers from target spec', () => {
   }, {});
   assert.equal(ownerRead.canOpen, true);
   assert.equal(ownerRead.canViewRuns, true);
+  assert.equal(ownerRead.canViewRuleMetadata, false);
   assert.equal(ownerRead.canRunNow, false);
   assert.equal(ownerRead.canConfigure, true);
   assert.equal(ownerRead.canDispatch, true);
+  assert.equal(ownerRead.canDeleteRuns, true);
   assert.equal(ownerRead.canDeleteOutbox, true);
 
   const deptRunner = policy.deriveAccessFlags({
@@ -35,8 +37,20 @@ test('deriveAccessFlags enforces NC scope tiers from target spec', () => {
     upload: { allowed: false, scopeId: 'SCP_USER' },
     del: { allowed: false, scopeId: 'SCP_USER' }
   }, {});
-  assert.equal(deptRunner.canRunNow, true);
+  assert.equal(deptRunner.canRunNow, false);
+  assert.equal(deptRunner.canViewRuleMetadata, false);
   assert.equal(deptRunner.canConfigure, false);
+
+  const orgViewer = policy.deriveAccessFlags({
+    read: { allowed: true, scopeId: 'SCP_ORG' },
+    readAll: { allowed: true, scopeId: 'SCP_ORG' },
+    update: { allowed: true, scopeId: 'SCP_ORG' },
+    configure: { allowed: false, scopeId: 'SCP_USER' },
+    upload: { allowed: false, scopeId: 'SCP_USER' },
+    del: { allowed: false, scopeId: 'SCP_USER' }
+  }, {});
+  assert.equal(orgViewer.canViewRuleMetadata, true);
+  assert.equal(orgViewer.canRunNow, true);
 });
 
 test('filterRunForViewer hides batches outside OWNER recipient scope', () => {

@@ -130,6 +130,65 @@ function buildAttendanceHistoryFromMatrix(columns, cells) {
   return Array.from(bySession.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
 
+function buildAttendanceHistoryFromAttendanceRecords(records = []) {
+  return (Array.isArray(records) ? records : [])
+    .map((rec) => ({
+      sessionId: String(rec?.sessionId || '').trim(),
+      date: String(rec?.date || '').trim(),
+      status: String(rec?.status || '').trim(),
+      lateMinutes: rec?.lateMinutes ?? 0,
+      earlyLeaveMinutes: rec?.earlyLeaveMinutes ?? 0
+    }))
+    .filter((row) => row.sessionId || row.date)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function findMatrixRowForStudent(matrix = [], { personId, studentId } = {}) {
+  const rows = Array.isArray(matrix) ? matrix : [];
+  const normalizedPersonId = toPublicId(personId);
+  const normalizedStudentId = toPublicId(studentId);
+  return rows.find((row) => idsEqual(row?.personId, normalizedPersonId))
+    || rows.find((row) => idsEqual(row?.studentRecordId, normalizedStudentId))
+    || rows.find((row) => idsEqual(row?.personId, normalizedStudentId))
+    || null;
+}
+
+function resolveAttendanceHistoryForMatrixRow(matrixRow, columns, cells) {
+  if (!matrixRow) return [];
+  const records = matrixRow._attendanceRecords;
+  if (Array.isArray(records) && records.length) {
+    return buildAttendanceHistoryFromAttendanceRecords(records);
+  }
+  return buildAttendanceHistoryFromMatrix(columns, matrixRow.cells || cells);
+}
+
+function buildEnrollmentMatrixLinks({ classId, startDate, endDate, personId } = {}) {
+  const normalizedClassId = String(classId || '').trim();
+  if (!normalizedClassId) {
+    return { attendanceMatrixUrl: '', gradesMatrixUrl: '' };
+  }
+  const windowStart = normalizeDateOnly(startDate);
+  const windowEnd = normalizeDateOnly(endDate) || windowStart;
+  const shared = {
+    classId: normalizedClassId,
+    range: 'allTime'
+  };
+  if (windowStart) shared.startDate = windowStart;
+  if (windowEnd) shared.endDate = windowEnd;
+
+  const gradesParams = new URLSearchParams(shared);
+  const attendanceParams = new URLSearchParams(shared);
+  const normalizedPersonId = String(personId || '').trim();
+  if (normalizedPersonId) {
+    attendanceParams.set('studentId', normalizedPersonId);
+  }
+
+  return {
+    attendanceMatrixUrl: `/school/attendances?${attendanceParams.toString()}`,
+    gradesMatrixUrl: `/school/grades-matrix?${gradesParams.toString()}`
+  };
+}
+
 async function loadRelatedLedgerEntries({ studentId, classId, startDate, endDate, orgToday = '' }) {
   const entries = await schoolRepositories.academicLedger.list({ query: {}, scope: { canViewAll: true } });
   const windowStart = normalizeDateOnly(startDate);
@@ -192,18 +251,28 @@ async function buildClassEnrollmentDetail({
 
   const matrixPayload = await buildGradesMatrixPayload(
     { user: reqUser },
-    { classId, startDate, endDate },
+    { classId, startDate, endDate, fullMatrix: '1' },
     { includeAttendanceInFinal: true }
   );
-  const matrixRow = (Array.isArray(matrixPayload?.matrix) ? matrixPayload.matrix : [])
-    .find((row) => idsEqual(row?.personId, personId)) || null;
+  const matrixRow = findMatrixRowForStudent(matrixPayload?.matrix, {
+    personId,
+    studentId: student?.id
+  });
 
-  const attendanceHistory = matrixRow
-    ? buildAttendanceHistoryFromMatrix(matrixPayload.columns, matrixRow.cells)
-    : [];
+  const attendanceHistory = resolveAttendanceHistoryForMatrixRow(
+    matrixRow,
+    matrixPayload.columns,
+    matrixRow?.cells
+  );
   const gradebookActivities = matrixRow
     ? buildGradebookActivities(matrixPayload.columns, matrixRow.cells)
     : [];
+  const matrixLinks = buildEnrollmentMatrixLinks({
+    classId,
+    startDate,
+    endDate,
+    personId
+  });
 
   return {
     view: 'class_enrollment',
@@ -253,6 +322,7 @@ async function buildClassEnrollmentDetail({
       finalPercent: matrixRow?.finalPercent ?? null,
       finalParts: matrixRow?.finalParts || null
     },
+    matrixLinks,
     relatedRecords
   };
 }
@@ -352,5 +422,9 @@ module.exports = {
   buildClassEnrollmentDetail,
   buildGradebookActivities,
   buildAttendanceHistoryFromMatrix,
+  buildAttendanceHistoryFromAttendanceRecords,
+  findMatrixRowForStudent,
+  buildEnrollmentMatrixLinks,
+  resolveAttendanceHistoryForMatrixRow,
   loadRelatedLedgerEntries
 };

@@ -27,17 +27,21 @@ const KNOWN_SCOPE_MODE_BY_NAME = Object.freeze({
 
 const READ_SCOPES = Object.freeze(['owner', 'department', 'division', 'organization', 'admin', 'global']);
 const READ_ALL_SCOPES = Object.freeze(['owner', 'department', 'division', 'organization', 'admin', 'global']);
-const RUN_NOW_SCOPES = Object.freeze(['department', 'division', 'organization', 'admin', 'global']);
+const RUN_NOW_SCOPES = Object.freeze(['organization', 'admin', 'global']);
+const RULE_METADATA_SCOPES = Object.freeze(['organization', 'admin', 'global']);
 const CONFIGURE_SCOPES = Object.freeze(['organization', 'admin', 'global']);
 const DISPATCH_SCOPES = Object.freeze(['organization', 'admin', 'global']);
 const DELETE_OUTBOX_SCOPES = Object.freeze(['organization', 'admin', 'global']);
+const DELETE_RUNS_SCOPES = Object.freeze(['organization', 'admin', 'global']);
 
 const EMPTY_ACCESS_FLAGS = Object.freeze({
   canOpen: false,
+  canViewRuleMetadata: false,
   canViewRuns: false,
   canRunNow: false,
   canConfigure: false,
   canDispatch: false,
+  canDeleteRuns: false,
   canDeleteOutbox: false,
   isAdminViewer: false,
   readScopeId: null,
@@ -163,6 +167,10 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     adminFlags.readAll
     || (readAllAllowed && scopeInList(readAll.scopeId, READ_ALL_SCOPES))
   );
+  const canViewRuleMetadata = Boolean(
+    adminFlags.readAll
+    || (readAllAllowed && scopeInList(readAll.scopeId, RULE_METADATA_SCOPES))
+  );
   const canRunNow = Boolean(
     adminFlags.update
     || (updateAllowed && scopeInList(update.scopeId, RUN_NOW_SCOPES))
@@ -179,14 +187,20 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     adminFlags.delete
     || (deleteAllowed && scopeInList(del.scopeId, DELETE_OUTBOX_SCOPES))
   );
+  const canDeleteRuns = Boolean(
+    adminFlags.delete
+    || (deleteAllowed && scopeInList(del.scopeId, DELETE_RUNS_SCOPES))
+  );
   const isAdminViewer = Boolean(adminFlags.readAll || adminFlags.read || adminFlags.configure);
 
   return {
     canOpen,
+    canViewRuleMetadata,
     canViewRuns,
     canRunNow,
     canConfigure,
     canDispatch,
+    canDeleteRuns,
     canDeleteOutbox,
     isAdminViewer,
     readScopeId: read.scopeId || null,

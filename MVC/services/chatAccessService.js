@@ -307,7 +307,8 @@ async function canAccessConversation({
     const review = await chatOperationPolicyService.canReviewConversation(
       user,
       conversation,
-      readAllAccess.scopeId
+      readAllAccess.scopeId,
+      { adminBypass: readAllAccess.adminBypass === true }
     );
     if (!review.allowed && readAllAccess.adminBypass !== true) {
       return {
@@ -374,17 +375,28 @@ async function canDeleteConversation(user, conversation, ipAddress) {
   }
 
   const isParticipant = conversationHasParticipant(conversation, user?.id);
+
+  const globalDelete = await canUseChatOperation(user, OPERATIONS.DELETE_ALL, ipAddress);
+  const globalAdmin = globalDelete.allowed ? await isGlobalChatAdmin(user, ipAddress) : false;
+  if (globalDelete.allowed && globalAdmin) {
+    return {
+      ...globalDelete,
+      participant: isParticipant,
+      globalAdmin: true
+    };
+  }
+
   const ownDelete = await canUseChatOperation(user, OPERATIONS.DELETE, ipAddress);
   if (ownDelete.allowed) {
     const scopeMode = chatContactScopeService.normalizeChatScopeMode(ownDelete.scopeId) || 'owner';
-    if (scopeMode === 'owner' || scopeMode === 'user') {
+    if ((scopeMode === 'owner' || scopeMode === 'user') && ownDelete.adminBypass !== true) {
       return {
         allowed: false,
         reason: 'Your Delete scope allows deleting only your own messages, not the whole conversation.'
       };
     }
-    if (scopeMode === 'global') {
-      return { ...ownDelete, participant: isParticipant, globalAdmin: true, scopeMode };
+    if (scopeMode === 'global' || ownDelete.adminBypass === true) {
+      return { ...ownDelete, participant: isParticipant, globalAdmin: true, scopeMode: 'global' };
     }
     if (['department', 'division', 'organization', 'admin'].includes(scopeMode)) {
       const scoped = await chatContactScopeService.getConversationScopeEligibility(user, conversation, {
@@ -394,15 +406,6 @@ async function canDeleteConversation(user, conversation, ipAddress) {
         return { ...ownDelete, participant: isParticipant, globalAdmin: false, scopeMode };
       }
     }
-  }
-
-  const globalDelete = await canUseChatOperation(user, OPERATIONS.DELETE_ALL, ipAddress);
-  if (globalDelete.allowed && await isGlobalChatAdmin(user, ipAddress)) {
-    return {
-      ...globalDelete,
-      participant: false,
-      globalAdmin: true
-    };
   }
 
   return {
@@ -423,6 +426,9 @@ async function canDeleteMessages(user, conversation, messages = [], ipAddress) {
 
   const ownDelete = await canUseChatOperation(user, OPERATIONS.DELETE, ipAddress);
   if (!ownDelete.allowed) return ownDelete;
+  if (ownDelete.adminBypass === true) {
+    return { ...ownDelete, allowed: true, globalAdmin: true, scopeMode: 'global' };
+  }
   const scopeMode = chatContactScopeService.normalizeChatScopeMode(ownDelete.scopeId) || 'owner';
   if (scopeMode === 'owner' || scopeMode === 'user') {
     const hasOtherSender = rows.some((message) => !idsEqual(message?.senderId, user?.id));
@@ -441,8 +447,13 @@ async function canDeleteMessages(user, conversation, messages = [], ipAddress) {
   return { ...ownDelete, allowed: true, globalAdmin: false, scopeMode };
 }
 
-async function filterReviewConversations(user, conversations, scopeId) {
-  return chatOperationPolicyService.filterConversationsForReviewList(user, conversations, scopeId);
+async function filterReviewConversations(user, conversations, scopeId, options = {}) {
+  return chatOperationPolicyService.filterConversationsForReviewList(
+    user,
+    conversations,
+    scopeId,
+    options
+  );
 }
 
 module.exports = {

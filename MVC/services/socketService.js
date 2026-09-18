@@ -300,6 +300,7 @@ function init(server) {
                     limits: access.limits || {},
                     pendingCount,
                     fileSizeBytes,
+                    adminBypass: access.adminBypass === true,
                     countSentMessages: (conversationId, senderId) => (
                         chatRepository.countSentMessagesByUser(conversationId, senderId)
                     )

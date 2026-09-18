@@ -52,6 +52,11 @@ test('getUpdateLimits returns docx defaults for OWNER and DEPARTMENT scopes', ()
     maxFileSizeKB: 1024,
     scopeMode: 'department'
   });
+  assert.deepEqual(policy.getUpdateLimits('OWNER', { maxAttempts: null, maxVolumeKB: null }), {
+    maxMessages: 15,
+    maxFileSizeKB: 50,
+    scopeMode: 'owner'
+  });
 });
 
 test('deriveAccessFlags splits inbox and message-content permissions', () => {
@@ -72,6 +77,37 @@ test('deriveAccessFlags splits inbox and message-content permissions', () => {
   assert.equal(flags.canReadMessageContent, false);
   assert.equal(flags.canCreate, true);
   assert.equal(flags.canManageConversationList, false);
+});
+
+test('deriveAccessFlags clears update limits for Family A bypass admins', () => {
+  delete require.cache[POLICY_PATH];
+  const policy = require(POLICY_PATH);
+
+  const flags = policy.deriveAccessFlags({
+    read: { allowed: true, scopeId: 'OWNER' },
+    readAll: { allowed: true, scopeId: 'OWNER' },
+    create: { allowed: true, scopeId: 'OWNER' },
+    update: { allowed: true, scopeId: 'OWNER', limits: { maxAttempts: 5, maxVolumeKB: 10 } },
+    del: { allowed: true, scopeId: 'OWNER' },
+    deleteAll: { allowed: true, scopeId: 'GLOBAL' },
+    download: { allowed: true, scopeId: 'OWNER' }
+  }, { update: true });
+
+  assert.equal(flags.updateLimits.maxMessages, null);
+  assert.equal(flags.updateLimits.maxFileSizeKB, null);
+});
+
+test('filterConversationsForReviewList returns all rows when adminBypass is set', async () => {
+  delete require.cache[POLICY_PATH];
+  const policy = require(POLICY_PATH);
+  const rows = [{ id: 'A' }, { id: 'B' }];
+  const filtered = await policy.filterConversationsForReviewList(
+    { id: 'ADMIN-1' },
+    rows,
+    'OWNER',
+    { adminBypass: true }
+  );
+  assert.deepEqual(filtered, rows);
 });
 
 test('applyOperationPolicy rejects USER scope even when central access allows', async () => {
@@ -204,4 +240,127 @@ test('assertUpdateWithinLimits blocks sends after the OWNER message cap', async 
   assert.equal(allowed.allowed, false);
   assert.match(allowed.reason, /15 messages/i);
   assert.equal(denied.allowed, false);
+});
+
+test('canDeleteConversation allows global delete when DELETE_ALL admin bypass is active', async () => {
+  const originals = new Map();
+  try {
+    stubModule('../MVC/services/security/index', {
+      evaluateAccess: async ({ operationId }) => ({
+        allowed: operationId === 'DELETE' || operationId === 'DELETE_ALL',
+        operationId,
+        scopeId: 'OWNER'
+      })
+    }, originals);
+    stubModule('../MVC/services/adminAuthorityService', {
+      isAdminForRequestAsync: async (_user, _sectionId, operationId) => operationId === 'DELETE_ALL'
+    }, originals);
+    stubModule('../MVC/services/chatContactScopeService', {
+      normalizeChatScopeMode: (scopeId) => {
+        const token = String(scopeId || '').toUpperCase();
+        if (token === 'OWNER') return 'owner';
+        return token.toLowerCase() || 'owner';
+      },
+      getConversationScopeEligibility: async () => ({ allowed: true })
+    }, originals);
+
+    delete require.cache[ACCESS_SERVICE_PATH];
+    delete require.cache[POLICY_PATH];
+    const chatAccessService = require(ACCESS_SERVICE_PATH);
+    const conversation = {
+      id: 'CONV-1',
+      participants: [{ userId: 'ADMIN-1' }, { userId: 'USER-2' }]
+    };
+
+    const result = await chatAccessService.canDeleteConversation(
+      { id: 'ADMIN-1', activeOrgId: 'ORG-1' },
+      conversation,
+      '127.0.0.1'
+    );
+
+    assert.equal(result.allowed, true);
+    assert.equal(result.globalAdmin, true);
+  } finally {
+    restoreModules(originals, [ACCESS_SERVICE_PATH, POLICY_PATH]);
+  }
+});
+
+test('canDeleteConversation denies whole conversation delete at OWNER scope without bypass', async () => {
+  const originals = new Map();
+  try {
+    stubModule('../MVC/services/security/index', {
+      evaluateAccess: async ({ operationId }) => ({
+        allowed: operationId === 'DELETE',
+        operationId,
+        scopeId: 'OWNER'
+      })
+    }, originals);
+    stubModule('../MVC/services/adminAuthorityService', {
+      isAdminForRequestAsync: async () => false
+    }, originals);
+    stubModule('../MVC/services/chatContactScopeService', {
+      normalizeChatScopeMode: () => 'owner',
+      getConversationScopeEligibility: async () => ({ allowed: true })
+    }, originals);
+
+    delete require.cache[ACCESS_SERVICE_PATH];
+    delete require.cache[POLICY_PATH];
+    const chatAccessService = require(ACCESS_SERVICE_PATH);
+    const conversation = {
+      id: 'CONV-1',
+      participants: [{ userId: 'USER-1' }, { userId: 'USER-2' }]
+    };
+
+    const result = await chatAccessService.canDeleteConversation(
+      { id: 'USER-1', activeOrgId: 'ORG-1' },
+      conversation,
+      '127.0.0.1'
+    );
+
+    assert.equal(result.allowed, false);
+    assert.match(result.reason, /not the whole conversation/i);
+  } finally {
+    restoreModules(originals, [ACCESS_SERVICE_PATH, POLICY_PATH]);
+  }
+});
+
+test('canDeleteMessages allows any sender when DELETE admin bypass is active', async () => {
+  const originals = new Map();
+  try {
+    stubModule('../MVC/services/security/index', {
+      evaluateAccess: async ({ operationId }) => ({
+        allowed: operationId === 'DELETE',
+        operationId,
+        scopeId: 'OWNER'
+      })
+    }, originals);
+    stubModule('../MVC/services/adminAuthorityService', {
+      isAdminForRequestAsync: async (_user, _sectionId, operationId) => operationId === 'DELETE'
+    }, originals);
+    stubModule('../MVC/services/chatContactScopeService', {
+      normalizeChatScopeMode: () => 'owner',
+      getConversationScopeEligibility: async () => ({ allowed: false })
+    }, originals);
+
+    delete require.cache[ACCESS_SERVICE_PATH];
+    delete require.cache[POLICY_PATH];
+    const chatAccessService = require(ACCESS_SERVICE_PATH);
+    const conversation = {
+      id: 'CONV-1',
+      participants: [{ userId: 'ADMIN-1' }, { userId: 'USER-2' }]
+    };
+    const messages = [{ id: 'M1', senderId: 'USER-2' }];
+
+    const result = await chatAccessService.canDeleteMessages(
+      { id: 'ADMIN-1', activeOrgId: 'ORG-1' },
+      conversation,
+      messages,
+      '127.0.0.1'
+    );
+
+    assert.equal(result.allowed, true);
+    assert.equal(result.globalAdmin, true);
+  } finally {
+    restoreModules(originals, [ACCESS_SERVICE_PATH, POLICY_PATH]);
+  }
 });

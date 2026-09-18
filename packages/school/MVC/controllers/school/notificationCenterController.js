@@ -604,7 +604,7 @@ async function deleteRun(req, res) {
 
     const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
 
-    if (!access.canRunNow) throw new Error('Not authorized to delete notification runs.');
+    if (!access.canDeleteRuns) throw new Error('Not authorized to delete notification runs.');
 
     await notificationCenterRunService.deleteRun(orgId, req.params.id, req.user);
 

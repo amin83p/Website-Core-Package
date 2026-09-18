@@ -149,6 +149,7 @@ async function assertUpdateWithinLimits(req, conversation, { pendingCount = 1, f
         limits: updateAccess.limits || req.accessLimits || {},
         pendingCount,
         fileSizeBytes,
+        adminBypass: updateAccess.adminBypass === true,
         countSentMessages: (convId, senderId) => chatRepository.countSentMessagesByUser(convId, senderId)
     });
     if (!limitCheck.allowed) {
@@ -249,7 +250,8 @@ exports.listAllChats = async (req, res) => {
                 query: {},
                 scope: { canViewAll: true }
             }),
-            listAccess.scopeId
+            listAccess.scopeId,
+            { adminBypass: listAccess.adminBypass === true }
         );
         const allUsers = await dataService.getAccessibleUsers({ isSuperAdmin: true });
         const userMap = new Map(allUsers.map(u => [String(u.id), u]));

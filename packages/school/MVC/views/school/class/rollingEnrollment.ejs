@@ -30,10 +30,15 @@
   });
   const rollingClassDataJson = jsonForScript({
     id: String(c.id || ''),
+    title: String(c.title || '').trim(),
     orgId: String(c.orgId || ''),
     room: String(c.room || ''),
     instructors: classInstructors,
-    maxCapacity: Number(c?.enrollment?.maxCapacity || c?.maxCapacity || 0)
+    maxCapacity: Number(c?.enrollment?.maxCapacity || c?.maxCapacity || 0),
+    billingMode: String(c.billingMode || '').trim(),
+    defaultTargetSessionCount: Number(c.defaultTargetSessionCount || 0),
+    defaultTargetHours: Number(c.defaultTargetHours || 0),
+    registrationMode: String(c.registrationMode || '').trim()
   });
   const orgTodayJson = jsonForScript(typeof orgToday !== 'undefined' ? orgToday : '');
   const classIdJson = jsonForScript(String(c.id || ''));
@@ -43,6 +48,8 @@
   const isClosedForNewEnrollmentJson = jsonForScript(Boolean(isClosedForNewEnrollment));
   const canManageEnrollmentOfficeJson = jsonForScript(Boolean(typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice));
   const canEditStudentClbJson = jsonForScript(Boolean(typeof canEditStudentClb !== 'undefined' && canEditStudentClb));
+  const canViewStudentAcademicOverviewJson = jsonForScript(Boolean(typeof canViewStudentAcademicOverview !== 'undefined' && canViewStudentAcademicOverview));
+  const canOpenStudentAttendanceReportJson = jsonForScript(Boolean(typeof canOpenStudentAttendanceReport !== 'undefined' && canOpenStudentAttendanceReport));
   const isRollingJson = jsonForScript(Boolean(isRolling));
   const rollingFilters = (typeof filters !== 'undefined' && filters && typeof filters === 'object') ? filters : {};
   const hasRollingFiltersAppliedFlag = typeof hasRollingFiltersApplied !== 'undefined' && hasRollingFiltersApplied === true;
@@ -284,6 +291,28 @@
     font-size: 0.8rem;
     white-space: nowrap;
   }
+  #moveEnrollmentModal .move-enrollment-mode-btn-group {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    width: 100%;
+  }
+  #moveEnrollmentModal .move-enrollment-mode-btn {
+    flex: 1 1 12rem;
+    min-height: 3.25rem;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.25;
+    border-width: 2px;
+  }
+  #moveEnrollmentModal .move-enrollment-mode-btn[data-move-mode="move"].is-active-mode {
+    box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.35);
+  }
+  #moveEnrollmentModal .move-enrollment-mode-btn[data-move-mode="new_elsewhere"].is-active-mode {
+    box-shadow: 0 0 0 2px rgba(13, 202, 240, 0.45);
+  }
   .rolling-enrollment-page .rolling-row-actions-wrap {
     position: relative;
     display: inline-block;
@@ -421,6 +450,79 @@
   #rollingStudentClaimNumbersModal td.rolling-claim-actions-col {
     width: 1%;
     white-space: nowrap;
+  }
+  #rollingStudentAcademicTimelineModal.rolling-student-manage-modal .modal-header {
+    border-bottom: 1px solid #e8edf3;
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-summary-item {
+    flex: 1 1 8rem;
+    border: 1px solid #e8edf3;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    padding: 0.65rem 0.85rem;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-summary-item .label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-summary-item .value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e3a5f;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-section {
+    border: 1px solid #e8edf3;
+    border-radius: 0.55rem;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    background: #fff;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-section-header {
+    padding: 0.65rem 0.85rem;
+    background: #f1f5f9;
+    border-bottom: 1px solid #e8edf3;
+    font-weight: 600;
+    color: #334155;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-section-header.primary {
+    background: #e8f0fa;
+    color: #1e3a5f;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-table-wrap {
+    max-height: 14rem;
+    overflow: auto;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-classes-wrap {
+    max-height: min(50vh, 28rem);
+    overflow: auto;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8fafc;
+    box-shadow: inset 0 -1px 0 #e8edf3;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-table tbody tr:nth-child(even) {
+    background: #fafbfc;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-registration-trigger {
+    font-size: 0.8125rem;
+    text-decoration: none;
+    padding: 0;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-registration-trigger:hover,
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-registration-trigger:focus-visible {
+    text-decoration: underline;
   }
   .clb-level-value-warning {
     background-color: #f8d7da !important;
@@ -1671,6 +1773,26 @@
   </div>
 </div>
 
+<div class="modal fade rolling-student-manage-modal" id="rollingStudentAcademicTimelineModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-clock-history me-2"></i><span id="rollingStudentAcademicTimelineTitle">Academic Timeline</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="rollingStudentAcademicTimelineBody">
+        <div class="text-muted text-center py-4">Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <a href="#" class="btn btn-outline-primary btn-sm d-none" id="rollingStudentAcademicTimelineFullOverviewLink" target="_blank" rel="noopener noreferrer">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Open full overview
+        </a>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="enrollmentSessionManagerModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
@@ -2186,6 +2308,13 @@
   <button type="button" class="rolling-student-context-menu-item" data-action="claim-numbers" id="rollingStudentContextMenuClaimNumbers">
     <i class="bi bi-card-checklist"></i><span>Manage Claim Numbers</span>
   </button>
+  <div class="rolling-student-context-menu-divider" aria-hidden="true"></div>
+  <button type="button" class="rolling-student-context-menu-item" data-action="academic-timeline" id="rollingStudentContextMenuAcademicTimeline">
+    <i class="bi bi-clock-history"></i><span>Academic Timeline</span>
+  </button>
+  <button type="button" class="rolling-student-context-menu-item" data-action="attendance-report" id="rollingStudentContextMenuAttendanceReport">
+    <i class="bi bi-person-lines-fill"></i><span>Student Attendance Report</span>
+  </button>
 </div>
 
 <%- include('../partials/studentClaimNumbersModal') %>
@@ -2276,12 +2405,20 @@
   <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="moveEnrollmentModalLabel"><i class="bi bi-arrow-left-right me-1"></i>Move Enrollment</h5>
+        <h5 class="modal-title" id="moveEnrollmentModalLabel"><i class="bi bi-arrow-left-right me-1"></i>Move/New Enrollment</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="move_periodId">
         <input type="hidden" id="move_studentId">
+        <div class="mb-3" id="move_modeSection">
+          <div class="small text-muted mb-2">What do you want to do?</div>
+          <div class="move-enrollment-mode-btn-group" role="group" aria-label="Enrollment action type">
+            <button type="button" class="btn btn-success move-enrollment-mode-btn is-active-mode" id="btn_move_mode_move" data-move-mode="move" aria-pressed="true">Close and start a new enrollment</button>
+            <button type="button" class="btn btn-outline-info move-enrollment-mode-btn" id="btn_move_mode_new_elsewhere" data-move-mode="new_elsewhere" aria-pressed="false">New enrollment elsewhere</button>
+          </div>
+          <div class="form-text compact-help mt-2 mb-0" id="move_modeHelpText">Close this enrollment, then start a new one in any rolling class (including this class).</div>
+        </div>
         <div class="alert alert-light border small mb-3" id="move_sourceContext">
           <div class="fw-semibold" id="move_studentLabel"></div>
           <div class="text-muted" id="move_sourceClassLabel"></div>
@@ -2294,9 +2431,9 @@
               <label class="form-label" for="move_close_endDate">End Date *</label>
               <input type="date" id="move_close_endDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
             </div>
-            <div class="col-lg-3 col-md-6">
+            <div class="col-lg-3 col-md-6" id="wrap_move_close_statusReadonly">
               <label class="form-label" for="move_close_status">Status</label>
-              <input type="text" id="move_close_status" class="form-control bg-light" value="Moved" readonly>
+              <input type="text" id="move_close_status" class="form-control bg-light" value="Completed (moved)" readonly>
             </div>
             <div class="col-12">
               <label class="form-label" for="move_close_reason">Close Reason *</label>
@@ -2305,9 +2442,17 @@
           </div>
         </div>
         <div class="border rounded bg-light-subtle p-3 mb-3" id="move_targetSection">
-          <div class="fw-semibold mb-2"><i class="bi bi-person-plus me-1 text-primary"></i>Enroll in new class</div>
-          <div class="mb-2">
-            <label class="form-label" for="move_targetClassLabel">Target Class *</label>
+          <div class="small text-muted mb-2 d-none" id="move_newElsewhereNote">Current class enrollment is not changed.</div>
+          <div class="fw-semibold mb-2"><i class="bi bi-person-plus me-1 text-primary"></i><span id="move_targetSectionTitle">Start new enrollment</span></div>
+          <div class="mb-3 d-none" id="wrap_move_closeStartStyleSwitch">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="move_transferToAnotherClass" checked>
+              <label class="form-check-label fw-semibold" for="move_transferToAnotherClass">Move to another class</label>
+            </div>
+            <div class="form-text compact-help mb-0" id="move_closeStartStyleHelp">When off, close as completed (not a move). You can still choose any rolling class for the new enrollment.</div>
+          </div>
+          <div class="mb-2" id="wrap_move_targetClassPicker">
+            <label class="form-label" for="move_targetClassLabel" id="move_targetClassPickerLabel">Target Class *</label>
             <input type="hidden" id="move_targetClassId">
             <div class="input-group">
               <input type="text" id="move_targetClassLabel" class="form-control bg-white" placeholder="Pick a rolling class..." readonly>
@@ -2390,13 +2535,13 @@
           </div>
         </div>
         <div id="move_previewPanel" class="alert alert-light border mb-0">
-          Preview the move before applying it.
+          Preview before applying your selection.
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewMoveEnrollment">Preview</button>
-        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_applyMoveEnrollment" disabled>Apply Move</button>
+        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_applyMoveEnrollment" disabled>Apply</button>
       </div>
     </div>
   </div>
@@ -3021,6 +3166,8 @@
   const canCreatePriorSubjectCredits = <%- canCreatePriorSubjectCreditsJson %>;
   const canManageEnrollmentOffice = <%- canManageEnrollmentOfficeJson %>;
   const canEditStudentClb = <%- canEditStudentClbJson %>;
+  const canViewStudentAcademicOverview = <%- canViewStudentAcademicOverviewJson %>;
+  const canOpenStudentAttendanceReport = <%- canOpenStudentAttendanceReportJson %>;
   const defaultTeacher = <%- defaultTeacherJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
@@ -3569,6 +3716,7 @@
   const groupEnrollmentResultsModalEl = qs('groupEnrollmentResultsModal');
   const rollingStudentClbModalEl = qs('rollingStudentClbModal');
   const rollingStudentClaimNumbersModalEl = qs('rollingStudentClaimNumbersModal');
+  const rollingStudentAcademicTimelineModalEl = qs('rollingStudentAcademicTimelineModal');
   const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
   const CLAIM_NUMBER_ADD_NEW = '__add_new__';
   const ROLLING_CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
@@ -3836,11 +3984,16 @@
   const groupEnrollmentResultsModal = createModalController(groupEnrollmentResultsModalEl);
   const rollingStudentClbModal = createModalController(rollingStudentClbModalEl);
   const rollingStudentClaimNumbersModal = createModalController(rollingStudentClaimNumbersModalEl);
+  const rollingStudentAcademicTimelineModal = createModalController(rollingStudentAcademicTimelineModalEl);
   let rollingStudentContextState = null;
   const addButton = qs('btn_addPeriod');
   let approvedCloseStatusPayload = null;
   let approvedMovePayload = null;
   let approvedMovePreviewHash = null;
+  let approvedMoveNewElsewherePayload = null;
+  let approvedMoveNewElsewhereDraft = null;
+  let approvedMoveNewElsewherePreviewMode = '';
+  let moveEnrollmentMode = 'move';
   let moveTargetClassMeta = null;
   let moveSourcePeriodRow = null;
   let approvedEditCloseStatusPayload = null;
@@ -6502,6 +6655,18 @@
       btn.disabled = !editable;
       btn.classList.toggle('disabled', !editable);
     });
+    const timelineBtn = qs('rollingStudentContextMenuAcademicTimeline');
+    if (timelineBtn) {
+      const viewable = canViewStudentAcademicOverview === true;
+      timelineBtn.disabled = !viewable;
+      timelineBtn.classList.toggle('disabled', !viewable);
+    }
+    const attendanceReportBtn = qs('rollingStudentContextMenuAttendanceReport');
+    if (attendanceReportBtn) {
+      const openable = canOpenStudentAttendanceReport === true;
+      attendanceReportBtn.disabled = !openable;
+      attendanceReportBtn.classList.toggle('disabled', !openable);
+    }
   }
 
   function hideRollingStudentContextMenu() {
@@ -6877,15 +7042,25 @@
     }).join('') + '</dl>';
   }
 
-  function renderEnrollmentDetailTable(headers = [], rows = [], rowRenderer) {
+  function renderEnrollmentDetailTable(headers = [], rows = [], rowRenderer, emptyHint = '') {
     if (!rows.length) {
-      return '<div class="text-muted small py-3 text-center">No records found.</div>';
+      const hint = String(emptyHint || '').trim();
+      return '<div class="text-muted small py-3 text-center">No records found.'
+        + (hint ? '<div class="mt-1">' + htmlEscape(hint) + '</div>' : '')
+        + '</div>';
     }
     return '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr>'
       + headers.map((header) => '<th>' + htmlEscape(header) + '</th>').join('')
       + '</tr></thead><tbody>'
       + rows.map(rowRenderer).join('')
       + '</tbody></table></div>';
+  }
+
+  function renderEnrollmentDetailSectionHeader(title, url, linkLabel) {
+    return '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">'
+      + '<div class="fw-bold">' + htmlEscape(title) + '</div>'
+      + '<div>' + renderAcademicTimelineExternalLink(url, linkLabel) + '</div>'
+      + '</div>';
   }
 
   function formatEnrollmentDetailCapDisplay(sessionsPayload, kind) {
@@ -6982,22 +7157,37 @@
       + '<div class="small text-muted">Assignments: ' + htmlEscape(gradebook.assignmentsPercent != null ? `${gradebook.assignmentsPercent}%` : '-') + '</div>'
       + '<div class="small text-muted">Final: ' + htmlEscape(gradebook.finalPercent != null ? `${gradebook.finalPercent}%` : '-') + '</div>'
       + '</div></div></div></div>';
-    const attendanceHtml = '<div class="fw-bold mb-2">Attendance History</div>'
+    const matrixLinks = payload.matrixLinks || {};
+    const attendanceRows = Array.isArray(payload.attendanceHistory) ? payload.attendanceHistory : [];
+    const gradebookActivities = Array.isArray(gradebook.activities) ? gradebook.activities : [];
+    const attendanceHtml = renderEnrollmentDetailSectionHeader(
+      'Attendance History',
+      matrixLinks.attendanceMatrixUrl,
+      'Open in Attendance Matrix'
+    )
       + renderEnrollmentDetailTable(
         ['Date', 'Status', 'Late Min', 'Early Leave Min'],
-        Array.isArray(payload.attendanceHistory) ? payload.attendanceHistory : [],
+        attendanceRows,
         (row) => '<tr><td>' + htmlEscape(row.date || '-') + '</td><td>' + htmlEscape(row.status || '-') + '</td>'
-          + '<td>' + htmlEscape(row.lateMinutes ?? '-') + '</td><td>' + htmlEscape(row.earlyLeaveMinutes ?? '-') + '</td></tr>'
+          + '<td>' + htmlEscape(row.lateMinutes ?? '-') + '</td><td>' + htmlEscape(row.earlyLeaveMinutes ?? '-') + '</td></tr>',
+        matrixLinks.attendanceMatrixUrl ? 'Open the attendance matrix for the full roster view.' : ''
       );
-    const gradebookHtml = '<div class="fw-bold mb-2 mt-4">Gradebook History</div>'
+    const gradebookHtml = '<div class="mt-4">'
+      + renderEnrollmentDetailSectionHeader(
+        'Gradebook History',
+        matrixLinks.gradesMatrixUrl,
+        'Open in Grades Matrix'
+      )
       + renderEnrollmentDetailTable(
         ['Date', 'Activity', 'Score', 'Percent', 'Attendance'],
-        Array.isArray(gradebook.activities) ? gradebook.activities : [],
+        gradebookActivities,
         (row) => '<tr><td>' + htmlEscape(row.date || '-') + '</td><td>' + htmlEscape(row.label || '-') + '</td>'
           + '<td>' + htmlEscape(row.score ?? '-') + (row.totalScore != null ? ' / ' + htmlEscape(row.totalScore) : '') + '</td>'
           + '<td>' + htmlEscape(row.percent != null ? `${row.percent}%` : '-') + '</td>'
-          + '<td>' + htmlEscape(row.attendanceStatus || '-') + '</td></tr>'
-      );
+          + '<td>' + htmlEscape(row.attendanceStatus || '-') + '</td></tr>',
+        matrixLinks.gradesMatrixUrl ? 'Open the grades matrix for the full class view.' : ''
+      )
+      + '</div>';
     const relatedHtml = '<div class="fw-bold mb-2 mt-4">Related Academic Records</div>'
       + renderEnrollmentDetailTable(
         ['Date', 'Type', 'Status', 'Memo'],
@@ -7008,10 +7198,191 @@
     bodyEl.innerHTML = summaryHtml + attendanceHtml + gradebookHtml + relatedHtml;
   }
 
-  async function openEnrollmentDetailModal(periodId) {
-    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
-    if (!row) return;
-    const detailUrl = buildEnrollmentDetailApiUrl(row.studentId, row.id);
+  function renderAcademicTimelineStatusBadge(status) {
+    const label = formatPeriodStatusLabel(status);
+    return '<span class="badge bg-secondary-subtle text-secondary-emphasis border">' + htmlEscape(label) + '</span>';
+  }
+
+  function renderAcademicTimelineExternalLink(url, label) {
+    const href = String(url || '').trim();
+    if (!href) return '<span class="text-muted">—</span>';
+    return '<a href="' + htmlEscape(href) + '" class="small text-decoration-none" target="_blank" rel="noopener noreferrer">'
+      + htmlEscape(label || 'Open') + ' <i class="bi bi-box-arrow-up-right"></i></a>';
+  }
+
+  function renderAcademicTimelineEmptyRow(colspan, message) {
+    return '<tr><td colspan="' + colspan + '" class="text-center text-muted py-3 small">' + htmlEscape(message) + '</td></tr>';
+  }
+
+  function renderRollingStudentAcademicTimelineModal(payload = {}) {
+    const bodyEl = qs('rollingStudentAcademicTimelineBody');
+    const titleEl = qs('rollingStudentAcademicTimelineTitle');
+    const fullLinkEl = qs('rollingStudentAcademicTimelineFullOverviewLink');
+    if (!bodyEl) return;
+    const student = payload.student || {};
+    const summary = payload.summary || {};
+    const studentId = String(student.id || '').trim();
+    const studentTitle = String(student.name || student.id || 'Student').trim();
+    const studentNumber = String(student.studentNumber || '').trim();
+    if (titleEl) {
+      titleEl.textContent = studentNumber
+        ? `${studentTitle} (${studentNumber})`
+        : studentTitle;
+    }
+    if (fullLinkEl) {
+      if (studentId) {
+        fullLinkEl.href = `/school/academic-ledger/student-overview/${encodeURIComponent(studentId)}`;
+        fullLinkEl.classList.remove('d-none');
+      } else {
+        fullLinkEl.href = '#';
+        fullLinkEl.classList.add('d-none');
+      }
+    }
+    const programs = Array.isArray(payload.programs) ? payload.programs : [];
+    const terms = Array.isArray(payload.terms) ? payload.terms : [];
+    const classes = Array.isArray(payload.classes) ? payload.classes : [];
+    const warnings = Array.isArray(payload.warnings) ? payload.warnings : [];
+    let warningsHtml = '';
+    if (warnings.length) {
+      warningsHtml = '<div class="alert alert-warning py-2 small mb-3">' + warnings.map((w) => htmlEscape(String(w || ''))).join('<br>') + '</div>';
+    } else if (payload.reviewRequired === true) {
+      warningsHtml = '<div class="alert alert-warning py-2 small mb-3">Academic review may be required for this student.</div>';
+    }
+    const summaryHtml = '<div class="rolling-academic-timeline-summary">'
+      + '<div class="rolling-academic-timeline-summary-item"><div class="label">Programs</div><div class="value">' + htmlEscape(String(summary.programCount ?? programs.length)) + '</div></div>'
+      + '<div class="rolling-academic-timeline-summary-item"><div class="label">Terms</div><div class="value">' + htmlEscape(String(summary.termCount ?? terms.length)) + '</div></div>'
+      + '<div class="rolling-academic-timeline-summary-item"><div class="label">Class enrollments</div><div class="value">' + htmlEscape(String(summary.classCount ?? classes.length)) + '</div></div>'
+      + '</div>';
+    const programRowsHtml = programs.length
+      ? programs.map((row) => {
+        return '<tr>'
+          + '<td class="ps-3"><div class="fw-semibold font-monospace small">' + htmlEscape(row.id || '-') + '</div>'
+          + '<div class="x-small text-muted">' + htmlEscape(row.registrationDate || '-') + '</div></td>'
+          + '<td><div class="fw-semibold">' + htmlEscape(row.programLabel || row.programId || '-') + '</div></td>'
+          + '<td>' + renderAcademicTimelineStatusBadge(row.status) + '</td>'
+          + '<td class="pe-3">' + renderAcademicTimelineExternalLink(row.detailUrl, 'View registration') + '</td>'
+          + '</tr>';
+      }).join('')
+      : renderAcademicTimelineEmptyRow(4, 'No program registrations found.');
+    const termRowsHtml = terms.length
+      ? terms.map((row) => {
+        return '<tr>'
+          + '<td class="ps-3"><div class="fw-semibold font-monospace small">' + htmlEscape(row.id || '-') + '</div>'
+          + '<div class="x-small text-muted">' + htmlEscape(row.registrationDate || '-') + '</div></td>'
+          + '<td><div class="fw-semibold">' + htmlEscape(row.programLabel || row.programId || '-') + '</div>'
+          + '<div class="small text-muted">' + htmlEscape(row.termLabel || row.termId || '-') + '</div></td>'
+          + '<td>' + renderAcademicTimelineStatusBadge(row.status) + '</td>'
+          + '<td class="pe-3">' + renderAcademicTimelineExternalLink(row.detailUrl, 'View registration') + '</td>'
+          + '</tr>';
+      }).join('')
+      : renderAcademicTimelineEmptyRow(4, 'No term registrations found.');
+    const classRowsHtml = classes.length
+      ? classes.map((row) => {
+        const periodLabel = [row.startDate || '-', row.endDate || '-'].join(' to ');
+        const registrationTrigger = row.enrollmentId
+          ? '<button type="button" class="btn btn-link rolling-academic-timeline-registration-trigger" data-student-id="' + htmlEscape(studentId) + '" data-enrollment-id="' + htmlEscape(row.enrollmentId) + '">View details</button>'
+          : '';
+        return '<tr>'
+          + '<td class="ps-3"><div class="fw-bold">' + htmlEscape(row.classTitle || row.classId || '-') + '</div>'
+          + '<div class="x-small text-muted font-monospace">' + htmlEscape(row.classId || '') + '</div></td>'
+          + '<td>' + htmlEscape(row.teacherName || '-') + '</td>'
+          + '<td>' + htmlEscape(row.programLabel || row.programId || '-') + '</td>'
+          + '<td><div>' + htmlEscape(row.termLabel || row.termId || '-') + '</div>'
+          + '<div class="x-small text-muted">' + htmlEscape(periodLabel) + '</div></td>'
+          + '<td>' + renderAcademicTimelineStatusBadge(row.status) + '</td>'
+          + '<td class="font-monospace small">' + htmlEscape(row.enrollmentId || '-') + '</td>'
+          + '<td class="pe-3 small"><div class="fw-semibold">' + htmlEscape(row.registrationLabel || '-') + '</div>'
+          + '<div class="x-small text-muted">' + htmlEscape(row.registrationSummary || '') + '</div>'
+          + registrationTrigger + '</td>'
+          + '</tr>';
+      }).join('')
+      : renderAcademicTimelineEmptyRow(7, 'No class enrollments found.');
+    bodyEl.innerHTML = warningsHtml + summaryHtml
+      + '<div class="rolling-academic-timeline-section"><div class="rolling-academic-timeline-section-header"><i class="bi bi-journal-bookmark me-2"></i>Programs</div>'
+      + '<div class="rolling-academic-timeline-table-wrap"><div class="table-responsive"><table class="table table-sm align-middle mb-0 rolling-academic-timeline-table">'
+      + '<thead><tr><th class="ps-3">Registration</th><th>Program</th><th>Status</th><th class="pe-3">Link</th></tr></thead><tbody>'
+      + programRowsHtml + '</tbody></table></div></div></div>'
+      + '<div class="rolling-academic-timeline-section"><div class="rolling-academic-timeline-section-header"><i class="bi bi-calendar3 me-2"></i>Terms</div>'
+      + '<div class="rolling-academic-timeline-table-wrap"><div class="table-responsive"><table class="table table-sm align-middle mb-0 rolling-academic-timeline-table">'
+      + '<thead><tr><th class="ps-3">Registration</th><th>Program / Term</th><th>Status</th><th class="pe-3">Link</th></tr></thead><tbody>'
+      + termRowsHtml + '</tbody></table></div></div></div>'
+      + '<div class="rolling-academic-timeline-section"><div class="rolling-academic-timeline-section-header primary"><i class="bi bi-easel me-2"></i>Class Enrollments</div>'
+      + '<div class="rolling-academic-timeline-classes-wrap"><div class="table-responsive"><table class="table table-sm align-middle mb-0 rolling-academic-timeline-table">'
+      + '<thead><tr><th class="ps-3">Class</th><th>Teacher</th><th>Program</th><th>Term / Enrollment period</th><th>Status</th><th>Enrollment ID</th><th class="pe-3">Registration</th></tr></thead><tbody>'
+      + classRowsHtml + '</tbody></table></div></div></div>';
+  }
+
+  async function fetchStudentAcademicOverview(studentId) {
+    const sid = String(studentId || '').trim();
+    if (!sid) throw new Error('Student is required.');
+    const url = `/school/academic-ledger/student-overview/${encodeURIComponent(sid)}/data`;
+    const result = await requestJson(url);
+    if (!result || String(result.status || '').toLowerCase() === 'error') {
+      throw new Error(result?.message || 'Failed to load academic timeline.');
+    }
+    return result;
+  }
+
+  async function openRollingStudentAcademicTimelineModal(context = {}) {
+    hideRollingStudentContextMenu();
+    if (canViewStudentAcademicOverview !== true) {
+      await showMsg('Permission', 'warning', 'You do not have permission to view the academic timeline.');
+      return;
+    }
+    const studentId = String(context?.studentId || '').trim();
+    if (!studentId) {
+      await showMsg('Academic Timeline', 'warning', 'Student id is missing.');
+      return;
+    }
+    const bodyEl = qs('rollingStudentAcademicTimelineBody');
+    if (bodyEl) bodyEl.innerHTML = '<div class="text-muted text-center py-4">Loading academic timeline...</div>';
+    mountRollingModalToBody(rollingStudentAcademicTimelineModalEl);
+    rollingStudentAcademicTimelineModal?.show();
+    raiseRollingModalAboveStack(rollingStudentAcademicTimelineModalEl);
+    try {
+      showBusy('Loading academic timeline...');
+      const payload = await fetchStudentAcademicOverview(studentId);
+      renderRollingStudentAcademicTimelineModal(payload);
+    } catch (error) {
+      if (bodyEl) {
+        bodyEl.innerHTML = '<div class="alert alert-warning mb-0">' + formatRichServerMessageHtml(error?.message || 'Failed to load academic timeline.') + '</div>';
+      } else {
+        await showMsg('Academic Timeline', 'warning', error?.message || 'Failed to load academic timeline.');
+      }
+    } finally {
+      hideBusy();
+    }
+  }
+
+  function buildRollingStudentAttendanceReportUrl(studentId) {
+    const sid = String(studentId || '').trim();
+    if (!sid) return '';
+    const url = new URL('/school/attendances/report', window.location.origin);
+    url.searchParams.set('studentIds', sid);
+    return url.toString();
+  }
+
+  async function openRollingStudentAttendanceReportTab(context = {}) {
+    hideRollingStudentContextMenu();
+    if (canOpenStudentAttendanceReport !== true) {
+      await showMsg('Permission', 'warning', 'You do not have permission to open the student attendance report.');
+      return;
+    }
+    const studentId = String(context?.studentId || '').trim();
+    if (!studentId) {
+      await showMsg('Student Attendance Report', 'warning', 'Student id is missing.');
+      return;
+    }
+    const reportUrl = buildRollingStudentAttendanceReportUrl(studentId);
+    if (!reportUrl) {
+      await showMsg('Student Attendance Report', 'warning', 'Unable to build the attendance report link.');
+      return;
+    }
+    window.open(reportUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  async function openEnrollmentDetailByIds(studentId, enrollmentId) {
+    const detailUrl = buildEnrollmentDetailApiUrl(studentId, enrollmentId);
     if (!detailUrl) {
       await showMsg('Details unavailable', 'warning', 'Student or enrollment id is missing.');
       return;
@@ -7021,6 +7392,7 @@
     if (!bodyEl || !modalEl) return;
     bodyEl.innerHTML = '<div class="text-muted text-center py-4">Loading...</div>';
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    raiseRollingModalAboveStack(modalEl);
     try {
       const result = await requestJson(detailUrl);
       if (!result || String(result.status || '').toLowerCase() === 'error') {
@@ -7030,6 +7402,12 @@
     } catch (error) {
       bodyEl.innerHTML = '<div class="alert alert-warning">' + formatRichServerMessageHtml(error?.message || 'Failed to load enrollment details.') + '</div>';
     }
+  }
+
+  async function openEnrollmentDetailModal(periodId) {
+    const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
+    if (!row) return;
+    await openEnrollmentDetailByIds(row.studentId, row.id);
   }
 
   function oneDayAfter(dateText) {
@@ -10105,7 +10483,7 @@
                 ${canReviewDraft ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-review-draft" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-text me-1"></i>Review Draft</button>` : ''}
                 ${canUndoClose ? `<button type="button" class="btn btn-outline-success btn-sm btn-row-undo-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-counterclockwise me-1"></i>Undo Close</button>` : ''}
                 ${canReenter ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>` : ''}
-                ${canMove ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-move" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-left-right me-1"></i>Move</button>` : ''}
+                ${canMove ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-move" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-left-right me-1"></i>Move/New Enrollment</button>` : ''}
                 ${canClose ? `<button type="button" class="btn btn-outline-danger btn-sm btn-row-close" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-x-circle me-1"></i>Close</button>` : ''}
                 ${canArchive ? `<button type="button" class="btn btn-outline-secondary btn-sm btn-row-archive" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-archive me-1"></i>Archive</button>` : ''}
                 ${canSyncAcademicLedger ? `<button type="button" class="btn btn-outline-info btn-sm btn-row-sync-ledger" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-bookmark me-1"></i>Sync academic ledger</button>` : ''}
@@ -10381,15 +10759,92 @@
     confirmBtn.disabled = !(periodId && effectiveDate && reason);
   }
 
+  const MOVE_ENROLLMENT_MODE_VARIANTS = {
+    move: { solid: 'btn-success', outline: 'btn-outline-success' },
+    new_elsewhere: { solid: 'btn-info', outline: 'btn-outline-info' }
+  };
+
+  function getMoveEnrollmentMode() {
+    const mode = String(moveEnrollmentMode || 'move').trim();
+    return mode === 'new_elsewhere' ? 'new_elsewhere' : 'move';
+  }
+
+  function setMoveEnrollmentMode(mode) {
+    const next = mode === 'new_elsewhere' ? 'new_elsewhere' : 'move';
+    moveEnrollmentMode = next;
+    moveEnrollmentModalEl?.querySelectorAll('.move-enrollment-mode-btn').forEach((btn) => {
+      const btnMode = String(btn.getAttribute('data-move-mode') || '').trim();
+      const variants = MOVE_ENROLLMENT_MODE_VARIANTS[btnMode] || MOVE_ENROLLMENT_MODE_VARIANTS.move;
+      const active = btnMode === next;
+      Object.values(MOVE_ENROLLMENT_MODE_VARIANTS).forEach((row) => {
+        btn.classList.remove(row.solid, row.outline);
+      });
+      btn.classList.remove('is-active-mode');
+      btn.classList.add(active ? variants.solid : variants.outline);
+      if (active) btn.classList.add('is-active-mode');
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    syncMoveEnrollmentModalMode();
+  }
+
+  function syncMoveEnrollmentModalMode() {
+    const mode = getMoveEnrollmentMode();
+    const closeSection = qs('move_closeSection');
+    const targetSection = qs('move_targetSection');
+    const newElsewhereNote = qs('move_newElsewhereNote');
+    const targetSectionTitle = qs('move_targetSectionTitle');
+    const applyBtn = qs('btn_applyMoveEnrollment');
+    const previewPanel = qs('move_previewPanel');
+    const modeHelp = qs('move_modeHelpText');
+
+    if (mode === 'move') {
+      closeSection?.classList.remove('d-none');
+      targetSection?.classList.remove('d-none');
+      newElsewhereNote?.classList.add('d-none');
+      qs('wrap_move_closeStartStyleSwitch')?.classList.remove('d-none');
+      if (targetSectionTitle) targetSectionTitle.textContent = 'Start new enrollment';
+      syncMoveCloseStartStyleUi();
+    } else {
+      closeSection?.classList.add('d-none');
+      targetSection?.classList.remove('d-none');
+      newElsewhereNote?.classList.remove('d-none');
+      qs('wrap_move_closeStartStyleSwitch')?.classList.add('d-none');
+      if (targetSectionTitle) targetSectionTitle.textContent = 'Enroll in another class';
+      if (applyBtn) applyBtn.textContent = 'Apply enrollment';
+      if (modeHelp) {
+        modeHelp.textContent = 'Enroll this student in another rolling class. This enrollment stays open.';
+      }
+    }
+
+    if (mode === 'move' && applyBtn && isMoveTransferToAnotherClass()) {
+      applyBtn.textContent = 'Apply close and enroll';
+    } else if (mode === 'move' && applyBtn) {
+      applyBtn.textContent = 'Apply finish and re-enroll';
+    }
+
+    if (mode === 'move' && modeHelp && isMoveTransferToAnotherClass()) {
+      modeHelp.textContent = 'Close as moved, then start a new enrollment in the class you select.';
+    } else if (mode === 'move' && modeHelp) {
+      modeHelp.textContent = 'Finish this enrollment (completed, not moved), then start a new enrollment in any rolling class you select.';
+    }
+
+    if (previewPanel && previewPanel.classList.contains('alert-light') && !previewPanel.querySelector('.fw-semibold')) {
+      previewPanel.textContent = 'Preview before applying your selection.';
+    }
+  }
+
   function resetMovePreviewState() {
     approvedMovePayload = null;
     approvedMovePreviewHash = null;
+    approvedMoveNewElsewherePayload = null;
+    approvedMoveNewElsewhereDraft = null;
+    approvedMoveNewElsewherePreviewMode = '';
     const applyBtn = qs('btn_applyMoveEnrollment');
     if (applyBtn) applyBtn.disabled = true;
     const panel = qs('move_previewPanel');
     if (panel) {
       panel.className = 'alert alert-light border mb-0';
-      panel.textContent = 'Preview the move before applying it.';
+      panel.textContent = 'Preview before applying your selection.';
     }
   }
 
@@ -10419,6 +10874,99 @@
     return reason;
   }
 
+  function isMoveTransferToAnotherClass() {
+    if (getMoveEnrollmentMode() !== 'move') return true;
+    const toggle = qs('move_transferToAnotherClass');
+    if (!toggle) return true;
+    return toggle.checked === true;
+  }
+
+  function resolveCurrentRollingClassTitle() {
+    return String(rollingClassData?.title || classId || '').trim();
+  }
+
+  function applyMoveTargetToCurrentClass() {
+    const currentClassId = String(classId || '').trim();
+    const title = resolveCurrentRollingClassTitle();
+    if (!currentClassId) return;
+    if (qs('move_targetClassId')) qs('move_targetClassId').value = currentClassId;
+    if (qs('move_targetClassLabel')) qs('move_targetClassLabel').value = title;
+    moveTargetClassMeta = {
+      id: currentClassId,
+      title,
+      enrollmentMode: inferMoveTargetEnrollmentMode(rollingClassData || {}),
+      isChargeable: String(rollingClassData?.billingMode || '').trim().toLowerCase() === 'chargeable'
+    };
+    syncMoveTargetClassFields();
+  }
+
+  function syncMoveCloseStartStyleUi() {
+    if (getMoveEnrollmentMode() !== 'move') return;
+    const transfer = isMoveTransferToAnotherClass();
+    const pickBtn = qs('btn_pickMoveTargetClass');
+    const classLabelInput = qs('move_targetClassLabel');
+    const statusInput = qs('move_close_status');
+    const classPickerLabel = qs('move_targetClassPickerLabel');
+    const styleHelp = qs('move_closeStartStyleHelp');
+    if (transfer) {
+      pickBtn?.classList.remove('d-none');
+      classLabelInput?.classList.remove('bg-light');
+      if (classLabelInput) classLabelInput.placeholder = 'Pick a rolling class...';
+      if (statusInput) statusInput.value = 'Completed (moved)';
+      if (classPickerLabel) classPickerLabel.textContent = 'Target Class *';
+      if (styleHelp) {
+        styleHelp.textContent = 'Close as moved and enroll in the selected class (can be this class or another).';
+      }
+      const reasonStartInput = qs('move_reasonStart');
+      const classTitle = resolveCurrentRollingClassTitle();
+      if (reasonStartInput && /^Re-enrolled in /i.test(String(reasonStartInput.value || ''))) {
+        reasonStartInput.value = classTitle ? `Moved from ${classTitle}.` : 'Moved from source class.';
+      }
+    } else {
+      pickBtn?.classList.remove('d-none');
+      classLabelInput?.classList.remove('bg-light');
+      if (classLabelInput) classLabelInput.placeholder = 'Pick a rolling class...';
+      if (statusInput) statusInput.value = 'Completed';
+      if (classPickerLabel) classPickerLabel.textContent = 'New enrollment class *';
+      if (styleHelp) {
+        styleHelp.textContent = 'Finish the current period (not a move). Pick any rolling class for the new enrollment, including this one.';
+      }
+      if (!String(qs('move_targetClassId')?.value || '').trim()) {
+        applyMoveTargetToCurrentClass();
+      }
+      const reasonStartInput = qs('move_reasonStart');
+      const targetTitle = String(qs('move_targetClassLabel')?.value || '').trim();
+      if (reasonStartInput && (!String(reasonStartInput.value || '').trim() || /^Moved from /i.test(reasonStartInput.value))) {
+        reasonStartInput.value = targetTitle
+          ? `New enrollment in ${targetTitle} after completing prior period.`
+          : 'New enrollment after completing prior period.';
+      }
+    }
+    const reasonInput = qs('move_close_reason');
+    if (reasonInput) {
+      const userReason = extractMoveCloseUserReason(reasonInput.value);
+      reasonInput.value = transfer
+        ? buildMoveCloseReason(String(qs('move_targetClassLabel')?.value || '').trim(), userReason)
+        : userReason;
+    }
+    const applyBtn = qs('btn_applyMoveEnrollment');
+    if (applyBtn) {
+      applyBtn.textContent = transfer ? 'Apply close and enroll' : 'Apply finish and re-enroll';
+    }
+    const modeHelp = qs('move_modeHelpText');
+    if (modeHelp) {
+      modeHelp.textContent = transfer
+        ? 'Close as moved, then start a new enrollment in the class you select.'
+        : 'Finish this enrollment (completed, not moved), then start a new enrollment in any rolling class you select.';
+    }
+  }
+
+  function buildMoveCloseReasonForModal(userReason = '') {
+    const reason = String(userReason || '').trim();
+    if (!isMoveTransferToAnotherClass()) return reason;
+    return buildMoveCloseReason(String(qs('move_targetClassLabel')?.value || '').trim(), reason);
+  }
+
   function extractMoveCloseUserReason(value = '') {
     const reason = String(value || '').trim();
     const match = reason.match(/^Moved to [^:]+:\s*(.*)$/i);
@@ -10443,37 +10991,116 @@
   }
 
   function syncMoveCloseReasonWithTarget(targetClassTitle) {
+    if (!isMoveTransferToAnotherClass()) return;
     const input = qs('move_close_reason');
     if (!input) return;
     input.value = buildMoveCloseReason(targetClassTitle, extractMoveCloseUserReason(input.value));
   }
 
-  function readMoveEnrollmentPayload() {
-    const funder = resolveFunderSelectionFromSelect('move_funder');
-    const targetClassTitle = String(qs('move_targetClassLabel')?.value || '').trim();
+  function readMoveCloseStatusPayloadFromModal() {
+    const effectiveDate = String(qs('move_close_endDate')?.value || '').trim();
     const userCloseReason = extractMoveCloseUserReason(qs('move_close_reason')?.value);
+    return {
+      targetStatus: 'completed',
+      effectiveDate,
+      reason: buildMoveCloseReasonForModal(userCloseReason)
+    };
+  }
+
+  function readMoveTargetEnrollmentPayload() {
+    const funder = resolveFunderSelectionFromSelect('move_funder');
     const sessionCount = normalizeTargetSessionCountValue(qs('move_targetSessionCount')?.value);
     const targetHours = normalizeTargetHoursValue(qs('move_targetHours')?.value);
+    const targetClassId = String(qs('move_targetClassId')?.value || '').trim();
+    const payload = {
+      classId: targetClassId,
+      studentId: String(qs('move_studentId')?.value || '').trim(),
+      startDate: String(qs('move_startDate')?.value || '').trim(),
+      endDate: String(qs('move_endDate')?.value || '').trim(),
+      status: String(qs('move_status')?.value || 'active').trim().toLowerCase() || 'active',
+      funderType: funder.funderType,
+      funderId: funder.funderId,
+      ...readEnrollmentClaimPayload('move_claimNumber'),
+      reasonStart: String(qs('move_reasonStart')?.value || '').trim(),
+      notes: String(qs('move_notes')?.value || '').trim(),
+      sessionCountPolicy: String(moveSourcePeriodRow?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na',
+      sessionCapacityType: readSessionCapacityTypeFromSelect('move_sessionCapacityType')
+    };
+    if (sessionCount > 0) payload.targetSessionCount = sessionCount;
+    if (targetHours > 0) payload.targetHours = targetHours;
+    const programId = String(moveSourcePeriodRow?.programId || '').trim();
+    const termId = String(moveSourcePeriodRow?.termId || '').trim();
+    const programRegistrationId = String(moveSourcePeriodRow?.programRegistrationId || '').trim();
+    if (programId) payload.programId = programId;
+    if (termId) payload.termId = termId;
+    if (programRegistrationId) payload.programRegistrationId = programRegistrationId;
+    return payload;
+  }
+
+  function inferMoveTargetEnrollmentModeFromForm() {
+    const sessionCount = normalizeTargetSessionCountValue(qs('move_targetSessionCount')?.value);
+    const targetHours = normalizeTargetHoursValue(qs('move_targetHours')?.value);
+    if (targetHours > 0) return 'hour_cap';
+    if (sessionCount > 0) return 'session_cap';
+    const meta = moveTargetClassMeta;
+    if (meta?.enrollmentMode) return String(meta.enrollmentMode).trim().toLowerCase();
+    return 'date_window';
+  }
+
+  function buildMoveTargetEnginePayload() {
+    const base = readMoveTargetEnrollmentPayload();
+    const enginePayload = {
+      classId: base.classId,
+      students: [{ studentId: base.studentId }],
+      enrollmentMode: inferMoveTargetEnrollmentModeFromForm(),
+      startDate: base.startDate,
+      endDate: base.endDate,
+      status: base.status,
+      funderType: base.funderType,
+      funderId: base.funderId,
+      claimNumberId: base.claimNumberId,
+      claimNumber: base.claimNumber,
+      reasonStart: base.reasonStart,
+      sessionCountPolicy: base.sessionCountPolicy,
+      sessionCapacityType: base.sessionCapacityType,
+      enrollmentSource: 'enrollment_move'
+    };
+    if (base.targetSessionCount) enginePayload.targetSessionCount = base.targetSessionCount;
+    if (base.targetHours) enginePayload.targetHours = base.targetHours;
+    if (base.notes) enginePayload.notes = base.notes;
+    if (base.programId) enginePayload.programId = base.programId;
+    if (base.termId) enginePayload.termId = base.termId;
+    if (base.programRegistrationId) enginePayload.programRegistrationId = base.programRegistrationId;
+    return enginePayload;
+  }
+
+  function readMoveEnrollmentPayload() {
+    const closeStatus = readMoveCloseStatusPayloadFromModal();
+    const target = readMoveTargetEnrollmentPayload();
     return {
       close: {
-        effectiveDate: String(qs('move_close_endDate')?.value || '').trim(),
-        targetStatus: 'completed',
-        reason: buildMoveCloseReason(targetClassTitle, userCloseReason)
+        effectiveDate: closeStatus.effectiveDate,
+        targetStatus: closeStatus.targetStatus,
+        reason: closeStatus.reason
       },
       target: {
-        classId: String(qs('move_targetClassId')?.value || '').trim(),
-        studentId: String(qs('move_studentId')?.value || '').trim(),
-        startDate: String(qs('move_startDate')?.value || '').trim(),
-        endDate: String(qs('move_endDate')?.value || '').trim(),
-        targetSessionCount: sessionCount,
-        targetHours,
-        funder,
-        reasonStart: String(qs('move_reasonStart')?.value || '').trim(),
-        notes: String(qs('move_notes')?.value || '').trim(),
-        status: String(qs('move_status')?.value || 'active').trim().toLowerCase() || 'active',
-        sessionCapacityType: readSessionCapacityTypeFromSelect('move_sessionCapacityType'),
-        ...readEnrollmentClaimPayload('move_claimNumber'),
-        sessionCountPolicy: String(moveSourcePeriodRow?.sessionCountPolicy || 'all_non_na').trim() || 'all_non_na'
+        classId: target.classId,
+        studentId: target.studentId,
+        startDate: target.startDate,
+        endDate: target.endDate,
+        targetSessionCount: target.targetSessionCount || 0,
+        targetHours: target.targetHours || 0,
+        funder: { funderId: target.funderId, funderType: target.funderType },
+        reasonStart: target.reasonStart,
+        notes: target.notes || '',
+        status: target.status,
+        sessionCapacityType: target.sessionCapacityType,
+        claimNumberId: target.claimNumberId,
+        claimNumber: target.claimNumber,
+        sessionCountPolicy: target.sessionCountPolicy,
+        programId: target.programId,
+        termId: target.termId,
+        programRegistrationId: target.programRegistrationId
       }
     };
   }
@@ -10507,9 +11134,10 @@
     const nextTitle = String(item?.title || item?.label || nextId).trim();
     const studentId = String(qs('move_studentId')?.value || '').trim();
     if (!nextId) return;
-    if (nextId === String(classId || '').trim()) {
+    const moveMode = getMoveEnrollmentMode();
+    if (moveMode === 'new_elsewhere' && nextId === String(classId || '').trim()) {
       clearMoveTargetClassPicker();
-      await showMsg('Invalid Target', 'warning', 'Target class must be different from the current class.');
+      await showMsg('Invalid Target', 'warning', 'Choose a different class, or use Close and start a new enrollment to enroll again in this class.');
       return;
     }
     if (item?.isClosedForNewEnrollment === true || String(item?.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true') {
@@ -10531,6 +11159,14 @@
       isChargeable: String(item?.billingMode || '').trim().toLowerCase() === 'chargeable'
     };
     syncMoveCloseReasonWithTarget(nextTitle);
+    if (!isMoveTransferToAnotherClass()) {
+      const reasonStartInput = qs('move_reasonStart');
+      if (reasonStartInput) {
+        reasonStartInput.value = nextTitle
+          ? `New enrollment in ${nextTitle} after completing prior period.`
+          : 'New enrollment after completing prior period.';
+      }
+    }
     syncMoveTargetClassFields();
   }
 
@@ -10551,8 +11187,10 @@
         : undefined,
       itemFilter: (item) => {
         const itemId = String(item?.id || '').trim();
-        if (!itemId || itemId === sourceClassId) return false;
-        return String(item?.registrationMode || '').trim().toLowerCase() === 'rolling';
+        if (!itemId) return false;
+        if (String(item?.registrationMode || '').trim().toLowerCase() !== 'rolling') return false;
+        if (getMoveEnrollmentMode() === 'new_elsewhere' && itemId === sourceClassId) return false;
+        return true;
       },
       onSelect: (item) => {
         syncMoveTargetClassFromPicker(item);
@@ -10594,6 +11232,9 @@
     }
     setSessionCapacitySelectValue('move_sessionCapacityType', row?.sessionCapacityType || 'group');
     clearMoveTargetClassPicker();
+    const transferToggle = qs('move_transferToAnotherClass');
+    if (transferToggle) transferToggle.checked = true;
+    setMoveEnrollmentMode('move');
     await refreshClaimNumberSelect('move_claimNumber', row.studentId, resolveClaimSelectToken(row));
     moveEnrollmentModal.show();
   }
@@ -10636,10 +11277,65 @@
     ].join('');
   }
 
+  function renderMoveNewElsewherePreviewPanel(previewResult) {
+    const panel = qs('move_previewPanel');
+    if (!panel) return;
+    const mode = String(previewResult?.mode || '').trim().toLowerCase();
+    panel.className = 'alert alert-info mb-0';
+    if (mode === 'chargeable' && previewResult?.requiresDraft) {
+      panel.innerHTML = [
+        '<div class="fw-semibold mb-1">Ready to apply</div>',
+        '<div>Chargeable target class. Applying will open the draft review step before enrollment is saved.</div>',
+        previewResult.message ? `<div class="small mt-2">${htmlEscape(String(previewResult.message))}</div>` : ''
+      ].join('');
+      return;
+    }
+    panel.innerHTML = [
+      '<div class="fw-semibold mb-1">Ready to apply</div>',
+      '<div>New enrollment can be created on the target class.</div>',
+      previewResult?.message ? `<div class="small mt-2">${htmlEscape(String(previewResult.message))}</div>` : ''
+    ].join('');
+  }
+
   async function previewMoveEnrollmentAction() {
     const periodId = String(qs('move_periodId')?.value || '').trim();
+    const mode = getMoveEnrollmentMode();
+    if (!periodId) {
+      await showMsg('Missing Period', 'warning', 'Enrollment period is required.');
+      return;
+    }
+
+    if (mode === 'new_elsewhere') {
+      const targetPayload = readMoveTargetEnrollmentPayload();
+      if (!targetPayload.classId || !targetPayload.startDate || !targetPayload.reasonStart) {
+        await showMsg('Missing Fields', 'warning', 'Target class, start date, and reason start are required before previewing.');
+        return;
+      }
+      try {
+        showBusy('Preparing enrollment preview...');
+        const previewResult = await requestJson('/school/classes/api/enrollment-periods/preview-create', 'POST', targetPayload);
+        if (!previewResult) return;
+        renderMoveNewElsewherePreviewPanel(previewResult);
+        approvedMoveNewElsewherePayload = { ...targetPayload };
+        approvedMoveNewElsewhereDraft = previewResult.draft || null;
+        approvedMoveNewElsewherePreviewMode = String(previewResult.mode || '').trim().toLowerCase();
+        qs('btn_applyMoveEnrollment').disabled = false;
+      } catch (error) {
+        resetMovePreviewState();
+        const panel = qs('move_previewPanel');
+        if (panel) {
+          panel.className = 'alert alert-warning mb-0';
+          panel.innerHTML = `<div class="fw-semibold mb-1">Preview blocked</div><div>${formatRichServerMessageHtml(error.message || 'Unable to preview enrollment.')}</div>`;
+        }
+        await showMsg('Preview failed', 'error', error.message || 'Unable to preview enrollment.');
+      } finally {
+        hideBusy();
+      }
+      return;
+    }
+
     const payload = readMoveEnrollmentPayload();
-    if (!periodId || !payload.close.effectiveDate || !payload.close.reason || !payload.target.classId || !payload.target.startDate || !payload.target.reasonStart) {
+    if (!payload.close.effectiveDate || !payload.close.reason || !payload.target.classId || !payload.target.startDate || !payload.target.reasonStart) {
       await showMsg('Missing Fields', 'warning', 'Complete all required close and target enrollment fields before previewing.');
       return;
     }
@@ -10667,20 +11363,81 @@
 
   async function applyMoveEnrollmentAction() {
     const periodId = String(qs('move_periodId')?.value || '').trim();
-    const payload = readMoveEnrollmentPayload();
+    const mode = getMoveEnrollmentMode();
     if (!periodId) {
       await showMsg('Missing Period', 'warning', 'Enrollment period is required.');
       return;
     }
+
+    if (mode === 'new_elsewhere') {
+      const targetPayload = readMoveTargetEnrollmentPayload();
+      if (!approvedMoveNewElsewherePayload || JSON.stringify(targetPayload) !== JSON.stringify(approvedMoveNewElsewherePayload)) {
+        await showMsg('Preview Required', 'warning', 'Preview the current enrollment details before applying.');
+        resetMovePreviewState();
+        return;
+      }
+      const confirmed = await showConfirm('Create enrollment on the target class?', 'New Enrollment Elsewhere', {
+        confirmText: 'Apply enrollment',
+        confirmClass: 'btn-primary'
+      });
+      if (!confirmed) return;
+      if (approvedMoveNewElsewherePreviewMode === 'chargeable' && approvedMoveNewElsewhereDraft) {
+        moveEnrollmentModal.hide();
+        openChargeModalWithDraft(targetPayload, approvedMoveNewElsewhereDraft);
+        resetMovePreviewState();
+        return;
+      }
+      const targetClassId = String(targetPayload.classId || '').trim();
+      if (!targetClassId) {
+        await showMsg('Missing Target', 'warning', 'Target class is required.');
+        return;
+      }
+      try {
+        showBusy('Creating enrollment...');
+        const enginePayload = buildMoveTargetEnginePayload();
+        const result = await requestJson(
+          `/school/classes/api/${encodeURIComponent(targetClassId)}/rolling-enrollment/execute`,
+          'POST',
+          enginePayload
+        );
+        if (!result) return;
+        moveEnrollmentModal.hide();
+        await loadRows();
+        const period = result.period || result.data?.results?.find((row) => row?.ok)?.period || result.data?.period;
+        const periodStatus = String(period?.status || '').trim().toLowerCase();
+        if (period?.id && ['draft', 'to_be_confirmed', 'waiting_list'].includes(periodStatus)) {
+          await showMsg('Enrollment Created', 'success', result.message || 'Enrollment created. Review draft charges if needed.');
+          openDraftReviewModal(period.id);
+          resetMovePreviewState();
+          return;
+        }
+        await showMsg('Enrollment Created', 'success', result.message || 'Enrollment created on the target class.');
+        resetMovePreviewState();
+      } catch (error) {
+        await showMsg('Create Failed', 'error', error.message || 'Unable to create enrollment.');
+        resetMovePreviewState();
+      } finally {
+        hideBusy();
+      }
+      return;
+    }
+
+    const payload = readMoveEnrollmentPayload();
     if (!approvedMovePayload || !approvedMovePreviewHash || JSON.stringify(payload) !== JSON.stringify(approvedMovePayload)) {
       await showMsg('Preview Required', 'warning', 'Preview the current move details before applying.');
       resetMovePreviewState();
       return;
     }
-    const confirmed = await showConfirm('Apply this enrollment move?', 'Move Enrollment', {
-      confirmText: 'Apply Move',
-      confirmClass: 'btn-primary'
-    });
+    const confirmed = await showConfirm(
+      isMoveTransferToAnotherClass()
+        ? 'Close this enrollment and start the new one?'
+        : 'Finish this enrollment and start a new one in this class?',
+      isMoveTransferToAnotherClass() ? 'Close and start a new enrollment' : 'Finish and re-enroll',
+      {
+        confirmText: isMoveTransferToAnotherClass() ? 'Apply close and enroll' : 'Apply finish and re-enroll',
+        confirmClass: isMoveTransferToAnotherClass() ? 'btn-success' : 'btn-success'
+      }
+    );
     if (!confirmed) return;
     try {
       showBusy('Applying enrollment move...');
@@ -10694,9 +11451,11 @@
       if (result.requiresDraftReview && result.targetPeriod?.id) {
         await showMsg('Move Applied', 'success', result.message || 'Enrollment moved. Review draft charges for the new class enrollment.');
         openDraftReviewModal(result.targetPeriod.id);
+        resetMovePreviewState();
         return;
       }
       await showMsg('Move Applied', 'success', result.message || 'Enrollment moved successfully.');
+      resetMovePreviewState();
     } catch (error) {
       await showMsg('Move Failed', 'error', error.message || 'Unable to apply enrollment move.');
       resetMovePreviewState();
@@ -13116,9 +13875,26 @@
   qs('btn_previewMoveEnrollment')?.addEventListener('click', previewMoveEnrollmentAction);
   qs('btn_applyMoveEnrollment')?.addEventListener('click', applyMoveEnrollmentAction);
   qs('btn_pickMoveTargetClass')?.addEventListener('click', openMoveTargetClassPicker);
+  qs('move_transferToAnotherClass')?.addEventListener('change', () => {
+    if (isMoveTransferToAnotherClass()) {
+      clearMoveTargetClassPicker();
+    } else if (!String(qs('move_targetClassId')?.value || '').trim()) {
+      applyMoveTargetToCurrentClass();
+    }
+    syncMoveCloseStartStyleUi();
+    resetMovePreviewState();
+  });
   ['move_close_endDate', 'move_close_reason', 'move_startDate', 'move_endDate', 'move_targetSessionCount', 'move_targetHours', 'move_reasonStart', 'move_notes', 'move_status', 'move_sessionCapacityType', 'move_claimNumber'].forEach((id) => {
     qs(id)?.addEventListener('input', resetMovePreviewState);
     qs(id)?.addEventListener('change', resetMovePreviewState);
+  });
+  moveEnrollmentModalEl?.querySelectorAll('.move-enrollment-mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const mode = String(btn.getAttribute('data-move-mode') || 'move').trim();
+      if (getMoveEnrollmentMode() === mode) return;
+      setMoveEnrollmentMode(mode);
+      resetMovePreviewState();
+    });
   });
   qs('move_funder')?.addEventListener('change', resetMovePreviewState);
   qs('move_targetSessionCount')?.addEventListener('input', () => applyEnrollmentCapMutualExclusion('move_targetSessionCount'));
@@ -13130,7 +13906,7 @@
   qs('move_close_endDate')?.addEventListener('change', () => {
     const closeDate = String(qs('move_close_endDate')?.value || '').trim();
     const startInput = qs('move_startDate');
-    if (startInput && closeDate) {
+    if (getMoveEnrollmentMode() === 'move' && startInput && closeDate) {
       startInput.value = closeDate;
     }
     resetMovePreviewState();
@@ -13238,6 +14014,23 @@
       studentId: rollingStudentContextState.studentId,
       studentLabel: rollingStudentContextState.studentLabel
     });
+  });
+  qs('rollingStudentContextMenuAcademicTimeline')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentAcademicTimelineModal(rollingStudentContextState);
+  });
+  qs('rollingStudentContextMenuAttendanceReport')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentAttendanceReportTab(rollingStudentContextState);
+  });
+  qs('rollingStudentAcademicTimelineBody')?.addEventListener('click', (event) => {
+    const trigger = event.target.closest('.rolling-academic-timeline-registration-trigger');
+    if (!trigger) return;
+    event.preventDefault();
+    const studentId = String(trigger.dataset.studentId || '').trim();
+    const enrollmentId = String(trigger.dataset.enrollmentId || '').trim();
+    if (!studentId || !enrollmentId) return;
+    openEnrollmentDetailByIds(studentId, enrollmentId);
   });
   qs('inp_claimNumber')?.addEventListener('change', () => {
     handleClaimNumberSelectChange('inp_claimNumber', qs('inp_studentId')?.value, qs('inp_studentLabel')?.value);

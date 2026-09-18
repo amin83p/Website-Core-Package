@@ -63,22 +63,22 @@
       "pte.packageAssets": "PTE/Package_Assets"
     },
     "brand": {
-      "appName": "Amin Pakenjad",
-      "appShortName": "Amin Pakenjad",
+      "appName": "EQUALIZER",
+      "appShortName": "EQZ",
       "tagline": "Equilibrium School",
       "logoUrl": "/uploads/GLOBAL/logo/Logo1.png",
       "iconSvgUrl": "/uploads/GLOBAL/logo/Logo.svg",
       "appleTouchIconUrl": "/uploads/GLOBAL/logo/Logo1.png",
       "themeColor": "#ffffff",
       "ownerDisplayName": "Amin Paknejad",
-      "footerAboutTitle": "About Amin Paknejad",
-      "footerAboutText": "<b>Amin Paknejad</b>, PhD, is a Calgary-based engineer, software developer, and instructor. His work focuses on CFD, scientific computing, and building practical tools that make research and engineering workflows faster and more reliable.",
+      "footerAboutTitle": "About Equalizer App",
+      "footerAboutText": "<b>Equilibrium School</b>, is a non-profit institution that has been serving our community since 1993. Equilibrium is an educational centre that promotes global education and intercultural understanding through the interaction of diverse groups of people of all ages. Equilibrium School offers a wide range of courses to prepare students for life, college, university, and technical and business institutes. ",
       "footerLogoAlt": "Amin Paknejad",
       "footerShowNewsletter": true,
-      "instagramUrl": "https://www.instagram.com/amin83/",
-      "facebookUrl": "",
-      "linkedinUrl": "https://www.linkedin.com/in/amin-paknejad/",
-      "youtubeUrl": "",
+      "instagramUrl": "https://www.instagram.com/equilibriumyyc/?hl=en",
+      "facebookUrl": "http://www.facebook.com/EquilibriumSchool",
+      "linkedinUrl": "https://www.linkedin.com/company/equilibrium-school/",
+      "youtubeUrl": "https://www.youtube.com/",
       "headerShowBuyMeACoffee": false,
       "headerBuyMeACoffeeUrl": "https://www.buymeacoffee.com/paknejad",
       "headerBuyMeACoffeeLabel": "Support",
@@ -86,42 +86,35 @@
       "headerBuyMeACoffeeTitle": "Support the work - one coffee at a time."
     },
     "contact": {
-      "email": "paknejad@live.com",
+      "email": "school@equilibrium.ab.ca",
       "collegeEmail": "",
-      "phone": "+1 (437) 602 8720",
-      "address": "Calgary, Alberta",
-      "faxes": [],
+      "phone": "(403) 283-1111",
+      "address": "707 14 Street NW, Calgary, AB, T2N 2A4, Calgary, Alberta",
+      "faxes": [
+        {
+          "title": "Fax",
+          "number": "(403) 270-7786"
+        }
+      ],
       "emails": [
         {
-          "title": "General Inquiries",
-          "email": "paknejad@live.com"
-        },
-        {
           "title": "School",
-          "email": "apaknejad@equilibrium.ab.ca"
-        },
-        {
-          "title": "College",
-          "email": "amin.paknejad@robertsoncollege.ca"
-        },
-        {
-          "title": "University",
-          "email": "apaknejad@ucalgary.ca"
+          "email": "school@equilibrium.ab.ca"
         }
       ],
       "phones": [
         {
           "title": "Phone",
-          "number": "+1 (437) 602 8720"
+          "number": "(403) 283-1111"
         }
       ],
       "addresses": [
         {
           "title": "Address",
-          "address": "Calgary, Alberta"
+          "address": "707 14 Street NW, Calgary, AB, T2N 2A4, Calgary, Alberta"
         }
       ],
-      "fax": ""
+      "fax": "(403) 270-7786"
     },
     "contactPage": {
       "heroEyebrow": "Contact And Support",
@@ -265,7 +258,7 @@
       {
         "key": "CANADA_POST_ADDRESS_API_KEY",
         "isSecret": true,
-        "valueEncrypted": "c077f7b65a0c7a668025ee80a8d36fba:b98194cc32dad55c514b4143de8ff791",
+        "valueEncrypted": "a9d428cc7320957cd5fc0bd8c61a1805:20bb45b719dcd11dd5db9fdc9d1e9f10",
         "valueHint": "***in@@"
       },
       {
@@ -299,6 +292,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-09-16T04:56:34.421Z"
+    "lastUpdateDateTime": "2026-09-18T02:46:08.979Z"
   }
 }

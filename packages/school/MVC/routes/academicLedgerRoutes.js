@@ -31,6 +31,11 @@ router.get('/student-overview/:studentId',
   trackActionState(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
   ctrl.showStudentOverviewForStudent);
 
+router.get('/student-overview/:studentId/data',
+  requireAccess(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
+  ctrl.getStudentOverviewData);
+
 router.get('/student-overview/:studentId/enrollment-detail/:enrollmentId',
   requireAccess(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),

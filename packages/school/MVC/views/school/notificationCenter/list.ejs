@@ -73,31 +73,49 @@
       <% } %>
 
       <% (data || []).forEach((rule) => { %>
+        <% const showRuleMetadata = access?.canViewRuleMetadata === true; %>
 
         <tr data-entity-row-id="<%= rule.id %>">
 
           <td class="ps-4">
 
+            <% if (showRuleMetadata) { %>
             <div class="fw-semibold text-dark"><%= rule.label %></div>
-
             <% if (rule.id) { %><div class="x-small text-muted font-monospace"><%= rule.id %></div><% } %>
-
-          </td>
-
-          <td><span class="text-dark"><%= typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel(rule.ruleType) : rule.ruleType %></span></td>
-
-          <td data-sort-value="<%= rule.enabled ? '1' : '0' %>">
-
-            <% if (rule.enabled) { %><span class="badge bg-success">Enabled</span><% } else { %><span class="badge bg-secondary">Paused</span><% } %>
-            <% if (typeof isRuleOutsideActivityWindow === 'function' && isRuleOutsideActivityWindow(rule)) { %>
-              <div class="x-small text-muted mt-1">Scheduled evaluation paused (outside activity date window)</div>
+            <% } else { %>
+            <span class="text-muted">—</span>
             <% } %>
 
           </td>
 
-          <td data-sort-value="<%= rule.legacyKey ? 'legacy' : 'custom' %>">
+          <td>
+            <% if (showRuleMetadata) { %>
+            <span class="text-dark"><%= typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel(rule.ruleType) : rule.ruleType %></span>
+            <% } else { %>
+            <span class="text-muted">—</span>
+            <% } %>
+          </td>
 
+          <td data-sort-value="<%= showRuleMetadata && rule.enabled ? '1' : '0' %>">
+
+            <% if (showRuleMetadata) { %>
+            <% if (rule.enabled) { %><span class="badge bg-success">Enabled</span><% } else { %><span class="badge bg-secondary">Paused</span><% } %>
+            <% if (typeof isRuleOutsideActivityWindow === 'function' && isRuleOutsideActivityWindow(rule)) { %>
+              <div class="x-small text-muted mt-1">Scheduled evaluation paused (outside activity date window)</div>
+            <% } %>
+            <% } else { %>
+            <span class="text-muted">—</span>
+            <% } %>
+
+          </td>
+
+          <td data-sort-value="<%= showRuleMetadata && rule.legacyKey ? 'legacy' : 'custom' %>">
+
+            <% if (showRuleMetadata) { %>
             <% if (rule.legacyKey) { %><span class="badge bg-light text-muted border">Legacy sync</span><% } else { %><span class="text-muted small">Custom</span><% } %>
+            <% } else { %>
+            <span class="text-muted">—</span>
+            <% } %>
 
           </td>
 
@@ -163,49 +181,51 @@
 
 
 
-<% if (access?.canViewRuns) { %>
+<div class="mt-4 mb-2">
 
-  <div class="mt-4 mb-2">
+  <h2 class="h5 fw-bold text-dark mb-0"><i class="bi bi-clock-history me-2"></i>Recent runs</h2>
 
-    <h2 class="h5 fw-bold text-dark mb-0"><i class="bi bi-clock-history me-2"></i>Recent runs</h2>
+  <p class="small text-muted mb-0">Preview results from manual and scheduled evaluations. Open a run to review findings.</p>
 
-    <p class="small text-muted mb-0">Preview results from manual and scheduled evaluations. Open a run to review findings.</p>
+</div>
 
-  </div>
+<div class="table-scroll-wrapper mt-2" data-floating-row-actions="true">
 
-  <div class="table-scroll-wrapper mt-2" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="nc-recent-runs-table">
 
-    <table class="table-responsive size-md" id="nc-recent-runs-table">
+    <thead>
 
-      <thead>
+      <tr>
 
-        <tr>
+        <th class="ps-4 text-center" data-column="review" style="width:3rem;">Review</th>
 
-          <th class="ps-4 text-center" data-column="review" style="width:3rem;">Review</th>
+        <th class="draggable" data-column="ruleLabel">Rule <span class="sort-icon"></span></th>
 
-          <th class="draggable" data-column="ruleLabel">Rule <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
 
-          <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="batchCount">Batches <span class="sort-icon"></span></th>
 
-          <th class="draggable" data-column="batchCount">Batches <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="findingCount">Findings <span class="sort-icon"></span></th>
 
-          <th class="draggable" data-column="findingCount">Findings <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="startedAt">Started <span class="sort-icon"></span></th>
 
-          <th class="draggable" data-column="startedAt">Started <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
 
-          <th class="text-end pe-4">Actions</th>
+      </tr>
 
-        </tr>
+    </thead>
 
-      </thead>
+    <tbody>
 
-      <tbody>
+      <% if (!access?.canViewRuns) { %>
 
-        <% if (!(runs || []).length) { %>
+        <tr data-nc-runs-locked="1"><td colspan="7" class="text-center py-4 text-muted">You need READ_ALL access to view recent runs.</td></tr>
 
-          <tr data-nc-empty-runs="1"><td colspan="7" class="text-center py-4 text-muted">No runs yet.</td></tr>
+      <% } else if (!(runs || []).length) { %>
 
-        <% } %>
+        <tr data-nc-empty-runs="1"><td colspan="7" class="text-center py-4 text-muted">No runs yet.</td></tr>
+
+      <% } else { %>
 
         <% (runs || []).forEach((run) => {
 
@@ -247,7 +267,7 @@
 
             <td class="table-actions text-end pe-4">
 
-              <% if (access?.canViewRuns || access?.canRunNow) { %>
+              <% if (access?.canViewRuns || access?.canDeleteRuns) { %>
 
               <div class="row-actions-wrap">
 
@@ -265,7 +285,7 @@
 
                   <% } %>
 
-                  <% if (access?.canRunNow) { %>
+                  <% if (access?.canDeleteRuns) { %>
 
                     <form method="post" action="/school/notification-center/runs/<%= run.id %>/delete" class="d-inline js-nc-delete-run-form">
 
@@ -287,13 +307,13 @@
 
         <% }); %>
 
-      </tbody>
+      <% } %>
+
+    </tbody>
 
     </table>
 
   </div>
-
-<% } %>
 
 
 

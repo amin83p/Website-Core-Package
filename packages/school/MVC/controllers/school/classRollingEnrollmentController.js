@@ -1551,7 +1551,9 @@ async function showRollingEnrollmentPage(req, res) {
       user: req.user,
       actionStateId: req.actionStateId,
       canManageEnrollmentOffice: isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
-      canEditStudentClb: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE)
+      canEditStudentClb: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
+      canViewStudentAcademicOverview: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
+      canOpenStudentAttendanceReport: (await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip)).canOpenReport
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });

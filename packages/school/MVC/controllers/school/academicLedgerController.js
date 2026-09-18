@@ -401,6 +401,29 @@ exports.showStudentOverviewForStudent = async (req, res) => {
   }
 };
 
+exports.getStudentOverviewData = async (req, res) => {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const overview = await studentAcademicOverviewService.buildStudentAcademicOverview({
+      reqUser: req.user,
+      activeOrgId,
+      studentId: req.params.studentId
+    });
+    return res.json({
+      status: 'success',
+      student: overview.student,
+      summary: overview.summary,
+      warnings: overview.warnings,
+      reviewRequired: overview.reviewRequired,
+      programs: overview.programs,
+      terms: overview.terms,
+      classes: overview.classes
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
 exports.getStudentEnrollmentDetail = async (req, res) => {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);

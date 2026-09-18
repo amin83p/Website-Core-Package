@@ -42,11 +42,13 @@ When reading this matrix, assume the user already has the NC operation at the st
 | Question | Answered here | Answered elsewhere |
 | --- | --- | --- |
 | Can the user open Notification Centre home? | Yes — `READ` | — |
+| Can the user see rule list metadata on home (label, type, enabled)? | Yes — `READ_ALL` at ORGANIZATION / ADMIN only | — |
 | Can the user create or edit notification rules? | Yes — `CONFIGURE` | — |
-| Can the user run a rule now (preview evaluation)? | Yes — `UPDATE` | — |
+| Can the user run a rule now (preview evaluation)? | Yes — `UPDATE` at ORGANIZATION / ADMIN only | — |
 | Can the user open run review and see teacher/session findings? | Yes — `READ_ALL` (filtered by scope tier) | — |
 | Can the user compose and schedule email for selected sessions? | Yes — `UPLOAD` | — |
 | Can the user list scheduled NC emails, cancel queued, delete failed? | `READ_ALL` / `UPLOAD` / `DELETE` respectively | — |
+| Can the user delete rows from Recent runs on home? | Yes — `DELETE` at ORGANIZATION / ADMIN | — |
 | Which classes/sessions appear in evaluator findings? | Partially — filtered with actor scope during evaluation and run display | `SCHOOL_CLASSES` / `SCHOOL_SESSIONS` |
 
 ### How to read operation and scope rows
@@ -61,7 +63,7 @@ Each row answers: *Given NC access at this scope, what centre actions and run/ou
 
 | Page / Where | What user can do and see |
 | --- | --- |
-| **Notification Centre** (`/school/notification-center`) | List rules (READ). **Run now** shows a waiting modal then opens run review (UPDATE). Recent preview runs when READ_ALL granted (sortable; read/unread icons per user). Links to rule editor (CONFIGURE), run review (READ_ALL), scheduled emails (READ_ALL). |
+| **Notification Centre** (`/school/notification-center`) | Open home (**READ**). **Rules** and **Recent runs** table shells are always visible when home is open; rule metadata and run rows populate only when the matching operation/scope applies (see Home UI capability flags). **Run now** shows a waiting modal then opens run review (**UPDATE** at ORGANIZATION / ADMIN). Recent preview runs when **READ_ALL** granted (sortable; read/unread icons per user). Links to rule editor (**CONFIGURE**), run review (**READ_ALL**), scheduled emails (**READ_ALL**). |
 | **Rule editor** (`/school/notification-center/rules/:id`) | Configure rule type, criteria, channels, email compose, optional **weekday + run time** schedule, and optional **activity date window** for scheduled evaluation (**CONFIGURE**). Saving syncs scheduled task definitions when evaluation schedule is enabled and today falls within the activity window (if configured). |
 | **Run review** (`/school/notification-center/runs/:id`) | Teacher → class → session tree for batches visible at actor’s READ_ALL scope; select sessions; open compose when UPLOAD granted (**READ_ALL**). |
 | **Compose / schedule** (`/school/notification-center/runs/:id/compose`, `POST .../schedule-email`) | Edit generated subject/body; set send datetime; queue to core email outbox (**UPLOAD**). |
@@ -87,16 +89,16 @@ See [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-20
 | Operation | Scope | What user can do and see |
 | --- | --- | --- |
 | READ | USER | No Access. |
-| READ | OWNER / DEPARTMENT / DIVISION / ORGANIZATION / ADMIN | Open Notification Centre home; see rule list metadata (label, type, enabled). Cannot see recent runs, edit rules, or outbox without other operations. |
+| READ | OWNER / DEPARTMENT / DIVISION / ORGANIZATION / ADMIN | Open Notification Centre home. **Cannot** see rule list metadata (label, type, enabled). **Cannot** see recent run rows, edit rules, or outbox without other operations. Both **Rules** and **Recent runs** table shells are visible; cells stay masked or empty until the user gains the operation that unlocks that content. |
 
 ### READ_ALL
 
 | Operation | Scope | What user can do and see |
 | --- | --- | --- |
 | READ_ALL | USER | No Access. |
-| READ_ALL | OWNER | View runs and batches where the actor is the **recipient** (teacher person id) or is a **session editor** on at least one finding in the batch. |
-| READ_ALL | DEPARTMENT / DIVISION | View runs and batches whose findings reference classes/sessions in the actor’s **assignment (class-picker) scope**. |
-| READ_ALL | ORGANIZATION | Org-wide run and batch visibility. |
+| READ_ALL | OWNER | View runs and batches where the actor is the **recipient** (teacher person id) or is a **session editor** on at least one finding in the batch. Does **not** unlock rule list metadata on home. |
+| READ_ALL | DEPARTMENT / DIVISION | View runs and batches whose findings reference classes/sessions in the actor’s **assignment (class-picker) scope**. Does **not** unlock rule list metadata on home. |
+| READ_ALL | ORGANIZATION | Org-wide run and batch visibility. **Can see rule list metadata** on home (label, type, enabled). |
 | READ_ALL | ADMIN | No additional READ_ALL extras beyond ORGANIZATION (Family B). |
 
 **Notes:**
@@ -117,8 +119,9 @@ See [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-20
 | Operation | Scope | What user can do and see |
 | --- | --- | --- |
 | UPDATE | USER | No Access. |
-| UPDATE | OWNER | No Access. |
-| UPDATE | DEPARTMENT / DIVISION / ORGANIZATION / ADMIN | Trigger on-demand evaluation (“Run now”); creates preview runs. |
+| UPDATE | OWNER / DEPARTMENT / DIVISION | No Access. |
+| UPDATE | ORGANIZATION | Trigger on-demand evaluation (“Run now”); creates preview runs. |
+| UPDATE | ADMIN | Same as ORGANIZATION (Family B). |
 
 ### UPLOAD (schedule email)
 
@@ -127,12 +130,31 @@ See [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-20
 | UPLOAD | USER / OWNER / DEPARTMENT / DIVISION | No Access. |
 | UPLOAD | ORGANIZATION / ADMIN | Open compose from run review; schedule email for selected sessions; cancel **queued** NC outbox entries. |
 
-### DELETE (outbox cleanup)
+### DELETE (runs and outbox cleanup)
 
 | Operation | Scope | What user can do and see |
 | --- | --- | --- |
 | DELETE | USER / OWNER / DEPARTMENT / DIVISION | No Access. |
-| DELETE | ORGANIZATION / ADMIN | Delete **cancelled** or **failed** NC outbox rows (not queued/sending). |
+| DELETE | ORGANIZATION / ADMIN | Delete rows from the **Recent runs** table on home. Delete **cancelled** or **failed** NC outbox rows (not queued/sending). |
+
+---
+
+## Home UI capability flags
+
+Implementers map Access Profile evaluations to UI and secondary checks in `notificationCenterOperationPolicyService.deriveAccessFlags`:
+
+| Flag | When true (non-bypass) |
+| --- | --- |
+| `canOpen` | READ allowed at OWNER / DEPARTMENT / DIVISION / ORGANIZATION / ADMIN |
+| `canViewRuleMetadata` | READ_ALL allowed at ORGANIZATION / ADMIN / global |
+| `canViewRuns` | READ_ALL allowed at OWNER / DEPARTMENT / DIVISION / ORGANIZATION / ADMIN |
+| `canConfigure` | CONFIGURE allowed at ORGANIZATION / ADMIN / global |
+| `canRunNow` | UPDATE allowed at ORGANIZATION / ADMIN / global |
+| `canDispatch` | UPLOAD allowed at ORGANIZATION / ADMIN / global |
+| `canDeleteRuns` | DELETE allowed at ORGANIZATION / ADMIN / global |
+| `canDeleteOutbox` | DELETE allowed at ORGANIZATION / ADMIN / global |
+
+Bypass admins (Family A) receive the corresponding bypass for each operation under test.
 
 ---
 
@@ -155,13 +177,14 @@ Current UI supports **email schedule** only (no SMS dispatch from NC compose).
 | GET | `/school/notification-center` | READ | Open home |
 | GET | `/school/notification-center/rules/:id` | CONFIGURE | Rule editor |
 | POST | `/school/notification-center/rules/save` | CONFIGURE | Save rule |
-| POST | `/school/notification-center/rules/:id/run` | UPDATE | Run now |
+| POST | `/school/notification-center/rules/:id/run` | UPDATE | Run now (ORG / ADMIN scope) |
 | GET | `/school/notification-center/runs/:id` | READ_ALL | Run review (filtered) |
+| POST | `/school/notification-center/runs/:id/delete` | DELETE | Delete recent run row |
 | GET | `/school/notification-center/runs/:id/compose` | UPLOAD | Compose email |
 | POST | `/school/notification-center/runs/:id/schedule-email` | UPLOAD | Queue outbox |
 | GET | `/school/notification-center/outbox` | READ_ALL | List outbox |
 | POST | `/school/notification-center/outbox/:id/cancel` | UPLOAD | Cancel queued |
-| POST | `/school/notification-center/outbox/:id/delete` | DELETE | Delete terminal rows |
+| POST | `/school/notification-center/outbox/:id/delete` | DELETE | Delete terminal outbox rows |
 
 ---
 
@@ -170,7 +193,7 @@ Current UI supports **email schedule** only (no SMS dispatch from NC compose).
 - Section id: `445586`, name: `SCHOOL_NOTIFICATION_CENTER`, home URL `/school/notification-center`.
 - Routes: `packages/school/MVC/routes/notificationCenterRoutes.js`
 - Access flags: `packages/school/MVC/services/school/notificationCenterAccessService.js`, policy `notificationCenterOperationPolicyService.js`, run filtering `notificationCenterRunScopeService.js`
-- Tests: `test/school-notification-center-feature.test.js`
+- Tests: `test/school-notification-center-access.test.js`, `test/school-notification-center-feature.test.js`
 - School Tasks (`SCHOOL_TASKS`) remain separate; optional future `alsoCreateTask` on rules.
 
 Regenerate Word copy:

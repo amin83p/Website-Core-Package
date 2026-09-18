@@ -112,9 +112,6 @@ function assertMovePayloadBasics(normalized, sourcePeriod, sourceClass, targetCl
   if (!normalized.target.classId) blockers.push({ code: 'TARGET_CLASS_REQUIRED', message: 'Target class is required.' });
   if (!normalized.target.startDate) blockers.push({ code: 'TARGET_START_REQUIRED', message: 'Target enrollment start date is required.' });
   if (!normalized.target.reasonStart) blockers.push({ code: 'TARGET_REASON_REQUIRED', message: 'Target enrollment reason is required.' });
-  if (normalized.target.classId && idsEqual(normalized.target.classId, sourcePeriod?.classId)) {
-    blockers.push({ code: 'SAME_CLASS', message: 'Target class must be different from the current class.' });
-  }
   const sourceStart = normalizeDateOnly(sourcePeriod?.startDate);
   if (normalized.close.effectiveDate && sourceStart && normalized.close.effectiveDate < sourceStart) {
     blockers.push({ code: 'CLOSE_BEFORE_START', message: 'Close end date cannot be before the enrollment start date.' });

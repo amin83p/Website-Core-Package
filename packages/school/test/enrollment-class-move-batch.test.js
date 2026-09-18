@@ -194,3 +194,25 @@ test('OPEN_STATUSES used for candidate filtering matches enrollment move service
   assert.ok(enrollmentMoveService.OPEN_STATUSES.has('active'));
   assert.ok(!enrollmentMoveService.OPEN_STATUSES.has('completed'));
 });
+
+/*
+ * Manual QA — Move/New Enrollment (rolling enrollment row action):
+ * 1. Close and start: close today, start +4 days, same class or other; preview + apply.
+ * 2. New elsewhere: source stays active; target must be a different class.
+ */
+test('static: rolling enrollment view exposes Move/New Enrollment two-mode row modal', () => {
+  assert.match(viewSource, /Move\/New Enrollment/);
+  assert.match(viewSource, /move-enrollment-mode-btn-group/);
+  assert.match(viewSource, /Close and start a new enrollment/);
+  assert.match(viewSource, /data-move-mode="move"/);
+  assert.match(viewSource, /data-move-mode="new_elsewhere"/);
+  assert.match(viewSource, /btn-success/);
+  assert.match(viewSource, /btn-outline-info/);
+  assert.doesNotMatch(viewSource, /data-move-mode="close_only"/);
+  assert.match(viewSource, /move_transferToAnotherClass/);
+  assert.match(viewSource, /syncMoveCloseStartStyleUi/);
+  assert.match(viewSource, /title: String\(c\.title/);
+  assert.match(viewSource, /enrollment-periods\/preview-create/);
+  assert.match(viewSource, /rolling-enrollment\/execute/);
+  assert.doesNotMatch(viewSource, /btn-row-move[^>]*>\s*Move<\/button>/);
+});

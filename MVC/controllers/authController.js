@@ -16,6 +16,7 @@ const passwordResetOrgService = require('../services/passwordResetOrgService');
 const smsProviderService = require('../services/sms/smsProviderService');
 const settingService = require('../services/settingService');
 const appBrandingService = require('../services/appBrandingService');
+const { getPublicShellPageLocals } = require('../utils/publicShellPageLocals');
 const userRepository = require('../repositories/userRepository');
 const microsoftAuthService = require('../services/microsoftAuthService');
 const microsoftPendingLoginService = require('../services/microsoftPendingLoginService');
@@ -605,14 +606,13 @@ async function showLogin(req, res) {
   const warningMessage = req.query.warning ? decodeURIComponent(req.query.warning) : null;
   const microsoftSessionLimit = await resolvePendingMicrosoftSessionLimit(req);
 
-  res.render('login/login', {
+  res.render('login/login', getPublicShellPageLocals({
     title: 'Login',
-    includeModal: true,
     user: null,
     warning: warningMessage,
     microsoftAuthEnabled: microsoftAuthService.isEnabled(),
     microsoftSessionLimit
-  });
+  }));
 }
 
 async function startMicrosoftLogin(req, res) {
@@ -976,12 +976,11 @@ async function switchProfileMode(req, res) {
 
 async function showPasswordReset(req, res) {
   const prefEmail = normalizeEmail(req.query?.email || '');
-  res.render('login/passwordReset', {
+  res.render('login/passwordReset', getPublicShellPageLocals({
     title: 'Reset Password',
-    includeModal: true,
     user: null,
     prefEmail
-  });
+  }));
 }
 
 async function requestPasswordReset(req, res) {
