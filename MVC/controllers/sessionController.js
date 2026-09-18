@@ -6,7 +6,8 @@ const { formatInstantInTimezone } = require('../utils/timezoneUtils');
 
 const dataService = require('../services/dataService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
-const adminChekersService = require('../services/adminChekersService');
+const adminAuthorityService = require('../services/adminAuthorityService');
+const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const SESSION_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'userId', 'status', 'currentOrgId'],
   allowedSearchFields: ['id', 'userId', 'deviceFingerprint.ip', 'username', 'userEmail', 'status'],
@@ -20,11 +21,44 @@ const MY_SESSION_LIST_QUERY_OPTIONS = Object.freeze({
   allowMetaKeys: true
 });
 
+async function canManageSessionAsAdmin(user, operationId, orgId) {
+  if (!user) return false;
+  return adminAuthorityService.isAdminForRequestAsync(
+    user,
+    SECTIONS.SESSIONS,
+    operationId,
+    { orgId: orgId || user.activeOrgId }
+  );
+}
+
+function denySessionAction(req, res, message = 'Unauthorized action.') {
+  if (req.headers['x-ajax-request'] || req.xhr || req.headers.accept?.includes('json')) {
+    return res.status(403).json({ status: 'error', message });
+  }
+  return res.status(403).render('error', {
+    title: 'Access Needed',
+    statusCode: 403,
+    message,
+    user: req.user || null
+  });
+}
+
+async function canAccessSessionRecord(req, targetSession, operationId) {
+  if (!req.user || !targetSession) return false;
+  if (idsEqual(targetSession.userId, req.user.id)) return true;
+  return canManageSessionAsAdmin(req.user, operationId, req.user.activeOrgId);
+}
+
 /* ---------------- CONTROLLERS ---------------- */
 
 // 1. ADMIN: View All Sessions
 async function listSessions(req, res) {
     try {
+        const canList = await canManageSessionAsAdmin(req.user, OPERATIONS.READ_ALL, req.user?.activeOrgId);
+        if (!canList) {
+            return denySessionAction(req, res, 'Administrator access required to view system sessions.');
+        }
+
         const query = await buildDataServiceQuery(req.query, SESSION_LIST_QUERY_OPTIONS);
         const page = Number.parseInt(req.query?.page, 10) || Number.parseInt(query?.page, 10) || 1;
         const limit = Number.parseInt(req.query?.limit, 10) || Number.parseInt(query?.limit, 10) || undefined;
@@ -143,23 +177,17 @@ async function terminateSession(req, res) {
     try {
         const { id } = req.params;
         const requestingUser = req.user;
-        console.log(requestingUser);
-        // Fetch target to verify ownership
         const targetSession = await dataService.getDataById('sessions', id, SYSTEM_CONTEXT);
 
         if (!targetSession) {
              return res.status(404).json({ status: 'error', message: 'Session not found.' });
         }
 
-        // Security: Owner OR Super Admin
-        const isOwner = idsEqual(targetSession.userId, requestingUser.id);
-        const isAdmin = adminChekersService.isSuperAdmin(requestingUser);
-
-        if (!isOwner && !isAdmin) {
-             return res.status(403).json({ status: 'error', message: 'Unauthorized action.' });
+        const allowed = await canAccessSessionRecord(req, targetSession, OPERATIONS.DELETE);
+        if (!allowed) {
+             return denySessionAction(req, res);
         }
 
-        // Perform Delete
         await sessionService.terminateSession(id);
 
         if (req.headers['x-ajax-request']) {
@@ -185,7 +213,8 @@ async function getSessionDetails(req, res) {
         if (!session) {
             return res.status(404).json({ status: 'error', message: 'Session not found' });
         }
-        if (!adminChekersService.isSuperAdmin(req.user) && req.user.id !== session.userId) {
+        const allowed = await canAccessSessionRecord(req, session, OPERATIONS.READ_ALL);
+        if (!allowed) {
              return res.status(403).json({ status: 'error', message: 'Unauthorized' });
         }
 
@@ -210,4 +239,11 @@ async function getSessionDetails(req, res) {
     }
 }
 
-module.exports = { listSessions, listMySessions, terminateSession, getSessionDetails };
+module.exports = {
+  listSessions,
+  listMySessions,
+  terminateSession,
+  getSessionDetails,
+  canManageSessionAsAdmin,
+  canAccessSessionRecord
+};

@@ -269,6 +269,55 @@ const requireAccessAny = (sectionIds, operationId) => {
   };
 };
 
+/**
+ * Restrict route to Admin Family A bypass admins only (isRequestAdmin).
+ * Stricter than requireAccess: profile operation grants alone are not enough.
+ */
+const requireFamilyAAdmin = (sectionId, operationId) => {
+  return async (req, res, next) => {
+    try {
+      setLogContext(req, sectionId, operationId);
+
+      if (!req.user) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Authentication required before access check.'
+        });
+      }
+
+      const adminAuthorityService = getAdminAuthorityService();
+      const allowed = await adminAuthorityService.isAdminForRequestAsync(
+        req.user,
+        sectionId,
+        operationId,
+        { orgId: req.user?.activeOrgId }
+      );
+
+      if (!allowed) {
+        return denyAccess(req, res, 'Administrator access required for this area.', {
+          sectionId,
+          operationId
+        });
+      }
+
+      req.adminContext = await adminAuthorityService.resolveAdminAuthorityAsync({
+        user: req.user,
+        sectionId,
+        operationId,
+        orgId: req.user?.activeOrgId
+      });
+      res.locals.adminContext = req.adminContext;
+      req.accessLimits = {};
+      req.accessScope = req.accessScope || '';
+
+      return next();
+    } catch (error) {
+      console.error('Family A access middleware error:', error);
+      return res.status(500).send('Internal Security Error');
+    }
+  };
+};
+
 const checkAccess = async (sectionId, operationId) => {
   //console.log('here i am for ',sectionId,' and ',operationId);
     try {
@@ -308,4 +357,4 @@ const checkAccess = async (sectionId, operationId) => {
     }
 };
 
-module.exports = { requireAccess, requireAccessAny, checkAccess };
+module.exports = { requireAccess, requireAccessAny, requireFamilyAAdmin, checkAccess };
