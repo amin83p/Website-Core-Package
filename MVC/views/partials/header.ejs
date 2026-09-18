@@ -531,9 +531,8 @@
           : '';
         const aboutRequestId = (typeof requestId !== 'undefined' && requestId) ? String(requestId).trim() : '';
         let aboutAppActiveOrgLabel = '';
-        if (typeof user !== 'undefined' && user) {
-          const { resolveActiveOrgDisplay } = require('../../utils/orgDisplayUtils');
-          aboutAppActiveOrgLabel = resolveActiveOrgDisplay(user).name;
+        if (typeof user !== 'undefined' && user && user.activeOrgDisplay && user.activeOrgDisplay.name) {
+          aboutAppActiveOrgLabel = String(user.activeOrgDisplay.name).trim();
         }
         let aboutAppUptimeLabel = '';
         const aboutStartedRaw = (typeof buildVersionStartedAt !== 'undefined' && buildVersionStartedAt)

@@ -1,10 +1,11 @@
 <% if (typeof user !== 'undefined' && user) { %>
   <% 
-    const { resolveActiveOrgDisplay, userCanUseSystemOrgContext } = require('../../utils/orgDisplayUtils');
     const currentOrgId = user.activeOrgId;
     const availableOrgs = Array.isArray(user.allowedOrgs) ? user.allowedOrgs : [];
-    const isSystemOrgUser = userCanUseSystemOrgContext(user);
-    const activeOrgDisplay = resolveActiveOrgDisplay(user);
+    const isSystemOrgUser = user.isSystemOrgUser === true;
+    const activeOrgDisplay = (user.activeOrgDisplay && typeof user.activeOrgDisplay === 'object')
+      ? user.activeOrgDisplay
+      : { orgId: String(currentOrgId || ''), name: 'No organization', role: 'Member' };
     const switchableOrgs = availableOrgs.filter((org) => {
         const orgId = String(org?.orgId || '').trim();
         if (!orgId) return false;

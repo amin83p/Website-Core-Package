@@ -26,6 +26,10 @@ const {
   invalidateAuthContextForSession
 } = require('./cache/authContextCacheService');
 const { cloneCacheValue } = require('./cache/cacheClone');
+const {
+  resolveActiveOrgDisplay,
+  userCanUseSystemOrgContext
+} = require('../utils/orgDisplayUtils');
 
 function extractSessionIdFromToken(token) {
   const parts = String(token || '').split('.');
@@ -296,6 +300,16 @@ async function isCachedAuthContextProfileCurrent(cached) {
 /* ============================================================
    CONTEXT RESOLVER (Token -> Full User Context)
 ============================================================ */
+function enrichOrgDisplayFields(userContext) {
+  if (!userContext || typeof userContext !== 'object') return userContext;
+  if (userContext.activeOrgDisplay && typeof userContext.isSystemOrgUser === 'boolean') {
+    return userContext;
+  }
+  const isSystemOrgUser = userCanUseSystemOrgContext(userContext);
+  const activeOrgDisplay = resolveActiveOrgDisplay(userContext);
+  return { ...userContext, isSystemOrgUser, activeOrgDisplay };
+}
+
 async function getUserFromToken(token) {
   const decoded = jwt.verify(token, SECRET_KEY);
   const sessionId = extractSessionIdFromToken(token);
@@ -315,7 +329,7 @@ async function getUserFromToken(token) {
     }
   }
 
-  if (cached) return cached;
+  if (cached) return enrichOrgDisplayFields(cloneCacheValue(cached));
 
   const userContext = await hydrateUserContextFromToken(token, decoded);
   setCachedAuthContext(decoded.id, sessionId, userContext);
@@ -581,6 +595,19 @@ async function hydrateUserContextFromToken(token, decoded) {
     ? user.preferences
     : {};
   const userSettings = await loadSafeUserSettings(user.id, legacyPreferences);
+  const orgContextPreview = {
+    ...decoded,
+    id: user.id,
+    username: user.username,
+    personId: user.personId,
+    systemAccessProfileId: user.systemAccessProfileId || '',
+    isVirtualSuperAdmin: user.isVirtualSuperAdmin,
+    activeOrgId,
+    allowedOrgs,
+    currentProfileMode
+  };
+  const isSystemOrgUser = userCanUseSystemOrgContext(orgContextPreview);
+  const activeOrgDisplay = resolveActiveOrgDisplay(orgContextPreview);
   const baseUserContext = {
     ...decoded,
     id: user.id, 
@@ -596,6 +623,8 @@ async function hydrateUserContextFromToken(token, decoded) {
     isSystemAdmin: (currentProfileMode === 'SYSTEM' && (isVirtualSuperAdmin || hasSystemProfile)), 
     activeOrgId, 
     allowedOrgs,
+    isSystemOrgUser,
+    activeOrgDisplay,
     activeOrgTimeZone,
     orgToday,
     activeProfile, 
