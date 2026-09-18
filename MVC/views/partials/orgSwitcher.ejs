@@ -1,27 +1,19 @@
 <% if (typeof user !== 'undefined' && user) { %>
   <% 
+    const { resolveActiveOrgDisplay, userCanUseSystemOrgContext } = require('../../utils/orgDisplayUtils');
     const currentOrgId = user.activeOrgId;
     const availableOrgs = Array.isArray(user.allowedOrgs) ? user.allowedOrgs : [];
+    const isSystemOrgUser = userCanUseSystemOrgContext(user);
+    const activeOrgDisplay = resolveActiveOrgDisplay(user);
     const switchableOrgs = availableOrgs.filter((org) => {
         const orgId = String(org?.orgId || '').trim();
         if (!orgId) return false;
-        if (orgId === 'SYSTEM') return true;
+        if (orgId === 'SYSTEM') return isSystemOrgUser;
         return org?.isSelectable !== false;
     });
     const canSwitchOrganizations = switchableOrgs.length > 1;
-    let activeOrgName = 'System / Global'; 
-    let activeOrgRole = 'System Admin';
-    if (currentOrgId) {
-        const activeOrg = availableOrgs.find(o => String(o.orgId) === String(currentOrgId)) || {};
-        activeOrgName = activeOrg.name || activeOrg.orgName || activeOrg.organizationName || ('Org ' + currentOrgId);
-        activeOrgRole = (Array.isArray(activeOrg.roles) && activeOrg.roles.length ? activeOrg.roles.join(', ') : (activeOrg.role || 'Member'));
-    } else {
-        const sysOrg = availableOrgs.find(o => o.orgId === 'SYSTEM');
-        if (sysOrg) { 
-            activeOrgName = sysOrg.name; 
-            activeOrgRole = (Array.isArray(sysOrg.roles) && sysOrg.roles.length ? sysOrg.roles.join(', ') : sysOrg.role); 
-        }
-    }
+    const activeOrgName = activeOrgDisplay.name;
+    const activeOrgRole = activeOrgDisplay.role;
   %>
 
   <% if (!canSwitchOrganizations) { %>
@@ -96,9 +88,15 @@
           <% } else { %>
             <div class="list-group list-group-flush org-list-container" id="orgModalList" role="listbox" aria-label="Available organizations">
               <% availableOrgs.forEach(org => { 
-                   let isActive = (!currentOrgId && org.orgId === 'SYSTEM') || (currentOrgId && String(org.orgId) === String(currentOrgId));
-                   const isSystem = org.orgId === 'SYSTEM';
-                   const isSelectable = isSystem ? true : (org.isSelectable !== false);
+                   const orgIdToken = String(org.orgId || '').trim();
+                   const isSystem = orgIdToken === 'SYSTEM';
+                   if (isSystem && !isSystemOrgUser) return;
+                   let isActive = currentOrgId && String(org.orgId) === String(currentOrgId);
+                   if (!isActive && !currentOrgId && isSystemOrgUser && isSystem) isActive = true;
+                   if (!isActive && !currentOrgId && !isSystemOrgUser) {
+                     isActive = String(activeOrgDisplay.orgId || '') === orgIdToken;
+                   }
+                   const isSelectable = isSystem ? isSystemOrgUser : (org.isSelectable !== false);
                    const disabledReason = String(org.switchDisabledReason || '').trim();
               %>
                 <button
@@ -432,21 +430,40 @@
     }
 
     function getDisplayedActiveOrgName(userContext) {
-        const orgId = userContext?.activeOrgId;
+        const orgId = String(userContext?.activeOrgId || '').trim();
         const orgs = Array.isArray(userContext?.allowedOrgs) ? userContext.allowedOrgs : [];
-        if (!orgId) return 'System / Global';
-        if (String(orgId) === 'SYSTEM') return 'System / Global';
-        const matched = orgs.find((org) => String(org.orgId) === String(orgId));
-        return matched?.name || matched?.orgName || matched?.organizationName || (`Org ${orgId}`);
+        const systemOrgUser = Boolean(
+          userContext?.isVirtualSuperAdmin
+          || String(userContext?.systemAccessProfileId || '').trim()
+          || String(userContext?.currentProfileMode || '').trim().toUpperCase() === 'SYSTEM'
+        );
+        if (orgId === 'SYSTEM' && systemOrgUser) return 'System / Global';
+        if (orgId) {
+          const matched = orgs.find((org) => String(org.orgId) === orgId);
+          return matched?.name || matched?.orgName || matched?.organizationName || (`Org ${orgId}`);
+        }
+        if (systemOrgUser) return 'System / Global';
+        const firstOrg = orgs.find((org) => String(org.orgId || '') && String(org.orgId) !== 'SYSTEM');
+        return firstOrg?.name || firstOrg?.orgName || firstOrg?.organizationName || 'No organization';
     }
 
     function getDisplayedActiveOrgRole(userContext) {
-        const orgId = userContext?.activeOrgId;
+        const orgId = String(userContext?.activeOrgId || '').trim();
         const orgs = Array.isArray(userContext?.allowedOrgs) ? userContext.allowedOrgs : [];
-        if (!orgId) return 'System Admin';
-        if (String(orgId) === 'SYSTEM') return 'System Admin';
-        const matched = orgs.find((org) => String(org.orgId) === String(orgId));
-        const role = Array.isArray(matched?.roles) && matched.roles.length ? matched.roles.join(', ') : (matched?.role || 'Member');
+        const systemOrgUser = Boolean(
+          userContext?.isVirtualSuperAdmin
+          || String(userContext?.systemAccessProfileId || '').trim()
+          || String(userContext?.currentProfileMode || '').trim().toUpperCase() === 'SYSTEM'
+        );
+        if (orgId === 'SYSTEM' && systemOrgUser) return 'System Admin';
+        if (orgId) {
+          const matched = orgs.find((org) => String(org.orgId) === orgId);
+          const role = Array.isArray(matched?.roles) && matched.roles.length ? matched.roles.join(', ') : (matched?.role || 'Member');
+          return role || 'Member';
+        }
+        if (systemOrgUser) return 'System Admin';
+        const firstOrg = orgs.find((org) => String(org.orgId || '') && String(org.orgId) !== 'SYSTEM');
+        const role = Array.isArray(firstOrg?.roles) && firstOrg.roles.length ? firstOrg.roles.join(', ') : (firstOrg?.role || 'Member');
         return role || 'Member';
     }
 

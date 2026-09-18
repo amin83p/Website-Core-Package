@@ -511,6 +511,21 @@ async function hydrateUserContextFromToken(token, decoded) {
 
   if (!activeOrgId) throw new Error('No active organization context available.');
 
+  if (!isVirtualSuperAdmin && !hasSystemProfile && String(activeOrgId).trim().toUpperCase() === 'SYSTEM') {
+    const firstRealOrg = allowedOrgs.find((org) => String(org?.orgId || '').trim() && String(org.orgId).trim().toUpperCase() !== 'SYSTEM');
+    if (firstRealOrg?.orgId) {
+      activeOrgId = firstRealOrg.orgId;
+      user.activeProfileMode = 'LOCAL';
+      user.primaryOrgId = toStorageId(activeOrgId);
+      await dataService.updateData('users', user.id, {
+        primaryOrgId: toStorageId(activeOrgId),
+        activeProfileMode: 'LOCAL'
+      }, SYSTEM_CONTEXT);
+    } else {
+      throw new Error('No available organizations to access.');
+    }
+  }
+
   // 5. PROFILE RESOLUTION
   let activeProfile = null;
   let canSwitchProfile = false;

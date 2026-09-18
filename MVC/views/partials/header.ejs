@@ -532,17 +532,8 @@
         const aboutRequestId = (typeof requestId !== 'undefined' && requestId) ? String(requestId).trim() : '';
         let aboutAppActiveOrgLabel = '';
         if (typeof user !== 'undefined' && user) {
-          const aboutOrgs = Array.isArray(user.allowedOrgs) ? user.allowedOrgs : [];
-          const aboutActiveOrg = aboutOrgs.find((org) => String(org?.orgId || '') === String(user.activeOrgId || ''));
-          if (aboutActiveOrg) {
-            aboutAppActiveOrgLabel = String(
-              aboutActiveOrg.name || aboutActiveOrg.orgName || aboutActiveOrg.organizationName || ''
-            ).trim();
-          } else if (user.activeOrgId) {
-            aboutAppActiveOrgLabel = `Organization ${user.activeOrgId}`;
-          } else {
-            aboutAppActiveOrgLabel = 'System / Global';
-          }
+          const { resolveActiveOrgDisplay } = require('../../utils/orgDisplayUtils');
+          aboutAppActiveOrgLabel = resolveActiveOrgDisplay(user).name;
         }
         let aboutAppUptimeLabel = '';
         const aboutStartedRaw = (typeof buildVersionStartedAt !== 'undefined' && buildVersionStartedAt)
