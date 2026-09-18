@@ -182,7 +182,12 @@ router.get('/public-pages/media/library',
 router.post('/public-pages/media/upload',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
-          trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE, { requireToken: true, allowOperationTokenFallback: true }),
+          trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE, {
+            requireToken: true,
+            allowOperationTokenFallback: true,
+            allowInactiveTokenFallback: true,
+            keepActive: true
+          }),
           upload('public-pages-staging', false).array('files', 10),
           upload.cleanupUploadedFileOnFail,
           ctrl.uploadPublicPageMedia);
@@ -195,7 +200,7 @@ router.get('/public-pages',
 router.post('/public-pages',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
-          trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE, { keepActive: true }),
           ctrl.updatePublicPageContentSettings);
 
 router.get('/default-file-paths',

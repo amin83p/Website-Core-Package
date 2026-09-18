@@ -980,6 +980,18 @@
     return cleanText(document.querySelector('#publicPageContentForm input[name="actionStateId"]')?.value || '');
   }
 
+  function applyActionStateTokenFromResponse(response) {
+    const headerToken = cleanText(
+      response?.headers?.get('X-Action-State-Id')
+      || response?.headers?.get('x-action-state-id')
+      || ''
+    );
+    if (!headerToken) return getActionStateToken();
+    const input = document.querySelector('#publicPageContentForm input[name="actionStateId"]');
+    if (input) input.value = headerToken;
+    return headerToken;
+  }
+
   function appendActionState(url, actionStateToken = getActionStateToken()) {
     const token = cleanText(actionStateToken);
     if (!token) return url;
@@ -1024,6 +1036,7 @@
       credentials: 'include'
     });
     const result = await response.json().catch(() => null);
+    applyActionStateTokenFromResponse(response);
     if (!response.ok || !result || result.status !== 'success') {
       throw new Error((result && result.message) || `Unable to load public page media (status ${response.status}).`);
     }
@@ -1069,6 +1082,7 @@
       body: formData
     });
     const result = await response.json().catch(() => null);
+    applyActionStateTokenFromResponse(response);
     if (!response.ok || !result || result.status !== 'success') {
       throw new Error((result && result.message) || `Unable to upload public page media (status ${response.status}).`);
     }
@@ -1497,6 +1511,7 @@
         body: JSON.stringify(payload)
       });
       const json = await response.json();
+      applyActionStateTokenFromResponse(response);
       if (!response.ok || json.status !== 'success') throw new Error(json.message || 'Unable to save public page content.');
       state.content = json.data?.content || contentPayload;
       renderFixedFields();
