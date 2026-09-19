@@ -228,10 +228,22 @@ router.get('/templates/copy/:id',
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
   ctrl.showTemplateCopyForm);
 
+router.post('/templates/snapshot-compliance',
+  requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  upload('school-reports').any(),
+  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  ctrl.checkTemplateSnapshotCompliance);
+
 router.get('/templates/:id/pdf-fields',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
   ctrl.inspectTemplatePdfFields);
+
+router.post('/templates/:id/snapshot-compliance',
+  requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  upload('school-reports').any(),
+  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  ctrl.checkTemplateSnapshotCompliance);
 
 router.get('/templates/edit/:id',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
@@ -285,6 +297,12 @@ router.post('/overall-templates/new',
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, overallTemplateMutationActionState),
   overallCtrl.saveTemplate);
 
+router.post('/overall-templates/file-compliance',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  upload('school-reports').any(),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  overallCtrl.checkOverallTemplateFileCompliance);
+
 router.post('/overall-templates/copy/:id',
   requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE),
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.CREATE, overallTemplateMutationActionState),
@@ -305,6 +323,12 @@ router.get('/overall-templates/:id/pdf-fields',
   requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
   trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
   overallCtrl.inspectTemplatePdfFields);
+
+router.post('/overall-templates/:id/file-compliance',
+  requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  upload('school-reports').any(),
+  trackActionState(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  overallCtrl.checkOverallTemplateFileCompliance);
 
 router.get('/overall-templates/delete/:id',
   requireAccess(OVERALL_REPORT_TEMPLATE_SECTION, OPERATIONS.DELETE),

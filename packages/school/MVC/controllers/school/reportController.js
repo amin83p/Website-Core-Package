@@ -250,15 +250,21 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
     assignment: buildAssignmentSnapshotFallback(instance, assignment),
     teacherId: instance.teacherId,
     studentId: instance.studentId,
-    reqUser
+    reqUser,
+    requiredKeys: reportService.resolveTemplateFillKeys(template)
   });
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const scopeCtx = reportService.resolveSnapshotScopeContext(template);
   const currentMerged = reportService.mergeTemplateData(template, instance, assignment);
   const changesByKey = new Map();
 
   fields.forEach((field) => {
     const type = String(field?.type || '').trim().toLowerCase();
     if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
+    if (scopeCtx.active
+      && !reportService.fieldIsInSnapshotScope(field, scopeCtx.baseLowerSet, scopeCtx.placeholderMap)) {
+      return;
+    }
 
     const valueMode = reportRuleEngineService.normalizeValueMode(field?.valueMode);
     if (valueMode === 'calculated' || valueMode === 'derived_editable') {
@@ -507,6 +513,9 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     pdfTemplate: clonePlainValue(sourceTemplate?.pdfTemplate, null),
     pdfTemplatesByFunder: clonePlainValue(sourceTemplate?.pdfTemplatesByFunder, []),
     pdfFieldMap: clonePlainValue(sourceTemplate?.pdfFieldMap, {}),
+    snapshotKeys: clonePlainValue(sourceTemplate?.snapshotKeys, []),
+    snapshotKeyLabels: clonePlainValue(sourceTemplate?.snapshotKeyLabels, {}),
+    snapshotKeyDocxAliases: clonePlainValue(sourceTemplate?.snapshotKeyDocxAliases, {}),
     allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(sourceTemplate)
   };
 }
@@ -637,6 +646,23 @@ async function saveTemplate(req, res) {
       throw new Error(`Invalid report prefill key${invalidPrefillKeys.length === 1 ? '' : 's'}: ${details}. Choose a key from the prefill catalog or leave the field blank.`);
     }
 
+    const snapshotReconcile = reportService.reconcileTemplateSnapshotKeys(payload);
+    if (snapshotReconcile.addedKeys.length) {
+      payload.snapshotKeys = snapshotReconcile.snapshotKeys;
+    }
+
+    const invalidSnapshotKeys = reportService.validateTemplateSnapshotKeys(payload);
+    if (invalidSnapshotKeys.length) {
+      const details = invalidSnapshotKeys
+        .slice(0, 8)
+        .map((item) => item.key)
+        .join(', ');
+      throw new Error(`Invalid lock snapshot key${invalidSnapshotKeys.length === 1 ? '' : 's'}: ${details}. Choose keys from the prefill catalog, template fields, or placeholder map.`);
+    }
+
+    reportService.ensureSnapshotDocxShortcuts(payload);
+    await reportService.validateTemplateDocxSnapshotTokens(payload);
+
     if (isEdit) {
       await reportIntegrityService.assertTemplateScopeChangeCompatible({
         templateId: id,
@@ -648,11 +674,67 @@ async function saveTemplate(req, res) {
       await schoolDataService.addData('reportTemplates', payload, req.user);
     }
 
-    if (isAjax(req)) return res.json({ status: 'success', message: 'Template saved successfully.' });
+    if (isAjax(req)) {
+      let message = 'Template saved successfully.';
+      if (snapshotReconcile.addedKeys.length) {
+        const listed = snapshotReconcile.addedKeys.slice(0, 12).join(', ');
+        const suffix = snapshotReconcile.addedKeys.length > 12 ? '…' : '';
+        message = `Saved template. Added ${snapshotReconcile.addedKeys.length} lock snapshot key${snapshotReconcile.addedKeys.length === 1 ? '' : 's'}: ${listed}${suffix}`;
+      }
+      return res.json({
+        status: 'success',
+        message,
+        snapshotKeysAdded: snapshotReconcile.addedKeys
+      });
+    }
     res.redirect('/school/reports/templates');
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function checkTemplateSnapshotCompliance(req, res) {
+  try {
+    const id = String(req.params.id || '').trim();
+    const existing = id
+      ? await reportIntegrityService.assertTemplateAccessible(id, req.user)
+      : null;
+    const activeOrgId = existing?.orgId || getActiveOrgIdOrThrow(req.user);
+    const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+    const draft = reportViewService.buildTemplateComplianceDraft({
+      body: req.body,
+      existingTemplate: existing,
+      activeOrgId,
+      reqUser: req.user,
+      uploadedFiles
+    });
+    try {
+      reportService.ensureSnapshotDocxShortcuts(draft);
+    } catch (shortcutError) {
+      return res.json({
+        status: 'success',
+        ok: false,
+        snapshotConfigured: Array.isArray(draft.snapshotKeys) && draft.snapshotKeys.length > 0,
+        results: [{
+          kind: 'info',
+          ok: false,
+          label: 'Lock Snapshot Keys',
+          issues: [{ type: 'shortcut', message: shortcutError.message }],
+          allowedSample: []
+        }]
+      });
+    }
+    const checkTarget = String(req.body.checkTarget || 'all-docx').trim();
+    const payload = await reportService.runTemplateSnapshotComplianceChecks(draft, checkTarget);
+    return res.json({
+      status: 'success',
+      ok: payload.ok,
+      snapshotConfigured: payload.snapshotConfigured,
+      results: payload.results
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
@@ -1209,6 +1291,9 @@ async function startInstance(req, res) {
       schoolDataService
     });
 
+    const template = await schoolDataService.getDataById('reportTemplates', assignment.templateId, req.user);
+    if (!template) throw new Error('Report template not found for this assignment.');
+
     const createdOrResolved = [];
     for (const studentId of targetStudentIds) {
       const targetKey = studentId ? `student:${studentId}` : 'class';
@@ -1226,7 +1311,8 @@ async function startInstance(req, res) {
           assignment,
           teacherId,
           studentId,
-          reqUser: req.user
+          reqUser: req.user,
+          requiredKeys: reportService.resolveTemplateFillKeys(template)
         });
         instance = await schoolDataService.addData('reportInstances', {
           orgId: assignment.orgId,
@@ -1300,7 +1386,8 @@ async function buildInstanceEditorRenderContext(req) {
       assignment: effectiveAssignment || assignment,
       teacherId: latestInstance.teacherId,
       studentId: latestInstance.studentId,
-      reqUser: req.user
+      reqUser: req.user,
+      requiredKeys: reportService.resolveTemplateFillKeys(template)
     });
     const prevPrefill = latestInstance.prefillSnapshot && typeof latestInstance.prefillSnapshot === 'object'
       ? latestInstance.prefillSnapshot
@@ -1407,6 +1494,7 @@ async function buildInstanceEditorRenderContext(req) {
     mergedData,
     mergedDataForClient: mergedDataForValidation,
     validationSummary,
+    snapshotComputationFieldIds: reportService.resolveSnapshotComputationFieldIds(template),
     reportReviewNavigator,
     canUnlockReportInstance,
     canReopenReportInstanceToDraft,
@@ -1768,10 +1856,15 @@ async function applyInstancePrefillRefresh(req, res) {
       mergedAnswers: mergedAfterPrefillRefresh,
       prefill: nextPrefill
     });
+    const scopeCtx = reportService.resolveSnapshotScopeContext(template);
     const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
     fields.forEach((field) => {
       const type = String(field?.type || '').trim().toLowerCase();
       if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
+      if (scopeCtx.active
+        && !reportService.fieldIsInSnapshotScope(field, scopeCtx.baseLowerSet, scopeCtx.placeholderMap)) {
+        return;
+      }
       if (reportRuleEngineService.normalizeValueMode(field?.valueMode) !== 'calculated') return;
       nextAnswers[field.id] = recomputedAfterPrefillRefresh.answers[field.id];
     });
@@ -1815,8 +1908,25 @@ async function lockInstance(req, res) {
 
     const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(req.params.id, req.user);
 
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
+    ]);
+    if (!template) throw new Error('Template not found for this report instance.');
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+    );
+    const lockSnapshot = await reportService.buildLockSnapshot({
+      template,
+      instance,
+      assignment: effectiveAssignment,
+      reqUser: req.user
+    });
+
     await schoolDataService.updateData('reportInstances', instance.id, {
       status: 'locked',
+      lockSnapshot,
       audit: {
         lastUpdateUser: req.user?.id || '',
         lastUpdateDateTime: new Date().toISOString(),
@@ -1864,6 +1974,7 @@ async function unlockInstance(req, res) {
 
     await schoolDataService.updateData('reportInstances', instance.id, {
       status: nextStatus,
+      lockSnapshot: null,
       audit: {
         lastUpdateUser: req.user?.id || '',
         lastUpdateDateTime: now,
@@ -2502,6 +2613,7 @@ module.exports = {
   showTemplateCopyForm,
   saveTemplate,
   inspectTemplatePdfFields,
+  checkTemplateSnapshotCompliance,
   deleteTemplate,
   listAssignments,
   showAssignmentForm,

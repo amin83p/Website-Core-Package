@@ -1380,12 +1380,20 @@
       return out;
     }
 
+    function fieldsForSnapshotComputation(allFields) {
+      const list = Array.isArray(allFields) ? allFields : [];
+      const scopedIds = matrixState.snapshotComputationFieldIds;
+      if (!Array.isArray(scopedIds) || !scopedIds.length) return list;
+      const allowed = new Set(scopedIds.map((id) => String(id)));
+      return list.filter((field) => field?.id && allowed.has(String(field.id)));
+    }
+
     function allMatrixFields() {
-      return [
+      return fieldsForSnapshotComputation([
         ...(matrixState.sharedFields || []),
         ...(matrixState.commonFields || []),
         ...(matrixState.tableFields || [])
-      ];
+      ]);
     }
 
     function collectMatrixEditableAnswers(row) {
@@ -1418,7 +1426,7 @@
       });
       rowState.calculationAnswers = prepared.calculationAnswers;
       rowState.answers = prepared.displayAnswers;
-      (matrixState.tableFields || []).filter((field) => field.calculated).forEach((field) => {
+      allMatrixFields().filter((field) => field.calculated).forEach((field) => {
         const selector = `.js-matrix-row-field[data-field-id="${CSS.escape(field.id)}"]`;
         writeControl(row.querySelector(selector), prepared.displayAnswers[field.id]);
       });

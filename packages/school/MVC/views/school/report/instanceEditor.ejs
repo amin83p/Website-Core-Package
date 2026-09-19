@@ -123,6 +123,7 @@
   <input type="hidden" id="reportInstanceActionStateId" value="<%= actionStateId || '' %>">
   <input type="hidden" id="reportInstanceSafeReturnUrl" value="<%= typeof safeReturnUrl !== 'undefined' && safeReturnUrl ? safeReturnUrl : '' %>">
   <script type="application/json" id="reportInstanceFieldsConfig"><%- JSON.stringify(fields).replace(/</g, '\\u003c') %></script>
+  <script type="application/json" id="reportInstanceSnapshotComputationFieldIds"><%- JSON.stringify(typeof snapshotComputationFieldIds !== 'undefined' ? snapshotComputationFieldIds : null).replace(/</g, '\\u003c') %></script>
   <script type="application/json" id="reportInstanceMergedData"><%- JSON.stringify((typeof mergedDataForClient !== 'undefined' && mergedDataForClient) ? mergedDataForClient : (mergedData || {})).replace(/</g, '\\u003c') %></script>
   <script type="application/json" id="reportInstancePrefillData"><%- JSON.stringify(instance?.prefillSnapshot || {}).replace(/</g, '\\u003c') %></script>
 
@@ -910,6 +911,7 @@
     const fieldConfigEl = document.getElementById('reportInstanceFieldsConfig');
     const mergedDataEl = document.getElementById('reportInstanceMergedData');
     const prefillDataEl = document.getElementById('reportInstancePrefillData');
+    const snapshotComputationFieldIdsEl = document.getElementById('reportInstanceSnapshotComputationFieldIds');
     const reportReviewNavLinks = Array.from(document.querySelectorAll('.js-report-review-nav-link'));
     const instanceId = <%- JSON.stringify(String(instance?.id || '')) %>;
     const summaryFocusStorageKey = 'report_instance_validation_focus';
@@ -1848,22 +1850,31 @@
       };
     }
 
+    function fieldsForSnapshotComputation(allFields) {
+      const list = Array.isArray(allFields) ? allFields : [];
+      const scopedIds = parseJsonScript(snapshotComputationFieldIdsEl, null);
+      if (!Array.isArray(scopedIds) || !scopedIds.length) return list;
+      const allowed = new Set(scopedIds.map((id) => String(id)));
+      return list.filter((field) => field?.id && allowed.has(String(field.id)));
+    }
+
     function runClientValidation() {
       const fields = parseJsonScript(fieldConfigEl, []);
+      const computationFields = fieldsForSnapshotComputation(fields);
       const mergedBefore = parseJsonScript(mergedDataEl, {});
       const prefill = parseJsonScript(prefillDataEl, {});
       const userAnswers = collectAnswers(fields, mergedBefore);
       const prepared = window.SchoolReportCalculatedFields?.prepareReportAnswersForUI
-        ? window.SchoolReportCalculatedFields.prepareReportAnswersForUI({ fields, answers: userAnswers, prefill })
+        ? window.SchoolReportCalculatedFields.prepareReportAnswersForUI({ fields: computationFields, answers: userAnswers, prefill })
         : {
-          calculationAnswers: recomputeCalculatedAnswers(fields, userAnswers, prefill),
-          displayAnswers: recomputeCalculatedAnswers(fields, userAnswers, prefill)
+          calculationAnswers: recomputeCalculatedAnswers(computationFields, userAnswers, prefill),
+          displayAnswers: recomputeCalculatedAnswers(computationFields, userAnswers, prefill)
         };
-      (Array.isArray(fields) ? fields : []).forEach((field) => {
+      computationFields.forEach((field) => {
         if (!isCalculatedField(field) || !field?.id) return;
         writeFieldValue(field, prepared.displayAnswers[field.id]);
       });
-      const summary = validateFields(fields, prepared.calculationAnswers, prefill);
+      const summary = validateFields(computationFields, prepared.calculationAnswers, prefill);
       Object.keys(summary.issuesByField).forEach((fieldId) => {
         setFieldIssues(fieldId, summary.issuesByField[fieldId]);
       });

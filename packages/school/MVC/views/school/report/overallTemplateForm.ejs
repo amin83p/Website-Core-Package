@@ -12,14 +12,102 @@
   .overall-picker-summary { min-height: 38px; }
   .overall-field-visual { background: #fcfcff; }
   .overall-field-dropdown-menu-floating { z-index: 1080; }
+  .template-form-section {
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    border-radius: 0.625rem;
+    overflow: hidden;
+  }
+  .template-form-section > .card-header {
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+  .template-section-toggle {
+    border-radius: 0;
+    box-shadow: none;
+    color: #1e293b;
+    text-decoration: none;
+    padding: 0.875rem 1.125rem !important;
+    border-left: 3px solid transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .template-section-toggle:hover,
+  .template-section-toggle:focus {
+    color: #0f172a;
+    text-decoration: none;
+    background: rgba(13, 110, 253, 0.06);
+  }
+  .template-section-toggle:not(.collapsed) {
+    background: #fff;
+    border-left-color: #0d6efd;
+  }
+  .template-section-toggle:not(.collapsed):hover,
+  .template-section-toggle:not(.collapsed):focus { background: #fff; }
+  .template-section-toggle h5 { font-size: 1.05rem; letter-spacing: -0.01em; }
+  .template-section-chevron {
+    transition: transform 0.2s ease, background-color 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+    color: #64748b;
+    font-size: 0.9rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.06);
+  }
+  .template-section-toggle:not(.collapsed) .template-section-chevron {
+    transform: rotate(180deg);
+    background: rgba(13, 110, 253, 0.12);
+    color: #0d6efd;
+  }
+  .template-scroll-panel {
+    max-height: min(22rem, 52vh);
+    overflow-y: auto;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .template-scroll-panel .table { margin-bottom: 0; }
+  .template-scroll-panel thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.08);
+  }
+  .template-scroll-panel thead.table-light th,
+  .template-scroll-panel .table-light thead th { background-color: #f8f9fa; }
+  .template-file-subsection {
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 0.5rem;
+    padding: 1rem 1.125rem;
+    background: #f8fafc;
+  }
+  .template-file-subsection + .template-file-subsection { margin-top: 1rem; }
+  .template-file-subsection-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 0.75rem;
+  }
+  .template-file-subsection-desc {
+    font-size: 0.8125rem;
+    color: #64748b;
+    margin-bottom: 0.75rem;
+  }
 </style>
 <div class="sections-page">
-  <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
-    <div>
+  <div class="row g-2 align-items-start mb-4">
+    <div class="col">
       <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><i class="bi bi-files me-2"></i><%= title %></h1>
       <div class="text-muted small mt-1">Combine completed report sources into editable and calculated overall fields.</div>
     </div>
-    <a href="/school/reports/overall-templates" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Overall Templates</a>
+    <div class="col-auto d-flex flex-column align-items-end gap-1">
+      <% if (isEdit && template?.id) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= template.id %></span>
+      <% } %>
+      <a href="/school/reports/overall-templates" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Overall Templates</a>
+    </div>
   </div>
 
   <form method="POST" enctype="multipart/form-data" id="overallTemplateForm" action="<%= isEdit ? '/school/reports/overall-templates/edit/' + encodeURIComponent(template.id) : '/school/reports/overall-templates/new' %>">
@@ -30,8 +118,18 @@
     <input type="hidden" name="pdfFieldMapJson" id="pdfFieldMapJsonInput">
     <input type="hidden" name="nextSlotNumber" id="nextSlotNumber" value="<%= Number(template?.nextSlotNumber || 3) %>">
 
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-body">
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOverallSettings" aria-expanded="true" aria-controls="collapseOverallSettings">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">Template settings</h5>
+            <span class="badge bg-light text-dark border">Name, version, status</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapseOverallSettings" class="collapse show">
+      <div class="card-body p-3 border-top">
         <div class="row g-3">
           <div class="col-md-5">
             <label class="form-label fw-bold">Name</label>
@@ -55,31 +153,50 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="mb-0 fw-bold">Source Template Slots</h5>
-          <div class="small text-muted">Use one source for extraction or multiple sources for consolidation. Aliases remain stable when rows are reordered, and the same template may be selected more than once.</div>
-        </div>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddSlot"><i class="bi bi-plus-lg me-1"></i>Add Source</button>
-      </div>
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
-          <thead class="table-light"><tr><th>Alias</th><th>Selected report template</th><th>Requirement</th><th>Version</th><th class="text-end">Order</th><th></th></tr></thead>
-          <tbody id="sourceSlotRows"></tbody>
-        </table>
       </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="mb-0 fw-bold">Overall Fields</h5>
-          <div class="small text-muted">Derived fields can use <code>source("T1", "key")</code>, <code>avg(...)</code>, <code>concat(...)</code>, and <code>answers.field_id</code>.</div>
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSourceSlots" aria-expanded="false" aria-controls="collapseSourceSlots">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">Source template slots</h5>
+            <span class="badge bg-light text-dark border">Report sources</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapseSourceSlots" class="collapse">
+      <div class="card-body p-0 border-top">
+        <div class="p-3 pb-2 border-bottom bg-white">
+          <p class="small text-muted mb-2">Use one source for extraction or multiple sources for consolidation. Aliases stay stable when rows are reordered; the same template may appear more than once.</p>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddSlot"><i class="bi bi-plus-lg me-1"></i>Add Source</button>
         </div>
-        <div class="d-flex flex-wrap gap-2">
+        <div class="table-responsive template-scroll-panel border-top">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light"><tr><th>Alias</th><th>Selected report template</th><th>Requirement</th><th>Version</th><th class="text-end">Order</th><th></th></tr></thead>
+            <tbody id="sourceSlotRows"></tbody>
+          </table>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOverallFields" aria-expanded="false" aria-controls="collapseOverallFields">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <span>
+              <h5 class="m-0 fw-bold">Overall fields</h5>
+              <span class="small text-muted d-block mt-1">Derived fields use <code>source("T1", "key")</code>, <code>avg(...)</code>, and related helpers.</span>
+            </span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapseOverallFields" class="collapse">
+      <div class="card-body p-0 border-top">
+        <div class="d-flex flex-wrap justify-content-end gap-2 p-3 pb-0">
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btnExportFieldsJson"><i class="bi bi-download me-1"></i>Export JSON</button>
           <label class="btn btn-outline-secondary btn-sm mb-0" for="importFieldsJsonFile"><i class="bi bi-upload me-1"></i>Import JSON</label>
           <input type="file" id="importFieldsJsonFile" accept=".json,application/json" class="d-none">
@@ -89,92 +206,152 @@
           <button type="button" class="btn btn-outline-dark btn-sm" id="btnAddRowBreak"><i class="bi bi-layout-three-columns me-1"></i>New Row</button>
           <button type="button" class="btn btn-primary btn-sm" id="btnAddField"><i class="bi bi-plus-lg me-1"></i>Add Field</button>
         </div>
+        <div class="table-responsive template-scroll-panel border-top mt-2">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light"><tr><th style="width:70px" class="text-center">Order</th><th>Field</th><th>Type</th><th>Flags</th><th>System DOCX shortcut</th><th style="width:60px"></th></tr></thead>
+            <tbody id="fieldRows"></tbody>
+          </table>
+        </div>
       </div>
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
-          <thead class="table-light"><tr><th style="width:70px" class="text-center">Order</th><th>Field</th><th>Type</th><th>Flags</th><th>System DOCX shortcut</th><th style="width:60px"></th></tr></thead>
-          <tbody id="fieldRows"></tbody>
-        </table>
       </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <div><h5 class="mb-0 fw-bold">Key Catalog</h5><div class="small text-muted">Source keys are inputs; overall keys contain saved/editable output values.</div></div>
-        <div class="d-flex gap-2">
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnKeysCsv">CSV</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnKeysJson">JSON</button>
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseKeyCatalog" aria-expanded="false" aria-controls="collapseKeyCatalog">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">Key catalog</h5>
+            <span class="badge bg-light text-dark border">Source &amp; overall keys</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapseKeyCatalog" class="collapse">
+      <div class="card-body p-3 border-top">
+        <p class="small text-muted mb-2">Source keys are inputs; overall keys contain saved or editable output values.</p>
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+          <input class="form-control form-control-sm" id="keySearch" placeholder="Search keys..." style="max-width: 360px;">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnKeysCsv">Export CSV</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnKeysJson">Export JSON</button>
+        </div>
+        <div class="table-responsive border rounded template-scroll-panel bg-white">
+          <table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Source</th><th>Label</th><th>Key</th><th>DOCX Shortcut</th><th>Origin</th><th></th></tr></thead><tbody id="keyRows"></tbody></table>
         </div>
       </div>
-      <div class="card-body">
-        <input class="form-control form-control-sm mb-2" id="keySearch" placeholder="Search keys...">
-        <div class="table-responsive" style="max-height:320px;overflow:auto;">
-          <table class="table table-sm"><thead><tr><th>Source</th><th>Label</th><th>Key</th><th>DOCX Shortcut</th><th>Origin</th><th></th></tr></thead><tbody id="keyRows"></tbody></table>
-        </div>
-      </div>
-    </div>
-
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white"><h5 class="mb-0 fw-bold">Word Templates</h5></div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-8">
-            <label class="form-label fw-bold">Default DOCX</label>
-            <input type="file" class="form-control" name="docxTemplate" accept=".docx">
-            <% if (template?.docxTemplate?.url) { %><div class="small mt-1">Current: <a href="<%= template.docxTemplate.url %>" target="_blank"><%= template.docxTemplate.originalName || template.docxTemplate.fileName %></a></div><% } %>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Add funder mapping</label>
-            <button type="button" class="btn btn-outline-primary w-100" id="btnAddFunder"><i class="bi bi-search me-1"></i>Find Funder</button>
-            <div class="form-text">Search active funders and add each mapping once.</div>
-          </div>
-        </div>
-        <div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>Funder</th><th>DOCX</th><th></th></tr></thead><tbody id="funderRows">
-          <% (template?.docxTemplatesByFunder || []).forEach((row) => { %>
-            <tr data-funder-key="<%= row.funderKey %>"><td><input type="hidden" name="funderDocxKeys" value="<%= row.funderKey %>"><input type="hidden" name="funderDocxLabels" value="<%= row.label %>"><%= row.label %></td><td><input class="form-control form-control-sm" type="file" name="funderDocxFile_<%= row.funderKey %>" accept=".docx"><% if (row.docxTemplate?.url) { %><a class="small" target="_blank" href="<%= row.docxTemplate.url %>">Current file</a><% } %></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder">Remove</button></td></tr>
-          <% }); %>
-        </tbody></table></div>
       </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white"><h5 class="mb-0 fw-bold">PDF Templates</h5></div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-8">
-            <label class="form-label fw-bold">Default PDF</label>
-            <input type="file" class="form-control" name="pdfTemplate" accept=".pdf">
-            <% if (template?.pdfTemplate?.url) { %><div class="small mt-1">Current: <a href="<%= template.pdfTemplate.url %>" target="_blank"><%= template.pdfTemplate.originalName || template.pdfTemplate.fileName %></a></div><% } %>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Add funder mapping</label>
-            <button type="button" class="btn btn-outline-primary w-100" id="btnAddFunderPdf"><i class="bi bi-search me-1"></i>Find Funder</button>
-            <div class="form-text">Search active funders and add each PDF mapping once.</div>
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFileTemplates" aria-expanded="false" aria-controls="collapseFileTemplates">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">File templates</h5>
+            <span class="badge bg-light text-dark border">DOCX, PDF, field map</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapseFileTemplates" class="collapse">
+      <div class="card-body p-3 border-top">
+        <p class="small text-muted mb-3">Upload Word and PDF files used when exporting overall reports. Use check buttons to validate placeholders and PDF mappings against the Key catalog.</p>
+
+        <div class="template-file-subsection">
+          <div class="template-file-subsection-title">Default templates</div>
+          <p class="template-file-subsection-desc mb-0">Used when no funder-specific file is mapped.</p>
+          <div class="row g-3 mt-2">
+            <div class="col-md-6">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                <label class="form-label fw-bold mb-0">Default DOCX Template File</label>
+                <button type="button" class="btn btn-outline-secondary btn-sm js-check-overall-file-compliance" data-check-target="docx:default">
+                  Check placeholders
+                </button>
+              </div>
+              <input type="file" class="form-control" name="docxTemplate" accept=".docx">
+              <% if (template?.docxTemplate?.url) { %>
+                <div class="small text-muted mt-1">Current: <a href="<%= template.docxTemplate.url %>" target="_blank"><%= template.docxTemplate.originalName || template.docxTemplate.fileName %></a></div>
+              <% } %>
+            </div>
+            <div class="col-md-6">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                <label class="form-label fw-bold mb-0">Default PDF Template File</label>
+                <button type="button" class="btn btn-outline-secondary btn-sm js-check-overall-file-compliance" data-check-target="pdf:default">
+                  Check placeholders
+                </button>
+              </div>
+              <input type="file" class="form-control" name="pdfTemplate" accept=".pdf">
+              <% if (template?.pdfTemplate?.url) { %>
+                <div class="small text-muted mt-1">Current: <a href="<%= template.pdfTemplate.url %>" target="_blank"><%= template.pdfTemplate.originalName || template.pdfTemplate.fileName %></a></div>
+              <% } %>
+            </div>
           </div>
         </div>
-        <div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>Funder</th><th>PDF</th><th></th></tr></thead><tbody id="funderPdfRows">
-          <% (template?.pdfTemplatesByFunder || []).forEach((row) => { %>
-            <tr data-funder-pdf-key="<%= row.funderKey %>"><td><input type="hidden" name="funderPdfKeys" value="<%= row.funderKey %>"><input type="hidden" name="funderPdfLabels" value="<%= row.label %>"><%= row.label %></td><td><input class="form-control form-control-sm" type="file" name="funderPdfFile_<%= row.funderKey %>" accept=".pdf"><% if (row.pdfTemplate?.url) { %><a class="small" target="_blank" href="<%= row.pdfTemplate.url %>">Current file</a><% } %></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder-pdf">Remove</button></td></tr>
-          <% }); %>
-        </tbody></table></div>
-        <div class="mt-3">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
-            <label class="form-label fw-bold mb-0">PDF Field Map</label>
-            <% if (isEdit && (template?.pdfTemplate?.path || (Array.isArray(template?.pdfTemplatesByFunder) && template.pdfTemplatesByFunder.some((row) => row?.pdfTemplate?.path)))) { %>
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnInspectPdfFields" data-template-id="<%= template.id %>">
-                <i class="bi bi-search me-1"></i>Inspect Saved PDF Fields
-              </button>
-            <% } %>
+
+        <div class="template-file-subsection">
+          <div class="template-file-subsection-title">Templates by funder</div>
+          <p class="template-file-subsection-desc mb-0">Optional overrides per funder. Unmapped students use the default files above.</p>
+          <div class="row g-3 mt-2">
+            <div class="col-12">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <label class="form-label fw-bold mb-0">Word templates by funder</label>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-outline-secondary btn-sm js-check-overall-file-compliance" data-check-target="all-docx">
+                    Check all Word files
+                  </button>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddFunder"><i class="bi bi-search me-1"></i>Find funder</button>
+                </div>
+              </div>
+              <div class="table-responsive border rounded template-scroll-panel bg-white">
+                <table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Funder</th><th>Word file</th><th style="width:120px;"></th></tr></thead><tbody id="funderRows">
+                  <% (template?.docxTemplatesByFunder || []).forEach((row) => { %>
+                    <tr data-funder-key="<%= row.funderKey %>"><td><input type="hidden" name="funderDocxKeys" value="<%= row.funderKey %>"><input type="hidden" name="funderDocxLabels" value="<%= row.label %>"><span class="fw-semibold"><%= row.label %></span></td><td><input class="form-control form-control-sm" type="file" name="funderDocxFile_<%= row.funderKey %>" accept=".docx"><% if (row.docxTemplate?.url) { %><div class="small text-muted mt-1">Current: <a target="_blank" href="<%= row.docxTemplate.url %>"><%= row.docxTemplate.originalName || row.docxTemplate.fileName || 'file' %></a></div><% } %></td><td class="text-end"><button type="button" class="btn btn-outline-secondary btn-sm js-check-overall-file-compliance mb-1" data-check-target="docx:funder:<%= row.funderKey %>">Check</button><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder">Remove</button></td></tr>
+                  <% }); %>
+                </tbody></table>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <label class="form-label fw-bold mb-0">PDF templates by funder</label>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-outline-secondary btn-sm js-check-overall-file-compliance" data-check-target="all-pdf">
+                    Check all PDF files
+                  </button>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddFunderPdf"><i class="bi bi-search me-1"></i>Find funder</button>
+                </div>
+              </div>
+              <div class="table-responsive border rounded template-scroll-panel bg-white">
+                <table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Funder</th><th>PDF file</th><th style="width:120px;"></th></tr></thead><tbody id="funderPdfRows">
+                  <% (template?.pdfTemplatesByFunder || []).forEach((row) => { %>
+                    <tr data-funder-pdf-key="<%= row.funderKey %>"><td><input type="hidden" name="funderPdfKeys" value="<%= row.funderKey %>"><input type="hidden" name="funderPdfLabels" value="<%= row.label %>"><span class="fw-semibold"><%= row.label %></span></td><td><input class="form-control form-control-sm" type="file" name="funderPdfFile_<%= row.funderKey %>" accept=".pdf"><% if (row.pdfTemplate?.url) { %><div class="small text-muted mt-1">Current: <a target="_blank" href="<%= row.pdfTemplate.url %>"><%= row.pdfTemplate.originalName || row.pdfTemplate.fileName || 'file' %></a></div><% } %></td><td class="text-end"><button type="button" class="btn btn-outline-secondary btn-sm js-check-overall-file-compliance mb-1" data-check-target="pdf:funder:<%= row.funderKey %>">Check</button><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder-pdf">Remove</button></td></tr>
+                  <% }); %>
+                </tbody></table>
+              </div>
+            </div>
           </div>
-          <textarea class="form-control font-monospace" id="pdfFieldMapEditor" rows="8" spellcheck="false"><%- JSON.stringify(initialPdfFieldMap, null, 2).replace(/</g, '\\u003c') %></textarea>
-          <div class="form-text">Map overall keys to exact PDF AcroForm field names. Example: <code>"O.attendance": "YN1"</code> or source keys like <code>"T1.student_name": "StudentName"</code>. You can also type placeholders like <code>{{O.attendance}}</code> directly into PDF text fields.</div>
         </div>
+
+        <div class="template-file-subsection mt-3">
+          <div class="template-file-subsection-title">PDF field map</div>
+          <p class="template-file-subsection-desc mb-0">Applies to default and funder PDF templates.</p>
+          <div class="mt-2">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+              <label class="form-label fw-bold mb-0">PDF Field Map</label>
+              <% if (isEdit && (template?.pdfTemplate?.path || (Array.isArray(template?.pdfTemplatesByFunder) && template.pdfTemplatesByFunder.some((row) => row?.pdfTemplate?.path)))) { %>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnInspectPdfFields" data-template-id="<%= template.id %>">
+                  <i class="bi bi-search me-1"></i>Inspect Saved PDF Fields
+                </button>
+              <% } %>
+            </div>
+            <textarea class="form-control font-monospace" id="pdfFieldMapEditor" rows="8" spellcheck="false"><%- JSON.stringify(initialPdfFieldMap, null, 2).replace(/</g, '\\u003c') %></textarea>
+            <div class="form-text">Map overall keys to exact PDF AcroForm field names. Example: <code>"O.attendance": "YN1"</code> or source keys like <code>"T1.student_name": "StudentName"</code>. You can also type placeholders like <code>{{O.attendance}}</code> directly into PDF text fields.</div>
+          </div>
+        </div>
+      </div>
       </div>
     </div>
 
-    <div class="d-flex justify-content-end gap-2 mb-5">
-      <a href="/school/reports/overall-templates" class="btn btn-outline-secondary">Cancel</a>
+    <div class="d-flex gap-2 mb-5">
       <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Save Overall Template</button>
+      <a href="/school/reports/overall-templates" class="btn btn-secondary">Cancel</a>
     </div>
   </form>
 </div>
@@ -261,6 +438,7 @@
   const slotRows = document.getElementById('sourceSlotRows');
   const fieldRows = document.getElementById('fieldRows');
   const form = document.getElementById('overallTemplateForm');
+  const savedTemplateId = String(initial?.id || '').trim();
   function bindOverallFieldDropdown(toggle) {
     if (!toggle || typeof bootstrap === 'undefined' || !bootstrap.Dropdown) return null;
     const dropdownRoot = toggle.closest('.js-overall-field-dropdown');
@@ -393,8 +571,8 @@
     return ['manual', 'derived_editable', 'derived_locked'].includes(mode) ? mode : 'manual';
   }
 
-  async function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
-    return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass });
+  async function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary', html = false, size = 'md' } = {}) {
+    return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass, html, size });
   }
 
   async function confirmReportModal({ title = 'Confirm', message = '', confirmText = 'Confirm', confirmClass = 'btn-danger' } = {}) {
@@ -1307,7 +1485,7 @@
       onSelect(item) {
         const key = String(item.id); const label = String(item.label || item.title || key);
         if (document.querySelector(`[data-funder-key="${CSS.escape(key)}"]`)) return;
-        document.getElementById('funderRows').insertAdjacentHTML('beforeend', `<tr data-funder-key="${escapeHtml(key)}"><td><input type="hidden" name="funderDocxKeys" value="${escapeHtml(key)}"><input type="hidden" name="funderDocxLabels" value="${escapeHtml(label)}">${escapeHtml(label)}</td><td><input class="form-control form-control-sm" type="file" name="funderDocxFile_${escapeHtml(key)}" accept=".docx"></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder">Remove</button></td></tr>`);
+        document.getElementById('funderRows').insertAdjacentHTML('beforeend', `<tr data-funder-key="${escapeHtml(key)}"><td><input type="hidden" name="funderDocxKeys" value="${escapeHtml(key)}"><input type="hidden" name="funderDocxLabels" value="${escapeHtml(label)}"><span class="fw-semibold">${escapeHtml(label)}</span></td><td><input class="form-control form-control-sm" type="file" name="funderDocxFile_${escapeHtml(key)}" accept=".docx"></td><td class="text-end"><button type="button" class="btn btn-outline-secondary btn-sm js-check-overall-file-compliance mb-1" data-check-target="docx:funder:${key.replace(/"/g, '&quot;')}">Check</button><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder">Remove</button></td></tr>`);
       }
     });
   });
@@ -1326,11 +1504,107 @@
       onSelect(item) {
         const key = String(item.id); const label = String(item.label || item.title || key);
         if (document.querySelector(`[data-funder-pdf-key="${CSS.escape(key)}"]`)) return;
-        document.getElementById('funderPdfRows').insertAdjacentHTML('beforeend', `<tr data-funder-pdf-key="${escapeHtml(key)}"><td><input type="hidden" name="funderPdfKeys" value="${escapeHtml(key)}"><input type="hidden" name="funderPdfLabels" value="${escapeHtml(label)}">${escapeHtml(label)}</td><td><input class="form-control form-control-sm" type="file" name="funderPdfFile_${escapeHtml(key)}" accept=".pdf"></td><td><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder-pdf">Remove</button></td></tr>`);
+        document.getElementById('funderPdfRows').insertAdjacentHTML('beforeend', `<tr data-funder-pdf-key="${escapeHtml(key)}"><td><input type="hidden" name="funderPdfKeys" value="${escapeHtml(key)}"><input type="hidden" name="funderPdfLabels" value="${escapeHtml(label)}"><span class="fw-semibold">${escapeHtml(label)}</span></td><td><input class="form-control form-control-sm" type="file" name="funderPdfFile_${escapeHtml(key)}" accept=".pdf"></td><td class="text-end"><button type="button" class="btn btn-outline-secondary btn-sm js-check-overall-file-compliance mb-1" data-check-target="pdf:funder:${key.replace(/"/g, '&quot;')}">Check</button><button type="button" class="btn btn-outline-danger btn-sm js-remove-funder-pdf">Remove</button></td></tr>`);
       }
     });
   });
   document.getElementById('funderPdfRows').addEventListener('click', event => event.target.closest('.js-remove-funder-pdf')?.closest('tr')?.remove());
+
+  function syncOverallFormDraftFields() {
+    ensureAliases();
+    document.getElementById('sourceSlotsJson').value = JSON.stringify(slots.map((slot, index) => ({ ...slot, order: index + 1 })));
+    document.getElementById('schemaJson').value = JSON.stringify({ version: Number(initial.schema?.version || 1), fields });
+    document.getElementById('placeholderMapJson').value = JSON.stringify(Object.fromEntries(fields.filter(field => !isVisual(field)).map(field => [field.id, `{{O.${field.id}}}`])));
+    document.getElementById('nextSlotNumber').value = nextSlot;
+    const pdfFieldMapEditor = document.getElementById('pdfFieldMapEditor');
+    const pdfFieldMapJsonInput = document.getElementById('pdfFieldMapJsonInput');
+    const pdfMapText = String(pdfFieldMapEditor?.value || '').trim();
+    if (!pdfMapText) {
+      if (pdfFieldMapJsonInput) pdfFieldMapJsonInput.value = '{}';
+      return { ok: true };
+    }
+    const duplicateKeys = findDuplicateTopLevelJsonKeys(pdfMapText);
+    if (duplicateKeys.length) {
+      return { ok: false, message: 'Each source key must appear only once in PDF Field Map. Duplicate key(s): ' + duplicateKeys.join(', ') };
+    }
+    try {
+      const parsed = JSON.parse(pdfMapText);
+      if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+        throw new Error('PDF Field Map must be a JSON object.');
+      }
+      if (pdfFieldMapJsonInput) pdfFieldMapJsonInput.value = JSON.stringify(parsed);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error?.message || 'PDF Field Map must be valid JSON.' };
+    }
+  }
+
+  function renderOverallFileComplianceModalHtml(result = {}) {
+    return window.ReportMessaging.buildTemplateFileComplianceModalHtml(result, {
+      skippedReason: 'Add source slots with report templates and overall fields before checking Word/PDF files.',
+      passLineSuffix: 'matches the Key catalog',
+      failureIntro: 'These placeholders are not in the Key catalog:',
+      tokenFixHint: 'Remove them from the file or add keys under source slots or O.field keys in the Key catalog.'
+    });
+  }
+
+  async function runOverallFileComplianceCheck(button, checkTarget) {
+    const target = String(checkTarget || '').trim() || 'all-docx';
+    const sync = syncOverallFormDraftFields();
+    if (!sync.ok) {
+      await showReportModal({ title: 'Cannot Check Files', icon: 'warning', message: sync.message });
+      return;
+    }
+    const formData = new FormData(form);
+    formData.set('checkTarget', target);
+    const url = savedTemplateId
+      ? `/school/reports/overall-templates/${encodeURIComponent(savedTemplateId)}/file-compliance`
+      : '/school/reports/overall-templates/file-compliance';
+    const original = button ? button.innerHTML : '';
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Checking...';
+    }
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.status === 'error') {
+        throw new Error(result.message || 'Unable to check Word/PDF files.');
+      }
+      await showReportModal({
+        title: result.ok ? 'File Check Passed' : 'File Check Failed',
+        icon: result.ok ? 'success' : 'warning',
+        message: renderOverallFileComplianceModalHtml(result),
+        html: true,
+        size: result.ok ? 'md' : 'lg',
+        buttonClass: result.ok ? 'btn-success' : 'btn-warning'
+      });
+    } catch (error) {
+      await showReportModal({
+        title: 'File Check Failed',
+        icon: 'error',
+        message: error?.message || 'Unable to check Word/PDF files.',
+        buttonClass: 'btn-danger'
+      });
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = original;
+      }
+    }
+  }
+
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.js-check-overall-file-compliance');
+    if (!btn || !form.contains(btn)) return;
+    event.preventDefault();
+    runOverallFileComplianceCheck(btn, btn.getAttribute('data-check-target'));
+  });
+
   document.getElementById('btnInspectPdfFields')?.addEventListener('click', async (event) => {
     const btn = event.currentTarget;
     const templateId = String(btn?.getAttribute('data-template-id') || '').trim();
@@ -1346,11 +1620,18 @@
       if (!response.ok || result.status === 'error') {
         throw new Error(result.message || 'Unable to inspect saved PDF fields.');
       }
-      const names = (Array.isArray(result.fields) ? result.fields : []).map((field) => String(field?.name || '').trim()).filter(Boolean);
-      const html = names.length
-        ? '<div class="text-start"><div class="small text-muted mb-2">Saved PDF fields for ' + escapeHtml(result.label || 'Default') + ':</div><pre class="small bg-light border rounded p-2 mb-0 text-wrap">' + escapeHtml(names.join('\n')) + '</pre></div>'
+      const fields = Array.isArray(result.fields) ? result.fields : [];
+      const hasFields = fields.some((field) => String(field?.name || '').trim());
+      const message = hasFields
+        ? window.ReportMessaging.buildPdfFieldsInspectModalHtml({ label: result.label || 'Default', fields })
         : 'No fillable PDF fields were found in the saved file.';
-      await showReportModal({ title: 'PDF Fields', icon: names.length ? 'info' : 'warning', message: html, html: true });
+      await showReportModal({
+        title: 'PDF Fields',
+        icon: hasFields ? 'info' : 'warning',
+        message,
+        html: hasFields,
+        size: hasFields ? 'lg' : 'md'
+      });
     } catch (error) {
       await showReportModal({ title: 'PDF Field Inspection Failed', icon: 'error', message: error?.message || 'Unable to inspect saved PDF fields.', buttonClass: 'btn-danger' });
     } finally {
@@ -1453,42 +1734,11 @@
       return;
     }
     ensureAliases();
-    document.getElementById('sourceSlotsJson').value = JSON.stringify(slots.map((slot, index) => ({ ...slot, order: index + 1 })));
-    document.getElementById('schemaJson').value = JSON.stringify({ version: Number(initial.schema?.version || 1), fields });
-    document.getElementById('placeholderMapJson').value = JSON.stringify(Object.fromEntries(fields.filter(field => !isVisual(field)).map(field => [field.id, `{{O.${field.id}}}`])));
-    document.getElementById('nextSlotNumber').value = nextSlot;
-
-    const pdfFieldMapEditor = document.getElementById('pdfFieldMapEditor');
-    const pdfFieldMapJsonInput = document.getElementById('pdfFieldMapJsonInput');
-    let pdfFieldMap = {};
-    const pdfMapText = String(pdfFieldMapEditor?.value || '').trim();
-    if (pdfMapText) {
-      const duplicateKeys = findDuplicateTopLevelJsonKeys(pdfMapText);
-      if (duplicateKeys.length) {
-        await showReportModal({
-          title: 'Duplicate PDF Field Map Keys',
-          icon: 'warning',
-          message: 'Each source key must appear only once. Duplicate key(s): ' + duplicateKeys.join(', '),
-          buttonClass: 'btn-warning'
-        });
-        return;
-      }
-      try {
-        pdfFieldMap = JSON.parse(pdfMapText);
-        if (!pdfFieldMap || Array.isArray(pdfFieldMap) || typeof pdfFieldMap !== 'object') {
-          throw new Error('PDF Field Map must be a JSON object.');
-        }
-      } catch (error) {
-        await showReportModal({
-          title: 'Invalid PDF Field Map',
-          icon: 'warning',
-          message: error?.message || 'PDF Field Map must be valid JSON.',
-          buttonClass: 'btn-warning'
-        });
-        return;
-      }
+    const draftSync = syncOverallFormDraftFields();
+    if (!draftSync.ok) {
+      await showReportModal({ title: 'Invalid PDF Field Map', icon: 'warning', message: draftSync.message, buttonClass: 'btn-warning' });
+      return;
     }
-    if (pdfFieldMapJsonInput) pdfFieldMapJsonInput.value = JSON.stringify(pdfFieldMap);
 
     const submitter = event.submitter || form.querySelector('button[type="submit"]');
     const originalHtml = submitter ? submitter.innerHTML : '';

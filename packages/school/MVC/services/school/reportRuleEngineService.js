@@ -1012,8 +1012,21 @@ function mergeEditableAnswersIntoCalculation({
   return base;
 }
 
+function templateForSnapshotComputation(template) {
+  if (!template || typeof template !== 'object') return template;
+  try {
+    // eslint-disable-next-line global-require
+    const reportService = require('./reportService');
+    if (!reportService.templateUsesSnapshotScope(template)) return template;
+    return reportService.filterTemplateToSnapshotScope(template);
+  } catch (_) {
+    return template;
+  }
+}
+
 function prepareReportAnswersForUI({ template, mergedAnswers = {}, prefill = {} } = {}) {
-  const recalculated = recomputeCalculatedAnswers({ template, mergedAnswers, prefill });
+  const computationTemplate = templateForSnapshotComputation(template);
+  const recalculated = recomputeCalculatedAnswers({ template: computationTemplate, mergedAnswers, prefill });
   const calculationAnswers = recalculated.answers && typeof recalculated.answers === 'object'
     ? recalculated.answers
     : (mergedAnswers && typeof mergedAnswers === 'object' ? { ...mergedAnswers } : {});
@@ -1100,11 +1113,12 @@ function evaluateFieldValidations({ field, value, answers = {}, prefill = {} }) 
 }
 
 function evaluateTemplateValidations({ template, mergedAnswers = {}, prefill = {}, extraIssues = [] }) {
-  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const computationTemplate = templateForSnapshotComputation(template);
+  const fields = Array.isArray(computationTemplate?.schema?.fields) ? computationTemplate.schema.fields : [];
   const answersRaw = mergedAnswers && typeof mergedAnswers === 'object' ? mergedAnswers : {};
   const prefillSafe = prefill && typeof prefill === 'object' ? prefill : {};
   const recalculated = recomputeCalculatedAnswers({
-    template,
+    template: computationTemplate,
     mergedAnswers: answersRaw,
     prefill: prefillSafe
   });

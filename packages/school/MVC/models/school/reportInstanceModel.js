@@ -74,6 +74,23 @@ function cleanPlainObject(v, label) {
   return out;
 }
 
+function sanitizeLockSnapshot(raw, existing = null) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (!isPlainObject(raw)) {
+    if (existing?.lockSnapshot && isPlainObject(existing.lockSnapshot)) return existing.lockSnapshot;
+    return null;
+  }
+  return {
+    templateId: cleanId(raw.templateId, { max: 80, allowEmpty: true }) || '',
+    templateVersion: cleanInteger(raw.templateVersion, { min: 1, max: 1000, allowEmpty: true }) || 1,
+    capturedAt: cleanString(raw.capturedAt, { max: 60, allowEmpty: true }) || new Date().toISOString(),
+    keys: cleanPlainObject(raw.keys, 'lockSnapshot.keys'),
+    placeholders: cleanPlainObject(raw.placeholders, 'lockSnapshot.placeholders'),
+    sourceValues: cleanPlainObject(raw.sourceValues, 'lockSnapshot.sourceValues'),
+    mergedAnswers: cleanPlainObject(raw.mergedAnswers, 'lockSnapshot.mergedAnswers')
+  };
+}
+
 function sanitizeDerivedOverrides(value) {
   const derivedOverrides = {};
   if (!isPlainObject(value)) return derivedOverrides;
@@ -143,6 +160,12 @@ function sanitizeInstance(input, { isUpdate = false, existing = null } = {}) {
     status,
     answers: cleanPlainObject(input.answers, 'answers'),
     prefillSnapshot: cleanPlainObject(input.prefillSnapshot, 'prefillSnapshot'),
+    lockSnapshot: input.lockSnapshot === null
+      ? null
+      : sanitizeLockSnapshot(
+        input.lockSnapshot !== undefined ? input.lockSnapshot : existing?.lockSnapshot,
+        existing
+      ),
     derivedOverrides: sanitizeDerivedOverrides(input.derivedOverrides),
     generatedDocs: sanitizeGeneratedDocs(input.generatedDocs),
     audit: sanitizeAudit(input.audit, existing?.audit || {})

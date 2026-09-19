@@ -65,6 +65,104 @@
     .field-summary-cell { white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.2; }
     .field-row-visual { background: #fcfcff; }
     .field-main-cell .field-kind { display: inline-block; font-size: 0.75rem; margin-right: 0.35rem; }
+    .template-form-section {
+      border: 1px solid rgba(15, 23, 42, 0.08) !important;
+      border-radius: 0.625rem;
+      overflow: hidden;
+    }
+    .template-form-section > .card-header {
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .template-section-toggle {
+      border-radius: 0;
+      box-shadow: none;
+      color: #1e293b;
+      text-decoration: none;
+      padding: 0.875rem 1.125rem !important;
+      border-left: 3px solid transparent;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .template-section-toggle:hover,
+    .template-section-toggle:focus {
+      color: #0f172a;
+      text-decoration: none;
+      background: rgba(13, 110, 253, 0.06);
+    }
+    .template-section-toggle:not(.collapsed) {
+      background: #fff;
+      border-left-color: #0d6efd;
+    }
+    .template-section-toggle:not(.collapsed):hover,
+    .template-section-toggle:not(.collapsed):focus {
+      background: #fff;
+    }
+    .template-section-toggle h5 {
+      font-size: 1.05rem;
+      letter-spacing: -0.01em;
+    }
+    .template-section-chevron {
+      transition: transform 0.2s ease, background-color 0.15s ease, color 0.15s ease;
+      flex-shrink: 0;
+      color: #64748b;
+      font-size: 0.9rem;
+      width: 1.75rem;
+      height: 1.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.06);
+    }
+    .template-section-toggle:not(.collapsed) .template-section-chevron {
+      transform: rotate(180deg);
+      background: rgba(13, 110, 253, 0.12);
+      color: #0d6efd;
+    }
+    .template-scroll-panel {
+      max-height: min(22rem, 52vh);
+      overflow-y: auto;
+      overflow-x: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+    .template-scroll-panel .table { margin-bottom: 0; }
+    .template-scroll-panel thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.08);
+    }
+    .template-scroll-panel thead.table-light th,
+    .template-scroll-panel .table-light thead th {
+      background-color: #f8f9fa;
+    }
+    .template-scroll-panel .list-group { border-radius: inherit; }
+    #collapsePrefillCatalog .accordion-body {
+      max-height: min(16rem, 40vh);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .template-file-subsection {
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 0.5rem;
+      padding: 1rem 1.125rem;
+      background: #f8fafc;
+    }
+    .template-file-subsection + .template-file-subsection {
+      margin-top: 1rem;
+    }
+    .template-file-subsection-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 0.75rem;
+    }
+    .template-file-subsection-desc {
+      font-size: 0.8125rem;
+      color: #64748b;
+      margin-bottom: 0.75rem;
+    }
   </style>
   <div class="row g-2 align-items-start mb-4">
     <div class="col">
@@ -89,8 +187,18 @@
       <input type="hidden" name="copySourceTemplateId" value="<%= sourceTemplateForCopy.id %>">
     <% } %>
 
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-body p-3">
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTemplateSettings" aria-expanded="true" aria-controls="collapseTemplateSettings">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">Template settings</h5>
+            <span class="badge bg-light text-dark border">Title, type, scopes</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapseTemplateSettings" class="collapse show">
+      <div class="card-body p-3 border-top">
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label fw-bold">Title</label>
@@ -150,11 +258,76 @@
             <label class="form-label fw-bold">Description</label>
             <textarea name="description" class="form-control" rows="2" maxlength="4000"><%= template?.description || '' %></textarea>
           </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Schema Version</label>
+            <input type="number" id="schemaVersionInput" class="form-control" min="1" max="1000" value="<%= Number(template?.schema?.version || 1) %>">
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
 
-          <div class="col-12 order-3">
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFileTemplates" aria-expanded="false" aria-controls="collapseFileTemplates">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">File templates</h5>
+            <span class="badge bg-light text-dark border">DOCX, PDF, field map</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapseFileTemplates" class="collapse">
+      <div class="card-body p-3 border-top">
+        <p class="small text-muted mb-3">Upload Word and PDF files used at export. Use snapshot check buttons to validate placeholders against Lock Snapshot Keys.</p>
+        <p class="small text-muted mb-3">Upload Word and PDF files used at export. Use snapshot check buttons to validate placeholders against Lock Snapshot Keys.</p>
+
+        <div class="template-file-subsection">
+          <div class="template-file-subsection-title">Default templates</div>
+          <p class="template-file-subsection-desc mb-0">Used when no funder-specific file is mapped for a student.</p>
+          <div class="row g-3 mt-2">
+            <div class="col-md-6">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                <label class="form-label fw-bold mb-0">Default DOCX Template File</label>
+                <button type="button" class="btn btn-outline-secondary btn-sm js-check-snapshot-compliance" data-check-target="docx:default">
+                  Check snapshot placeholders
+                </button>
+              </div>
+              <input type="file" name="docxTemplate" class="form-control" accept=".docx">
+              <% if (template?.docxTemplate?.url) { %>
+                <div class="small text-muted mt-1">
+                  Current: <a href="<%= template.docxTemplate.url %>" target="_blank"><%= template.docxTemplate.originalName || template.docxTemplate.fileName %></a>
+                </div>
+              <% } %>
+            </div>
+            <div class="col-md-6">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                <label class="form-label fw-bold mb-0">Default PDF Template File</label>
+                <button type="button" class="btn btn-outline-secondary btn-sm js-check-snapshot-compliance" data-check-target="pdf:default">
+                  Check snapshot placeholders
+                </button>
+              </div>
+              <input type="file" name="pdfTemplate" class="form-control" accept=".pdf">
+              <% if (template?.pdfTemplate?.url) { %>
+                <div class="small text-muted mt-1">
+                  Current: <a href="<%= template.pdfTemplate.url %>" target="_blank"><%= template.pdfTemplate.originalName || template.pdfTemplate.fileName %></a>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <div class="template-file-subsection">
+          <div class="template-file-subsection-title">Templates by funder</div>
+          <p class="template-file-subsection-desc mb-0">Optional overrides per funder. Unmapped students use the default files above.</p>
+          <div class="row g-3 mt-2">
+          <div class="col-12">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
               <label class="form-label fw-bold mb-0">Word templates by funder</label>
               <div class="d-flex flex-wrap gap-2 align-items-center">
+                <button type="button" class="btn btn-outline-secondary btn-sm js-check-snapshot-compliance" data-check-target="all-docx">
+                  Check all Word files
+                </button>
                 <select id="funderDocxPicker" class="form-select form-select-sm" style="min-width: 220px;">
                   <option value="">Add funder…</option>
                   <% availableFunderPickerOptions.forEach((opt) => { %>
@@ -166,7 +339,7 @@
                 </button>
               </div>
             </div>
-            <div class="table-responsive border rounded">
+            <div class="table-responsive border rounded template-scroll-panel bg-white">
               <table class="table table-sm align-middle mb-0" id="funderDocxTable">
                 <thead class="table-light">
                   <tr>
@@ -193,6 +366,7 @@
                         <% } %>
                       </td>
                       <td class="text-end">
+                        <button type="button" class="btn btn-outline-secondary btn-sm js-check-snapshot-compliance mb-1" data-check-target="docx:funder:<%= row.funderKey %>">Check</button>
                         <button type="button" class="btn btn-outline-danger btn-sm btn-remove-funder-docx">Remove</button>
                       </td>
                     </tr>
@@ -200,35 +374,16 @@
                 </tbody>
               </table>
             </div>
-            <div class="form-text">Map a Word file for Self Fund and each registered funder. Students without a mapping use the default Word file below.</div>
+            <div class="form-text">Map a Word file for Self Fund and each registered funder.</div>
           </div>
 
-          <div class="col-md-6 order-1">
-            <label class="form-label fw-bold">Default DOCX Template File</label>
-            <input type="file" name="docxTemplate" class="form-control" accept=".docx">
-            <% if (template?.docxTemplate?.url) { %>
-              <div class="small text-muted mt-1">
-                Current: <a href="<%= template.docxTemplate.url %>" target="_blank"><%= template.docxTemplate.originalName || template.docxTemplate.fileName %></a>
-              </div>
-            <% } %>
-          </div>
-          <div class="col-md-6 order-1">
-            <label class="form-label fw-bold">Default PDF Template File</label>
-            <input type="file" name="pdfTemplate" class="form-control" accept=".pdf">
-            <% if (template?.pdfTemplate?.url) { %>
-              <div class="small text-muted mt-1">
-                Current: <a href="<%= template.pdfTemplate.url %>" target="_blank"><%= template.pdfTemplate.originalName || template.pdfTemplate.fileName %></a>
-              </div>
-            <% } %>
-          </div>
-          <div class="col-md-4 order-2">
-            <label class="form-label fw-bold">Schema Version</label>
-            <input type="number" id="schemaVersionInput" class="form-control" min="1" max="1000" value="<%= Number(template?.schema?.version || 1) %>">
-          </div>
-          <div class="col-12 order-4">
+          <div class="col-12">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
               <label class="form-label fw-bold mb-0">PDF templates by funder</label>
               <div class="d-flex flex-wrap gap-2 align-items-center">
+                <button type="button" class="btn btn-outline-secondary btn-sm js-check-snapshot-compliance" data-check-target="all-pdf">
+                  Check all PDF files
+                </button>
                 <select id="funderPdfPicker" class="form-select form-select-sm" style="min-width: 220px;">
                   <option value="">Add funder...</option>
                   <% availableFunderPickerOptions.forEach((opt) => { %>
@@ -240,7 +395,7 @@
                 </button>
               </div>
             </div>
-            <div class="table-responsive border rounded">
+            <div class="table-responsive border rounded template-scroll-panel bg-white">
               <table class="table table-sm align-middle mb-0" id="funderPdfTable">
                 <thead class="table-light">
                   <tr>
@@ -267,6 +422,7 @@
                         <% } %>
                       </td>
                       <td class="text-end">
+                        <button type="button" class="btn btn-outline-secondary btn-sm js-check-snapshot-compliance mb-1" data-check-target="pdf:funder:<%= row.funderKey %>">Check</button>
                         <button type="button" class="btn btn-outline-danger btn-sm btn-remove-funder-pdf">Remove</button>
                       </td>
                     </tr>
@@ -274,9 +430,16 @@
                 </tbody>
               </table>
             </div>
-            <div class="form-text">Students without a funder PDF mapping use the default PDF file above.</div>
+            <div class="form-text">Map a PDF file for Self Fund and each registered funder.</div>
           </div>
-          <div class="col-12 order-5">
+          </div>
+        </div>
+
+        <div class="template-file-subsection mt-3">
+          <div class="template-file-subsection-title">PDF field map</div>
+          <p class="template-file-subsection-desc mb-0">Applies to default and funder PDF templates.</p>
+          <div class="row g-3 mt-2">
+          <div class="col-12">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
               <label class="form-label fw-bold mb-0">PDF Field Map</label>
               <% if (isEdit && (template?.pdfTemplate?.path || (Array.isArray(template?.pdfTemplatesByFunder) && template.pdfTemplatesByFunder.some((row) => row?.pdfTemplate?.path)))) { %>
@@ -288,16 +451,57 @@
             <textarea class="form-control font-monospace" id="pdfFieldMapEditor" rows="8" spellcheck="false"><%- JSON.stringify(initialPdfFieldMap, null, 2).replace(/</g, '\\u003c') %></textarea>
             <div class="form-text">Map report field IDs or prefill keys to exact PDF AcroForm field names. Example: <code>"attendance_presence_01": "YN1"</code>. Each source key must appear only once; duplicate keys silently keep the last value. You can also type placeholders like <code>{{attendance_presence_01}}</code> directly into PDF text fields; export will replace them with calculated/converted values.</div>
           </div>
+          </div>
         </div>
+      </div>
       </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="m-0 fw-bold">DOCX Prefill Keys Catalog</h5>
-        <span class="badge bg-light text-dark border">Copy Supported</span>
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSnapshotKeys" aria-expanded="false" aria-controls="collapseSnapshotKeys">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">Lock Snapshot Keys</h5>
+            <span class="badge bg-light text-dark border">Required to lock report instances</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
       </div>
-      <div class="card-body p-3">
+      <div id="collapseSnapshotKeys" class="collapse">
+      <div class="card-body p-3 border-top">
+        <div class="alert alert-light border small mb-3">
+          One canonical key per data field (prefill key, else DOCX placeholder, else field id). Section, subheader, and row break rows are excluded.
+          Names you set here appear in overall and semi-monthly source-key pickers. Add Key opens a searchable list of catalog and template keys.
+          Only keys listed here are computed for fill, export, and lock snapshots. DOCX files may only use these canonical keys or their DOCX shortcuts; other placeholders are rejected when you save.
+        </div>
+        <input type="hidden" name="snapshotKeys" id="snapshotKeysJsonInput" value="">
+        <input type="hidden" name="snapshotKeyLabels" id="snapshotKeyLabelsJsonInput" value="">
+        <input type="hidden" name="snapshotKeyDocxAliases" id="snapshotKeyDocxAliasesJsonInput" value="">
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddSnapshotKey">Add Key</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSuggestSnapshotKeys">Suggest From Template</button>
+        </div>
+        <div class="template-scroll-panel border rounded">
+        <ul class="list-group list-group-flush mb-0" id="snapshotKeysList">
+          <li class="list-group-item text-muted small js-snapshot-keys-empty">No snapshot keys yet. Use Add Key or Suggest From Template.</li>
+        </ul>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrefillCatalog" aria-expanded="false" aria-controls="collapsePrefillCatalog">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">DOCX Prefill Keys Catalog</h5>
+            <span class="badge bg-light text-dark border">Copy Supported</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapsePrefillCatalog" class="collapse">
+      <div class="card-body p-3 border-top">
         <div class="alert alert-light border small mb-3">
           These keys are available during export and can be mapped into DOCX placeholders via the field mapping.
           Use the copy button to copy ready-to-paste DOCX tokens (for example <code>{{student_full_name}}</code>).
@@ -313,11 +517,11 @@
         <div class="accordion" id="prefillCatalogAccordion">
           <div class="accordion-item">
             <h2 class="accordion-header" id="prefillCommonHeading">
-              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#prefillCommonPanel" aria-expanded="true" aria-controls="prefillCommonPanel">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#prefillCommonPanel" aria-expanded="false" aria-controls="prefillCommonPanel">
                 Common Keys
               </button>
             </h2>
-            <div id="prefillCommonPanel" class="accordion-collapse collapse show" aria-labelledby="prefillCommonHeading" data-bs-parent="#prefillCatalogAccordion">
+            <div id="prefillCommonPanel" class="accordion-collapse collapse" aria-labelledby="prefillCommonHeading" data-bs-parent="#prefillCatalogAccordion">
               <div class="accordion-body p-2">
                 <% (prefillCatalogData.common || []).forEach((item) => { %>
                   <div class="prefill-item d-flex justify-content-between align-items-start border rounded px-2 py-2 mb-1">
@@ -511,14 +715,21 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="m-0 fw-bold">DOCX Repeat Tables</h5>
-        <span class="badge bg-light text-dark border">Dynamic Rows</span>
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDocxRepeatTables" aria-expanded="false" aria-controls="collapseDocxRepeatTables">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="m-0 fw-bold">DOCX Repeat Tables</h5>
+            <span class="badge bg-light text-dark border">Dynamic Rows</span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
       </div>
-      <div class="card-body p-3">
+      <div id="collapseDocxRepeatTables" class="collapse">
+      <div class="card-body p-3 border-top">
         <div class="alert alert-light border small mb-3">
           Use one sample row in the Word table. Put the loop start in the first cell and the loop end in the last cell of the same row.
         </div>
@@ -573,23 +784,30 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="m-0 fw-bold">Field Designer</h5>
-          <div class="small text-muted mt-1">Rows are compact and read-only here. Use the three-dot menu to edit field details in a full modal. Drag rows to reorder.</div>
-        </div>
-        <div class="d-flex align-items-center gap-2">
+    <div class="card border-0 shadow-sm mb-3 template-form-section">
+      <div class="card-header p-0">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFieldDesigner" aria-expanded="false" aria-controls="collapseFieldDesigner">
+          <span class="d-flex align-items-center gap-2 flex-wrap">
+            <span>
+              <h5 class="m-0 fw-bold">Field Designer</h5>
+              <span class="small text-muted d-block mt-1">Compact rows; use the menu to edit. Drag to reorder.</span>
+            </span>
+          </span>
+          <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="collapseFieldDesigner" class="collapse">
+      <div class="card-body p-0 border-top">
+        <div class="d-flex flex-wrap justify-content-end gap-2 p-3 pb-0">
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPreviewTemplate"><i class="bi bi-eye"></i> Preview Form</button>
           <button type="button" class="btn btn-sm btn-outline-dark" id="btnAddSection"><i class="bi bi-layout-text-window-reverse"></i> Add Section</button>
           <button type="button" class="btn btn-sm btn-outline-dark" id="btnAddSubheader"><i class="bi bi-text-indent-left"></i> Add Subheader</button>
           <button type="button" class="btn btn-sm btn-outline-dark" id="btnAddRowBreak"><i class="bi bi-layout-three-columns me-1"></i> New Row</button>
           <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddField"><i class="bi bi-plus-circle"></i> Add Field</button>
         </div>
-      </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
+        <div class="table-responsive template-scroll-panel border-top">
           <table class="table table-sm align-middle mb-0 field-designer-table">
             <thead class="table-light">
               <tr>
@@ -604,6 +822,7 @@
             <tbody id="fieldRowsBody"></tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
 
@@ -922,6 +1141,22 @@
     const placeholderMapJsonInput = document.getElementById('placeholderMapJsonInput');
     const pdfFieldMapJsonInput = document.getElementById('pdfFieldMapJsonInput');
     const pdfFieldMapEditor = document.getElementById('pdfFieldMapEditor');
+    const snapshotKeysJsonInput = document.getElementById('snapshotKeysJsonInput');
+    const snapshotKeysList = document.getElementById('snapshotKeysList');
+    const btnAddSnapshotKey = document.getElementById('btnAddSnapshotKey');
+    const btnSuggestSnapshotKeys = document.getElementById('btnSuggestSnapshotKeys');
+    const initialSnapshotKeys = <%- JSON.stringify(Array.isArray(template?.snapshotKeys) ? template.snapshotKeys : []).replace(/</g, '\\u003c') %>;
+    const initialSnapshotKeyLabels = <%- JSON.stringify(template?.snapshotKeyLabels && typeof template.snapshotKeyLabels === 'object' ? template.snapshotKeyLabels : {}).replace(/</g, '\\u003c') %>;
+    let snapshotKeysState = Array.isArray(initialSnapshotKeys) ? [...initialSnapshotKeys] : [];
+    let snapshotKeyLabelsState = (initialSnapshotKeyLabels && typeof initialSnapshotKeyLabels === 'object' && !Array.isArray(initialSnapshotKeyLabels))
+      ? { ...initialSnapshotKeyLabels }
+      : {};
+    const initialSnapshotKeyDocxAliases = <%- JSON.stringify(template?.snapshotKeyDocxAliases && typeof template.snapshotKeyDocxAliases === 'object' ? template.snapshotKeyDocxAliases : {}).replace(/</g, '\\u003c') %>;
+    let snapshotKeyDocxAliasesState = (initialSnapshotKeyDocxAliases && typeof initialSnapshotKeyDocxAliases === 'object' && !Array.isArray(initialSnapshotKeyDocxAliases))
+      ? { ...initialSnapshotKeyDocxAliases }
+      : {};
+    const snapshotKeyLabelsJsonInput = document.getElementById('snapshotKeyLabelsJsonInput');
+    const snapshotKeyDocxAliasesJsonInput = document.getElementById('snapshotKeyDocxAliasesJsonInput');
     const schemaVersionInput = document.getElementById('schemaVersionInput');
     const prefillSearchInput = document.getElementById('prefillKeySearch');
     const btnExpandPrefill = document.getElementById('btnExpandPrefill');
@@ -930,6 +1165,7 @@
     const btnExportPrefillCsv = document.getElementById('btnExportPrefillCsv');
     const prefillCatalog = <%- JSON.stringify(prefillCatalogData).replace(/</g, '\\u003c') %>;
     const isEditMode = <%- JSON.stringify(isEdit) %>;
+    const savedTemplateId = <%- JSON.stringify(template?.id || '') %>;
     const VALUE_MODES = Object.freeze({ MANUAL: 'manual', DERIVED_EDITABLE: 'derived_editable', CALCULATED: 'calculated' });
     const CALC_ON_ERROR = Object.freeze({ KEEP_LAST: 'keep_last', EMPTY: 'empty' });
     const EXPORT_TEXT_CASES = Object.freeze({ AS_ENTERED: 'as_entered', UPPER: 'upper', LOWER: 'lower', TITLE: 'title' });
@@ -1271,8 +1507,8 @@
       return `${base}_${i}`;
     }
 
-    async function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
-      return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass });
+    async function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary', html = false, size = 'md' } = {}) {
+      return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass, html, size });
     }
 
     async function confirmReportModal({
@@ -1701,6 +1937,452 @@ num(value) <= 95</code></pre>
         },
         placeholderMap
       };
+    }
+
+    function normalizeSnapshotKeyToken(rawKey = '') {
+      let key = String(rawKey || '').trim();
+      if (!key) return '';
+      const wrapped = /^\{\{\s*([^{}]+?)\s*\}\}$/.exec(key);
+      if (wrapped) key = String(wrapped[1] || '').trim();
+      return key;
+    }
+
+    function lookupPrefillCatalogLabel(rawKey = '') {
+      const key = normalizeSnapshotKeyToken(rawKey);
+      if (!key) return '';
+      const groups = Object.values(prefillCatalog || {});
+      for (const rows of groups) {
+        if (!Array.isArray(rows)) continue;
+        const match = rows.find((row) => String(row?.key || '') === key);
+        if (match) return String(match.label || key).trim();
+      }
+      return '';
+    }
+
+    function resolveCanonicalSnapshotKeyForFieldClient(field, placeholderMap = {}) {
+      if (isVisualOnlyType(field?.type)) return null;
+      const fieldId = String(field?.id || '').trim();
+      const prefillKey = normalizeSnapshotKeyToken(field?.prefillKey || '');
+      if (prefillKey) return { key: prefillKey, origin: 'template_prefill' };
+      const rawToken = String(placeholderMap[fieldId] || '').trim();
+      let tokenKey = normalizeSnapshotKeyToken(rawToken);
+      if (!tokenKey && rawToken) {
+        tokenKey = normalizeSnapshotKeyToken(rawToken.replace(/^\{\{\s*/, '').replace(/\s*\}\}$/, ''));
+      }
+      if (tokenKey) return { key: tokenKey, origin: 'placeholder' };
+      if (fieldId) return { key: fieldId, origin: 'template_field' };
+      return null;
+    }
+
+    function buildCanonicalSnapshotSuggestions(payload = {}) {
+      const placeholderMap = payload?.placeholderMap && typeof payload.placeholderMap === 'object'
+        ? payload.placeholderMap
+        : {};
+      const fields = Array.isArray(payload?.schema?.fields) ? payload.schema.fields : [];
+      const fieldById = new Map(fields.map((field) => [String(field?.id || '').trim(), field]).filter(([id]) => id));
+      const suggestions = [];
+      const seen = new Set();
+      fields.forEach((field) => {
+        if (isVisualOnlyType(field?.type)) return;
+        const resolved = resolveCanonicalSnapshotKeyForFieldClient(field, placeholderMap);
+        if (!resolved?.key) return;
+        const token = resolved.key.toLowerCase();
+        if (seen.has(token)) return;
+        seen.add(token);
+        const fieldLabel = String(field?.label || field?.id || '').trim();
+        suggestions.push({
+          key: resolved.key,
+          label: fieldLabel || lookupPrefillCatalogLabel(resolved.key) || resolved.key,
+          fieldId: String(field?.id || '').trim(),
+          origin: resolved.origin
+        });
+      });
+      let pdfFieldMap = {};
+      const pdfMapText = String(pdfFieldMapEditor?.value || '').trim();
+      if (pdfMapText) {
+        try {
+          pdfFieldMap = JSON.parse(pdfMapText);
+        } catch (_) {
+          pdfFieldMap = {};
+        }
+      }
+      if (pdfFieldMap && typeof pdfFieldMap === 'object' && !Array.isArray(pdfFieldMap)) {
+        Object.keys(pdfFieldMap).forEach((sourceKey) => {
+          const key = normalizeSnapshotKeyToken(sourceKey);
+          if (!key) return;
+          const token = key.toLowerCase();
+          if (seen.has(token)) return;
+          const linkedField = fieldById.get(key);
+          if (linkedField && isVisualOnlyType(linkedField?.type)) return;
+          if (linkedField && !isVisualOnlyType(linkedField?.type)) return;
+          if (!lookupPrefillCatalogLabel(key)) return;
+          seen.add(token);
+          suggestions.push({
+            key,
+            label: lookupPrefillCatalogLabel(key) || key,
+            fieldId: '',
+            origin: 'pdf_field_map'
+          });
+        });
+      }
+      return suggestions.sort((left, right) => (
+        String(left.label || '').localeCompare(String(right.label || ''))
+        || String(left.key || '').localeCompare(String(right.key || ''))
+      ));
+    }
+
+    function resolveSnapshotKeyLabelClient(key = '') {
+      const normalized = normalizeSnapshotKeyToken(key);
+      if (!normalized) return '';
+      if (snapshotKeyLabelsState[normalized]) return String(snapshotKeyLabelsState[normalized]).trim();
+      const lower = normalized.toLowerCase();
+      const stored = Object.entries(snapshotKeyLabelsState).find(([labelKey]) => (
+        normalizeSnapshotKeyToken(labelKey).toLowerCase() === lower
+      ));
+      if (stored) return String(stored[1]).trim();
+      const payload = collect();
+      const match = buildCanonicalSnapshotSuggestions(payload).find((row) => (
+        row.key.toLowerCase() === lower
+      ));
+      if (match?.label) return match.label;
+      return lookupPrefillCatalogLabel(normalized) || normalized;
+    }
+
+    function collectFieldExpressionDependencyKeysClient(field) {
+      const deps = new Set();
+      if (isVisualOnlyType(field?.type)) return deps;
+      normalizeCalculationDependencies(field?.calculationDependencies || []).forEach((dep) => {
+        const token = normalizeSnapshotKeyToken(dep);
+        if (token) deps.add(token);
+      });
+      const expressions = [
+        String(field?.calculationRule?.expression || '').trim(),
+        String(field?.conversionRule?.expression || '').trim()
+      ];
+      expressions.forEach((expression) => {
+        if (!expression) return;
+        const patterns = [/\bprefill\.([A-Za-z_][A-Za-z0-9_]*)/g, /\banswers\.([A-Za-z_][A-Za-z0-9_]*)/g];
+        patterns.forEach((pattern) => {
+          let match = pattern.exec(expression);
+          while (match) {
+            deps.add(match[1]);
+            match = pattern.exec(expression);
+          }
+        });
+      });
+      return deps;
+    }
+
+    function fieldIsInSnapshotScopeClient(field, baseLowerSet, placeholderMap = {}) {
+      const fieldId = String(field?.id || '').trim();
+      if (fieldId && baseLowerSet.has(fieldId.toLowerCase())) return true;
+      const canonical = resolveCanonicalSnapshotKeyForFieldClient(field, placeholderMap);
+      if (canonical?.key && baseLowerSet.has(canonical.key.toLowerCase())) return true;
+      return false;
+    }
+
+    function expandSnapshotKeysWithFieldDependencies(payload = null) {
+      const draft = payload || collect();
+      const placeholderMap = draft?.placeholderMap && typeof draft.placeholderMap === 'object'
+        ? draft.placeholderMap
+        : {};
+      const fields = Array.isArray(draft?.schema?.fields) ? draft.schema.fields : [];
+      const baseLowerSet = new Set(
+        snapshotKeysState.map((key) => normalizeSnapshotKeyToken(key).toLowerCase()).filter(Boolean)
+      );
+      if (!baseLowerSet.size) return 0;
+      let added = 0;
+      fields.forEach((field) => {
+        if (!fieldIsInSnapshotScopeClient(field, baseLowerSet, placeholderMap)) return;
+        collectFieldExpressionDependencyKeysClient(field).forEach((dep) => {
+          const key = normalizeSnapshotKeyToken(dep);
+          if (!key) return;
+          baseLowerSet.add(key.toLowerCase());
+          if (addSnapshotKey(key, lookupPrefillCatalogLabel(key) || '')) {
+            added += 1;
+          }
+        });
+      });
+      return added;
+    }
+
+    function findFieldForSnapshotKeyClient(key, payload = null) {
+      const draft = payload || collect();
+      const normalized = normalizeSnapshotKeyToken(key);
+      if (!normalized) return null;
+      const lower = normalized.toLowerCase();
+      const placeholderMap = draft?.placeholderMap && typeof draft.placeholderMap === 'object'
+        ? draft.placeholderMap
+        : {};
+      const fields = Array.isArray(draft?.schema?.fields) ? draft.schema.fields : [];
+      for (const field of fields) {
+        if (isVisualOnlyType(field?.type)) continue;
+        const fieldId = String(field?.id || '').trim();
+        if (fieldId && fieldId.toLowerCase() === lower) return field;
+        const canonical = resolveCanonicalSnapshotKeyForFieldClient(field, placeholderMap);
+        if (canonical?.key && canonical.key.toLowerCase() === lower) return field;
+      }
+      return null;
+    }
+
+    function resolveSnapshotShortcutClient(key, payload = null) {
+      const normalized = normalizeSnapshotKeyToken(key);
+      if (!normalized) return '';
+      if (snapshotKeyDocxAliasesState[normalized]) {
+        return normalizeDocxAlias(snapshotKeyDocxAliasesState[normalized]);
+      }
+      const field = findFieldForSnapshotKeyClient(normalized, payload);
+      if (field) return normalizeDocxAlias(field.docxAlias);
+      return '';
+    }
+
+    function ensureSnapshotShortcutForKey(key, payload = null) {
+      const normalized = normalizeSnapshotKeyToken(key);
+      if (!normalized) return '';
+      let alias = resolveSnapshotShortcutClient(normalized, payload);
+      if (alias && DOCX_ALIAS_PATTERN.test(alias)) return alias;
+      alias = generateUniqueDocxAlias();
+      const field = findFieldForSnapshotKeyClient(normalized, payload);
+      if (field) {
+        field.docxAlias = alias;
+        const idx = fieldsState.findIndex((row) => String(row?.id || '') === String(field.id || ''));
+        if (idx >= 0) fieldsState[idx].docxAlias = alias;
+        if (snapshotKeyDocxAliasesState[normalized]) delete snapshotKeyDocxAliasesState[normalized];
+      } else {
+        snapshotKeyDocxAliasesState[normalized] = alias;
+      }
+      return alias;
+    }
+
+    function validateSnapshotShortcutClient(key, alias, payload = null) {
+      const normalizedKey = normalizeSnapshotKeyToken(key);
+      const normalizedAlias = normalizeDocxAlias(alias);
+      if (!normalizedAlias || !DOCX_ALIAS_PATTERN.test(normalizedAlias)) {
+        return `Invalid DOCX shortcut for "${normalizedKey}". Use a letter plus three lowercase letters or numbers.`;
+      }
+      const reserved = collectReservedDocxTokens({ includeAliases: true });
+      const field = findFieldForSnapshotKeyClient(normalizedKey, payload);
+      if (field) {
+        const fieldAlias = normalizeDocxAlias(field.docxAlias);
+        if (fieldAlias) reserved.delete(fieldAlias);
+      }
+      if (snapshotKeyDocxAliasesState[normalizedKey]) {
+        reserved.delete(normalizeDocxAlias(snapshotKeyDocxAliasesState[normalizedKey]));
+      }
+      reserved.delete(normalizedKey.toLowerCase());
+      snapshotKeysState.forEach((row) => {
+        const snapKey = normalizeSnapshotKeyToken(row);
+        if (snapKey) reserved.add(snapKey.toLowerCase());
+      });
+      if (reserved.has(normalizedAlias)) {
+        return `Shortcut "${normalizedAlias}" for "${normalizedKey}" conflicts with another placeholder token or catalog key. Choose a different shortcut.`;
+      }
+      return '';
+    }
+
+    function applySnapshotShortcutFromInput(key, alias, payload = null) {
+      const normalizedKey = normalizeSnapshotKeyToken(key);
+      const normalizedAlias = normalizeDocxAlias(alias);
+      const error = validateSnapshotShortcutClient(normalizedKey, normalizedAlias, payload);
+      if (error) return error;
+      const field = findFieldForSnapshotKeyClient(normalizedKey, payload);
+      if (field) {
+        field.docxAlias = normalizedAlias;
+        const idx = fieldsState.findIndex((row) => String(row?.id || '') === String(field.id || ''));
+        if (idx >= 0) fieldsState[idx].docxAlias = normalizedAlias;
+        if (snapshotKeyDocxAliasesState[normalizedKey]) delete snapshotKeyDocxAliasesState[normalizedKey];
+      } else {
+        snapshotKeyDocxAliasesState[normalizedKey] = normalizedAlias;
+      }
+      return '';
+    }
+
+    function renderSnapshotKeysList() {
+      if (!snapshotKeysList) return;
+      if (!snapshotKeysState.length) {
+        snapshotKeysList.innerHTML = '<li class="list-group-item text-muted small js-snapshot-keys-empty">No snapshot keys yet. Add keys manually or use Suggest From Template.</li>';
+        return;
+      }
+      snapshotKeysList.innerHTML = snapshotKeysState.map((key, index) => {
+        const label = resolveSnapshotKeyLabelClient(key);
+        const showLabel = label && label.toLowerCase() !== String(key).toLowerCase();
+        const payload = collect();
+        const shortcut = ensureSnapshotShortcutForKey(key, payload);
+        return `
+        <li class="list-group-item py-2">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+            <div class="me-2 flex-grow-1">
+              ${showLabel ? `<div class="fw-semibold small">${escapeHtml(label)}</div>` : ''}
+              <div class="font-monospace small text-muted mb-1">${escapeHtml(key)}</div>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <label class="small text-muted mb-0">Shortcut</label>
+                <input type="text" class="form-control form-control-sm font-monospace js-snapshot-shortcut-input" style="max-width: 7rem;" data-snapshot-key="${escapeHtml(key)}" value="${escapeHtml(shortcut)}" autocomplete="off" spellcheck="false">
+                <span class="small text-muted">{{${escapeHtml(shortcut)}}}</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{${escapeHtml(key)}}}" title="Copy canonical DOCX token">
+                  <i class="bi bi-copy"></i> Key
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key" data-copy-token="{{${escapeHtml(shortcut)}}}" title="Copy shortcut DOCX token">
+                  <i class="bi bi-copy"></i> Short
+                </button>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline-danger btn-sm js-remove-snapshot-key" data-index="${index}" title="Remove key">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </li>
+      `;
+      }).join('');
+    }
+
+    function addSnapshotKey(rawKey = '', label = '') {
+      const key = normalizeSnapshotKeyToken(rawKey);
+      if (!key) return false;
+      const exists = snapshotKeysState.some((row) => String(row).toLowerCase() === key.toLowerCase());
+      if (exists) return false;
+      snapshotKeysState.push(key);
+      const resolvedLabel = String(label || '').trim()
+        || lookupPrefillCatalogLabel(key)
+        || resolveSnapshotKeyLabelClient(key);
+      if (resolvedLabel && resolvedLabel.toLowerCase() !== key.toLowerCase()) {
+        snapshotKeyLabelsState[key] = resolvedLabel;
+      }
+      ensureSnapshotShortcutForKey(key, collect());
+      renderSnapshotKeysList();
+      return true;
+    }
+
+    function suggestSnapshotKeysFromTemplate() {
+      const payload = collect();
+      const suggestions = buildCanonicalSnapshotSuggestions(payload);
+      let added = 0;
+      suggestions.forEach((row) => {
+        const key = normalizeSnapshotKeyToken(row?.key || '');
+        if (!key) return;
+        const exists = snapshotKeysState.some((item) => String(item).toLowerCase() === key.toLowerCase());
+        if (addSnapshotKey(key, row?.label || '')) {
+          added += 1;
+          return;
+        }
+        if (exists && row?.label && !snapshotKeyLabelsState[key]) {
+          snapshotKeyLabelsState[key] = String(row.label).trim();
+        }
+      });
+      added += expandSnapshotKeysWithFieldDependencies(payload);
+      renderSnapshotKeysList();
+      return added;
+    }
+
+    function expandSnapshotKeysWithUsedTemplateKeys(payload = null) {
+      const draft = payload || collect();
+      let added = 0;
+      buildCanonicalSnapshotSuggestions(draft).forEach((row) => {
+        const key = normalizeSnapshotKeyToken(row?.key || '');
+        if (!key) return;
+        if (addSnapshotKey(key, row?.label || '')) {
+          added += 1;
+        }
+      });
+      const fields = Array.isArray(draft?.schema?.fields) ? draft.schema.fields : [];
+      fields.forEach((field) => {
+        collectFieldExpressionDependencyKeysClient(field).forEach((dep) => {
+          const key = normalizeSnapshotKeyToken(dep);
+          if (!key) return;
+          if (addSnapshotKey(key, lookupPrefillCatalogLabel(key) || '')) {
+            added += 1;
+          }
+        });
+      });
+      return added;
+    }
+
+    function snapshotKeyAlreadyListed(rawKey = '') {
+      const key = normalizeSnapshotKeyToken(rawKey);
+      if (!key) return false;
+      return snapshotKeysState.some((row) => String(row).toLowerCase() === key.toLowerCase());
+    }
+
+    function tryAddSnapshotKeyFromPicker(item = {}) {
+      const key = normalizeSnapshotKeyToken(item?.key || item?.id || '');
+      if (!key) {
+        showReportModal({
+          title: 'Invalid Key',
+          icon: 'warning',
+          message: 'Choose a row with a valid snapshot key.'
+        });
+        return false;
+      }
+      if (snapshotKeyAlreadyListed(key)) {
+        showReportModal({
+          title: 'Duplicate Key',
+          icon: 'info',
+          message: `"${key}" is already in the lock snapshot list. Choose another key or remove it first.`
+        });
+        return false;
+      }
+      const label = String(item?.label || item?.title || '').trim()
+        || lookupPrefillCatalogLabel(key);
+      return addSnapshotKey(key, label);
+    }
+
+    function snapshotKeyPickerItems() {
+      const byKey = new Map();
+      prefillCatalogItems().forEach((item) => {
+        const key = normalizeSnapshotKeyToken(item?.key || '');
+        if (!key) return;
+        byKey.set(key.toLowerCase(), {
+          id: `catalog|${key}`,
+          key,
+          label: String(item?.label || key).trim(),
+          description: String(item?.description || '').trim(),
+          group: String(item?.group || 'Catalog').trim(),
+          origin: 'catalog',
+          title: String(item?.label || key).trim()
+        });
+      });
+      buildCanonicalSnapshotSuggestions(collect()).forEach((row) => {
+        const key = normalizeSnapshotKeyToken(row?.key || '');
+        if (!key) return;
+        byKey.set(key.toLowerCase(), {
+          id: `template|${key}`,
+          key,
+          label: String(row?.label || key).trim(),
+          description: row?.fieldId
+            ? `Template field ${row.fieldId}${row?.origin ? ` (${row.origin})` : ''}`
+            : 'From this template',
+          group: 'This template',
+          origin: 'template',
+          title: String(row?.label || key).trim()
+        });
+      });
+      return [...byKey.values()].sort((left, right) => (
+        String(left.group || '').localeCompare(String(right.group || ''))
+        || String(left.label || '').localeCompare(String(right.label || ''))
+        || String(left.key || '').localeCompare(String(right.key || ''))
+      ));
+    }
+
+    function openSnapshotKeyPicker() {
+      const items = snapshotKeyPickerItems();
+      if (!items.length) {
+        showReportModal({
+          title: 'No Keys Available',
+          icon: 'warning',
+          message: 'Add template fields or use the prefill catalog before choosing snapshot keys.'
+        });
+        return;
+      }
+      openLocalPicker({
+        title: 'Add Lock Snapshot Key',
+        icon: 'bi-key',
+        placeholder: 'Search by key, label, description, or group...',
+        localItems: items,
+        searchFields: 'key,label,description,group,title',
+        renderer: renderPrefillCatalogItem,
+        onSelect(item) {
+          tryAddSnapshotKeyFromPicker(item);
+        }
+      });
     }
 
     function updateFieldEditorOptionsVisibility() {
@@ -2485,6 +3167,49 @@ num(value) <= 95</code></pre>
     }
 
     prefillSearchInput?.addEventListener('input', applyPrefillFilter);
+    btnAddSnapshotKey?.addEventListener('click', () => {
+      openSnapshotKeyPicker();
+    });
+    btnSuggestSnapshotKeys?.addEventListener('click', () => {
+      const added = suggestSnapshotKeysFromTemplate();
+      showReportModal({
+        title: 'Snapshot Keys Suggested',
+        icon: 'success',
+        message: added
+          ? `Added ${added} key${added === 1 ? '' : 's'} from the current template builder state.`
+          : 'No new keys were found to add. Keys may already be listed.',
+        buttonClass: 'btn-success'
+      });
+    });
+    snapshotKeysList?.addEventListener('click', (event) => {
+      const btn = event.target.closest('.js-remove-snapshot-key');
+      if (!btn) return;
+      const index = Number(btn.getAttribute('data-index'));
+      if (!Number.isFinite(index) || index < 0 || index >= snapshotKeysState.length) return;
+      const removedKey = snapshotKeysState[index];
+      snapshotKeysState.splice(index, 1);
+      if (removedKey && snapshotKeyLabelsState[removedKey]) {
+        delete snapshotKeyLabelsState[removedKey];
+      }
+      if (removedKey && snapshotKeyDocxAliasesState[removedKey]) {
+        delete snapshotKeyDocxAliasesState[removedKey];
+      }
+      renderSnapshotKeysList();
+    });
+    snapshotKeysList?.addEventListener('change', (event) => {
+      const input = event.target.closest('.js-snapshot-shortcut-input');
+      if (!input) return;
+      const snapshotKey = String(input.getAttribute('data-snapshot-key') || '').trim();
+      const payload = collect();
+      const error = applySnapshotShortcutFromInput(snapshotKey, input.value, payload);
+      if (error) {
+        showReportModal({ title: 'Invalid Shortcut', icon: 'warning', message: error, buttonClass: 'btn-warning' });
+        input.value = resolveSnapshotShortcutClient(snapshotKey, payload) || generateUniqueDocxAlias();
+        return;
+      }
+      renderSnapshotKeysList();
+    });
+    renderSnapshotKeysList();
     btnExpandPrefill?.addEventListener('click', () => {
       document.querySelectorAll('#prefillCatalogAccordion .accordion-collapse').forEach((panel) => {
         setAccordionPanelShown(panel, true);
@@ -2497,6 +3222,107 @@ num(value) <= 95</code></pre>
     });
     btnExportPrefillJson?.addEventListener('click', () => exportPrefillRows('json'));
     btnExportPrefillCsv?.addEventListener('click', () => exportPrefillRows('csv'));
+
+    function syncSnapshotFieldsForComplianceCheck() {
+      const payload = collect();
+      expandSnapshotKeysWithUsedTemplateKeys(payload);
+      expandSnapshotKeysWithFieldDependencies(payload);
+      const finalPayload = collect();
+      schemaJsonInput.value = JSON.stringify(finalPayload.schema);
+      placeholderMapJsonInput.value = JSON.stringify(finalPayload.placeholderMap);
+      const pdfMapText = String(pdfFieldMapEditor?.value || '').trim();
+      if (pdfFieldMapJsonInput) {
+        try {
+          pdfFieldMapJsonInput.value = pdfMapText
+            ? JSON.stringify(JSON.parse(pdfMapText))
+            : '{}';
+        } catch (_) {
+          pdfFieldMapJsonInput.value = '{}';
+        }
+      }
+      if (snapshotKeysJsonInput) snapshotKeysJsonInput.value = JSON.stringify(snapshotKeysState);
+      const labelsOut = {};
+      snapshotKeysState.forEach((key) => {
+        const label = snapshotKeyLabelsState[key] || resolveSnapshotKeyLabelClient(key);
+        if (label && label.toLowerCase() !== String(key).toLowerCase()) {
+          labelsOut[key] = label;
+        }
+      });
+      if (snapshotKeyLabelsJsonInput) snapshotKeyLabelsJsonInput.value = JSON.stringify(labelsOut);
+      const aliasesOut = {};
+      snapshotKeysState.forEach((key) => {
+        const normalized = normalizeSnapshotKeyToken(key);
+        if (!normalized) return;
+        const field = findFieldForSnapshotKeyClient(normalized, finalPayload);
+        if (field) return;
+        const alias = normalizeDocxAlias(snapshotKeyDocxAliasesState[normalized] || resolveSnapshotShortcutClient(normalized, finalPayload));
+        if (alias) aliasesOut[normalized] = alias;
+      });
+      if (snapshotKeyDocxAliasesJsonInput) snapshotKeyDocxAliasesJsonInput.value = JSON.stringify(aliasesOut);
+    }
+
+    function renderSnapshotComplianceModalHtml(result = {}) {
+      return window.ReportMessaging.buildTemplateFileComplianceModalHtml(result, {
+        skippedReason: 'Add keys under Lock Snapshot Keys before checking templates.',
+        passLineSuffix: 'only uses Lock Snapshot Keys and shortcuts',
+        failureIntro: 'These Word/PDF placeholders are not in Lock Snapshot Keys:',
+        tokenFixHint: 'Remove them from the file or add the keys under Lock Snapshot Keys (or use an allowed shortcut).'
+      });
+    }
+
+    async function runSnapshotComplianceCheck(button, checkTarget) {
+      const target = String(checkTarget || '').trim() || 'all-docx';
+      syncSnapshotFieldsForComplianceCheck();
+      const formData = new FormData(form);
+      formData.set('checkTarget', target);
+      const url = savedTemplateId
+        ? `/school/reports/templates/${encodeURIComponent(savedTemplateId)}/snapshot-compliance`
+        : '/school/reports/templates/snapshot-compliance';
+      const original = button ? button.innerHTML : '';
+      if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Checking...';
+      }
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: formData
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status === 'error') {
+          throw new Error(result.message || 'Unable to check snapshot placeholders.');
+        }
+        await showReportModal({
+          title: result.ok ? 'Snapshot Check Passed' : 'Snapshot Check Failed',
+          icon: result.ok ? 'success' : 'warning',
+          message: renderSnapshotComplianceModalHtml(result),
+          html: true,
+          size: result.ok ? 'md' : 'lg',
+          buttonClass: result.ok ? 'btn-success' : 'btn-warning'
+        });
+      } catch (error) {
+        await showReportModal({
+          title: 'Snapshot Check Failed',
+          icon: 'error',
+          message: error?.message || 'Unable to check snapshot placeholders.',
+          buttonClass: 'btn-danger'
+        });
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.innerHTML = original;
+        }
+      }
+    }
+
+    document.addEventListener('click', (event) => {
+      const btn = event.target.closest('.js-check-snapshot-compliance');
+      if (!btn || !form.contains(btn)) return;
+      event.preventDefault();
+      runSnapshotComplianceCheck(btn, btn.getAttribute('data-check-target'));
+    });
+
     document.getElementById('btnInspectPdfFields')?.addEventListener('click', async (event) => {
       const btn = event.currentTarget;
       const templateId = String(btn?.getAttribute('data-template-id') || '').trim();
@@ -2512,15 +3338,17 @@ num(value) <= 95</code></pre>
         if (!response.ok || result.status === 'error') {
           throw new Error(result.message || 'Unable to inspect saved PDF fields.');
         }
-        const names = (Array.isArray(result.fields) ? result.fields : []).map((field) => String(field?.name || '').trim()).filter(Boolean);
-        const html = names.length
-          ? '<div class="text-start"><div class="small text-muted mb-2">Saved PDF fields for ' + escapeHtml(result.label || 'Default') + ':</div><pre class="small bg-light border rounded p-2 mb-0 text-wrap">' + escapeHtml(names.join('\n')) + '</pre></div>'
+        const fields = Array.isArray(result.fields) ? result.fields : [];
+        const hasFields = fields.some((field) => String(field?.name || '').trim());
+        const message = hasFields
+          ? window.ReportMessaging.buildPdfFieldsInspectModalHtml({ label: result.label || 'Default', fields })
           : 'No fillable PDF fields were found in the saved file.';
         await showReportModal({
           title: 'PDF Fields',
-          icon: names.length ? 'info' : 'warning',
-          message: html,
-          html: true
+          icon: hasFields ? 'info' : 'warning',
+          message,
+          html: hasFields,
+          size: hasFields ? 'lg' : 'md'
         });
       } catch (error) {
         await showReportModal({
@@ -2599,6 +3427,46 @@ num(value) <= 95</code></pre>
       schemaJsonInput.value = JSON.stringify(payload.schema);
       placeholderMapJsonInput.value = JSON.stringify(payload.placeholderMap);
       pdfFieldMapJsonInput.value = JSON.stringify(pdfFieldMap);
+      expandSnapshotKeysWithUsedTemplateKeys(payload);
+      expandSnapshotKeysWithFieldDependencies(payload);
+      renderSnapshotKeysList();
+      const finalPayload = collect();
+      const shortcutErrors = [];
+      snapshotKeysState.forEach((key) => {
+        const shortcut = resolveSnapshotShortcutClient(key, finalPayload);
+        const error = validateSnapshotShortcutClient(key, shortcut, finalPayload);
+        if (error) shortcutErrors.push(error);
+      });
+      if (shortcutErrors.length) {
+        await showReportModal({
+          title: 'Invalid Snapshot Shortcuts',
+          icon: 'warning',
+          message: shortcutErrors.slice(0, 5).join('\n'),
+          buttonClass: 'btn-warning'
+        });
+        return;
+      }
+      schemaJsonInput.value = JSON.stringify(finalPayload.schema);
+      placeholderMapJsonInput.value = JSON.stringify(finalPayload.placeholderMap);
+      if (snapshotKeysJsonInput) snapshotKeysJsonInput.value = JSON.stringify(snapshotKeysState);
+      const labelsOut = {};
+      snapshotKeysState.forEach((key) => {
+        const label = snapshotKeyLabelsState[key] || resolveSnapshotKeyLabelClient(key);
+        if (label && label.toLowerCase() !== String(key).toLowerCase()) {
+          labelsOut[key] = label;
+        }
+      });
+      if (snapshotKeyLabelsJsonInput) snapshotKeyLabelsJsonInput.value = JSON.stringify(labelsOut);
+      const aliasesOut = {};
+      snapshotKeysState.forEach((key) => {
+        const normalized = normalizeSnapshotKeyToken(key);
+        if (!normalized) return;
+        const field = findFieldForSnapshotKeyClient(normalized, finalPayload);
+        if (field) return;
+        const alias = normalizeDocxAlias(snapshotKeyDocxAliasesState[normalized] || resolveSnapshotShortcutClient(normalized, finalPayload));
+        if (alias) aliasesOut[normalized] = alias;
+      });
+      if (snapshotKeyDocxAliasesJsonInput) snapshotKeyDocxAliasesJsonInput.value = JSON.stringify(aliasesOut);
 
       const submitter = e.submitter || form.querySelector('button[type="submit"]');
       const originalHtml = submitter ? submitter.innerHTML : '';
@@ -2682,6 +3550,7 @@ num(value) <= 95</code></pre>
           <input type="file" class="form-control form-control-sm" name="funderDocxFile_${key.replace(/"/g, '&quot;')}" accept=".docx">
         </td>
         <td class="text-end">
+          <button type="button" class="btn btn-outline-secondary btn-sm js-check-snapshot-compliance mb-1" data-check-target="docx:funder:${key.replace(/"/g, '&quot;')}">Check</button>
           <button type="button" class="btn btn-outline-danger btn-sm btn-remove-funder-docx">Remove</button>
         </td>
       `;
@@ -2742,6 +3611,7 @@ num(value) <= 95</code></pre>
           <input type="file" class="form-control form-control-sm" name="funderPdfFile_${key.replace(/"/g, '&quot;')}" accept=".pdf">
         </td>
         <td class="text-end">
+          <button type="button" class="btn btn-outline-secondary btn-sm js-check-snapshot-compliance mb-1" data-check-target="pdf:funder:${key.replace(/"/g, '&quot;')}">Check</button>
           <button type="button" class="btn btn-outline-danger btn-sm btn-remove-funder-pdf">Remove</button>
         </td>
       `;

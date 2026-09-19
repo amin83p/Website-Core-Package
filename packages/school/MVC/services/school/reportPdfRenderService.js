@@ -103,6 +103,26 @@ async function inspectPdfTemplateFields(pdfTemplate = {}) {
   return { filePath, fields };
 }
 
+async function inspectPdfPlaceholderTokens(pdfTemplate = {}) {
+  const { PDFDocument } = getPdfDependencies();
+  const { binary, filePath } = await readPdfTemplateBuffer(pdfTemplate);
+  const pdfDoc = await PDFDocument.load(binary);
+  const form = pdfDoc.getForm();
+  const tokens = new Set();
+  form.getFields().forEach((field) => {
+    if (typeof field.getText !== 'function') return;
+    const text = String(field.getText() || '');
+    if (!text.includes('{{')) return;
+    const regex = /\{\{\s*([^{}]+?)\s*\}\}/g;
+    let match;
+    while ((match = regex.exec(text))) {
+      const token = normalizeTokenKey(match[1]);
+      if (token) tokens.add(String(token).trim().toLowerCase());
+    }
+  });
+  return { filePath, tokens: [...tokens] };
+}
+
 function buildValueLookup({ placeholders = {}, mergedAnswers = {}, prefillSnapshot = {} } = {}) {
   const values = {};
   Object.keys(mergedAnswers || {}).forEach((key) => {
@@ -276,6 +296,7 @@ module.exports = {
   resolveTemplateFilePath,
   readPdfTemplateBuffer,
   inspectPdfTemplateFields,
+  inspectPdfPlaceholderTokens,
   buildValueLookup,
   resolveMappedPdfValues,
   renderReportInstancePdf,

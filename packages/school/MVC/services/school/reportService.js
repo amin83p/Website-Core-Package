@@ -2064,22 +2064,199 @@ function getLatestClbLevelEntry(studentRecord = {}) {
   return sorted[0] || null;
 }
 
-async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = '', reqUser }) {
+const PREFILL_COMPUTE_BUNDLE = Object.freeze({
+  CORE: 'core',
+  CLASS_SESSION_ATTENDANCE: 'classSessionAttendance',
+  CLASS_ATTENDANCE_SPAN: 'classAttendanceSpan',
+  STUDENT_SESSION_ATTENDANCE: 'studentSessionAttendance',
+  STUDENT_ATTENDANCE_SPAN: 'studentAttendanceSpan',
+  STUDENT_PUNCTUALITY_SPAN: 'studentPunctualitySpan',
+  STUDENT_SESSION_RATING_SPAN: 'studentSessionRatingSpan',
+  OVERALL_ATTENDANCE_DAYS: 'overallAttendanceDays',
+  GRADEBOOK_PERIOD: 'gradebookPeriod',
+  GRADEBOOK_SKILLS: 'gradebookSkills',
+  EXAM_PERIOD: 'examPeriod',
+  STUDENT_IDENTITY: 'studentIdentity',
+  STUDENT_RECORD: 'studentRecord',
+  ENROLLMENT_CLAIM: 'enrollmentClaim',
+  CLB: 'clb',
+  STUDENT_ORG_MEMBERSHIP: 'studentOrgMembership'
+});
+
+const ALL_PREFILL_COMPUTE_BUNDLES = new Set(Object.values(PREFILL_COMPUTE_BUNDLE));
+
+let prefillKeyBundleLookupCache = null;
+
+function classifyStudentOnlyPrefillKeyToBundle(rawKey = '') {
+  const token = normalizeSnapshotKey(rawKey).toLowerCase();
+  if (!token) return PREFILL_COMPUTE_BUNDLE.STUDENT_IDENTITY;
+  if (/^attendance_day_\d{2}$/.test(token) || /^attendance_presence_\d{2}$/.test(token) || /^attendance_note_\d{2}$/.test(token)) {
+    return PREFILL_COMPUTE_BUNDLE.OVERALL_ATTENDANCE_DAYS;
+  }
+  if (token.startsWith('student_attendance_span_')) return PREFILL_COMPUTE_BUNDLE.STUDENT_ATTENDANCE_SPAN;
+  if (token.startsWith('student_punctuality_span_')) return PREFILL_COMPUTE_BUNDLE.STUDENT_PUNCTUALITY_SPAN;
+  if (token.startsWith('student_session_rating_span_')) return PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_RATING_SPAN;
+  if (token.startsWith('student_attendance_') || token.startsWith('student_late_') || token.startsWith('student_early_leave_')) {
+    return PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_ATTENDANCE;
+  }
+  if (token === 'enrollment_claim_number' || token === 'student_id_at_funder') {
+    return PREFILL_COMPUTE_BUNDLE.ENROLLMENT_CLAIM;
+  }
+  if (token.startsWith('clb_')) return PREFILL_COMPUTE_BUNDLE.CLB;
+  if (token === 'student_org_member_role' || token === 'student_org_member_status') {
+    return PREFILL_COMPUTE_BUNDLE.STUDENT_ORG_MEMBERSHIP;
+  }
+  if (token === 'student_record_id' || token === 'student_local_id' || token.startsWith('student_enrollment_')
+    || token.startsWith('student_country_of_') || token.startsWith('student_fee_') || token.startsWith('student_academic_')
+    || token.startsWith('student_sending_') || token.startsWith('student_funder_') || token === 'student_student_account_id'
+    || token === 'student_self_fund' || token === 'student_record_notes' || token === 'student_funder_note') {
+    return PREFILL_COMPUTE_BUNDLE.STUDENT_RECORD;
+  }
+  return PREFILL_COMPUTE_BUNDLE.STUDENT_IDENTITY;
+}
+
+function getPrefillKeyBundleLookup() {
+  if (prefillKeyBundleLookupCache) return prefillKeyBundleLookupCache;
+  const map = new Map();
+  const catalog = getPrefillCatalog();
+  const staticGroupBundles = {
+    common: PREFILL_COMPUTE_BUNDLE.CORE,
+    gradebookPeriodClass: PREFILL_COMPUTE_BUNDLE.GRADEBOOK_PERIOD,
+    gradebookPeriodStudent: PREFILL_COMPUTE_BUNDLE.GRADEBOOK_PERIOD,
+    gradebookPeriodSkillsClass: PREFILL_COMPUTE_BUNDLE.GRADEBOOK_SKILLS,
+    gradebookPeriodSkillsStudent: PREFILL_COMPUTE_BUNDLE.GRADEBOOK_SKILLS,
+    examPeriodClass: PREFILL_COMPUTE_BUNDLE.EXAM_PERIOD,
+    examPeriodStudent: PREFILL_COMPUTE_BUNDLE.EXAM_PERIOD
+  };
+  Object.entries(catalog).forEach(([groupName, rows]) => {
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const key = normalizeSnapshotKey(row?.key || '');
+      if (!key) return;
+      let bundle = staticGroupBundles[groupName];
+      if (groupName === 'classOnly') {
+        bundle = key.includes('_span_')
+          ? PREFILL_COMPUTE_BUNDLE.CLASS_ATTENDANCE_SPAN
+          : PREFILL_COMPUTE_BUNDLE.CLASS_SESSION_ATTENDANCE;
+      } else if (groupName === 'studentOnly') {
+        bundle = classifyStudentOnlyPrefillKeyToBundle(key);
+      }
+      map.set(key.toLowerCase(), bundle || PREFILL_COMPUTE_BUNDLE.CORE);
+    });
+  });
+  prefillKeyBundleLookupCache = map;
+  return map;
+}
+
+function normalizeRequiredKeySet(requiredKeys = null) {
+  if (requiredKeys instanceof Set) {
+    const out = new Set();
+    requiredKeys.forEach((rawKey) => {
+      const key = normalizeSnapshotKey(rawKey);
+      if (key) out.add(key);
+    });
+    return out.size ? out : null;
+  }
+  if (Array.isArray(requiredKeys) && requiredKeys.length) {
+    const out = new Set();
+    requiredKeys.forEach((rawKey) => {
+      const key = normalizeSnapshotKey(rawKey);
+      if (key) out.add(key);
+    });
+    return out.size ? out : null;
+  }
+  return null;
+}
+
+function resolvePrefillBundlesForKeys(requiredKeySet = null) {
+  if (!requiredKeySet || !requiredKeySet.size) {
+    return new Set(ALL_PREFILL_COMPUTE_BUNDLES);
+  }
+  const bundles = new Set([PREFILL_COMPUTE_BUNDLE.CORE]);
+  const lookup = getPrefillKeyBundleLookup();
+  requiredKeySet.forEach((rawKey) => {
+    const key = normalizeSnapshotKey(rawKey);
+    if (!key) return;
+    const mapped = lookup.get(key.toLowerCase());
+    if (mapped) {
+      bundles.add(mapped);
+      return;
+    }
+    if (isKnownPrefillKey(key)) {
+      bundles.add(PREFILL_COMPUTE_BUNDLE.CORE);
+      return;
+    }
+    bundles.add(PREFILL_COMPUTE_BUNDLE.CORE);
+  });
+  if ([...requiredKeySet].some((key) => String(key).toLowerCase().startsWith('student_'))) {
+    bundles.add(PREFILL_COMPUTE_BUNDLE.STUDENT_IDENTITY);
+  }
+  return bundles;
+}
+
+function resolveTemplateUsedKeys(template) {
+  return resolveLegacyTemplateFillKeys(template);
+}
+
+function reconcileTemplateSnapshotKeys(template = {}) {
+  const usedKeys = resolveTemplateUsedKeys(template);
+  const existing = resolveTemplateLockKeys(template);
+  const seen = new Set(existing.map((key) => key.toLowerCase()));
+  const snapshotKeys = [...existing];
+  const addedKeys = [];
+  usedKeys.forEach((rawKey) => {
+    const key = normalizeSnapshotKey(rawKey);
+    if (!key) return;
+    const lower = key.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    snapshotKeys.push(key);
+    addedKeys.push(key);
+  });
+  return { snapshotKeys, addedKeys };
+}
+
+async function buildPrefillSnapshot({
+  assignment,
+  teacherId = '',
+  studentId = '',
+  reqUser,
+  requiredKeys = null
+}) {
+  const requiredKeySet = normalizeRequiredKeySet(requiredKeys);
+  const bundles = resolvePrefillBundlesForKeys(requiredKeySet);
+  const wants = (bundleId) => bundles.has(bundleId);
+
+  const needsStudentsTable = wants(PREFILL_COMPUTE_BUNDLE.STUDENT_RECORD)
+    || wants(PREFILL_COMPUTE_BUNDLE.ENROLLMENT_CLAIM)
+    || wants(PREFILL_COMPUTE_BUNDLE.CLB)
+    || wants(PREFILL_COMPUTE_BUNDLE.EXAM_PERIOD);
+  const needsAttendanceWork = wants(PREFILL_COMPUTE_BUNDLE.CLASS_SESSION_ATTENDANCE)
+    || wants(PREFILL_COMPUTE_BUNDLE.CLASS_ATTENDANCE_SPAN)
+    || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_ATTENDANCE)
+    || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_ATTENDANCE_SPAN)
+    || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_PUNCTUALITY_SPAN)
+    || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_RATING_SPAN)
+    || wants(PREFILL_COMPUTE_BUNDLE.OVERALL_ATTENDANCE_DAYS);
+
   const classIdForQuery = toPublicId(assignment.classId);
-  const [classData, sessions, students, persons, organizations, examAssignmentsForClass, enrollmentPeriodRows] = await Promise.all([
+  const [classData, sessions, persons, organizations] = await Promise.all([
     schoolDataService.getDataById('classes', assignment.classId, reqUser),
     schoolDataService.getClassSessions(assignment.classId, reqUser),
-    schoolDataService.fetchAllData('students', {}, reqUser),
     schoolIdentityLookupService.listSchoolPersonRecords({
       reqUser,
       requireSchoolRole: false,
       query: { limit: 1000 }
     }).then((payload) => payload.allRows || payload.rows || []),
-    dataServiceGlobal.fetchData('organizations', {}, reqUser),
-    classIdForQuery
+    dataServiceGlobal.fetchData('organizations', {}, reqUser)
+  ]);
+  const [students, examAssignmentsForClass, enrollmentPeriodRows] = await Promise.all([
+    needsStudentsTable
+      ? schoolDataService.fetchAllData('students', {}, reqUser)
+      : Promise.resolve([]),
+    wants(PREFILL_COMPUTE_BUNDLE.EXAM_PERIOD) && classIdForQuery
       ? schoolDataService.fetchData('examAssignments', { classId__eq: classIdForQuery }, reqUser)
       : Promise.resolve([]),
-    classIdForQuery
+    (wants(PREFILL_COMPUTE_BUNDLE.ENROLLMENT_CLAIM) || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_RECORD)) && classIdForQuery
       ? schoolDataService.getClassEnrollmentPeriodsByClassId(classIdForQuery, reqUser)
       : Promise.resolve([])
   ]);
@@ -2106,87 +2283,186 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     const pid = toPublicId(row?.personId);
     if (sid && pid) studentToPersonMap.set(sid, pid);
   });
-  const enrollmentClaimNumber = reportFunderDocxService.resolveEnrollmentClaimNumberForReportPeriod({
-    periodRows: enrollmentPeriodRows,
-    studentId: studentRecord?.id,
-    personId: studentPersonId,
-    studentToPersonMap,
-    windowStart: reportPeriod.startDate,
-    windowEnd: reportPeriod.dueDate
-  });
+  const enrollmentClaimNumber = (wants(PREFILL_COMPUTE_BUNDLE.ENROLLMENT_CLAIM) || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_RECORD))
+    ? reportFunderDocxService.resolveEnrollmentClaimNumberForReportPeriod({
+      periodRows: enrollmentPeriodRows,
+      studentId: studentRecord?.id,
+      personId: studentPersonId,
+      studentToPersonMap,
+      windowStart: reportPeriod.startDate,
+      windowEnd: reportPeriod.dueDate
+    })
+    : '';
   const reportOrgId = toPublicId(classData?.orgId || assignment?.orgId || studentRecord?.orgId);
-  const statusMap = await sessionStatusPolicyService.getStatusMap(reportOrgId || reqUser?.activeOrgId || '', { includeInactive: true });
-  const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(reportOrgId || reqUser?.activeOrgId || '');
-  const classAttendance = buildClassAttendanceSummary(session, statusMap);
-  const allAttendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
-    classData,
-    sessions,
-    studentRecord,
-    studentPersonId,
-    reqUser,
-    orgId: reportOrgId || reqUser?.activeOrgId || ''
-  });
-  const studentAttendance = await buildStudentAttendanceSummary(sessions, studentId, statusMap, {
-    classData,
-    orgPolicyLayer,
-    ...allAttendanceApplicabilityContext
-  });
+  let statusMap = {};
+  let orgPolicyLayer = {};
+  if (needsAttendanceWork) {
+    statusMap = await sessionStatusPolicyService.getStatusMap(reportOrgId || reqUser?.activeOrgId || '', { includeInactive: true });
+    orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(reportOrgId || reqUser?.activeOrgId || '');
+  }
+  const classAttendance = needsAttendanceWork
+    ? buildClassAttendanceSummary(session, statusMap)
+    : { total: 0, present: 0, late: 0, excused: 0, absent: 0, acf: 0, notApplicable: 0 };
+  let allAttendanceApplicabilityContext = {};
+  if (needsAttendanceWork) {
+    allAttendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
+      classData,
+      sessions,
+      studentRecord,
+      studentPersonId,
+      reqUser,
+      orgId: reportOrgId || reqUser?.activeOrgId || ''
+    });
+  }
+  const studentAttendance = needsAttendanceWork && wants(PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_ATTENDANCE)
+    ? await buildStudentAttendanceSummary(sessions, studentId, statusMap, {
+      classData,
+      orgPolicyLayer,
+      ...allAttendanceApplicabilityContext
+    })
+    : {
+      totalSessions: 0,
+      present: 0,
+      late: 0,
+      excused: 0,
+      absent: 0,
+      acf: 0,
+      notApplicable: 0,
+      attendancePercent: 0,
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      lateExcusedSessions: 0,
+      lateExcusedMinutes: 0,
+      earlyLeaveExcusedSessions: 0,
+      earlyLeaveExcusedMinutes: 0
+    };
   const periodSessions = filterSessionsByDateRange(sessions, reportPeriod.startDate, reportPeriod.dueDate);
-  const periodSessionsGrade = filterPeriodSessionsForGradeMetrics(sessions, reportPeriod.startDate, reportPeriod.dueDate, statusMap);
-  const gradebookPeriodStats = computeReportPeriodGradebookStats(periodSessionsGrade, studentPersonId, statusMap);
-  const gradebookSkillPeriodStats = computeReportPeriodGradebookSkillStats(periodSessionsGrade, studentPersonId, statusMap);
+  const periodSessionsGrade = wants(PREFILL_COMPUTE_BUNDLE.GRADEBOOK_PERIOD) || wants(PREFILL_COMPUTE_BUNDLE.GRADEBOOK_SKILLS)
+    ? filterPeriodSessionsForGradeMetrics(sessions, reportPeriod.startDate, reportPeriod.dueDate, statusMap)
+    : [];
+  const gradebookPeriodStats = wants(PREFILL_COMPUTE_BUNDLE.GRADEBOOK_PERIOD)
+    ? computeReportPeriodGradebookStats(periodSessionsGrade, studentPersonId, statusMap)
+    : {};
+  const gradebookSkillPeriodStats = wants(PREFILL_COMPUTE_BUNDLE.GRADEBOOK_SKILLS)
+    ? computeReportPeriodGradebookSkillStats(periodSessionsGrade, studentPersonId, statusMap)
+    : { skillRows: [] };
   const { skillRows: _skillRows, ...gradebookSkillPrefillStats } = gradebookSkillPeriodStats;
   const examRows = Array.isArray(examAssignmentsForClass) ? examAssignmentsForClass : [];
-  const examPeriodStats = computeReportPeriodExamStats(
-    examRows,
-    classData?.orgId,
-    reportPeriod.startDate,
-    reportPeriod.dueDate,
-    studentRecord?.id
-  );
-  const attendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
-    classData,
-    sessions: periodSessions,
-    studentRecord,
-    studentPersonId,
-    reqUser,
-    orgId: reportOrgId || reqUser?.activeOrgId || ''
-  });
-  const classAttendanceSpan = await buildClassAttendanceSpanSummary(periodSessions, statusMap, {
-    classData,
-    orgPolicyLayer
-  });
-  const studentAttendanceSpan = await buildStudentAttendanceSummary(periodSessions, studentId, statusMap, {
-    countMissingAsAbsent: true,
-    classData,
-    orgPolicyLayer,
-    ...attendanceApplicabilityContext
-  });
-  const studentPunctualitySpan = buildStudentPunctualitySummary(periodSessions, studentId, statusMap, {
-    classData,
-    orgPolicyLayer
-  });
-  const studentSessionRatingSpan = buildStudentSessionRatingSummary(periodSessions, studentId, statusMap, {
-    classData,
-    orgPolicyLayer
-  });
-  const overallAttendanceDayPrefill = buildOverallAttendanceDayPrefill({
-    sessions: periodSessions,
-    studentPersonId,
-    statusMap,
-    applicability: attendanceApplicabilityContext,
-    reportPeriod
-  });
-  const primaryAttendance = studentPersonId
+  const examPeriodStats = wants(PREFILL_COMPUTE_BUNDLE.EXAM_PERIOD)
+    ? computeReportPeriodExamStats(
+      examRows,
+      classData?.orgId,
+      reportPeriod.startDate,
+      reportPeriod.dueDate,
+      studentRecord?.id
+    )
+    : {};
+  let attendanceApplicabilityContext = {};
+  if (needsAttendanceWork && (wants(PREFILL_COMPUTE_BUNDLE.STUDENT_ATTENDANCE_SPAN)
+    || wants(PREFILL_COMPUTE_BUNDLE.OVERALL_ATTENDANCE_DAYS))) {
+    attendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
+      classData,
+      sessions: periodSessions,
+      studentRecord,
+      studentPersonId,
+      reqUser,
+      orgId: reportOrgId || reqUser?.activeOrgId || ''
+    });
+  }
+  const classAttendanceSpan = wants(PREFILL_COMPUTE_BUNDLE.CLASS_ATTENDANCE_SPAN)
+    ? await buildClassAttendanceSpanSummary(periodSessions, statusMap, {
+      classData,
+      orgPolicyLayer
+    })
+    : {
+      sessionCount: 0,
+      uniqueStudents: 0,
+      total: 0,
+      present: 0,
+      late: 0,
+      excused: 0,
+      absent: 0,
+      acf: 0,
+      notApplicable: 0,
+      attendancePercent: 0
+    };
+  const studentAttendanceSpan = wants(PREFILL_COMPUTE_BUNDLE.STUDENT_ATTENDANCE_SPAN)
+    ? await buildStudentAttendanceSummary(periodSessions, studentId, statusMap, {
+      countMissingAsAbsent: true,
+      classData,
+      orgPolicyLayer,
+      ...attendanceApplicabilityContext
+    })
+    : {
+      totalSessions: 0,
+      present: 0,
+      late: 0,
+      excused: 0,
+      absent: 0,
+      acf: 0,
+      notApplicable: 0,
+      attendancePercent: 0,
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      lateExcusedSessions: 0,
+      lateExcusedMinutes: 0,
+      earlyLeaveExcusedSessions: 0,
+      earlyLeaveExcusedMinutes: 0
+    };
+  const studentPunctualitySpan = wants(PREFILL_COMPUTE_BUNDLE.STUDENT_PUNCTUALITY_SPAN)
+    ? buildStudentPunctualitySummary(periodSessions, studentId, statusMap, {
+      classData,
+      orgPolicyLayer
+    })
+    : {
+      attendedSessions: 0,
+      onTimeSessions: 0,
+      lateSessions: 0,
+      leftEarlySessions: 0,
+      lateMinutes: 0,
+      leftEarlyMinutes: 0,
+      lateExcusedSessions: 0,
+      lateExcusedMinutes: 0,
+      leftEarlyExcusedSessions: 0,
+      leftEarlyExcusedMinutes: 0,
+      totalIssueSessions: 0,
+      punctualityPercent: 0,
+      punctualityLabel: ''
+    };
+  const studentSessionRatingSpan = wants(PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_RATING_SPAN)
+    ? buildStudentSessionRatingSummary(periodSessions, studentId, statusMap, {
+      classData,
+      orgPolicyLayer
+    })
+    : {
+      ratedSessions: 0,
+      classEffortPercent: 0,
+      classParticipationPercent: 0,
+      respectsTeachersPercent: 0,
+      respectsStudentsPercent: 0
+    };
+  const overallAttendanceDayPrefill = wants(PREFILL_COMPUTE_BUNDLE.OVERALL_ATTENDANCE_DAYS)
+    ? buildOverallAttendanceDayPrefill({
+      sessions: periodSessions,
+      studentPersonId,
+      statusMap,
+      applicability: attendanceApplicabilityContext,
+      reportPeriod
+    })
+    : {};
+  const useStudentPrimaryAttendance = Boolean(studentPersonId)
+    && (wants(PREFILL_COMPUTE_BUNDLE.STUDENT_ATTENDANCE_SPAN)
+      || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_ATTENDANCE));
+  const primaryAttendance = useStudentPrimaryAttendance
     ? {
-        total: studentAttendanceSpan.totalSessions,
-        present: studentAttendanceSpan.attendancePercent,
-        late: studentAttendanceSpan.late,
-        excused: studentAttendanceSpan.excused,
-        absent: studentAttendanceSpan.absent,
-        acf: studentAttendanceSpan.acf || 0,
-        notApplicable: studentAttendanceSpan.notApplicable
-      }
+      total: studentAttendanceSpan.totalSessions,
+      present: studentAttendanceSpan.attendancePercent,
+      late: studentAttendanceSpan.late,
+      excused: studentAttendanceSpan.excused,
+      absent: studentAttendanceSpan.absent,
+      acf: studentAttendanceSpan.acf || 0,
+      notApplicable: studentAttendanceSpan.notApplicable
+    }
     : classAttendance;
   const reportOrg = organizations.find((row) => idsEqual(row?.id, reportOrgId)) || null;
   const studentOrgId = toPublicId(studentRecord?.orgId || reportOrgId);
@@ -2194,7 +2470,9 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
   const studentOrgMembership = findOrgMembership(studentPerson, studentOrgId);
   const studentAddress = getAddressFromPerson(studentPerson);
   const studentNameParts = getPersonNameParts(studentPerson);
-  const latestClbLevelEntry = getLatestClbLevelEntry(studentRecord);
+  const latestClbLevelEntry = wants(PREFILL_COMPUTE_BUNDLE.CLB)
+    ? getLatestClbLevelEntry(studentRecord)
+    : null;
 
   const snapshot = {
     teacher_id: resolvedTeacherId,
@@ -2335,10 +2613,667 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     ...examPeriodStats
   };
 
+  if (requiredKeySet) {
+    return pickKeySubset(snapshot, requiredKeySet);
+  }
   return snapshot;
 }
 
-function mergeTemplateData(template, instance, assignment = null) {
+function resolveSnapshotScopeContext(template) {
+  const lockKeys = resolveTemplateLockKeys(template);
+  if (!lockKeys.length) {
+    return { active: false };
+  }
+  const fillKeySet = resolveTemplateFillKeys(template);
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const baseLowerSet = new Set([...fillKeySet].map((key) => String(key).toLowerCase()));
+  return {
+    active: true,
+    fillKeySet,
+    baseLowerSet,
+    placeholderMap
+  };
+}
+
+function filterTemplateToSnapshotScope(template, ctx = null) {
+  const scope = ctx && ctx.active ? ctx : resolveSnapshotScopeContext(template);
+  if (!scope.active) return template;
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const scopedFields = fields.filter((field) => (
+    fieldIsInSnapshotScope(field, scope.baseLowerSet, scope.placeholderMap)
+  ));
+  return {
+    ...template,
+    schema: {
+      ...(template?.schema && typeof template.schema === 'object' ? template.schema : {}),
+      fields: scopedFields
+    }
+  };
+}
+
+function findFieldForSnapshotKey(template, rawKey = '') {
+  const key = normalizeSnapshotKey(rawKey);
+  if (!key) return null;
+  const lower = key.toLowerCase();
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  for (const field of fields) {
+    if (isVisualOnlyField(field)) continue;
+    const fieldId = String(field?.id || '').trim();
+    if (fieldId && fieldId.toLowerCase() === lower) return field;
+    const canonical = resolveCanonicalSnapshotKeyForField(field, placeholderMap);
+    if (canonical?.key && canonical.key.toLowerCase() === lower) return field;
+  }
+  return null;
+}
+
+function stripOutOfScopeMergedAnswers(template, merged, ctx) {
+  if (!ctx?.active || !merged || typeof merged !== 'object') return merged;
+  const out = {};
+  ctx.fillKeySet.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(merged, key)) {
+      out[key] = merged[key];
+    }
+  });
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    const fieldId = String(field?.id || '').trim();
+    if (!fieldId) return;
+    if (!fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) return;
+    if (Object.prototype.hasOwnProperty.call(merged, fieldId)) {
+      out[fieldId] = merged[fieldId];
+    }
+  });
+  return out;
+}
+
+function resolveTemplateSourceExportKeys(template) {
+  const lockKeys = resolveTemplateLockKeys(template);
+  if (!lockKeys.length) return null;
+  const ctx = resolveSnapshotScopeContext(template);
+  const set = new Set();
+  ctx.fillKeySet.forEach((key) => {
+    const normalized = normalizeSnapshotKey(key);
+    if (normalized) set.add(normalized.toLowerCase());
+  });
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (!fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) return;
+    const alias = reportRuleEngineService.normalizeDocxAlias(field?.docxAlias);
+    if (alias && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      set.add(alias);
+    }
+  });
+  const snapshotKeyDocxAliases = template?.snapshotKeyDocxAliases && typeof template.snapshotKeyDocxAliases === 'object'
+    ? template.snapshotKeyDocxAliases
+    : {};
+  lockKeys.forEach((lockKey) => {
+    const key = normalizeSnapshotKey(lockKey);
+    if (!key) return;
+    if (findFieldForSnapshotKey(template, key)) return;
+    const alias = reportRuleEngineService.normalizeDocxAlias(snapshotKeyDocxAliases[key]);
+    if (alias && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      set.add(alias);
+    }
+  });
+  return set;
+}
+
+function resolveAllowedDocxTokens(template) {
+  const lockKeys = resolveTemplateLockKeys(template);
+  if (!lockKeys.length) return null;
+  const ctx = resolveSnapshotScopeContext(template);
+  const allowed = new Set();
+  lockKeys.forEach((rawKey) => {
+    const key = normalizeSnapshotKey(rawKey);
+    if (key) allowed.add(key.toLowerCase());
+  });
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (!fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) return;
+    const alias = reportRuleEngineService.normalizeDocxAlias(field?.docxAlias);
+    if (alias && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      allowed.add(alias);
+    }
+  });
+  const snapshotKeyDocxAliases = template?.snapshotKeyDocxAliases && typeof template.snapshotKeyDocxAliases === 'object'
+    ? template.snapshotKeyDocxAliases
+    : {};
+  lockKeys.forEach((lockKey) => {
+    const key = normalizeSnapshotKey(lockKey);
+    if (!key) return;
+    if (findFieldForSnapshotKey(template, key)) return;
+    const alias = reportRuleEngineService.normalizeDocxAlias(snapshotKeyDocxAliases[key]);
+    if (alias && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      allowed.add(alias);
+    }
+  });
+  return allowed;
+}
+
+const SNAPSHOT_COMPLIANCE_ISSUE_CAP = 15;
+
+function buildSnapshotAllowedTokenSummary(template) {
+  const allowedSet = resolveAllowedDocxTokens(template);
+  if (!allowedSet) {
+    return {
+      configured: false,
+      canonicalKeys: [],
+      shortcuts: [],
+      allowedSet: null
+    };
+  }
+  const canonicalKeys = resolveTemplateLockKeys(template).map((raw) => normalizeSnapshotKey(raw)).filter(Boolean);
+  const canonicalLower = new Set(canonicalKeys.map((key) => key.toLowerCase()));
+  const shortcuts = [...allowedSet].filter((token) => !canonicalLower.has(String(token).toLowerCase()));
+  return {
+    configured: true,
+    canonicalKeys,
+    shortcuts,
+    allowedSet
+  };
+}
+
+function buildAllowedSampleList(allowedSet, limit = 12) {
+  if (!allowedSet || !allowedSet.size) return [];
+  return [...allowedSet].slice(0, limit);
+}
+
+function formatDocxTokenIssueMessage(token, label, allowedSample = [], customHint = '') {
+  const sample = allowedSample.length
+    ? ` Allowed examples: ${allowedSample.map((row) => `{{${row}}}`).join(', ')}.`
+    : '';
+  const hint = customHint || 'Remove it from the Word file, add the key under Lock Snapshot Keys, or use an allowed shortcut.';
+  return `{{${token}}} in [${label}] is not allowed. ${hint}${sample}`;
+}
+
+function formatPdfFieldMapIssueMessage(sourceKey, pdfFieldName, allowedSample = [], customHint = '') {
+  const sample = allowedSample.length
+    ? ` Allowed examples: ${allowedSample.join(', ')}.`
+    : '';
+  const target = pdfFieldName ? ` → ${pdfFieldName}` : '';
+  const hint = customHint || `Remove the mapping or add "${sourceKey}" to the snapshot list.`;
+  return `PDF Field Map entry "${sourceKey}"${target} is not in Lock Snapshot Keys. ${hint}${sample}`;
+}
+
+function formatPdfPlaceholderIssueMessage(token, label, allowedSample = []) {
+  return formatDocxTokenIssueMessage(token, label, allowedSample).replace('Word file', 'PDF');
+}
+
+async function inspectTemplateDocxSnapshotCompliance(template, { docxTemplate, label = 'DOCX', complianceOptions = {} } = {}) {
+  const summary = complianceOptions.allowedSet instanceof Set
+    ? {
+      configured: complianceOptions.allowedSet.size > 0,
+      allowedSet: complianceOptions.allowedSet,
+      canonicalKeys: [],
+      shortcuts: []
+    }
+    : buildSnapshotAllowedTokenSummary(template);
+  const skipReason = complianceOptions.notConfiguredReason
+    || 'Add keys under Lock Snapshot Keys before checking templates.';
+  if (!summary.configured) {
+    return {
+      kind: 'docx',
+      ok: true,
+      skipped: true,
+      label,
+      reason: skipReason,
+      issues: [],
+      allowedSample: [],
+      tokensChecked: 0
+    };
+  }
+  if (!docxTemplate?.path) {
+    return {
+      kind: 'docx',
+      ok: false,
+      skipped: false,
+      label,
+      issues: [{
+        type: 'missing_file',
+        message: `No Word file is available for [${label}]. Choose a file or save the template with an attachment first.`
+      }],
+      allowedSample: buildAllowedSampleList(summary.allowedSet),
+      tokensChecked: 0
+    };
+  }
+  const reportDocxRenderService = require('./reportDocxRenderService');
+  const inspection = await reportDocxRenderService.inspectDocxTemplateTokens(docxTemplate);
+  const allowedSample = buildAllowedSampleList(summary.allowedSet);
+  const issues = [];
+  (inspection?.tokens || []).forEach((token) => {
+    const normalized = String(token || '').trim().toLowerCase();
+    if (!normalized) return;
+    if (summary.allowedSet.has(normalized)) return;
+    issues.push({
+      type: 'token',
+      token: normalized,
+      message: formatDocxTokenIssueMessage(
+        normalized,
+        label,
+        allowedSample,
+        complianceOptions.docxTokenIssueHint
+      )
+    });
+  });
+  const tokensChecked = (inspection?.tokens || []).length;
+  const capped = issues.slice(0, SNAPSHOT_COMPLIANCE_ISSUE_CAP);
+  return {
+    kind: 'docx',
+    ok: issues.length === 0,
+    skipped: false,
+    label,
+    issues: capped,
+    allowedSample,
+    tokensChecked,
+    totalIssueCount: issues.length
+  };
+}
+
+async function inspectTemplatePdfSnapshotCompliance(template, { pdfTemplate, label = 'PDF', complianceOptions = {} } = {}) {
+  const summary = complianceOptions.allowedSet instanceof Set
+    ? {
+      configured: complianceOptions.allowedSet.size > 0,
+      allowedSet: complianceOptions.allowedSet,
+      canonicalKeys: [],
+      shortcuts: []
+    }
+    : buildSnapshotAllowedTokenSummary(template);
+  const skipReason = complianceOptions.notConfiguredReason
+    || 'Add keys under Lock Snapshot Keys before checking templates.';
+  if (!summary.configured) {
+    return {
+      kind: 'pdf',
+      ok: true,
+      skipped: true,
+      label,
+      reason: skipReason,
+      issues: [],
+      allowedSample: [],
+      tokensChecked: 0
+    };
+  }
+  const allowedSample = buildAllowedSampleList(summary.allowedSet);
+  const issues = [];
+  const pdfFieldMap = template?.pdfFieldMap && typeof template.pdfFieldMap === 'object'
+    ? template.pdfFieldMap
+    : {};
+  Object.entries(pdfFieldMap).forEach(([sourceKey, pdfFieldName]) => {
+    const normalized = normalizeSnapshotKey(sourceKey).toLowerCase();
+    if (!normalized) return;
+    if (summary.allowedSet.has(normalized)) return;
+    issues.push({
+      type: 'pdf_field_map',
+      token: normalized,
+      message: formatPdfFieldMapIssueMessage(
+        sourceKey,
+        String(pdfFieldName || '').trim(),
+        allowedSample,
+        complianceOptions.pdfFieldMapIssueHint
+      )
+    });
+  });
+  let tokensChecked = 0;
+  if (pdfTemplate?.path) {
+    const reportPdfRenderService = require('./reportPdfRenderService');
+    const inspection = await reportPdfRenderService.inspectPdfPlaceholderTokens(pdfTemplate);
+    tokensChecked = (inspection?.tokens || []).length;
+    (inspection?.tokens || []).forEach((token) => {
+      const normalized = String(token || '').trim().toLowerCase();
+      if (!normalized) return;
+      if (summary.allowedSet.has(normalized)) return;
+      issues.push({
+        type: 'pdf_placeholder',
+        token: normalized,
+        message: formatPdfPlaceholderIssueMessage(normalized, label, allowedSample)
+      });
+    });
+  } else if (!issues.length) {
+    issues.push({
+      type: 'missing_file',
+      message: `No PDF file is available for [${label}]. Choose a file or save the template with an attachment first.`
+    });
+  }
+  return {
+    kind: 'pdf',
+    ok: issues.length === 0,
+    skipped: false,
+    label,
+    issues: issues.slice(0, SNAPSHOT_COMPLIANCE_ISSUE_CAP),
+    allowedSample,
+    tokensChecked,
+    totalIssueCount: issues.length
+  };
+}
+
+function formatSnapshotComplianceError(results = [], options = {}) {
+  const failed = (Array.isArray(results) ? results : []).filter((row) => row && row.ok === false && !row.skipped);
+  if (!failed.length) return '';
+  const docxRows = [];
+  failed.forEach((row) => {
+    (row.issues || []).forEach((issue) => {
+      if (issue.type === 'token' && issue.token) {
+        docxRows.push(`${issue.token} (${row.label})`);
+      } else if (issue.message) {
+        docxRows.push(issue.message);
+      }
+    });
+  });
+  const details = docxRows.slice(0, 12).join('; ');
+  const suffix = docxRows.length > 12 ? '…' : '';
+  const prefix = options.errorPrefix
+    || 'DOCX template uses placeholder tokens that are not listed under Lock Snapshot Keys (or their shortcuts):';
+  const suffixHint = options.errorSuffix
+    || 'Remove them from the Word file or add the keys to the snapshot section.';
+  return `${prefix} ${details}${suffix}. ${suffixHint}`;
+}
+
+function parseSnapshotComplianceCheckTarget(rawTarget = '') {
+  const token = String(rawTarget || '').trim().toLowerCase();
+  if (!token || token === 'all-docx') {
+    return { mode: 'all-docx' };
+  }
+  if (token === 'all-pdf') {
+    return { mode: 'all-pdf' };
+  }
+  const match = token.match(/^(docx|pdf):(default|funder):(.+)$/);
+  if (match) {
+    return {
+      mode: 'single',
+      kind: match[1],
+      scope: match[2],
+      funderKey: match[3]
+    };
+  }
+  const short = token.match(/^(docx|pdf):(default)$/);
+  if (short) {
+    return { mode: 'single', kind: short[1], scope: 'default', funderKey: '' };
+  }
+  return { mode: 'all-docx' };
+}
+
+async function runTemplateSnapshotComplianceChecks(template, checkTarget = 'all-docx', complianceOptions = {}) {
+  const parsed = parseSnapshotComplianceCheckTarget(checkTarget);
+  const summary = complianceOptions.allowedSet instanceof Set
+    ? {
+      configured: complianceOptions.allowedSet.size > 0,
+      allowedSet: complianceOptions.allowedSet,
+      canonicalKeys: [],
+      shortcuts: []
+    }
+    : buildSnapshotAllowedTokenSummary(template);
+  if (!summary.configured) {
+    return {
+      ok: true,
+      snapshotConfigured: false,
+      results: [{
+        kind: 'info',
+        ok: true,
+        skipped: true,
+        label: complianceOptions.notConfiguredLabel || 'Lock Snapshot Keys',
+        reason: complianceOptions.notConfiguredReason
+          || 'Add keys under Lock Snapshot Keys before checking templates.',
+        issues: [],
+        allowedSample: []
+      }]
+    };
+  }
+
+  const inspectOptions = { complianceOptions };
+  const results = [];
+  const runDocx = parsed.mode === 'all-docx' || (parsed.mode === 'single' && parsed.kind === 'docx');
+  const runPdf = parsed.mode === 'all-pdf' || (parsed.mode === 'single' && parsed.kind === 'pdf');
+
+  if (runDocx) {
+    const docxTargets = [];
+    if (parsed.mode === 'single' && parsed.scope === 'funder') {
+      const funderKey = String(parsed.funderKey || '').trim();
+      const row = (Array.isArray(template?.docxTemplatesByFunder) ? template.docxTemplatesByFunder : [])
+        .find((item) => String(item?.funderKey || '').trim().toLowerCase() === funderKey.toLowerCase());
+      if (row?.docxTemplate) {
+        docxTargets.push({
+          label: String(row.label || row.funderKey || 'funder DOCX').trim(),
+          docxTemplate: row.docxTemplate
+        });
+      }
+    } else if (parsed.mode === 'single' && parsed.scope === 'default') {
+      docxTargets.push({ label: 'Default DOCX', docxTemplate: template.docxTemplate });
+    } else {
+      if (template?.docxTemplate?.path) {
+        docxTargets.push({ label: 'Default DOCX', docxTemplate: template.docxTemplate });
+      }
+      (Array.isArray(template?.docxTemplatesByFunder) ? template.docxTemplatesByFunder : []).forEach((row) => {
+        if (!row?.docxTemplate?.path) return;
+        docxTargets.push({
+          label: String(row?.label || row?.funderKey || 'funder DOCX').trim(),
+          docxTemplate: row.docxTemplate
+        });
+      });
+    }
+    if (!docxTargets.length) {
+      results.push({
+        kind: 'docx',
+        ok: false,
+        label: parsed.mode === 'single' ? 'DOCX' : 'Word templates',
+        issues: [{
+          type: 'missing_file',
+          message: 'No Word file is available to check. Choose a file or save the template with an attachment first.'
+        }],
+        allowedSample: buildAllowedSampleList(summary.allowedSet),
+        tokensChecked: 0
+      });
+    } else {
+      for (const target of docxTargets) {
+        // eslint-disable-next-line no-await-in-loop
+        results.push(await inspectTemplateDocxSnapshotCompliance(template, { ...target, ...inspectOptions }));
+      }
+    }
+  }
+
+  if (runPdf) {
+    const pdfTargets = [];
+    if (parsed.mode === 'single' && parsed.scope === 'funder') {
+      const funderKey = String(parsed.funderKey || '').trim();
+      const row = (Array.isArray(template?.pdfTemplatesByFunder) ? template.pdfTemplatesByFunder : [])
+        .find((item) => String(item?.funderKey || '').trim().toLowerCase() === funderKey.toLowerCase());
+      if (row?.pdfTemplate) {
+        pdfTargets.push({
+          label: String(row.label || row.funderKey || 'funder PDF').trim(),
+          pdfTemplate: row.pdfTemplate
+        });
+      }
+    } else if (parsed.mode === 'single' && parsed.scope === 'default') {
+      pdfTargets.push({ label: 'Default PDF', pdfTemplate: template.pdfTemplate });
+    } else {
+      pdfTargets.push({ label: 'Default PDF', pdfTemplate: template.pdfTemplate });
+      (Array.isArray(template?.pdfTemplatesByFunder) ? template.pdfTemplatesByFunder : []).forEach((row) => {
+        if (!row?.pdfTemplate?.path) return;
+        pdfTargets.push({
+          label: String(row?.label || row?.funderKey || 'funder PDF').trim(),
+          pdfTemplate: row.pdfTemplate
+        });
+      });
+    }
+    if (!pdfTargets.length && parsed.mode !== 'single') {
+      results.push(await inspectTemplatePdfSnapshotCompliance(template, {
+        label: 'Default PDF',
+        pdfTemplate: null,
+        ...inspectOptions
+      }));
+    } else if (!pdfTargets.length) {
+      results.push({
+        kind: 'pdf',
+        ok: false,
+        label: 'PDF',
+        issues: [{
+          type: 'missing_file',
+          message: 'No PDF file is available to check. Choose a file or save the template with an attachment first.'
+        }],
+        allowedSample: buildAllowedSampleList(summary.allowedSet),
+        tokensChecked: 0
+      });
+    } else {
+      for (const target of pdfTargets) {
+        // eslint-disable-next-line no-await-in-loop
+        results.push(await inspectTemplatePdfSnapshotCompliance(template, { ...target, ...inspectOptions }));
+      }
+    }
+  }
+
+  const ok = results.every((row) => row.ok !== false || row.skipped);
+  return {
+    ok,
+    snapshotConfigured: true,
+    results
+  };
+}
+
+async function validateTemplateDocxSnapshotTokens(template) {
+  const summary = buildSnapshotAllowedTokenSummary(template);
+  if (!summary.configured) return { ok: true, disallowed: [] };
+
+  const docxTargets = [];
+  if (template?.docxTemplate?.path) {
+    docxTargets.push({ label: 'Default DOCX', docxTemplate: template.docxTemplate });
+  }
+  (Array.isArray(template?.docxTemplatesByFunder) ? template.docxTemplatesByFunder : []).forEach((row) => {
+    if (!row?.docxTemplate?.path) return;
+    docxTargets.push({
+      label: String(row?.label || row?.funderKey || 'funder DOCX').trim(),
+      docxTemplate: row.docxTemplate
+    });
+  });
+
+  if (!docxTargets.length) {
+    return { ok: true, disallowed: [] };
+  }
+
+  const results = [];
+  for (const target of docxTargets) {
+    // eslint-disable-next-line no-await-in-loop
+    results.push(await inspectTemplateDocxSnapshotCompliance(template, target));
+  }
+  const errorText = formatSnapshotComplianceError(results);
+  if (errorText) throw new Error(errorText);
+  return { ok: true, disallowed: [] };
+}
+
+function buildReservedDocxTokenSet(template, { excludeFieldId = '', excludeSnapshotKey = '' } = {}) {
+  const reserved = new Set();
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const skipId = String(excludeFieldId || '').trim().toLowerCase();
+  const skipSnapshotKey = normalizeSnapshotKey(excludeSnapshotKey).toLowerCase();
+  fields.forEach((field) => {
+    const fieldId = String(field?.id || '').trim();
+    if (fieldId && fieldId.toLowerCase() !== skipId) {
+      reserved.add(fieldId.toLowerCase());
+    }
+    const prefillKey = normalizeSnapshotKey(field?.prefillKey || '');
+    if (prefillKey) reserved.add(prefillKey.toLowerCase());
+    if (fieldId) {
+      const token = normalizeSnapshotKey(placeholderMap[fieldId] || '');
+      if (token) reserved.add(token.toLowerCase());
+    }
+    if (fieldId.toLowerCase() === skipId) return;
+    const alias = reportRuleEngineService.normalizeDocxAlias(field?.docxAlias);
+    if (alias) reserved.add(alias);
+  });
+  resolveTemplateLockKeys(template).forEach((rawKey) => {
+    const key = normalizeSnapshotKey(rawKey);
+    if (key) reserved.add(key.toLowerCase());
+  });
+  const snapshotKeyDocxAliases = template?.snapshotKeyDocxAliases && typeof template.snapshotKeyDocxAliases === 'object'
+    ? template.snapshotKeyDocxAliases
+    : {};
+  Object.entries(snapshotKeyDocxAliases).forEach(([rawKey, rawAlias]) => {
+    const key = normalizeSnapshotKey(rawKey);
+    if (key && skipSnapshotKey && key.toLowerCase() === skipSnapshotKey) return;
+    const alias = reportRuleEngineService.normalizeDocxAlias(rawAlias);
+    if (key) reserved.add(key.toLowerCase());
+    if (alias) reserved.add(alias);
+  });
+  return reserved;
+}
+
+function assertValidSnapshotShortcut(template, snapshotKey, alias, { excludeFieldId = '', excludeSnapshotKey = '' } = {}) {
+  const key = normalizeSnapshotKey(snapshotKey);
+  const normalized = reportRuleEngineService.normalizeDocxAlias(alias);
+  if (!normalized || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(normalized)) {
+    throw new Error(`Invalid DOCX shortcut for snapshot key "${key || snapshotKey}". Expected a letter followed by lowercase letters or numbers.`);
+  }
+  const reserved = buildReservedDocxTokenSet(template, { excludeFieldId, excludeSnapshotKey: excludeSnapshotKey || key });
+  const field = findFieldForSnapshotKey(template, key);
+  if (field?.id) {
+    const fieldAlias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+    if (fieldAlias === normalized) reserved.delete(normalized);
+  }
+  if (reserved.has(normalized)) {
+    throw new Error(`DOCX shortcut "${normalized}" for snapshot key "${key}" conflicts with another placeholder token or catalog key. Choose a different shortcut.`);
+  }
+}
+
+function ensureSnapshotDocxShortcuts(template) {
+  const lockKeys = resolveTemplateLockKeys(template);
+  if (!lockKeys.length) return template;
+  if (!template.snapshotKeyDocxAliases || typeof template.snapshotKeyDocxAliases !== 'object') {
+    template.snapshotKeyDocxAliases = {};
+  }
+  lockKeys.forEach((rawKey) => {
+    const key = normalizeSnapshotKey(rawKey);
+    if (!key) return;
+    const field = findFieldForSnapshotKey(template, key);
+    if (field && !isVisualOnlyField(field)) {
+      let alias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+      if (!alias || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+        const reserved = buildReservedDocxTokenSet(template, { excludeFieldId: field.id });
+        alias = reportRuleEngineService.generateDocxAlias(reserved);
+        field.docxAlias = alias;
+      }
+      assertValidSnapshotShortcut(template, key, alias, { excludeFieldId: field.id, excludeSnapshotKey: key });
+      return;
+    }
+    let alias = reportRuleEngineService.normalizeDocxAlias(template.snapshotKeyDocxAliases[key]);
+    if (!alias || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      const reserved = buildReservedDocxTokenSet(template);
+      alias = reportRuleEngineService.generateDocxAlias(reserved);
+      template.snapshotKeyDocxAliases[key] = alias;
+    }
+    assertValidSnapshotShortcut(template, key, alias, { excludeSnapshotKey: key });
+  });
+  return template;
+}
+
+function templateUsesSnapshotScope(template) {
+  return resolveTemplateLockKeys(template).length > 0;
+}
+
+function resolveSnapshotScopeOptions(template, options = {}) {
+  if (options.respectSnapshotKeys === false) return { respectSnapshotKeys: false };
+  if (options.respectSnapshotKeys === true) return { respectSnapshotKeys: true };
+  return templateUsesSnapshotScope(template) ? { respectSnapshotKeys: true } : { respectSnapshotKeys: false };
+}
+
+function resolveSnapshotComputationFieldIds(template) {
+  const ctx = resolveSnapshotScopeContext(template);
+  if (!ctx.active) return null;
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  return fields
+    .filter((field) => field?.id && fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap))
+    .map((field) => String(field.id));
+}
+
+function mergeTemplateData(template, instance, assignment = null, options = {}) {
+  const scopeResolved = resolveSnapshotScopeOptions(template, options);
+  const respectSnapshotKeys = scopeResolved.respectSnapshotKeys === true;
+  const ctx = resolveSnapshotScopeContext(template);
+  const useScope = respectSnapshotKeys && ctx.active;
   const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object' ? instance.prefillSnapshot : {};
   const answers = instance?.answers && typeof instance.answers === 'object' ? instance.answers : {};
   const sharedRaw = assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object' ? assignment.sharedAnswers : {};
@@ -2348,6 +3283,9 @@ function mergeTemplateData(template, instance, assignment = null) {
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
 
   fields.forEach((field) => {
+    if (useScope && !fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) {
+      return;
+    }
     if (isVisualOnlyField(field) || !field?.id) {
       if (field?.id) delete merged[field.id];
       return;
@@ -2379,11 +3317,15 @@ function mergeTemplateData(template, instance, assignment = null) {
     }
   });
 
+  const templateForCalc = useScope ? filterTemplateToSnapshotScope(template, ctx) : template;
   const recalculated = reportRuleEngineService.recomputeCalculatedAnswers({
-    template,
+    template: templateForCalc,
     mergedAnswers: merged,
     prefill
   });
+  if (useScope) {
+    return stripOutOfScopeMergedAnswers(template, recalculated.answers, ctx);
+  }
   return recalculated.answers;
 }
 
@@ -2420,9 +3362,16 @@ function buildPlaceholderPayloadDetailed(
   template,
   instance,
   assignment = null,
-  { applyDocxValueCase = false, includeFieldIdTokens = false } = {}
+  options = {}
 ) {
-  const merged = mergeTemplateData(template, instance, assignment);
+  const opts = options && typeof options === 'object' ? options : {};
+  const scopeResolved = resolveSnapshotScopeOptions(template, opts);
+  const respectSnapshotKeys = scopeResolved.respectSnapshotKeys === true;
+  const applyDocxValueCase = opts.applyDocxValueCase === true;
+  const includeFieldIdTokens = opts.includeFieldIdTokens === true;
+  const ctx = resolveSnapshotScopeContext(template);
+  const useScope = respectSnapshotKeys && ctx.active;
+  const merged = mergeTemplateData(template, instance, assignment, scopeResolved);
   const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
     ? template.placeholderMap
     : {};
@@ -2437,12 +3386,20 @@ function buildPlaceholderPayloadDetailed(
   Object.keys(prefill).forEach((key) => {
     const cleanKey = normalizePrefillKey(key);
     if (!cleanKey) return;
+    if (useScope) {
+      const lower = cleanKey.toLowerCase();
+      const inSet = [...ctx.fillKeySet].some((row) => String(row).toLowerCase() === lower);
+      if (!inSet) return;
+    }
     out[`{{${cleanKey}}}`] = toPrintableValue(prefill[key]);
   });
   Object.keys(placeholderMap).forEach((fieldId) => {
     const token = String(placeholderMap[fieldId] || '').trim();
     if (!token) return;
     const field = fieldMap.get(String(fieldId || '').trim());
+    if (useScope && field && !fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) {
+      return;
+    }
     const conversion = reportRuleEngineService.convertFieldValueForExport({
       field,
       value: merged[fieldId],
@@ -2471,14 +3428,18 @@ function buildPlaceholderPayloadDetailed(
   return { placeholders: out, conversionDiagnostics };
 }
 
-function buildDocxPlaceholderPayloadDetailed(template, instance, assignment = null) {
-  return buildPlaceholderPayloadDetailed(template, instance, assignment, { applyDocxValueCase: true });
-}
-
-function buildPdfPlaceholderPayloadDetailed(template, instance, assignment = null) {
+function buildDocxPlaceholderPayloadDetailed(template, instance, assignment = null, options = {}) {
   return buildPlaceholderPayloadDetailed(template, instance, assignment, {
     applyDocxValueCase: true,
-    includeFieldIdTokens: true
+    ...(options && typeof options === 'object' ? options : {})
+  });
+}
+
+function buildPdfPlaceholderPayloadDetailed(template, instance, assignment = null, options = {}) {
+  return buildPlaceholderPayloadDetailed(template, instance, assignment, {
+    applyDocxValueCase: true,
+    includeFieldIdTokens: true,
+    ...(options && typeof options === 'object' ? options : {})
   });
 }
 
@@ -2549,6 +3510,348 @@ function validateTemplatePrefillKeys(templateOrSchema) {
   return invalid;
 }
 
+function normalizeSnapshotKey(rawKey = '') {
+  return normalizePrefillKey(rawKey);
+}
+
+function pickKeySubset(source = {}, keySet) {
+  if (!source || typeof source !== 'object') return {};
+  if (!keySet || !(keySet instanceof Set) || !keySet.size) return { ...source };
+  const out = {};
+  const index = new Map();
+  Object.keys(source).forEach((key) => {
+    index.set(String(key).toLowerCase(), key);
+  });
+  keySet.forEach((rawKey) => {
+    const normalized = normalizeSnapshotKey(rawKey);
+    if (!normalized) return;
+    if (Object.prototype.hasOwnProperty.call(source, normalized)) {
+      out[normalized] = source[normalized];
+      return;
+    }
+    const actual = index.get(normalized.toLowerCase());
+    if (actual && Object.prototype.hasOwnProperty.call(source, actual)) {
+      out[actual] = source[actual];
+    }
+  });
+  return out;
+}
+
+function collectExpressionContextKeys(expression) {
+  const keys = new Set();
+  const text = String(expression || '');
+  const patterns = [
+    /\bprefill\.([A-Za-z_][A-Za-z0-9_]*)/g,
+    /\banswers\.([A-Za-z_][A-Za-z0-9_]*)/g
+  ];
+  patterns.forEach((pattern) => {
+    let match = pattern.exec(text);
+    while (match) {
+      keys.add(match[1]);
+      match = pattern.exec(text);
+    }
+  });
+  return keys;
+}
+
+function isKnownSnapshotKey(template, rawKey = '') {
+  const key = normalizeSnapshotKey(rawKey);
+  if (!key) return false;
+  if (isKnownPrefillKey(key)) return true;
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  if (fields.some((field) => String(field?.id || '').trim().toLowerCase() === key.toLowerCase())) {
+    return true;
+  }
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  if (Object.keys(placeholderMap).some((fieldId) => String(fieldId).toLowerCase() === key.toLowerCase())) {
+    return true;
+  }
+  if (Object.values(placeholderMap).some((token) => (
+    normalizeSnapshotKey(token).toLowerCase() === key.toLowerCase()
+  ))) {
+    return true;
+  }
+  if (fields.some((field) => normalizeSnapshotKey(field?.docxAlias || '').toLowerCase() === key.toLowerCase())) {
+    return true;
+  }
+  const pdfFieldMap = template?.pdfFieldMap && typeof template.pdfFieldMap === 'object'
+    ? template.pdfFieldMap
+    : {};
+  if (Object.keys(pdfFieldMap).some((sourceKey) => String(sourceKey).toLowerCase() === key.toLowerCase())) {
+    return true;
+  }
+  if (Object.values(pdfFieldMap).some((pdfName) => (
+    normalizeSnapshotKey(pdfName).toLowerCase() === key.toLowerCase()
+  ))) {
+    return true;
+  }
+  return false;
+}
+
+function getPrefillCatalogLabel(rawKey = '') {
+  const key = normalizeSnapshotKey(rawKey);
+  if (!key) return '';
+  const rows = Object.values(getPrefillCatalog()).flat();
+  const match = rows.find((row) => String(row?.key || '') === key);
+  return match ? String(match.label || key).trim() : '';
+}
+
+function resolveCanonicalSnapshotKeyForField(field, placeholderMap = {}) {
+  if (isVisualOnlyField(field)) return null;
+  const fieldId = String(field?.id || '').trim();
+  const prefillKey = normalizeSnapshotKey(field?.prefillKey || '');
+  if (prefillKey) {
+    return { key: prefillKey, origin: 'template_prefill' };
+  }
+  const rawToken = String(placeholderMap[fieldId] || '').trim();
+  let tokenKey = normalizeSnapshotKey(rawToken);
+  if (!tokenKey && rawToken) {
+    tokenKey = normalizeSnapshotKey(rawToken.replace(/^\{\{\s*/, '').replace(/\s*\}\}$/, ''));
+  }
+  if (tokenKey) {
+    return { key: tokenKey, origin: 'placeholder' };
+  }
+  if (fieldId) {
+    return { key: fieldId, origin: 'template_field' };
+  }
+  return null;
+}
+
+function buildTemplateSnapshotKeySuggestions(template = {}) {
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const fieldById = new Map(
+    fields.map((field) => [String(field?.id || '').trim(), field]).filter(([id]) => id)
+  );
+  const suggestions = [];
+  const seen = new Set();
+
+  fields.forEach((field) => {
+    if (isVisualOnlyField(field)) return;
+    const resolved = resolveCanonicalSnapshotKeyForField(field, placeholderMap);
+    if (!resolved?.key) return;
+    const { key, origin } = resolved;
+    const token = key.toLowerCase();
+    if (seen.has(token)) return;
+    seen.add(token);
+    const fieldLabel = String(field?.label || field?.id || '').trim();
+    suggestions.push({
+      key,
+      label: fieldLabel || getPrefillCatalogLabel(key) || key,
+      fieldId: String(field?.id || '').trim(),
+      origin
+    });
+  });
+
+  const pdfFieldMap = template?.pdfFieldMap && typeof template.pdfFieldMap === 'object'
+    ? template.pdfFieldMap
+    : {};
+  Object.keys(pdfFieldMap).forEach((sourceKey) => {
+    const key = normalizeSnapshotKey(sourceKey);
+    if (!key) return;
+    const token = key.toLowerCase();
+    if (seen.has(token)) return;
+    const linkedField = fieldById.get(key);
+    if (linkedField && isVisualOnlyField(linkedField)) return;
+    if (linkedField && !isVisualOnlyField(linkedField)) return;
+    if (!isKnownPrefillKey(key)) return;
+    seen.add(token);
+    suggestions.push({
+      key,
+      label: getPrefillCatalogLabel(key) || key,
+      fieldId: '',
+      origin: 'pdf_field_map'
+    });
+  });
+
+  return suggestions.sort((left, right) => (
+    String(left.label || '').localeCompare(String(right.label || ''))
+    || String(left.key || '').localeCompare(String(right.key || ''))
+  ));
+}
+
+function resolveSnapshotKeyLabel(template, rawKey = '') {
+  const key = normalizeSnapshotKey(rawKey);
+  if (!key) return '';
+  const labels = template?.snapshotKeyLabels && typeof template.snapshotKeyLabels === 'object'
+    ? template.snapshotKeyLabels
+    : {};
+  if (Object.prototype.hasOwnProperty.call(labels, key) && String(labels[key] ?? '').trim()) {
+    return String(labels[key]).trim();
+  }
+  const lower = key.toLowerCase();
+  const stored = Object.entries(labels).find(([labelKey]) => (
+    normalizeSnapshotKey(labelKey).toLowerCase() === lower
+  ));
+  if (stored && String(stored[1] ?? '').trim()) {
+    return String(stored[1]).trim();
+  }
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  for (const field of fields) {
+    if (isVisualOnlyField(field)) continue;
+    const canonical = resolveCanonicalSnapshotKeyForField(field, placeholderMap);
+    if (canonical?.key.toLowerCase() === lower) {
+      return String(field?.label || field?.id || getPrefillCatalogLabel(key) || key).trim();
+    }
+    const fieldId = String(field?.id || '').trim();
+    if (fieldId.toLowerCase() === lower) {
+      return String(field?.label || fieldId).trim();
+    }
+  }
+  const catalogLabel = getPrefillCatalogLabel(key);
+  if (catalogLabel) return catalogLabel;
+  return key;
+}
+
+function collectFieldExpressionDependencyKeys(field) {
+  const deps = new Set();
+  if (isVisualOnlyField(field)) return deps;
+  reportRuleEngineService.normalizeCalculationDependencies(field?.calculationDependencies || [])
+    .forEach((dep) => deps.add(dep));
+  const calcRule = field?.calculationRule && typeof field.calculationRule === 'object'
+    ? field.calculationRule
+    : {};
+  const conversionRule = field?.conversionRule && typeof field.conversionRule === 'object'
+    ? field.conversionRule
+    : {};
+  collectExpressionContextKeys(calcRule.expression).forEach((dep) => deps.add(dep));
+  collectExpressionContextKeys(conversionRule.expression).forEach((dep) => deps.add(dep));
+  return deps;
+}
+
+function resolveLegacyTemplateFillKeys(template) {
+  const set = new Set();
+  buildTemplateSnapshotKeySuggestions(template).forEach((row) => {
+    if (row?.key) set.add(row.key);
+  });
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    collectFieldExpressionDependencyKeys(field).forEach((dep) => set.add(dep));
+  });
+  return set;
+}
+
+function fieldIsInSnapshotScope(field, baseLowerSet, placeholderMap = {}) {
+  const fieldId = String(field?.id || '').trim();
+  if (fieldId && baseLowerSet.has(fieldId.toLowerCase())) return true;
+  const canonical = resolveCanonicalSnapshotKeyForField(field, placeholderMap);
+  if (canonical?.key && baseLowerSet.has(canonical.key.toLowerCase())) return true;
+  return false;
+}
+
+function resolveTemplateFillKeys(template) {
+  const lockKeys = resolveTemplateLockKeys(template);
+  if (!lockKeys.length) {
+    return resolveLegacyTemplateFillKeys(template);
+  }
+
+  const set = new Set();
+  lockKeys.forEach((rawKey) => {
+    const key = normalizeSnapshotKey(rawKey);
+    if (key) set.add(key);
+  });
+  const baseLowerSet = new Set([...set].map((key) => key.toLowerCase()));
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (!fieldIsInSnapshotScope(field, baseLowerSet, placeholderMap)) return;
+    collectFieldExpressionDependencyKeys(field).forEach((dep) => set.add(dep));
+  });
+  return set;
+}
+
+function resolveTemplateLockKeys(template) {
+  const keys = Array.isArray(template?.snapshotKeys) ? template.snapshotKeys : [];
+  const out = [];
+  const seen = new Set();
+  keys.forEach((rawKey) => {
+    const normalized = normalizeSnapshotKey(rawKey);
+    if (!normalized) return;
+    const token = normalized.toLowerCase();
+    if (seen.has(token)) return;
+    seen.add(token);
+    out.push(normalized);
+  });
+  return out;
+}
+
+function validateTemplateSnapshotKeys(template) {
+  const keys = Array.isArray(template?.snapshotKeys) ? template.snapshotKeys : [];
+  const invalid = [];
+  keys.forEach((rawKey) => {
+    const key = String(rawKey || '').trim();
+    if (!key) return;
+    if (isKnownSnapshotKey(template, key)) return;
+    invalid.push({ key: normalizeSnapshotKey(key) || key });
+  });
+  return invalid;
+}
+
+async function buildLockSnapshot({ template, instance, assignment = null, reqUser }) {
+  void reqUser;
+  const overallReportService = require('./overallReportService');
+  const lockKeys = resolveTemplateLockKeys(template);
+  if (!lockKeys.length) {
+    throw new Error('Configure lock snapshot keys on the report template before locking.');
+  }
+  const scopeOptions = templateUsesSnapshotScope(template) ? { respectSnapshotKeys: true } : {};
+  const mergedAnswers = mergeTemplateData(template, instance, assignment, scopeOptions);
+  const placeholderBundle = buildDocxPlaceholderPayloadDetailed(template, instance, assignment, scopeOptions);
+  const placeholders = placeholderBundle?.placeholders && typeof placeholderBundle.placeholders === 'object'
+    ? placeholderBundle.placeholders
+    : {};
+  const sourceValuesFull = overallReportService.buildSourceValuesFromPlaceholders(template, placeholders);
+  const lockKeySet = new Set(lockKeys.map((key) => normalizeSnapshotKey(key)).filter(Boolean));
+  const sourceValues = pickKeySubset(sourceValuesFull, lockKeySet);
+  const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
+    ? instance.prefillSnapshot
+    : {};
+  const keys = {};
+  lockKeys.forEach((rawKey) => {
+    const key = normalizeSnapshotKey(rawKey);
+    if (!key) return;
+    if (Object.prototype.hasOwnProperty.call(mergedAnswers, key)) {
+      keys[key] = mergedAnswers[key];
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(mergedAnswers, rawKey)) {
+      keys[key] = mergedAnswers[rawKey];
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(sourceValues, key)) {
+      keys[key] = sourceValues[key];
+      return;
+    }
+    const resolved = getPrefillValue(prefill, key);
+    if (resolved.found) {
+      keys[key] = resolved.value;
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(placeholders, key)) {
+      keys[key] = placeholders[key];
+    }
+  });
+
+  return {
+    templateId: String(template?.id || instance?.templateId || '').trim(),
+    templateVersion: Number(instance?.templateVersion || template?.version || 1) || 1,
+    capturedAt: new Date().toISOString(),
+    keys,
+    placeholders: pickKeySubset(placeholders, lockKeySet),
+    sourceValues,
+    mergedAnswers
+  };
+}
+
 module.exports = {
   buildStudentSessionRatingSummary,
   buildPrefillSnapshot,
@@ -2566,7 +3869,38 @@ module.exports = {
   buildReportDocxCollections,
   getPrefillCatalog,
   validateTemplatePrefillKeys,
+  validateTemplateSnapshotKeys,
+  isKnownSnapshotKey,
   isKnownPrefillKey,
+  normalizeSnapshotKey,
+  pickKeySubset,
+  resolveTemplateFillKeys,
+  resolveTemplateUsedKeys,
+  reconcileTemplateSnapshotKeys,
+  resolvePrefillBundlesForKeys,
+  normalizeRequiredKeySet,
+  resolveTemplateLockKeys,
+  fieldIsInSnapshotScope,
+  buildLockSnapshot,
+  buildTemplateSnapshotKeySuggestions,
+  resolveSnapshotKeyLabel,
+  resolveCanonicalSnapshotKeyForField,
+  resolveSnapshotScopeContext,
+  filterTemplateToSnapshotScope,
+  resolveTemplateSourceExportKeys,
+  resolveAllowedDocxTokens,
+  ensureSnapshotDocxShortcuts,
+  validateTemplateDocxSnapshotTokens,
+  buildSnapshotAllowedTokenSummary,
+  inspectTemplateDocxSnapshotCompliance,
+  inspectTemplatePdfSnapshotCompliance,
+  runTemplateSnapshotComplianceChecks,
+  formatSnapshotComplianceError,
+  templateUsesSnapshotScope,
+  resolveSnapshotScopeOptions,
+  resolveSnapshotComputationFieldIds,
+  findFieldForSnapshotKey,
+  getPrefillCatalogLabel,
   formatStudentPhonesList,
   normalizePrefillKey
 };

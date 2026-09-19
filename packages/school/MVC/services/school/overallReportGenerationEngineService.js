@@ -603,13 +603,35 @@ async function generateSourceBatchFromStoredInstances(request = {}, reqUser) {
       assignment,
       reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
     );
-    const payload = await reportGenerationEngineService.buildStudentPayload({
-      template,
-      assignment: effectiveAssignment,
-      instance,
-      reqUser,
-      options: { format: 'json' }
-    });
+    const lockSnapshot = String(instance.status || '').toLowerCase() === 'locked'
+      && instance.lockSnapshot
+      && typeof instance.lockSnapshot === 'object'
+      ? instance.lockSnapshot
+      : null;
+    let payload;
+    if (lockSnapshot?.sourceValues && typeof lockSnapshot.sourceValues === 'object') {
+      const studentName = String(
+        instance?.prefillSnapshot?.student_full_name
+        || lockSnapshot.keys?.student_full_name
+        || instance.studentId
+        || ''
+      ).trim();
+      payload = {
+        instanceId: instance.id,
+        studentId: instance.studentId || '',
+        studentName,
+        placeholders: lockSnapshot.placeholders || {},
+        warnings: []
+      };
+    } else {
+      payload = await reportGenerationEngineService.buildStudentPayload({
+        template,
+        assignment: effectiveAssignment,
+        instance,
+        reqUser,
+        options: { format: 'json' }
+      });
+    }
     (payload.warnings || []).forEach((warning) => warnings.push(warning));
     const rowStudentId = studentId || clean(instance.studentId);
     const engineResult = {

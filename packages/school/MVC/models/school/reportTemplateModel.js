@@ -384,6 +384,89 @@ function sanitizeAudit(v, existingAudit = {}) {
   };
 }
 
+function sanitizeSnapshotKeys(rawKeys) {
+  let rows = rawKeys;
+  if (typeof rows === 'string' && rows.trim()) {
+    try {
+      rows = JSON.parse(rows);
+    } catch {
+      rows = rows.split(/[,|\n]/).map((item) => String(item || '').trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(rows)) rows = [];
+  const out = [];
+  const seen = new Set();
+  rows.slice(0, 200).forEach((row) => {
+    const key = normalizePrefillKey(row);
+    if (!key) return;
+    const token = key.toLowerCase();
+    if (seen.has(token)) return;
+    seen.add(token);
+    out.push(cleanString(key, { max: 120, allowEmpty: false }));
+  });
+  return out;
+}
+
+function sanitizeSnapshotKeyLabels(rawLabels, snapshotKeys = []) {
+  const allowed = new Set(
+    (Array.isArray(snapshotKeys) ? snapshotKeys : [])
+      .map((row) => normalizePrefillKey(row).toLowerCase())
+      .filter(Boolean)
+  );
+  let source = rawLabels;
+  if (typeof source === 'string' && source.trim()) {
+    try {
+      source = JSON.parse(source);
+    } catch {
+      source = {};
+    }
+  }
+  if (!isPlainObject(source)) source = {};
+  const out = {};
+  let count = 0;
+  Object.entries(source).forEach(([rawKey, rawLabel]) => {
+    if (count >= 200) return;
+    const key = normalizePrefillKey(rawKey);
+    if (!key) return;
+    if (allowed.size && !allowed.has(key.toLowerCase())) return;
+    const label = cleanString(rawLabel, { max: 160, allowEmpty: false });
+    if (!label) return;
+    out[key] = label;
+    count += 1;
+  });
+  return out;
+}
+
+function sanitizeSnapshotKeyDocxAliases(rawAliases, snapshotKeys = []) {
+  const allowed = new Set(
+    (Array.isArray(snapshotKeys) ? snapshotKeys : [])
+      .map((row) => normalizePrefillKey(row).toLowerCase())
+      .filter(Boolean)
+  );
+  let source = rawAliases;
+  if (typeof source === 'string' && source.trim()) {
+    try {
+      source = JSON.parse(source);
+    } catch {
+      source = {};
+    }
+  }
+  if (!isPlainObject(source)) source = {};
+  const out = {};
+  let count = 0;
+  Object.entries(source).forEach(([rawKey, rawAlias]) => {
+    if (count >= 200) return;
+    const key = normalizePrefillKey(rawKey);
+    if (!key) return;
+    if (allowed.size && !allowed.has(key.toLowerCase())) return;
+    const alias = cleanString(rawAlias, { max: 32, allowEmpty: false }).toLowerCase();
+    if (!alias) return;
+    out[key] = alias;
+    count += 1;
+  });
+  return out;
+}
+
 function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
   if (!isPlainObject(input)) throw new Error('Invalid report template payload.');
 
@@ -398,6 +481,9 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
   const version = cleanInteger(input.version, { min: 1, max: 1000, allowEmpty: true }) || 1;
   const schema = sanitizeSchema(input.schema);
   const placeholderMap = sanitizePlaceholderMap(input.placeholderMap, schema);
+  const snapshotKeys = sanitizeSnapshotKeys(
+    input.snapshotKeys !== undefined ? input.snapshotKeys : existing?.snapshotKeys
+  );
 
   const out = {
     orgId,
@@ -406,6 +492,15 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
     title,
     status,
     description: cleanString(input.description, { max: 4000, allowEmpty: true }),
+    snapshotKeys,
+    snapshotKeyLabels: sanitizeSnapshotKeyLabels(
+      input.snapshotKeyLabels !== undefined ? input.snapshotKeyLabels : existing?.snapshotKeyLabels,
+      snapshotKeys
+    ),
+    snapshotKeyDocxAliases: sanitizeSnapshotKeyDocxAliases(
+      input.snapshotKeyDocxAliases !== undefined ? input.snapshotKeyDocxAliases : existing?.snapshotKeyDocxAliases,
+      snapshotKeys
+    ),
     allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(input.allowedReportScopes),
     conductRequiredBeforeFill: cleanBoolean(
       input.conductRequiredBeforeFill,

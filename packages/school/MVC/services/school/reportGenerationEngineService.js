@@ -441,7 +441,8 @@ async function buildSyntheticInstance({
     assignment,
     teacherId,
     studentId,
-    reqUser
+    reqUser,
+    requiredKeys: reportService.resolveTemplateFillKeys(template)
   });
   const instance = {
     id: `engine-${studentId || 'class'}`,
@@ -460,10 +461,18 @@ async function buildSyntheticInstance({
   };
   const hydrated = hydrateAnswersFromPrefill(template, instance);
   instance.answers = hydrated.answers;
-  const mergedAnswers = reportService.mergeTemplateData(template, instance, assignment);
+  const mergeOptions = reportService.templateUsesSnapshotScope(template)
+    ? { respectSnapshotKeys: true }
+    : {};
+  const mergedAnswers = reportService.mergeTemplateData(template, instance, assignment, mergeOptions);
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const ctx = reportService.resolveSnapshotScopeContext(template);
   fields.forEach((field) => {
     if (!field?.id || isVisualOnlyField(field)) return;
+    if (mergeOptions.respectSnapshotKeys && ctx.active
+      && !reportService.fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) {
+      return;
+    }
     const valueMode = reportRuleEngineService.normalizeValueMode(field?.valueMode);
     if (valueMode === 'calculated') {
       instance.answers[field.id] = mergedAnswers[field.id];
@@ -472,12 +481,16 @@ async function buildSyntheticInstance({
   return instance;
 }
 
-function assessGenerationWarnings(template, assignment, instance, mergedAnswers = null) {
+function assessGenerationWarnings(template, assignment, instance, mergedAnswers = null, options = {}) {
   const warnings = [];
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const mergeOptions = options.respectSnapshotKeys === true && reportService.templateUsesSnapshotScope(template)
+    ? { respectSnapshotKeys: true }
+    : {};
+  const ctx = reportService.resolveSnapshotScopeContext(template);
   const merged = mergedAnswers && typeof mergedAnswers === 'object'
     ? mergedAnswers
-    : reportService.mergeTemplateData(template, instance, assignment);
+    : reportService.mergeTemplateData(template, instance, assignment, mergeOptions);
   const studentTargeted = reportService.isStudentTargetedScope(assignment?.reportScope);
   const sharedRaw = assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object'
     ? assignment.sharedAnswers
@@ -488,6 +501,10 @@ function assessGenerationWarnings(template, assignment, instance, mergedAnswers 
   const answers = instance?.answers && typeof instance.answers === 'object' ? instance.answers : {};
 
   fields.forEach((field) => {
+    if (mergeOptions.respectSnapshotKeys && ctx.active
+      && !reportService.fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) {
+      return;
+    }
     if (isVisualOnlyField(field) || !field?.id) return;
     const fieldId = String(field.id);
     const valueMode = reportRuleEngineService.normalizeValueMode(field?.valueMode);
@@ -544,13 +561,16 @@ function assessGenerationWarnings(template, assignment, instance, mergedAnswers 
 }
 
 function buildPlaceholderBundle(template, instance, assignment, format = 'json') {
+  const scopeOptions = reportService.templateUsesSnapshotScope(template)
+    ? { respectSnapshotKeys: true }
+    : {};
   if (format === 'docx') {
-    return reportService.buildDocxPlaceholderPayloadDetailed(template, instance, assignment);
+    return reportService.buildDocxPlaceholderPayloadDetailed(template, instance, assignment, scopeOptions);
   }
   if (format === 'pdf') {
-    return reportService.buildPdfPlaceholderPayloadDetailed(template, instance, assignment);
+    return reportService.buildPdfPlaceholderPayloadDetailed(template, instance, assignment, scopeOptions);
   }
-  return reportService.buildPlaceholderPayloadDetailed(template, instance, assignment);
+  return reportService.buildPlaceholderPayloadDetailed(template, instance, assignment, scopeOptions);
 }
 
 async function buildStudentPayload({
@@ -561,7 +581,10 @@ async function buildStudentPayload({
   options = {}
 } = {}) {
   const format = String(options.format || 'json').trim().toLowerCase();
-  const mergedAnswers = reportService.mergeTemplateData(template, instance, assignment);
+  const mergeOptions = reportService.templateUsesSnapshotScope(template)
+    ? { respectSnapshotKeys: true }
+    : {};
+  const mergedAnswers = reportService.mergeTemplateData(template, instance, assignment, mergeOptions);
   const placeholderBundle = buildPlaceholderBundle(template, instance, assignment, format);
   const collections = await reportService.buildReportDocxCollections({
     template,
@@ -569,7 +592,7 @@ async function buildStudentPayload({
     assignment,
     reqUser
   });
-  const warnings = assessGenerationWarnings(template, assignment, instance, mergedAnswers);
+  const warnings = assessGenerationWarnings(template, assignment, instance, mergedAnswers, mergeOptions);
   const collectionDiagnostics = Object.fromEntries(
     Object.entries(collections || {}).map(([key, rows]) => [key, { rowCount: Array.isArray(rows) ? rows.length : 0 }])
   );

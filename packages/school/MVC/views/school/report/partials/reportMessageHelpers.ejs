@@ -16,6 +16,112 @@
     return String(value ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
   }
 
+  function formatPdfAcroFieldType(rawType = '') {
+    const token = String(rawType || '').trim();
+    if (!token) return 'Unknown';
+    return token
+      .replace(/^PDF/i, '')
+      .replace(/Field$/i, '')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .trim() || token;
+  }
+
+  function buildTemplateFileComplianceModalHtml(result = {}, options = {}) {
+    const results = Array.isArray(result.results) ? result.results : [];
+    const skippedReason = options.skippedReason || 'Add keys before checking templates.';
+    const passLineSuffix = options.passLineSuffix || 'passed the check';
+    const failureIntro = options.failureIntro || 'These placeholders are not allowed:';
+    const tokenFixHint = options.tokenFixHint || 'Remove them from the file or add the keys to your template.';
+
+    if (result.snapshotConfigured === false || results.some((row) => row.skipped && row.reason)) {
+      const reason = results.find((row) => row.reason)?.reason || skippedReason;
+      return `<div class="text-start report-compliance-modal"><p class="mb-0">${escapeReportMessage(reason)}</p></div>`;
+    }
+
+    if (result.ok) {
+      const lines = results.filter((row) => !row.skipped).map((row) => {
+        const count = Number(row.tokensChecked || 0);
+        const suffix = count ? ` (${count} placeholder token${count === 1 ? '' : 's'} checked)` : '';
+        return `<li><strong>${escapeReportMessage(row.label || 'Template')}:</strong> ${escapeReportMessage(passLineSuffix)}${escapeReportMessage(suffix)}.</li>`;
+      });
+      return `<div class="text-start report-compliance-modal"><ul class="mb-0 ps-3">${lines.join('') || '<li>Check completed.</li>'}</ul></div>`;
+    }
+
+    const blocks = results.filter((row) => row.ok === false).map((row) => {
+      const issues = Array.isArray(row.issues) ? row.issues : [];
+      const tokenIssues = issues.filter((issue) => (issue.type === 'token' || issue.type === 'pdf_placeholder') && issue.token);
+      const otherIssues = issues.filter((issue) => !((issue.type === 'token' || issue.type === 'pdf_placeholder') && issue.token));
+      const extraCount = Math.max(0, Number(row.totalIssueCount || 0) - issues.length);
+
+      let body = '';
+      if (tokenIssues.length) {
+        body += `<p class="small text-muted mb-2">${escapeReportMessage(failureIntro)}</p>`;
+        body += '<ul class="list-unstyled mb-0 report-compliance-token-list" style="max-height:min(14rem,38vh);overflow-y:auto;border:1px solid rgba(15,23,42,.12);border-radius:.375rem;padding:.5rem .75rem;background:#fff;">';
+        body += tokenIssues.map((issue) => (
+          `<li class="mb-1"><code class="user-select-all">${escapeReportMessage(`{{${issue.token}}}`)}</code></li>`
+        )).join('');
+        body += '</ul>';
+      }
+      if (otherIssues.length) {
+        body += `<ul class="mb-0 ps-3 small mt-2">${otherIssues.map((issue) => (
+          `<li class="mb-1">${escapeReportMessage(issue.message || 'Issue found')}</li>`
+        )).join('')}</ul>`;
+      }
+      if (extraCount) {
+        body += `<p class="small text-muted mb-0 mt-2">…and ${extraCount} more issue(s) not shown.</p>`;
+      }
+
+      const allowed = Array.isArray(row.allowedSample) && row.allowedSample.length
+        ? `<div class="small border-top pt-2 mt-2"><div class="text-muted mb-1">Allowed examples</div><div class="d-flex flex-wrap gap-1">${row.allowedSample.map((token) => (
+          `<code class="user-select-all">${escapeReportMessage(`{{${token}}}`)}</code>`
+        )).join('')}</div></div>`
+        : '';
+
+      const fixHint = tokenIssues.length
+        ? `<p class="small text-muted mb-0 mt-2">${escapeReportMessage(tokenFixHint)}</p>`
+        : '';
+
+      return `<div class="border rounded p-3 mb-2 bg-light"><div class="fw-semibold mb-2">${escapeReportMessage(row.label || 'Template')}</div>${body}${allowed}${fixHint}</div>`;
+    });
+
+    return `<div class="text-start report-compliance-modal">${blocks.join('') || '<p class="mb-0">Check failed.</p>'}</div>`;
+  }
+
+  function buildPdfFieldsInspectModalHtml({ label = 'Default', fields = [] } = {}) {
+    const list = (Array.isArray(fields) ? fields : [])
+      .map((field) => ({
+        name: String(field?.name || '').trim(),
+        type: formatPdfAcroFieldType(field?.type)
+      }))
+      .filter((field) => field.name);
+    if (!list.length) {
+      return '<p class="mb-0 text-muted">No fillable PDF fields were found in the saved file.</p>';
+    }
+    const safeLabel = escapeReportMessage(label || 'Default');
+    const rows = list.map((field, index) => (
+      `<tr>`
+      + `<td class="text-muted small text-end pe-2" style="width: 2.5rem;">${index + 1}</td>`
+      + `<td><code class="small user-select-all">${escapeReportMessage(field.name)}</code></td>`
+      + `<td class="small text-muted text-nowrap">${escapeReportMessage(field.type)}</td>`
+      + `</tr>`
+    )).join('');
+    return (
+      '<div class="report-pdf-fields-modal text-start">'
+      + `<p class="small text-muted mb-2">Fillable AcroForm fields in the saved PDF template <strong>${safeLabel}</strong>.</p>`
+      + `<div class="d-flex flex-wrap align-items-center gap-2 mb-2">`
+      + `<span class="badge text-bg-secondary">${list.length} field${list.length === 1 ? '' : 's'}</span>`
+      + `<span class="small text-muted">Use these exact names in <strong>PDF Field Map</strong>.</span>`
+      + `</div>`
+      + `<div class="table-responsive border rounded" style="max-height: min(22rem, 55vh); overflow: auto;">`
+      + `<table class="table table-sm table-striped align-middle mb-0">`
+      + `<thead class="table-light" style="position: sticky; top: 0; z-index: 1;">`
+      + `<tr><th scope="col" class="text-end pe-2" style="width: 2.5rem;">#</th><th scope="col">Field name</th><th scope="col">Type</th></tr>`
+      + `</thead><tbody>${rows}</tbody></table></div>`
+      + `<p class="small text-muted mt-2 mb-0">Tip: select a field name in the table to copy it.</p>`
+      + `</div>`
+    );
+  }
+
   function reportMessageModalAvailable() {
     return typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
   }
@@ -26,7 +132,8 @@
     icon = 'warning',
     buttonClass = 'btn-primary',
     buttons = null,
-    html = false
+    html = false,
+    size = 'md'
   } = {}) {
     if (!reportMessageModalAvailable()) {
       console.error('Report message modal is unavailable on this page.');
@@ -37,6 +144,7 @@
       title,
       icon,
       message: displayMessage,
+      size,
       buttons: buttons || [{ text: 'OK', class: buttonClass }]
     });
   }
@@ -71,6 +179,9 @@
     ready: true,
     escapeReportMessage,
     plainReportMessage,
+    buildPdfFieldsInspectModalHtml,
+    buildTemplateFileComplianceModalHtml,
+    formatPdfAcroFieldType,
     showReportMessage,
     confirmReportAction
   };

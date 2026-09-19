@@ -181,7 +181,12 @@ function buildCalculationPrefill(template, prefill = {}) {
   const source = prefill && typeof prefill === 'object' ? prefill : {};
   const keys = new Set();
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const scopeCtx = reportService.resolveSnapshotScopeContext(template);
   fields.filter(isCalculatedField).forEach((field) => {
+    if (scopeCtx.active
+      && !reportService.fieldIsInSnapshotScope(field, scopeCtx.baseLowerSet, scopeCtx.placeholderMap)) {
+      return;
+    }
     const expression = clean(field?.calculationRule?.expression);
     const pattern = /\bprefill\.([A-Za-z_][A-Za-z0-9_]*)\b/g;
     let match = pattern.exec(expression);
@@ -264,7 +269,8 @@ async function buildStudentMatrixRow({
       assignment,
       teacherId,
       studentId,
-      reqUser
+      reqUser,
+      requiredKeys: reportService.resolveTemplateFillKeys(template)
     });
     effectiveInstance = {
       assignmentId: assignment.id,
@@ -285,7 +291,8 @@ async function buildStudentMatrixRow({
       assignment,
       teacherId,
       studentId,
-      reqUser
+      reqUser,
+      requiredKeys: reportService.resolveTemplateFillKeys(template)
     });
     const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(instance, reqUser);
     if (canEditAnswers) {
@@ -515,6 +522,7 @@ async function buildMatrixContext({
     sharedFieldsEditable: sharedFieldsGate.sharedFieldsEditable,
     sharedFieldsLockReason: sharedFieldsGate.reason || '',
     sharedFieldsBlockingSiblingCount: sharedFieldsGate.blockingSiblingCount || 0,
+    snapshotComputationFieldIds: reportService.resolveSnapshotComputationFieldIds(template),
     ...fieldGroups,
     rows,
     progress
@@ -592,7 +600,8 @@ async function saveMatrixRow({
       assignment,
       teacherId: resolvedTeacherId,
       studentId: resolvedStudentId,
-      reqUser
+      reqUser,
+      requiredKeys: reportService.resolveTemplateFillKeys(template)
     });
     instance = await schoolDataService.addData('reportInstances', {
       orgId: assignment.orgId,
@@ -842,7 +851,13 @@ async function buildMatrixPrefillPreview({ assignmentId, assignmentRowId = '', t
       continue;
     }
     const oldPrefill = instance.prefillSnapshot && typeof instance.prefillSnapshot === 'object' ? instance.prefillSnapshot : {};
-    const refreshedPrefill = await reportService.buildPrefillSnapshot({ assignment: source.assignment, teacherId: source.resolvedTeacherId, studentId, reqUser });
+    const refreshedPrefill = await reportService.buildPrefillSnapshot({
+      assignment: source.assignment,
+      teacherId: source.resolvedTeacherId,
+      studentId,
+      reqUser,
+      requiredKeys: reportService.resolveTemplateFillKeys(source.template)
+    });
     const merged = reportService.mergeTemplateData(source.template, instance, source.assignment);
     const changes = new Map();
     for (const field of fields) {

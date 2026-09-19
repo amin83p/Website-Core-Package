@@ -1022,7 +1022,71 @@ function buildTemplateSavePayload({
   });
   payload.pdfFieldMap = buildPdfFieldMapFromPayload(body);
 
+  let snapshotKeys = body.snapshotKeys;
+  if (typeof snapshotKeys === 'string' && snapshotKeys.trim()) {
+    try {
+      snapshotKeys = JSON.parse(snapshotKeys);
+    } catch {
+      snapshotKeys = snapshotKeys.split(/[,|\n]/).map((item) => String(item || '').trim()).filter(Boolean);
+    }
+  }
+  if (Array.isArray(snapshotKeys)) {
+    payload.snapshotKeys = snapshotKeys;
+  } else if (Array.isArray(existingTemplate?.snapshotKeys)) {
+    payload.snapshotKeys = existingTemplate.snapshotKeys;
+  } else {
+    payload.snapshotKeys = [];
+  }
+
+  let snapshotKeyLabels = body.snapshotKeyLabels;
+  if (typeof snapshotKeyLabels === 'string' && snapshotKeyLabels.trim()) {
+    try {
+      snapshotKeyLabels = JSON.parse(snapshotKeyLabels);
+    } catch {
+      snapshotKeyLabels = {};
+    }
+  }
+  if (snapshotKeyLabels && typeof snapshotKeyLabels === 'object' && !Array.isArray(snapshotKeyLabels)) {
+    payload.snapshotKeyLabels = snapshotKeyLabels;
+  } else if (existingTemplate?.snapshotKeyLabels && typeof existingTemplate.snapshotKeyLabels === 'object') {
+    payload.snapshotKeyLabels = existingTemplate.snapshotKeyLabels;
+  } else {
+    payload.snapshotKeyLabels = {};
+  }
+
+  let snapshotKeyDocxAliases = body.snapshotKeyDocxAliases;
+  if (typeof snapshotKeyDocxAliases === 'string' && snapshotKeyDocxAliases.trim()) {
+    try {
+      snapshotKeyDocxAliases = JSON.parse(snapshotKeyDocxAliases);
+    } catch {
+      snapshotKeyDocxAliases = {};
+    }
+  }
+  if (snapshotKeyDocxAliases && typeof snapshotKeyDocxAliases === 'object' && !Array.isArray(snapshotKeyDocxAliases)) {
+    payload.snapshotKeyDocxAliases = snapshotKeyDocxAliases;
+  } else if (existingTemplate?.snapshotKeyDocxAliases && typeof existingTemplate.snapshotKeyDocxAliases === 'object') {
+    payload.snapshotKeyDocxAliases = existingTemplate.snapshotKeyDocxAliases;
+  } else {
+    payload.snapshotKeyDocxAliases = {};
+  }
+
   return payload;
+}
+
+function buildTemplateComplianceDraft({
+  body,
+  existingTemplate = null,
+  activeOrgId,
+  reqUser,
+  uploadedFiles = []
+}) {
+  return buildTemplateSavePayload({
+    body,
+    existingTemplate,
+    activeOrgId,
+    reqUser,
+    uploadedFiles
+  });
 }
 
 function buildDocxTemplatesByFunderFromUpload({ body = {}, existingTemplate = null, uploadedFiles = [] } = {}) {
@@ -2162,6 +2226,7 @@ module.exports = {
   filterRecordsByOrg,
   buildHomeSummary,
   buildTemplateSavePayload,
+  buildTemplateComplianceDraft,
   buildDocxTemplatesByFunderFromUpload,
   buildPdfTemplatesByFunderFromUpload,
   buildPdfFieldMapFromPayload,

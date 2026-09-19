@@ -155,6 +155,44 @@ async function showTemplateForm(req, res) {
   }
 }
 
+function buildOverallTemplateComplianceDraft(req, existing = null) {
+  const orgId = existing?.orgId || activeOrgId(req.user);
+  const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+  const defaultFile = uploadedFiles.find((file) => String(file.fieldname) === 'docxTemplate');
+  const docxTemplate = uploadedFileRecord(defaultFile) || existing?.docxTemplate || null;
+  const defaultPdfFile = uploadedFiles.find((file) => String(file.fieldname) === 'pdfTemplate');
+  const pdfTemplate = uploadedFileRecord(defaultPdfFile) || existing?.pdfTemplate || null;
+  const docxTemplatesByFunder = reportViewService.buildDocxTemplatesByFunderFromUpload({
+    body: req.body,
+    existingTemplate: existing,
+    uploadedFiles
+  });
+  const pdfTemplatesByFunder = reportViewService.buildPdfTemplatesByFunderFromUpload({
+    body: req.body,
+    existingTemplate: existing,
+    uploadedFiles
+  });
+  const pdfFieldMap = reportViewService.buildPdfFieldMapFromPayload(req.body);
+  const rawPayload = {
+    ...(existing || {}),
+    orgId,
+    title: req.body.title,
+    version: req.body.version,
+    status: req.body.status,
+    description: req.body.description,
+    sourceSlots: parseJson(req.body.sourceSlotsJson, []),
+    nextSlotNumber: req.body.nextSlotNumber,
+    schema: parseJson(req.body.schemaJson, { version: 1, fields: [] }),
+    placeholderMap: parseJson(req.body.placeholderMapJson, {}),
+    docxTemplate,
+    docxTemplatesByFunder,
+    pdfTemplate,
+    pdfTemplatesByFunder,
+    pdfFieldMap
+  };
+  return overallReportTemplateModel.sanitizeTemplate(rawPayload, { existing, isUpdate: Boolean(existing) });
+}
+
 async function saveTemplate(req, res) {
   try {
     const id = String(req.params.id || '').trim();
@@ -163,47 +201,14 @@ async function saveTemplate(req, res) {
       ? await schoolDataService.getDataById('overallReportTemplates', id, req.user)
       : null;
     if (id && (!existing || !idsEqual(existing.orgId, orgId))) throw new Error('Overall report template not found.');
-    const uploadedFiles = Array.isArray(req.files) ? req.files : [];
-    const defaultFile = uploadedFiles.find((file) => String(file.fieldname) === 'docxTemplate');
-    const docxTemplate = uploadedFileRecord(defaultFile) || existing?.docxTemplate || null;
-    const defaultPdfFile = uploadedFiles.find((file) => String(file.fieldname) === 'pdfTemplate');
-    const pdfTemplate = uploadedFileRecord(defaultPdfFile) || existing?.pdfTemplate || null;
-    const docxTemplatesByFunder = reportViewService.buildDocxTemplatesByFunderFromUpload({
-      body: req.body,
-      existingTemplate: existing,
-      uploadedFiles
-    });
-    const pdfTemplatesByFunder = reportViewService.buildPdfTemplatesByFunderFromUpload({
-      body: req.body,
-      existingTemplate: existing,
-      uploadedFiles
-    });
-    const pdfFieldMap = reportViewService.buildPdfFieldMapFromPayload(req.body);
-    const rawPayload = {
-      ...(existing || {}),
-      orgId,
-      title: req.body.title,
-      version: req.body.version,
-      status: req.body.status,
-      description: req.body.description,
-      sourceSlots: parseJson(req.body.sourceSlotsJson, []),
-      nextSlotNumber: req.body.nextSlotNumber,
-      schema: parseJson(req.body.schemaJson, { version: 1, fields: [] }),
-      placeholderMap: parseJson(req.body.placeholderMapJson, {}),
-      docxTemplate,
-      docxTemplatesByFunder,
-      pdfTemplate,
-      pdfTemplatesByFunder,
-      pdfFieldMap,
-      audit: {
-        ...(existing?.audit || {}),
-        createUser: existing?.audit?.createUser || req.user?.id || '',
-        createDateTime: existing?.audit?.createDateTime || new Date().toISOString(),
-        lastUpdateUser: req.user?.id || '',
-        lastUpdateDateTime: new Date().toISOString()
-      }
+    const payload = buildOverallTemplateComplianceDraft(req, existing);
+    payload.audit = {
+      ...(existing?.audit || {}),
+      createUser: existing?.audit?.createUser || req.user?.id || '',
+      createDateTime: existing?.audit?.createDateTime || new Date().toISOString(),
+      lastUpdateUser: req.user?.id || '',
+      lastUpdateDateTime: new Date().toISOString()
     };
-    const payload = overallReportTemplateModel.sanitizeTemplate(rawPayload, { existing, isUpdate: Boolean(existing) });
     await overallReportService.validateTemplateReferences(payload, req.user);
     const saved = existing
       ? await schoolDataService.updateData('overallReportTemplates', existing.id, payload, req.user)
@@ -212,6 +217,30 @@ async function saveTemplate(req, res) {
     return res.redirect('/school/reports/overall-templates');
   } catch (error) {
     return sendError(req, res, error, 'Save Overall Report Template');
+  }
+}
+
+async function checkOverallTemplateFileCompliance(req, res) {
+  try {
+    const id = String(req.params.id || '').trim();
+    const existing = id
+      ? await schoolDataService.getDataById('overallReportTemplates', id, req.user)
+      : null;
+    if (id && (!existing || !idsEqual(existing.orgId, activeOrgId(req.user)))) {
+      throw new Error('Overall report template not found.');
+    }
+    const draft = buildOverallTemplateComplianceDraft(req, existing);
+    draft.orgId = draft.orgId || activeOrgId(req.user);
+    const checkTarget = String(req.body.checkTarget || 'all-docx').trim();
+    const payload = await overallReportService.runOverallTemplateFileComplianceChecks(draft, checkTarget, req.user);
+    return res.json({
+      status: 'success',
+      ok: payload.ok,
+      snapshotConfigured: payload.snapshotConfigured,
+      results: payload.results
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
@@ -935,6 +964,7 @@ module.exports = {
   listTemplates,
   showTemplateForm,
   saveTemplate,
+  checkOverallTemplateFileCompliance,
   inspectTemplatePdfFields,
   copyTemplate,
   deleteTemplate,

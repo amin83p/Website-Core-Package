@@ -213,14 +213,38 @@ function buildDocxAliasLookup(template = {}) {
 
 function mirrorDocxAliasValues(template = {}, values = {}) {
   const mirrored = { ...(values || {}) };
-  getSourceTemplateKeyOptions(template).forEach((option) => {
-    if (option.origin === 'docx_alias') return;
-    const catalogKey = normalizeTokenKey(option.key);
-    const alias = reportRuleEngineService.normalizeDocxAlias(option.docxAlias);
-    if (!catalogKey || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) return;
-    if (Object.prototype.hasOwnProperty.call(mirrored, catalogKey)) {
-      mirrored[alias] = mirrored[catalogKey];
+  const prepared = template?.schema?.fields ? template : prepareSourceTemplateForKeyOptions(template);
+  getDataFields(prepared).forEach((field) => {
+    const aliases = listDocxPlaceholderAliases(field);
+    if (!aliases.length) return;
+    const catalogKeys = [
+      normalizeTokenKey(field.id),
+      normalizeTokenKey(field.prefillKey),
+      normalizeTokenKey(prepared?.placeholderMap?.[field.id])
+    ].filter(Boolean);
+    let resolvedValue;
+    for (const catalogKey of catalogKeys) {
+      if (Object.prototype.hasOwnProperty.call(mirrored, catalogKey)) {
+        resolvedValue = mirrored[catalogKey];
+        break;
+      }
     }
+    if (resolvedValue === undefined) return;
+    aliases.forEach((alias) => {
+      const normalizedAlias = reportRuleEngineService.normalizeDocxAlias(alias);
+      if (!reportRuleEngineService.DOCX_ALIAS_PATTERN.test(normalizedAlias)) return;
+      mirrored[normalizedAlias] = resolvedValue;
+    });
+  });
+  const snapshotKeyDocxAliases = prepared?.snapshotKeyDocxAliases && typeof prepared.snapshotKeyDocxAliases === 'object'
+    ? prepared.snapshotKeyDocxAliases
+    : {};
+  Object.entries(snapshotKeyDocxAliases).forEach(([rawKey, rawAlias]) => {
+    const catalogKey = normalizeTokenKey(rawKey);
+    const alias = reportRuleEngineService.normalizeDocxAlias(rawAlias);
+    if (!catalogKey || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) return;
+    if (!Object.prototype.hasOwnProperty.call(mirrored, catalogKey)) return;
+    mirrored[alias] = mirrored[catalogKey];
   });
   return mirrored;
 }
@@ -354,13 +378,46 @@ function getSourceTemplateKeyOptions(template = {}) {
       String(left.group || '').localeCompare(String(right.group || ''))
       || String(left.label || '').localeCompare(String(right.label || ''))
       || String(left.key || '').localeCompare(String(right.key || ''))
-    )));
+    )))
+    .filter((option) => {
+      const snapshotKeys = Array.isArray(template?.snapshotKeys) ? template.snapshotKeys : [];
+      if (!snapshotKeys.length) return true;
+      const allowed = new Set(
+        snapshotKeys.map((key) => normalizeTokenKey(key)).filter(Boolean)
+      );
+      return allowed.has(normalizeTokenKey(option.key));
+    })
+    .map((option) => {
+      const resolvedLabel = reportService.resolveSnapshotKeyLabel(template, option.key);
+      if (!resolvedLabel || resolvedLabel === option.label) return option;
+      return {
+        ...option,
+        label: resolvedLabel,
+        description: option.description || `Snapshot key ${option.key}`
+      };
+    });
 }
 
 function getSourceTemplateKeyCatalog(template = {}) {
-  return getSourceTemplateKeyOptions(template)
-    .map((option) => option.key)
-    .sort((left, right) => left.localeCompare(right));
+  const options = getSourceTemplateKeyOptions(template);
+  const keys = new Set(options.map((option) => normalizeTokenKey(option.key)).filter(Boolean));
+  const prepared = template?.schema?.fields ? template : prepareSourceTemplateForKeyOptions(template);
+  getDataFields(prepared).forEach((field) => {
+    const catalogKeys = [
+      normalizeTokenKey(field.id),
+      normalizeTokenKey(field.prefillKey),
+      normalizeTokenKey(prepared?.placeholderMap?.[field.id])
+    ].filter(Boolean);
+    const catalogAllowed = catalogKeys.some((key) => keys.has(key));
+    if (!catalogAllowed) return;
+    listDocxPlaceholderAliases(field).forEach((alias) => {
+      const normalized = reportRuleEngineService.normalizeDocxAlias(alias);
+      if (reportRuleEngineService.DOCX_ALIAS_PATTERN.test(normalized)) {
+        keys.add(normalized);
+      }
+    });
+  });
+  return [...keys].sort((left, right) => left.localeCompare(right));
 }
 
 function isOptionalSlot(slot = {}) {
@@ -374,6 +431,75 @@ function buildEmptySourceSlotValues(sourceTemplate = {}) {
     placeholders[key] = '';
   });
   return buildSourceValuesFromPlaceholders(sourceTemplate, placeholders);
+}
+
+async function resolveOverallSourceTemplateMap(template = {}, reqUser) {
+  const orgId = toPublicId(template?.orgId);
+  const map = new Map();
+  for (const slot of Array.isArray(template?.sourceSlots) ? template.sourceSlots : []) {
+    const slotKey = String(slot?.slotKey || '').trim().toUpperCase();
+    const templateId = String(slot?.templateId || '').trim();
+    if (!slotKey || !templateId) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const sourceTemplate = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
+    if (sourceTemplate && idsEqual(sourceTemplate.orgId, orgId)) {
+      map.set(slotKey, sourceTemplate);
+    }
+  }
+  return map;
+}
+
+function buildOverallTemplateKeyAllowlist(template = {}, sourceTemplateMap = new Map()) {
+  const allowed = new Set();
+  const addToken = (rawToken = '') => {
+    const normalized = normalizeTokenKey(String(rawToken || '').replace(/^\{\{|\}\}$/g, ''));
+    if (normalized) allowed.add(String(normalized).toLowerCase());
+  };
+
+  (Array.isArray(template?.sourceSlots) ? template.sourceSlots : []).forEach((slot) => {
+    const slotKey = String(slot?.slotKey || '').trim().toUpperCase();
+    if (!slotKey) return;
+    const sourceTemplate = sourceTemplateMap.get(slotKey);
+    if (!sourceTemplate) return;
+    const options = getSourceTemplateKeyOptions(sourceTemplate);
+    options.forEach((option) => {
+      if (String(option?.origin || '') === 'docx_alias') return;
+      const optionKey = String(option?.key || '').trim();
+      if (!optionKey) return;
+      addToken(`${slotKey}.${optionKey}`);
+      const alias = reportRuleEngineService.normalizeDocxAlias(option.docxAlias);
+      if (alias && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+        addToken(`${slotKey}.${alias}`);
+      }
+    });
+  });
+
+  getDataFields(template).forEach((field) => {
+    addToken(`O.${field.id}`);
+    const alias = reportRuleEngineService.normalizeDocxAlias(field.docxAlias);
+    if (alias && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      addToken(`O.${alias}`);
+    }
+  });
+
+  Object.keys(template?.pdfFieldMap && typeof template.pdfFieldMap === 'object' ? template.pdfFieldMap : {})
+    .forEach((key) => addToken(key));
+
+  return allowed;
+}
+
+async function runOverallTemplateFileComplianceChecks(template = {}, checkTarget = 'all-docx', reqUser) {
+  const sourceTemplateMap = await resolveOverallSourceTemplateMap(template, reqUser);
+  const allowedSet = buildOverallTemplateKeyAllowlist(template, sourceTemplateMap);
+  return reportService.runTemplateSnapshotComplianceChecks(template, checkTarget, {
+    allowedSet,
+    notConfiguredLabel: 'Key catalog',
+    notConfiguredReason: 'Add source slots with report templates and overall fields before checking Word/PDF files.',
+    docxTokenIssueHint: 'Remove it from the Word file or add the key to the Key catalog (slot keys or O.field keys).',
+    pdfFieldMapIssueHint: 'Remove the mapping or use a key listed in the Key catalog.',
+    errorPrefix: 'Word/PDF files use placeholders or mappings that are not in the Key catalog:',
+    errorSuffix: 'Fix the file or update the overall template Key catalog.'
+  });
 }
 
 async function resolveSourceSlotSelection({
@@ -593,7 +719,12 @@ function buildSourceValuesFromPlaceholders(template = {}, placeholders = {}) {
     const key = normalizeTokenKey(token);
     if (key) values[key] = value;
   });
-  return mirrorDocxAliasValues(template, values);
+  const mirrored = mirrorDocxAliasValues(template, values);
+  const exportKeys = reportService.resolveTemplateSourceExportKeys(template);
+  if (exportKeys) {
+    return reportService.pickKeySubset(mirrored, exportKeys);
+  }
+  return mirrored;
 }
 
 async function buildSourcePayload(instance, reqUser) {
@@ -604,7 +735,20 @@ async function buildSourcePayload(instance, reqUser) {
       : Promise.resolve(null)
   ]);
   if (!template) throw new Error(`Report template not found for source instance ${instance.id}.`);
-  const bundle = reportService.buildDocxPlaceholderPayloadDetailed(template, instance, assignment);
+  if (String(instance.status || '').toLowerCase() === 'locked'
+    && instance.lockSnapshot?.sourceValues
+    && typeof instance.lockSnapshot.sourceValues === 'object') {
+    return {
+      template,
+      assignment,
+      values: instance.lockSnapshot.sourceValues,
+      diagnostics: []
+    };
+  }
+  const scopeOptions = reportService.templateUsesSnapshotScope(template)
+    ? { respectSnapshotKeys: true }
+    : {};
+  const bundle = reportService.buildDocxPlaceholderPayloadDetailed(template, instance, assignment, scopeOptions);
   const values = buildSourceValuesFromPlaceholders(template, bundle.placeholders);
   return { template, assignment, values, diagnostics: bundle.conversionDiagnostics || [] };
 }
@@ -2028,6 +2172,8 @@ module.exports = {
   ensureSourceTemplateDocxAliases,
   prepareSourceTemplateForKeyOptions,
   validateTemplateReferences,
+  buildOverallTemplateKeyAllowlist,
+  runOverallTemplateFileComplianceChecks,
   calculateAnswers,
   validateAnswers,
   buildSourceValuesFromPlaceholders,
