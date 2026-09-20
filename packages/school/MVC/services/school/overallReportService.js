@@ -211,6 +211,42 @@ function buildDocxAliasLookup(template = {}) {
   return { aliasToCatalogKey, aliasKeys };
 }
 
+function applySourceTemplateCatalogAliases(template = {}, values = {}) {
+  const out = { ...(values || {}) };
+  const catalog = getSourceTemplateKeyCatalog(template);
+  const { aliasToCatalogKey } = buildDocxAliasLookup(template);
+  catalog.forEach((rawKey) => {
+    const key = normalizeTokenKey(rawKey);
+    if (!key) return;
+    if (Object.prototype.hasOwnProperty.call(out, key)) return;
+    const parentKey = aliasToCatalogKey.get(key);
+    if (parentKey && Object.prototype.hasOwnProperty.call(out, parentKey)) {
+      out[key] = out[parentKey];
+      return;
+    }
+    const caseMatch = Object.keys(out).find((row) => String(row).toLowerCase() === String(key).toLowerCase());
+    if (caseMatch !== undefined) {
+      out[key] = out[caseMatch];
+      return;
+    }
+    out[key] = '';
+  });
+  return out;
+}
+
+function resolveSourceTemplateExportKeySet(template = {}) {
+  const snapshotKeys = reportService.resolveTemplateLockKeys(template);
+  if (!snapshotKeys.length) return null;
+  const catalog = getSourceTemplateKeyCatalog(template);
+  if (!catalog.length) return reportService.resolveTemplateSourceExportKeys(template);
+  const set = new Set();
+  catalog.forEach((rawKey) => {
+    const key = normalizeTokenKey(rawKey);
+    if (key) set.add(String(key).toLowerCase());
+  });
+  return set;
+}
+
 function mirrorDocxAliasValues(template = {}, values = {}) {
   const mirrored = { ...(values || {}) };
   const prepared = template?.schema?.fields ? template : prepareSourceTemplateForKeyOptions(template);
@@ -401,6 +437,12 @@ function getSourceTemplateKeyOptions(template = {}) {
 function getSourceTemplateKeyCatalog(template = {}) {
   const options = getSourceTemplateKeyOptions(template);
   const keys = new Set(options.map((option) => normalizeTokenKey(option.key)).filter(Boolean));
+  options.forEach((option) => {
+    const alias = reportRuleEngineService.normalizeDocxAlias(option.docxAlias);
+    if (alias && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      keys.add(alias);
+    }
+  });
   const prepared = template?.schema?.fields ? template : prepareSourceTemplateForKeyOptions(template);
   getDataFields(prepared).forEach((field) => {
     const catalogKeys = [
@@ -720,11 +762,13 @@ function buildSourceValuesFromPlaceholders(template = {}, placeholders = {}) {
     if (key) values[key] = value;
   });
   const mirrored = mirrorDocxAliasValues(template, values);
-  const exportKeys = reportService.resolveTemplateSourceExportKeys(template);
+  const withCatalog = applySourceTemplateCatalogAliases(template, mirrored);
+  const exportKeys = resolveSourceTemplateExportKeySet(template);
+  let result = withCatalog;
   if (exportKeys) {
-    return reportService.pickKeySubset(mirrored, exportKeys);
+    result = reportService.pickKeySubset(withCatalog, exportKeys);
   }
-  return mirrored;
+  return result;
 }
 
 async function buildSourcePayload(instance, reqUser) {

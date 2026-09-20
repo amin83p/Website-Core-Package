@@ -1679,10 +1679,7 @@
     const dataFields = fields.filter(field => field.id && !['section','subheader','row_break'].includes(String(field.type)));
     const fieldIds = new Set(dataFields.map(field => field.id));
     const dependencies = new Map();
-    const allowedHelpers = new Set([
-      'source', 'round', 'avg', 'concat', 'num', 'str', 'len', 'min', 'max', 'abs', 'clamp', 'ifelse', 'caseof',
-      'digits', 'substr', 'phoneAt', 'phoneLabelAt', 'phoneTypeAt', 'phoneByType'
-    ]);
+    const allowedHelpers = new Set(<%- JSON.stringify(Array.isArray(expressionHelperNames) ? expressionHelperNames : ['source']).replace(/</g, '\\u003c') %>);
     dataFields.forEach(field => {
       const mode = normalizedMode(field);
       const expression = mode === 'manual' ? '' : String(field.calculationRule?.expression || '');

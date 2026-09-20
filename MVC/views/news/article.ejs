@@ -43,6 +43,13 @@
 %>
 
 <section class="news-public-page news-article-page">
+  <div class="news-article-bg-motion" aria-hidden="true">
+    <span class="news-float-orb news-float-orb-a"></span>
+    <span class="news-float-orb news-float-orb-b"></span>
+    <span class="news-float-orb news-float-orb-c"></span>
+    <span class="news-float-shape news-float-shape-d"></span>
+    <span class="news-float-shape news-float-shape-e"></span>
+  </div>
   <section class="news-article-hero" aria-labelledby="newsArticleTitle">
     <div class="news-hero-orbit" aria-hidden="true">
       <span></span>
@@ -50,37 +57,43 @@
       <span></span>
     </div>
 
-    <div class="news-article-hero-copy">
+    <div class="news-article-hero-lead">
       <a href="/news" class="news-back-link"><i class="bi bi-arrow-left"></i>Back to News</a>
       <div class="news-article-meta-line">
         <span><%= articleCategory %></span>
         <small><%= formatLongDate(meta.publishDate) %></small>
       </div>
-      <h1 id="newsArticleTitle"><%= articleTitle %></h1>
-      <% if (articleSummary) { %>
-        <p><%= articleSummary %></p>
-      <% } %>
+    </div>
 
-      <div class="news-article-author-band">
-        <span class="news-avatar"><%= authorInitial %></span>
-        <div>
-          <strong><%= authorName %></strong>
-          <small><%= readCount ? readCount + ' reads' : 'Contributor' %></small>
+    <div class="news-article-hero-body">
+      <h1 class="news-article-hero-title" id="newsArticleTitle"><%= articleTitle %></h1>
+
+      <div class="news-article-hero-media">
+        <% if (articleImage) { %>
+          <img src="<%= articleImage %>" alt="<%= articleTitle %>">
+        <% } else { %>
+          <div class="news-image-fallback"><i class="bi bi-newspaper"></i></div>
+        <% } %>
+      </div>
+
+      <div class="news-article-hero-details">
+        <% if (articleSummary) { %>
+          <p class="news-article-hero-summary"><%= articleSummary %></p>
+        <% } %>
+
+        <div class="news-article-author-band">
+          <span class="news-avatar"><%= authorInitial %></span>
+          <div>
+            <strong><%= authorName %></strong>
+            <small><%= readCount ? readCount + ' reads' : 'Contributor' %></small>
+          </div>
         </div>
       </div>
     </div>
-
-    <div class="news-article-hero-media">
-      <% if (articleImage) { %>
-        <img src="<%= articleImage %>" alt="<%= articleTitle %>">
-      <% } else { %>
-        <div class="news-image-fallback"><i class="bi bi-newspaper"></i></div>
-      <% } %>
-    </div>
   </section>
 
-  <div class="row g-4 g-xl-5 align-items-start" id="articleLayoutRow">
-    <aside class="news-sidebar-col col-lg-3 d-none d-lg-block" id="leftSidebar">
+  <div class="row g-2 g-lg-3 align-items-start news-article-layout-row" id="articleLayoutRow">
+    <aside class="news-sidebar-col col-lg-2 d-none d-lg-block" id="leftSidebar">
       <div class="news-sticky-stack">
         <div class="news-glass-card">
           <div class="news-widget-title"><i class="bi bi-clock-history"></i>Latest News</div>
@@ -107,7 +120,7 @@
       </div>
     </aside>
 
-    <main class="col-lg-6 col-md-12 transition-all" id="mainColumn">
+    <main class="col-lg-8 col-md-12 transition-all" id="mainColumn">
       <article class="news-article-card" id="articleContent">
         <div class="reading-toolbar">
           <button class="tool-btn" id="btnDecreaseFont" title="Decrease Font"><i class="bi bi-fonts" style="font-size: 0.8rem;"></i></button>
@@ -142,7 +155,7 @@
       </div>
     </main>
 
-    <aside class="news-sidebar-col col-lg-3 d-none d-lg-block" id="rightSidebar">
+    <aside class="news-sidebar-col col-lg-2 d-none d-lg-block" id="rightSidebar">
       <div class="news-sticky-stack">
         <div class="news-glass-card">
           <div class="news-widget-title"><i class="bi bi-fire"></i>Related Stories</div>
@@ -191,6 +204,23 @@ html.news-public-root body.news-public-body {
 
 body.news-public-body { background-attachment: fixed; }
 
+html.news-public-root body.news-public-body:has(.news-article-page) {
+  animation: newsPageGradientDrift 28s ease-in-out infinite alternate;
+  background-size: 140% 140%, 140% 140%, 130% 130%, 130% 130%, 100% 100%;
+}
+
+@keyframes newsPageGradientDrift {
+  0% { background-position: 0% 0%, 100% 0%, 0% 50%, 100% 100%, 0% 0%; }
+  100% { background-position: 18% 12%, 82% 8%, 12% 58%, 88% 92%, 0% 0%; }
+}
+
+body.news-public-body:has(.news-article-page) > header,
+body.news-public-body:has(.news-article-page) > main,
+body.news-public-body:has(.news-article-page) > footer {
+  position: relative;
+  z-index: 1;
+}
+
 main.news-public-main {
   margin-bottom: 0 !important;
   margin-top: 0 !important;
@@ -226,13 +256,113 @@ main.news-public-main {
 }
 
 .news-article-hero {
-  display: grid;
-  gap: clamp(1.5rem, 4vw, 3rem);
-  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
   margin-bottom: clamp(2rem, 5vw, 4rem);
-  min-height: 430px;
+  min-height: 0;
   position: relative;
 }
+
+.news-article-hero-body {
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 992px) {
+  .news-article-hero-body {
+    column-gap: clamp(1rem, 2.5vw, 1.75rem);
+    display: grid;
+    grid-template-areas:
+      "title-line1 title-line1"
+      "title-rest media"
+      "details media";
+    grid-template-columns: minmax(0, 1fr) minmax(260px, min(42%, 520px));
+    row-gap: clamp(0.35rem, 1vw, 0.65rem);
+  }
+}
+
+.news-article-hero-lead { position: relative; z-index: 1; }
+
+.news-article-hero-title {
+  display: block;
+  margin: 0;
+}
+
+@media (min-width: 992px) {
+  .news-article-hero-title {
+    display: contents;
+  }
+}
+
+.news-article-hero-title-line1,
+.news-article-hero-title-rest,
+.news-article-hero-title-probe {
+  color: var(--news-ink);
+  direction: ltr;
+  font-size: clamp(2.55rem, 5.8vw, 5.4rem);
+  font-weight: 800;
+  letter-spacing: -0.07em;
+  line-height: 1.06;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+
+.news-article-hero-title-line1 {
+  animation: newsTitleReveal 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+  display: block;
+}
+
+@media (min-width: 992px) {
+  .news-article-hero-title-line1 { grid-area: title-line1; }
+  .news-article-hero-title-line1 {
+    box-sizing: border-box;
+    margin-left: calc(50% - 50vw);
+    padding-left: calc(50vw - 50%);
+    padding-right: calc(50vw - 50%);
+    width: 100vw;
+  }
+  .news-article-hero-title-rest {
+    display: block;
+    grid-area: title-rest;
+  }
+  .news-article-hero-title-rest:empty { display: none; }
+}
+
+.news-article-hero-title-probe {
+  left: -9999px;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  visibility: hidden;
+}
+
+@keyframes newsTitleReveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0.2;
+    transform: translateX(-12px);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.news-article-hero-details {
+  position: relative;
+}
+
+@media (min-width: 992px) {
+  .news-article-hero-details { grid-area: details; }
+}
+
+.news-article-hero-summary {
+  color: var(--news-muted);
+  font-size: clamp(1.02rem, 1.7vw, 1.25rem);
+  line-height: 1.72;
+  margin-bottom: 0;
+}
+
+.news-article-hero .news-article-author-band { margin-top: 1.5rem; }
 
 .news-hero-orbit { inset: 0; pointer-events: none; position: absolute; }
 .news-hero-orbit span { border: 1px solid rgba(29,95,184,0.18); border-radius: 999px; position: absolute; }
@@ -240,9 +370,8 @@ main.news-public-main {
 .news-hero-orbit span:nth-child(2) { height: 160px; right: 14%; top: 26%; width: 160px; }
 .news-hero-orbit span:nth-child(3) { background: rgba(8,127,140,0.10); height: 68px; right: 7%; top: 48%; width: 68px; }
 
-.news-article-hero-copy { align-self: center; position: relative; z-index: 1; }
 .news-back-link { align-items: center; color: var(--news-blue); display: inline-flex; font-weight: 800; gap: 0.45rem; margin-bottom: 1rem; text-decoration: none; }
-.news-article-meta-line { align-items: center; display: flex; flex-wrap: wrap; gap: 0.85rem; margin-bottom: 1rem; }
+.news-article-meta-line { align-items: center; display: flex; flex-wrap: wrap; gap: 0.85rem; margin-bottom: 0; }
 .news-article-meta-line span {
   background: rgba(8,127,140,0.12);
   border-radius: 999px;
@@ -254,7 +383,6 @@ main.news-public-main {
   text-transform: uppercase;
 }
 .news-article-meta-line small { color: var(--news-muted); font-weight: 700; }
-.news-article-hero h1 { color: var(--news-ink); font-size: clamp(2.55rem, 5.8vw, 5.4rem); font-weight: 800; letter-spacing: -0.07em; line-height: 0.94; margin-bottom: 1rem; }
 .news-article-hero p { color: var(--news-muted); font-size: clamp(1.02rem, 1.7vw, 1.25rem); line-height: 1.72; }
 .news-article-author-band { align-items: center; color: var(--news-muted); display: flex; gap: 0.85rem; margin-top: 1.5rem; }
 .news-article-author-band strong { color: var(--news-ink); display: block; }
@@ -262,16 +390,26 @@ main.news-public-main {
 .news-avatar { align-items: center; background: linear-gradient(135deg, var(--news-blue), var(--news-teal)); border-radius: 999px; color: #fff; display: inline-flex; font-weight: 800; height: 2.7rem; justify-content: center; width: 2.7rem; }
 
 .news-article-hero-media {
-  align-self: center;
   backdrop-filter: blur(18px);
   background: rgba(255,255,255,0.62);
   border: 1px solid rgba(215,225,231,0.82);
   border-radius: 36px;
   box-shadow: var(--news-shadow);
-  min-height: 390px;
+  margin: 0 0 1.25rem;
+  min-height: 320px;
   overflow: hidden;
   position: relative;
+  width: 100%;
   z-index: 1;
+}
+
+@media (min-width: 992px) {
+  .news-article-hero-media {
+    align-self: start;
+    grid-area: media;
+    margin-bottom: 0;
+    min-height: 390px;
+  }
 }
 .news-article-hero-media img { height: 100%; object-fit: cover; width: 100%; }
 .news-image-fallback { align-items: center; background: radial-gradient(circle at 30% 20%, rgba(29,95,184,0.22), transparent 32%), linear-gradient(135deg, #eaf4fb, #f8fbff); color: rgba(29,95,184,0.35); display: flex; font-size: 4rem; height: 100%; justify-content: center; min-height: 390px; }
@@ -299,12 +437,164 @@ main.news-public-main {
 .news-admin-card p { color: var(--news-muted); }
 .news-btn-primary { background: linear-gradient(135deg, var(--news-blue), var(--news-teal)); border: 0; border-radius: 999px; color: #fff; font-weight: 800; padding: 0.72rem 1.2rem; text-decoration: none; }
 
+.news-article-page {
+  overflow: visible;
+}
+
+.news-article-bg-motion,
+.news-article-bg-motion--viewport {
+  height: 100dvh;
+  inset: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  pointer-events: none;
+  position: fixed;
+  width: 100vw;
+  z-index: 0;
+}
+
+.news-float-orb,
+.news-float-shape {
+  border-radius: 999px;
+  filter: blur(42px);
+  opacity: 0.55;
+  pointer-events: none;
+  position: absolute;
+  will-change: transform;
+}
+
+.news-float-orb-a {
+  animation: newsOrbDriftA 22s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(29, 95, 184, 0.42), rgba(29, 95, 184, 0));
+  height: min(42vw, 420px);
+  left: -8%;
+  top: 18%;
+  width: min(42vw, 420px);
+}
+
+.news-float-orb-b {
+  animation: newsOrbDriftB 26s ease-in-out infinite;
+  animation-delay: -6s;
+  background: radial-gradient(circle, rgba(8, 127, 140, 0.38), rgba(8, 127, 140, 0));
+  height: min(36vw, 360px);
+  right: -6%;
+  top: 42%;
+  width: min(36vw, 360px);
+}
+
+.news-float-orb-c {
+  animation: newsOrbDriftC 19s ease-in-out infinite;
+  animation-delay: -11s;
+  background: radial-gradient(circle, rgba(99, 179, 237, 0.35), rgba(99, 179, 237, 0));
+  bottom: 8%;
+  height: min(28vw, 280px);
+  left: 38%;
+  width: min(28vw, 280px);
+}
+
+.news-float-shape-d,
+.news-float-shape-e {
+  animation: newsShapeFloat 16s ease-in-out infinite;
+  border: 1px solid rgba(29, 95, 184, 0.14);
+  filter: none;
+  opacity: 0.35;
+}
+
+.news-float-shape-d {
+  height: 140px;
+  left: 12%;
+  top: 62%;
+  width: 140px;
+}
+
+.news-float-shape-e {
+  animation-delay: -8s;
+  height: 96px;
+  right: 16%;
+  top: 24%;
+  width: 96px;
+}
+
+@keyframes newsOrbDriftA {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(36px, -48px) scale(1.08); }
+}
+
+@keyframes newsOrbDriftB {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-42px, 32px) scale(0.94); }
+}
+
+@keyframes newsOrbDriftC {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(28px, 40px) scale(1.06); }
+}
+
+@keyframes newsShapeFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(8deg); }
+}
+
+.news-article-page .news-article-hero,
+.news-article-page #articleLayoutRow {
+  position: relative;
+  z-index: 1;
+}
+
+.news-article-page .news-article-card {
+  animation: newsCardFloat 9s ease-in-out infinite;
+}
+
+@keyframes newsCardFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .news-float-orb,
+  .news-float-shape,
+  .news-article-page .news-article-card,
+  .news-hero-orbit span,
+  html.news-public-root body.news-public-body:has(.news-article-page),
+  .news-article-hero-title-line1 {
+    animation: none !important;
+  }
+
+  .news-article-hero-title-line1 {
+    clip-path: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+#articleLayoutRow {
+  --news-article-main-max: none;
+}
+
+@media (min-width: 992px) {
+  .news-article-page .news-article-layout-row {
+    --bs-gutter-x: 0.65rem;
+    --bs-gutter-y: 1rem;
+  }
+
+  .news-article-page .news-sidebar-col .news-glass-card {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .news-article-page .news-article-layout-row {
+    --bs-gutter-x: 0.85rem;
+  }
+}
+
 .news-article-card { border-radius: 34px; padding: clamp(1.35rem, 3vw, 2.6rem); }
 .reading-toolbar { align-items: center; border-bottom: 1px solid rgba(215,225,231,0.78); display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; margin-bottom: 1.6rem; padding-bottom: 1rem; }
 .tool-btn { align-items: center; background: rgba(255,255,255,0.82); border: 1px solid rgba(215,225,231,0.96); border-radius: 999px; color: var(--news-muted); cursor: pointer; display: flex; height: 38px; justify-content: center; transition: all 0.2s ease; width: 38px; }
 .tool-btn:hover,
 .tool-btn.active { background: linear-gradient(135deg, var(--news-blue), var(--news-teal)); border-color: transparent; color: #fff; }
-.article-body { color: #263642; font-family: 'Manrope', 'Segoe UI', sans-serif; font-size: 1rem; line-height: 1.78; transition: font-size 0.2s ease; }
+.article-body { color: #263642; font-family: 'Manrope', 'Segoe UI', sans-serif; font-size: clamp(1rem, 1.05vw, 1.08rem); line-height: 1.78; max-width: none; transition: font-size 0.2s ease; width: 100%; }
 .article-body p { margin-bottom: 1.45rem; }
 .article-body h2,
 .article-body h3 { color: var(--news-ink); font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.9rem; margin-top: 2.2rem; }
@@ -329,12 +619,10 @@ main.news-public-main {
 .reader-mode-active .tool-btn.active { background: #5b4636; color: #fff; }
 
 @media (max-width: 991.98px) {
-  .news-article-hero { grid-template-columns: 1fr; }
-  .news-article-hero-media { min-height: 320px; }
   .news-sticky-stack { position: static; }
 }
 @media (max-width: 767.98px) {
-  .news-article-hero h1 { font-size: clamp(2.25rem, 13vw, 3.6rem); }
+  .news-article-hero-title { font-size: clamp(2.25rem, 13vw, 3.6rem); }
   .news-article-card { border-radius: 26px; }
   .reading-toolbar { justify-content: flex-start; }
 }
@@ -342,6 +630,12 @@ main.news-public-main {
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const bgMotion = document.querySelector('.news-article-bg-motion');
+    if (bgMotion && bgMotion.parentElement !== document.body) {
+        bgMotion.classList.add('news-article-bg-motion--viewport');
+        document.body.prepend(bgMotion);
+    }
+
     const state = {
         fontSize: 16,
         isFocus: false,
@@ -387,15 +681,15 @@ document.addEventListener('DOMContentLoaded', () => {
             rightBar.classList.remove('d-lg-block');
             leftBar.classList.add('d-none');
             rightBar.classList.add('d-none');
-            mainCol.classList.remove('col-lg-6');
-            mainCol.classList.add('col-lg-8', 'mx-auto');
+            mainCol.classList.remove('col-lg-8');
+            mainCol.classList.add('col-lg-10', 'mx-auto');
             btnFocus.classList.add('active');
             btnFocus.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
         } else {
             leftBar.classList.add('d-none', 'd-lg-block');
             rightBar.classList.add('d-none', 'd-lg-block');
-            mainCol.classList.add('col-lg-6');
-            mainCol.classList.remove('col-lg-8', 'mx-auto');
+            mainCol.classList.add('col-lg-8');
+            mainCol.classList.remove('col-lg-10', 'mx-auto');
             btnFocus.classList.remove('active');
             btnFocus.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
         }
@@ -406,5 +700,89 @@ document.addEventListener('DOMContentLoaded', () => {
         layoutRow.classList.toggle('reader-mode-active', state.isReader);
         btnReader.classList.toggle('active', state.isReader);
     });
+
+    layoutHeroTitle();
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(layoutHeroTitle).catch(() => {});
+    }
+    let heroTitleResizeTimer;
+    const heroBody = document.querySelector('.news-article-hero-body');
+    if (heroBody && typeof ResizeObserver !== 'undefined') {
+        const heroTitleObserver = new ResizeObserver(() => {
+            clearTimeout(heroTitleResizeTimer);
+            heroTitleResizeTimer = setTimeout(layoutHeroTitle, 120);
+        });
+        heroTitleObserver.observe(heroBody);
+    }
+    window.addEventListener('resize', () => {
+        clearTimeout(heroTitleResizeTimer);
+        heroTitleResizeTimer = setTimeout(layoutHeroTitle, 120);
+    });
 });
+
+function layoutHeroTitle() {
+    const h1 = document.getElementById('newsArticleTitle');
+    const body = h1 && h1.closest('.news-article-hero-body');
+    if (!h1 || !body) return;
+
+    const full = (h1.dataset.fullTitle || h1.textContent || '').trim();
+    if (!full) return;
+    h1.dataset.fullTitle = full;
+
+    let line1El = h1.querySelector('.news-article-hero-title-line1');
+    let restEl = h1.querySelector('.news-article-hero-title-rest');
+    if (!line1El) {
+        h1.textContent = '';
+        line1El = document.createElement('span');
+        line1El.className = 'news-article-hero-title-line1';
+        restEl = document.createElement('span');
+        restEl.className = 'news-article-hero-title-rest';
+        h1.append(line1El, restEl);
+    }
+
+    if (window.matchMedia('(max-width: 991.98px)').matches) {
+        line1El.textContent = full;
+        restEl.textContent = '';
+        return;
+    }
+
+    const words = full.split(/\s+/).filter(Boolean);
+    if (!words.length) {
+        line1El.textContent = '';
+        restEl.textContent = '';
+        return;
+    }
+
+    let probe = body.querySelector('.news-article-hero-title-probe');
+    if (!probe) {
+        probe = document.createElement('div');
+        probe.className = 'news-article-hero-title-probe';
+        body.appendChild(probe);
+    }
+    const bodyRect = body.getBoundingClientRect();
+    probe.style.width = `${window.innerWidth}px`;
+    probe.style.boxSizing = 'border-box';
+    probe.style.paddingLeft = `${bodyRect.left}px`;
+    probe.style.paddingRight = `${Math.max(0, window.innerWidth - bodyRect.right)}px`;
+
+    probe.textContent = words[0];
+    const singleLineHeight = probe.scrollHeight;
+    const lineBreakThreshold = singleLineHeight * 1.2;
+
+    const line1Words = [];
+    for (let i = 0; i < words.length; i += 1) {
+        const candidateWords = line1Words.concat(words[i]);
+        probe.textContent = candidateWords.join(' ');
+        if (probe.scrollHeight > lineBreakThreshold && line1Words.length) {
+            break;
+        }
+        line1Words.push(words[i]);
+        if (probe.scrollHeight > lineBreakThreshold && line1Words.length === 1) {
+            break;
+        }
+    }
+
+    line1El.textContent = line1Words.join(' ');
+    restEl.textContent = words.slice(line1Words.length).join(' ');
+}
 </script>

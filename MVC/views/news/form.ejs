@@ -3,13 +3,13 @@
   const catList = typeof categories !== 'undefined' ? categories : [];
   const existingOrgs = (item && item.targetOrgIds) ? item.targetOrgIds : [];
   const articleAttachments = (item && item.attachments) ? item.attachments : [];
-  const libraryFiles = typeof library_Files !== 'undefined' ? library_Files : [];
-  
-  // Helper to safely get featured image
   const featuredImg = (item && item.content && item.content.featuredImage) ? item.content.featuredImage : '';
+  const resolvedNewsMediaDefaultFolder = (typeof newsMediaDefaultFolder !== 'undefined' && newsMediaDefaultFolder)
+    ? newsMediaDefaultFolder
+    : 'news';
 %>
 
-<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/quill@1.3.6/dist/quill.snow.css" rel="stylesheet">
 
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
@@ -21,7 +21,7 @@
     <% } %>
   </div>
 
-  <form id="newsForm" action="<%= isEdit ? '/news/manage/edit/' + item.id : '/news/manage/new' %>" method="POST" enctype="multipart/form-data">
+  <form id="newsForm" action="<%= isEdit ? '/news/manage/edit/' + item.id : '/news/manage/new' %>" method="POST">
     <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
     
     <input type="hidden" name="htmlContent" id="hiddenHtmlContent">
@@ -31,7 +31,6 @@
     <input type="hidden" name="featuredImage" id="featuredImageInput" value="<%= featuredImg %>">
 
     <script type="application/json" id="initTargetOrgs"><%- JSON.stringify(existingOrgs) %></script>
-    <script type="application/json" id="initLibrary"><%- JSON.stringify(libraryFiles) %></script>
     <script type="application/json" id="initArticleAttachments"><%- JSON.stringify(articleAttachments) %></script>
 
     <div class="row g-4">
@@ -54,7 +53,7 @@
                 <div class="d-flex justify-content-between align-items-end mb-2">
                     <label class="form-label fw-bold mb-0">Article Body</label>
                     
-                    <button type="button" class="btn btn-sm btn-primary btn-filled" id="btnOpenMediaForEditor" data-bs-toggle="modal" data-bs-target="#mediaManagerModal">
+                    <button type="button" class="btn btn-sm btn-primary btn-filled" id="btnOpenMediaForEditor">
                         <i class="bi bi-images me-1"></i> Manage & Insert Media
                     </button>
                 </div>
@@ -108,7 +107,7 @@
                     </div>
                     
                     <div class="d-grid gap-2">
-                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnSetFeaturedImage" data-bs-toggle="modal" data-bs-target="#mediaManagerModal">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnSetFeaturedImage">
                             <i class="bi bi-card-image me-1"></i> <%= featuredImg ? 'Replace Image' : 'Set Featured Image' %>
                         </button>
                         <button type="button" class="btn btn-outline-danger btn-sm <%= featuredImg ? '' : 'd-none' %>" id="btnRemoveFeaturedImage">
@@ -179,286 +178,241 @@
   </form>
 </div>
 
-<div class="modal fade" id="mediaManagerModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
-    <div class="modal-content" style="height: 90vh;">
-      <div class="modal-header border-bottom-0 pb-0">
-          <ul class="nav nav-tabs border-bottom-0" id="mediaTabs" role="tablist">
-            <li class="nav-item">
-                <button class="nav-link active fw-bold" id="tab-library" data-bs-toggle="tab" data-bs-target="#panel-library" type="button">
-                    <i class="bi bi-images me-2"></i>Library
-                </button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link fw-bold" id="tab-upload" data-bs-toggle="tab" data-bs-target="#panel-upload" type="button">
-                    <i class="bi bi-cloud-upload me-2"></i>Upload
-                </button>
-            </li>
-          </ul>
-          <button type="button" class="btn-close mb-2 me-2" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body bg-light">
-          <div class="tab-content h-100">
-              <div class="tab-pane fade show active h-100" id="panel-library">
-                  <div class="row g-3" id="mediaGrid"></div>
-                  <div id="emptyLibraryMsg" class="d-none flex-column align-items-center justify-content-center h-100 text-muted">
-                      <i class="bi bi-images fs-1 opacity-25 mb-3"></i>
-                      <p>Library is empty.</p>
-                      <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('tab-upload').click()">Go to Upload Tab</button>
-                  </div>
-              </div>
-              <div class="tab-pane fade h-100" id="panel-upload">
-                  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-5 border rounded-3 bg-white border-dashed">
-                      <div id="uploadSpinner" class="d-none text-center">
-                          <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
-                          <h5 class="mt-3">Uploading...</h5>
-                      </div>
-                      <div id="uploadZone" class="text-center">
-                          <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 4rem;"></i>
-                          <h4 class="fw-bold mt-3">Upload Files</h4>
-                          <p class="text-muted mb-4">Files will be added to the organization's library.</p>
-                          <input type="file" id="ajaxFileInput" class="d-none" multiple accept="image/*,video/*,application/pdf">
-                          <button class="btn btn-primary btn-lg px-5" onclick="document.getElementById('ajaxFileInput').click()">Select Files</button>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      </div>
-      <div class="modal-footer bg-light">
-        <div class="me-auto text-muted small" id="selectionStatus">Select an item to insert</div>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" id="btnInsertMedia" disabled>
-            <i class="bi bi-plus-lg me-1"></i> Insert Selected
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <%- include('../partials/modal_GenericPicker') %>
+<%- include('../partials/modal_MediaManager') %>
 
-<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.6/dist/quill.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // --- 1. GLOBAL STATE & INIT ---
-    const grid = document.getElementById('mediaGrid');
-    const emptyMsg = document.getElementById('emptyLibraryMsg');
+    if (typeof window.Quill !== 'function') {
+        console.error('[news/form] Quill failed to load (check Content-Security-Policy).');
+        if (typeof showMessageModal === 'function') {
+            showMessageModal({
+                title: 'Editor Unavailable',
+                icon: 'error',
+                message: 'The rich text editor could not load. Refresh the page or contact support if this continues.',
+                buttons: [{ text: 'OK', class: 'btn-primary', value: 'ok' }]
+            });
+        }
+        return;
+    }
     const attachmentRegistryInput = document.getElementById('attachmentRegistryInput');
-    
-    let libraryFiles = JSON.parse(document.getElementById('initLibrary').textContent || '[]');
-    let articleAttachments = JSON.parse(document.getElementById('initArticleAttachments').textContent || '[]');
-    let selectedMedia = null;
-    
-    // ✅ NEW: Modal Context (To distinguish between Editor Insert vs Featured Image Set)
-    let modalContext = 'editor'; 
+    const NEWS_MEDIA_DEFAULT_FOLDER = <%- JSON.stringify(resolvedNewsMediaDefaultFolder) %>;
+    const mediaManagerModalEl = document.getElementById('mediaManagerModal');
+    const mediaManagerModal = (window.bootstrap && window.bootstrap.Modal && mediaManagerModalEl)
+        ? window.bootstrap.Modal.getOrCreateInstance(mediaManagerModalEl)
+        : null;
+    const mediaManagerModalApi = (window.MediaManagerModal && typeof window.MediaManagerModal.open === 'function')
+        ? window.MediaManagerModal
+        : null;
+    const newsMediaLibraryCache = new Map();
 
-    var quill = new Quill('#editor-container', {
+    let articleAttachments = JSON.parse(document.getElementById('initArticleAttachments').textContent || '[]');
+
+    const quill = new Quill('#editor-container', {
         theme: 'snow',
         placeholder: 'Write your story...',
-        modules: { toolbar: [ 
-            [{ 'header': [1, 2, 3, false] }], 
-            ['bold', 'italic', 'underline', 'strike', 'blockquote'], 
-            [{ 'color': [] }, { 'background': [] }], 
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }], 
-            [{ 'align': [] }], 
-            ['link', 'image', 'video'], ['clean'] 
+        modules: { toolbar: [
+            [{ header: [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+            [{ color: [] }, { background: [] }],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ align: [] }],
+            ['link', 'image', 'video'], ['clean']
         ]}
     });
 
-    // --- 2. RENDER LIBRARY ---
-    function renderLibrary() {
-        grid.innerHTML = '';
-        if (libraryFiles.length === 0) {
-            emptyMsg.classList.remove('d-none');
-            emptyMsg.classList.add('d-flex');
-            return;
-        }
-        emptyMsg.classList.add('d-none');
-        emptyMsg.classList.remove('d-flex');
-
-        libraryFiles.forEach(file => {
-            const isLinked = articleAttachments.some(a => a.url === file.url);
-            const col = document.createElement('div');
-            col.className = 'col-md-3 col-sm-4 col-6 media-col';
-            col.innerHTML = `
-                <div class="card h-100 border shadow-sm media-item-card" 
-                     data-url="${file.url}" data-type="${file.type}" data-name="${file.name}">
-                    <div class="ratio ratio-1x1 bg-secondary position-relative">
-                        ${file.type === 'image' 
-                            ? `<img src="${file.url}" class="object-fit-cover">` 
-                            : `<div class="d-flex align-items-center justify-content-center text-white h-100 w-100"><i class="bi bi-file-earmark-play fs-1"></i></div>`
-                        }
-                        ${isLinked ? `<div class="position-absolute bottom-0 start-0 m-1"><span class="badge bg-success small" style="font-size:0.6rem">Attached</span></div>` : ''}
-                        <div class="selected-overlay position-absolute top-0 start-0 w-100 h-100 bg-primary bg-opacity-50 d-none align-items-center justify-content-center">
-                            <i class="bi bi-check-circle-fill text-white fs-1"></i>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 p-0 d-flex align-items-center justify-content-center btn-delete-media" 
-                                style="width:24px; height:24px; z-index:10;" title="Permanently Delete" data-url="${file.url}">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                    <div class="card-body p-2 bg-white">
-                        <div class="small text-truncate fw-bold">${file.name}</div>
-                    </div>
-                </div>
-            `;
-            grid.appendChild(col);
-        });
+    function syncAttachmentRegistry() {
         attachmentRegistryInput.value = JSON.stringify(articleAttachments);
     }
-    renderLibrary();
+    syncAttachmentRegistry();
 
-// --- 3. UPLOAD LOGIC ---
-    const fileInput = document.getElementById('ajaxFileInput');
-    const spinner = document.getElementById('uploadSpinner');
-    const zone = document.getElementById('uploadZone');
-
-    fileInput.addEventListener('change', async () => {
-        if (fileInput.files.length === 0) return;
-        zone.classList.add('d-none');
-        spinner.classList.remove('d-none');
-
-        const formData = new FormData();
-        // ✅ REMOVED: formData.append('targetOrgId', 'GLOBAL'); 
-        // ✅ REMOVED: formData.append('category', 'news'); 
-        // The route /news/api/upload already knows it goes to 'news' folder
-
-        Array.from(fileInput.files).forEach(f => formData.append('files', f));
-
-        try {
-            // ✅ UPDATED: Point to the specific News API route
-            const resp = await fetch('/news/api/upload', {
-                method: 'POST',
-                headers: { 'X-AJAX-Request': 'true' },
-                body: formData
+    async function showNewsMessage(title, message, icon = 'error') {
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+                title,
+                icon,
+                message,
+                buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-success' : 'btn-primary', value: 'ok' }]
             });
-            const data = await resp.json();
-            
-            if (data.status === 'success') {
-                data.files.forEach(f => {
-                    // Prepend to library so it shows up first
-                    libraryFiles.unshift({ url: f.url, type: f.type, name: f.name });
-                    // Also add to registry so it persists on save
-                    articleAttachments.push({ url: f.url, type: f.type, name: f.name });
-                });
-                renderLibrary();
-                document.getElementById('tab-library').click();
-            } else {
-                alert('Upload failed: ' + data.message);
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Network error.');
-        } finally {
-            spinner.classList.add('d-none');
-            zone.classList.remove('d-none');
-            fileInput.value = '';
+            return;
         }
-    });
-    // --- 4. CLICK HANDLERS (Select / Delete) ---
-    grid.addEventListener('click', async (e) => {
-        const delBtn = e.target.closest('.btn-delete-media');
-        if (delBtn) {
-            e.stopPropagation();
-            if (typeof showMessageModal === 'function') {
-                const confirmed = await showMessageModal({
-                    title: 'Delete File', message: 'Permanently delete this file?', icon: 'warning',
-                    buttons: [{ text: 'Cancel', class: 'btn-secondary', value: false }, { text: 'Delete', class: 'btn-danger', value: true }]
-                });
-                if (!confirmed) return;
-            } else {
-                if (!confirm('Permanently delete this file?')) return;
-            }
-            
-            const urlToDelete = delBtn.dataset.url;
-            let relativePath = urlToDelete.replace('/uploads/', '');
-            if(relativePath.startsWith('/')) relativePath = relativePath.substring(1);
+        alert(message);
+    }
 
-            try {
-                const resp = await fetch(`/files/delete/dummy?path=${encodeURIComponent(relativePath)}`, { method: 'POST', headers: {'X-AJAX-Request': 'true'} });
-                const res = await resp.json();
-                if(res.status === 'success') {
-                    libraryFiles = libraryFiles.filter(a => a.url !== urlToDelete);
-                    articleAttachments = articleAttachments.filter(a => a.url !== urlToDelete);
-                    renderLibrary();
-                } else {
-                    alert(res.message);
-                }
-            } catch(e) { alert('Error deleting file'); }
+    function resolveMediaRowUrl(row = {}) {
+        const url = String(row.url || row.path || '').trim();
+        if (!url) return '';
+        if (/^\/uploads\//i.test(url)) return url;
+        const match = url.match(/\/uploads\/(.+)$/i);
+        if (match && match[1]) return `/uploads/${match[1].replace(/^\/+/, '')}`;
+        return url;
+    }
+
+    function inferMediaTypeFromRow(row = {}) {
+        const name = String(row.name || row.originalName || row.filename || '').toLowerCase();
+        const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '';
+        const imageExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico'];
+        if (imageExt.includes(ext)) return 'image';
+        const mime = String(row.mimeType || '').toLowerCase();
+        if (mime.startsWith('image/')) return 'image';
+        return 'document';
+    }
+
+    async function fetchNewsMediaLibrary(options = {}) {
+        const hasFolder = Object.prototype.hasOwnProperty.call(options || {}, 'folder');
+        const folder = hasFolder ? String(options.folder ?? '').trim() : '';
+        const cacheKey = hasFolder ? `folder:${folder}` : '__default__';
+        if (!options.forceRefresh && newsMediaLibraryCache.has(cacheKey)) {
+            return newsMediaLibraryCache.get(cacheKey);
+        }
+
+        let endpoint = '/news/api/media/library';
+        if (hasFolder) {
+            endpoint += `${endpoint.includes('?') ? '&' : '?'}folder=${encodeURIComponent(folder)}`;
+        }
+        const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
+            credentials: 'include'
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result || result.status !== 'success') {
+            throw new Error((result && result.message) || `Unable to load news media (status ${response.status}).`);
+        }
+
+        const payload = {
+            rows: Array.isArray(result.results) ? result.results : [],
+            message: String(result.message || '').trim() || 'News media loaded.',
+            folders: Array.isArray(result.folders) ? result.folders : [],
+            currentFolder: String(result.currentFolder || folder || '').trim(),
+            parentFolder: String(result.parentFolder || '').trim(),
+            defaultFolder: String(result.defaultFolder || NEWS_MEDIA_DEFAULT_FOLDER).trim() || NEWS_MEDIA_DEFAULT_FOLDER,
+            defaults: result.defaults && typeof result.defaults === 'object' ? result.defaults : null
+        };
+        newsMediaLibraryCache.set(cacheKey, payload);
+        return payload;
+    }
+
+    async function uploadNewsMediaFiles(files = [], context = {}) {
+        const inputFiles = Array.isArray(files) ? files.filter(Boolean) : [];
+        if (!inputFiles.length) throw new Error('No files selected for upload.');
+
+        const uploadFolder = String(context.currentFolder || context.defaultFolder || NEWS_MEDIA_DEFAULT_FOLDER).trim()
+            || NEWS_MEDIA_DEFAULT_FOLDER;
+        const formData = new FormData();
+        inputFiles.forEach((file) => formData.append('files', file));
+        formData.set('folder', uploadFolder);
+
+        const response = await fetch('/news/api/upload', {
+            method: 'POST',
+            headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
+            credentials: 'include',
+            body: formData
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result || result.status !== 'success') {
+            throw new Error((result && result.message) || `Upload failed (status ${response.status}).`);
+        }
+
+        newsMediaLibraryCache.clear();
+        const rows = Array.isArray(result.results)
+            ? result.results
+            : (Array.isArray(result.rows) ? result.rows : []);
+        return {
+            rows,
+            message: String(result.message || '').trim() || `Uploaded ${rows.length} file(s).`
+        };
+    }
+
+    function applyFeaturedImage(imageUrl) {
+        const url = String(imageUrl || '').trim();
+        if (!url) return;
+        document.getElementById('featuredImageInput').value = url;
+        const preview = document.getElementById('featuredImagePreview');
+        preview.querySelector('img').src = url;
+        preview.classList.remove('d-none');
+        document.getElementById('featuredImagePlaceholder').classList.add('d-none');
+        document.getElementById('btnSetFeaturedImage').innerHTML = '<i class="bi bi-card-image me-1"></i> Replace Image';
+        document.getElementById('btnRemoveFeaturedImage').classList.remove('d-none');
+    }
+
+    function insertMediaIntoEditor(row = {}) {
+        const url = resolveMediaRowUrl(row);
+        if (!url) throw new Error('Selected media has no URL.');
+        const name = String(row.name || row.originalName || row.filename || 'Media').trim() || 'Media';
+        const type = inferMediaTypeFromRow(row);
+        if (!articleAttachments.some((entry) => entry.url === url)) {
+            articleAttachments.push({ url, type, name });
+            syncAttachmentRegistry();
+        }
+        const range = quill.getSelection(true);
+        if (type === 'image') {
+            quill.insertEmbed(range.index, 'image', url);
+        } else {
+            quill.insertText(range.index, ` ${name} `, 'link', url);
+        }
+    }
+
+    async function openNewsMediaPicker(mode) {
+        if (!mediaManagerModalApi || typeof mediaManagerModalApi.open !== 'function') {
+            await showNewsMessage('Media Library Unavailable', 'The media manager is not available on this page.', 'warning');
             return;
         }
 
-        const card = e.target.closest('.media-item-card');
-        if (card) {
-            document.querySelectorAll('.media-item-card').forEach(c => {
-                c.classList.remove('border-primary', 'border-2');
-                c.querySelector('.selected-overlay').classList.add('d-none');
-                c.querySelector('.selected-overlay').classList.remove('d-flex');
+        const isFeatured = mode === 'featured';
+        if (typeof mediaManagerModalApi.setModalCompat === 'function' && mediaManagerModalEl && mediaManagerModal) {
+            mediaManagerModalApi.setModalCompat({
+                modalEl: mediaManagerModalEl,
+                modalInstance: mediaManagerModal,
+                open: (instance) => {
+                    if (instance && typeof instance.show === 'function') instance.show();
+                    return true;
+                },
+                close: (instance) => {
+                    if (instance && typeof instance.hide === 'function') instance.hide();
+                    return true;
+                }
             });
-            card.classList.add('border-primary', 'border-2');
-            card.querySelector('.selected-overlay').classList.remove('d-none');
-            card.querySelector('.selected-overlay').classList.add('d-flex');
-
-            selectedMedia = { url: card.dataset.url, type: card.dataset.type, name: card.dataset.name };
-            document.getElementById('selectionStatus').innerHTML = `Selected: <strong>${selectedMedia.name}</strong>`;
-            document.getElementById('btnInsertMedia').disabled = false;
         }
-    });
 
-    // --- 5. INSERT / SET FEATURED LOGIC ---
-    
-    // Set Context: Editor
+        await mediaManagerModalApi.open({
+            title: isFeatured ? 'Select Featured Image' : 'Select Article Media',
+            mode: 'assign',
+            mediaKind: isFeatured ? 'image' : 'any',
+            maxSelection: 1,
+            defaultView: 'tile',
+            defaultFolder: NEWS_MEDIA_DEFAULT_FOLDER,
+            forceRefresh: true,
+            onRefresh: async (query = {}) => fetchNewsMediaLibrary({
+                folder: query && query.folder,
+                forceRefresh: true
+            }),
+            onUpload: uploadNewsMediaFiles,
+            onApply: async (selectedRows) => {
+                const rows = Array.isArray(selectedRows) ? selectedRows : [];
+                if (!rows.length) throw new Error('Select at least one file.');
+                if (isFeatured) {
+                    applyFeaturedImage(resolveMediaRowUrl(rows[0]));
+                    return;
+                }
+                insertMediaIntoEditor(rows[0]);
+            }
+        });
+    }
+
     document.getElementById('btnOpenMediaForEditor').addEventListener('click', () => {
-        modalContext = 'editor';
-        document.getElementById('btnInsertMedia').innerHTML = '<i class="bi bi-plus-lg me-1"></i> Insert Selected';
+        openNewsMediaPicker('editor').catch((error) => {
+            showNewsMessage('Media Error', error.message || 'Unable to open media library.');
+        });
     });
 
-    // Set Context: Featured Image
     document.getElementById('btnSetFeaturedImage').addEventListener('click', () => {
-        modalContext = 'featured';
-        document.getElementById('btnInsertMedia').innerHTML = '<i class="bi bi-check-lg me-1"></i> Set as Featured';
+        openNewsMediaPicker('featured').catch((error) => {
+            showNewsMessage('Media Error', error.message || 'Unable to open media library.');
+        });
     });
 
-    // Main Action Button
-    document.getElementById('btnInsertMedia').addEventListener('click', () => {
-        if (!selectedMedia) return;
-
-        if (modalContext === 'featured') {
-            // ✅ Handle Featured Image Logic
-            if (selectedMedia.type !== 'image') {
-                alert('Please select an image file for the featured image.');
-                return;
-            }
-            // Update UI & Input
-            document.getElementById('featuredImageInput').value = selectedMedia.url;
-            const preview = document.getElementById('featuredImagePreview');
-            preview.querySelector('img').src = selectedMedia.url;
-            preview.classList.remove('d-none');
-            document.getElementById('featuredImagePlaceholder').classList.add('d-none');
-            
-            // Toggle Buttons
-            document.getElementById('btnSetFeaturedImage').innerHTML = '<i class="bi bi-card-image me-1"></i> Replace Image';
-            document.getElementById('btnRemoveFeaturedImage').classList.remove('d-none');
-
-        } else {
-            // ✅ Handle Editor Insert Logic
-            if (!articleAttachments.some(a => a.url === selectedMedia.url)) {
-                articleAttachments.push(selectedMedia);
-                renderLibrary();
-            }
-            const range = quill.getSelection(true);
-            if (selectedMedia.type === 'image') {
-                quill.insertEmbed(range.index, 'image', selectedMedia.url);
-            } else {
-                 quill.insertText(range.index, ` ${selectedMedia.name} `, 'link', selectedMedia.url);
-            }
-        }
-        
-        bootstrap.Modal.getInstance(document.getElementById('mediaManagerModal')).hide();
-    });
-
-    // Remove Featured Image Logic
     document.getElementById('btnRemoveFeaturedImage').addEventListener('click', () => {
         document.getElementById('featuredImageInput').value = '';
         document.getElementById('featuredImagePreview').classList.add('d-none');
@@ -466,10 +420,76 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btnSetFeaturedImage').innerHTML = '<i class="bi bi-card-image me-1"></i> Set Featured Image';
         document.getElementById('btnRemoveFeaturedImage').classList.add('d-none');
     });
-
-    // --- 6. FORM SUBMIT ---
-    document.getElementById('newsForm').addEventListener('submit', () => {
+    const newsForm = document.getElementById('newsForm');
+    newsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
         document.getElementById('hiddenHtmlContent').value = document.querySelector('.ql-editor').innerHTML;
+
+        const submitBtn = newsForm.querySelector('button[type="submit"]');
+        const originalHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+        }
+
+        try {
+            const fd = new FormData(newsForm);
+            const response = await fetch(newsForm.action, {
+                method: 'POST',
+                headers: {
+                    'X-AJAX-Request': 'true',
+                    Accept: 'application/json'
+                },
+                body: fd
+            });
+            const result = await response.json().catch(() => ({}));
+
+            if (response.ok && result.status === 'success') {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({
+                        title: 'Success',
+                        icon: 'success',
+                        message: result.message || 'Article saved.',
+                        buttons: [{ text: 'OK', class: 'btn-success', value: 'ok' }]
+                    });
+                }
+                window.location.href = result.redirect || '/news/manage';
+                return;
+            }
+
+            const message = result.message
+                || (response.status === 403
+                    ? 'This page is out of date. Please refresh the page and try again.'
+                    : 'Failed to save article.');
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'Error',
+                    icon: 'error',
+                    message,
+                    buttons: [{ text: 'OK', class: 'btn-danger', value: 'ok' }]
+                });
+            } else {
+                alert(message);
+            }
+        } catch (err) {
+            console.error(err);
+            const message = 'An unexpected error occurred while saving the article.';
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'System Error',
+                    icon: 'error',
+                    message,
+                    buttons: [{ text: 'OK', class: 'btn-danger', value: 'ok' }]
+                });
+            } else {
+                alert(message);
+            }
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml;
+            }
+        }
     });
 
     // --- 7. ORG PICKER & VISIBILITY ---
@@ -540,7 +560,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <style>
 .cursor-pointer { cursor: pointer; }
-.media-item-card { cursor: pointer; transition: transform 0.1s; }
-.media-item-card:hover { transform: scale(1.02); }
 .border-dashed { border-style: dashed !important; }
 </style>

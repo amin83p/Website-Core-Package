@@ -126,6 +126,35 @@
     return typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
   }
 
+  function buildDocxExportCancelledModalHtml(message = '') {
+    const raw = String(message || '').trim();
+    const prefix = 'DOCX export cancelled. Missing stored values for:';
+    if (!raw.includes(prefix)) return null;
+    const tailMatch = raw.match(/Missing stored values for:\s*([\s\S]+?)\.\s*Update the Word template/i);
+    if (!tailMatch) return null;
+    const hintBlock = tailMatch[1].trim();
+    const hints = hintBlock.split(/,\s*(?=T\d+\.|O\.)/i).map((row) => row.trim()).filter(Boolean);
+    const rows = hints.map((hint) => {
+      const tokenMatch = hint.match(/^((?:T\d+|O)\.[A-Za-z0-9]+)/i);
+      const token = tokenMatch ? tokenMatch[1] : hint.split('(')[0].trim();
+      const detail = hint.includes('(') ? hint.slice(hint.indexOf('(')).trim() : '';
+      return (
+        `<li class="mb-2">`
+        + `<code class="user-select-all">${escapeReportMessage(token)}</code>`
+        + (detail ? `<div class="small text-muted mt-1">${escapeReportMessage(detail)}</div>` : '')
+        + `</li>`
+      );
+    }).join('');
+    const footer = raw.includes('Update the Word') ? raw.slice(raw.indexOf('Update the Word')).trim() : '';
+    return (
+      '<div class="text-start report-docx-export-error">'
+      + '<p class="mb-2">Some placeholders in the overall Word file do not have values for this export.</p>'
+      + `<ul class="list-unstyled mb-0 ps-1" style="max-height:min(16rem,42vh);overflow-y:auto;">${rows}</ul>`
+      + (footer ? `<p class="small text-muted border-top pt-2 mt-3 mb-0">${escapeReportMessage(footer)}</p>` : '')
+      + '</div>'
+    );
+  }
+
   async function showReportMessage({
     title = 'Notice',
     message = '',
@@ -181,6 +210,7 @@
     plainReportMessage,
     buildPdfFieldsInspectModalHtml,
     buildTemplateFileComplianceModalHtml,
+    buildDocxExportCancelledModalHtml,
     formatPdfAcroFieldType,
     showReportMessage,
     confirmReportAction

@@ -213,6 +213,35 @@ test('getSourceTemplateKeyCatalog filters to snapshotKeys when configured', () =
   assert.ok(!catalog.includes('teacher_name'));
 });
 
+test('getSourceTemplateKeyCatalog includes option docxAlias shortcuts used in overall Key catalog', () => {
+  const template = {
+    ...baseTemplatePayload,
+    id: 'RPTTPL-1',
+    snapshotKeys: ['student_full_name']
+  };
+  const options = overallReportService.getSourceTemplateKeyOptions(template);
+  const nameOption = options.find((row) => row.key === 'student_full_name');
+  assert.ok(nameOption?.docxAlias, 'expected docxAlias on snapshotted catalog option');
+  const catalog = overallReportService.getSourceTemplateKeyCatalog(template);
+  assert.ok(catalog.includes(nameOption.docxAlias));
+});
+
+test('buildSourceValuesFromPlaceholders materializes catalog docxAlias keys for export', () => {
+  const template = {
+    ...baseTemplatePayload,
+    id: 'RPTTPL-1',
+    snapshotKeys: ['student_full_name']
+  };
+  const options = overallReportService.getSourceTemplateKeyOptions(template);
+  const alias = options.find((row) => row.key === 'student_full_name')?.docxAlias;
+  assert.ok(alias);
+  const values = overallReportService.buildSourceValuesFromPlaceholders(template, {
+    student_full_name: 'Ada Lovelace'
+  });
+  assert.equal(values.student_full_name, 'Ada Lovelace');
+  assert.equal(values[alias], 'Ada Lovelace');
+});
+
 test('buildTemplateSnapshotKeySuggestions skips visual fields and docx alias duplicates', () => {
   const suggestions = reportService.buildTemplateSnapshotKeySuggestions({
     ...baseTemplatePayload,

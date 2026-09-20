@@ -1,12 +1,13 @@
 // MVC/controllers/newsController.js
+const crypto = require('crypto');
 const dataService = require('../services/dataService');
 const coreFilesService = require('../services/coreFilesService');
-const fs = require('fs').promises; 
+const fs = require('fs').promises;
 const path = require('path');
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const uploadMiddleware = require('../middleware/upload');
-const fileAssetStorage = require('../services/fileAssetStorageService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
+const settingService = require('../services/settingService');
 
 const NEWS_ADMIN_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: [
@@ -125,27 +126,184 @@ function normalizeNewsItem(item = {}) {
     };
 }
 
-async function getLibraryFiles(scopeId) {
-    try {
-        const files = await fileAssetStorage.listDirectory({
-            scopeKey: scopeId,
-            relativeDir: uploadFolderSettingsService.resolveUploadFolder('core.news')
-        });
-        return files.filter((item) => item && !item.isDir).map(item => {
-            const filename = item.name;
-            const ext = path.extname(filename || '').toLowerCase();
-            const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(ext);
-            return {
-                url: item.url,
-                name: filename,
-                type: isImage ? 'image' : 'document',
-                uploadDate: item.modified || ''
-            };
-        }).sort((a, b) => String(b.uploadDate || b.name).localeCompare(String(a.uploadDate || a.name)));
+function cleanNewsString(value, max = 260) {
+    return String(value ?? '').trim().slice(0, max);
+}
 
-    } catch (err) {
-        console.error("Error reading library:", err);
-        return [];
+function normalizeNewsRelativeFolder(value, max = 800) {
+    const token = cleanNewsString(value, max).replace(/\\/g, '/');
+    if (!token || token === '/' || token === '.') return '';
+    const compact = token
+        .split('/')
+        .map((part) => cleanNewsString(part, 200))
+        .filter(Boolean)
+        .join('/');
+    if (!compact || compact === '.') return '';
+    return compact.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
+function getNewsMediaDefaultFolder() {
+    return uploadFolderSettingsService.resolveUploadFolder('core.news') || 'news';
+}
+
+function resolveNewsScopeKey(user = null) {
+    const activeOrgId = user?.activeOrgId;
+    const token = String(activeOrgId || '').trim();
+    if (token && token.toUpperCase() !== 'SYSTEM') return token;
+    return 'GLOBAL';
+}
+
+function resolveNewsMediaPageSize() {
+    const raw = Number.parseInt(String(settingService.getValue('app', 'defaultPageSize') || ''), 10);
+    if (!Number.isFinite(raw) || Number.isNaN(raw) || raw <= 0) return 30;
+    return Math.max(5, Math.min(500, raw));
+}
+
+function buildNewsScopeUploadPrefix(scopeKey = '') {
+    const token = String(scopeKey || '').trim().toUpperCase();
+    if (!token || token === 'GLOBAL') return '/uploads/GLOBAL';
+    return `/uploads/ORG_${token.replace(/^ORG_/, '')}`;
+}
+
+function encodeNewsUploadUrl(uploadPath = '') {
+    const normalized = String(uploadPath || '').replace(/\\/g, '/').replace(/\/+/g, '/').trim();
+    if (!normalized) return '';
+    return normalized
+        .split('/')
+        .map((part, index) => (index === 0 ? part : encodeURIComponent(part)))
+        .join('/');
+}
+
+function buildNewsMediaLibraryRow(entry = {}, scopeKey = '', currentFolder = '') {
+    const fileName = cleanNewsString(entry.name);
+    const folder = normalizeNewsRelativeFolder(currentFolder);
+    const uploadPath = `${buildNewsScopeUploadPrefix(scopeKey)}/${[folder, fileName].filter(Boolean).join('/')}`.replace(/\/+/g, '/');
+    const digest = crypto.createHash('md5').update(uploadPath).digest('hex');
+    const webUrl = cleanNewsString(entry.url) || encodeNewsUploadUrl(uploadPath);
+    return {
+        id: `LIB_${digest}`,
+        name: fileName,
+        originalName: cleanNewsString(entry.originalName) || fileName,
+        filename: fileName,
+        path: uploadPath,
+        url: webUrl,
+        mimeType: cleanNewsString(entry.mimeType),
+        size: Number(entry.size || 0) || 0,
+        uploadDate: entry.modified ? new Date(entry.modified).toISOString() : '',
+        source: 'news_library'
+    };
+}
+
+function buildNewsMediaLibraryRowFromUploadedFile(file = {}, scopeKey = '', targetFolder = '') {
+    const storedName = path.basename(String(file?.path || file?.filename || file?.originalname || '').trim());
+    const webUrl = getWebUrlFromFile(file);
+    return buildNewsMediaLibraryRow({
+        name: storedName,
+        originalName: file?.originalname || storedName,
+        url: webUrl,
+        mimeType: file?.mimetype || '',
+        size: file?.size || 0,
+        modified: file?.mtime ? new Date(file.mtime).toISOString() : new Date().toISOString()
+    }, scopeKey, targetFolder);
+}
+
+function resolveNewsMediaFolder(rawFolder = '') {
+    const defaultFolder = getNewsMediaDefaultFolder();
+    const normalized = normalizeNewsRelativeFolder(rawFolder);
+    if (!normalized) return defaultFolder;
+    if (normalized === defaultFolder || normalized.startsWith(`${defaultFolder}/`)) return normalized;
+    return `${defaultFolder}/${normalized}`.replace(/\/+/g, '/');
+}
+
+function getNewsParentFolder(currentFolder = '') {
+    const folder = normalizeNewsRelativeFolder(currentFolder);
+    if (!folder || !folder.includes('/')) return '';
+    return folder.split('/').slice(0, -1).join('/');
+}
+
+async function relocateUploadedFilesToFolder(req, targetRelativeFolder = '') {
+    const scopeKey = resolveNewsScopeKey(req.user);
+    const folder = resolveNewsMediaFolder(targetRelativeFolder);
+    const defaultFolder = getNewsMediaDefaultFolder();
+    if (folder === defaultFolder) return folder;
+
+    const baseDir = coreFilesService.getRootPath(scopeKey);
+    const targetPath = coreFilesService.resolveSafePath(baseDir, folder);
+    coreFilesService.ensureDir(targetPath);
+
+    const files = Array.isArray(req.files) ? req.files : [];
+    for (const file of files) {
+        const sourcePath = String(file?.path || '').trim();
+        if (!sourcePath) continue;
+        const fileName = path.basename(sourcePath);
+        const destinationPath = coreFilesService.resolveSafePath(targetPath, fileName);
+        if (sourcePath !== destinationPath) {
+            await fs.rename(sourcePath, destinationPath);
+            file.path = destinationPath;
+        }
+    }
+    return folder;
+}
+
+async function listNewsMediaLibrary(req, res) {
+    try {
+        const defaultPageSize = resolveNewsMediaPageSize();
+        const scopeKey = resolveNewsScopeKey(req.user);
+        const defaultFolder = getNewsMediaDefaultFolder();
+        const hasRequestedFolder = Object.prototype.hasOwnProperty.call(req.query || {}, 'folder');
+        const requestedFolder = hasRequestedFolder
+            ? resolveNewsMediaFolder(req.query?.folder)
+            : '';
+        const candidateFolders = hasRequestedFolder
+            ? [requestedFolder, defaultFolder]
+            : [defaultFolder];
+
+        let currentFolder = '';
+        let entries = [];
+        for (const folderToken of candidateFolders) {
+            // eslint-disable-next-line no-await-in-loop
+            const listed = await coreFilesService.listDirectoryByScope({
+                scopeKey,
+                relativeDir: normalizeNewsRelativeFolder(folderToken)
+            }).catch(() => null);
+            if (Array.isArray(listed)) {
+                currentFolder = normalizeNewsRelativeFolder(folderToken) || defaultFolder;
+                entries = listed;
+                break;
+            }
+        }
+
+        const folders = [];
+        const rows = [];
+        for (const entry of entries) {
+            if (!entry) continue;
+            const name = cleanNewsString(entry.name);
+            if (!name) continue;
+            if (entry.isDir) {
+                folders.push({
+                    name,
+                    path: normalizeNewsRelativeFolder([currentFolder, name].filter(Boolean).join('/'))
+                });
+                continue;
+            }
+            rows.push(buildNewsMediaLibraryRow(entry, scopeKey, currentFolder));
+        }
+
+        folders.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+        rows.sort((a, b) => String(b.uploadDate || '').localeCompare(String(a.uploadDate || '')));
+
+        return res.json({
+            status: 'success',
+            message: rows.length ? `Loaded ${rows.length} file(s).` : 'No news media files found in this folder.',
+            results: rows,
+            folders,
+            currentFolder,
+            parentFolder: getNewsParentFolder(currentFolder),
+            defaultFolder,
+            defaults: { pageSize: defaultPageSize }
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to load news media library.' });
     }
 }
 
@@ -357,14 +515,6 @@ async function showForm(req, res) {
         }
         
         const categories = await getCategories();
-        
-        // ✅ NEW: Fetch ALL files in the current scope's News folder
-        // Use Active Org ID or GLOBAL
-        const scopeId = (req.user.activeOrgId && req.user.activeOrgId !== 'SYSTEM') 
-                        ? req.user.activeOrgId 
-                        : 'GLOBAL';
-        
-        const library_Files = await getLibraryFiles(scopeId);
 
         res.render('news/form', {
             title: id ? 'Edit News' : 'Compose News',
@@ -372,7 +522,7 @@ async function showForm(req, res) {
             categories,
             user: req.user,
             actionStateId: req.actionStateId,
-            library_Files,
+            newsMediaDefaultFolder: getNewsMediaDefaultFolder(),
             includeModal: true
         });
     } catch (error) {
@@ -556,23 +706,38 @@ async function showStats(req, res) {
 // ✅ NEW: Handle AJAX Uploads for News Media Library
 async function uploadMedia(req, res) {
     try {
-        if (!req.files || req.files.length === 0) throw new Error("No files uploaded");
+        if (!req.files || req.files.length === 0) throw new Error('No files uploaded');
 
-        // The Middleware (upload('news')) has already saved the files to /uploads/GLOBAL/news
-        // We just need to return the URLs to the frontend
-        
-        const uploadedResults = req.files.map(file => ({
+        const scopeKey = resolveNewsScopeKey(req.user);
+        const targetFolder = await relocateUploadedFilesToFolder(req, req.body?.folder || '');
+
+        const uploadedResults = req.files.map((file) => {
+            const url = getWebUrlFromFile(file);
+            const storedName = path.basename(String(file?.path || file?.filename || file?.originalname || '').trim());
+            const ext = path.extname(storedName || String(file.originalname || '')).toLowerCase();
+            const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico'].includes(ext)
+                || String(file.mimetype || '').startsWith('image/');
+            return {
+                status: 'success',
+                url,
+                type: isImage ? 'image' : 'document',
+                name: storedName,
+                originalName: file.originalname || storedName
+            };
+        });
+
+        const results = req.files.map((file) => buildNewsMediaLibraryRowFromUploadedFile(file, scopeKey, targetFolder));
+
+        res.json({
             status: 'success',
-            url: getWebUrlFromFile(file), 
-            type: file.mimetype.startsWith('image/') ? 'image' : 'document',
-            name: file.originalname
-        }));
-
-        res.json({ status: 'success', files: uploadedResults });
+            message: uploadedResults.length ? 'News media uploaded successfully.' : 'No files were uploaded.',
+            files: uploadedResults,
+            results,
+            rows: results
+        });
 
     } catch (err) {
-        // Cleanup if error
-        if(req.files) await uploadMiddleware.deleteUploadedFiles(req).catch(()=>{});
+        if (req.files) await uploadMiddleware.deleteUploadedFiles(req).catch(() => {});
         res.status(400).json({ status: 'error', message: err.message });
     }
 }
@@ -586,5 +751,6 @@ module.exports = {
     saveNews,
     deleteNews,
     showStats,
-    uploadMedia // <--- ✅ EXPORT THE NEW FUNCTION
+    uploadMedia,
+    listNewsMediaLibrary
 };

@@ -12,6 +12,7 @@ const reportFunderPdfService = require('../../services/school/reportFunderPdfSer
 const reportPdfRenderService = require('../../services/school/reportPdfRenderService');
 const overallReportService = require('../../services/school/overallReportService');
 const overallReportTemplateModel = require('../../models/school/overallReportTemplateModel');
+const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 
 function activeOrgId(reqUser) {
   const id = toPublicId(reqUser?.activeOrgId || reqUser?.organizationId || reqUser?.orgId);
@@ -131,7 +132,8 @@ async function loadTemplateFormData(req, template = null) {
     sourceTemplates,
     funderPickerOptions: reportFunderDocxService.buildFunderPickerOptions(activeFunders),
     valueModes: overallReportTemplateModel.OVERALL_VALUE_MODES,
-    statuses: overallReportTemplateModel.TEMPLATE_STATUSES
+    statuses: overallReportTemplateModel.TEMPLATE_STATUSES,
+    expressionHelperNames: ['source', ...Object.keys(reportRuleEngineService.HELPERS || {})]
   };
 }
 

@@ -1166,11 +1166,16 @@
 
     async function showReportMessage({ title = 'Student Attendance Report', icon = 'info', message = '' } = {}) {
         const safeMessage = String(message || '').trim() || 'Operation could not be completed.';
+        const docxHtml = icon === 'error' && window.ReportMessaging?.buildDocxExportCancelledModalHtml
+            ? window.ReportMessaging.buildDocxExportCancelledModalHtml(safeMessage)
+            : null;
         if (window.ReportMessaging?.showReportMessage) {
             return window.ReportMessaging.showReportMessage({
                 title,
                 icon,
-                message: safeMessage,
+                message: docxHtml || safeMessage,
+                html: Boolean(docxHtml),
+                size: docxHtml ? 'lg' : 'md',
                 buttonClass: icon === 'error' ? 'btn-danger' : 'btn-primary'
             });
         }

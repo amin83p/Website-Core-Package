@@ -68,7 +68,7 @@ function mapSourceRunsToSlots(template, sourceRuns = []) {
     const slotKey = clean(slot?.slotKey).toUpperCase();
     const run = runs.find((row) => {
       const runSlot = clean(row?.slotKey).toUpperCase();
-      if (runSlot && runSlot === slotKey) return true;
+      if (runSlot) return runSlot === slotKey;
       return idsEqual(row?.templateId, slot?.templateId);
     });
     if (!run) {
@@ -84,7 +84,8 @@ function mapSourceRunsToSlots(template, sourceRuns = []) {
   runs.forEach((run) => {
     const runSlot = clean(run?.slotKey).toUpperCase();
     const matchesSlot = slots.some((slot) => {
-      if (runSlot && runSlot === clean(slot.slotKey).toUpperCase()) return true;
+      const slotKey = clean(slot.slotKey).toUpperCase();
+      if (runSlot) return runSlot === slotKey;
       return idsEqual(run?.templateId, slot?.templateId);
     });
     if (!matchesSlot && runSlot) {
