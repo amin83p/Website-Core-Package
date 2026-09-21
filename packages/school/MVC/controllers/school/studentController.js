@@ -35,6 +35,8 @@ const schoolDeletionGuardService = require('../../services/school/schoolDeletion
 const studentSystemIdMigrationService = require('../../services/school/studentSystemIdMigrationService');
 const programRegistrationApplyService = require('../../services/school/programRegistrationApplyService');
 const programRegistrationViewService = require('../../services/school/programRegistrationViewService');
+const termRegistrationViewService = require('../../services/school/termRegistrationViewService');
+const { buildClassEnrollmentRows } = require('../../services/school/studentAcademicOverviewService');
 const studentListSearchService = require('../../services/school/studentListSearchService');
 const reportService = require('../../services/school/reportService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
@@ -704,6 +706,7 @@ exports.showForm = async (req, res) => {
         let personName = '';
         let personOrganizations = [];
         let existingProgramRegistrations = [];
+        let classEnrollmentRows = [];
 
         if (isEdit) {
             student = await dataService.getDataById('students', req.params.id, req.user, routeAccess(req));
@@ -715,8 +718,28 @@ exports.showForm = async (req, res) => {
                 personName = schoolPersonAccessService.formatPersonName(person, '');
                 personOrganizations = Array.isArray(person.organizations) ? person.organizations : [];
             }
-            existingProgramRegistrations = await programRegistrationViewService.buildRegistrationSummaries(req.user, activeOrgId, {
-                filters: { studentId: student.id }
+            const [programRegistrationSummaries, programs, terms, classes, subjects, termRows] = await Promise.all([
+                programRegistrationViewService.buildRegistrationSummaries(req.user, activeOrgId, {
+                    filters: { studentId: student.id }
+                }),
+                dataService.fetchAllData('programs', {}, req.user),
+                dataService.fetchAllData('terms', {}, req.user),
+                dataService.fetchAllData('classes', {}, req.user),
+                dataService.fetchAllData('subjects', {}, req.user),
+                termRegistrationViewService.buildRegistrationSummaries(req.user, activeOrgId, {
+                    filters: { studentId: student.id }
+                })
+            ]);
+            existingProgramRegistrations = programRegistrationSummaries;
+            classEnrollmentRows = await buildClassEnrollmentRows({
+                reqUser: req.user,
+                activeOrgId,
+                studentId: student.id,
+                programs,
+                terms,
+                classes,
+                subjects,
+                termRows
             });
 
         }
@@ -760,6 +783,7 @@ exports.showForm = async (req, res) => {
             linkedPersonLinkType: 'student',
             linkedPersonLinkId: isEdit ? editFormRecordId : '',
             existingProgramRegistrations,
+            classEnrollmentRows,
             canEditStudentClb,
             claimNumbersForView
         });

@@ -6,45 +6,7 @@
 <div class="sections-page<%= resolvedSectionsPageClass ? ' ' + resolvedSectionsPageClass : '' %>">
   <div id="process-data">
     <span id="urlRef" data-id="<%= typeof newUrl !== 'undefined' && newUrl != null ? newUrl : '' %>" hidden></span>
-    <span id="user-id" data-id="<%= user.id %>" hidden></span>
-    <%
-      const u = user || {};
-      const activeOrgId = String(u.activeOrgId || u.primaryOrgId || '').trim();
-      const activeOrg = Array.isArray(u.allowedOrgs)
-        ? u.allowedOrgs.find((o) => String(o?.orgId || '') === activeOrgId)
-        : null;
-      const activeOrgName = String(
-        activeOrg?.name ||
-        activeOrg?.orgName ||
-        activeOrg?.organizationName ||
-        u.activeOrgName ||
-        ''
-      ).trim();
-      const activeOrgRoles = Array.isArray(activeOrg?.roles) && activeOrg.roles.length
-        ? activeOrg.roles
-        : (activeOrg?.role ? [activeOrg.role] : []);
-      const hasAdminOrgRole = activeOrgRoles
-        .map((r) => String(r || '').trim().toLowerCase())
-        .some((r) => ['admin', 'owner', 'superadmin', 'super_admin', 'system_admin'].includes(r));
-      const adminCtx = typeof adminContext !== 'undefined' && adminContext ? adminContext : {};
-      const isPrintAdmin = Boolean(adminCtx.isRequestAdmin || adminCtx.isSystemAdmin || adminCtx.isSuperAdmin || hasAdminOrgRole);
-      const requestingUserName = String(
-        u.identity?.displayName ||
-        (u.name && typeof u.name === 'object' ? `${u.name.first || ''} ${u.name.last || ''}` : '') ||
-        u.name ||
-        u.username ||
-        u.email ||
-        u.id ||
-        ''
-      ).trim();
-      const printBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
-      const printLogoUrl = printBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
-    %>
-    <span id="activeOrgIdRef" data-id="<%= activeOrgId %>" hidden></span>
-    <span id="activeOrgNameRef" data-name="<%= activeOrgName %>" hidden></span>
-    <span id="printAdminRef" data-is-admin="<%= isPrintAdmin ? 'true' : 'false' %>" hidden></span>
-    <span id="requestingUserNameRef" data-name="<%= requestingUserName %>" hidden></span>
-    <span id="printBrandLogoRef" data-url="<%= printLogoUrl %>" hidden></span>
+    <%- include('printContextRefs') %>
     <% if (typeof actionStateId !== 'undefined' && actionStateId !== null) { %>
       <span id="actionStateIdRef" data-id="<%= actionStateId %>" hidden></span>
     <% } %>

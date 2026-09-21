@@ -45,6 +45,8 @@
   const currentPageCount = stories.length;
 %>
 
+<%- include('news/partials/newsPublicBackground') %>
+
 <section class="news-public-page news-feed-page">
   <section class="news-hero" aria-labelledby="newsFeedTitle">
     <div class="news-hero-orbit" aria-hidden="true">
@@ -207,57 +209,9 @@
   </section>
 </section>
 
+<%- include('news/partials/newsPublicShellStyles') %>
+
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
-
-html.news-public-root,
-html.news-public-root body.news-public-body {
-  background:
-    radial-gradient(circle at 8% 6%, rgba(29, 95, 184, 0.17), transparent 29%),
-    radial-gradient(circle at 92% 7%, rgba(8, 127, 140, 0.17), transparent 27%),
-    radial-gradient(circle at 9% 54%, rgba(29, 95, 184, 0.08), transparent 25%),
-    radial-gradient(circle at 89% 78%, rgba(8, 127, 140, 0.10), transparent 28%),
-    linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
-  min-height: 100%;
-}
-
-body.news-public-body { background-attachment: fixed; }
-
-main.news-public-main {
-  margin-bottom: 0 !important;
-  margin-top: 0 !important;
-  padding-bottom: clamp(2.5rem, 5vw, 5rem);
-  padding-top: 0;
-  position: relative;
-}
-
-.news-public-page {
-  --news-blue: #1d5fb8;
-  --news-teal: #087f8c;
-  --news-ink: #13222c;
-  --news-muted: #53636f;
-  --news-line: #d7e1e7;
-  --news-surface: rgba(255, 255, 255, 0.82);
-  --news-shadow: 0 26px 70px rgba(19, 34, 44, 0.14);
-  font-family: 'Manrope', 'Segoe UI', sans-serif;
-  isolation: isolate;
-  padding-top: clamp(1.3rem, 3vw, 2.4rem);
-  position: relative;
-}
-
-.news-public-page::before {
-  background:
-    linear-gradient(115deg, rgba(255,255,255,0.82), rgba(255,255,255,0.24)),
-    radial-gradient(circle at 12% 18%, rgba(29, 95, 184, 0.12), transparent 25%),
-    radial-gradient(circle at 86% 22%, rgba(8, 127, 140, 0.12), transparent 27%);
-  border-radius: 0;
-  content: "";
-  inset: -2.5rem calc(50% - 50vw) -5rem;
-  pointer-events: none;
-  position: absolute;
-  z-index: -1;
-}
-
 .news-hero {
   display: grid;
   gap: clamp(1.5rem, 4vw, 3rem);

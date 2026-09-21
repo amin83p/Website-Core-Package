@@ -234,6 +234,9 @@ const domainOpsService = {
     const logEntry = {
       timestamp: new Date().toISOString(),
       userId: user ? user.id : null,
+      userName: user
+        ? String(user.displayName || user.name || user.username || user.email || '').trim()
+        : null,
       userRole: user ? (user.role || 'user') : 'guest',
       orgId: user ? user.activeOrgId : 'public'
     };

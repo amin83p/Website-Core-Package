@@ -1,0 +1,135 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+html.news-public-root {
+  height: auto;
+  min-height: 100%;
+}
+
+html.news-public-root body.news-public-body {
+  background-color: #f8fbff;
+  height: auto;
+  min-height: 100vh;
+}
+
+body.news-public-body > header,
+body.news-public-body > main,
+body.news-public-body > footer {
+  background: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+main.news-public-main {
+  background: transparent;
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-bottom: clamp(2.5rem, 5vw, 5rem);
+  padding-top: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.news-public-bg-shell {
+  height: 100%;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: fixed;
+  width: 100%;
+  z-index: 0;
+}
+
+.news-public-bg-gradient {
+  background:
+    radial-gradient(circle at 8% 6%, rgba(29, 95, 184, 0.17), transparent 29%),
+    radial-gradient(circle at 92% 7%, rgba(8, 127, 140, 0.17), transparent 27%),
+    radial-gradient(circle at 9% 54%, rgba(29, 95, 184, 0.08), transparent 25%),
+    radial-gradient(circle at 89% 78%, rgba(8, 127, 140, 0.10), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+  inset: 0;
+  position: absolute;
+}
+
+.news-public-bg-motion {
+  inset: 0;
+  overflow: hidden;
+  position: absolute;
+}
+
+.news-public-page {
+  --news-blue: #1d5fb8;
+  --news-teal: #087f8c;
+  --news-ink: #13222c;
+  --news-muted: #53636f;
+  --news-line: #d7e1e7;
+  --news-surface: rgba(255, 255, 255, 0.82);
+  --news-shadow: 0 26px 70px rgba(19, 34, 44, 0.14);
+  background: transparent;
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  padding-top: clamp(1.3rem, 3vw, 2.4rem);
+  position: relative;
+  z-index: 1;
+}
+
+.news-float-orb,
+.news-float-shape {
+  border-radius: 999px;
+  filter: blur(42px);
+  opacity: 0.45;
+  pointer-events: none;
+  position: absolute;
+  will-change: transform;
+}
+
+.news-float-orb-a {
+  animation: newsOrbDriftA 22s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(29, 95, 184, 0.42), rgba(29, 95, 184, 0));
+  height: min(42vw, 420px);
+  left: -8%;
+  top: 18%;
+  width: min(42vw, 420px);
+}
+
+.news-float-orb-b {
+  animation: newsOrbDriftB 26s ease-in-out infinite;
+  animation-delay: -6s;
+  background: radial-gradient(circle, rgba(8, 127, 140, 0.38), rgba(8, 127, 140, 0));
+  height: min(36vw, 360px);
+  right: -6%;
+  top: 42%;
+  width: min(36vw, 360px);
+}
+
+.news-float-orb-c {
+  animation: newsOrbDriftC 19s ease-in-out infinite;
+  animation-delay: -11s;
+  background: radial-gradient(circle, rgba(99, 179, 237, 0.35), rgba(99, 179, 237, 0));
+  bottom: 8%;
+  height: min(28vw, 280px);
+  left: 38%;
+  width: min(28vw, 280px);
+}
+
+@keyframes newsOrbDriftA {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(36px, -48px) scale(1.08); }
+}
+
+@keyframes newsOrbDriftB {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-42px, 32px) scale(0.94); }
+}
+
+@keyframes newsOrbDriftC {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(28px, 40px) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .news-float-orb,
+  .news-float-shape {
+    animation: none !important;
+  }
+}
+</style>

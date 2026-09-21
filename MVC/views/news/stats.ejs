@@ -13,191 +13,596 @@
     const readTime = safeStats.readTime || '0m';
     const wordCount = Number(safeStats.wordCount || 0);
     const safeChartData = chartData && typeof chartData === 'object' ? chartData : { dates: [], views: [] };
+    const impactLabel = totalViews > 50 ? 'High' : (totalViews > 10 ? 'Med' : 'Low');
+    const viewerRows = Array.isArray(recentViewers) ? recentViewers : [];
+    const showViewerList = typeof showRecentViewers !== 'undefined' && showRecentViewers;
+    const safeViewerPagination = (typeof viewerPagination !== 'undefined' && viewerPagination && typeof viewerPagination === 'object')
+      ? viewerPagination
+      : { currentPage: 1, totalPages: 1, totalItems: viewerRows.length, limit: viewerRows.length || 1, startItem: viewerRows.length ? 1 : 0, endItem: viewerRows.length };
+    const safeViewerFilters = (typeof viewerFilters !== 'undefined' && viewerFilters && typeof viewerFilters === 'object') ? viewerFilters : {};
+    const visibilityLabel = String(typeof articleVisibility !== 'undefined' ? articleVisibility : 'public').trim().toLowerCase();
+    const visitSummaryLabel = safeViewerPagination.totalItems
+      ? `Showing ${safeViewerPagination.startItem}-${safeViewerPagination.endItem} of ${safeViewerPagination.totalItems}`
+      : '0 visits';
 %>
 
-<div class="sections-page">
-    
-    <div class="d-flex align-items-center justify-content-between mb-4">
+<%- include('news/partials/newsPublicBackground') %>
+
+<section class="news-public-page news-stats-page">
+  <section class="news-stats-hero" aria-labelledby="newsStatsTitle">
+    <div class="news-hero-orbit" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <div class="news-stats-hero-lead">
+      <a href="/news/manage" class="news-back-link"><i class="bi bi-arrow-left"></i>Back to News List</a>
+      <div class="news-eyebrow">Article performance</div>
+    </div>
+
+    <h1 class="news-stats-hero-title" id="newsStatsTitle">Engagement Analytics</h1>
+
+    <div class="news-stats-hero-copy">
+      <p class="news-stats-report-line">
+        Report for <strong><%= articleTitle %></strong>
+      </p>
+    </div>
+
+    <aside class="news-stats-hero-meta" aria-label="Article metadata">
+      <span class="news-stats-meta-pill"><i class="bi bi-calendar3"></i>Published <%= publishedLabel %></span>
+      <span class="news-stats-meta-id">ID: <%= articleId %></span>
+    </aside>
+  </section>
+
+  <div class="row g-4 g-lg-4 news-stats-section news-stats-metrics">
+    <div class="col-md-6 col-xl-3">
+      <div class="news-stats-metric-card">
+        <div class="news-stats-metric-icon news-stats-metric-icon-blue"><i class="bi bi-eye"></i></div>
         <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <a href="/news/manage" class="text-decoration-none text-muted small"><i class="bi bi-arrow-left"></i> Back to List</a>
-            </div>
-            <h1 class="page-heading size-md m-0">Engagement Analytics</h1>
-            <div class="text-muted">
-                Report for: <span class="fw-bold text-dark">"<%= articleTitle %>"</span>
-            </div>
+          <span class="news-stats-metric-label">Total Views</span>
+          <strong class="news-stats-metric-value"><%= totalViews %></strong>
         </div>
-        <div class="text-end">
-             <span class="badge bg-light text-secondary border px-3 py-2 d-block mb-1">
-                Published: <%= publishedLabel %>
-             </span>
-             <small class="text-muted">ID: <%= articleId %></small>
-        </div>
+      </div>
     </div>
-
-    <div class="row g-3 mb-4">
-        
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="text-uppercase text-muted small fw-bold mb-1">Total Views</div>
-                            <div class="display-6 fw-bold text-primary"><%= totalViews %></div>
-                        </div>
-                        <div class="rounded-circle bg-primary-subtle text-primary p-2">
-                            <i class="bi bi-eye fs-4"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="news-stats-metric-card">
+        <div class="news-stats-metric-icon news-stats-metric-icon-teal"><i class="bi bi-people"></i></div>
+        <div>
+          <span class="news-stats-metric-label">Est. Unique Users</span>
+          <strong class="news-stats-metric-value"><%= uniqueUsers %></strong>
         </div>
-
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="text-uppercase text-muted small fw-bold mb-1">Est. Unique Users</div>
-                            <div class="display-6 fw-bold text-dark"><%= uniqueUsers %></div>
-                        </div>
-                        <div class="rounded-circle bg-success-subtle text-success p-2">
-                            <i class="bi bi-people fs-4"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="text-uppercase text-muted small fw-bold mb-1">Est. Read Time</div>
-                            <div class="display-6 fw-bold text-dark"><%= readTime %></div>
-                        </div>
-                        <div class="rounded-circle bg-warning-subtle text-warning-emphasis p-2">
-                            <i class="bi bi-stopwatch fs-4"></i>
-                        </div>
-                    </div>
-                     <div class="mt-3 small text-muted">
-                        Based on <%= wordCount %> words
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="text-uppercase text-muted small fw-bold mb-1">Impact Score</div>
-                            <div class="display-6 fw-bold text-info">
-                                <%= totalViews > 50 ? 'High' : (totalViews > 10 ? 'Med' : 'Low') %>
-                            </div>
-                        </div>
-                        <div class="rounded-circle bg-info-subtle text-info p-2">
-                            <i class="bi bi-graph-up-arrow fs-4"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-
-    <div class="row g-4">
-        
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3 border-bottom-0">
-                    <h6 class="fw-bold m-0"><i class="bi bi-activity me-2"></i>Traffic Trend (Last 7 Days)</h6>
-                </div>
-                <div class="card-body">
-                    <canvas id="viewsChart" style="max-height: 300px;"></canvas>
-                </div>
-            </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="news-stats-metric-card">
+        <div class="news-stats-metric-icon news-stats-metric-icon-amber"><i class="bi bi-stopwatch"></i></div>
+        <div>
+          <span class="news-stats-metric-label">Est. Read Time</span>
+          <strong class="news-stats-metric-value"><%= readTime %></strong>
+          <small class="news-stats-metric-note"><%= wordCount %> words</small>
         </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="news-stats-metric-card">
+        <div class="news-stats-metric-icon news-stats-metric-icon-violet"><i class="bi bi-graph-up-arrow"></i></div>
+        <div>
+          <span class="news-stats-metric-label">Impact Score</span>
+          <strong class="news-stats-metric-value news-stats-metric-value-text"><%= impactLabel %></strong>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        <div class="col-lg-4">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3 border-bottom-0">
-                    <h6 class="fw-bold m-0"><i class="bi bi-pie-chart me-2"></i>Reader Segments</h6>
-                </div>
-                <div class="card-body d-flex align-items-center justify-content-center">
-                    <canvas id="orgChart" style="max-height: 250px;"></canvas>
-                </div>
-                <div class="card-footer bg-white border-top-0 pb-4">
-                    <div class="small text-muted text-center fst-italic">
-                        Breakdown by User Type
+  <div class="row g-4 g-lg-4 news-stats-section news-stats-charts align-items-start">
+    <div class="col-lg-8">
+      <div class="news-stats-panel">
+        <div class="news-stats-panel-head">
+          <h2><i class="bi bi-activity"></i>Traffic Trend (Last 7 Days)</h2>
+        </div>
+        <div class="news-stats-panel-body">
+          <div class="news-stats-chart-shell news-stats-chart-shell-line">
+            <canvas id="viewsChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="news-stats-panel">
+        <div class="news-stats-panel-head">
+          <h2><i class="bi bi-pie-chart"></i>Reader Segments</h2>
+        </div>
+        <div class="news-stats-panel-body">
+          <div class="news-stats-chart-shell news-stats-chart-shell-donut">
+            <canvas id="orgChart"></canvas>
+          </div>
+          <p class="news-stats-chart-caption">Breakdown by user type (estimated)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <% if (showViewerList) { %>
+    <section class="news-stats-section" aria-labelledby="newsStatsRecentViewersTitle">
+      <div class="news-stats-panel">
+        <div class="news-stats-panel-head news-stats-panel-head-split">
+          <div>
+            <h2 id="newsStatsRecentViewersTitle"><i class="bi bi-person-lines-fill"></i>Article visits</h2>
+            <p class="news-stats-panel-subtitle">
+              Each row is one time the article URL was opened (newest first).
+              Visibility: <strong><%= visibilityLabel %></strong><% if (visibilityLabel === 'public') { %> — guests and signed-in users are logged.<% } else { %> — includes signed-in readers.<% } %>
+            </p>
+          </div>
+          <span class="news-stats-meta-pill"><%= visitSummaryLabel %></span>
+        </div>
+        <div class="news-stats-panel-body">
+          <% if (viewerRows.length) { %>
+            <ul class="news-stats-viewer-list">
+              <% viewerRows.forEach((viewer) => { %>
+                <li class="news-stats-viewer-row">
+                  <div class="news-stats-viewer-main">
+                    <span class="news-stats-viewer-avatar"><%= (String(viewer.userName || '?').charAt(0) || '?').toUpperCase() %></span>
+                    <div>
+                      <strong class="news-stats-viewer-name"><%= viewer.userName || viewer.userId || 'Guest' %></strong>
+                      <% if (!viewer.isGuest && viewer.userId) { %>
+                        <small class="news-stats-viewer-id"><%= viewer.userId %></small>
+                      <% } %>
                     </div>
-                </div>
-            </div>
+                  </div>
+                  <div class="news-stats-viewer-meta">
+                    <span class="news-stats-viewer-role"><%= viewer.userRoleLabel || viewer.userRole || 'User' %></span>
+                    <time datetime="<%= viewer.viewedAt || '' %>"><%= viewer.viewedAt ? formatOrgDateTime(viewer.viewedAt) : 'View time unavailable' %></time>
+                  </div>
+                </li>
+              <% }) %>
+            </ul>
+            <% if (safeViewerPagination.totalPages > 1) { %>
+              <div class="news-stats-viewer-pagination">
+                <%- include('../partials/pagination', {
+                  pagination: safeViewerPagination,
+                  filters: safeViewerFilters,
+                  baseUrlPath: 'news/manage/stats/' + articleId
+                }) %>
+              </div>
+            <% } %>
+          <% } else { %>
+            <p class="news-stats-empty-note mb-0">No article visits have been recorded yet. Views appear after someone opens the article URL.</p>
+          <% } %>
         </div>
+      </div>
+    </section>
+  <% } %>
+</section>
 
-    </div>
-    
-    </div>
+<%- include('news/partials/newsPublicShellStyles') %>
+
+<style>
+.news-stats-hero {
+  display: grid;
+  gap: clamp(0.75rem, 2vw, 1.25rem);
+  grid-template-areas:
+    "lead lead"
+    "title title"
+    "copy meta";
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: clamp(1.75rem, 4vw, 2.75rem);
+  overflow: visible;
+  position: relative;
+}
+
+.news-stats-hero-lead { grid-area: lead; }
+.news-stats-hero-copy { grid-area: copy; }
+.news-stats-hero-meta {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  grid-area: meta;
+  justify-content: flex-end;
+}
+
+.news-back-link {
+  align-items: center;
+  color: var(--news-blue);
+  display: inline-flex;
+  font-weight: 800;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+  text-decoration: none;
+}
+
+.news-eyebrow {
+  color: var(--news-teal);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.news-stats-hero-title {
+  animation: newsStatsTitleReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  box-sizing: border-box;
+  color: var(--news-ink);
+  direction: ltr;
+  font-size: clamp(2.4rem, 5.5vw, 4.6rem);
+  font-weight: 800;
+  grid-area: title;
+  letter-spacing: -0.07em;
+  line-height: 1.14;
+  margin: 0;
+  margin-left: calc(50% - 50vw);
+  overflow: visible;
+  padding-block: 0.06em 0.2em;
+  padding-inline: calc(50vw - 50%);
+  text-align: left;
+  width: 100vw;
+}
+
+@keyframes newsStatsTitleReveal {
+  from {
+    opacity: 0.25;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.news-stats-report-line {
+  color: var(--news-muted);
+  font-size: clamp(1rem, 1.5vw, 1.15rem);
+  line-height: 1.65;
+  margin: 0;
+  max-width: 52rem;
+}
+
+.news-stats-report-line strong { color: var(--news-ink); }
+
+.news-stats-meta-pill {
+  align-items: center;
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(215, 225, 231, 0.9);
+  border-radius: 999px;
+  color: var(--news-muted);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 700;
+  gap: 0.4rem;
+  padding: 0.55rem 0.85rem;
+}
+
+.news-stats-meta-id {
+  color: var(--news-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.news-hero-orbit { inset: 0; pointer-events: none; position: absolute; }
+.news-hero-orbit span { border: 1px solid rgba(29,95,184,0.16); border-radius: 999px; position: absolute; }
+.news-hero-orbit span:nth-child(1) { height: 240px; right: 4%; top: 0; width: 240px; }
+.news-hero-orbit span:nth-child(2) { height: 140px; right: 16%; top: 18%; width: 140px; }
+.news-hero-orbit span:nth-child(3) { background: rgba(8,127,140,0.10); height: 64px; right: 8%; top: 38%; width: 64px; }
+
+.news-stats-metrics,
+.news-stats-charts {
+  position: relative;
+  z-index: 1;
+}
+
+.news-stats-section {
+  margin-bottom: clamp(1.35rem, 3vw, 2.25rem);
+}
+
+.news-stats-section:last-child {
+  margin-bottom: 0;
+}
+
+.news-stats-metric-card {
+  align-items: center;
+  backdrop-filter: blur(16px);
+  background: var(--news-surface);
+  border: 1px solid rgba(215, 225, 231, 0.82);
+  border-radius: 24px;
+  box-shadow: var(--news-shadow);
+  display: flex;
+  gap: 1rem;
+  height: 100%;
+  padding: 1.15rem 1.2rem;
+}
+
+.news-stats-metric-icon {
+  align-items: center;
+  border-radius: 18px;
+  display: flex;
+  flex-shrink: 0;
+  font-size: 1.35rem;
+  height: 3rem;
+  justify-content: center;
+  width: 3rem;
+}
+
+.news-stats-metric-icon-blue { background: rgba(29, 95, 184, 0.12); color: var(--news-blue); }
+.news-stats-metric-icon-teal { background: rgba(8, 127, 140, 0.12); color: var(--news-teal); }
+.news-stats-metric-icon-amber { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+.news-stats-metric-icon-violet { background: rgba(99, 102, 241, 0.12); color: #4f46e5; }
+
+.news-stats-metric-label {
+  color: var(--news-muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+}
+
+.news-stats-metric-value {
+  color: var(--news-ink);
+  display: block;
+  font-size: clamp(1.65rem, 2.5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.news-stats-metric-value-text { font-size: clamp(1.35rem, 2vw, 1.65rem); }
+
+.news-stats-metric-note {
+  color: var(--news-muted);
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+
+.news-stats-panel {
+  backdrop-filter: blur(16px);
+  background: var(--news-surface);
+  border: 1px solid rgba(215, 225, 231, 0.82);
+  border-radius: 28px;
+  box-shadow: var(--news-shadow);
+  overflow: hidden;
+}
+
+.news-stats-panel-head {
+  border-bottom: 1px solid rgba(215, 225, 231, 0.75);
+  padding: 1rem 1.25rem;
+}
+
+.news-stats-panel-head h2 {
+  align-items: center;
+  color: var(--news-ink);
+  display: flex;
+  font-size: 0.95rem;
+  font-weight: 800;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.news-stats-panel-head i { color: var(--news-teal); }
+
+.news-stats-panel-head-split {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.news-stats-panel-subtitle {
+  color: var(--news-muted);
+  font-size: 0.82rem;
+  margin: 0.35rem 0 0;
+}
+
+.news-stats-viewer-list {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.news-stats-viewer-row {
+  align-items: center;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(215, 225, 231, 0.85);
+  border-radius: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.75rem 0.9rem;
+}
+
+.news-stats-viewer-main {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.news-stats-viewer-avatar {
+  align-items: center;
+  background: linear-gradient(135deg, var(--news-blue), var(--news-teal));
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  height: 2.25rem;
+  justify-content: center;
+  width: 2.25rem;
+}
+
+.news-stats-viewer-name {
+  color: var(--news-ink);
+  display: block;
+  font-size: 0.92rem;
+}
+
+.news-stats-viewer-id {
+  color: var(--news-muted);
+  display: block;
+  font-size: 0.74rem;
+}
+
+.news-stats-viewer-meta {
+  align-items: flex-end;
+  color: var(--news-muted);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  gap: 0.15rem;
+  text-align: right;
+}
+
+.news-stats-viewer-role {
+  background: rgba(8, 127, 140, 0.1);
+  border-radius: 999px;
+  color: var(--news-teal);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.45rem;
+  text-transform: none;
+}
+
+.news-stats-viewer-pagination {
+  margin-top: 1rem;
+}
+
+.news-stats-empty-note {
+  color: var(--news-muted);
+}
+
+.news-stats-panel-body { padding: 1.1rem 1.25rem 1.25rem; }
+
+.news-stats-chart-shell {
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.news-stats-chart-shell-line {
+  height: 300px;
+  max-height: 300px;
+}
+
+.news-stats-chart-shell-donut {
+  height: 260px;
+  max-height: 260px;
+}
+
+.news-stats-chart-shell canvas {
+  display: block;
+  height: 100% !important;
+  max-height: 100%;
+  width: 100% !important;
+}
+
+.news-stats-chart-caption {
+  color: var(--news-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+  margin: 0.85rem 0 0;
+  text-align: center;
+}
+
+@media (max-width: 991.98px) {
+  .news-stats-hero {
+    grid-template-areas:
+      "lead"
+      "title"
+      "copy"
+      "meta";
+    grid-template-columns: 1fr;
+  }
+
+  .news-stats-hero-meta {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .news-stats-page .news-float-orb,
+  .news-stats-hero-title {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}
+</style>
 
 <script id="chartData" type="application/json"><%- JSON.stringify(safeChartData) %></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // Parse the REAL data passed from the controller
     const data = JSON.parse(document.getElementById('chartData').textContent);
+    const newsBlue = '#1d5fb8';
+    const newsTeal = '#087f8c';
 
-    // 1. Traffic Chart (Connected to Real Data)
     const ctxViews = document.getElementById('viewsChart');
-    new Chart(ctxViews, {
-        type: 'line',
-        data: {
-            labels: data.dates, // ["Mon", "Tue"...] from controller
-            datasets: [{
-                label: 'Views',
-                data: data.views, // [5, 12, 0...] from controller
-                borderColor: '#0d6efd',
-                backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                tension: 0.4,
-                fill: true,
-                borderWidth: 2,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: '#0d6efd',
-                pointRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, ticks: { precision: 0 }, grid: { borderDash: [2, 4] } },
-                x: { grid: { display: false } }
+    if (ctxViews) {
+        new Chart(ctxViews, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'Views',
+                    data: data.views,
+                    borderColor: newsBlue,
+                    backgroundColor: 'rgba(29, 95, 184, 0.12)',
+                    tension: 0.4,
+                    fill: true,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: newsBlue,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(215,225,231,0.6)' } },
+                    x: { grid: { display: false }, ticks: { color: '#53636f' } }
+                }
             }
-        }
-    });
+        });
+    }
 
-    // 2. Segments Chart (Mocked for visual balance until user role data is aggregated)
     const ctxOrg = document.getElementById('orgChart');
-    new Chart(ctxOrg, {
-        type: 'doughnut',
-        data: {
-            labels: ['Logged In', 'Guest / Public'],
-            datasets: [{
-                data: [70, 30], 
-                backgroundColor: ['#0d6efd', '#e9ecef'],
-                borderWidth: 0,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
+    if (ctxOrg) {
+        new Chart(ctxOrg, {
+            type: 'doughnut',
+            data: {
+                labels: ['Logged In', 'Guest / Public'],
+                datasets: [{
+                    data: [70, 30],
+                    backgroundColor: [newsBlue, 'rgba(215, 225, 231, 0.85)'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: { padding: { bottom: 8 } },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 10, color: '#53636f', padding: 12, usePointStyle: true }
+                    }
+                }
             }
-        }
-    });
+        });
+    }
 });
 </script>

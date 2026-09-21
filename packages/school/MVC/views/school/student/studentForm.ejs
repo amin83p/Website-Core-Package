@@ -24,6 +24,9 @@
   const initOrganizationLookupJson = JSON.stringify(typeof organizationLookup !== 'undefined' ? (organizationLookup || {}) : {}).replace(/</g, '\\u003c');
   const entityDisplayName = String(typeof personName !== 'undefined' ? personName : '').trim() || 'Student';
   const entityRecordId = String(routeId || s.personId || '').trim();
+  const enrollmentRows = Array.isArray(typeof classEnrollmentRows !== 'undefined' ? classEnrollmentRows : null)
+    ? classEnrollmentRows
+    : [];
 %>
 
 <div class="sections-page">
@@ -63,7 +66,10 @@
         <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">Step 1: Person</button></li>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-financial" type="button">Step 2: Student</button></li>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-programs" type="button">Step 3: Programs</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-documents" type="button">Step 4: Documents</button></li>
+        <% if (isEdit) { %>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-enrollments" type="button">Step 4: Enrollments</button></li>
+        <% } %>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-documents" type="button">Step <%= isEdit ? '5' : '4' %>: Documents</button></li>
       </ul>
 
       <div class="card border-0 shadow-sm mb-4">
@@ -513,6 +519,32 @@
                </div>
            </div>
 
+           <% if (isEdit) { %>
+           <div class="tab-pane fade" id="tab-enrollments">
+             <div class="alert alert-light border shadow-sm mb-3">
+               <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                 <div>
+                   <h6 class="fw-bold mb-2"><i class="bi bi-journal-check me-2"></i>Class enrollment periods</h6>
+                   <p class="small text-muted mb-0">
+                     Read-only list of class enrollment periods for the active organization. Program registration selections are managed on Step 3.
+                   </p>
+                 </div>
+                 <a href="/school/academic-ledger/student-overview/<%= encodeURIComponent(s.id) %>" class="btn btn-outline-primary btn-sm fw-bold">
+                   <i class="bi bi-box-arrow-up-right me-1"></i>Open full registration overview
+                 </a>
+               </div>
+             </div>
+             <div class="card border-0 shadow-sm">
+               <div class="card-header bg-white border-bottom py-3">
+                 <div class="fw-bold"><i class="bi bi-easel me-2"></i>Class Enrollments</div>
+               </div>
+               <div class="card-body p-0">
+                 <%- include('school/partials/studentClassEnrollmentsTable', { classRows: enrollmentRows, showRegistrationDetail: false }) %>
+               </div>
+             </div>
+           </div>
+           <% } %>
+
            <div class="tab-pane fade" id="tab-documents">
                <div class="alert alert-light border shadow-sm">
                    <h6 class="fw-bold mb-2"><i class="bi bi-paperclip me-2"></i>Attached Documents</h6>
@@ -716,7 +748,9 @@
 
   const newWrap = document.getElementById('newFilesWrap');
   const newTbody = document.getElementById('newFilesTbody');
-  const wizardTabTargets = ['#tab-general', '#tab-financial', '#tab-programs', '#tab-documents'];
+  const wizardTabTargets = <%- isEdit
+    ? JSON.stringify(['#tab-general', '#tab-financial', '#tab-programs', '#tab-enrollments', '#tab-documents'])
+    : JSON.stringify(['#tab-general', '#tab-financial', '#tab-programs', '#tab-documents']) %>;
   const btnWizardPrev = document.getElementById('btnWizardPrev');
   const btnWizardNext = document.getElementById('btnWizardNext');
   const btnWizardSubmit = document.getElementById('btnWizardSubmit');

@@ -261,9 +261,11 @@ test('layout and print.js load shared print manager between builder and print sc
 
 test('print settings modal is shared outside tablePages-start', () => {
   const partial = read('MVC/views/partials/tablePages-start.ejs');
+  const printRefs = read('MVC/views/partials/printContextRefs.ejs');
   const modal = read('MVC/views/partials/printSettingsModal.ejs');
-  assert.match(partial, /id="printBrandLogoRef"/);
-  assert.match(partial, /printLogoUrl/);
+  assert.match(partial, /include\('printContextRefs'\)/);
+  assert.match(printRefs, /id="printBrandLogoRef"/);
+  assert.match(printRefs, /printLogoUrl/);
   assert.doesNotMatch(partial, /id="printSettingsModal"/);
   assert.match(modal, /id="printSettingsModal"/);
   assert.match(modal, /id="printSettingOrientation"/);

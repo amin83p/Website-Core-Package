@@ -3,6 +3,7 @@ const dataService = require('../services/dataService');
 const bcrypt = require('bcryptjs');
 const adminTotpService = require('../services/adminTotpService');
 const adminAuthorityService = require('../services/adminAuthorityService');
+const microsoftAuthService = require('../services/microsoftAuthService');
 const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { buildDataServiceQuery } = require('../utils/generalTools');
@@ -93,6 +94,9 @@ async function showProfile(req, res) {
             person: person,
             accessDefinitions: accessDefinitions,
             includeModal: true,
+            includePrintManager: true,
+            includeUserAccountPrintHandout: true,
+            microsoftAuthEnabled: microsoftAuthService.isEnabled(),
             actionStateId: req.actionStateId
         });
 

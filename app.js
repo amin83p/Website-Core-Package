@@ -57,6 +57,7 @@ const sessionEnforcement = require('./MVC/middleware/sessionEnforcement');
 const requestRatePhaseOne = require('./MVC/middleware/requestRateMonitor');
 const settingService = require('./MVC/services/settingService'); // Import Setting Service
 const appBrandingService = require('./MVC/services/appBrandingService');
+const appPublicUrlService = require('./MVC/services/appPublicUrlService');
 const smsProviderService = require('./MVC/services/sms/smsProviderService');
 const adminAuthorityService = require('./MVC/services/adminAuthorityService');
 const { registerCoreEntityQueryExecutors } = require('./MVC/models/queryExecutorBootstrap');
@@ -505,6 +506,7 @@ app.use(requestPerfTracer.wrapMiddleware('chat-access-locals', chatAccessLocals)
 app.use(requestPerfTracer.wrapMiddleware('scheduled-task-manager-locals', scheduledTaskManagerLocals));
 app.use(requestPerfTracer.wrapMiddleware('app-locals', (req, res, next) => {
   res.locals.appBrand = appBrandingService.getBrand();
+  res.locals.publicSiteUrl = appPublicUrlService.resolvePublicSiteUrl({ req });
   res.locals.appContact = appBrandingService.getContact();
   res.locals.appContactPage = appBrandingService.getContactPage();
   res.locals.publicMenu = appBrandingService.getPublicMenu(req.user || null);

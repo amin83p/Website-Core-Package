@@ -6,6 +6,7 @@ const organizationRepository = require('../repositories/organizationRepository')
 const securityService = require('../services/security');
 const bcrypt = require('bcrypt');
 const adminAuthorityService = require('../services/adminAuthorityService');
+const microsoftAuthService = require('../services/microsoftAuthService');
 const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
 const { hardRevokeAuthContextForUser } = require('../services/cache/authContextInvalidationService');
 
@@ -439,6 +440,8 @@ async function showEditUserForm(req, res) {
     res.render('user/userForm', {
       title: 'Edit User',
       includeModal: true,
+      includePrintManager: true,
+      includeUserAccountPrintHandout: true,
       userItem,
       person: {
         id: personsItem.id,
@@ -449,6 +452,7 @@ async function showEditUserForm(req, res) {
       scopeDefinitions,
       user: req.user || null,
       actionStateId: req.actionStateId,
+      microsoftAuthEnabled: microsoftAuthService.isEnabled(),
       
       // ✅ Allow View to render the special field
       isSystemAdmin: canAssignSystem

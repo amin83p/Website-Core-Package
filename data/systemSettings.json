@@ -65,15 +65,15 @@
     "brand": {
       "appName": "EQUALIZER",
       "appShortName": "EQZ",
-      "tagline": "Equilibrium School",
+      "tagline": "EQUALIZER Platform",
       "logoUrl": "/uploads/GLOBAL/logo/Logo1.png",
       "iconSvgUrl": "/uploads/GLOBAL/logo/Logo.svg",
       "appleTouchIconUrl": "/uploads/GLOBAL/logo/Logo1.png",
       "themeColor": "#ffffff",
-      "ownerDisplayName": "Amin Paknejad",
+      "ownerDisplayName": "Equilibrium School",
       "footerAboutTitle": "About Equalizer App",
       "footerAboutText": "<b>Equilibrium School</b>, is a non-profit institution that has been serving our community since 1993. Equilibrium is an educational centre that promotes global education and intercultural understanding through the interaction of diverse groups of people of all ages. Equilibrium School offers a wide range of courses to prepare students for life, college, university, and technical and business institutes. ",
-      "footerLogoAlt": "Amin Paknejad",
+      "footerLogoAlt": "Equilibrium School",
       "footerShowNewsletter": true,
       "instagramUrl": "https://www.instagram.com/equilibriumyyc/?hl=en",
       "facebookUrl": "http://www.facebook.com/EquilibriumSchool",
@@ -292,6 +292,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-09-18T02:46:08.979Z"
+    "lastUpdateDateTime": "2026-09-20T21:13:38.491Z"
   }
 }

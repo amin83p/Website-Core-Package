@@ -237,6 +237,9 @@
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/appPrintManager.js') : '/scripts/appPrintManager.js' %>"></script>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/print.js') : '/scripts/print.js' %>"></script>
   <% } %>
+  <% if (typeof includeUserAccountPrintHandout !== 'undefined' && includeUserAccountPrintHandout) { %>
+    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/userAccountPrintHandout.js') : '/scripts/userAccountPrintHandout.js' %>"></script>
+  <% } %>
   
   <% if (typeof includeModal_FileImport !== 'undefined' && includeModal_FileImport!== null && includeModal_FileImport) { %>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/modal_FileImport.js') : '/scripts/modal_FileImport.js' %>"></script>

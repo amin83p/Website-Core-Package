@@ -1,0 +1,73 @@
+<%
+  const rows = Array.isArray(classRows) ? classRows : [];
+  const registrationDetail = showRegistrationDetail === true;
+%>
+<div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th class="ps-3">Class</th>
+        <th>Subject</th>
+        <th>Program / Term</th>
+        <th>Enrollment Period</th>
+        <th>Status</th>
+        <th>Enrollment ID</th>
+        <th class="pe-3">Registration</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!rows.length) { %>
+        <tr><td colspan="7" class="text-center text-muted py-4">No class enrollments found for this student.</td></tr>
+      <% } %>
+      <% rows.forEach(function(row) { %>
+        <tr class="overview-row-link" data-href="<%= row.editUrl %>">
+          <td class="ps-3">
+            <div class="fw-bold">
+              <% if (row.editUrl) { %>
+                <a href="<%= row.editUrl %>" class="text-decoration-none"><%= row.classTitle || row.classId %></a>
+              <% } else { %>
+                <%= row.classTitle || row.classId %>
+              <% } %>
+            </div>
+            <div class="small text-muted font-monospace"><%= row.classId || '-' %></div>
+          </td>
+          <td><%= row.subjectLabel || '-' %></td>
+          <td>
+            <div><%= row.programLabel || row.programId || '-' %></div>
+            <div class="small text-muted"><%= row.termLabel || row.termId || '-' %></div>
+          </td>
+          <td class="small"><%= row.startDate || '-' %> to <%= row.endDate || '-' %></td>
+          <td><span class="badge bg-secondary-subtle text-secondary-emphasis border"><%= row.status || '-' %></span></td>
+          <td class="font-monospace small"><%= row.enrollmentId || '-' %></td>
+          <td class="font-monospace small pe-3">
+            <% if (registrationDetail && row.detailApiUrl) { %>
+              <div
+                class="registration-detail-trigger"
+                role="button"
+                tabindex="0"
+                data-detail-url="<%= row.detailApiUrl %>"
+                data-registration-type="<%= row.registrationType || 'class_enrollment' %>"
+                data-registration-label="<%= row.registrationLabel || 'Registration' %>"
+                aria-label="View <%= row.registrationLabel || 'registration' %> details"
+              >
+                <span class="badge <%= row.registrationType === 'term_registration' ? 'bg-info-subtle text-info-emphasis' : 'bg-primary-subtle text-primary-emphasis' %> border mb-1">
+                  <%= row.registrationLabel || 'Registration' %>
+                </span>
+                <div class="fw-semibold text-primary"><%= row.registrationId || row.enrollmentId || '-' %></div>
+                <div class="text-muted x-small"><%= row.registrationSummary || '-' %></div>
+              </div>
+            <% } else if (!registrationDetail && (row.registrationLabel || row.registrationSummary || row.registrationId)) { %>
+              <span class="badge <%= row.registrationType === 'term_registration' ? 'bg-info-subtle text-info-emphasis' : 'bg-primary-subtle text-primary-emphasis' %> border mb-1">
+                <%= row.registrationLabel || 'Registration' %>
+              </span>
+              <div class="small"><%= row.registrationId || row.enrollmentId || '-' %></div>
+              <div class="text-muted x-small"><%= row.registrationSummary || '-' %></div>
+            <% } else { %>
+              -
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

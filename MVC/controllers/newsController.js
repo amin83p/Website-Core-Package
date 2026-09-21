@@ -8,6 +8,9 @@ const { buildDataServiceQuery } = require('../utils/generalTools');
 const uploadMiddleware = require('../middleware/upload');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const settingService = require('../services/settingService');
+const paginate = require('../utils/paginationHelper');
+
+const MAX_ARTICLE_VISIT_PAGE_LIMIT = 100;
 
 const NEWS_ADMIN_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: [
@@ -625,6 +628,111 @@ async function showCenter(req, res) {
     }
 }
 
+function resolveUserDisplayName(userRow) {
+    if (!userRow || typeof userRow !== 'object') return '';
+    const displayName = String(userRow.displayName || userRow.identity?.displayName || '').trim();
+    if (displayName) return displayName;
+    if (userRow.name && typeof userRow.name === 'object') {
+        const fromName = [userRow.name.first, userRow.name.last].filter(Boolean).join(' ').trim();
+        if (fromName) return fromName;
+    }
+    if (typeof userRow.name === 'string') {
+        const asString = userRow.name.trim();
+        if (asString) return asString;
+    }
+    return String(userRow.username || userRow.email || '').trim();
+}
+
+function formatVisitRoleLabel(role) {
+    const raw = String(role || 'user').trim().toLowerCase();
+    if (raw === 'guest') return 'Guest';
+    return raw
+        .split('_')
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+function buildArticleVisitLogPage(analytics, query = {}) {
+    const logs = Array.isArray(analytics) ? analytics : [];
+    let limit = Number.parseInt(query.limit, 10);
+    if (!Number.isFinite(limit) || limit <= 0) {
+        limit = Number.parseInt(settingService.getValue('app', 'defaultPageSize'), 10) || 20;
+    }
+    limit = Math.min(Math.max(limit, 1), MAX_ARTICLE_VISIT_PAGE_LIMIT);
+    const page = Number.parseInt(query.page, 10) || 1;
+
+    const rows = logs.map((log, index) => {
+        const entry = log && typeof log === 'object' ? log : {};
+        const userIdRaw = entry.userId;
+        const userId = userIdRaw != null && String(userIdRaw).trim() !== '' ? String(userIdRaw).trim() : null;
+        const viewedAt = entry.timestamp || entry.viewedAt || '';
+        const isGuest = !userId;
+        return {
+            userId: userId || '',
+            userName: isGuest ? 'Guest' : String(entry.userName || entry.displayName || '').trim(),
+            userRole: isGuest ? 'guest' : String(entry.userRole || 'user').trim(),
+            userRoleLabel: isGuest ? 'Guest' : formatVisitRoleLabel(entry.userRole || 'user'),
+            viewedAt,
+            orgId: entry.orgId != null ? String(entry.orgId) : '',
+            isGuest,
+            _sortTime: viewedAt ? Date.parse(viewedAt) : 0,
+            _index: index
+        };
+    });
+
+    rows.sort((a, b) => {
+        if (b._sortTime !== a._sortTime) return b._sortTime - a._sortTime;
+        return b._index - a._index;
+    });
+
+    const cleaned = rows.map(({ _sortTime, _index, ...rest }) => rest);
+    const paged = paginate(cleaned, { page, limit });
+    return {
+        rows: paged.data,
+        pagination: paged.pagination,
+        filters: { page: paged.pagination.currentPage, limit: paged.pagination.limit }
+    };
+}
+
+async function enrichVisitLogNames(rows, actor) {
+    const list = Array.isArray(rows) ? rows : [];
+    const userCache = new Map();
+    const enriched = [];
+
+    for (const row of list) {
+        if (row.isGuest || !row.userId) {
+            enriched.push({
+                ...row,
+                userName: 'Guest',
+                userRoleLabel: formatVisitRoleLabel('guest')
+            });
+            continue;
+        }
+
+        let userName = String(row.userName || '').trim();
+        if (!userName) {
+            if (!userCache.has(row.userId)) {
+                try {
+                    const userRow = await dataService.getDataById('users', row.userId, actor);
+                    userCache.set(row.userId, resolveUserDisplayName(userRow) || row.userId);
+                } catch (_) {
+                    userCache.set(row.userId, row.userId);
+                }
+            }
+            userName = userCache.get(row.userId);
+        }
+
+        enriched.push({
+            ...row,
+            userName: userName || row.userId,
+            userRoleLabel: formatVisitRoleLabel(row.userRole)
+        });
+    }
+
+    return enriched;
+}
+
 async function showStats(req, res) {
     try {
         const id = req.params.id;
@@ -635,6 +743,7 @@ async function showStats(req, res) {
 
         // --- Data Logic ---
         const totalViews = Math.max(0, Number(item.metrics && item.metrics.views ? item.metrics.views : 0) || 0);
+        const visibility = String(item.visibility || 'public').trim().toLowerCase();
         
         // 1. Calculate History (Last 7 Days)
         // Note: Ideally you use real dates from item.analytics. 
@@ -690,12 +799,23 @@ async function showStats(req, res) {
             wordCount: wordCount     // ✅ NEW: Real Value
         };
 
+        const visitLogPage = buildArticleVisitLogPage(logs, req.query);
+        const recentViewers = await enrichVisitLogNames(visitLogPage.rows, req.user);
+
         res.render('news/stats', {
             title: 'News Analytics',
             article: item,
             stats,
             chartData,
-            user: req.user
+            showRecentViewers: true,
+            recentViewers,
+            viewerPagination: visitLogPage.pagination,
+            viewerFilters: visitLogPage.filters,
+            articleVisibility: visibility,
+            user: req.user,
+            htmlClass: 'news-public-root',
+            bodyClass: 'news-public-body public-zoom-centered-body',
+            mainClass: 'container news-public-main'
         });
 
     } catch (error) {
@@ -752,5 +872,8 @@ module.exports = {
     deleteNews,
     showStats,
     uploadMedia,
-    listNewsMediaLibrary
+    listNewsMediaLibrary,
+    buildArticleVisitLogPage,
+    formatVisitRoleLabel,
+    resolveUserDisplayName
 };

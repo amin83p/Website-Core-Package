@@ -1,22 +1,75 @@
 <%
   const u = user || {}; 
-  // Access Defs for lookup (for displaying profile names)
   const accessDefs = typeof accessDefinitions !== 'undefined' ? accessDefinitions : [];
-  
-  // Person Data (Safe Access)
   const pData = (typeof person !== 'undefined' ? person : null) || { id: u.personId || '', name: { first: 'N/A', last: '' } };
 
-  // Helper to find profile name
   const getProfileName = (id) => {
       const found = accessDefs.find(a => String(a.id) === String(id));
       return found ? found.name : id;
   };
+
+  const formatTokenLabel = (token) => {
+    const raw = String(token || '').trim().toLowerCase();
+    if (!raw) return '—';
+    const known = {
+      pending: 'Pending',
+      active: 'Active',
+      suspended: 'Suspended',
+      deleted: 'Deleted',
+      member: 'Member',
+      admin: 'Admin',
+      owner: 'Owner',
+      school_teacher: 'Teacher',
+      school_student: 'Student',
+      school_staff: 'Staff',
+      school_funder: 'Funder',
+      pte_student: 'PTE Student',
+      pte_teacher: 'PTE Teacher',
+      pte_instructor: 'PTE Instructor',
+      pte_trainer: 'PTE Trainer',
+      credit_customer: 'Credit Customer'
+    };
+    if (known[raw]) return known[raw];
+    return raw
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
+
+  let linkedPersonName = 'N/A';
+  if (pData && pData.name) {
+    linkedPersonName = [pData.name.first, pData.name.last].filter(Boolean).join(' ').trim() || 'N/A';
+  }
+
+  const printBrandMeta = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+  const configuredSiteBase = (typeof publicSiteUrl !== 'undefined' && publicSiteUrl)
+    ? String(publicSiteUrl).trim().replace(/\/$/, '')
+    : '';
+  const accountStatusLabel = formatTokenLabel(u.status || 'pending');
 %>
 
 <div class="sections-page">
-  <div class="d-flex align-items-center justify-content-between mb-4">
-    <h1 class="page-heading size-md m-0">My Profile</h1>
-    <span class="badge bg-secondary border">User ID: <%= u.id %></span>
+  <div id="profilePrintContext" hidden>
+    <%- include('../partials/printContextRefs') %>
+  </div>
+  <script type="application/json" id="initUserAccountPrint"><%- JSON.stringify({
+    userId: u.id,
+    appName: printBrandMeta.appName || 'Application',
+    personName: linkedPersonName,
+    siteBase: configuredSiteBase,
+    statusLabel: accountStatusLabel,
+    microsoftAuthEnabled: typeof microsoftAuthEnabled !== 'undefined' && !!microsoftAuthEnabled
+  }) %></script>
+
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-3 min-w-0 flex-wrap">
+      <h1 class="page-heading size-md m-0">My Profile</h1>
+      <span class="badge bg-secondary border">User ID: <%= u.id %></span>
+    </div>
+    <button type="button" class="btn btn-outline-secondary btn-md" id="btnPrintUserAccount" title="Print account handout">
+      <i class="bi bi-printer me-1"></i>Print account info
+    </button>
   </div>
 
   <div class="form-container wide" style="width: 100%; max-width: 1400px;">
@@ -28,7 +81,7 @@
       <script type="application/json" id="initPersonOrgs"><%- JSON.stringify(pData.organizations || []) %></script>
       <script type="application/json" id="initAccessDefs"><%- JSON.stringify(accessDefs) %></script>
 
-      <ul class="nav nav-tabs mb-3" role="tablist">
+      <ul class="nav nav-tabs mb-4" role="tablist">
         <li class="nav-item">
             <button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-account" type="button">
                 <i class="bi bi-person-gear me-1"></i> Account Settings
@@ -52,19 +105,19 @@
           <div class="card border-0 bg-light p-3 mb-3">
               <div class="row g-3">
                 <div class="col-md-7">
-                  <label class="form-label fw-bold">Email Address</label>
+                  <label class="form-label small fw-bold text-muted">Email Address</label>
                   <input type="email" name="email" class="form-control size-md" value="<%= u.email || '' %>" required>
                   <div class="form-text">This email is used for login and system tasks.</div>
                 </div>
                 <div class="col-md-5">
-                  <label class="form-label fw-bold">Username</label>
+                  <label class="form-label small fw-bold text-muted">Username</label>
                   <input type="text" name="username" class="form-control size-md" value="<%= u.username || '' %>">
                 </div>
               </div>
           </div>
 
           <div class="card border-0 bg-light p-3 mb-3">
-              <label class="form-label fw-bold">Change Password</label>
+              <label class="form-label small fw-bold text-muted">Change Password</label>
               <div class="input-group">
                   <span class="input-group-text bg-white border-end-0"><i class="bi bi-key"></i></span>
                   <input type="password" name="password" class="form-control size-md border-start-0" autocomplete="new-password" placeholder="Leave empty to keep current password">
@@ -85,16 +138,17 @@
         </div>
 
         <div class="tab-pane fade" id="tab-orgs">
-          <div class="mb-4">
-            <label class="form-label text-muted small fw-bold">Linked Identity</label>
-            <% 
-               let initialPersonName = 'N/A';
-               if(pData && pData.name) {
-                   initialPersonName = (pData.name.first || '') + ' ' + (pData.name.last || '');
-               }
-               if(u.personId) initialPersonName += ` (ID: ${u.personId})`;
-            %>
-            <input type="text" class="form-control bg-white" readonly value="<%= initialPersonName %>">
+          <div class="user-settings-picker-panel mb-4">
+            <div class="user-settings-picker-main">
+              <div class="user-settings-picker-icon" aria-hidden="true">
+                <i class="bi bi-person-vcard"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="form-label small fw-bold text-muted mb-1">Linked Identity</div>
+                <div class="fw-bold text-truncate"><%= linkedPersonName %></div>
+                <div class="small text-muted font-monospace"><%= u.personId ? ('Person ID: ' + u.personId) : 'No person linked' %></div>
+              </div>
+            </div>
           </div>
 
           <label class="form-label mb-2 fw-bold text-primary">Your Memberships</label>
@@ -103,7 +157,8 @@
                 <thead class="table-light">
                     <tr>
                         <th>Organization</th>
-                        <th>Role / Status</th>
+                        <th>Roles</th>
+                        <th>Membership</th>
                         <th>Assigned Profile</th>
                     </tr>
                 </thead>
@@ -113,7 +168,7 @@
           </div>
 
           <div class="card bg-light border-0 p-3">
-            <label class="form-label fw-bold">Default Dashboard Context</label>
+            <label class="form-label small fw-bold text-muted">Default Dashboard Context</label>
             <select name="primaryOrgId" id="primaryOrgSelect" class="form-select size-md">
                <option value="">Auto / First Organization</option>
             </select>
@@ -124,28 +179,38 @@
         <div class="tab-pane fade" id="tab-status">
           <div class="row g-3 mb-3">
             <div class="col-md-6">
-              <label class="form-label text-muted small">Current Status</label>
-              <input type="text" class="form-control" disabled value="<%= (u.status || 'Pending').toUpperCase() %>">
+              <label class="form-label small fw-bold text-muted">Current Status</label>
+              <div class="p-3 border rounded bg-white">
+                <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle fs-6"><%= accountStatusLabel %></span>
+              </div>
             </div>
             <div class="col-md-6">
-               <label class="form-label text-muted small">Access Level</label>
-               <input type="text" class="form-control" disabled value="<%= u.accessLevel ?? 1 %>">
+               <label class="form-label small fw-bold text-muted">Access Level</label>
+               <div class="p-3 border rounded bg-white fw-semibold"><%= u.accessLevel ?? 1 %></div>
             </div>
           </div>
           <div class="row g-3">
              <div class="col-md-6">
                 <div class="card p-3 h-100 bg-light border-0">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" disabled <%= u.active ? 'checked' : '' %>>
-                        <label class="form-check-label fw-bold">Account Active</label>
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span class="fw-bold">Account Active</span>
+                        <% if (u.active) { %>
+                          <span class="badge bg-success">Active</span>
+                        <% } else { %>
+                          <span class="badge bg-secondary">Inactive</span>
+                        <% } %>
                     </div>
                 </div>
              </div>
              <div class="col-md-6">
                 <div class="card p-3 h-100 bg-light border-0">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" disabled <%= u.isEmailVerified ? 'checked' : '' %>>
-                        <label class="form-check-label fw-bold">Email Verified</label>
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span class="fw-bold">Email Verified</span>
+                        <% if (u.isEmailVerified) { %>
+                          <span class="badge bg-success">Verified</span>
+                        <% } else { %>
+                          <span class="badge bg-warning text-dark">Not verified</span>
+                        <% } %>
                     </div>
                 </div>
              </div>
@@ -154,9 +219,9 @@
 
       </div>
 
-      <div class="button-row mt-4 pt-3 border-top">
-        <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-save me-1"></i> Update Profile</button>
-        <a href="/dashboard" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      <div class="button-row mt-4 pt-3 border-top d-flex gap-2">
+        <button type="submit" class="btn btn-filled btn-primary btn-md px-4"><i class="bi bi-save me-2"></i>Update Profile</button>
+        <a href="/dashboard" class="btn btn-filled btn-secondary btn-md px-4">Cancel</a>
       </div>
     </form>
   </div>
@@ -164,15 +229,55 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // DATA INIT
+  const ROLE_LABELS = {
+    pending: 'Pending',
+    active: 'Active',
+    suspended: 'Suspended',
+    deleted: 'Deleted',
+    member: 'Member',
+    admin: 'Admin',
+    owner: 'Owner',
+    school_teacher: 'Teacher',
+    school_student: 'Student',
+    school_staff: 'Staff',
+    school_funder: 'Funder',
+    pte_student: 'PTE Student',
+    pte_teacher: 'PTE Teacher',
+    pte_instructor: 'PTE Instructor',
+    pte_trainer: 'PTE Trainer',
+    credit_customer: 'Credit Customer'
+  };
+
+  function formatMembershipLabel(token) {
+    const raw = String(token || '').trim().toLowerCase();
+    if (!raw) return '—';
+    if (ROLE_LABELS[raw]) return ROLE_LABELS[raw];
+    return raw
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  function formatMemberStatusLabel(status) {
+    return formatMembershipLabel(status);
+  }
+
+  function memberStatusBadgeClass(status) {
+    const raw = String(status || '').trim().toLowerCase();
+    if (raw === 'active') return 'bg-success';
+    if (raw === 'pending') return 'bg-warning text-dark';
+    if (raw === 'suspended' || raw === 'deleted') return 'bg-danger';
+    return 'bg-secondary';
+  }
+
   const userOrgs = JSON.parse(document.getElementById('initUserOrgs').textContent || '[]');
   const personOrgs = JSON.parse(document.getElementById('initPersonOrgs').textContent || '[]'); 
   const accessDefs = JSON.parse(document.getElementById('initAccessDefs').textContent || '[]');
   const accessMap = new Map(accessDefs.map(a => [a.id, a]));
 
-  // Merge Data (Read-Only Logic)
   let currentOrgsState = personOrgs.map(pOrg => {
-      const existingConfig = userOrgs.find(u => Number(u.orgId) === Number(pOrg.orgId));
+      const existingConfig = userOrgs.find(uo => Number(uo.orgId) === Number(pOrg.orgId));
       return {
           orgId: pOrg.orgId,
           name: pOrg.name || ('Org ' + pOrg.orgId),
@@ -183,7 +288,6 @@ document.addEventListener('DOMContentLoaded', () => {
       };
   });
 
-  // Render Org Table (View Only - No Buttons)
   const orgTableBody = document.getElementById('orgConfigBody');
   const primarySelect = document.getElementById('primaryOrgSelect');
   const currentPrimary = "<%= u.primaryOrgId || '' %>";
@@ -193,19 +297,17 @@ document.addEventListener('DOMContentLoaded', () => {
       primarySelect.innerHTML = '<option value="">Auto / First Organization</option>';
       
       if (currentOrgsState.length === 0) {
-          orgTableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">No organizations found.</td></tr>';
+          orgTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No organizations found.</td></tr>';
           return;
       }
 
       currentOrgsState.forEach((org) => {
-          // Update Select
           const opt = document.createElement('option');
           opt.value = org.orgId;
           opt.textContent = `${org.name} (#${org.orgId})`;
           if(String(org.orgId) === String(currentPrimary)) opt.selected = true;
           primarySelect.appendChild(opt);
 
-          // Render Row
           const tr = document.createElement('tr');
           
           let profilesHtml = '<span class="text-muted small">None</span>';
@@ -213,20 +315,27 @@ document.addEventListener('DOMContentLoaded', () => {
              profilesHtml = org.accessProfileIds.map((pid) => {
                  const profile = accessMap.get(pid);
                  if (profile) {
-                     return `<span class="badge bg-info text-dark me-1"><i class="bi bi-shield-lock me-1"></i>${profile.name}</span>`;
+                     return `<span class="badge bg-info text-dark me-1 mb-1"><i class="bi bi-shield-lock me-1"></i>${profile.name}</span>`;
                  }
-                 return `<span class="badge bg-secondary me-1">${pid}</span>`;
+                 return `<span class="badge bg-secondary me-1 mb-1">${pid}</span>`;
              }).join('');
           }
+
+          const roles = (Array.isArray(org.roles) && org.roles.length ? org.roles : [org.role || 'member']);
+          const rolesHtml = roles.map((role) =>
+            `<span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle me-1 mb-1"><i class="bi bi-person-badge me-1"></i>${formatMembershipLabel(role)}</span>`
+          ).join('');
+          const statusLabel = formatMemberStatusLabel(org.memberStatus);
+          const statusClass = memberStatusBadgeClass(org.memberStatus);
 
           tr.innerHTML = `
              <td>
                 <div class="fw-bold text-dark">${org.name}</div>
-                <div class="text-muted x-small">ID: ${org.orgId}</div>
+                <div class="text-muted small">ID: ${org.orgId}</div>
              </td>
+             <td>${rolesHtml || '<span class="text-muted small">—</span>'}</td>
              <td>
-                <div class="small">${(Array.isArray(org.roles) && org.roles.length ? org.roles : [org.role || 'member']).map((role) => `<span class="badge bg-light text-dark border me-1">${role}</span>`).join('')}</div>
-                <span class="badge bg-light text-secondary border">${org.memberStatus}</span>
+                <span class="badge ${statusClass}">${statusLabel}</span>
              </td>
              <td>${profilesHtml}</td>
           `;
@@ -236,12 +345,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   renderOrgTable();
 
-  // Form Submit
   const form = document.getElementById('profileForm');
   form.addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      // Basic UI Feedback
       const btn = form.querySelector('button[type="submit"]');
       const originalText = btn.innerHTML;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
@@ -260,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if(typeof showMessageModal === 'function') {
              await showMessageModal({ title: 'Profile Updated', icon: 'success', message: result.message, buttons: [{ text: 'OK', class: 'btn-success' }] });
           } else { alert('Saved!'); }
-          window.location ='/dashboard';//.reload();
+          window.location ='/dashboard';
         } else {
            if(typeof showMessageModal === 'function') {
              await showMessageModal({ title: 'Error', icon: 'error', message: result.message, buttons: [{ text: 'OK', class: 'btn-danger' }] });
@@ -274,5 +381,17 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.disabled = false;
       }
   });
+
+  const userAccountPrintInitEl = document.getElementById('initUserAccountPrint');
+  if (userAccountPrintInitEl && window.UserAccountPrintHandout) {
+    document.getElementById('btnPrintUserAccount')?.addEventListener('click', () => {
+      window.UserAccountPrintHandout.openAccountPrintPreview({
+        form,
+        initEl: userAccountPrintInitEl,
+        sourcePath: location.pathname,
+        view: 'my-profile'
+      });
+    });
+  }
 });
 </script>
