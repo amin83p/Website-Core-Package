@@ -3158,7 +3158,16 @@ async function validateTemplateDocxSnapshotTokens(template) {
     results.push(await inspectTemplateDocxSnapshotCompliance(template, target));
   }
   const errorText = formatSnapshotComplianceError(results);
-  if (errorText) throw new Error(errorText);
+  if (errorText) {
+    const err = new Error(errorText);
+    err.code = 'SNAPSHOT_DOCX_COMPLIANCE';
+    err.compliance = {
+      ok: false,
+      snapshotConfigured: true,
+      results: results.filter((row) => row && row.ok === false && !row.skipped)
+    };
+    throw err;
+  }
   return { ok: true, disallowed: [] };
 }
 

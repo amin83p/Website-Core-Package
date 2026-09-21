@@ -689,7 +689,17 @@ async function saveTemplate(req, res) {
     }
     res.redirect('/school/reports/templates');
   } catch (error) {
-    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    if (isAjax(req)) {
+      if (error?.code === 'SNAPSHOT_DOCX_COMPLIANCE' && error.compliance) {
+        return res.status(400).json({
+          status: 'error',
+          errorCode: error.code,
+          message: error.message,
+          compliance: error.compliance
+        });
+      }
+      return res.status(400).json({ status: 'error', message: error.message });
+    }
     res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
   }
 }

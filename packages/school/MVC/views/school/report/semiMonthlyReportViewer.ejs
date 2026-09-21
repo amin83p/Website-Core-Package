@@ -253,6 +253,7 @@
 <%- include('partials/modal_GenericPicker') %>
 <%- include('school/partials/modal_SchoolEntityPicker') %>
 <%- include('partials/tablePages-end') %>
+<%- include('partials/reportMessageHelpers') %>
 
 <script>
 (function () {
@@ -480,20 +481,28 @@
 
   async function showReportMessage({ title = 'School Semi-Monthly Report', icon = 'info', message = '' } = {}) {
     const safeMessage = String(message || '').trim() || 'Operation could not be completed.';
+    const docxHtml = icon === 'error' && window.ReportMessaging?.buildDocxExportCancelledModalHtml
+      ? window.ReportMessaging.buildDocxExportCancelledModalHtml(safeMessage)
+      : null;
+    const exportFailed = Boolean(docxHtml);
     if (window.ReportMessaging?.showReportMessage) {
       return window.ReportMessaging.showReportMessage({
-        title,
+        title: exportFailed ? 'DOCX Export Failed' : title,
         icon,
-        message: safeMessage,
-        buttonClass: icon === 'error' ? 'btn-danger' : 'btn-primary'
+        message: docxHtml || safeMessage,
+        html: exportFailed,
+        size: exportFailed ? 'lg' : 'md',
+        buttonClass: icon === 'error' ? (exportFailed ? 'btn-warning' : 'btn-danger') : 'btn-primary'
       });
     }
     if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
       return window.showMessageModal({
-        title,
+        title: exportFailed ? 'DOCX Export Failed' : title,
         icon,
-        message: safeMessage,
-        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+        message: docxHtml || safeMessage,
+        html: Boolean(docxHtml),
+        size: exportFailed ? 'lg' : 'md',
+        buttons: [{ text: 'OK', class: icon === 'error' ? (exportFailed ? 'btn-warning' : 'btn-danger') : 'btn-primary' }]
       });
     }
     console.error('Message modal is unavailable on this page.');

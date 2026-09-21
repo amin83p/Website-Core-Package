@@ -3485,6 +3485,22 @@ num(value) <= 95</code></pre>
         let result = null;
         try { result = await response.json(); } catch (_) { result = null; }
         if (!response.ok || result?.status !== 'success') {
+          if (result?.errorCode === 'SNAPSHOT_DOCX_COMPLIANCE' && result?.compliance && window.ReportMessaging?.buildSnapshotComplianceSaveFailureModalHtml) {
+            await showReportModal({
+              title: 'Save Failed — Word Placeholders',
+              icon: 'warning',
+              message: window.ReportMessaging.buildSnapshotComplianceSaveFailureModalHtml(result.compliance, {
+                skippedReason: 'Add keys under Lock Snapshot Keys before checking templates.',
+                passLineSuffix: 'only uses Lock Snapshot Keys and shortcuts',
+                failureIntro: 'Placeholders not listed under Lock Snapshot Keys (or shortcuts):',
+                tokenFixHint: 'Fix: remove each placeholder from the Word file, or add its key under Lock Snapshot Keys and use the canonical key or DOCX shortcut in the document.'
+              }),
+              html: true,
+              size: 'lg',
+              buttonClass: 'btn-warning'
+            });
+            return;
+          }
           const reason = String(result?.message || `Save failed (HTTP ${response.status}).`).trim();
           await showReportModal({ title: 'Save Failed', icon: 'error', message: reason, buttonClass: 'btn-danger' });
           return;

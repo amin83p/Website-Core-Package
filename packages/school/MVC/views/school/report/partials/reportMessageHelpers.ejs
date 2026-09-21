@@ -26,6 +26,16 @@
       .trim() || token;
   }
 
+  function buildSnapshotComplianceSaveFailureModalHtml(compliance = {}, options = {}) {
+    const inner = buildTemplateFileComplianceModalHtml(compliance, options);
+    return (
+      '<div class="text-start report-compliance-save-failure">'
+      + '<p class="mb-3">The template was not saved. Your Word file uses placeholders that are not covered by <strong>Lock Snapshot Keys</strong> (or their DOCX shortcuts).</p>'
+      + inner
+      + '</div>'
+    );
+  }
+
   function buildTemplateFileComplianceModalHtml(result = {}, options = {}) {
     const results = Array.isArray(result.results) ? result.results : [];
     const skippedReason = options.skippedReason || 'Add keys before checking templates.';
@@ -139,18 +149,24 @@
       const token = tokenMatch ? tokenMatch[1] : hint.split('(')[0].trim();
       const detail = hint.includes('(') ? hint.slice(hint.indexOf('(')).trim() : '';
       return (
-        `<li class="mb-2">`
+        `<li class="mb-2 pb-2 border-bottom border-light-subtle">`
         + `<code class="user-select-all">${escapeReportMessage(token)}</code>`
         + (detail ? `<div class="small text-muted mt-1">${escapeReportMessage(detail)}</div>` : '')
         + `</li>`
       );
     }).join('');
     const footer = raw.includes('Update the Word') ? raw.slice(raw.indexOf('Update the Word')).trim() : '';
+    const count = hints.length;
     return (
       '<div class="text-start report-docx-export-error">'
-      + '<p class="mb-2">Some placeholders in the overall Word file do not have values for this export.</p>'
-      + `<ul class="list-unstyled mb-0 ps-1" style="max-height:min(16rem,42vh);overflow-y:auto;">${rows}</ul>`
-      + (footer ? `<p class="small text-muted border-top pt-2 mt-3 mb-0">${escapeReportMessage(footer)}</p>` : '')
+      + '<p class="mb-2">The Word export was cancelled because placeholders in the overall template do not have stored values for this student and period.</p>'
+      + `<div class="d-flex flex-wrap align-items-center gap-2 mb-2">`
+      + `<span class="badge text-bg-warning">${count} missing placeholder${count === 1 ? '' : 's'}</span>`
+      + `<span class="small text-muted">Keys use <code>T#.</code> (source template slot) or <code>O.</code> (overall field) prefixes.</span>`
+      + `</div>`
+      + `<p class="small text-muted mb-2">Missing tokens:</p>`
+      + `<ul class="list-unstyled mb-0 report-compliance-token-list" style="max-height:min(14rem,38vh);overflow-y:auto;border:1px solid rgba(15,23,42,.12);border-radius:.375rem;padding:.5rem .75rem;background:#fff;">${rows}</ul>`
+      + (footer ? `<div class="small border-top pt-2 mt-3 mb-0"><div class="fw-semibold mb-1">How to fix</div><p class="text-muted mb-0">${escapeReportMessage(footer)}</p></div>` : '')
       + '</div>'
     );
   }
@@ -168,12 +184,23 @@
       console.error('Report message modal is unavailable on this page.');
       return 'OK';
     }
-    const displayMessage = html ? String(message ?? '') : escapeReportMessage(plainReportMessage(message));
+    let resolvedHtml = html === true;
+    let resolvedMessage = message;
+    let resolvedSize = size;
+    if (!resolvedHtml && icon === 'error') {
+      const docxHtml = buildDocxExportCancelledModalHtml(plainReportMessage(message));
+      if (docxHtml) {
+        resolvedMessage = docxHtml;
+        resolvedHtml = true;
+        resolvedSize = 'lg';
+      }
+    }
+    const displayMessage = resolvedHtml ? String(resolvedMessage ?? '') : escapeReportMessage(plainReportMessage(resolvedMessage));
     return window.showMessageModal({
       title,
       icon,
       message: displayMessage,
-      size,
+      size: resolvedSize,
       buttons: buttons || [{ text: 'OK', class: buttonClass }]
     });
   }
@@ -210,6 +237,7 @@
     plainReportMessage,
     buildPdfFieldsInspectModalHtml,
     buildTemplateFileComplianceModalHtml,
+    buildSnapshotComplianceSaveFailureModalHtml,
     buildDocxExportCancelledModalHtml,
     formatPdfAcroFieldType,
     showReportMessage,
