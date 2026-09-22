@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "foundation": [
+    {
+      "id": "admin-access-types",
+      "title": "Bypass admins vs Access Profile ADMIN",
+      "markdown": "admin-access-types-reference-2026-09-05.md",
+      "docx": "admin-access-types-reference-2026-09-05.docx"
+    }
+  ],
+  "sections": [
+    {
+      "sectionKeys": ["SCHOOL_ATTENDANCES", "SCHOOL_ATTENDANCE_REPORT"],
+      "title": "Attendance",
+      "markdown": "attendance-operation-scope-capabilities-2026-09-06.md",
+      "docx": "attendance-operation-scope-capabilities-2026-09-06.docx",
+      "status": "target-spec",
+      "seedScript": "scripts/seed-school-attendances-section.js",
+      "verifyScript": "scripts/school/verify-attendance-access-profiles.js"
+    },
+    {
+      "sectionKeys": ["SCHOOL_SESSION_STUDENT_CASES"],
+      "title": "Session student cases",
+      "markdown": "student-case-operation-scope-capabilities-2026-09-06.md",
+      "docx": "student-case-operation-scope-capabilities-2026-09-06.docx",
+      "status": "implemented",
+      "seedScript": "scripts/seed-school-student-cases-section.js",
+      "verifyScript": "scripts/school/verify-student-case-access-profiles.js"
+    },
+    {
+      "sectionKeys": ["SCHOOL_NOTIFICATION_CENTER"],
+      "title": "Notification centre",
+      "markdown": "notification-center-operation-scope-capabilities-2026-09-16.md",
+      "docx": "notification-center-operation-scope-capabilities-2026-09-16.docx",
+      "status": "target-spec",
+      "mongoNote": "Apply section/operation bindings in MongoDB sections collection (section 445586); no dedicated seed script in repo yet."
+    }
+  ],
+  "crossCutting": [
+    {
+      "id": "student-picker-search",
+      "title": "Student picker search matrix",
+      "markdown": "student-picker-search-matrix-2026-09-17.md",
+      "audience": "developers-and-qa"
+    }
+  ],
+  "otherReferences": [
+    {
+      "id": "ielts-micro-assessment-committee",
+      "title": "IELTS micro-assessment committee reference",
+      "markdown": "ielts-micro-assessment-committee-reference-2026-09-06.md",
+      "docx": "ielts-micro-assessment-committee-reference-2026-09-06.docx",
+      "note": "Committee/dissertation reference—not Access Profile configuration"
+    },
+    {
+      "id": "ielts-micro-assessment-faq",
+      "title": "IELTS micro-assessment plain-language FAQ",
+      "markdown": "ielts-micro-assessment-plain-language-faq-2026-09-06.md",
+      "docx": "ielts-micro-assessment-plain-language-faq-2026-09-06.docx",
+      "note": "Committee/dissertation reference—not Access Profile configuration"
+    }
+  ],
+  "superseded": [
+    {
+      "markdown": "archive/notification-center-operation-scope-capabilities-2026-09-15.md",
+      "replacedBy": "notification-center-operation-scope-capabilities-2026-09-16.md"
+    }
+  ]
+}

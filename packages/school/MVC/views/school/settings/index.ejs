@@ -43,6 +43,7 @@
       beforeAfterSearchDays: 14,
       disqualifyOnLeaveDuringHolidayWeek: false,
       disqualifyOnLeaveBeforeAfter: true,
+      skipAfterBoundaryInNextMonth: false,
       payableHolidayTypes: ['National Holiday', 'Observance Paid']
     };
   const statutoryHolidayPayEnabled = statutoryHolidayPayPolicy.enabled !== false;
@@ -1721,6 +1722,22 @@
                     <input class="form-check-input" type="checkbox" id="statutoryHolidayRoundCalculatedHours" name="statutoryHolidayRoundCalculatedHours" value="true" <%= statutoryHolidayPayPolicy.roundCalculatedHours === true ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
                     <label class="form-check-label" for="statutoryHolidayRoundCalculatedHours">Round calculated statutory holiday hours</label>
                   </div>
+                </div>
+              </div>
+              <div class="border rounded rollup-feature-card p-0 mt-4">
+                <div class="p-3 border-bottom">
+                  <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#statHolidayBoundaryWorkdaysCollapse" aria-expanded="false" aria-controls="statHolidayBoundaryWorkdaysCollapse">
+                    <i class="bi bi-chevron-down"></i>
+                    <span>Boundary workdays</span>
+                  </button>
+                </div>
+                <div class="collapse p-3" id="statHolidayBoundaryWorkdaysCollapse">
+                  <p class="small text-muted mb-3">Applies to the before-and-after boundary rules above (nearest payable workdays within the search window).</p>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="statutoryHolidaySkipAfterBoundaryInNextMonth" name="statutoryHolidaySkipAfterBoundaryInNextMonth" value="true" <%= statutoryHolidayPayPolicy.skipAfterBoundaryInNextMonth === true ? 'checked' : '' %> <%= canUpdateFlag ? '' : 'disabled' %>>
+                    <label class="form-check-label" for="statutoryHolidaySkipAfterBoundaryInNextMonth">Skip the after-boundary workday when it falls in the next calendar month</label>
+                  </div>
+                  <div class="form-text">When enabled, the first payable workday after the holiday is not used for boundary leave checks if that day is in a different month than the holiday (for example, a holiday on January 31 with the next workday on February 3).</div>
                 </div>
               </div>
               <div class="border rounded rollup-feature-card p-0 mt-4">
@@ -3498,6 +3515,7 @@
       statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek: document.getElementById('statutoryHolidayDisqualifyOnLeaveDuringHolidayWeek')?.checked ? 'true' : 'false',
       statutoryHolidayDisqualifyOnLeaveBeforeAfter: document.getElementById('statutoryHolidayDisqualifyOnLeaveBeforeAfter')?.checked ? 'true' : 'false',
       statutoryHolidayRoundCalculatedHours: document.getElementById('statutoryHolidayRoundCalculatedHours')?.checked ? 'true' : 'false',
+      statutoryHolidaySkipAfterBoundaryInNextMonth: document.getElementById('statutoryHolidaySkipAfterBoundaryInNextMonth')?.checked ? 'true' : 'false',
       payableHolidayType_National_Holiday: document.getElementById('payableHolidayType_National_Holiday')?.checked ? 'true' : 'false',
       payableHolidayType_Observance_Paid: document.getElementById('payableHolidayType_Observance_Paid')?.checked ? 'true' : 'false',
       statutoryHolidayMappingYear: mappingYear,
@@ -3529,6 +3547,10 @@
     const roundCalculatedHoursInput = document.getElementById('statutoryHolidayRoundCalculatedHours');
     if (roundCalculatedHoursInput) {
       roundCalculatedHoursInput.checked = savedStatPay.roundCalculatedHours === true;
+    }
+    const skipAfterBoundaryInNextMonthInput = document.getElementById('statutoryHolidaySkipAfterBoundaryInNextMonth');
+    if (skipAfterBoundaryInNextMonthInput) {
+      skipAfterBoundaryInNextMonthInput.checked = savedStatPay.skipAfterBoundaryInNextMonth === true;
     }
     document.querySelectorAll('select[name^="departmentSchemeAssignment_"]').forEach((selectEl) => {
       const match = /^departmentSchemeAssignment_(.+)$/.exec(String(selectEl.name || ''));

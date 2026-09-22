@@ -5,8 +5,9 @@ const timesheetParametersPolicyService = require('./timesheetParametersPolicySer
 const statutoryHolidaySchemeService = require('./statutoryHolidaySchemeService');
 const {
   addDays,
-  buildWorkdayHistory,
-  WorkdayHistory
+  buildPersonWorkdayContext,
+  WorkdayHistory,
+  isWorkdayHistory
 } = require('./timesheetWorkdayHistoryService');
 const {
   evaluateHolidayEligibility,
@@ -73,7 +74,8 @@ function evaluateEquilibriumTrack({
   policy,
   workdayEntries = [],
   leaveDates = new Set(),
-  supplementalHoursByDate = new Map()
+  supplementalHoursByDate = new Map(),
+  boundaryWorkdayHistory = null
 } = {}) {
   const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(policy);
   const schemeEntries = statutoryHolidaySchemeService.filterEntriesForScheme(
@@ -90,7 +92,8 @@ function evaluateEquilibriumTrack({
     policy: resolvedPolicy,
     workdayHistory,
     leaveDates,
-    supplementalHoursByDate: supplementalForScheme
+    supplementalHoursByDate: supplementalForScheme,
+    boundaryWorkdayHistory
   });
 
   const schemeResult = statutoryHolidaySchemeService.calculateEquilibriumSchemeHours({
@@ -137,7 +140,8 @@ function evaluateLincTrack({
   holiday,
   policy,
   workdayEntries = [],
-  leaveDates = new Set()
+  leaveDates = new Set(),
+  boundaryWorkdayHistory = null
 } = {}) {
   const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(policy);
   const statPolicy = resolvedPolicy?.statutoryHolidayPay
@@ -165,14 +169,17 @@ function evaluateLincTrack({
       statutoryHolidaySchemeService.SCHEME_LINC,
       resolvedPolicy
     );
-    const hoursByDate = statutoryHolidaySchemeService.buildWorkdayHistoryFromEntries(schemeEntries);
-    const workdayHistory = new WorkdayHistory(hoursByDate);
+    const fallbackHoursByDate = statutoryHolidaySchemeService.buildWorkdayHistoryFromEntries(schemeEntries);
+    const workdayHistory = isWorkdayHistory(boundaryWorkdayHistory)
+      ? boundaryWorkdayHistory
+      : new WorkdayHistory(fallbackHoursByDate);
     leaveBeforeAfter = buildLeaveBeforeAfterCheck({
       date,
       workdayHistory,
       leaveDates,
       beforeAfterSearchDays: statPolicy.beforeAfterSearchDays,
-      enforce: true
+      enforce: true,
+      skipAfterBoundaryInNextMonth: statPolicy.skipAfterBoundaryInNextMonth === true
     });
   }
   const qualified = calculatedHours > 0
@@ -228,18 +235,26 @@ function evaluateSchemeHolidayTrack({
   policy,
   workdayEntries = [],
   leaveDates = new Set(),
-  supplementalHoursByDate = new Map()
+  supplementalHoursByDate = new Map(),
+  boundaryWorkdayHistory = null
 } = {}) {
   const key = cleanId(schemeId) || statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM;
   if (key === statutoryHolidaySchemeService.SCHEME_LINC) {
-    return evaluateLincTrack({ holiday, policy, workdayEntries, leaveDates });
+    return evaluateLincTrack({
+      holiday,
+      policy,
+      workdayEntries,
+      leaveDates,
+      boundaryWorkdayHistory
+    });
   }
   return evaluateEquilibriumTrack({
     holiday,
     policy,
     workdayEntries,
     leaveDates,
-    supplementalHoursByDate
+    supplementalHoursByDate,
+    boundaryWorkdayHistory
   });
 }
 
@@ -314,21 +329,26 @@ async function calculateStatutoryHolidayForPeriod({
     .filter((entry) => typeof supplementalEntryFilter !== 'function' || supplementalEntryFilter(entry));
   const filteredPeriodEntries = (Array.isArray(periodEntries) ? periodEntries : [])
     .filter((entry) => typeof supplementalEntryFilter !== 'function' || supplementalEntryFilter(entry));
-  const workdaySourceEntries = mergeWorkdaySourceEntries(filteredPeriodEntries, filteredSupplementalEntries);
+  const periodWorkdaySourceEntries = mergeWorkdaySourceEntries(filteredPeriodEntries, filteredSupplementalEntries);
   const historyEndDate = addDays(
     [String(periodEndDate || '').trim(), maxHolidayDate].filter(Boolean).sort().pop(),
     statPolicy.beforeAfterSearchDays + 7
   );
 
-  await buildWorkdayHistory({
+  const personWorkdayContext = await buildPersonWorkdayContext({
     orgId,
     personId,
     endDate: historyEndDate,
     lookbackDays,
     useFullHistory: true,
     reqUser,
-    supplementalEntries: workdaySourceEntries
+    supplementalEntries: periodWorkdaySourceEntries
   });
+  const boundaryWorkdayHistory = personWorkdayContext.workdayHistory;
+  const workdaySourceEntries = mergeWorkdaySourceEntries(
+    periodWorkdaySourceEntries,
+    personWorkdayContext.payableEntries
+  );
 
   const supplementalHoursByDate = buildSupplementalHoursByDate(workdaySourceEntries);
   const existingBySessionId = new Map(
@@ -357,7 +377,8 @@ async function calculateStatutoryHolidayForPeriod({
         policy: resolvedPolicy,
         workdayEntries: workdaySourceEntries,
         leaveDates,
-        supplementalHoursByDate
+        supplementalHoursByDate,
+        boundaryWorkdayHistory
       });
       evaluations.push({ ...evaluation, schemeId });
 

@@ -121,6 +121,22 @@ function resolvePayableHours(entry = {}) {
   return roundHours(entry.durationHours ?? entry.hours ?? 0);
 }
 
+/** Statutory-holiday calculation only; payroll totals still use resolvePayableHours. */
+function resolveStatHolidayPlanningHours(entry = {}) {
+  if (!entry || entry.isDeleted === true) return 0;
+  const approvalStatus = cleanText(entry.approvalStatus).toLowerCase();
+  if (entry.excludeFromTotals === true || ['rejected', 'unpaid'].includes(approvalStatus)) return 0;
+  if (entry.isManual === true && approvalStatus === 'pending_approval') {
+    return resolveRequestedHours(entry);
+  }
+  return resolvePayableHours(entry);
+}
+
+function isStatHolidayPlanningWorkdayEntry(entry = {}) {
+  if (!entry || entry.isDeleted === true || entry.isStatutoryHoliday === true) return false;
+  return resolveStatHolidayPlanningHours(entry) > 0;
+}
+
 function resolveOptionalScheduledBaseHours(entry = {}) {
   const duration = numberOrZero(entry.durationHours);
   if (duration > 0) return duration;
@@ -352,9 +368,13 @@ function buildStatHolidayPrintSteps(entry = {}) {
   const beforeDateLabel = leaveBeforeAfter.beforeDate
     ? formatStatHolidayDateLabel(leaveBeforeAfter.beforeDate)
     : 'Not found';
-  const afterDateLabel = leaveBeforeAfter.afterDate
-    ? formatStatHolidayDateLabel(leaveBeforeAfter.afterDate)
-    : 'Not found';
+  const afterDateLabel = leaveBeforeAfter.afterBoundarySkippedNextMonth
+    ? (leaveBeforeAfter.afterDateIgnored
+      ? `${formatStatHolidayDateLabel(leaveBeforeAfter.afterDateIgnored)} (skipped)`
+      : 'Skipped (next month)')
+    : (leaveBeforeAfter.afterDate
+      ? formatStatHolidayDateLabel(leaveBeforeAfter.afterDate)
+      : 'Not found');
   const leaveBeforeAfterDates = Array.isArray(leaveBeforeAfter.leaveDates)
     ? leaveBeforeAfter.leaveDates.filter(Boolean)
     : [];
@@ -362,6 +382,9 @@ function buildStatHolidayPrintSteps(entry = {}) {
     `Nearest workday before holiday: ${beforeDateLabel}`,
     `Nearest workday after holiday: ${afterDateLabel}`
   ];
+  if (leaveBeforeAfter.afterBoundarySkippedNextMonth) {
+    leaveBeforeAfterDetails.push('After-boundary day skipped (falls in next month per school setting).');
+  }
   if (leaveBeforeAfter.missingBeforeBoundary) {
     leaveBeforeAfterDetails.push('Could not resolve the before-boundary workday within the search window.');
   }
@@ -522,7 +545,9 @@ function shapePrintEntry(entry = {}, lookups = {}) {
   const optionalHours = resolveOptionalHours(entry);
   const approval = cleanText(entry.approvalStatus).toLowerCase();
   let payableNote = '';
-  if (approval === 'pending_approval') payableNote = '0.00 payable (pending)';
+  if (approval === 'pending_approval') {
+    payableNote = entry.isManual === true ? '' : '0.00 payable (pending)';
+  }
   else if (approval === 'rejected') payableNote = '0.00 payable (rejected)';
   else if (approval === 'unpaid') payableNote = '0.00 payable (unpaid)';
 
@@ -886,6 +911,8 @@ module.exports = {
   resolveOrganizationNameFromContext,
   parsePrintReviewType,
   resolvePayableHours,
+  resolveStatHolidayPlanningHours,
+  isStatHolidayPlanningWorkdayEntry,
   resolvePrintReviewTitle,
   resolveRegularDisplayHours,
   filterDaysForPrintReview,

@@ -1,29 +1,105 @@
 # Design Documents
 
-Canonical design references for access, architecture, and cross-cutting platform behavior. These documents are the source of truth for humans and for agents/skills when planning or implementing features.
+Canonical design references for **access profiles**, architecture, and cross-cutting platform behavior. Markdown in this folder is the source of truth for humans, agents, and implementation work.
+
+**Machine-readable index:** [access-definition-catalog.json](access-definition-catalog.json) (validated by `npm run design-docs:validate-catalog`).
+
+**In-app browsing:** Documentation Center (`/docs`) → folder `design_docs` → this README.
+
+---
+
+## Start here (Access Profile administrators)
+
+1. Read the foundation doc: [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-2026-09-05.md) (bypass admins vs Access Profile ADMIN scope).
+2. Open the **section matrix** for the area you are configuring (table below).
+3. After changing Mongo **section operation bindings**, run the listed seed script (if any), then **verify access profiles** still grant the right operations at the intended scopes. Section binding alone does not grant user access.
+
+**Status legend**
+
+| Status | Meaning |
+| --- | --- |
+| `target-spec` | Matrix describes intended behavior; runtime may still be catching up |
+| `implemented` | Policy, routes, UI, and tests align with the matrix |
+
+---
+
+## Access definition catalog
+
+| Section key(s) | Title | Markdown | Word | Status | Seed / verify |
+| --- | --- | --- | --- | --- | --- |
+| *(foundation)* | Bypass vs ADMIN | [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-2026-09-05.md) | [docx](admin-access-types-reference-2026-09-05.docx) | — | — |
+| `SCHOOL_ATTENDANCES`, `SCHOOL_ATTENDANCE_REPORT` | Attendance | [matrix](attendance-operation-scope-capabilities-2026-09-06.md) | [docx](attendance-operation-scope-capabilities-2026-09-06.docx) | target-spec | `node scripts/seed-school-attendances-section.js` · `node scripts/school/verify-attendance-access-profiles.js` |
+| `SCHOOL_SESSION_STUDENT_CASES` | Session student cases | [matrix](student-case-operation-scope-capabilities-2026-09-06.md) | [docx](student-case-operation-scope-capabilities-2026-09-06.docx) | implemented | `node scripts/seed-school-student-cases-section.js` · `node scripts/school/verify-student-case-access-profiles.js` |
+| `SCHOOL_NOTIFICATION_CENTER` | Notification centre | [matrix](notification-center-operation-scope-capabilities-2026-09-16.md) | [docx](notification-center-operation-scope-capabilities-2026-09-16.docx) | target-spec | Mongo section **445586** — no dedicated seed script yet (see matrix doc) |
+
+### Cross-cutting (not a section matrix)
+
+| Topic | Audience | Markdown |
+| --- | --- | --- |
+| Student picker / search surfaces | Developers & QA | [student-picker-search-matrix-2026-09-17.md](student-picker-search-matrix-2026-09-17.md) |
+
+### Other references (not access definition)
+
+| Document | Purpose |
+| --- | --- |
+| [ielts-micro-assessment-committee-reference-2026-09-06.md](ielts-micro-assessment-committee-reference-2026-09-06.md) | Committee / dissertation evidence |
+| [ielts-micro-assessment-plain-language-faq-2026-09-06.md](ielts-micro-assessment-plain-language-faq-2026-09-06.md) | Plain-language FAQ for committee questions |
+
+### Superseded revisions
+
+| Archived markdown | Replaced by |
+| --- | --- |
+| [archive/notification-center-operation-scope-capabilities-2026-09-15.md](archive/notification-center-operation-scope-capabilities-2026-09-15.md) | [notification-center-operation-scope-capabilities-2026-09-16.md](notification-center-operation-scope-capabilities-2026-09-16.md) |
+
+Older copies outside this folder (for example [../attendance-operation-scope-capabilities-2026-09-04.md](../attendance-operation-scope-capabilities-2026-09-04.md)) are marked superseded and should not be used for profile work.
+
+---
 
 ## Naming convention
 
 | Pattern | Example |
 | --- | --- |
 | `{topic}-reference-YYYY-MM-DD.md` | `admin-access-types-reference-2026-09-05.md` |
-| Matching Word output | `admin-access-types-reference-2026-09-05.docx` |
+| `{section-slug}-operation-scope-capabilities-YYYY-MM-DD.md` | `attendance-operation-scope-capabilities-2026-09-06.md` |
+| Matching Word output | Same basename as the markdown file (kebab-case, **no spaces**) |
 
 - **Markdown (`.md`)** — editable source of truth; preferred for agents and version control.
 - **Word (`.docx`)** — formatted output for human review; regenerated from markdown.
+
+New section matrices: copy [templates/operation-scope-capabilities-template.md](templates/operation-scope-capabilities-template.md).
+
+---
 
 ## Folder layout
 
 ```
 docs/design_docs/
-  README.md                          ← this file
-  admin-access-types-reference-*.md
-  admin-access-types-reference-*.docx
+  README.md
+  access-definition-catalog.json
+  admin-access-types-reference-*.md / .docx
+  *-operation-scope-capabilities-*.md / .docx
+  archive/                    ← superseded markdown only
   templates/
-    design-doc-base.docx             ← style shell (headings, Table Grid)
+    design-doc-base.docx
+    operation-scope-capabilities-template.md
 scripts/design_docs/
-  generate_design_doc_docx.py        ← MD → DOCX generator
+  generate_design_doc_docx.py
+  generate_design_doc_docx.mjs
+  validate-access-catalog.mjs
 ```
+
+---
+
+## Revision workflow (access matrices)
+
+1. Edit the markdown matrix (or add a new dated file if you need to keep history).
+2. Update [access-definition-catalog.json](access-definition-catalog.json) and the table in this README.
+3. Move the previous markdown to `archive/` and add a `superseded` entry in the catalog.
+4. Regenerate the matching `.docx` (commands below).
+5. Apply Mongo section bindings (seed script) and re-check access profiles (verify script).
+6. Run `npm run design-docs:validate-catalog` (also covered by `npm test`).
+
+---
 
 ## Regenerating a docx
 
@@ -39,30 +115,29 @@ Optional template override:
 python scripts/design_docs/generate_design_doc_docx.py INPUT.md OUTPUT.docx --template docs/design_docs/templates/design-doc-base.docx
 ```
 
-## Adding a new design document
+Node fallback (requires `docx` package):
 
-1. Create `{topic}-reference-YYYY-MM-DD.md` in this folder using standard markdown headings and pipe tables.
-2. Run the generator to produce the matching `.docx`.
-3. Link to the new doc from section-specific docs (operation-scope matrices, architecture reports) instead of duplicating content.
+```bash
+node scripts/design_docs/generate_design_doc_docx.mjs INPUT.md OUTPUT.docx
+```
 
-## Current documents
+Validate catalog paths:
 
-| Document | Purpose |
-| --- | --- |
-| [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-2026-09-05.md) | Bypass admins vs Access Profile ADMIN scope; developer API for admin checks |
-| [attendance-operation-scope-capabilities-2026-09-06.md](attendance-operation-scope-capabilities-2026-09-06.md) | `SCHOOL_ATTENDANCES` and `SCHOOL_ATTENDANCE_REPORT` operation/scope matrix (target spec for app implementation) |
-| [student-picker-search-matrix-2026-09-17.md](student-picker-search-matrix-2026-09-17.md) | Student picker/search surfaces, claim-aware field contract, regression tests, manual QA checklist |
-| [student-case-operation-scope-capabilities-2026-09-06.md](student-case-operation-scope-capabilities-2026-09-06.md) | `SCHOOL_SESSION_STUDENT_CASES` operation/scope matrix (**promoted**); READ vs READ_ALL, locked-case lifecycle, ADMIN override |
-| [notification-center-operation-scope-capabilities-2026-09-16.md](notification-center-operation-scope-capabilities-2026-09-16.md) | `SCHOOL_NOTIFICATION_CENTER` operation/scope matrix (target spec); rules, runs, compose, outbox |
+```bash
+npm run design-docs:validate-catalog
+```
+
+---
 
 ## MongoDB catalog (runtime source of truth)
 
 When `DATA_BACKEND=mongo` (production default), section and operation catalog changes must be applied in **MongoDB** collections `operations` and `sections`. Do **not** rely on edits to `data/operations.json` or `data/sections.json` for deployment.
 
-For attendance UPLOAD/PRINT operation bindings:
+### Attendance (`SCHOOL_ATTENDANCES`)
 
 ```bash
 node scripts/seed-school-attendances-section.js
+node scripts/school/verify-attendance-access-profiles.js
 ```
 
 Dry-run (no writes):
@@ -71,20 +146,13 @@ Dry-run (no writes):
 node scripts/seed-school-attendances-section.js --dry-run
 ```
 
-The script resolves `UPLOAD` and `PRINT` by operation **name** (uses existing Mongo ids when present) and binds them on `SCHOOL_ATTENDANCES` only. Attendance file uploads require `SCHOOL_ATTENDANCES` UPLOAD.
+The script resolves `UPLOAD` and `PRINT` by operation **name** and binds them on `SCHOOL_ATTENDANCES` only. See [attendance-operation-scope-capabilities-2026-09-06.md](attendance-operation-scope-capabilities-2026-09-06.md).
 
-After seeding, verify access **profiles** in Mongo still grant the new operations at the intended scopes (section binding alone does not grant user access). See [attendance-operation-scope-capabilities-2026-09-06.md](attendance-operation-scope-capabilities-2026-09-06.md).
-
-Profile check helper:
-
-```bash
-node scripts/school/verify-attendance-access-profiles.js
-```
-
-For student-case operation bindings on `SCHOOL_SESSION_STUDENT_CASES` (section id `778771`):
+### Session student cases (`SCHOOL_SESSION_STUDENT_CASES`, section id `778771`)
 
 ```bash
 node scripts/seed-school-student-cases-section.js
+node scripts/school/verify-student-case-access-profiles.js
 ```
 
 Dry-run:
@@ -93,12 +161,8 @@ Dry-run:
 node scripts/seed-school-student-cases-section.js --dry-run
 ```
 
-The script resolves `READ`, `READ_ALL`, `CREATE`, `UPDATE`, `RESOLVE`, `DELETE`, and `CONFIGURE` by operation **name** and binds them on `SCHOOL_SESSION_STUDENT_CASES` only. Student-case capabilities do **not** fall back to `SCHOOL_SESSIONS`.
-
-After seeding, verify access profiles:
-
-```bash
-node scripts/school/verify-student-case-access-profiles.js
-```
-
 See [student-case-operation-scope-capabilities-2026-09-06.md](student-case-operation-scope-capabilities-2026-09-06.md).
+
+### Notification centre (`SCHOOL_NOTIFICATION_CENTER`, section id `445586`)
+
+No repository seed script yet. Apply operation bindings in Mongo per [notification-center-operation-scope-capabilities-2026-09-16.md](notification-center-operation-scope-capabilities-2026-09-16.md), then update access profiles to match the matrix.

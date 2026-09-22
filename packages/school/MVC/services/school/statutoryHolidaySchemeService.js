@@ -2,7 +2,7 @@
 
 const timesheetParametersPolicyService = require('./timesheetParametersPolicyService');
 const timesheetPrintService = require('./timesheetPrintService');
-const { addDays, getWeekday, isPayableWorkdayEntry } = require('./timesheetWorkdayHistoryService');
+const { addDays, getWeekday } = require('./timesheetWorkdayHistoryService');
 
 const SCHEME_EQUILIBRIUM = 'equilibrium_school';
 const SCHEME_LINC = 'linc';
@@ -190,12 +190,12 @@ function departmentsForScheme(schemeId = '', policy = {}) {
 function buildDepartmentHoursIndex(entries = []) {
   const byDeptDate = new Map();
   (Array.isArray(entries) ? entries : []).forEach((entry) => {
-    if (!isPayableWorkdayEntry(entry)) return;
+    if (!timesheetPrintService.isStatHolidayPlanningWorkdayEntry(entry)) return;
     const deptId = resolveEntryDepartmentId(entry);
     if (!deptId) return;
     const date = cleanId(entry?.date);
     if (!date) return;
-    const hours = timesheetPrintService.resolvePayableHours(entry);
+    const hours = timesheetPrintService.resolveStatHolidayPlanningHours(entry);
     if (hours <= 0) return;
     if (!byDeptDate.has(deptId)) byDeptDate.set(deptId, new Map());
     const dateMap = byDeptDate.get(deptId);
@@ -208,7 +208,7 @@ function filterEntriesForScheme(entries = [], schemeId = '', policy = {}) {
   const { assigned, includesDefault } = departmentsForScheme(schemeId, policy);
   const assignedSet = new Set(assigned);
   return (Array.isArray(entries) ? entries : []).filter((entry) => {
-    if (!isPayableWorkdayEntry(entry)) return false;
+    if (!timesheetPrintService.isStatHolidayPlanningWorkdayEntry(entry)) return false;
     const deptId = resolveEntryDepartmentId(entry);
     if (!deptId) return includesDefault;
     if (assignedSet.has(deptId)) return true;
@@ -222,10 +222,10 @@ function filterEntriesForScheme(entries = [], schemeId = '', policy = {}) {
 function buildWorkdayHistoryFromEntries(entries = []) {
   const hoursByDate = new Map();
   (Array.isArray(entries) ? entries : []).forEach((entry) => {
-    if (!isPayableWorkdayEntry(entry)) return;
+    if (!timesheetPrintService.isStatHolidayPlanningWorkdayEntry(entry)) return;
     const date = cleanId(entry?.date);
     if (!date) return;
-    const hours = timesheetPrintService.resolvePayableHours(entry);
+    const hours = timesheetPrintService.resolveStatHolidayPlanningHours(entry);
     if (hours <= 0) return;
     hoursByDate.set(date, Number(((hoursByDate.get(date) || 0) + hours).toFixed(2)));
   });

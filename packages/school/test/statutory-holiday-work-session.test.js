@@ -86,6 +86,26 @@ test('buildStatHolidayWarning returns null when force pay override applies', () 
   assert.equal(warning, null);
 });
 
+test('filterStatHolidayWarningsForDisplay drops warnings when activity already has payable hours', () => {
+  const warnings = [{
+    holidayId: 'H_TR',
+    date: '2026-09-30',
+    schemeId: 'linc',
+    reasons: ['Approved leave on the last or first adjacent payable workday.'],
+    calculatedHours: 12
+  }];
+  const filtered = statutoryHolidayEligibilityService.filterStatHolidayWarningsForDisplay(warnings, {
+    liveSessions: [{
+      statHolidayId: 'H_TR',
+      statHolidaySchemeId: 'linc',
+      date: '2026-09-30',
+      hours: 6
+    }],
+    previewRows: []
+  });
+  assert.equal(filtered.length, 0);
+});
+
 test('buildStatHolidayWarning returns reasons when pay is blocked', () => {
   const evaluation = {
     holidayId: 'H1',

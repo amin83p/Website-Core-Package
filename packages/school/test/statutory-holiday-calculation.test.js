@@ -7,6 +7,8 @@ const timesheetParametersPolicyService = require('../MVC/services/school/timeshe
 const statutoryHolidayCalculationService = require('../MVC/services/school/statutoryHolidayCalculationService');
 const statutoryHolidayEligibilityService = require('../MVC/services/school/statutoryHolidayEligibilityService');
 const statutoryHolidaySchemeService = require('../MVC/services/school/statutoryHolidaySchemeService');
+const { WorkdayHistory } = require('../MVC/services/school/timesheetWorkdayHistoryService');
+const { buildLeaveBeforeAfterCheck } = statutoryHolidayEligibilityService;
 
 function buildPolicy(overrides = {}) {
   return timesheetParametersPolicyService.resolvePolicy({
@@ -74,6 +76,74 @@ test('evaluateLincTrack qualifies independently of equilibrium eligibility gates
   assert.equal(evaluation.qualified, true);
   assert.equal(evaluation.calculatedHours, 4);
   assert.equal(evaluation.checks.trackType, 'linc');
+});
+
+test('buildLeaveBeforeAfterCheck skips after boundary in next month when policy enabled', () => {
+  const workdayHistory = new WorkdayHistory(new Map([
+    ['2026-01-30', 8],
+    ['2026-02-03', 8]
+  ]));
+  const holidayDate = '2026-01-31';
+  const leaveDates = new Set(['2026-02-03']);
+
+  const strict = buildLeaveBeforeAfterCheck({
+    date: holidayDate,
+    workdayHistory,
+    leaveDates,
+    enforce: true,
+    skipAfterBoundaryInNextMonth: false
+  });
+  assert.equal(strict.pass, false);
+  assert.equal(strict.afterDate, '2026-02-03');
+  assert.equal(strict.afterBoundarySkippedNextMonth, false);
+
+  const lenient = buildLeaveBeforeAfterCheck({
+    date: holidayDate,
+    workdayHistory,
+    leaveDates,
+    enforce: true,
+    skipAfterBoundaryInNextMonth: true
+  });
+  assert.equal(lenient.pass, true);
+  assert.equal(lenient.afterBoundarySkippedNextMonth, true);
+  assert.equal(lenient.afterDateIgnored, '2026-02-03');
+  assert.equal(lenient.afterDate, '');
+  assert.deepEqual(lenient.leaveDates, []);
+  assert.equal(lenient.missingAfterBoundary, false);
+});
+
+test('buildLeaveBeforeAfterCheck waives missing after boundary when skip setting is on', () => {
+  const workdayHistory = new WorkdayHistory(new Map([
+    ['2026-09-29', 8]
+  ]));
+  const result = buildLeaveBeforeAfterCheck({
+    date: '2026-09-30',
+    workdayHistory,
+    leaveDates: new Set(),
+    enforce: true,
+    skipAfterBoundaryInNextMonth: true
+  });
+  assert.equal(result.afterBoundaryWaivedNoWorkday, true);
+  assert.equal(result.missingAfterBoundary, false);
+  assert.equal(result.pass, true);
+});
+
+test('buildLeaveBeforeAfterCheck does not skip after boundary in same month', () => {
+  const workdayHistory = new WorkdayHistory(new Map([
+    ['2026-01-14', 8],
+    ['2026-01-16', 8]
+  ]));
+  const leaveDates = new Set(['2026-01-16']);
+  const result = buildLeaveBeforeAfterCheck({
+    date: '2026-01-15',
+    workdayHistory,
+    leaveDates,
+    enforce: true,
+    skipAfterBoundaryInNextMonth: true
+  });
+  assert.equal(result.afterBoundarySkippedNextMonth, false);
+  assert.equal(result.afterDate, '2026-01-16');
+  assert.equal(result.pass, false);
 });
 
 test('evaluateLincTrack disqualifies on boundary leave when LINC guard is active', () => {
@@ -270,6 +340,74 @@ test('evaluateSchemeHolidayTrack dispatches by scheme id', () => {
     ]
   });
   assert.equal(linc.checks.trackType, statutoryHolidaySchemeService.SCHEME_LINC);
+});
+
+test('resolveStatHolidayPlanningHours counts pending manual rows but not rejected', () => {
+  const timesheetPrintService = require('../MVC/services/school/timesheetPrintService');
+  const pending = {
+    isManual: true,
+    approvalStatus: 'pending_approval',
+    requestedHours: 6,
+    date: '2026-02-02',
+    deliveryDepartmentId: 'DEPT_EQ'
+  };
+  assert.equal(timesheetPrintService.resolvePayableHours(pending), 0);
+  assert.equal(timesheetPrintService.resolveStatHolidayPlanningHours(pending), 6);
+  assert.equal(timesheetPrintService.resolveStatHolidayPlanningHours({
+    ...pending,
+    approvalStatus: 'rejected'
+  }), 0);
+});
+
+test('buildSupplementalHoursByDate includes pending manual hours for stat holiday planning', () => {
+  const map = statutoryHolidayEligibilityService.buildSupplementalHoursByDate([
+    {
+      isManual: true,
+      approvalStatus: 'pending_approval',
+      requestedHours: 5,
+      date: '2026-02-16',
+      deliveryDepartmentId: 'DEPT_EQ'
+    }
+  ]);
+  assert.equal(map.get('2026-02-16'), 5);
+});
+
+test('filterEntriesForScheme includes pending manual rows for stat holiday planning', () => {
+  const policy = buildPolicy();
+  const rows = statutoryHolidaySchemeService.filterEntriesForScheme([
+    {
+      isManual: true,
+      approvalStatus: 'pending_approval',
+      requestedHours: 4,
+      date: '2026-01-26',
+      deliveryDepartmentId: 'DEPT_EQ',
+      hours: 4
+    }
+  ], statutoryHolidaySchemeService.SCHEME_EQUILIBRIUM, policy);
+  assert.equal(rows.length, 1);
+});
+
+test('evaluateEquilibriumTrack uses pending manual hours in calculatedHours', () => {
+  const policy = buildPolicy({ minWorkdays: 1, weekdayOccurrencesRequired: 1 });
+  const evaluation = statutoryHolidayCalculationService.evaluateEquilibriumTrack({
+    holiday: { id: 'H1', date: '2026-02-16', title: 'Family Day', type: 'National Holiday' },
+    policy,
+    workdayEntries: [
+      {
+        isManual: true,
+        approvalStatus: 'pending_approval',
+        requestedHours: 7.5,
+        date: '2026-02-09',
+        deliveryDepartmentId: 'DEPT_EQ',
+        hours: 7.5,
+        timesheetHours: 7.5
+      }
+    ],
+    leaveDates: new Set(),
+    supplementalHoursByDate: new Map()
+  });
+  assert.ok(evaluation.calculatedHours > 0);
+  assert.equal(evaluation.calculatedHours, 7.5);
 });
 
 test('assemblePeriodWorkdayEntries includes frozen auto-pulled act sessions from timesheet entries', () => {

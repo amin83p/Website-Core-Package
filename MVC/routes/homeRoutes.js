@@ -22,6 +22,23 @@ router.get(['/about', 'aboutus', 'about-us'], async (req, res, next)=>{
         next(error);
     }
 })
+router.get(['/important-notices', '/importantNotices'], async (req, res, next) => {
+    try {
+        const publicPageContent = await publicPageContentSettingsDataService.getPublicPageContentModel();
+        res.render('importantNotices', {
+            title: 'Important Notices',
+            htmlClass: 'pte-public-root',
+            bodyClass: 'pte-public-body public-zoom-centered-body important-notices-public-body',
+            mainClass: 'container pte-public-main important-notices-public-main',
+            publicPageContent,
+            importantNoticesContent: publicPageContent.importantNotices,
+            user: req.user
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get(['/whatWeOffer', '/whatIOffer'], async (req, res, next)=>{
     try {
         const publicPageContent = await publicPageContentSettingsDataService.getPublicPageContentModel();

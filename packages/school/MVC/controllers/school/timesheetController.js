@@ -30,6 +30,7 @@ const timesheetParametersPolicyService = require('../../services/school/timeshee
 const statutoryHolidayEligibilityService = require('../../services/school/statutoryHolidayEligibilityService');
 const statutoryHolidayWorkSessionService = require('../../services/school/statutoryHolidayWorkSessionService');
 const statutoryHolidayTimesheetLifecycleService = require('../../services/school/statutoryHolidayTimesheetLifecycleService');
+const timesheetStatHolidayRecalculationService = require('../../services/school/timesheetStatHolidayRecalculationService');
 const timesheetEffectiveEntryService = require('../../services/school/timesheetEffectiveEntryService');
 const timesheetPrintService = require('../../services/school/timesheetPrintService');
 const deadlineReconciliationService = require('../../services/school/timesheetDeadlineReconciliationService');
@@ -109,10 +110,25 @@ function enrichLiveSessionsWithStatHolidayMeta(sessions = [], statHolidayRows = 
             || 'equilibrium_school';
         const meta = metaByAssigneeKey.get(`${schemeId}|${holidayId}|${date}`);
         if (!meta?.checks) return session;
+        const primaryDepartment = statutoryHolidayEligibilityService.resolvePrimaryStatHolidayDepartment(
+            { statHolidayMeta: meta },
+            new Map()
+        );
+        const deptId = String(session?.deliveryDepartmentId || primaryDepartment.deliveryDepartmentId || '').trim();
+        const deptName = String(session?.deliveryDepartmentName || primaryDepartment.deliveryDepartmentName || '').trim();
         return {
             ...session,
             statHolidaySchemeId: schemeId,
-            statHolidayMeta: { ...(session.statHolidayMeta || {}), ...meta }
+            statHolidayMeta: { ...(session.statHolidayMeta || {}), ...meta },
+            ...(deptId ? {
+                deliveryDepartmentId: deptId,
+                departmentId: deptId,
+                compensationLookup: {
+                    ...(session.compensationLookup || {}),
+                    departmentId: deptId
+                }
+            } : {}),
+            ...(deptName ? { deliveryDepartmentName: deptName, departmentName: deptName } : {})
         };
     });
 }
@@ -2589,6 +2605,13 @@ exports.viewTimesheet = async (req, res) => {
                 liveSessionsWithStatHolidays,
                 statHolidayPreviewRows
             );
+            statHolidayWarnings = statutoryHolidayEligibilityService.filterStatHolidayWarningsForDisplay(
+                statHolidayWarnings,
+                {
+                    liveSessions: liveSessionsWithStatHolidays,
+                    previewRows: statHolidayPreviewRows
+                }
+            );
         }
 
         const payrollEditor = shapePayrollContextForEditor(payrollContext);
@@ -3058,67 +3081,37 @@ exports.saveTimesheet = async (req, res) => {
             ...trustedLiveSessions,
             ...(Array.isArray(activityLiveSessions) ? activityLiveSessions : [])
         ];
-        const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
-            entryRows.filter((entry) => entry && entry.isDeleted !== true),
-            supplementalLiveSessions
-        );
-        const allHolidays = await dataService.fetchAllData('holidays', {}, req.user);
+        let statHolidayMaterialization = null;
+        const statHolidaySaveResult = await timesheetStatHolidayRecalculationService.runStatHolidayMaterializationForTimesheetSave({
+            activeOrgId,
+            period,
+            teacherContext,
+            entryRows,
+            existing,
+            existingEntriesBySessionId,
+            reqUser: req.user,
+            timesheetParametersPolicy,
+            payrollContext,
+            supplementalLiveSessions,
+            shouldPersistStatHoliday,
+            nextStatus,
+            reviewerEdit
+        });
+        entryRows = statHolidaySaveResult.entryRows;
+        statHolidayMaterialization = statHolidaySaveResult.statHolidayMaterialization;
+        if (Array.isArray(statHolidaySaveResult.refreshedActivityLiveSessions)
+            && statHolidaySaveResult.refreshedActivityLiveSessions.length) {
+            activityLiveById.clear();
+            timesheetStatHolidayRecalculationService.mapActivitySessionsById(
+                statHolidaySaveResult.refreshedActivityLiveSessions
+            ).forEach((row, key) => activityLiveById.set(key, row));
+        }
         const allowStatHolidayOverride = await statutoryHolidayTimesheetLifecycleService.resolveStatHolidayOverridePermission({
             reqUser: req.user,
             timesheet: existing,
             period,
             reviewerEdit
         });
-        let statHolidayMaterialization = null;
-        if (shouldPersistStatHoliday
-            && statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled(timesheetParametersPolicy)) {
-            const materializeContext = {
-                orgId: activeOrgId,
-                personId: teacherContext.targetTeacherId,
-                personName: payrollContext.personName,
-                period,
-                policy: timesheetParametersPolicy,
-                holidays: allHolidays,
-                periodEntries: periodWorkdayEntries,
-                existingEntries: entryRows.filter((entry) => entry && entry.isDeleted !== true),
-                reqUser: req.user,
-                allowManagerOverride: allowStatHolidayOverride
-            };
-            if (nextStatus === 'submitted' && !reviewerEdit) {
-                statHolidayMaterialization = await statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit(materializeContext);
-            } else {
-                statHolidayMaterialization = await statutoryHolidayTimesheetLifecycleService.updateStatHolidayOnReviewerSave({
-                    ...materializeContext,
-                    allowManagerOverride: allowStatHolidayOverride
-                });
-            }
-            const statHolidayBlockingErrors = Array.isArray(statHolidayMaterialization?.blockingErrors)
-                ? statHolidayMaterialization.blockingErrors.filter(Boolean)
-                : [];
-            if (statHolidayBlockingErrors.length) {
-                const error = new Error(statHolidayBlockingErrors.join(' '));
-                error.statusCode = 400;
-                throw error;
-            }
-            entryRows = statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries({
-                entries: entryRows,
-                statHolidayRows: statHolidayMaterialization?.rows || [],
-                usesActivityMode: statHolidayMaterialization?.usesActivityMode === true,
-                existingEntriesBySessionId
-            });
-            const refreshedActivityLiveSessions = await activityService.getTimesheetEntriesForPerson({
-                orgId: activeOrgId,
-                personId: teacherContext.targetTeacherId,
-                periodStartDate: period.startDate,
-                periodEndDate: period.endDate,
-                reqUser: req.user
-            });
-            activityLiveById.clear();
-            (Array.isArray(refreshedActivityLiveSessions) ? refreshedActivityLiveSessions : []).forEach((row) => {
-                const key = String(row?.sessionId || '').trim();
-                if (key) activityLiveById.set(key, row);
-            });
-        }
         const statHolidayById = new Map(
             (Array.isArray(statHolidayMaterialization?.rows) ? statHolidayMaterialization.rows : [])
                 .map((row) => [String(row?.sessionId || '').trim(), row])
@@ -3203,7 +3196,7 @@ exports.saveTimesheet = async (req, res) => {
                 if (activityId && !activityRow) {
                     throw new Error('Selected activity is not active or no longer available. Please reselect the activity.');
                 }
-                if (activityRow && activityService.isPersonHiddenFromTimesheetSelection(activityRow, teacherContext.targetTeacherId)) {
+                if (activityRow && !activityService.isPersonEligibleForManualTimesheetActivity(activityRow, teacherContext.targetTeacherId)) {
                     throw new Error('This activity is hidden from your timesheet selection. Please choose another activity.');
                 }
                 if (activityRow && !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
@@ -4290,7 +4283,7 @@ exports.validateManualTimesheetRow = async (req, res) => {
 
         if (String(proposed?.activityId || '').trim()) {
             const activityRow = await activityService.getActivity(proposed.activityId, req.user);
-            if (!activityRow || activityService.isPersonHiddenFromTimesheetSelection(activityRow, teacherContext.targetTeacherId)) {
+            if (!activityRow || !activityService.isPersonEligibleForManualTimesheetActivity(activityRow, teacherContext.targetTeacherId)) {
                 throw new Error('This activity is hidden from your timesheet selection.');
             }
             if (!activityRow || !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {
@@ -4397,7 +4390,7 @@ exports.validateManualTimesheetRowsBatch = async (req, res) => {
                     activityRow = await activityService.getActivity(activityId, req.user);
                     activityCache.set(activityId, activityRow || null);
                 }
-                if (!activityRow || activityService.isPersonHiddenFromTimesheetSelection(activityRow, teacherContext.targetTeacherId)) {
+                if (!activityRow || !activityService.isPersonEligibleForManualTimesheetActivity(activityRow, teacherContext.targetTeacherId)) {
                     throw new Error('One or more selected activities are hidden from your timesheet selection.');
                 }
                 if (!activityRow || !activityService.isPersonEligibleForActivity(activityRow, teacherContext.targetTeacherId)) {

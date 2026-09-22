@@ -13,6 +13,10 @@ const deadlineReconciliationService = require('./timesheetDeadlineReconciliation
 const makeupReconciliationService = require('./timesheetMakeupReconciliationService');
 const { buildReportReflectionLiveSessions } = require('./reportTimesheetReflectionService');
 const activityService = require('./activityService');
+const statutoryHolidayTimesheetLifecycleService = require('./statutoryHolidayTimesheetLifecycleService');
+const statutoryHolidaySchemeService = require('./statutoryHolidaySchemeService');
+const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+const timesheetParametersPolicyService = require('./timesheetParametersPolicyService');
 const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -55,6 +59,26 @@ function formatHours(value) {
 function isPriorTimesheetPayrollFinal(priorTimesheet = {}, priorPeriod = {}) {
     return String(priorTimesheet?.status || '').trim().toLowerCase() === 'processed'
         || String(priorPeriod?.status || '').trim().toLowerCase() === 'processed';
+}
+
+function isStatutoryHolidayLegacyDriftExemptEntry(entry = {}, schemeActivityIds = null) {
+    if (statutoryHolidayTimesheetLifecycleService.isStatHolidayEntry(entry)) return true;
+    const holidayId = normalizeId(entry?.statHolidayMeta?.holidayId || entry?.statHolidayId);
+    if (holidayId) return true;
+    const activityId = normalizeId(entry?.activityId);
+    if (activityId && schemeActivityIds instanceof Set && schemeActivityIds.has(activityId)) return true;
+    return false;
+}
+
+async function resolveSchemeStatHolidayActivityIds(activeOrgId, reqUser) {
+    const orgId = normalizeId(activeOrgId);
+    if (!orgId) return new Set();
+    const policy = await timesheetParametersPolicyModel.getPolicyForOrg(orgId);
+    const resolved = timesheetParametersPolicyService.resolvePolicy(policy);
+    const ids = statutoryHolidaySchemeService.resolveAllSchemeActivityIds(resolved)
+        .map((id) => normalizeId(id))
+        .filter(Boolean);
+    return new Set(ids);
 }
 
 function buildChangeSummary({ snapshotEntry, snapshotHours, currentHours, currentStatus, sessionMissing }) {
@@ -341,22 +365,40 @@ function buildReconciliationChangeSummary(item = {}) {
     });
 }
 
-async function detectLegacyAdjustments({ snapshotEntries, priorPeriod, currentPeriod, teacherId, activeOrgId, reqUser }) {
+async function detectLegacyAdjustments({
+    snapshotEntries,
+    priorTimesheet,
+    priorPeriod,
+    currentPeriod,
+    teacherId,
+    activeOrgId,
+    reqUser,
+    priorPayableIndex = null,
+    currentPayableIndex = null
+}) {
     if (!snapshotEntries.length) return [];
-    const priorIndex = await buildCurrentPayableIndex({
-        teacherId,
-        periodStartDate: priorPeriod?.startDate,
-        periodEndDate: priorPeriod?.endDate,
-        activeOrgId,
-        reqUser
-    });
-    const currentIndex = await buildCurrentPayableIndex({
-        teacherId,
-        periodStartDate: currentPeriod?.startDate,
-        periodEndDate: currentPeriod?.endDate,
-        activeOrgId,
-        reqUser
-    });
+    const payrollFinal = isPriorTimesheetPayrollFinal(priorTimesheet || {}, priorPeriod || {});
+    const schemeActivityIds = payrollFinal
+        ? await resolveSchemeStatHolidayActivityIds(activeOrgId, reqUser)
+        : null;
+    const priorIndex = priorPayableIndex instanceof Map
+        ? priorPayableIndex
+        : await buildCurrentPayableIndex({
+            teacherId,
+            periodStartDate: priorPeriod?.startDate,
+            periodEndDate: priorPeriod?.endDate,
+            activeOrgId,
+            reqUser
+        });
+    const currentIndex = currentPayableIndex instanceof Map
+        ? currentPayableIndex
+        : await buildCurrentPayableIndex({
+            teacherId,
+            periodStartDate: currentPeriod?.startDate,
+            periodEndDate: currentPeriod?.endDate,
+            activeOrgId,
+            reqUser
+        });
     const allSessionIds = new Set([...priorIndex.keys(), ...currentIndex.keys()]);
     const fullIndex = new Map();
     allSessionIds.forEach((sessionId) => {
@@ -378,6 +420,7 @@ async function detectLegacyAdjustments({ snapshotEntries, priorPeriod, currentPe
         const snapshotEntry = sanitizeSnapshotEntry(rawEntry) || rawEntry;
         const sessionId = normalizeId(snapshotEntry?.sessionId);
         if (!sessionId) return;
+        if (payrollFinal && isStatutoryHolidayLegacyDriftExemptEntry(snapshotEntry, schemeActivityIds)) return;
         const snapshotHours = roundHours(snapshotEntry?.hours);
         const live = fullIndex.get(sessionId);
         let currentHours = 0;
@@ -558,6 +601,7 @@ async function detectReconciliation({ priorTimesheet, priorPeriod, currentPeriod
         }));
     const legacyAdjustments = await detectLegacyAdjustments({
         snapshotEntries: legacyEntries,
+        priorTimesheet,
         priorPeriod,
         currentPeriod,
         teacherId,
@@ -817,7 +861,9 @@ module.exports = {
     detectAdjustments,
     detectReconciliation,
     findPriorSubmittedTimesheet,
+    isStatutoryHolidayLegacyDriftExemptEntry,
     isPriorTimesheetPayrollFinal,
+    detectLegacyAdjustments,
     isMakeupConfirmationCurrent,
     isReconciliationReceiptCurrent,
     listCrossPeriodNettingSummaries,

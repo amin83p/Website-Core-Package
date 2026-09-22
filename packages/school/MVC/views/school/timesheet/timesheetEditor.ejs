@@ -1052,43 +1052,58 @@
           <input type="hidden" id="man_date">
           <input type="hidden" id="man_editSessionId">
           
-          <div class="mb-3">
-              <label class="form-label fw-bold small text-muted">Selected Date</label>
-              <div class="d-flex align-items-stretch gap-2">
-                  <div id="man_date_display" class="form-control bg-light fw-bold flex-grow-1"></div>
-                  <button type="button" class="btn btn-outline-primary text-nowrap" id="btnViewDaySchedule" title="Open schedule for this day in a new tab">
-                      <i class="bi bi-calendar-week"></i><span class="d-none d-sm-inline ms-1">View Day</span>
-                  </button>
+          <div class="mb-3" id="div_man_timeRange">
+              <div class="row g-2 align-items-end">
+                  <div class="col-lg-3 col-md-6">
+                      <label class="form-label fw-bold small text-muted">Selected Date</label>
+                      <div id="man_date_display" class="form-control bg-light fw-bold"></div>
+                  </div>
+                  <div class="col-lg-3 col-md-3 col-6">
+                      <label class="form-label fw-bold">Start Time *</label>
+                      <input type="time" id="man_startTime" class="form-control">
+                  </div>
+                  <div class="col-lg-3 col-md-3 col-6">
+                      <label class="form-label fw-bold">End Time *</label>
+                      <input type="time" id="man_endTime" class="form-control">
+                  </div>
+                  <div class="col-lg-3 col-md-6">
+                      <label class="form-label fw-bold">Total Hours *</label>
+                      <input type="number" id="man_hours" class="form-control bg-light" step="0.25" min="0" max="<%= maxSessionHours %>" placeholder="Calculated from start/end time" readonly required>
+                  </div>
               </div>
-          </div>
-          
-          <div class="mb-3">
-              <label class="form-label fw-bold">Activity Type *</label>
-              <select id="man_type" class="form-select" onchange="toggleManualType()" required>
-                  <option value="" disabled selected>Select activity…</option>
-                  <% (manualActivities || []).forEach((activity) => { %>
-                    <option
-                      value="<%= activity.id || '' %>"
-                      data-name="<%= activity.name || activity.id || '' %>"
-                      data-paid="<%= activity.paid ? 'true' : 'false' %>"
-                      data-category="<%= activity.categoryName || '' %>"
-                      data-department="<%= activity.departmentName || '' %>"
-                      data-visibility-scope="<%= activity.visibilityScope || 'school' %>">
-                      <%= activity.name || activity.id || 'Activity' %>
-                    </option>
-                  <% }) %>
-              </select>
-              <div class="form-text">Public activities require picking an existing work session. Individual activities suggest a new work session for approval. Manual class sessions are temporarily disabled.</div>
+              <div class="form-text text-danger mt-1" id="man_hours_warning"></div>
+              <div class="form-text mt-1">Total hours are calculated automatically from start and end time.</div>
           </div>
 
-          <div class="mb-3 <%= (typeof payrollRoles !== 'undefined' && payrollRoles.length > 1) ? '' : 'd-none' %>" id="div_man_payrollRole">
-              <label class="form-label fw-bold">Payroll Role *</label>
-              <select id="man_personRole" class="form-select">
-                  <% (payrollRoles || []).forEach((role) => { %>
-                    <option value="<%= role %>"><%= String(role).charAt(0).toUpperCase() + String(role).slice(1) %></option>
-                  <% }) %>
-              </select>
-              <div class="form-text">Choose whether this work should be paid under your teacher or staff profile.</div>
+          <div class="mb-3">
+              <div class="row g-2 align-items-end">
+                  <div class="<%= (typeof payrollRoles !== 'undefined' && payrollRoles.length > 1) ? 'col-9' : 'col-12' %>">
+                      <label class="form-label fw-bold">Activity Type *</label>
+                      <select id="man_type" class="form-select" onchange="toggleManualType()" required>
+                          <option value="" disabled selected>Select activity…</option>
+                          <% (manualActivities || []).forEach((activity) => { %>
+                            <option
+                              value="<%= activity.id || '' %>"
+                              data-name="<%= activity.name || activity.id || '' %>"
+                              data-paid="<%= activity.paid ? 'true' : 'false' %>"
+                              data-category="<%= activity.categoryName || '' %>"
+                              data-department="<%= activity.departmentName || '' %>"
+                              data-visibility-scope="<%= activity.visibilityScope || 'school' %>">
+                              <%= activity.name || activity.id || 'Activity' %>
+                            </option>
+                          <% }) %>
+                      </select>
+                  </div>
+                  <div class="col-3 <%= (typeof payrollRoles !== 'undefined' && payrollRoles.length > 1) ? '' : 'd-none' %>" id="div_man_payrollRole">
+                      <label class="form-label fw-bold">Role *</label>
+                      <select id="man_personRole" class="form-select">
+                          <% (payrollRoles || []).forEach((role) => { %>
+                            <option value="<%= role %>"><%= String(role).charAt(0).toUpperCase() + String(role).slice(1) %></option>
+                          <% }) %>
+                      </select>
+                  </div>
+              </div>
+              <div class="form-text">Public activities require picking an existing work session. Individual activities suggest a new work session for approval. Manual class sessions are temporarily disabled.</div>
           </div>
 
           <div class="mb-3 d-none" id="div_man_classPicker">
@@ -1116,34 +1131,19 @@
               <input type="text" id="man_desc" class="form-control" placeholder="e.g. Extra prep, admin work, meeting...">
           </div>
 
-          <div class="row g-2 mb-3" id="div_man_timeRange">
-              <div class="col-6">
-                  <label class="form-label fw-bold">Start Time *</label>
-                  <input type="time" id="man_startTime" class="form-control">
-              </div>
-              <div class="col-6">
-                  <label class="form-label fw-bold">End Time *</label>
-                  <input type="time" id="man_endTime" class="form-control">
-              </div>
-              <div class="col-12">
-                  <div class="form-text">For class or activity rows, total hours are calculated from start/end time and applied to the materialized session.</div>
-              </div>
-          </div>
-
-          <div class="mb-3">
-              <label class="form-label fw-bold">Total Hours *</label>
-              <input type="number" id="man_hours" class="form-control" step="0.25" min="0" max="<%= maxSessionHours %>" placeholder="e.g. 1.5" required>
-              <div class="form-text text-danger" id="man_hours_warning"></div>
-          </div>
-          
           <div class="mb-3">
               <label class="form-label fw-bold">Notes / Comments</label>
               <input type="text" id="man_comment" class="form-control" placeholder="Reason for manual entry...">
           </div>
       </div>
-      <div class="modal-footer bg-light border-0">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary fw-bold" id="btnSaveManualEntry">Save Entry</button>
+      <div class="modal-footer bg-light border-0 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <button type="button" class="btn btn-outline-primary" id="btnViewDaySchedule" title="Open the schedule for this date in a new tab">
+          <i class="bi bi-calendar-week me-1"></i>Open Day Schedule
+        </button>
+        <div class="d-flex flex-wrap gap-2 ms-md-auto">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary fw-bold" id="btnSaveManualEntry">Save Entry</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1780,10 +1780,10 @@ function toggleManualType() {
         endInput.disabled = isPublicActivity || showFrozenClassRow;
         endInput.readOnly = isPublicActivity || showFrozenClassRow;
     }
-    const usesTimedEntry = usingActivity || showFrozenClassRow;
     if (hoursInput) {
-        hoursInput.readOnly = usesTimedEntry || isPublicActivity || showFrozenClassRow;
-        hoursInput.placeholder = usesTimedEntry ? 'Calculated from start/end time' : 'e.g. 1.5';
+        hoursInput.readOnly = true;
+        hoursInput.classList.add('bg-light');
+        hoursInput.placeholder = 'Calculated from start/end time';
     }
     if (usingActivity) {
         if (classIdInput) classIdInput.value = '';
@@ -2250,11 +2250,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     document.getElementById('man_startTime').value = normalizeClock(item?.startTime || '');
                     document.getElementById('man_endTime').value = normalizeClock(item?.endTime || '');
-                    const hours = Number(parseFloat(item?.durationHours ?? item?.hours) || calculateHoursFromRange(
-                        document.getElementById('man_startTime').value,
-                        document.getElementById('man_endTime').value
-                    ) || 0);
-                    document.getElementById('man_hours').value = hours > 0 ? hours.toFixed(2) : '';
+                    if (typeof window.updateManualComputedHoursFromTimes === 'function') {
+                        window.updateManualComputedHoursFromTimes();
+                    }
                     const descInput = document.getElementById('man_desc');
                     if (descInput && !String(descInput.value || '').trim()) {
                         descInput.value = sessionName;
@@ -2278,9 +2276,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const manualStartInput = document.getElementById('man_startTime');
     const manualEndInput = document.getElementById('man_endTime');
-    if (manualStartInput) manualStartInput.addEventListener('change', () => window.updateManualComputedHoursFromTimes());
-    if (manualEndInput) manualEndInput.addEventListener('change', () => window.updateManualComputedHoursFromTimes());
-
+    const refreshManualHoursFromTimes = () => window.updateManualComputedHoursFromTimes();
+    if (manualStartInput) {
+        manualStartInput.addEventListener('change', refreshManualHoursFromTimes);
+        manualStartInput.addEventListener('input', refreshManualHoursFromTimes);
+    }
+    if (manualEndInput) {
+        manualEndInput.addEventListener('change', refreshManualHoursFromTimes);
+        manualEndInput.addEventListener('input', refreshManualHoursFromTimes);
+    }
     const tbody = document.getElementById('tsBody');
     let grandTotalHours = 0;
     let provisionalSessionCount = 0;
@@ -3500,13 +3504,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const beforeDateLabel = leaveBeforeAfter.beforeDate
                 ? formatTimesheetDateLabel(leaveBeforeAfter.beforeDate)
                 : 'Not found';
-            const afterDateLabel = leaveBeforeAfter.afterDate
-                ? formatTimesheetDateLabel(leaveBeforeAfter.afterDate)
-                : 'Not found';
+            const afterDateLabel = leaveBeforeAfter.afterBoundarySkippedNextMonth
+                ? (leaveBeforeAfter.afterDateIgnored
+                    ? `${formatTimesheetDateLabel(leaveBeforeAfter.afterDateIgnored)} (skipped)`
+                    : 'Skipped (next month)')
+                : (leaveBeforeAfter.afterDate
+                    ? formatTimesheetDateLabel(leaveBeforeAfter.afterDate)
+                    : 'Not found');
             const leaveBeforeAfterDetails = [
                 `Nearest workday before holiday: ${beforeDateLabel}`,
                 `Nearest workday after holiday: ${afterDateLabel}`
             ];
+            if (leaveBeforeAfter.afterBoundarySkippedNextMonth) {
+                leaveBeforeAfterDetails.push('After-boundary day skipped (falls in next month per school setting).');
+            }
             if (leaveBeforeAfter.missingBeforeBoundary) {
                 leaveBeforeAfterDetails.push('Could not resolve the before-boundary workday within the search window.');
             }
@@ -3564,11 +3575,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const leaveBeforeAfterDates = Array.isArray(leaveBeforeAfter.leaveDates) ? leaveBeforeAfter.leaveDates.filter(Boolean) : [];
         const weekdayName = String(weekdayRule.weekdayName || '').trim() || 'Target weekday';
         const beforeDateLabel = leaveBeforeAfter.beforeDate ? formatTimesheetDateLabel(leaveBeforeAfter.beforeDate) : 'Not found';
-        const afterDateLabel = leaveBeforeAfter.afterDate ? formatTimesheetDateLabel(leaveBeforeAfter.afterDate) : 'Not found';
+        const afterDateLabel = leaveBeforeAfter.afterBoundarySkippedNextMonth
+            ? (leaveBeforeAfter.afterDateIgnored
+                ? `${formatTimesheetDateLabel(leaveBeforeAfter.afterDateIgnored)} (skipped)`
+                : 'Skipped (next month)')
+            : (leaveBeforeAfter.afterDate ? formatTimesheetDateLabel(leaveBeforeAfter.afterDate) : 'Not found');
         const leaveBeforeAfterDetails = [
             `Nearest workday before holiday: ${beforeDateLabel}`,
             `Nearest workday after holiday: ${afterDateLabel}`
         ];
+        if (leaveBeforeAfter.afterBoundarySkippedNextMonth) {
+            leaveBeforeAfterDetails.push('After-boundary day skipped (falls in next month per school setting).');
+        }
         if (leaveBeforeAfter.missingBeforeBoundary) {
             leaveBeforeAfterDetails.push('Could not resolve the before-boundary workday within the search window.');
         }
@@ -4611,7 +4629,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const usesOptionalColumn = resolveOptionalReportingHours(entry) > 0;
         let hoursHtml = '';
         if (isPendingApprovalEntry(entry)) {
-            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div><div class="small text-warning fw-semibold">0.00 payable (pending)</div>`;
+            const pendingHoursLine = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div>`;
+            hoursHtml = entry?.isManual === true
+                ? pendingHoursLine
+                : `${pendingHoursLine}<div class="small text-warning fw-semibold">0.00 payable (pending)</div>`;
         } else if (isRejectedApprovalEntry(entry)) {
             hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div><div class="small text-danger fw-semibold">0.00 payable (rejected)</div>`;
         } else if (isUnpaidApprovalEntry(entry)) {
@@ -4650,6 +4671,22 @@ document.addEventListener('DOMContentLoaded', () => {
             || ''
         ).trim();
         if (direct) return direct;
+
+        const statHolidayDepts = entry?.statHolidayMeta?.checks?.departments;
+        if (Array.isArray(statHolidayDepts) && statHolidayDepts.length) {
+            const primary = statHolidayDepts.find((row) => String(row?.matchedDate || '').trim())
+                || statHolidayDepts[0];
+            const deptId = String(primary?.departmentId || '').trim();
+            if (deptId) {
+                for (const ls of LIVE_SESSIONS) {
+                    if (String(ls?.deliveryDepartmentId || ls?.departmentId || '') === deptId
+                        && String(ls?.deliveryDepartmentName || ls?.departmentName || '').trim()) {
+                        return String(ls.deliveryDepartmentName || ls.departmentName).trim();
+                    }
+                }
+                return deptId;
+            }
+        }
 
         const sessionId = String(entry?.sessionId || '').trim();
         const liveBySession = sessionId ? liveSessionById.get(sessionId) : null;
@@ -5470,10 +5507,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.updateManualComputedHoursFromTimes = function() {
-        const type = String(document.getElementById('man_type')?.value || '').trim();
-        const classId = String(document.getElementById('man_classId')?.value || '').trim();
-        const usesTimedEntry = Boolean(type) || Boolean(classId);
-        if (!usesTimedEntry) return;
         const startTime = document.getElementById('man_startTime')?.value || '';
         const endTime = document.getElementById('man_endTime')?.value || '';
         const hours = calculateHoursFromRange(startTime, endTime);
@@ -6323,11 +6356,13 @@ document.addEventListener('DOMContentLoaded', () => {
         isEdited = true;
         document.getElementById('badge_manualEdit')?.classList.remove('d-none');
         renderTable();
-        await messageBox({
-            title: 'Manual Row Updated',
-            icon: 'success',
-            message: `${normalizedDecision === 'approved' ? 'Approved' : 'Rejected'} in this draft. Save review changes to apply it.`
-        });
+        if (normalizedDecision === 'rejected') {
+            await messageBox({
+                title: 'Manual Row Updated',
+                icon: 'success',
+                message: 'Rejected in this draft. Save review changes to apply it.'
+            });
+        }
     }
 
     window.decideManualRow = async function(entryId, decision) {
@@ -6342,15 +6377,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (decision === 'approved') {
-            const ok = await confirmAction({
-                title: 'Approve Manual Row',
-                message: 'Approve this paid manual row and include its requested hours in the payable total?',
-                confirmText: 'Approve Row',
-                cancelText: 'Cancel',
-                icon: 'warning',
-                confirmBtnClass: 'btn-success'
-            });
-            if (ok) await executeManualRowDecision(entryId, 'approved');
+            await executeManualRowDecision(entryId, 'approved');
             return;
         }
         const modalEl = document.getElementById('manualRowRejectModal');

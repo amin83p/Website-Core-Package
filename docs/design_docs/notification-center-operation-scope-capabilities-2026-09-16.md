@@ -199,11 +199,11 @@ Current UI supports **email schedule** only (no SMS dispatch from NC compose).
 Regenerate Word copy:
 
 ```bash
-python scripts/design_docs/generate_design_doc_docx.py docs/design_docs/notification-center-operation-scope-capabilities-2026-09-16.md "docs/design_docs/School Notification-operation-scope-capabilities-2026-09-16.docx"
+python scripts/design_docs/generate_design_doc_docx.py docs/design_docs/notification-center-operation-scope-capabilities-2026-09-16.md docs/design_docs/notification-center-operation-scope-capabilities-2026-09-16.docx
 ```
 
 Node fallback (requires `npm install docx`):
 
 ```bash
-node scripts/design_docs/generate_design_doc_docx.mjs docs/design_docs/notification-center-operation-scope-capabilities-2026-09-16.md "docs/design_docs/School Notification-operation-scope-capabilities-2026-09-16.docx"
+node scripts/design_docs/generate_design_doc_docx.mjs docs/design_docs/notification-center-operation-scope-capabilities-2026-09-16.md docs/design_docs/notification-center-operation-scope-capabilities-2026-09-16.docx
 ```

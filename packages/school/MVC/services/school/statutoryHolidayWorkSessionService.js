@@ -11,6 +11,7 @@ const timesheetPayrollContextService = require('./timesheetPayrollContextService
 const activityAssigneeTimingService = require('./activityAssigneeTimingService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const dataService = requireCoreModule('MVC/services/dataService');
 
 const {
   STAT_HOLIDAY_DAY_START,
@@ -410,7 +411,9 @@ function buildStatHolidayWorkSessionAssignee({
   holidayId = '',
   schemeId = '',
   periodId = '',
-  notes = ''
+  notes = '',
+  deliveryDepartmentId = '',
+  deliveryDepartmentName = ''
 }) {
   const paid = activity.paid === true;
   const safeHours = Number(Number(hours || 0).toFixed(2));
@@ -422,12 +425,16 @@ function buildStatHolidayWorkSessionAssignee({
     statHolidayPersonId: cleanId(personId)
   };
   const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);
+  const deptId = cleanId(deliveryDepartmentId);
+  const deptName = String(deliveryDepartmentName || '').trim();
   const base = {
     personId: cleanId(personId),
     personName: String(personName || personId || '').trim(),
     paid,
     paidHours: safeHours,
     notes: String(notes || '').trim(),
+    ...(deptId ? { deliveryDepartmentId: deptId, departmentId: deptId } : {}),
+    ...(deptName ? { deliveryDepartmentName: deptName, departmentName: deptName } : {}),
     ...roleFields,
     ...trace
   };
@@ -803,6 +810,17 @@ async function syncStatHolidayWorkSessionsForPersonPeriod({
   }
 
   let updatedAssigneeCount = 0;
+  let departmentNameById = new Map();
+  try {
+    const departments = await dataService.fetchAllData('departments', { orgId }, reqUser);
+    (Array.isArray(departments) ? departments : []).forEach((dept) => {
+      const id = cleanId(dept?.id);
+      if (!id) return;
+      departmentNameById.set(id, String(dept?.name || dept?.title || '').trim());
+    });
+  } catch (_) {
+    departmentNameById = new Map();
+  }
 
   (Array.isArray(payItems) ? payItems : []).forEach((item) => {
     const hours = Number(Number(item?.hours || 0).toFixed(2));
@@ -816,6 +834,10 @@ async function syncStatHolidayWorkSessionsForPersonPeriod({
     if (!dayEntry) return;
 
     const normalizedDayEntry = normalizeStatHolidayDayEntryShape(dayEntry, holidayId);
+    const primaryDepartment = statutoryHolidayEligibilityService.resolvePrimaryStatHolidayDepartment(
+      item,
+      departmentNameById
+    );
     const assignee = buildStatHolidayWorkSessionAssignee({
       activity,
       entry: normalizedDayEntry,
@@ -826,7 +848,9 @@ async function syncStatHolidayWorkSessionsForPersonPeriod({
       holidayId,
       schemeId: cleanId(item?.schemeId),
       periodId: targetPeriodId,
-      notes: hours > 0 ? 'Statutory holiday pay' : 'Statutory holiday pay (not qualified)'
+      notes: hours > 0 ? 'Statutory holiday pay' : 'Statutory holiday pay (not qualified)',
+      deliveryDepartmentId: primaryDepartment.deliveryDepartmentId,
+      deliveryDepartmentName: primaryDepartment.deliveryDepartmentName
     });
 
     const index = workingEntries.findIndex((entry) => entry === dayEntry);

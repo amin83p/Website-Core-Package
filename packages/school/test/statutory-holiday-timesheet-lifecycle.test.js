@@ -237,6 +237,9 @@ test('timesheet editor supports statutory holiday hours rounding helpers and set
   assert.match(settingsSource, /id="statutoryHolidayRoundCalculatedHours"/);
   assert.match(settingsSource, /statutoryHolidayRoundCalculatedHours:/);
   assert.match(settingsSource, /savedStatPay\.roundCalculatedHours/);
+  assert.match(settingsSource, /id="statutoryHolidaySkipAfterBoundaryInNextMonth"/);
+  assert.match(settingsSource, /statutoryHolidaySkipAfterBoundaryInNextMonth:/);
+  assert.match(settingsSource, /savedStatPay\.skipAfterBoundaryInNextMonth/);
   assert.match(controllerSource, /statutoryHolidayRoundCalculatedHours:/);
 });
 

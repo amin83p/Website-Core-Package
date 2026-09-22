@@ -350,6 +350,8 @@ function sanitizeActivityPayload(input = {}) {
   const evaluationType = normalizeEvaluationType(input.evaluationType || 'attendance');
   const visibilityScope = normalizeActivityVisibilityScope(input.visibilityScope || input.calendarScope || input.scope);
   const paid = input.paid === true || input.paid === 'true' || input.paid === 'on';
+  const showInTimesheetActivities = input.showInTimesheetActivities !== false
+    && input.showInTimesheetActivities !== 'false';
   const { allowedPersonIds, excludedPersonIds } = sanitizeAllowedExcludedLists(
     input.allowedPersonIds || input.allowedPersons || [],
     input.excludedPersonIds || input.excludedPersons || []
@@ -392,6 +394,7 @@ function sanitizeActivityPayload(input = {}) {
     durationHours: firstEntry.durationHours,
     totalDurationHours,
     paid,
+    showInTimesheetActivities,
     status,
     evaluationType,
     visibilityScope,

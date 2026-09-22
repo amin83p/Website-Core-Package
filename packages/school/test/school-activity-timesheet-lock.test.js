@@ -299,6 +299,78 @@ test('isPersonHiddenFromTimesheetSelection blocks hidden allowed persons only', 
   assert.equal(activityService.isPersonEligibleForActivity(activity, 'TEACHER_A'), true);
 });
 
+test('isPersonEligibleForManualTimesheetActivity respects showInTimesheetActivities and hidden persons', () => {
+  const activity = {
+    ...buildScopePersonActivityFixture(),
+    showInTimesheetActivities: false
+  };
+  assert.equal(activityService.isPersonEligibleForManualTimesheetActivity(activity, 'TEACHER_A'), false);
+
+  const hiddenActivity = {
+    ...buildScopePersonActivityFixture(),
+    hiddenPersonIds: ['TEACHER_A']
+  };
+  assert.equal(activityService.isPersonEligibleForManualTimesheetActivity(hiddenActivity, 'TEACHER_A'), false);
+  assert.equal(activityService.isPersonEligibleForManualTimesheetActivity(hiddenActivity, 'TEACHER_B'), true);
+});
+
+test('listManualEntryActivitiesForPerson excludes activities hidden from manual timesheet selection', async () => {
+  const schoolDataService = require('../MVC/services/school/schoolDataService');
+  const originalFetchData = schoolDataService.fetchData;
+  const originalFetchAllCategories = schoolDataService.fetchAllData;
+  schoolDataService.fetchData = async () => [{
+    id: 'ACT_INTERNAL',
+    orgId: 'ORG_1',
+    status: 'posted',
+    visibilityScope: 'school',
+    showInTimesheetActivities: false,
+    entries: []
+  }, {
+    id: 'ACT_VISIBLE',
+    orgId: 'ORG_1',
+    status: 'posted',
+    visibilityScope: 'school',
+    entries: []
+  }];
+  schoolDataService.fetchAllData = async (table) => (table === 'activityCategories' || table === 'departments' ? [] : []);
+  try {
+    const rows = await activityService.listManualEntryActivitiesForPerson({
+      orgId: 'ORG_1',
+      personId: 'TEACHER_A',
+      reqUser: {}
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, 'ACT_VISIBLE');
+  } finally {
+    schoolDataService.fetchData = originalFetchData;
+    schoolDataService.fetchAllData = originalFetchAllCategories;
+  }
+});
+
+test('activity sanitize defaults showInTimesheetActivities to true', () => {
+  const activityModel = require('../MVC/models/school/activityModel');
+  const defaults = activityModel.sanitizeActivityPayload({
+    orgId: 'ORG_1',
+    title: 'Test',
+    categoryId: 'CAT_1',
+    departmentId: 'DEPT_1',
+    allowEmptyEntries: true,
+    entries: []
+  });
+  assert.equal(defaults.showInTimesheetActivities, true);
+
+  const hidden = activityModel.sanitizeActivityPayload({
+    orgId: 'ORG_1',
+    title: 'Internal',
+    categoryId: 'CAT_1',
+    departmentId: 'DEPT_1',
+    showInTimesheetActivities: 'false',
+    allowEmptyEntries: true,
+    entries: []
+  });
+  assert.equal(hidden.showInTimesheetActivities, false);
+});
+
 test('sumAssigneeHoursOnTimesheet totals matching activity entry hours', () => {
   const hours = activityService.sumAssigneeHoursOnTimesheet({
     teacherId: 'TEACHER/A',

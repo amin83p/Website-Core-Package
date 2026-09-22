@@ -386,6 +386,119 @@ const DEFAULT_PUBLIC_PAGE_CONTENT = Object.freeze({
       secondaryLabel: 'Open Biography',
       secondaryHref: '/bio'
     }
+  },
+  importantNotices: {
+    hero: {
+      eyebrow: 'Resources',
+      title: 'Important Notices',
+      subtitle: 'Legal, privacy, and operational notices for visitors, customers, and platform users. Review these statements before using our public sites, software, or educational tools.',
+      primaryLabel: 'Contact Us',
+      primaryHref: '/contact',
+      secondaryLabel: 'Back to Home',
+      secondaryHref: '/'
+    },
+    highlights: [
+      { value: 'Transparency', label: 'Clear policies and disclaimers', active: true, order: 10 },
+      { value: 'Updated', label: 'Review effective dates below', active: true, order: 20 },
+      { value: 'Questions', label: 'Reach out via Contact', active: true, order: 30 }
+    ],
+    intro: {
+      eyebrow: 'Overview',
+      title: 'How to use this page',
+      body: 'Each notice below describes how we handle content, data, software use, and educational materials. Effective dates show when a notice was last revised. Contact us if you need clarification.'
+    },
+    notices: [
+      {
+        title: 'Copyright and intellectual property',
+        category: 'Legal',
+        effectiveDate: '2026-05-20',
+        summary: 'Site content, branding, and original materials are protected unless otherwise stated.',
+        body: [
+          'Unless noted otherwise, text, graphics, logos, software interfaces, and documentation on this website are owned by or licensed to the operator and may not be copied, redistributed, or reused without written permission.',
+          'Third-party trademarks and media remain the property of their respective owners. Links to external resources do not imply endorsement.'
+        ],
+        linkLabel: '',
+        linkHref: '',
+        active: true,
+        order: 10
+      },
+      {
+        title: 'Privacy and personal data',
+        category: 'Privacy',
+        effectiveDate: '2026-05-20',
+        summary: 'We collect only what is needed to operate accounts, forms, and services you request.',
+        body: [
+          'Information submitted through contact forms, account registration, or authenticated applications is used to provide the requested service, improve reliability, and meet legal obligations.',
+          'We do not sell personal data. Access is limited to authorized personnel and subprocessors required to host or deliver the service.'
+        ],
+        linkLabel: 'Contact privacy questions',
+        linkHref: '/contact',
+        active: true,
+        order: 20
+      },
+      {
+        title: 'Terms of use',
+        category: 'Legal',
+        effectiveDate: '2026-05-20',
+        summary: 'Use of this website and related software is subject to acceptable-use expectations.',
+        body: [
+          'You agree not to misuse the platform, attempt unauthorized access, interfere with other users, or upload unlawful content.',
+          'Software and content are provided on an as-is basis where permitted by law. We may update features, availability, or these notices with reasonable notice when practicable.'
+        ],
+        linkLabel: '',
+        linkHref: '',
+        active: true,
+        order: 30
+      },
+      {
+        title: 'AI-assisted and educational tools',
+        category: 'Education',
+        effectiveDate: '2026-05-20',
+        summary: 'Automated scoring and feedback are aids, not official certifications.',
+        body: [
+          'AI-assisted evaluation features are designed to support learning and workflow speed. They are not a substitute for human judgment, accredited examination results, or regulatory compliance decisions.',
+          'Users remain responsible for verifying outputs before relying on them in academic, employment, or safety-critical contexts.'
+        ],
+        linkLabel: '',
+        linkHref: '',
+        active: true,
+        order: 40
+      },
+      {
+        title: 'Accessibility commitment',
+        category: 'Accessibility',
+        effectiveDate: '2026-05-20',
+        summary: 'We aim to improve access to public information and core workflows.',
+        body: [
+          'We work to maintain readable layouts, keyboard-friendly navigation, and clear contrast on public pages. If you encounter a barrier, please tell us what page and assistive technology you use so we can address it.'
+        ],
+        linkLabel: 'Report an accessibility issue',
+        linkHref: '/contact',
+        active: true,
+        order: 50
+      }
+    ],
+    resourcePanel: {
+      title: 'Related resources',
+      body: 'More information and ways to reach the team.',
+      links: [
+        { label: 'Contact Us', href: '/contact', active: true, order: 10 },
+        { label: 'FAQ', href: '/faq', active: true, order: 20 },
+        { label: 'Resource Library', href: '/resource-library', active: true, order: 30 }
+      ]
+    },
+    finalCta: {
+      title: 'Need clarification on a notice?',
+      body: 'Send your question through Contact and reference the notice title so we can respond accurately.',
+      signedInPrimaryLabel: 'Open Dashboard',
+      signedInPrimaryHref: '/dashboard',
+      guestPrimaryLabel: 'Sign In',
+      guestPrimaryHref: '/login',
+      guestSecondaryLabel: 'Create Account',
+      guestSecondaryHref: '/persons/join',
+      contactLabel: 'Contact Us',
+      contactHref: '/contact'
+    }
   }
 });
 
@@ -404,6 +517,15 @@ function deepClone(value) {
 function cleanString(value, max = 4000) {
   const token = String(value ?? '').replace(/\0/g, '').trim();
   return token.length > max ? token.slice(0, max) : token;
+}
+
+function cleanDateOnly(value, fallback = '') {
+  const token = cleanString(value, 40);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
+  const parsed = new Date(token);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  const fb = cleanString(fallback, 40);
+  return /^\d{4}-\d{2}-\d{2}$/.test(fb) ? fb : '';
 }
 
 function valueOrDefault(source, key, fallback = '') {
@@ -740,12 +862,63 @@ function normalizeAbout(rawAbout = {}, options = {}) {
   };
 }
 
+function normalizeImportantNotices(rawImportantNotices = {}, options = {}) {
+  const runtime = options.runtime === true;
+  const input = isPlainObject(rawImportantNotices) ? rawImportantNotices : {};
+  const base = DEFAULT_PUBLIC_PAGE_CONTENT.importantNotices;
+
+  return {
+    hero: normalizeHero(input.hero, base.hero),
+    highlights: normalizeHighlights(input.highlights, base.highlights, runtime),
+    intro: {
+      eyebrow: cleanString(valueOrDefault(input.intro, 'eyebrow', base.intro.eyebrow), 140),
+      title: cleanString(valueOrDefault(input.intro, 'title', base.intro.title), 260),
+      body: cleanString(valueOrDefault(input.intro, 'body', base.intro.body), 1200)
+    },
+    notices: normalizeOrderedRows(input.notices, base.notices, (row, index) => {
+      const title = cleanString(row.title, 220);
+      const summary = cleanString(row.summary, 500);
+      const body = normalizeParagraphList(row.body, []);
+      if (!title && !summary && !body.length) return null;
+      const fallbackDate = cleanDateOnly(base.notices?.[index]?.effectiveDate, '2026-05-20');
+      return {
+        title,
+        category: cleanString(row.category, 80),
+        effectiveDate: cleanDateOnly(row.effectiveDate, fallbackDate),
+        summary,
+        body,
+        linkLabel: cleanString(row.linkLabel, 140),
+        linkHref: cleanHref(row.linkHref, ''),
+        active: cleanBoolean(row.active, true),
+        order: cleanOrder(row.order, (index + 1) * 10)
+      };
+    }, { runtime }),
+    resourcePanel: {
+      title: cleanString(valueOrDefault(input.resourcePanel, 'title', base.resourcePanel.title), 220),
+      body: cleanString(valueOrDefault(input.resourcePanel, 'body', base.resourcePanel.body), 900),
+      links: normalizeOrderedRows(input.resourcePanel?.links, base.resourcePanel.links, (row, index) => {
+        const label = cleanString(row.label, 140);
+        const href = cleanHref(row.href, '');
+        if (!label && !href) return null;
+        return {
+          label: label || 'Link',
+          href,
+          active: cleanBoolean(row.active, true),
+          order: cleanOrder(row.order, (index + 1) * 10)
+        };
+      }, { runtime })
+    },
+    finalCta: normalizeFinalCta(input.finalCta, base.finalCta)
+  };
+}
+
 function normalizeContent(rawContent = {}, options = {}) {
   const source = isPlainObject(rawContent) ? rawContent : {};
   return {
     home: normalizeHome(source.home, options),
     projects: normalizeProjects(source.projects, options),
-    about: normalizeAbout(source.about, options)
+    about: normalizeAbout(source.about, options),
+    importantNotices: normalizeImportantNotices(source.importantNotices, options)
   };
 }
 
@@ -761,7 +934,12 @@ function parseSubmittedContent(payload = {}) {
   if (typeof payload?.contentJson === 'string') return parseSubmittedContent(payload.contentJson);
   if (isPlainObject(payload?.content)) return payload.content;
   if (isPlainObject(payload?.pages)) return payload.pages;
-  if (isPlainObject(payload) && (hasOwn(payload, 'home') || hasOwn(payload, 'projects') || hasOwn(payload, 'about'))) {
+  if (isPlainObject(payload) && (
+    hasOwn(payload, 'home')
+    || hasOwn(payload, 'projects')
+    || hasOwn(payload, 'about')
+    || hasOwn(payload, 'importantNotices')
+  )) {
     return payload;
   }
   throw new Error('No public page content was submitted. Please refresh the page and save again.');

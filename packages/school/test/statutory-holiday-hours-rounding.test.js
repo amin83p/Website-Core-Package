@@ -60,3 +60,17 @@ test('normalizePolicyFromForm round-trips statutoryHolidayRoundCalculatedHours',
   });
   assert.equal(disabled.statutoryHolidayPay.roundCalculatedHours, false);
 });
+
+test('normalizePolicyFromForm round-trips statutoryHolidaySkipAfterBoundaryInNextMonth', () => {
+  const enabled = timesheetParametersPolicyService.normalizePolicyFromForm({
+    emptyEnrollmentSessions: 'hide',
+    statutoryHolidaySkipAfterBoundaryInNextMonth: 'true'
+  });
+  assert.equal(enabled.statutoryHolidayPay.skipAfterBoundaryInNextMonth, true);
+
+  const disabled = timesheetParametersPolicyService.normalizePolicyFromForm({
+    emptyEnrollmentSessions: 'hide',
+    statutoryHolidaySkipAfterBoundaryInNextMonth: 'false'
+  });
+  assert.equal(disabled.statutoryHolidayPay.skipAfterBoundaryInNextMonth, false);
+});

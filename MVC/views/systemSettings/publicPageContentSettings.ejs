@@ -91,6 +91,11 @@
           </button>
         </li>
         <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="important-notices-content-tab" data-bs-toggle="tab" data-bs-target="#important-notices-content-pane" type="button" role="tab" aria-controls="important-notices-content-pane" aria-selected="false">
+            <i class="bi bi-megaphone me-1"></i>Important Notices
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
           <button class="nav-link fw-semibold" id="surface-contact-tab-main" data-bs-toggle="tab" data-bs-target="#surface-contact-pane" type="button" role="tab" aria-controls="surface-contact-pane" aria-selected="false">
             <i class="bi bi-window-sidebar me-1"></i>Contact Page
           </button>
@@ -584,6 +589,142 @@
                   <input type="text" class="form-control font-monospace" data-content-path="about.footerCta.secondaryHref">
                 </div>
               </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="important-notices-content-pane" role="tabpanel" aria-labelledby="important-notices-content-tab" tabindex="0">
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-megaphone text-primary me-2"></i>Important Notices Hero</h2>
+                <p>Public /important-notices page header and actions.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="importantNotices.hero.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Title</label>
+                  <input type="text" class="form-control" data-content-path="importantNotices.hero.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Subtitle</label>
+                  <textarea class="form-control" rows="3" data-content-path="importantNotices.hero.subtitle"></textarea>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Label</label>
+                  <input type="text" class="form-control" data-content-path="importantNotices.hero.primaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="importantNotices.hero.primaryHref">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Label</label>
+                  <input type="text" class="form-control" data-content-path="importantNotices.hero.secondaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="importantNotices.hero.secondaryHref">
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-bar-chart text-primary me-2"></i>Notices Highlights</h2>
+                <p>Hero chips on the Important Notices page.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="importantNotices.highlights">
+                <i class="bi bi-plus-lg me-1"></i>Add Highlight
+              </button>
+            </div>
+            <div class="settings-card-body repeatable-body" id="importantNoticesHighlightRows"></div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-info-circle text-primary me-2"></i>Page Intro</h2>
+                <p>Overview block above the notice list.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="importantNotices.intro.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Title</label>
+                  <input type="text" class="form-control" data-content-path="importantNotices.intro.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Body</label>
+                  <textarea class="form-control" rows="3" data-content-path="importantNotices.intro.body"></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-journal-text text-primary me-2"></i>Notices</h2>
+                <p>Repeatable legal and policy notices (shown on the public page).</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="importantNotices.notices">
+                <i class="bi bi-plus-lg me-1"></i>Add Notice
+              </button>
+            </div>
+            <div class="settings-card-body repeatable-body" id="importantNoticesNoticeRows"></div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-link-45deg text-primary me-2"></i>Related Resources</h2>
+                <p>Cross-links panel at the bottom of the notice list.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Panel Title</label>
+                  <input type="text" class="form-control" data-content-path="importantNotices.resourcePanel.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Panel Body</label>
+                  <textarea class="form-control" rows="2" data-content-path="importantNotices.resourcePanel.body"></textarea>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-semibold">Resource links</span>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="importantNotices.resourcePanel.links">
+                  <i class="bi bi-plus-lg me-1"></i>Add Link
+                </button>
+              </div>
+              <div class="repeatable-body" id="importantNoticesResourceLinkRows"></div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-chat-square-text text-primary me-2"></i>Important Notices Final CTA</h2>
+                <p>Closing call-to-action block.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <%- include('./publicPageContentSettingsFields/finalCta', { prefix: 'importantNotices.finalCta', includeEyebrow: false }) %>
             </div>
           </section>
         </div>
@@ -1250,6 +1391,30 @@
       fields: [
         { name: 'name', label: 'Name', col: 'col-md-8' },
         { name: 'icon', label: 'Icon', col: 'col-md-4' }
+      ]
+    },
+    'importantNotices.highlights': { containerId: 'importantNoticesHighlightRows', title: 'Highlight', empty: { value: '', label: '', active: true }, fields: commonHighlightFields },
+    'importantNotices.notices': {
+      containerId: 'importantNoticesNoticeRows',
+      title: 'Notice',
+      empty: { title: '', category: '', effectiveDate: '', summary: '', body: [], linkLabel: '', linkHref: '', active: true },
+      fields: [
+        { name: 'title', label: 'Title', col: 'col-md-6' },
+        { name: 'category', label: 'Category', col: 'col-md-3' },
+        { name: 'effectiveDate', label: 'Effective Date (YYYY-MM-DD)', col: 'col-md-3' },
+        { name: 'summary', label: 'Summary', kind: 'textarea', col: 'col-md-12' },
+        { name: 'body', label: 'Body Paragraphs (blank line between paragraphs)', kind: 'paragraphs', col: 'col-md-12' },
+        { name: 'linkLabel', label: 'Optional Link Label', col: 'col-md-4' },
+        { name: 'linkHref', label: 'Optional Link URL', col: 'col-md-8' }
+      ]
+    },
+    'importantNotices.resourcePanel.links': {
+      containerId: 'importantNoticesResourceLinkRows',
+      title: 'Resource Link',
+      empty: { label: '', href: '', active: true },
+      fields: [
+        { name: 'label', label: 'Label', col: 'col-md-5' },
+        { name: 'href', label: 'Link', col: 'col-md-7' }
       ]
     },
     'about.experiences': {

@@ -97,6 +97,7 @@ const PUBLIC_MENU_ENDPOINT_OPTIONS = Object.freeze([
   { label: 'Biography', href: '/biography', icon: 'bi-person-badge', visibility: 'all', target: '_self', category: 'Core' },
   { label: 'Contact', href: '/contact', icon: 'bi-envelope', visibility: 'all', target: '_self', category: 'Core' },
   { label: 'About', href: '/about', icon: 'bi-info-circle', visibility: 'all', target: '_self', category: 'Core' },
+  { label: 'Important Notices', href: '/important-notices', icon: 'bi-megaphone', visibility: 'all', target: '_self', category: 'Core' },
   { label: 'Create Account', href: '/persons/join', icon: 'bi-person-plus', visibility: 'guest', target: '_self', category: 'Account' },
   { label: 'Register', href: '/persons/register', icon: 'bi-pencil-square', visibility: 'guest', target: '_self', category: 'Account' },
   { label: 'Sign In', href: '/login', icon: 'bi-box-arrow-in-right', visibility: 'guest', target: '_self', category: 'Account' },

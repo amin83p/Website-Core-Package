@@ -1,5 +1,7 @@
 # Attendance Operation and Scope Capabilities
 
+> **Superseded:** Use [attendance-operation-scope-capabilities-2026-09-06.md](design_docs/attendance-operation-scope-capabilities-2026-09-06.md) in `docs/design_docs/`.
+
 Access Profile reference | 4 September 2026
 
 This matrix describes the effective **SCHOOL_ATTENDANCES** behavior after central access approval. Every action is rechecked against the target class, session, enrollment window, session lock, completed-session edit policy, and matrix business rules. Client-side flags improve UX but are not authoritative.

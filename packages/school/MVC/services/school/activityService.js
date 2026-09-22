@@ -253,6 +253,16 @@ function isPersonHiddenFromTimesheetSelection(activity = {}, personId) {
   return hiddenSet.has(targetPersonId);
 }
 
+function isActivityShownInTimesheetManualSelection(activity = {}) {
+  return activity.showInTimesheetActivities !== false;
+}
+
+function isPersonEligibleForManualTimesheetActivity(activity = {}, personId) {
+  if (!isActivityShownInTimesheetManualSelection(activity)) return false;
+  if (isPersonHiddenFromTimesheetSelection(activity, personId)) return false;
+  return isPersonEligibleForActivity(activity, personId);
+}
+
 function listLegacyAttendeePersonIds(activity = {}) {
   return normalizePersonIdList(activity?.attendees || []);
 }
@@ -490,6 +500,7 @@ function normalizeActivityRecord(activity = {}) {
     allowedPersonIds,
     excludedPersonIds,
     hiddenPersonIds,
+    showInTimesheetActivities: isActivityShownInTimesheetManualSelection(activity),
     attendees,
     entries
   };
@@ -836,6 +847,23 @@ async function saveActivity(payload = {}, reqUser) {
   return created;
 }
 
+async function setShowInTimesheetActivities(activityId, showInTimesheetActivities, reqUser) {
+  const targetId = normalizeId(activityId);
+  if (!targetId) return null;
+  const existing = await schoolDataService.getDataById('activities', targetId, reqUser);
+  if (!existing) return null;
+  const visible = showInTimesheetActivities !== false;
+  if (isActivityShownInTimesheetManualSelection(existing) === visible) return existing;
+  const next = normalizeActivityRecord({
+    ...existing,
+    showInTimesheetActivities: visible
+  });
+  return schoolDataService.updateData('activities', targetId, {
+    ...existing,
+    showInTimesheetActivities: next.showInTimesheetActivities
+  }, reqUser);
+}
+
 async function saveActivityCategory(payload = {}, reqUser) {
   const orgId = payload.orgId || getActiveOrgId(reqUser);
   const data = activityCategoryModel.sanitizeCategoryPayload({ ...payload, orgId });
@@ -1050,8 +1078,7 @@ async function listManualEntryActivitiesForPerson({ orgId, personId, reqUser } =
     if (!belongsToOrg(activity, orgId)) return false;
     if (normalizeStatus(activity.status) !== 'posted') return false;
     if (!isActiveManualEntryActivityRow(activity)) return false;
-    if (isPersonHiddenFromTimesheetSelection(activity, targetPersonId)) return false;
-    return isPersonEligibleForActivity(activity, targetPersonId);
+    return isPersonEligibleForManualTimesheetActivity(activity, targetPersonId);
   });
 }
 
@@ -1088,7 +1115,7 @@ async function listManualEntryWorkSessionsForPerson({
   if (!activity || !belongsToOrg(activity, orgId)) return [];
   if (normalizeStatus(activity.status) !== 'posted') return [];
   if (!isActiveManualEntryActivityRow(activity)) return [];
-  if (!isPersonEligibleForActivity(activity, targetPersonId)) return [];
+  if (!isPersonEligibleForManualTimesheetActivity(activity, targetPersonId)) return [];
 
   const visibilityScope = normalizeActivityVisibilityScope(
     activity.visibilityScope || activity.calendarScope || activity.scope
@@ -1169,6 +1196,14 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
           const className = importClassName
             ? (entryTitle.includes(importClassName) ? entryTitle : `${activity.title}: ${importClassName}`)
             : entryTitle;
+          const assigneeDepartmentId = normalizeId(
+            attendee?.deliveryDepartmentId || attendee?.departmentId
+          );
+          const assigneeDepartmentName = String(
+            attendee?.deliveryDepartmentName || attendee?.departmentName || ''
+          ).trim();
+          const resolvedDepartmentId = assigneeDepartmentId || activity.departmentId;
+          const resolvedDepartmentName = assigneeDepartmentName || activity.departmentName;
           return {
             sessionId: `act-${activity.id}-${entry.entryId}-${targetPersonId}${sessionIdSuffix}`,
             activityId: activity.id,
@@ -1178,10 +1213,10 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             endTime: timing.endTime || entry.endTime,
             className,
             classId: null,
-            deliveryDepartmentId: activity.departmentId,
-            deliveryDepartmentName: activity.departmentName,
-            departmentId: activity.departmentId,
-            departmentName: activity.departmentName,
+            deliveryDepartmentId: resolvedDepartmentId,
+            deliveryDepartmentName: resolvedDepartmentName,
+            departmentId: resolvedDepartmentId,
+            departmentName: resolvedDepartmentName,
             categoryName: activity.categoryName,
             visibilityScope: activity.visibilityScope,
             hours,
@@ -1199,7 +1234,7 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             personRole: resolveActivityEntryPersonRole(attendee),
             compensationLookup: {
               personId: targetPersonId,
-              departmentId: activity.departmentId,
+              departmentId: resolvedDepartmentId,
               activityId: activity.id,
               activityEntryId: entry.entryId
             }
@@ -1414,6 +1449,9 @@ module.exports = {
   isActivityWorkSessionAssignee,
   normalizeHiddenPersonIds,
   isPersonHiddenFromTimesheetSelection,
+  isActivityShownInTimesheetManualSelection,
+  isPersonEligibleForManualTimesheetActivity,
+  setShowInTimesheetActivities,
   enforceScopePersonRules,
   getScheduleEventsForPerson,
   buildActivityScheduleCompletionScan,

@@ -1005,6 +1005,7 @@ async function saveTimesheetParametersPolicy(req, res) {
         reqUser: req.user,
         activityId
       });
+      await activityService.setShowInTimesheetActivities(activityId, false, req.user);
     }
     const policy = await timesheetParametersPolicyModel.savePolicyForOrg(
       activeOrgId,

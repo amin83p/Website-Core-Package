@@ -39,6 +39,15 @@ function isPayableWorkdayEntry(entry = {}) {
   return timesheetPrintService.resolvePayableHours(entry) > 0;
 }
 
+function isWorkdayHistory(value) {
+  return Boolean(
+    value
+    && value.hoursByDate instanceof Map
+    && typeof value.lastWorkdayBefore === 'function'
+    && typeof value.firstWorkdayAfter === 'function'
+  );
+}
+
 class WorkdayHistory {
   constructor(hoursByDate = new Map()) {
     this.hoursByDate = hoursByDate;
@@ -128,7 +137,7 @@ class WorkdayHistory {
   }
 }
 
-async function buildWorkdayHistory({
+async function buildPersonWorkdayContext({
   orgId,
   personId,
   endDate,
@@ -142,6 +151,7 @@ async function buildWorkdayHistory({
     ? ''
     : addDays(end, -Math.max(1, Number(lookbackDays) || 120));
   const hoursByDate = new Map();
+  const payableEntries = [];
 
   function ingestEntry(entry) {
     if (!isPayableWorkdayEntry(entry)) return;
@@ -150,6 +160,7 @@ async function buildWorkdayHistory({
     const hours = timesheetPrintService.resolvePayableHours(entry);
     if (hours <= 0) return;
     hoursByDate.set(date, Number(((hoursByDate.get(date) || 0) + hours).toFixed(2)));
+    payableEntries.push(entry);
   }
 
   const timesheets = await schoolDataService.fetchData(
@@ -168,16 +179,35 @@ async function buildWorkdayHistory({
     resolveAuthoritativeEntries(timesheet).forEach(ingestEntry);
   });
 
-  (Array.isArray(supplementalEntries) ? supplementalEntries : []).forEach(ingestEntry);
+  function ingestSupplementalEntry(entry) {
+    if (!timesheetPrintService.isStatHolidayPlanningWorkdayEntry(entry)) return;
+    const date = String(entry?.date || '').trim();
+    if (!date || (start && date < start) || (end && date > end)) return;
+    const hours = timesheetPrintService.resolveStatHolidayPlanningHours(entry);
+    if (hours <= 0) return;
+    hoursByDate.set(date, Number(((hoursByDate.get(date) || 0) + hours).toFixed(2)));
+  }
 
-  return new WorkdayHistory(hoursByDate);
+  (Array.isArray(supplementalEntries) ? supplementalEntries : []).forEach(ingestSupplementalEntry);
+
+  return {
+    workdayHistory: new WorkdayHistory(hoursByDate),
+    payableEntries
+  };
+}
+
+async function buildWorkdayHistory(options = {}) {
+  const { workdayHistory } = await buildPersonWorkdayContext(options);
+  return workdayHistory;
 }
 
 module.exports = {
   WorkdayHistory,
+  isWorkdayHistory,
   addDays,
   getWeekday,
   resolveAuthoritativeEntries,
   isPayableWorkdayEntry,
-  buildWorkdayHistory
+  buildWorkdayHistory,
+  buildPersonWorkdayContext
 };

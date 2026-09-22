@@ -1,6 +1,6 @@
 # Notification Centre Operation and Scope Capabilities
 
-> **Superseded:** Use [notification-center-operation-scope-capabilities-2026-09-16.md](notification-center-operation-scope-capabilities-2026-09-16.md).
+> **Superseded:** Use [notification-center-operation-scope-capabilities-2026-09-16.md](../notification-center-operation-scope-capabilities-2026-09-16.md).
 
 Access Profile reference | 15 September 2026
 
@@ -15,18 +15,18 @@ Consult this document when:
 **Critical rules:**
 
 1. This doc defines **notification centre section behavior only** — not access to edit sessions, attendance, or timesheets (deep links still use target sections).
-2. **Bypass admins (Family A)** — see [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-2026-09-05.md). Operation/scope rows apply to **non-bypass users only** unless stated.
+2. **Bypass admins (Family A)** — see [admin-access-types-reference-2026-09-05.md](../admin-access-types-reference-2026-09-05.md). Operation/scope rows apply to **non-bypass users only** unless stated.
 3. **ADMIN in scope column** means Access Profile ADMIN scope (`SCP_ADMIN`, Family B) only.
 4. Evaluators must only include findings the **recipient** can act on; operators see batches filtered by **READ_ALL** scope tier.
 
 **Related documents:**
 
-- [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-2026-09-05.md)
-- [attendance-operation-scope-capabilities-2026-09-06.md](attendance-operation-scope-capabilities-2026-09-06.md)
+- [admin-access-types-reference-2026-09-05.md](../admin-access-types-reference-2026-09-05.md)
+- [attendance-operation-scope-capabilities-2026-09-06.md](../attendance-operation-scope-capabilities-2026-09-06.md)
 
 **Status:** Manual workflow (no background prepare/dispatch tasks). Operators run rules, review findings, and schedule email only.
 
-**Navigation:** Primary entry is the **School dashboard** tile (`/school` → Notification Centre, grouped beside Reports). Package catalog nests section **445586** under **SCHOOL_REPORTS**. List UI follows [list-page-development-guide.md](../../packages/school/docs/list-page-development-guide.md) (Skills baseline).
+**Navigation:** Primary entry is the **School dashboard** tile (`/school` → Notification Centre, grouped beside Reports). Package catalog nests section **445586** under **SCHOOL_REPORTS**. List UI follows [list-page-development-guide.md](../../../packages/school/docs/list-page-development-guide.md) (Skills baseline).
 
 **Automation:** Notification Centre does **not** register active scheduled prepare/dispatch tasks. Legacy `school.notificationCenter` task definitions are disabled when rules are saved or the centre home loads.
 

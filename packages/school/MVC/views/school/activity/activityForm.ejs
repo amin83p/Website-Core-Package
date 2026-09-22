@@ -202,6 +202,14 @@
               <div class="form-text small">Assignees can still be marked unpaid per work session.</div>
             </div>
             <div class="col-md-4">
+              <input type="hidden" name="showInTimesheetActivities" id="showInTimesheetActivitiesInput" value="<%= row.showInTimesheetActivities === false ? 'false' : 'true' %>">
+              <div class="form-check form-switch mt-4">
+                <input class="form-check-input" type="checkbox" id="showInTimesheetActivitiesSwitch" <%= row.showInTimesheetActivities !== false ? 'checked' : '' %>>
+                <label class="form-check-label fw-bold" for="showInTimesheetActivitiesSwitch">Show in timesheet activities</label>
+              </div>
+              <div class="form-text small">When off, this activity is hidden from the manual timesheet activity list for everyone. System-posted hours (for example statutory holiday pay) can still appear on the timesheet.</div>
+            </div>
+            <div class="col-md-4">
               <label class="form-label fw-bold">Evaluation type *</label>
               <select name="evaluationType" id="activityEvaluationType" class="form-select size-md" required <%= evaluationTypeLocked ? 'disabled' : '' %>>
                 <option value="attendance" <%= evaluationType === 'attendance' ? 'selected' : '' %>>Attendance — presence/absence is the criterion</option>
@@ -487,6 +495,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const entryModalEl = document.getElementById('activityEntryModal');
   const entryModalBody = document.getElementById('activityEntryModalBody');
   const paidInput = document.getElementById('activityPaid');
+  const showInTimesheetActivitiesInput = document.getElementById('showInTimesheetActivitiesInput');
+  const showInTimesheetActivitiesSwitch = document.getElementById('showInTimesheetActivitiesSwitch');
   const categorySelect = document.getElementById('activityCategoryId');
   const visibilityScopeSelect = document.getElementById('activityVisibilityScope');
   const activityTitleInput = document.getElementById('activityTitle');
@@ -692,6 +702,11 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
     return new Set(schoolAllowed);
+  }
+
+  function syncShowInTimesheetActivitiesInput() {
+    if (!showInTimesheetActivitiesInput || !showInTimesheetActivitiesSwitch) return;
+    showInTimesheetActivitiesInput.value = showInTimesheetActivitiesSwitch.checked ? 'true' : 'false';
   }
 
   function syncActivityScopePersonControlInputs() {
@@ -2407,8 +2422,11 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   document.getElementById('generateActivityEntries')?.addEventListener('click', generateActivityBatchEntries);
 
+  showInTimesheetActivitiesSwitch?.addEventListener('change', syncShowInTimesheetActivitiesInput);
+
   form.addEventListener('submit', async function (event) {
     event.preventDefault();
+    syncShowInTimesheetActivitiesInput();
     const validationMessage = validateEntriesBeforeSubmit();
     if (validationMessage) {
       await safeShowMessage({
