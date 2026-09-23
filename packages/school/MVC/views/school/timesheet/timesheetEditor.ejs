@@ -704,39 +704,9 @@
   #tsDepartmentTotals .table {
     margin-bottom: 0;
   }
-  .copy-manual-days-list {
-    max-height: 300px;
-    overflow-y: auto;
-    border: 1px solid var(--bs-border-color);
-    border-radius: 0.375rem;
-    background: #fff;
-  }
-  .copy-manual-day-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.7rem 1rem;
-    border-bottom: 1px solid var(--bs-border-color);
-    cursor: pointer;
-    user-select: none;
-  }
-  .copy-manual-day-item:last-child {
-    border-bottom: 0;
-  }
-  .copy-manual-day-item:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-  }
-  .copy-manual-day-item.is-selected {
-    background-color: rgba(13, 110, 253, 0.08);
-  }
-  .copy-manual-day-date {
-    font-weight: 600;
-    color: var(--bs-body-color);
-    min-width: 8.5rem;
-  }
-  .copy-manual-day-weekday {
-    color: var(--bs-secondary-color);
-    font-size: 0.875rem;
+  .copy-manual-source-card {
+    border-left: 4px solid var(--bs-primary) !important;
+    background: #fff !important;
   }
   .copy-manual-source-meta {
     display: flex;
@@ -749,6 +719,131 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
+  }
+  .copy-manual-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+  }
+  .copy-manual-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .copy-manual-legend-swatch {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+  }
+  .copy-manual-legend-swatch--day0 { background: #ffffff; }
+  .copy-manual-legend-swatch--day1 { background: #eef2f7; }
+  .copy-manual-legend-swatch--holiday { background: #f8d7da; }
+  .copy-manual-legend-swatch--selected { background: #fff; box-shadow: 0 0 0 2px #0d6efd; }
+  .copy-manual-legend-swatch--dim { background: #eef2f7; opacity: 0.45; }
+  .copy-manual-days-scroll {
+    max-height: min(22rem, 50vh);
+    overflow-y: auto;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 0.65rem;
+  }
+  .copy-manual-days-calendar {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+  .copy-manual-weekday-label {
+    text-align: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bs-secondary-color);
+    padding-bottom: 0.15rem;
+  }
+  .copy-manual-day-pad {
+    min-height: 3.25rem;
+  }
+  .copy-manual-day-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.25rem;
+    padding: 0.35rem 0.2rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    text-align: center;
+    user-select: none;
+    transition: box-shadow 0.12s ease, transform 0.12s ease;
+  }
+  label.copy-manual-day-tile {
+    cursor: pointer;
+    margin-bottom: 0;
+  }
+  label.copy-manual-day-tile:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+  .copy-manual-day-tile.is-selected {
+    box-shadow: 0 0 0 2px #0d6efd;
+  }
+  .copy-manual-day-tile.is-unavailable,
+  .copy-manual-day-tile.is-source {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .copy-manual-tile-holiday { background-color: #f8d7da; }
+  .copy-manual-tile-day-0 { background-color: #ffffff; }
+  .copy-manual-tile-day-1 { background-color: #eef2f7; }
+  .copy-manual-tile-day-num {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--bs-body-color);
+  }
+  .copy-manual-tile-weekday {
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+    line-height: 1.2;
+  }
+  .copy-manual-tile-holiday-name {
+    font-size: 0.58rem;
+    line-height: 1.15;
+    color: #842029;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 0.1rem;
+  }
+  .copy-manual-tile-badge {
+    position: absolute;
+    top: 0.15rem;
+    right: 0.15rem;
+    font-size: 0.55rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.2rem;
+    background: rgba(13, 110, 253, 0.12);
+    color: #0d6efd;
+  }
+  .copy-manual-day-tile .js-copy-day {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
   }
   @media (max-width: 767.98px) {
     .ts-page-header {
@@ -1214,15 +1309,18 @@
 </div>
 
 <div class="modal fade" id="copyManualRowModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-scrollable">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
     <div class="modal-content border-0 shadow">
-      <div class="modal-header bg-light border-0">
-        <h5 class="modal-title fw-bold"><i class="bi bi-copy me-2 text-primary"></i>Copy to Other Days</h5>
+      <div class="modal-header bg-white border-bottom">
+        <div>
+          <h5 class="modal-title fw-bold mb-0"><i class="bi bi-copy me-2 text-primary"></i>Copy to Other Days</h5>
+          <p class="small text-muted mb-0 mt-1">Choose days in this pay period without schedule conflicts.</p>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="copyManualSourceSessionId">
-        <div class="card border bg-light mb-3" id="copyManualSourceCard">
+        <div class="card border copy-manual-source-card shadow-sm mb-3" id="copyManualSourceCard">
           <div class="card-body py-3">
             <div class="small text-muted mb-1">Row to copy</div>
             <div class="fw-bold text-body" id="copyManualSourceTitle">—</div>
@@ -1234,18 +1332,27 @@
           </div>
         </div>
         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-          <label class="form-label fw-bold mb-0" for="copyManualDaysList">Target days</label>
+          <label class="form-label fw-bold mb-0" for="copyManualDaysCalendar">Target days</label>
           <div class="btn-group btn-group-sm" id="copyManualQuickSelect">
             <button type="button" class="btn btn-outline-secondary" id="btnCopySelectAll">Select all</button>
             <button type="button" class="btn btn-outline-secondary" id="btnCopyClearAll">Clear</button>
           </div>
         </div>
-        <p class="small text-muted mb-3" id="copyManualRowSummary">Only days without schedule conflicts are listed below.</p>
+        <p class="small text-muted mb-2" id="copyManualRowSummary">Dimmed days cannot be copied (conflict or source day).</p>
+        <div class="copy-manual-legend mb-3" id="copyManualDaysLegend" aria-hidden="false">
+          <span class="copy-manual-legend-item"><span class="copy-manual-legend-swatch copy-manual-legend-swatch--day0"></span>Weekday</span>
+          <span class="copy-manual-legend-item"><span class="copy-manual-legend-swatch copy-manual-legend-swatch--day1"></span>Alt weekday</span>
+          <span class="copy-manual-legend-item"><span class="copy-manual-legend-swatch copy-manual-legend-swatch--holiday"></span>Weekend / statutory holiday</span>
+          <span class="copy-manual-legend-item"><span class="copy-manual-legend-swatch copy-manual-legend-swatch--selected"></span>Selected</span>
+          <span class="copy-manual-legend-item"><span class="copy-manual-legend-swatch copy-manual-legend-swatch--dim"></span>Unavailable</span>
+        </div>
         <div id="copyManualDaysEmpty" class="alert alert-warning d-none mb-0">No eligible days are available. Every other day in this period either conflicts with this time range or is unavailable.</div>
-        <div id="copyManualDaysList" class="list-group copy-manual-days-list" role="group" aria-label="Eligible target days"></div>
-        <div class="small text-muted mt-2" id="copyManualSelectionCount" aria-live="polite">Select one or more days above</div>
+        <div id="copyManualDaysList" class="copy-manual-days-scroll d-none" role="group" aria-label="Target days in this pay period">
+          <div id="copyManualDaysCalendar" class="copy-manual-days-calendar"></div>
+        </div>
+        <div class="small text-muted mt-2" id="copyManualSelectionCount" aria-live="polite">Select one or more days on the calendar</div>
       </div>
-      <div class="modal-footer bg-light border-0">
+      <div class="modal-footer bg-white border-top">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-primary fw-bold" id="btnConfirmCopyManualRow" disabled>Copy to <span id="copyManualBtnCount">0</span> days</button>
       </div>
@@ -1832,7 +1939,12 @@ document.addEventListener('DOMContentLoaded', () => {
         operation = ''
     } = {}) {
         if (typeof window.showLoading !== 'function') return null;
-        return window.showLoading({ title, note, operation });
+        const operationLabel = String(operation || '').trim();
+        return window.showLoading({
+            title,
+            note,
+            operation: operationLabel
+        });
     }
 
     function hideTimesheetWaitingModal(token = null) {
@@ -5285,7 +5397,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncCopyManualConfirmButton() {
-        const checked = document.querySelectorAll('#copyManualDaysList input.js-copy-day:checked');
+        const checked = document.querySelectorAll('#copyManualDaysCalendar input.js-copy-day:checked');
         const count = checked.length;
         const btn = document.getElementById('btnConfirmCopyManualRow');
         const countEl = document.getElementById('copyManualBtnCount');
@@ -5295,12 +5407,116 @@ document.addEventListener('DOMContentLoaded', () => {
         if (summaryCount) {
             summaryCount.textContent = count
                 ? `${count} day${count === 1 ? '' : 's'} selected`
-                : 'Select one or more days above';
+                : 'Select one or more days on the calendar';
         }
-        document.querySelectorAll('.copy-manual-day-item').forEach((item) => {
+        document.querySelectorAll('.copy-manual-day-tile').forEach((item) => {
             const input = item.querySelector('input.js-copy-day');
-            item.classList.toggle('is-selected', Boolean(input?.checked));
+            if (!input) return;
+            item.classList.toggle('is-selected', Boolean(input.checked));
         });
+    }
+
+    function resolveCopyManualTileBgClass(dateStr) {
+        const hol = holidayMap.get(dateStr);
+        const isHoliday = Boolean(hol);
+        const isWeekend = isWeekendDate(dateStr);
+        if (isHoliday || isWeekend) return 'copy-manual-tile-holiday';
+        const dayIndex = dateDayIndexMap.get(dateStr) ?? 0;
+        return `copy-manual-tile-day-${Math.abs(Number(dayIndex) || 0) % 2}`;
+    }
+
+    function copyManualTileDayNumber(dateStr) {
+        const parts = String(dateStr || '').split('-').map((part) => Number(part));
+        if (parts.length !== 3 || !Number.isFinite(parts[2])) return '';
+        return String(parts[2]);
+    }
+
+    function buildCopyManualDayTileInnerHtml(dateStr) {
+        const dayNum = copyManualTileDayNumber(dateStr);
+        const weekdayShort = formatTimesheetDatePart(dateStr, { weekday: 'short' });
+        const hol = holidayMap.get(dateStr);
+        const holName = hol ? holidayName(hol) : '';
+        const holHtml = holName
+            ? `<div class="copy-manual-tile-holiday-name" title="${escapeHtml(holName)}">${escapeHtml(holName.length > 12 ? `${holName.slice(0, 11)}…` : holName)}</div>`
+            : '';
+        return `
+            <span class="copy-manual-tile-day-num">${escapeHtml(dayNum)}</span>
+            <span class="copy-manual-tile-weekday">${escapeHtml(weekdayShort)}</span>
+            ${holHtml}
+        `;
+    }
+
+    function renderCopyManualDayCalendar({ sourceDate, eligibleSet } = {}) {
+        const calEl = document.getElementById('copyManualDaysCalendar');
+        const scrollEl = document.getElementById('copyManualDaysList');
+        const legendEl = document.getElementById('copyManualDaysLegend');
+        if (!calEl) return 0;
+        const source = String(sourceDate || '').trim();
+        const eligible = eligibleSet instanceof Set ? eligibleSet : new Set();
+        const periodDates = Array.isArray(dates) ? dates : [];
+        const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const parts = [];
+
+        weekdayLabels.forEach((label) => {
+            parts.push(`<div class="copy-manual-weekday-label">${escapeHtml(label)}</div>`);
+        });
+
+        if (periodDates.length) {
+            const firstDow = dateKeyWeekday(periodDates[0]).dayOfWeek;
+            const padCount = firstDow >= 0 ? firstDow : 0;
+            for (let i = 0; i < padCount; i += 1) {
+                parts.push('<div class="copy-manual-day-pad" aria-hidden="true"></div>');
+            }
+        }
+
+        let eligibleCount = 0;
+        periodDates.forEach((dateStr) => {
+            const token = String(dateStr || '').trim();
+            if (!token) return;
+            const bgClass = resolveCopyManualTileBgClass(token);
+            const inner = buildCopyManualDayTileInnerHtml(token);
+            const hol = holidayMap.get(token);
+            const titleParts = [formatTimesheetDateLabel(token, { weekday: 'long', month: 'long', day: 'numeric' })];
+            if (hol) titleParts.push(holidayName(hol));
+
+            if (token === source) {
+                titleParts.push('Source row (not a copy target)');
+                parts.push(`
+                    <div class="copy-manual-day-tile ${bgClass} is-source" title="${escapeHtml(titleParts.join(' · '))}">
+                        <span class="copy-manual-tile-badge">Source</span>
+                        ${inner}
+                    </div>
+                `);
+                return;
+            }
+
+            if (eligible.has(token)) {
+                eligibleCount += 1;
+                parts.push(`
+                    <label class="copy-manual-day-tile ${bgClass} is-eligible" title="${escapeHtml(titleParts.join(' · '))}">
+                        <input class="js-copy-day" type="checkbox" value="${escapeHtml(token)}" aria-label="${escapeHtml(titleParts[0])}">
+                        ${inner}
+                    </label>
+                `);
+                return;
+            }
+
+            titleParts.push('Not available (schedule conflict or unavailable)');
+            parts.push(`
+                <div class="copy-manual-day-tile ${bgClass} is-unavailable" title="${escapeHtml(titleParts.join(' · '))}">
+                    ${inner}
+                </div>
+            `);
+        });
+
+        calEl.innerHTML = parts.join('');
+        calEl.querySelectorAll('input.js-copy-day').forEach((input) => {
+            input.addEventListener('change', syncCopyManualConfirmButton);
+        });
+        if (scrollEl) scrollEl.classList.remove('d-none');
+        if (legendEl) legendEl.classList.remove('d-none');
+        syncCopyManualConfirmButton();
+        return eligibleCount;
     }
 
     function populateCopyManualSourceCard(source) {
@@ -5332,31 +5548,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function buildCopyManualDayOptionHtml(dateStr) {
-        const { dayName } = dateKeyWeekday(dateStr);
-        const hol = holidayMap.get(dateStr);
-        const displayDate = formatTimesheetDateLabel(dateStr, { weekday: 'short', month: 'short', day: 'numeric' });
-        const holidayBadge = hol
-            ? `<span class="badge text-bg-danger-subtle border text-danger ms-2">${escapeHtml(holidayName(hol))}</span>`
-            : '';
-        return `
-            <label class="copy-manual-day-item list-group-item list-group-item-action mb-0 border-0">
-                <input class="form-check-input js-copy-day flex-shrink-0" type="checkbox" value="${escapeHtml(dateStr)}">
-                <span class="copy-manual-day-date">${escapeHtml(displayDate)}</span>
-                <span class="copy-manual-day-weekday">${escapeHtml(dayName)}</span>
-                ${holidayBadge}
-            </label>
-        `;
-    }
-
     document.getElementById('btnCopySelectAll')?.addEventListener('click', () => {
-        document.querySelectorAll('#copyManualDaysList input.js-copy-day').forEach((input) => {
+        document.querySelectorAll('#copyManualDaysCalendar input.js-copy-day').forEach((input) => {
             input.checked = true;
         });
         syncCopyManualConfirmButton();
     });
     document.getElementById('btnCopyClearAll')?.addEventListener('click', () => {
-        document.querySelectorAll('#copyManualDaysList input.js-copy-day').forEach((input) => {
+        document.querySelectorAll('#copyManualDaysCalendar input.js-copy-day').forEach((input) => {
             input.checked = false;
         });
         syncCopyManualConfirmButton();
@@ -5375,16 +5574,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const sourceDate = String(source.date || '').trim();
         const candidateDates = listPeriodDatesExcluding(sourceDate);
-        const listEl = document.getElementById('copyManualDaysList');
+        const scrollEl = document.getElementById('copyManualDaysList');
+        const calEl = document.getElementById('copyManualDaysCalendar');
         const emptyEl = document.getElementById('copyManualDaysEmpty');
         const summaryEl = document.getElementById('copyManualRowSummary');
         const quickSelectEl = document.getElementById('copyManualQuickSelect');
+        const legendEl = document.getElementById('copyManualDaysLegend');
         const confirmBtn = document.getElementById('btnConfirmCopyManualRow');
         document.getElementById('copyManualSourceSessionId').value = String(sessionId || '');
         populateCopyManualSourceCard(source);
-        if (listEl) listEl.innerHTML = '<div class="text-center text-muted small py-4"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Checking eligible days…</div>';
+        if (scrollEl) scrollEl.classList.remove('d-none');
+        if (calEl) {
+            calEl.innerHTML = '<div class="text-center text-muted small py-4" style="grid-column:1/-1;"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Checking eligible days…</div>';
+        }
         if (emptyEl) emptyEl.classList.add('d-none');
         if (quickSelectEl) quickSelectEl.classList.add('d-none');
+        if (legendEl) legendEl.classList.add('d-none');
         if (summaryEl) summaryEl.classList.remove('d-none');
         if (confirmBtn) confirmBtn.disabled = true;
         syncCopyManualConfirmButton();
@@ -5394,23 +5599,25 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
 
         const loadingToken = showTimesheetWaitingModal({
-            title: 'Checking days',
-            note: 'Finding eligible days without conflicts…',
+            title: 'Checking eligible days',
+            note: 'Finding days in this period without schedule conflicts…',
             operation: 'copy_manual_probe'
         });
-        let eligible = [];
+        let eligibleSet = new Set();
         try {
-            const eligibleSet = await validateCopyTargetDatesBatch(source, candidateDates);
-            eligible = candidateDates.filter((dateStr) => eligibleSet.has(String(dateStr || '').trim()));
+            eligibleSet = await validateCopyTargetDatesBatch(source, candidateDates);
         } finally {
             hideTimesheetWaitingModal(loadingToken);
         }
 
-        if (!listEl) return;
-        if (!eligible.length) {
-            listEl.innerHTML = '';
+        if (!calEl) return;
+        const eligibleCount = eligibleSet.size;
+        if (!eligibleCount) {
+            if (scrollEl) scrollEl.classList.add('d-none');
+            if (calEl) calEl.innerHTML = '';
             if (emptyEl) emptyEl.classList.remove('d-none');
             if (quickSelectEl) quickSelectEl.classList.add('d-none');
+            if (legendEl) legendEl.classList.add('d-none');
             if (summaryEl) summaryEl.classList.add('d-none');
             if (confirmBtn) confirmBtn.disabled = true;
             syncCopyManualConfirmButton();
@@ -5419,14 +5626,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (emptyEl) emptyEl.classList.add('d-none');
         if (quickSelectEl) quickSelectEl.classList.remove('d-none');
         if (summaryEl) {
-            summaryEl.textContent = `${eligible.length} eligible day${eligible.length === 1 ? '' : 's'} without schedule conflicts.`;
+            summaryEl.textContent = `${eligibleCount} eligible day${eligibleCount === 1 ? '' : 's'} without schedule conflicts. Dimmed tiles cannot be copied.`;
             summaryEl.classList.remove('d-none');
         }
-        listEl.innerHTML = eligible.map((dateStr) => buildCopyManualDayOptionHtml(dateStr)).join('');
-        listEl.querySelectorAll('input.js-copy-day').forEach((input) => {
-            input.addEventListener('change', syncCopyManualConfirmButton);
-        });
-        syncCopyManualConfirmButton();
+        renderCopyManualDayCalendar({ sourceDate, eligibleSet });
     };
 
     document.getElementById('btnConfirmCopyManualRow')?.addEventListener('click', async () => {
@@ -5436,7 +5639,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await messageBox({ title: 'Copy Failed', icon: 'error', message: 'Source individual manual row was not found.' });
             return;
         }
-        const selectedDates = Array.from(document.querySelectorAll('#copyManualDaysList input.js-copy-day:checked'))
+        const selectedDates = Array.from(document.querySelectorAll('#copyManualDaysCalendar input.js-copy-day:checked'))
             .map((input) => String(input.value || '').trim())
             .filter(Boolean);
         if (!selectedDates.length) {
@@ -6418,10 +6621,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!ok) return;
         }
+        const adminActionLabels = {
+            approve: 'Manager approval',
+            process: 'Finance processing',
+            'allow-late-submission': 'Allow late submission',
+            return: 'Return to draft',
+            unprocess: 'Undo processing'
+        };
+        const endpointKey = String(endpoint || '').trim();
         const loadingToken = showTimesheetWaitingModal({
-            title: successTitle || 'Processing Request',
-            note: 'Please wait while this timesheet action completes...',
-            operation: endpoint
+            title: successTitle || 'Processing request',
+            note: 'Please wait while this timesheet action completes…',
+            operation: adminActionLabels[endpointKey] || endpointKey
         });
         try {
             const body = requestBody && typeof requestBody === 'object'

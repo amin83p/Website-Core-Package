@@ -211,6 +211,36 @@ function getLoadingElements() {
     };
 }
 
+function humanizeLoadingOperation(raw) {
+    const token = String(raw || '').trim();
+    if (!token) return '';
+
+    const knownLabels = {
+        copy_manual_probe: 'Checking eligible days',
+        approve: 'Manager approval',
+        process: 'Finance processing',
+        'allow-late-submission': 'Allow late submission',
+        return: 'Return to draft',
+        unprocess: 'Undo processing'
+    };
+    const direct = knownLabels[token] || knownLabels[token.toLowerCase()];
+    if (direct) return direct;
+
+    if (/\s/.test(token) && !/^[a-z0-9_-]+$/i.test(token)) {
+        return token;
+    }
+
+    if (/^[a-z0-9][a-z0-9_-]*$/i.test(token)) {
+        return token
+            .split(/[_-]+/)
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join(' ');
+    }
+
+    return token;
+}
+
 function normalizeLoadingState(input = {}) {
     if (typeof input === 'string') {
         return {
@@ -236,7 +266,7 @@ function normalizeLoadingState(input = {}) {
     }
 
     if (Object.prototype.hasOwnProperty.call(input, 'operation')) {
-        next.operation = String(input.operation || '').trim();
+        next.operation = humanizeLoadingOperation(String(input.operation || '').trim());
     }
 
     if (Object.prototype.hasOwnProperty.call(input, 'progress')) {

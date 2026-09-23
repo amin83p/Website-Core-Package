@@ -8,7 +8,8 @@
       <h5 id="globalLoadingTitle" class="app-loading-title">Please wait</h5>
       <p id="globalLoadingNote" class="app-loading-note mb-0">Processing your request...</p>
       <p id="globalLoadingOperationWrap" class="app-loading-operation d-none mb-0">
-        Operation: <span id="globalLoadingOperation"></span>
+        <span class="app-loading-operation-label">Step</span>
+        <span id="globalLoadingOperation"></span>
       </p>
       <div id="globalLoadingProgressWrap" class="app-loading-progress d-none">
         <div class="progress">
@@ -112,6 +113,22 @@
     color: #0f4c81;
     font-size: 0.94rem;
     font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .app-loading-operation-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(15, 76, 129, 0.08);
   }
 
   .app-loading-progress {

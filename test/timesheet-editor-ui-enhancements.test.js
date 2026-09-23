@@ -768,3 +768,25 @@ test('timesheet list and editor expose year bulk delete and period navigation', 
   assert.match(controller, /prevPeriodNav/);
   assert.match(routes, /\/api\/import\/legacy\/year/);
 });
+
+test('copy manual row modal uses period calendar tiles with holiday styling', () => {
+  const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
+
+  assert.match(editor, /id="copyManualDaysCalendar"/);
+  assert.match(editor, /copy-manual-days-calendar/);
+  assert.match(editor, /copy-manual-tile-holiday/);
+  assert.match(editor, /copy-manual-tile-day-0/);
+  assert.match(editor, /function renderCopyManualDayCalendar/);
+  assert.match(editor, /Weekend \/ statutory holiday/);
+  assert.match(editor, /copyManualRowModal[\s\S]*modal-lg/);
+});
+
+test('global loading modal humanizes internal operation slugs', () => {
+  const main = read('public/scripts/main.js');
+  const loadingModal = read('MVC/views/partials/loadingModal.ejs');
+
+  assert.match(main, /function humanizeLoadingOperation/);
+  assert.match(main, /copy_manual_probe:\s*'Checking eligible days'/);
+  assert.match(loadingModal, /app-loading-operation-label/);
+  assert.doesNotMatch(loadingModal, /Operation:\s*<span id="globalLoadingOperation"/);
+});
