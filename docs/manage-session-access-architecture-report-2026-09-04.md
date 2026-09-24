@@ -140,7 +140,7 @@ On page load, the controller tries `manageSession` first; if that fails it falls
         }
 ```
 
-Class admin override (`SCHOOL_CLASSES` UPDATE admin) unlocks administrative session metadata, co-teacher management, and most completed-session section overrides via `canOverride`.
+Class admin override (`SCHOOL_CLASSES` UPDATE admin) unlocks administrative session metadata, co-teacher management, and most completed-session section overrides via `canOverride`. Access Profile matrix: [design_docs/classes-operation-scope-capabilities-2026-09-24.md](design_docs/classes-operation-scope-capabilities-2026-09-24.md).
 
 ## Sub-Feature Access Matrix
 

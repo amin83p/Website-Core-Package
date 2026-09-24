@@ -12,7 +12,7 @@ Consult this document when:
 
 **Critical rules:**
 
-1. This doc defines **attendance-section behavior only** — not which classes/sessions appear (see `SCHOOL_CLASSES` / `SCHOOL_SESSIONS`).
+1. This doc defines **attendance-section behavior only** — not which classes/sessions appear (see [classes-operation-scope-capabilities-2026-09-24.md](classes-operation-scope-capabilities-2026-09-24.md) / `SCHOOL_SESSIONS`).
 2. **Bypass admins (Family A)** — see [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-2026-09-05.md). Operation/scope rows apply to **non-bypass users only**.
 3. **ADMIN in scope column** means Access Profile ADMIN scope (`SCP_ADMIN`, Family B) only — incremental `"+"` extras, not bypass admins.
 4. **Locked sessions** are visible to all scopes that can open the matrix; lock blocks **UPDATE** only (unless UPDATE + ADMIN scope or bypass override A1).

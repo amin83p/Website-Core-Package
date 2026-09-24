@@ -31,6 +31,7 @@ Canonical design references for **access profiles**, architecture, and cross-cut
 | `SCHOOL_ATTENDANCES`, `SCHOOL_ATTENDANCE_REPORT` | Attendance | [matrix](attendance-operation-scope-capabilities-2026-09-06.md) | [docx](attendance-operation-scope-capabilities-2026-09-06.docx) | target-spec | `node scripts/seed-school-attendances-section.js` · `node scripts/school/verify-attendance-access-profiles.js` |
 | `SCHOOL_SESSION_STUDENT_CASES` | Session student cases | [matrix](student-case-operation-scope-capabilities-2026-09-06.md) | [docx](student-case-operation-scope-capabilities-2026-09-06.docx) | implemented | `node scripts/seed-school-student-cases-section.js` · `node scripts/school/verify-student-case-access-profiles.js` |
 | `SCHOOL_NOTIFICATION_CENTER` | Notification centre | [matrix](notification-center-operation-scope-capabilities-2026-09-16.md) | [docx](notification-center-operation-scope-capabilities-2026-09-16.docx) | target-spec | Mongo section **445586** — no dedicated seed script yet (see matrix doc) |
+| `SCHOOL_CLASSES` | Classes | [matrix](classes-operation-scope-capabilities-2026-09-24.md) | [docx](classes-operation-scope-capabilities-2026-09-24.docx) | implemented | Mongo section **442039** — no dedicated seed script yet (see matrix doc) |
 
 ### Cross-cutting (not a section matrix)
 
