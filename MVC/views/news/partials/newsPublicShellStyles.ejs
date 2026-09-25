@@ -13,11 +13,14 @@ html.news-public-root body.news-public-body {
 }
 
 body.news-public-body > header,
-body.news-public-body > main,
-body.news-public-body > footer {
+body.news-public-body > main {
   background: transparent;
   position: relative;
-  z-index: 1;
+}
+
+body.news-public-body > footer {
+  position: relative;
+  z-index: 2;
 }
 
 main.news-public-main {
@@ -27,7 +30,6 @@ main.news-public-main {
   padding-bottom: clamp(2.5rem, 5vw, 5rem);
   padding-top: 0;
   position: relative;
-  z-index: 1;
 }
 
 .news-public-bg-shell {
