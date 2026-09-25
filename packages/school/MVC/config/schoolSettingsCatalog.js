@@ -44,6 +44,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     order: 35
   }),
   Object.freeze({
+    key: 'enrollment-finish-alert',
+    title: 'Enrollment Finish Alerts',
+    description: 'Highlight rolling enrollments near expected finish on Manage Session attendance.',
+    icon: 'bi-exclamation-circle',
+    order: 36
+  }),
+  Object.freeze({
     key: 'student-attendance-report',
     title: 'Student Attendance Report',
     description: 'Choose report templates used for generated student attendance reports.',

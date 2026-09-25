@@ -77,6 +77,19 @@
     ? statutoryHolidayPayPolicy.payableHolidayTypes
     : ['National Holiday', 'Observance Paid'];
   const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', importBaseStartTime: '00:00', saveImportedSessionsIntoOneWorkSession: true, importWorkSessionStartTime: '07:00', importWorkSessionEndTime: '21:00', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
+  const enrollmentFinishAlertPolicyJson = JSON.stringify(typeof enrollmentFinishAlertPolicy !== 'undefined' ? enrollmentFinishAlertPolicy : {}).replace(/</g, '\\u003c');
+  const enrollmentFinishAlertDaysValue = (typeof enrollmentFinishAlertPolicy !== 'undefined' && enrollmentFinishAlertPolicy?.daysToExpectedFinishDate != null)
+    ? String(enrollmentFinishAlertPolicy.daysToExpectedFinishDate)
+    : '';
+  const enrollmentFinishAlertSessionsValue = (typeof enrollmentFinishAlertPolicy !== 'undefined' && enrollmentFinishAlertPolicy?.sessionsToFinishEnrollment != null)
+    ? String(enrollmentFinishAlertPolicy.sessionsToFinishEnrollment)
+    : '';
+  const enrollmentFinishAlertHoursValue = (typeof enrollmentFinishAlertPolicy !== 'undefined' && enrollmentFinishAlertPolicy?.hoursToFinishEnrollment != null)
+    ? String(enrollmentFinishAlertPolicy.hoursToFinishEnrollment)
+    : '';
+  const enrollmentFinishAlertMessageValue = (typeof enrollmentFinishAlertPolicy !== 'undefined' && enrollmentFinishAlertPolicy?.alertMessage)
+    ? String(enrollmentFinishAlertPolicy.alertMessage)
+    : '';
   const timesheetImportActivityOptionsList = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
   const statutoryHolidayPublicActivityOptionsList = Array.isArray(statutoryHolidayPublicActivityOptions)
     ? statutoryHolidayPublicActivityOptions
@@ -1286,6 +1299,53 @@
         </div>
       </section>
 
+      <section class="school-settings-panel card border-0 shadow-sm" id="enrollment-finish-alert" role="tabpanel" aria-labelledby="settings-tab-enrollment-finish-alert" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Enrollment Finish Alerts</h2>
+              <p class="small text-muted mb-0">Turn the Manage Session attendance enrollment info button red when a rolling enrollment is near its expected finish.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted mb-3">Leave a threshold blank to disable that check. If any enabled threshold is met, the info button turns red and the message below appears in the enrollment info modal.</p>
+          <div class="alert alert-danger d-none js-settings-error" id="enrollmentFinishAlertSettingsError" role="alert"></div>
+          <form id="enrollmentFinishAlertSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" for="enrollmentFinishAlertDays">Days to expected finish date</label>
+                <input class="form-control" type="number" min="1" max="9999" step="1" id="enrollmentFinishAlertDays" value="<%= enrollmentFinishAlertDaysValue %>" placeholder="Off" <%= canUpdateFlag ? '' : 'disabled' %>>
+                <p class="small text-muted mb-0 mt-1">Alert when the session date is within this many days of the expected finish date (or past it).</p>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" for="enrollmentFinishAlertSessions">Sessions to finish enrollment</label>
+                <input class="form-control" type="number" min="1" max="9999" step="1" id="enrollmentFinishAlertSessions" value="<%= enrollmentFinishAlertSessionsValue %>" placeholder="Off" <%= canUpdateFlag ? '' : 'disabled' %>>
+                <p class="small text-muted mb-0 mt-1">Alert when remaining sessions to the enrollment target are at or below this number.</p>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" for="enrollmentFinishAlertHours">Hours to finish enrollment</label>
+                <input class="form-control" type="number" min="1" max="9999" step="1" id="enrollmentFinishAlertHours" value="<%= enrollmentFinishAlertHoursValue %>" placeholder="Off" <%= canUpdateFlag ? '' : 'disabled' %>>
+                <p class="small text-muted mb-0 mt-1">Alert when remaining hours to the enrollment target are at or below this number.</p>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold" for="enrollmentFinishAlertMessage">Modal message</label>
+                <textarea class="form-control" id="enrollmentFinishAlertMessage" rows="3" maxlength="500" placeholder="Optional message shown in the enrollment info modal when an alert is active." <%= canUpdateFlag ? '' : 'disabled' %>><%= enrollmentFinishAlertMessageValue %></textarea>
+              </div>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end mt-4">
+                <button class="btn btn-primary" type="submit" id="btnSaveEnrollmentFinishAlertSettings">
+                  <i class="bi bi-save me-1"></i>Save Enrollment Finish Alerts
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+
       <section class="school-settings-panel card border-0 shadow-sm" id="student-attendance-report" role="tabpanel" aria-labelledby="settings-tab-student-attendance-report" tabindex="0" hidden>
         <header class="school-settings-panel-header card-header px-4 py-3">
           <div class="d-flex align-items-center gap-3">
@@ -2077,6 +2137,7 @@
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
   let timesheetParametersPolicy = <%- timesheetParametersPolicyJson %>;
   let timesheetImportPolicy = <%- timesheetImportPolicyJson %>;
+  let enrollmentFinishAlertPolicy = <%- enrollmentFinishAlertPolicyJson %>;
   const timesheetImportActivityOptions = <%- timesheetImportActivityOptionsJson %>;
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
   let sarReportTemplateCapabilities = <%- studentAttendanceReportTemplateCapabilitiesJson %>;
@@ -3468,6 +3529,21 @@
     selectEl.addEventListener('change', syncStatHolidayMappingActivityFromSchemeActivity);
   });
   document.getElementById('statutoryHolidayDefaultSchemeId')?.addEventListener('change', syncStatHolidayMappingActivityFromSchemeActivity);
+
+  document.getElementById('enrollmentFinishAlertSettingsForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!canUpdate) return;
+    const button = event.submitter || document.getElementById('btnSaveEnrollmentFinishAlertSettings');
+    const result = await postSettings('/school/settings/enrollment-finish-alert', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      daysToExpectedFinishDate: document.getElementById('enrollmentFinishAlertDays')?.value || '',
+      sessionsToFinishEnrollment: document.getElementById('enrollmentFinishAlertSessions')?.value || '',
+      hoursToFinishEnrollment: document.getElementById('enrollmentFinishAlertHours')?.value || '',
+      alertMessage: document.getElementById('enrollmentFinishAlertMessage')?.value || ''
+    }, button, 'enrollmentFinishAlertSettingsError');
+    if (!result) return;
+    enrollmentFinishAlertPolicy = result.policy && typeof result.policy === 'object' ? result.policy : enrollmentFinishAlertPolicy;
+  });
 
   document.getElementById('timesheetParametersSettingsForm')?.addEventListener('submit', async event => {
     event.preventDefault();

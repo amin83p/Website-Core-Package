@@ -411,6 +411,20 @@ function buildCatalog() {
         return next;
       }
     },
+    {
+      key: 'school.enrollmentFinishAlertPolicy',
+      domain: 'School',
+      section: 'Enrollment Finish Alert Policy',
+      source: 'school/enrollmentFinishAlertPolicy.json',
+      collection: 'schoolEnrollmentFinishAlertPolicy',
+      sourceFormat: 'single_object',
+      transformRecord: (record) => ({ ...(record || {}), id: 'enrollment-finish-alert-policy' }),
+      inverseTransformRecord: (record) => {
+        const next = { ...(record || {}) };
+        if (next.id === 'enrollment-finish-alert-policy') delete next.id;
+        return next;
+      }
+    },
 
     // IELTS
     { key: 'ielts.task2Samples', domain: 'IELTS', section: 'Task 2 Samples', source: 'ielts/task2samples.json', collection: 'ieltsTask2Samples' },

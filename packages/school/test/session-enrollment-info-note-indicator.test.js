@@ -15,11 +15,18 @@ test('session manager defines enrollment info note style sync helper', () => {
 
 test('session manager highlights enrollment info button when note exists on render', () => {
   assert.match(viewSource, /hasEnrollmentNote/);
-  assert.match(viewSource, /hasEnrollmentNote \? 'btn-warning text-dark enrollment-info-trigger-has-note'/);
+  assert.match(viewSource, /enrollment-info-trigger-has-note/);
   assert.match(viewSource, /bi-info-circle-fill/);
 });
 
 test('session manager updates enrollment info button style after note save', () => {
-  assert.match(viewSource, /syncEnrollmentInfoTriggerNoteStyle\(activeEnrollmentInfoTrigger, savedNotes\)/);
+  assert.match(viewSource, /syncEnrollmentInfoTriggerStyle\(activeEnrollmentInfoTrigger, savedNotes\)/);
   assert.match(viewSource, /querySelectorAll\('\.js-enrollment-info-trigger'\)/);
+});
+
+test('session manager supports enrollment finish alert button styling', () => {
+  assert.match(viewSource, /enrollment-info-trigger-alert/);
+  assert.match(viewSource, /data-enrollment-alert-active/);
+  assert.match(viewSource, /attendanceEnrollmentInfoAlert/);
+  assert.match(viewSource, /btn-danger text-white enrollment-info-trigger-alert/);
 });

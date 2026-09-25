@@ -51,6 +51,7 @@ const attendanceEnrollmentNaLockService = require('../../services/school/attenda
 const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const sessionNaVisibilityService = require('../../services/school/sessionNaVisibilityService');
 const sessionEnrollmentContextService = require('../../services/school/sessionEnrollmentContextService');
+const enrollmentFinishAlertPolicyModel = require('../../models/school/enrollmentFinishAlertPolicyModel');
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
@@ -1626,8 +1627,9 @@ async function buildEnrichedSessionRosterForMutation({
     prefetchedStudents = null,
     prefetchedSessions = null,
     prefetchedPeriodRows = null,
-    prefetchedNaVisibility = null
-}) {
+    prefetchedNaVisibility = null,
+    enrollmentFinishAlertPolicy = null
+} = {}) {
     const hasPrefetch = Array.isArray(prefetchedPersons) && Array.isArray(prefetchedStudents);
     const identityData = hasPrefetch
         ? { persons: prefetchedPersons, students: prefetchedStudents }
@@ -1794,7 +1796,8 @@ async function buildEnrichedSessionRosterForMutation({
         students,
         sessions: Array.isArray(prefetchedSessions) ? prefetchedSessions : [workingSession],
         reqUser,
-        registrationMode: getClassRegistrationModeKey(classData)
+        registrationMode: getClassRegistrationModeKey(classData),
+        alertPolicy: enrollmentFinishAlertPolicy
     });
     filteredRoster.forEach((row) => {
         const pid = cleanPersonId(row?.personId);
@@ -4352,12 +4355,13 @@ async function manageSession(req, res) {
 
         // 2. Prefetch identity, subjects, and enrollment periods once; reuse across roster, reports, outline, and locks.
         const prefetchStart = Date.now();
-        const [allSubjects, rosterIdentityData, enrollmentPeriodRows] = await Promise.all([
+        const [allSubjects, rosterIdentityData, enrollmentPeriodRows, enrollmentFinishAlertPolicy] = await Promise.all([
             schoolDataService.fetchAllData('subjects', {}, req.user),
             loadSessionRosterIdentityData(req.user),
             isRollingClass
                 ? schoolDataService.getClassEnrollmentPeriodsByClassId(classId, req.user)
-                : Promise.resolve(null)
+                : Promise.resolve(null),
+            enrollmentFinishAlertPolicyModel.getPolicyForOrg(orgIdForPolicies)
         ]);
         logManageSessionStep(req, 'prefetch', prefetchStart);
 
@@ -4372,7 +4376,8 @@ async function manageSession(req, res) {
             prefetchedPersons: rosterIdentityData.persons,
             prefetchedStudents: rosterIdentityData.students,
             prefetchedSessions: sessions,
-            prefetchedPeriodRows: enrollmentPeriodRows
+            prefetchedPeriodRows: enrollmentPeriodRows,
+            enrollmentFinishAlertPolicy
         });
         logManageSessionStep(req, 'roster', rosterStart);
 
@@ -4719,6 +4724,7 @@ async function manageSession(req, res) {
             attendanceMatrixPolicyResolved,
             enabledAttendanceStatuses,
             canOpenAttendanceMatrix: Boolean(attendanceAccess.canOpenMatrix),
+            enrollmentFinishAlertPolicy,
             canViewAttendanceFields: Boolean(attendanceAccess.canViewRosterFields),
             canEditAttendanceRoster: Boolean(attendanceAccess.canEditRoster),
             canUploadAttendanceFiles: Boolean(attendanceAccess.canUploadFiles),

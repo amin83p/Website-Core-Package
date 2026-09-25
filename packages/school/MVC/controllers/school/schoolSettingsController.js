@@ -29,11 +29,13 @@ const {
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyReportPolicyModel');
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+const enrollmentFinishAlertPolicyModel = require('../../models/school/enrollmentFinishAlertPolicyModel');
 const timesheetImportPolicyModel = require('../../models/school/timesheetImportPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 const semiMonthlyReportPolicyService = require('../../services/school/semiMonthlyReportPolicyService');
 const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
+const enrollmentFinishAlertPolicyService = require('../../services/school/enrollmentFinishAlertPolicyService');
 const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
 const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
 const statutoryHolidayDayMappingService = require('../../services/school/statutoryHolidayDayMappingService');
@@ -402,6 +404,7 @@ async function loadSettingsPageData(req) {
     semiMonthlyReportPolicy,
     timesheetParametersPolicy,
     timesheetImportPolicy,
+    enrollmentFinishAlertPolicy,
     canUpdate
   ] = await Promise.all([
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
@@ -414,6 +417,7 @@ async function loadSettingsPageData(req) {
     semiMonthlyReportPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetImportPolicyModel.getPolicyForOrg(activeOrgId),
+    enrollmentFinishAlertPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
   const studentAttendanceReportLabels = await resolveStudentAttendanceReportLabels(
@@ -491,6 +495,7 @@ async function loadSettingsPageData(req) {
     semiMonthlyReportPolicy,
     timesheetParametersPolicy,
     timesheetImportPolicy,
+    enrollmentFinishAlertPolicy,
     timesheetImportActivityOptions,
     statutoryHolidayPublicActivityOptions,
     statutoryHolidayMappingYearOptions,
@@ -989,6 +994,28 @@ async function saveTimesheetImportPolicy(req, res) {
   }
 }
 
+async function saveEnrollmentFinishAlertPolicy(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const normalized = enrollmentFinishAlertPolicyService.validatePolicyInput(req.body || {});
+    const policy = await enrollmentFinishAlertPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      normalized,
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Enrollment finish alert settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save enrollment finish alert settings.'
+    });
+  }
+}
+
 async function saveTimesheetParametersPolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -1138,6 +1165,7 @@ module.exports = {
   saveStudentAttendanceReportSettings,
   saveSemiMonthlyReportSettings,
   saveTimesheetParametersPolicy,
+  saveEnrollmentFinishAlertPolicy,
   previewStatutoryHolidayDayMapping,
   mapStatutoryHolidayDays,
   saveTimesheetImportPolicy,

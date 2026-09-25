@@ -6,6 +6,7 @@ const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSes
 const classEnrollmentPeriodProgressService = require('./classEnrollmentPeriodProgressService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const enrollmentFinishAlertPolicyService = require('./enrollmentFinishAlertPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -84,7 +85,12 @@ function emptyEnrollmentContext() {
     enrollmentClbGoal: {},
     enrollmentClbRecordedAt: '',
     enrollmentExpectedFinishDate: '',
-    enrollmentNotes: ''
+    enrollmentNotes: '',
+    enrollmentRemainingSessionCount: null,
+    enrollmentRemainingHours: null,
+    enrollmentFinishAlertActive: false,
+    enrollmentFinishAlertReasons: [],
+    enrollmentFinishAlertDetails: []
   };
 }
 
@@ -96,7 +102,8 @@ async function buildRosterEnrollmentContextBatch({
   students = [],
   sessions = [],
   reqUser = null,
-  registrationMode = ''
+  registrationMode = '',
+  alertPolicy = null
 } = {}) {
   const mode = String(registrationMode || classData?.registrationMode || '').trim().toLowerCase();
   const people = Array.from(personIds instanceof Set ? personIds : new Set(personIds || []))
@@ -173,16 +180,38 @@ async function buildRosterEnrollmentContextBatch({
 
     const enrichedPeriod = progressByPeriodId.get(periodId) || period;
     const clbContext = map.get(personId) || buildClbContextFromStudent(findStudentByPersonId(students, personId));
+    const finishDate = resolveExpectedFinishDate({
+      period,
+      sessions,
+      statusMap,
+      enrichedPeriodRow: enrichedPeriod
+    });
+    const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(period?.targetSessionCount);
+    const targetHours = classEnrollmentSessionApplicabilityService.normalizeTargetHours(period?.targetHours);
+    const hasSessionTarget = targetSessionCount > 0
+      || (targetHours > 0 && enrichedPeriod?.effectiveTargetSessionCount > 0);
+    const hasHourTarget = targetHours > 0;
+    const remainingSessionCount = enrichedPeriod?.remainingSessionCount ?? null;
+    const remainingHours = enrichedPeriod?.remainingHours ?? null;
+    const alertEvaluation = enrollmentFinishAlertPolicyService.evaluateAlert({
+      policy: alertPolicy || {},
+      sessionDate: session?.date,
+      finishDate,
+      remainingSessionCount,
+      remainingHours,
+      hasSessionTarget,
+      hasHourTarget
+    });
     map.set(personId, {
       ...clbContext,
       enrollmentPeriodId: periodId,
-      enrollmentExpectedFinishDate: resolveExpectedFinishDate({
-        period,
-        sessions,
-        statusMap,
-        enrichedPeriodRow: enrichedPeriod
-      }),
-      enrollmentNotes: String(period.notes || '').trim()
+      enrollmentExpectedFinishDate: finishDate,
+      enrollmentNotes: String(period.notes || '').trim(),
+      enrollmentRemainingSessionCount: remainingSessionCount,
+      enrollmentRemainingHours: remainingHours,
+      enrollmentFinishAlertActive: alertEvaluation.active === true,
+      enrollmentFinishAlertReasons: Array.isArray(alertEvaluation.reasons) ? alertEvaluation.reasons : [],
+      enrollmentFinishAlertDetails: Array.isArray(alertEvaluation.details) ? alertEvaluation.details : []
     });
   });
 
