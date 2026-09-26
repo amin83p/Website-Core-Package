@@ -1322,3 +1322,133 @@ test('dedupeStatHolidayActivitySessionsForPerson keeps highest-hours row per sta
   assert.equal(familyDay.sessionId, 'act-1');
   assert.equal(familyDay.hours, 60);
 });
+
+test('getActivityEntries on statutory holiday activity avoids shared attendee fallback on day shells', () => {
+  const activity = {
+    title: 'STATUTORY HOLIDAY (LINC Payable)',
+    attendees: [{ personId: 'TEACHER/A', personName: 'Amin Paknejad' }],
+    entries: [
+      {
+        entryId: 'ENT-1',
+        date: '2026-02-16',
+        startTime: '08:00',
+        endTime: '20:00',
+        durationHours: 12,
+        notes: 'Statutory holiday',
+        assignees: []
+      },
+      {
+        entryId: 'ENT-2',
+        date: '2026-07-01',
+        startTime: '08:00',
+        endTime: '20:00',
+        durationHours: 12,
+        notes: 'Statutory holiday',
+        statHolidayId: 'H2',
+        assignees: [{
+          personId: 'TEACHER/A',
+          personName: 'Amin Paknejad',
+          statHolidayId: 'H2',
+          statHolidayPersonId: 'TEACHER/A',
+          paidHours: 6
+        }]
+      },
+      {
+        entryId: 'ENT-3',
+        date: '2026-08-03',
+        startTime: '08:00',
+        endTime: '20:00',
+        durationHours: 12,
+        notes: 'Statutory holiday',
+        assignees: [{
+          personId: 'TEACHER/A',
+          personName: 'Amin Paknejad',
+          statHolidayId: 'H2',
+          statHolidayPersonId: 'TEACHER/A',
+          paidHours: 6
+        }]
+      }
+    ]
+  };
+  const entries = activityService.getActivityEntries(activity);
+  assert.equal(entries[0].assignees.length, 0);
+  assert.equal(entries[1].assignees.length, 1);
+  assert.equal(entries[1].assignees[0].personId, 'TEACHER/A');
+  assert.equal(entries[2].assignees.length, 0);
+});
+
+test('alignActivityBoundEntryPlanningHours matches work session by activity date when activityEntryId is missing', async () => {
+  const originalGet = dataService.getDataById;
+  dataService.getDataById = async (_table, id) => {
+    if (id !== '705736') return null;
+    return {
+      id: '705736',
+      paid: true,
+      evaluationType: 'attendance',
+      entries: [{
+        entryId: 'ENT-705736-0002',
+        date: '2026-08-10',
+        startTime: '08:00',
+        endTime: '20:00',
+        durationHours: 12,
+        status: 'posted',
+        assignees: [{ personId: 'TEACHER/AMIN', status: 'attended', paid: true, paidHours: 6 }]
+      }]
+    };
+  };
+  try {
+    const aligned = await timesheetWorkdayHistoryService.alignActivityBoundEntryPlanningHours([{
+      activityId: '705736',
+      activityEntryId: '',
+      date: '2026-08-10',
+      deliveryDepartmentId: 'DEP_LINC',
+      isManual: true,
+      approvalStatus: 'approved',
+      hours: 12,
+      timesheetHours: 12,
+      requestedHours: 12
+    }], 'TEACHER/AMIN', {});
+    assert.equal(aligned[0].hours, 6);
+  } finally {
+    dataService.getDataById = originalGet;
+  }
+});
+
+test('alignActivityBoundEntryPlanningHours replaces session duration with assignee paidHours', async () => {
+  const originalGet = dataService.getDataById;
+  dataService.getDataById = async (_table, id) => {
+    if (id !== 'ACT_LINC') return null;
+    return {
+      id: 'ACT_LINC',
+      paid: true,
+      evaluationType: 'attendance',
+      entries: [{
+        entryId: 'ENT_1',
+        date: '2026-08-10',
+        startTime: '08:00',
+        endTime: '20:00',
+        durationHours: 12,
+        status: 'posted',
+        assignees: [{ personId: 'TEACHER/A', status: 'attended', paid: true, paidHours: 6 }]
+      }]
+    };
+  };
+  try {
+    const aligned = await timesheetWorkdayHistoryService.alignActivityBoundEntryPlanningHours([{
+      activityId: 'ACT_LINC',
+      activityEntryId: 'ENT_1',
+      date: '2026-08-10',
+      deliveryDepartmentId: 'DEPT_LINC',
+      isManual: true,
+      approvalStatus: 'approved',
+      hours: 12,
+      timesheetHours: 12,
+      requestedHours: 12
+    }], 'TEACHER/A', {});
+    assert.equal(aligned[0].hours, 6);
+    assert.equal(aligned[0].timesheetHours, 6);
+    assert.equal(aligned[0].requestedHours, 6);
+  } finally {
+    dataService.getDataById = originalGet;
+  }
+});

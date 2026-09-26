@@ -14,6 +14,7 @@ const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtil
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const gradebookWeightService = require('./gradebookWeightService');
 const reportFunderDocxService = require('./reportFunderDocxService');
+const sessionGradebookMakeupService = require('./sessionGradebookMakeupService');
 
 const STUDENT_PHONE_TYPES = Object.freeze(['mobile', 'home', 'work', 'other']);
 const STUDENT_PHONE_TYPE_LABELS = Object.freeze({
@@ -988,6 +989,7 @@ function collectPeriodGradeColumns(periodSessions) {
   const cols = [];
   (Array.isArray(periodSessions) ? periodSessions : []).forEach((ses) => {
     (Array.isArray(ses.gradebooks) ? ses.gradebooks : []).forEach((gb) => {
+      if (!sessionGradebookMakeupService.isOriginalGradebookActivity(gb)) return;
       const skills = gradebookSkillCatalogService.normalizeGradebookSkillIds(
         gb?.skills || gradebookSkillCatalogService.matchSkillIdsFromLegacyText(gb?.skillFocus)
       );
@@ -1112,7 +1114,7 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
     const studentAvg = targetStudent
       ? gradebookWeightService.computeWeightedAveragePercent(
         skillCols,
-        (col) => resolveGradebookColumnScore(col, targetStudent, statusMap)
+        (col) => resolveGradebookColumnScore(col, targetStudent, statusMap, periodSessions)
       )
       : null;
     const classAvg = gradebookWeightService.computeWeightedAveragePercent(
@@ -1156,7 +1158,7 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
   return { ...flatMap, skillRows };
 }
 
-function resolveGradebookColumnScore(col, personId, statusMap = null) {
+function resolveGradebookColumnScore(col, personId, statusMap = null, periodSessions = null) {
   const ses = col?.session;
   const pid = toPublicId(personId);
   if (!ses || !pid) return { skip: true };
@@ -1167,9 +1169,23 @@ function resolveGradebookColumnScore(col, personId, statusMap = null) {
     : rosterAttendanceLower(ses, pid);
   const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
     || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
-  if (absent) return { skip: true };
-  const raw = getScoreFromScoresMap(col.scores, pid);
   const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : 0;
+  if (absent) {
+    if (col.sourceKind === 'gradebook' && Array.isArray(periodSessions)) {
+      const overlay = sessionGradebookMakeupService.resolveEffectiveGradebookScoreForStudent({
+        allSessions: periodSessions,
+        sourceSessionId: ses?.sessionId || ses?.id,
+        sourceGradebookId: col.id,
+        personId: pid,
+        sourceSessionAttendance: att
+      });
+      if (overlay != null && total > 0) {
+        return { skip: false, score: overlay, totalScore: total };
+      }
+    }
+    return { skip: true };
+  }
+  const raw = getScoreFromScoresMap(col.scores, pid);
   if (raw == null || total <= 0) return { skip: true };
   return { skip: false, score: raw, totalScore: total };
 }
@@ -1205,7 +1221,7 @@ function computeReportPeriodGradebookStats(periodSessions, studentPersonId, stat
     roster.forEach((r) => {
       const pid = toPublicId(r?.personId);
       if (!pid) return;
-      const resolved = resolveGradebookColumnScore(col, pid, statusMap);
+      const resolved = resolveGradebookColumnScore(col, pid, statusMap, periodSessions);
       if (resolved.skip) return;
       classEarned += Number(resolved.score);
       classPossible += Number(resolved.totalScore);
@@ -1220,7 +1236,7 @@ function computeReportPeriodGradebookStats(periodSessions, studentPersonId, stat
   const studentAvg = targetStudent
     ? gradebookWeightService.computeWeightedAveragePercent(
       gradebookCols,
-      (col) => resolveGradebookColumnScore(col, targetStudent, statusMap)
+      (col) => resolveGradebookColumnScore(col, targetStudent, statusMap, periodSessions)
     )
     : null;
 

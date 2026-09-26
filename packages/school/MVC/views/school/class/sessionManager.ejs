@@ -1369,6 +1369,22 @@
         padding: 0.7rem 1.25rem;
         box-shadow: none;
     }
+    .session-gradebook-cta-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+    .session-gradebook-cta-row .session-gradebook-add-btn {
+        flex: 3 1 0;
+        min-width: 0;
+    }
+    .session-gradebook-cta-row .session-gradebook-makeup-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        font-size: 0.88rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
     .session-panel-open-btn--primary {
         box-shadow: none;
     }
@@ -3097,9 +3113,14 @@
                     </div>
                     <% if (!gradebookSectionReadOnly) { %>
                     <div class="session-panel-cta-zone session-panel-cta-zone--primary">
-                        <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenGradebookModal">
-                            <i class="bi bi-journal-plus me-2"></i>Add activity
-                        </button>
+                        <div class="session-gradebook-cta-row">
+                            <button type="button" class="btn btn-outline-primary session-panel-open-btn session-gradebook-add-btn w-100" id="btnOpenGradebookModal">
+                                <i class="bi bi-journal-plus me-2"></i>Add activity
+                            </button>
+                            <button type="button" class="btn btn-warning session-panel-open-btn session-gradebook-makeup-btn w-100" id="btnOpenGradebookMakeupPicker" title="Add make-up activity from a past session">
+                                <i class="bi bi-arrow-repeat me-1"></i>Make-up
+                            </button>
+                        </div>
                     </div>
                     <% } %>
                     <div class="card-body">
@@ -3453,6 +3474,38 @@
             <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary fw-bold" id="gbModalSaveBtn">Save activity</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="gradebookMakeupPickerModal" tabindex="-1" aria-labelledby="gradebookMakeupPickerModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title fw-bold" id="gradebookMakeupPickerModalTitle"><i class="bi bi-arrow-repeat me-2"></i>Make-up from past activity</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">Choose an original activity from an earlier session in this class (within the last <strong id="gbMakeupPickerLookbackDays">15</strong> days before this session). Make-up copies are not listed here.</p>
+                <div id="gbMakeupPickerLoading" class="text-muted small d-none">Loading activities…</div>
+                <div id="gbMakeupPickerEmpty" class="alert alert-light border small d-none mb-0">No gradebook activities were found in the last 15 days before this session.</div>
+                <div class="table-responsive" id="gbMakeupPickerTableWrap">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Session date</th>
+                                <th>Activity</th>
+                                <th class="text-end">Points</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="gbMakeupPickerRows"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -7588,6 +7641,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-session-panel');
             if (id) setActivePanel(id);
+            if (id === 'gradebook') {
+                void gbLoadMakeupActivitiesIfNeeded();
+            }
             if (id === 'assignments') {
                 refreshSessionReportInstances().catch(() => {});
             }
@@ -10045,12 +10101,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 includeInGradeCalculation: gb.includeInGradeCalculation !== false,
                 scores,
                 scoreComments,
-                attachments
+                attachments,
+                makeupSource: gb.makeupSource && typeof gb.makeupSource === 'object'
+                    ? {
+                        sessionId: String(gb.makeupSource.sessionId || '').trim(),
+                        gradebookId: String(gb.makeupSource.gradebookId || '').trim(),
+                        sessionDate: String(gb.makeupSource.sessionDate || '').trim()
+                    }
+                    : undefined,
+                makeupRoles: gb.makeupRoles && typeof gb.makeupRoles === 'object'
+                    ? Object.fromEntries(Object.entries(gb.makeupRoles).map(([k, v]) => [String(k), String(v || '').trim()]))
+                    : undefined
             };
         });
     }
 
-    gradebooksState = gbNormalizeIncoming(<%- jsonForScript(session.gradebooks || []) %>);
+    gradebooksState = gbNormalizeIncoming(<%- jsonForScript(typeof sessionGradebooksInline !== 'undefined' ? sessionGradebooksInline : (session.gradebooks || [])) %>);
+    let gbMakeupActivitiesHydrated = false;
+    let gbMakeupActivitiesLoadPromise = null;
+
+    async function gbLoadMakeupActivitiesIfNeeded() {
+        if (gbMakeupActivitiesHydrated) return;
+        if (gbMakeupActivitiesLoadPromise) return gbMakeupActivitiesLoadPromise;
+        gbMakeupActivitiesLoadPromise = (async () => {
+            const url = `/school/classes/${encodeURIComponent(gbClassId)}/sessions/${encodeURIComponent(gbSessionId)}/gradebooks/makeup-activities`;
+            const response = await fetch(url, { headers: { Accept: 'application/json', 'x-ajax-request': 'true' } });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Unable to load make-up activities.');
+            }
+            const incoming = gbNormalizeIncoming(Array.isArray(payload.gradebooks) ? payload.gradebooks : []);
+            const existingIds = new Set(gradebooksState.map((row) => String(row.id)));
+            incoming.forEach((row) => {
+                const id = String(row.id || '').trim();
+                if (!id || existingIds.has(id)) return;
+                gradebooksState.push(row);
+                existingIds.add(id);
+            });
+            gbMakeupActivitiesHydrated = true;
+            gbRenderList();
+        })().catch((err) => {
+            gbMakeupActivitiesLoadPromise = null;
+            void sessionMessageBox({
+                title: 'Make-up activities',
+                icon: 'error',
+                message: err.message || 'Unable to load make-up activities.'
+            });
+        });
+        return gbMakeupActivitiesLoadPromise;
+    }
 
     function gbFormatPct(score, total) {
         if (score === null || score === undefined || Number.isNaN(Number(score))) return '—';
@@ -10149,7 +10248,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const total = Number(gb.totalScore);
             gradebookRoster.forEach(({ personId }) => {
                 const pid = String(personId);
-                if (gbIsPersonGradeBlocked(pid)) {
+                const makeupRole = gb.makeupRoles && gb.makeupRoles[pid] ? String(gb.makeupRoles[pid]).trim() : '';
+                if (makeupRole === 'done') return;
+                const blockedByMakeup = makeupRole === 'blocked' || (makeupRole === 'makeup' && gbIsPersonGradeBlocked(pid));
+                if (blockedByMakeup || (!makeupRole && gbIsPersonGradeBlocked(pid))) {
                     gb.scores[pid] = null;
                     if (gb.scoreComments && typeof gb.scoreComments === 'object') delete gb.scoreComments[pid];
                     return;
@@ -10218,6 +10320,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const weightBadge = gbRenderWeightBadge(gb);
             const collapsed = gbCollapsedIds.has(gb.id);
             const incl = gb.includeInGradeCalculation ? '<span class="badge bg-light text-success border">In grade</span>' : '<span class="badge bg-light text-secondary border">Excluded</span>';
+            const makeupHeader = gb.makeupSource && String(gb.makeupSource.sessionDate || gb.makeupSource.sessionId || '').trim()
+                ? `<span class="badge bg-warning text-dark me-2">Make-up</span><span class="small text-muted">From ${gbEscapeHtml(String(gb.makeupSource.sessionDate || ''))}: ${gbEscapeHtml(String(gb.name || ''))}</span>`
+                : '';
             const gradeHeader = `Grade/${Number.isFinite(total) && total > 0 ? total : '—'}`;
             const headActions = gbReadOnly ? '' : `
                 <button type="button" class="btn btn-outline-primary btn-sm gb-edit" data-gb-id="${gbEscapeHtml(gb.id)}" title="Edit"><i class="bi bi-pencil"></i></button>
@@ -10227,8 +10332,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const rows = gradebookRoster.length
                 ? gradebookRoster.map(({ personId, name }) => {
                     const pid = String(personId);
+                    const makeupRole = gb.makeupSource && gb.makeupRoles ? String(gb.makeupRoles[pid] || '').trim() : '';
+                    if (makeupRole === 'done') {
+                        const sc = gb.scores[pid];
+                        const val = sc !== null && sc !== undefined && !Number.isNaN(Number(sc)) ? String(sc) : '';
+                        return `<tr class="gb-row-makeup-done">
+                        <td class="ps-3">${gbEscapeHtml(name)}</td>
+                        <td style="max-width:140px;"><span class="badge bg-success-subtle text-success border me-1">Done</span><span class="fw-semibold">${gbEscapeHtml(val || '—')}</span></td>
+                        <td class="gb-pct small text-nowrap">${gbFormatPct(sc, total)}</td>
+                        <td class="gb-wt-pct small text-nowrap">${gbFormatWeightContribution(sc, total, explicitWeight)}</td>
+                        <td class="text-center">${gbRenderCommentButton(gb, pid, name)}</td>
+                    </tr>`;
+                    }
                     const unmarked = gbIsPersonAttendanceUnmarked(pid);
-                    if (gbIsPersonGradeBlocked(pid)) {
+                    const blockedByMakeup = makeupRole === 'blocked' || (makeupRole === 'makeup' && gbIsPersonGradeBlocked(pid));
+                    if (blockedByMakeup || (!makeupRole && gbIsPersonGradeBlocked(pid))) {
                         const attendanceStatus = gbAttendanceStatus(pid);
                         let blockedLabel = 'Absent';
                         let rowClass = 'gb-row-attendance-blocked';
@@ -10237,6 +10355,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             rowClass = 'gb-row-attendance-unmarked';
                         } else if (attendanceStatus === 'not_applicable') {
                             blockedLabel = 'N/A';
+                        } else if (makeupRole === 'blocked') {
+                            blockedLabel = 'Make-up blocked';
                         }
                         return `<tr class="${rowClass}">
                         <td class="ps-3">${gbEscapeHtml(name)}</td>
@@ -10269,6 +10389,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                         <div class="flex-grow-1 min-w-0">
                             <div class="fw-bold text-primary">${gbEscapeHtml(gb.name || 'Untitled')}</div>
+                            ${makeupHeader ? `<div class="small mt-1">${makeupHeader}</div>` : ''}
                             <div class="small text-muted mt-1">${gb.skills && gb.skills.length ? `<span class="me-2 d-inline-flex align-items-start gap-1"><i class="bi bi-bullseye me-1 flex-shrink-0 mt-1"></i>${gbRenderSkillChips(gb.skills)}</span>` : ''}
                                 ${weightBadge}<span class="me-2"><i class="bi bi-calculator me-1"></i>Total: <strong>${total}</strong> pts</span>${incl}
                                 ${gbRenderAttachmentLinks(gb.attachments)}
@@ -10582,6 +10703,134 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnOpenGradebookModal = document.getElementById('btnOpenGradebookModal');
     if (btnOpenGradebookModal) {
         btnOpenGradebookModal.addEventListener('click', () => gbOpenModal(null));
+    }
+
+    const gbMakeupPickerModalEl = document.getElementById('gradebookMakeupPickerModal');
+    let gbMakeupPickerModalInstance = null;
+    if (gbMakeupPickerModalEl && typeof bootstrap !== 'undefined') {
+        gbMakeupPickerModalInstance = bootstrap.Modal.getOrCreateInstance(gbMakeupPickerModalEl);
+    }
+
+    async function gbLoadMakeupPickerRows() {
+        const loadingEl = document.getElementById('gbMakeupPickerLoading');
+        const emptyEl = document.getElementById('gbMakeupPickerEmpty');
+        const tableWrap = document.getElementById('gbMakeupPickerTableWrap');
+        const tbody = document.getElementById('gbMakeupPickerRows');
+        if (loadingEl) loadingEl.classList.remove('d-none');
+        if (emptyEl) emptyEl.classList.add('d-none');
+        if (tableWrap) tableWrap.classList.add('d-none');
+        if (tbody) tbody.innerHTML = '';
+        try {
+            const url = `/school/classes/${encodeURIComponent(gbClassId)}/sessions/${encodeURIComponent(gbSessionId)}/gradebooks/makeup-sources`;
+            const response = await fetch(url, { headers: { Accept: 'application/json', 'x-ajax-request': 'true' } });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Unable to load make-up activities.');
+            }
+            const rows = Array.isArray(payload.rows) ? payload.rows : [];
+            const lookbackDays = Number(payload.lookbackDays) || 15;
+            const lookbackEl = document.getElementById('gbMakeupPickerLookbackDays');
+            if (lookbackEl) lookbackEl.textContent = String(lookbackDays);
+            if (emptyEl) {
+                emptyEl.textContent = `No gradebook activities were found in the last ${lookbackDays} days before this session.`;
+            }
+            if (!rows.length) {
+                if (emptyEl) emptyEl.classList.remove('d-none');
+                return;
+            }
+            if (tableWrap) tableWrap.classList.remove('d-none');
+            if (tbody) {
+                tbody.innerHTML = rows.map((row) => {
+                    const dateLabel = [row.sessionDate, row.sessionStartTime].filter(Boolean).join(' ');
+                    return `<tr>
+                        <td>${gbEscapeHtml(dateLabel || row.sessionDate || '')}</td>
+                        <td>${gbEscapeHtml(row.name || 'Activity')}</td>
+                        <td class="text-end">${gbEscapeHtml(String(row.totalScore || ''))}</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-warning js-gb-makeup-pick"
+                                data-session-id="${gbEscapeHtml(row.sessionId)}"
+                                data-gradebook-id="${gbEscapeHtml(row.gradebookId)}">Select</button>
+                        </td>
+                    </tr>`;
+                }).join('');
+                tbody.querySelectorAll('.js-gb-makeup-pick').forEach((btn) => {
+                    btn.addEventListener('click', () => gbApplyMakeupPick(
+                        btn.getAttribute('data-session-id'),
+                        btn.getAttribute('data-gradebook-id')
+                    ));
+                });
+            }
+        } catch (err) {
+            void sessionMessageBox({ title: 'Make-up activities', icon: 'error', message: err.message || 'Unable to load activities.' });
+        } finally {
+            if (loadingEl) loadingEl.classList.add('d-none');
+        }
+    }
+
+    async function gbApplyMakeupPick(sourceSessionId, sourceGradebookId) {
+        if (gbReadOnly) return;
+        const sid = String(sourceSessionId || '').trim();
+        const gid = String(sourceGradebookId || '').trim();
+        if (!sid || !gid) return;
+        try {
+            const pageToken = String(typeof actionStateId !== 'undefined' ? actionStateId : '').trim();
+            const url = `/school/classes/${encodeURIComponent(gbClassId)}/sessions/${encodeURIComponent(gbSessionId)}/gradebooks/makeup-from`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'x-ajax-request': 'true',
+                    'x-action-state-id': pageToken
+                },
+                body: JSON.stringify({
+                    actionStateId: pageToken,
+                    sourceSessionId: sid,
+                    sourceGradebookId: gid
+                })
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Unable to create make-up activity.');
+            }
+            const previewStatus = String(payload.previewStatus || '').trim();
+            const messages = Array.isArray(payload.messages) ? payload.messages : [];
+            if (previewStatus === 'blocked' || !payload.gradebook) {
+                void sessionMessageBox({
+                    title: 'Make-up not added',
+                    icon: 'warning',
+                    message: messages.join('\n') || 'This activity cannot be added as make-up.'
+                });
+                return;
+            }
+            if (previewStatus === 'warn' && messages.length) {
+                const proceed = await sessionConfirmBox({
+                    title: 'Add make-up activity?',
+                    message: messages.join('\n'),
+                    icon: 'warning',
+                    confirmText: 'Add make-up',
+                    confirmClass: 'btn-warning'
+                });
+                if (!proceed) return;
+            }
+            gradebooksState.push(gbNormalizeIncoming([payload.gradebook])[0]);
+            if (gbMakeupPickerModalInstance) gbMakeupPickerModalInstance.hide();
+            gbRenderList();
+            markSessionAutosaveGradebookDirty();
+        } catch (err) {
+            void sessionMessageBox({ title: 'Make-up activity', icon: 'error', message: err.message || 'Unable to add make-up activity.' });
+        }
+    }
+
+    const btnOpenGradebookMakeupPicker = document.getElementById('btnOpenGradebookMakeupPicker');
+    if (btnOpenGradebookMakeupPicker) {
+        if (gbReadOnly) btnOpenGradebookMakeupPicker.disabled = true;
+        btnOpenGradebookMakeupPicker.addEventListener('click', async () => {
+            if (gbReadOnly) return;
+            await gbLoadMakeupActivitiesIfNeeded();
+            if (gbMakeupPickerModalInstance) gbMakeupPickerModalInstance.show();
+            void gbLoadMakeupPickerRows();
+        });
     }
     const gbModalSaveBtn = document.getElementById('gbModalSaveBtn');
     if (gbModalSaveBtn) gbModalSaveBtn.addEventListener('click', () => gbApplyModalSave());

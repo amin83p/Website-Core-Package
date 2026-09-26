@@ -45,10 +45,28 @@ function parseActivitySessionId(sessionId) {
   };
 }
 
+function parseMaterializedManualActivitySessionId(sessionId) {
+  const token = normalizeId(sessionId);
+  if (!token.startsWith('act-')) return null;
+  const parts = token.slice(4).split('-').filter(Boolean);
+  if (parts.length < 3) return null;
+  const personId = normalizeId(parts.pop());
+  const activityEntryId = normalizeId(parts.pop());
+  const activityId = normalizeId(parts.join('-'));
+  if (!activityId || !activityEntryId || !personId) return null;
+  return { activityId, activityEntryId, personId };
+}
+
 function parseReportReflectionSessionId(sessionId) {
   const token = normalizeId(sessionId);
   if (!token.startsWith('rptref-')) return null;
   return { assignmentId: normalizeId(token.slice(7)) };
+}
+
+function manualTimesheetEntryShouldSkipActivityLock(entry = {}) {
+  if (entry?.isManual !== true) return false;
+  const approval = String(entry?.approvalStatus || '').trim().toLowerCase();
+  return ['pending_approval', 'rejected', 'unpaid'].includes(approval);
 }
 
 function collectRefsFromEntry(entry = {}) {
@@ -60,13 +78,21 @@ function collectRefsFromEntry(entry = {}) {
     refs.push({ type: 'classSession', classId, sessionId });
   }
   const activityId = normalizeId(entry.activityId);
-  const activityEntryId = normalizeId(entry.activityEntryId);
-  if (activityId) {
+  let activityEntryId = normalizeId(entry.activityEntryId);
+  let activityPersonId = normalizeId(entry.personId || '');
+  if (activityId && !manualTimesheetEntryShouldSkipActivityLock(entry)) {
+    if (!activityEntryId) {
+      const parsedMaterialized = parseMaterializedManualActivitySessionId(entry.materializedSessionId);
+      if (parsedMaterialized && idsEqual(parsedMaterialized.activityId, activityId)) {
+        activityEntryId = parsedMaterialized.activityEntryId;
+        if (!activityPersonId) activityPersonId = parsedMaterialized.personId;
+      }
+    }
     refs.push({
       type: 'activity',
       activityId,
       activityEntryId: activityEntryId || '',
-      personId: normalizeId(entry.personId || '')
+      personId: activityPersonId
     });
   }
   if (sessionId.startsWith('act-')) {
@@ -401,56 +427,9 @@ async function lockActivitySources({ activityId, entryIds = [], locks = [], time
   }
   const normalizedActivityId = normalizeId(activityId);
   if (!normalizedActivityId) return { locked: false };
-  const activity = await schoolDataService.getDataById('activities', normalizedActivityId, reqUser);
-  if (!activity) return { locked: false, missing: true };
-  const entryIdSet = new Set((Array.isArray(entryIds) ? entryIds : []).map(normalizeId).filter(Boolean));
-  const lockAllEntries = !entryIdSet.size;
-  let changed = false;
-  const lockedAt = new Date().toISOString();
-  const lockedBy = toPublicId(reqUser?.id);
-  const lockedTimesheetId = normalizeId(timesheetId);
-  const stampAssigneeLock = (assignee) => {
-    if (isAssigneeTimesheetLocked(assignee)) return assignee;
-    changed = true;
-    return {
-      ...assignee,
-      locked: true,
-      lockedAt,
-      lockedBy,
-      lockReason: 'timesheet_approved',
-      lockedTimesheetId
-    };
-  };
-  const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((entry) => {
-    const entryId = normalizeId(entry?.entryId || entry?.id);
-    if (!lockAllEntries && !entryIdSet.has(entryId)) return entry;
-    const priorAssignees = (Array.isArray(entry?.assignees) ? entry.assignees : [])
-      .filter((assignee) => assignee && typeof assignee === 'object');
-    const assignees = priorAssignees.map(stampAssigneeLock);
-    const entryAlreadyLocked = isActivityEntryTimesheetLocked(entry)
-      && String(entry?.lockReason || '') === 'timesheet_approved';
-    const assigneesChanged = assignees.some((row, index) => row !== priorAssignees[index]);
-    if (entryAlreadyLocked && !assigneesChanged) return entry;
-    changed = true;
-    return {
-      ...entry,
-      assignees,
-      locked: true,
-      lockedAt: entryAlreadyLocked ? (entry.lockedAt || lockedAt) : lockedAt,
-      lockedBy: entryAlreadyLocked ? (entry.lockedBy || lockedBy) : lockedBy,
-      lockReason: 'timesheet_approved',
-      lockedTimesheetId: entryAlreadyLocked ? (entry.lockedTimesheetId || lockedTimesheetId) : lockedTimesheetId
-    };
-  });
-  const nextActivity = {
-    ...activity,
-    entries,
-    locked: lockAllEntries || entries.some(isActivityEntryTimesheetLocked) ? true : activity.locked
-  };
-  if (changed || (!activity.locked && nextActivity.locked)) {
-    await schoolDataService.updateData('activities', normalizedActivityId, nextActivity, reqUser);
-  }
-  return { locked: changed || nextActivity.locked === true };
+  // Bulk entry-level locking is intentionally disabled: timesheet approval must lock
+  // named assignees via lockActivityAssignees (personId + activityEntryId on timesheet refs).
+  return { locked: false };
 }
 
 async function lockReportAssignment({ assignmentId, timesheetId, reqUser }) {
@@ -502,47 +481,100 @@ async function getActivityEntrySubmittedTimesheetLockMap({
   return lockMap;
 }
 
-async function repairActivityEntryTimesheetLocksIfNeeded({ activity, entry, reqUser } = {}) {
+async function assigneeTimesheetLockStillValid(assignee, reqUser, minStatus = 'submitted') {
+  if (!isAssigneeTimesheetLocked(assignee)) return false;
+  const timesheetId = normalizeId(assignee.lockedTimesheetId);
+  if (!timesheetId) return false;
+  const timesheet = await schoolDataService.getDataById('timesheets', timesheetId, reqUser);
+  if (!timesheet) return false;
+  return meetsMinTimesheetStatus(String(timesheet?.status || '').toLowerCase(), minStatus);
+}
+
+function dedupeActivityEntryRefsFromSourceRefs(refs = []) {
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(refs) ? refs : []).forEach((ref) => {
+    if (ref?.type !== 'activity') return;
+    const activityId = normalizeId(ref.activityId);
+    const activityEntryId = normalizeId(ref.activityEntryId);
+    if (!activityId || !activityEntryId) return;
+    const key = `${activityId}::${activityEntryId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ activityId, activityEntryId });
+  });
+  return out;
+}
+
+async function syncActivityEntryTimesheetLocksFromSubmittedRefs({
+  activity,
+  entry,
+  reqUser,
+  minStatus = 'submitted',
+  allowUnlock = true
+} = {}) {
   const entryId = normalizeId(entry?.entryId || entry?.id);
   const activityId = normalizeId(activity?.id);
-  if (!activityId || !entryId) return entry;
+  if (!activityId || !entryId) return { entry, changed: false };
   const assignees = (Array.isArray(entry.assignees) ? entry.assignees : [])
     .filter((assignee) => assignee && typeof assignee === 'object');
-  if (assignees.length <= 1) return entry;
 
   const lockMap = await getActivityEntrySubmittedTimesheetLockMap({
     orgId: activity.orgId,
     activityId,
     entryId,
-    minStatus: 'submitted',
+    minStatus,
     reqUser
   });
 
   let changed = false;
-  const nextAssignees = assignees.map((assignee) => {
+  const nextAssignees = [];
+  for (const assignee of assignees) {
     const personId = normalizeId(assignee.personId);
     const shouldLock = lockMap.has(personId);
+    const correctTimesheetId = shouldLock ? normalizeId(lockMap.get(personId)) : '';
     const isLocked = isAssigneeTimesheetLocked(assignee);
-    if (shouldLock === isLocked) return assignee;
-    changed = true;
-    if (!shouldLock) {
-      const next = { ...assignee };
-      next.locked = false;
-      delete next.lockReason;
-      delete next.lockedTimesheetId;
-      delete next.lockedAt;
-      delete next.lockedBy;
-      return next;
+    const currentTimesheetId = normalizeId(assignee.lockedTimesheetId);
+
+    if (shouldLock) {
+      if (isLocked && currentTimesheetId === correctTimesheetId) {
+        nextAssignees.push(assignee);
+        continue;
+      }
+      changed = true;
+      nextAssignees.push({
+        ...assignee,
+        locked: true,
+        lockedAt: assignee.lockedAt || new Date().toISOString(),
+        lockedBy: assignee.lockedBy || null,
+        lockReason: 'timesheet_approved',
+        lockedTimesheetId: correctTimesheetId
+      });
+      continue;
     }
-    return {
-      ...assignee,
-      locked: true,
-      lockedAt: assignee.lockedAt || new Date().toISOString(),
-      lockedBy: assignee.lockedBy || null,
-      lockReason: 'timesheet_approved',
-      lockedTimesheetId: lockMap.get(personId)
-    };
-  });
+
+    if (!isLocked) {
+      nextAssignees.push(assignee);
+      continue;
+    }
+    if (!allowUnlock) {
+      nextAssignees.push(assignee);
+      continue;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    if (await assigneeTimesheetLockStillValid(assignee, reqUser, minStatus)) {
+      nextAssignees.push(assignee);
+      continue;
+    }
+    changed = true;
+    const next = { ...assignee };
+    next.locked = false;
+    delete next.lockReason;
+    delete next.lockedTimesheetId;
+    delete next.lockedAt;
+    delete next.lockedBy;
+    nextAssignees.push(next);
+  }
 
   const allAssigneesLocked = nextAssignees.length > 0 && nextAssignees.every(isAssigneeTimesheetLocked);
   const entryWasLocked = isActivityEntryTimesheetLocked(entry);
@@ -553,7 +585,7 @@ async function repairActivityEntryTimesheetLocksIfNeeded({ activity, entry, reqU
     nextEntry.lockReason = 'timesheet_approved';
     nextEntry.lockedTimesheetId = normalizeId(nextEntry.lockedTimesheetId)
       || normalizeId([...lockMap.values()][0]);
-  } else if (!allAssigneesLocked && entryWasLocked) {
+  } else if (allowUnlock && (!allAssigneesLocked || nextAssignees.length === 0) && entryWasLocked) {
     changed = true;
     nextEntry.locked = false;
     delete nextEntry.lockReason;
@@ -562,6 +594,18 @@ async function repairActivityEntryTimesheetLocksIfNeeded({ activity, entry, reqU
     delete nextEntry.lockedBy;
   }
 
+  return { entry: nextEntry, changed };
+}
+
+async function repairActivityEntryTimesheetLocksIfNeeded({ activity, entry, reqUser } = {}) {
+  const entryId = normalizeId(entry?.entryId || entry?.id);
+  const activityId = normalizeId(activity?.id);
+  if (!activityId || !entryId) return entry;
+  const { entry: nextEntry, changed } = await syncActivityEntryTimesheetLocksFromSubmittedRefs({
+    activity,
+    entry,
+    reqUser
+  });
   if (!changed) return entry;
 
   const entries = (Array.isArray(activity.entries) ? activity.entries : []).map((row) => (
@@ -575,6 +619,120 @@ async function repairActivityEntryTimesheetLocksIfNeeded({ activity, entry, reqU
     locked: stillActivityLocked
   }, reqUser);
   return nextEntry;
+}
+
+async function repairActivityTimesheetLocksIfNeeded({ activity, reqUser } = {}) {
+  const activityId = normalizeId(activity?.id);
+  if (!activityId) return activity;
+  const sourceEntries = Array.isArray(activity.entries) ? activity.entries : [];
+  if (!sourceEntries.length) return activity;
+  let changed = false;
+  const nextEntries = [];
+  for (const entry of sourceEntries) {
+    const assignees = Array.isArray(entry?.assignees) ? entry.assignees : [];
+    const hasLockState = isActivityEntryTimesheetLocked(entry) || assignees.some(isAssigneeTimesheetLocked);
+    if (!hasLockState) {
+      nextEntries.push(entry);
+      continue;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const { entry: syncedEntry, changed: entryChanged } = await syncActivityEntryTimesheetLocksFromSubmittedRefs({
+      activity,
+      entry,
+      reqUser
+    });
+    if (entryChanged) {
+      changed = true;
+    }
+    nextEntries.push(entryChanged ? syncedEntry : entry);
+  }
+  if (!changed) return activity;
+  const stillActivityLocked = nextEntries.some(isActivityEntryTimesheetLocked)
+    || nextEntries.some((row) => (Array.isArray(row?.assignees) ? row.assignees : []).some(isAssigneeTimesheetLocked));
+  const nextActivity = { ...activity, entries: nextEntries, locked: stillActivityLocked };
+  await schoolDataService.updateData('activities', activityId, nextActivity, reqUser);
+  return nextActivity;
+}
+
+async function reinforceActivityTimesheetLocksIfNeeded({ activity, reqUser } = {}) {
+  const activityId = normalizeId(activity?.id);
+  if (!activityId) return activity;
+  const activityService = require('./activityService');
+  const sourceEntries = activityService.parseJsonArray(activity.entries);
+  if (!sourceEntries.length && Array.isArray(activity.entries)) {
+    sourceEntries.push(...activity.entries);
+  }
+  if (!sourceEntries.length) return activity;
+  let changed = false;
+  const nextEntries = [];
+  for (const entry of sourceEntries) {
+    const assignees = activityService.normalizeActivityAssigneeRows(
+      activityService.parseJsonArray(entry?.assignees)
+    );
+    if (!assignees.length && !isActivityEntryTimesheetLocked(entry)) {
+      nextEntries.push(entry);
+      continue;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const { entry: syncedEntry, changed: entryChanged } = await syncActivityEntryTimesheetLocksFromSubmittedRefs({
+      activity,
+      entry,
+      reqUser,
+      allowUnlock: false
+    });
+    if (entryChanged) changed = true;
+    nextEntries.push(entryChanged ? syncedEntry : entry);
+  }
+  if (!changed) return activity;
+  const stillActivityLocked = nextEntries.some(isActivityEntryTimesheetLocked)
+    || nextEntries.some((row) => (Array.isArray(row?.assignees) ? row.assignees : []).some(isAssigneeTimesheetLocked));
+  const nextActivity = { ...activity, entries: nextEntries, locked: stillActivityLocked };
+  await schoolDataService.updateData('activities', activityId, nextActivity, reqUser);
+  return nextActivity;
+}
+
+async function reconcileActivityEntriesForTimesheetRefs({ orgId, refs, reqUser } = {}) {
+  const targets = dedupeActivityEntryRefsFromSourceRefs(refs);
+  if (!targets.length) return { reconciled: 0 };
+  const byActivity = new Map();
+  targets.forEach(({ activityId, activityEntryId }) => {
+    if (!byActivity.has(activityId)) byActivity.set(activityId, new Set());
+    byActivity.get(activityId).add(activityEntryId);
+  });
+  let reconciled = 0;
+  for (const [activityId, entryIdSet] of byActivity.entries()) {
+    // eslint-disable-next-line no-await-in-loop
+    let activity = await schoolDataService.getDataById('activities', activityId, reqUser);
+    if (!activity) continue;
+    const resolvedOrgId = normalizeId(orgId) || normalizeId(activity.orgId);
+    let activityChanged = false;
+    const nextEntries = [...(Array.isArray(activity.entries) ? activity.entries : [])];
+    for (const entryToken of entryIdSet) {
+      const index = nextEntries.findIndex((row) => idsEqual(row?.entryId || row?.id, entryToken));
+      if (index < 0) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const { entry: syncedEntry, changed } = await syncActivityEntryTimesheetLocksFromSubmittedRefs({
+        activity: { ...activity, orgId: resolvedOrgId || activity.orgId },
+        entry: nextEntries[index],
+        reqUser
+      });
+      if (changed) {
+        nextEntries[index] = syncedEntry;
+        activityChanged = true;
+        reconciled += 1;
+      }
+    }
+    if (!activityChanged) continue;
+    const stillActivityLocked = nextEntries.some(isActivityEntryTimesheetLocked)
+      || nextEntries.some((row) => (Array.isArray(row?.assignees) ? row.assignees : []).some(isAssigneeTimesheetLocked));
+    // eslint-disable-next-line no-await-in-loop
+    await schoolDataService.updateData('activities', activityId, {
+      ...activity,
+      entries: nextEntries,
+      locked: stillActivityLocked
+    }, reqUser);
+  }
+  return { reconciled };
 }
 
 async function lockSourcesForApprovedTimesheet(timesheet = {}, reqUser) {
@@ -621,6 +779,7 @@ async function lockSourcesForApprovedTimesheet(timesheet = {}, reqUser) {
   }
 
   for (const [activityId, entryIds] of activityEntries.entries()) {
+    if (!entryIds.size) continue;
     // eslint-disable-next-line no-await-in-loop
     const result = await lockActivitySources({
       activityId,
@@ -1466,7 +1625,12 @@ module.exports = {
   collectRefsFromEntry,
   collectTimesheetSourceRefs,
   getActivityEntrySubmittedTimesheetLockMap,
+  syncActivityEntryTimesheetLocksFromSubmittedRefs,
   repairActivityEntryTimesheetLocksIfNeeded,
+  repairActivityTimesheetLocksIfNeeded,
+  reinforceActivityTimesheetLocksIfNeeded,
+  reconcileActivityEntriesForTimesheetRefs,
+  dedupeActivityEntryRefsFromSourceRefs,
   resolveActivityRefPersonId,
   findTimesheetsReferencingSource,
   buildTimesheetBlockers,

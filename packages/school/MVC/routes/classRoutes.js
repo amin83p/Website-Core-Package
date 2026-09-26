@@ -700,6 +700,16 @@ router.delete('/:id/sessions/:sessionId',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
   classCtrl.deleteClassSession);
+router.get('/:id/sessions/:sessionId/gradebooks/makeup-sources',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  classCtrl.getGradebookMakeupSources);
+router.get('/:id/sessions/:sessionId/gradebooks/makeup-activities',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ),
+  classCtrl.getGradebookMakeupActivities);
+router.post('/:id/sessions/:sessionId/gradebooks/makeup-from',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
+  classCtrl.postGradebookMakeupFrom);
 router.post('/:id/sessions/:sessionId/gradebooks/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),

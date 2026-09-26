@@ -21,6 +21,7 @@ const matrixWindowService = require('../../services/school/matrixWindowService')
 const matrixRollupService = require('../../services/school/matrixRollupService');
 const gradebookWeightService = require('../../services/school/gradebookWeightService');
 const gradesMatrixWeightSaveService = require('../../services/school/gradesMatrixWeightSaveService');
+const sessionGradebookMakeupService = require('../../services/school/sessionGradebookMakeupService');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -179,6 +180,7 @@ function collectColumns(filteredSessions) {
     const band = dateBand.get(date) ?? 0;
 
     (Array.isArray(ses.gradebooks) ? ses.gradebooks : []).forEach((gb) => {
+      if (!sessionGradebookMakeupService.isOriginalGradebookActivity(gb)) return;
       const id = String(gb?.id || '').trim() || `gb_${columns.length}`;
       const total = Number(gb?.totalScore) || 0;
       columns.push({
@@ -385,17 +387,35 @@ function buildGradesMatrixCell(stu, col, ctx, rosterMaps) {
   }
 
   const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : Number(payload.totalScore) || 0;
-  const raw = (absent || notApplicable) ? null : getScoreFromMap(payload.scores, stu.personId);
+  let raw = null;
+  let effectiveAbsent = absent;
+  if (!notApplicable) {
+    if (!absent) {
+      raw = getScoreFromMap(payload.scores, stu.personId);
+    } else if (col.kind === 'gradebook') {
+      const overlay = sessionGradebookMakeupService.resolveEffectiveGradebookScoreForStudent({
+        allSessions: ctx.filteredSessions || [],
+        sourceSessionId: col.sessionId,
+        sourceGradebookId: col.itemId,
+        personId: stu.personId,
+        sourceSessionAttendance: att
+      });
+      if (overlay != null) {
+        raw = overlay;
+        effectiveAbsent = false;
+      }
+    }
+  }
   let percent = null;
-  if (!absent && !notApplicable && raw != null && total > 0) {
+  if (!effectiveAbsent && !notApplicable && raw != null && total > 0) {
     percent = Math.round((raw / total) * 1000) / 10;
   }
-  const effective = col.includeInGradeCalculation === true && !notApplicable;
+  const effective = col.includeInGradeCalculation === true && !notApplicable && !effectiveAbsent;
 
   const cell = {
-    score: (absent || notApplicable) ? null : raw,
+    score: (effectiveAbsent || notApplicable) ? null : raw,
     percent,
-    absent,
+    absent: effectiveAbsent,
     notApplicable,
     attendanceStatus: att,
     effective,

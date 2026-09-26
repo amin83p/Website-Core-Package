@@ -1155,15 +1155,24 @@
                   </div>
                   <div class="col-lg-3 col-md-3 col-6">
                       <label class="form-label fw-bold">Start Time *</label>
-                      <input type="time" id="man_startTime" class="form-control">
+                      <select id="man_startTimePick" class="form-select man-time-pick-control" aria-label="Start time"></select>
+                      <input type="time" id="man_startTime" class="form-control man-time-manual-control d-none">
                   </div>
                   <div class="col-lg-3 col-md-3 col-6">
                       <label class="form-label fw-bold">End Time *</label>
-                      <input type="time" id="man_endTime" class="form-control">
+                      <select id="man_endTimePick" class="form-select man-time-pick-control" aria-label="End time"></select>
+                      <input type="time" id="man_endTime" class="form-control man-time-manual-control d-none">
                   </div>
                   <div class="col-lg-3 col-md-6">
                       <label class="form-label fw-bold">Total Hours *</label>
                       <input type="number" id="man_hours" class="form-control bg-light" step="0.25" min="0" max="<%= maxSessionHours %>" placeholder="Calculated from start/end time" readonly required>
+                  </div>
+                  <div class="col-12">
+                      <div class="form-check mt-1">
+                          <input class="form-check-input" type="checkbox" id="man_pickTimes" checked>
+                          <label class="form-check-label" for="man_pickTimes">Pick Times</label>
+                      </div>
+                      <div class="form-text">Uncheck to enter times outside 7:00 AM–7:00 PM or between 30-minute slots.</div>
                   </div>
               </div>
               <div class="form-text text-danger mt-1" id="man_hours_warning"></div>
@@ -1303,6 +1312,24 @@
       <div class="modal-footer bg-light border-0">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-danger fw-bold" id="btnConfirmManualRowReject">Reject Row</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="manualRowRejectDetailModal" tabindex="-1" aria-hidden="true" aria-labelledby="manualRowRejectDetailModalTitle">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger-subtle border-0">
+        <h5 class="modal-title fw-bold" id="manualRowRejectDetailModalTitle"><i class="bi bi-x-circle-fill me-2 text-danger"></i>Manual Row Rejection</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="ts-stat-calc-summary-grid mb-3" id="manualRowRejectDetailSummary"></div>
+        <div id="manualRowRejectDetailResult" class="mb-0"></div>
+      </div>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -1646,6 +1673,7 @@
     const IS_READONLY = <%= isEditorLocked %>;
     const IS_ADMIN = <%= isAdmin %>;
     const CAN_MANAGER_REVIEW = <%= (typeof canSendBack !== 'undefined' && canSendBack) ? 'true' : 'false' %>;
+    const CAN_DELETE_REJECTED_MANUAL_ROW = <%= (typeof canDeleteRejectedManualRow !== 'undefined' && canDeleteRejectedManualRow) ? 'true' : 'false' %>;
     const IS_REVIEWER_EDITING = <%= isReviewerEditing ? 'true' : 'false' %>;
     const IS_SUBMISSION_DEADLINE_PASSED = <%= isSubmissionDeadlinePassedFlag ? 'true' : 'false' %>;
     const ALLOW_LATE_SUBMISSION = <%= allowLateSubmissionFlag ? 'true' : 'false' %>;
@@ -1830,8 +1858,6 @@ function toggleManualType() {
     const classIdInput = document.getElementById('man_classId');
     const classNameInput = document.getElementById('man_className');
     const classButton = document.getElementById('btnPickClass');
-    const startInput = document.getElementById('man_startTime');
-    const endInput = document.getElementById('man_endTime');
     const hoursInput = document.getElementById('man_hours');
     const descWrap = document.getElementById('div_man_desc');
     const descInput = document.getElementById('man_desc');
@@ -1879,13 +1905,9 @@ function toggleManualType() {
         classNameInput.placeholder = 'Class manuals are frozen';
     }
     if (classButton) classButton.disabled = true;
-    if (startInput) {
-        startInput.disabled = isPublicActivity || showFrozenClassRow;
-        startInput.readOnly = isPublicActivity || showFrozenClassRow;
-    }
-    if (endInput) {
-        endInput.disabled = isPublicActivity || showFrozenClassRow;
-        endInput.readOnly = isPublicActivity || showFrozenClassRow;
+    const timeLocked = isPublicActivity || showFrozenClassRow;
+    if (typeof window.applyManualEntryTimeControlsDisabled === 'function') {
+        window.applyManualEntryTimeControlsDisabled(timeLocked);
     }
     if (hoursInput) {
         hoursInput.readOnly = true;
@@ -2054,6 +2076,116 @@ document.addEventListener('DOMContentLoaded', () => {
         return Number(((endMinutes - startMinutes) / 60).toFixed(2));
     }
 
+    const MANUAL_PICK_TIME_MINUTES = { start: 7 * 60, end: 19 * 60, step: 30 };
+
+    function formatManualPickTimeLabel(totalMinutes) {
+        const h24 = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        const period = h24 >= 12 ? 'PM' : 'AM';
+        let h12 = h24 % 12;
+        if (h12 === 0) h12 = 12;
+        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+    }
+
+    function buildManualPickTimeOptions() {
+        const options = [];
+        for (let minutes = MANUAL_PICK_TIME_MINUTES.start; minutes <= MANUAL_PICK_TIME_MINUTES.end; minutes += MANUAL_PICK_TIME_MINUTES.step) {
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            const value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            options.push({ value, label: formatManualPickTimeLabel(minutes) });
+        }
+        return options;
+    }
+
+    function isManualTimeOnPickGrid(value) {
+        const normalized = normalizeClock(value);
+        if (!normalized) return false;
+        const [h, m] = normalized.split(':').map(Number);
+        const total = (h * 60) + m;
+        if (total < MANUAL_PICK_TIME_MINUTES.start || total > MANUAL_PICK_TIME_MINUTES.end) return false;
+        return (total - MANUAL_PICK_TIME_MINUTES.start) % MANUAL_PICK_TIME_MINUTES.step === 0;
+    }
+
+    function populateManualPickTimeSelects() {
+        const options = buildManualPickTimeOptions();
+        ['man_startTimePick', 'man_endTimePick'].forEach((id) => {
+            const select = document.getElementById(id);
+            if (!select) return;
+            select.innerHTML = '<option value="">Select…</option>'
+                + options.map((row) => `<option value="${row.value}">${row.label}</option>`).join('');
+        });
+    }
+
+    function syncManualPickTimesToInputs() {
+        const pickChecked = document.getElementById('man_pickTimes')?.checked === true;
+        if (!pickChecked) return;
+        const startPick = document.getElementById('man_startTimePick')?.value || '';
+        const endPick = document.getElementById('man_endTimePick')?.value || '';
+        const startInput = document.getElementById('man_startTime');
+        const endInput = document.getElementById('man_endTime');
+        if (startInput) startInput.value = normalizeClock(startPick);
+        if (endInput) endInput.value = normalizeClock(endPick);
+    }
+
+    window.toggleManualPickTimesUI = function() {
+        const pickChecked = document.getElementById('man_pickTimes')?.checked === true;
+        document.querySelectorAll('.man-time-pick-control').forEach((el) => {
+            el.classList.toggle('d-none', !pickChecked);
+        });
+        document.querySelectorAll('.man-time-manual-control').forEach((el) => {
+            el.classList.toggle('d-none', pickChecked);
+        });
+        if (pickChecked) {
+            syncManualPickTimesToInputs();
+        }
+        if (typeof window.updateManualComputedHoursFromTimes === 'function') {
+            window.updateManualComputedHoursFromTimes();
+        }
+    };
+
+    window.setManualEntryTimes = function(startTime, endTime, options = {}) {
+        const preferPick = options.preferPick !== false;
+        const start = normalizeClock(startTime);
+        const end = normalizeClock(endTime);
+        const pickCheckbox = document.getElementById('man_pickTimes');
+        const startPick = document.getElementById('man_startTimePick');
+        const endPick = document.getElementById('man_endTimePick');
+        const startInput = document.getElementById('man_startTime');
+        const endInput = document.getElementById('man_endTime');
+        let usePick = false;
+        if (preferPick) {
+            if (!start && !end) {
+                usePick = true;
+            } else if (start && end && isManualTimeOnPickGrid(start) && isManualTimeOnPickGrid(end)) {
+                usePick = true;
+            }
+        }
+        if (pickCheckbox) pickCheckbox.checked = usePick;
+        if (startPick) startPick.value = usePick ? start : '';
+        if (endPick) endPick.value = usePick ? end : '';
+        if (startInput) startInput.value = start;
+        if (endInput) endInput.value = end;
+        window.toggleManualPickTimesUI();
+    };
+
+    function applyManualEntryTimeControlsDisabled(disabled) {
+        const pickCheckbox = document.getElementById('man_pickTimes');
+        if (pickCheckbox) pickCheckbox.disabled = disabled;
+        ['man_startTimePick', 'man_endTimePick', 'man_startTime', 'man_endTime'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.disabled = disabled;
+            if (id === 'man_startTime' || id === 'man_endTime') {
+                el.readOnly = disabled;
+            }
+        });
+    }
+    window.applyManualEntryTimeControlsDisabled = applyManualEntryTimeControlsDisabled;
+
+    populateManualPickTimeSelects();
+    window.toggleManualPickTimesUI();
+
     function hasTimeOverlap(startA, endA, startB, endB) {
         const aStart = normalizeClock(startA);
         const aEnd = normalizeClock(endA);
@@ -2154,11 +2286,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (warn) return 'bi-exclamation-triangle-fill';
         return STATUS_ICON_BY_CODE[normalizeStatusCode(statusCode)] || 'bi-circle-fill';
     };
-    const buildStatusChipHtml = ({ icon, label, colorBg, colorText, colorBorder, interactive = false, sessionId = '' }) => {
+    const buildStatusChipHtml = ({
+        icon,
+        label,
+        colorBg,
+        colorText,
+        colorBorder,
+        interactive = false,
+        sessionId = '',
+        interactiveModalId = 'statHolidayCalcModal',
+        interactiveTriggerClass = 'ts-stat-holiday-status-trigger'
+    }) => {
         const tip = escapeHtml(label);
-        const interactiveClass = interactive ? ' ts-status-chip--interactive ts-stat-holiday-status-trigger' : '';
+        const interactiveClass = interactive ? ` ts-status-chip--interactive ${interactiveTriggerClass}` : '';
         const interactiveAttrs = interactive
-            ? ` role="button" aria-haspopup="dialog" aria-controls="statHolidayCalcModal" data-sesid="${escapeHtml(sessionId)}"`
+            ? ` role="button" aria-haspopup="dialog" aria-controls="${escapeHtml(interactiveModalId)}" data-sesid="${escapeHtml(sessionId)}"`
             : '';
         return `<span class="ts-status-chip ts-tooltip-trigger${interactiveClass}" style="background:${escapeHtml(colorBg)};color:${escapeHtml(colorText)};border-color:${escapeHtml(colorBorder)};" data-tip="${tip}" data-tip-bg="${escapeHtml(colorBg)}" data-tip-fg="${escapeHtml(colorText)}" data-tip-border="${escapeHtml(colorBorder)}" aria-label="${tip}" tabindex="0"${interactiveAttrs}><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span>`;
     };
@@ -2183,12 +2325,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
             if (isRejectedApprovalEntry(entry)) {
+                const hasRejectDetail = Boolean(
+                    String(entry?.decisionNote || '').trim()
+                    || String(entry?.decisionAt || '').trim()
+                    || String(entry?.decisionByName || '').trim()
+                );
                 return buildStatusChipHtml({
                     icon: 'bi-x-circle-fill',
-                    label: 'Rejected',
+                    label: hasRejectDetail ? 'Rejected — view reason' : 'Rejected',
                     colorBg: '#f8d7da',
                     colorText: '#842029',
-                    colorBorder: '#dc3545'
+                    colorBorder: '#dc3545',
+                    interactive: hasRejectDetail,
+                    sessionId: String(entry?.sessionId || '').trim(),
+                    interactiveModalId: 'manualRowRejectDetailModal',
+                    interactiveTriggerClass: 'ts-manual-reject-status-trigger'
                 });
             }
             if (String(entry?.approvalStatus || '').toLowerCase() === 'approved' && entry?.activityPaid === true) {
@@ -2360,9 +2511,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('man_date').value = sessionDate;
                         document.getElementById('man_date_display').innerText = sessionDate;
                     }
-                    document.getElementById('man_startTime').value = normalizeClock(item?.startTime || '');
-                    document.getElementById('man_endTime').value = normalizeClock(item?.endTime || '');
-                    if (typeof window.updateManualComputedHoursFromTimes === 'function') {
+                    if (typeof window.setManualEntryTimes === 'function') {
+                        window.setManualEntryTimes(item?.startTime || '', item?.endTime || '', { preferPick: true });
+                    } else if (typeof window.updateManualComputedHoursFromTimes === 'function') {
                         window.updateManualComputedHoursFromTimes();
                     }
                     const descInput = document.getElementById('man_desc');
@@ -2388,7 +2539,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const manualStartInput = document.getElementById('man_startTime');
     const manualEndInput = document.getElementById('man_endTime');
+    const manualStartPick = document.getElementById('man_startTimePick');
+    const manualEndPick = document.getElementById('man_endTimePick');
+    const manualPickTimesCheckbox = document.getElementById('man_pickTimes');
     const refreshManualHoursFromTimes = () => window.updateManualComputedHoursFromTimes();
+    if (manualPickTimesCheckbox) {
+        manualPickTimesCheckbox.addEventListener('change', () => window.toggleManualPickTimesUI());
+    }
+    if (manualStartPick) {
+        manualStartPick.addEventListener('change', refreshManualHoursFromTimes);
+    }
+    if (manualEndPick) {
+        manualEndPick.addEventListener('change', refreshManualHoursFromTimes);
+    }
     if (manualStartInput) {
         manualStartInput.addEventListener('change', refreshManualHoursFromTimes);
         manualStartInput.addEventListener('input', refreshManualHoursFromTimes);
@@ -3872,6 +4035,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    let manualRowRejectDetailModal = null;
+
+    function formatManualRowDecisionTimestamp(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '—';
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return raw;
+        return parsed.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    function renderManualRowRejectDetailModal(entry) {
+        const summaryEl = document.getElementById('manualRowRejectDetailSummary');
+        const resultEl = document.getElementById('manualRowRejectDetailResult');
+        const titleEl = document.getElementById('manualRowRejectDetailModalTitle');
+        if (!summaryEl || !resultEl || !titleEl) return;
+
+        const rowLabel = String(entry?.className || entry?.description || entry?.activityName || 'Manual row').trim();
+        const dateLabel = entry?.date ? formatTimesheetDateLabel(String(entry.date)) : '—';
+        const startTime = String(entry?.startTime || '').trim();
+        const endTime = String(entry?.endTime || '').trim();
+        const timeLabel = startTime && endTime ? `${startTime} – ${endTime}` : (startTime || endTime || '—');
+        const requestedHours = Number(parseFloat(entry?.requestedHours ?? entry?.durationHours ?? entry?.hours) || 0).toFixed(2);
+        const decidedBy = String(entry?.decisionByName || entry?.decisionBy || '').trim() || '—';
+        const decidedAt = formatManualRowDecisionTimestamp(entry?.decisionAt);
+        const note = String(entry?.decisionNote || '').trim();
+
+        titleEl.innerHTML = `<i class="bi bi-x-circle-fill me-2 text-danger"></i>Manual Row Rejection`;
+        summaryEl.innerHTML = `
+            <div class="ts-stat-calc-summary-item"><span class="label">Row</span><span class="value">${escapeHtml(rowLabel)}</span></div>
+            <div class="ts-stat-calc-summary-item"><span class="label">Date</span><span class="value">${escapeHtml(dateLabel)}</span></div>
+            <div class="ts-stat-calc-summary-item"><span class="label">Time</span><span class="value">${escapeHtml(timeLabel)}</span></div>
+            <div class="ts-stat-calc-summary-item"><span class="label">Requested Hours</span><span class="value">${escapeHtml(requestedHours)} hrs (not payable)</span></div>
+            <div class="ts-stat-calc-summary-item"><span class="label">Decided By</span><span class="value">${escapeHtml(decidedBy)}</span></div>
+            <div class="ts-stat-calc-summary-item"><span class="label">Decided At</span><span class="value">${escapeHtml(decidedAt)}</span></div>
+        `;
+        resultEl.innerHTML = note
+            ? `<div class="alert alert-light border mb-0"><strong>Rejection reason</strong><p class="mb-0 mt-2">${escapeHtml(note).replace(/\n/g, '<br>')}</p></div>`
+            : '<div class="alert alert-warning mb-0">No rejection reason was recorded for this row.</div>';
+    }
+
+    window.openManualRowRejectDetailModal = function(sessionId) {
+        const normalizedSessionId = String(sessionId || '').trim();
+        const entry = activeEntries.find((row) => String(row?.sessionId || '').trim() === normalizedSessionId);
+        if (!entry || !isRejectedApprovalEntry(entry)) return;
+        const modalEl = document.getElementById('manualRowRejectDetailModal');
+        if (!modalEl || !window.bootstrap) return;
+        renderManualRowRejectDetailModal(entry);
+        if (!manualRowRejectDetailModal) {
+            manualRowRejectDetailModal = window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: true });
+        }
+        manualRowRejectDetailModal.show();
+    };
+
     window.openStatHolidayCalculationModal = function(sessionId) {
         if (STAT_HOLIDAY_PREVIEW_ONLY) return;
         const normalizedSessionId = String(sessionId || '').trim();
@@ -4746,7 +4962,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? pendingHoursLine
                 : `${pendingHoursLine}<div class="small text-warning fw-semibold">0.00 payable (pending)</div>`;
         } else if (isRejectedApprovalEntry(entry)) {
-            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div><div class="small text-danger fw-semibold">0.00 payable (rejected)</div>`;
+            hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div>`;
         } else if (isUnpaidApprovalEntry(entry)) {
             hoursHtml = `<div class="ts-hours-line"><span class="ts-hours-value text-muted text-decoration-line-through">${requestedHours.toFixed(2)}</span></div><div class="small text-secondary fw-semibold">0.00 payable (unpaid)</div>`;
         } else if (usesOptionalColumn) {
@@ -5079,6 +5295,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else if (isPriorAdj) {
                             actBtns = `<span class="text-muted small"><i class="bi bi-lock-fill"></i></span>`;
                         } else if (ses.isManual) {
+                            if (isRejectedApprovalEntry(ses)) {
+                                actBtns = CAN_DELETE_REJECTED_MANUAL_ROW
+                                    ? `<button class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove rejected manual row (administrator)" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`
+                                    : `<span class="text-muted small ts-tooltip-trigger" data-tip="Manager-rejected rows cannot be removed. Contact a timesheet administrator." tabindex="0"><i class="bi bi-lock-fill"></i></span>`;
+                            } else {
                             const isPersistedManualEntry = persistedTimesheetEntryIds.has(String(ses.sessionId || '').trim());
                             const reviewBtns = CAN_MANAGER_REVIEW && isPendingApprovalEntry(ses) && ses.activityPaid === true && isPersistedManualEntry
                                 ? `<button class="btn btn-sm btn-outline-success py-0 px-1 me-1" title="Approve paid manual row" onclick="decideManualRow('${ses.sessionId}', 'approved')"><i class="bi bi-check-lg"></i></button>
@@ -5093,6 +5314,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             actBtns = `${saveFirstHint}${reviewBtns}<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit" onclick="openManualModal('${dateStr}', '${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
                                        ${copyBtn}
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" title="Remove" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
+                            }
                         } else if (isStatutoryHolidayEntry(ses)) {
                             actBtns = buildStatHolidayManagerActionButtonsHtml(ses);
                         } else if (isAutoPulledTimesheetEntry(ses) && !IS_ADMIN) {
@@ -5180,6 +5402,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     tbody.addEventListener('click', (event) => {
+        const rejectTrigger = event.target.closest('.ts-manual-reject-status-trigger');
+        if (rejectTrigger && tbody.contains(rejectTrigger)) {
+            event.preventDefault();
+            hideEntryTip();
+            const sessionId = String(rejectTrigger.dataset.sesid || '').trim();
+            if (sessionId) openManualRowRejectDetailModal(sessionId);
+            return;
+        }
         const statTrigger = event.target.closest('.ts-stat-holiday-status-trigger');
         if (statTrigger && tbody.contains(statTrigger)) {
             event.preventDefault();
@@ -5212,6 +5442,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const statHolidayCalcModalEl = document.getElementById('statHolidayCalcModal');
     if (statHolidayCalcModalEl) {
         statHolidayCalcModalEl.addEventListener('hidden.bs.modal', () => {
+            releaseStrayModalShell();
+        });
+    }
+    const manualRowRejectDetailModalEl = document.getElementById('manualRowRejectDetailModal');
+    if (manualRowRejectDetailModalEl) {
+        manualRowRejectDetailModalEl.addEventListener('hidden.bs.modal', () => {
             releaseStrayModalShell();
         });
     }
@@ -5710,6 +5946,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.updateManualComputedHoursFromTimes = function() {
+        if (document.getElementById('man_pickTimes')?.checked === true) {
+            syncManualPickTimesToInputs();
+        }
         const startTime = document.getElementById('man_startTime')?.value || '';
         const endTime = document.getElementById('man_endTime')?.value || '';
         const hours = calculateHoursFromRange(startTime, endTime);
@@ -5732,6 +5971,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('man_date_display').innerText = dateStr;
         
         let existingHoursToIgnore = 0;
+        let editStartTime = '';
+        let editEndTime = '';
 
         if (editId) {
             document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil me-2 text-primary"></i>Edit Manual Entry';
@@ -5739,6 +5980,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const e = activeEntries.find(x => x.sessionId === editId);
             
             existingHoursToIgnore = resolveRequestedHours(e);
+            editStartTime = e.startTime || '';
+            editEndTime = e.endTime || '';
 
             if (e.activityId && !e.classId) {
                 document.getElementById('man_type').value = e.activityId;
@@ -5753,16 +5996,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? (e.className || e.description || e.activityEntryId)
                     : '';
                 document.getElementById('man_desc').value = e.description || e.className || '';
-                document.getElementById('man_startTime').value = normalizeClock(e.startTime || '');
-                document.getElementById('man_endTime').value = normalizeClock(e.endTime || '');
             } else if (e.classId) {
                 document.getElementById('man_type').value = '';
                 document.getElementById('man_classId').value = e.classId;
                 document.getElementById('man_className').value = e.className;
                 clearManualWorkSessionPicker();
                 document.getElementById('man_desc').value = e.description || '';
-                document.getElementById('man_startTime').value = normalizeClock(e.startTime || '');
-                document.getElementById('man_endTime').value = normalizeClock(e.endTime || '');
                 document.getElementById('btnSaveManualEntry').disabled = true;
                 document.getElementById('btnSaveManualEntry').title = 'Manual class sessions are frozen';
             } else {
@@ -5773,8 +6012,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('btnSaveManualEntry').title = '';
                 clearManualWorkSessionPicker();
                 document.getElementById('man_desc').value = e.className;
-                document.getElementById('man_startTime').value = '';
-                document.getElementById('man_endTime').value = '';
+                editStartTime = '';
+                editEndTime = '';
             }
             document.getElementById('man_hours').value = existingHoursToIgnore ? existingHoursToIgnore.toFixed(2) : '';
             document.getElementById('man_comment').value = e.comment || '';
@@ -5790,12 +6029,16 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('man_className').value = '';
             clearManualWorkSessionPicker();
             document.getElementById('man_desc').value = '';
-            document.getElementById('man_startTime').value = '';
-            document.getElementById('man_endTime').value = '';
             document.getElementById('man_hours').value = '';
             document.getElementById('man_comment').value = '';
             const roleSelect = document.getElementById('man_personRole');
             if (roleSelect) roleSelect.value = PAYROLL_DEFAULT_ROLE || 'teacher';
+            editStartTime = '';
+            editEndTime = '';
+        }
+
+        if (typeof window.setManualEntryTimes === 'function') {
+            window.setManualEntryTimes(editStartTime, editEndTime, { preferPick: true });
         }
         
         toggleManualType();
@@ -5870,7 +6113,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok && result.status === 'success') return true;
             const conflicts = Array.isArray(result?.conflicts) ? result.conflicts : [];
             const detail = conflicts.length
-                ? conflicts.slice(0, 3).map((row) => `${row.conflictLabel || 'Conflict'} (${row.conflictDate || row.date || ''})`).join('; ')
+                ? conflicts.slice(0, 3).map((row) => {
+                    if (row?.userMessage) return row.userMessage;
+                    if (row?.sourceApprovalStatus === 'rejected') {
+                        return 'This time overlaps a manager-rejected manual row. An administrator must delete that row before you can add hours here.';
+                    }
+                    return `${row.conflictLabel || 'Conflict'} (${row.conflictDate || row.date || ''})`;
+                }).join('; ')
                 : (result.message || 'Schedule conflict detected.');
             await messageBox({
                 title: 'Schedule Conflict Detected',
@@ -5968,10 +6217,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     || finalActivityName;
             }
             if (finalActivityPaid) {
+                const existingEditRow = editId
+                    ? activeEntries.find((row) => String(row?.sessionId || '') === String(editId || ''))
+                    : null;
+                const wasApprovedManual = String(existingEditRow?.approvalStatus || '').trim().toLowerCase() === 'approved';
                 const proceed = await confirmAction({
-                    title: 'Paid Activity Requires Approval',
-                    message: 'This paid activity row will be saved as pending approval and excluded from payable totals until authorities approve it. Continue?',
-                    confirmText: 'Save as Pending Approval',
+                    title: wasApprovedManual ? 'Approved Row Will Need Re-approval' : 'Paid Activity Requires Approval',
+                    message: wasApprovedManual
+                        ? 'This approved manual row will move back to pending approval. The linked activity assignee will be removed from the work session until a manager approves the row again after you submit. Continue?'
+                        : 'This paid activity row will be saved as pending approval and excluded from payable totals until authorities approve it. Continue?',
+                    confirmText: wasApprovedManual ? 'Save for Re-approval' : 'Save as Pending Approval',
                     cancelText: 'Cancel',
                     icon: 'warning',
                     confirmBtnClass: 'btn-warning'

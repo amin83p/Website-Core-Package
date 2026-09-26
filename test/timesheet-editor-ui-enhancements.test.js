@@ -781,6 +781,19 @@ test('copy manual row modal uses period calendar tiles with holiday styling', ()
   assert.match(editor, /copyManualRowModal[\s\S]*modal-lg/);
 });
 
+test('manual entry modal supports Pick Times dropdowns for 7am-7pm schedule', () => {
+  const editor = read('packages/school/MVC/views/school/timesheet/timesheetEditor.ejs');
+
+  assert.match(editor, /id="man_pickTimes"/);
+  assert.match(editor, /Pick Times/);
+  assert.match(editor, /id="man_startTimePick"/);
+  assert.match(editor, /id="man_endTimePick"/);
+  assert.match(editor, /function buildManualPickTimeOptions/);
+  assert.match(editor, /toggleManualPickTimesUI/);
+  assert.match(editor, /setManualEntryTimes/);
+  assert.match(editor, /MANUAL_PICK_TIME_MINUTES[\s\S]*start:\s*7 \* 60[\s\S]*end:\s*19 \* 60[\s\S]*step:\s*30/);
+});
+
 test('global loading modal humanizes internal operation slugs', () => {
   const main = read('public/scripts/main.js');
   const loadingModal = read('MVC/views/partials/loadingModal.ejs');

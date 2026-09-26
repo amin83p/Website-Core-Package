@@ -25,6 +25,27 @@ function isManualMaterializationCandidate(entry = {}) {
   return Boolean(normalizeId(entry.classId) || normalizeId(entry.activityId));
 }
 
+function collectPreservedMaterializedManualEntryIds(entries = []) {
+  const preserved = new Set();
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    if (!entry || entry.isDeleted === true || entry.isManual !== true) return;
+    if (String(entry.approvalStatus || '').trim().toLowerCase() !== 'approved') return;
+    if (!normalizeId(entry.activityId)) return;
+    const sessionId = normalizeId(entry.sessionId);
+    const originalEntryId = normalizeId(entry.materializedFromTimesheetEntryId);
+    if (sessionId) preserved.add(sessionId);
+    if (originalEntryId) preserved.add(originalEntryId);
+  });
+  return preserved;
+}
+
+function isPersistedRejectedManualActivityRow(entry = {}) {
+  if (!entry || entry.isDeleted === true || entry.isManual !== true) return false;
+  if (entry.activityPaid !== true) return false;
+  if (!normalizeId(entry.activityId)) return false;
+  return String(entry.approvalStatus || '').trim().toLowerCase() === 'rejected';
+}
+
 function mergeLiveMaterializationMarkers(snapshotEntry = {}, liveEntry = {}) {
   if (!snapshotEntry || !liveEntry) return snapshotEntry;
   if (!liveEntry.materializedAt && !liveEntry.materializedSessionId) return snapshotEntry;
@@ -489,9 +510,19 @@ async function revertMaterializedActivityManualEntry({
   return { reverted: true, revertedAssignees, removedEntry };
 }
 
-async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = {}) {
+async function revertMaterializedRecordsForTimesheet({
+  timesheetId,
+  reqUser,
+  preserveTimesheetEntryIds = []
+} = {}) {
   const token = normalizeId(timesheetId);
   if (!token) return { revertedClassSessions: 0, revertedActivityEntries: 0, entryRestorations: [] };
+
+  const preserveEntryIds = new Set(
+    (Array.isArray(preserveTimesheetEntryIds) ? preserveTimesheetEntryIds : [])
+      .map(normalizeId)
+      .filter(Boolean)
+  );
 
   let revertedClassSessions = 0;
   let revertedActivityEntries = 0;
@@ -505,9 +536,11 @@ async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = 
     let changed = false;
     const kept = (Array.isArray(sessions) ? sessions : []).filter((session) => {
       if (normalizeId(session?.materializedFromTimesheetId) !== token) return true;
+      const fromEntry = normalizeId(session?.materializedFromTimesheetEntryId);
+      if (preserveEntryIds.has(fromEntry)) return true;
       entryRestorations.push({
         materializedSessionId: normalizeId(session?.sessionId),
-        originalEntryId: normalizeId(session?.materializedFromTimesheetEntryId)
+        originalEntryId: fromEntry
       });
       revertedClassSessions += 1;
       changed = true;
@@ -529,10 +562,12 @@ async function revertMaterializedRecordsForTimesheet({ timesheetId, reqUser } = 
     entries.forEach((entry) => {
       const assignees = (Array.isArray(entry.assignees) ? entry.assignees : []).filter((assignee) => {
         if (normalizeId(assignee?.materializedFromTimesheetId) === token) {
+          const fromEntry = normalizeId(assignee?.materializedFromTimesheetEntryId);
+          if (preserveEntryIds.has(fromEntry)) return true;
           entryRestorations.push({
             materializedSessionId: `act-${activityId}-${normalizeId(entry?.entryId || entry?.id)}-${normalizeId(assignee?.personId)}`,
             activityEntryId: normalizeId(entry?.entryId || entry?.id),
-            originalEntryId: normalizeId(assignee?.materializedFromTimesheetEntryId)
+            originalEntryId: fromEntry
           });
           revertedActivityEntries += 1;
           changed = true;
@@ -566,6 +601,8 @@ module.exports = {
   applyActivityMaterializationMarkers,
   clearActivityMaterializationMarkers,
   materializeApprovedTimesheetManualEntries,
+  collectPreservedMaterializedManualEntryIds,
+  isPersistedRejectedManualActivityRow,
   revertMaterializedActivityManualEntry,
   revertMaterializedRecordsForTimesheet
 };

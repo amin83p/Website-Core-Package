@@ -197,3 +197,35 @@ test('buildOverrideLookup keys overrides by scheme and holiday', () => {
   assert.ok(lookup.has(key));
   assert.equal(lookup.get(key).statHolidayOverride.hours, 3);
 });
+
+test('calculateLincSchemeHours uses assignee-scoped hours after activity-bound rows are aligned', () => {
+  const policy = timesheetParametersPolicyService.resolvePolicy({
+    statutoryHolidayPay: {
+      defaultSchemeId: 'linc',
+      departmentSchemeAssignments: { DEPT_LINC: 'linc' },
+      schemes: {
+        equilibrium_school: { id: 'equilibrium_school', activityId: 'ACT_EQ' },
+        linc: { id: 'linc', activityId: 'ACT_LINC', hourMode: 'most_recent' }
+      }
+    }
+  });
+  const aligned = [{
+    activityId: 'ACT_LINC',
+    activityEntryId: 'ENT_1',
+    date: '2026-08-10',
+    deliveryDepartmentId: 'DEPT_LINC',
+    isManual: true,
+    approvalStatus: 'approved',
+    hours: 6,
+    timesheetHours: 6,
+    requestedHours: 6
+  }];
+  const result = statutoryHolidaySchemeService.calculateLincSchemeHours({
+    holidayDate: '2026-08-03',
+    workdayEntries: aligned,
+    policy
+  });
+  assert.equal(result.calculatedHours, 6);
+  assert.equal(result.departmentDetails.DEPT_LINC.matchedDate, '2026-08-10');
+  assert.equal(result.departmentDetails.DEPT_LINC.searchDirection, 'after');
+});

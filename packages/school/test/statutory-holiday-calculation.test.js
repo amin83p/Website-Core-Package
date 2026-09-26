@@ -429,3 +429,31 @@ test('assemblePeriodWorkdayEntries includes frozen auto-pulled act sessions from
   assert.equal(rows.length, 1);
   assert.equal(rows[0].sessionId, 'act-705736-ENT-705736-0029-526625');
 });
+
+test('assemblePeriodWorkdayEntries skips live act session when manual row covers same activity date', () => {
+  const rows = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries([
+    {
+      sessionId: 'MAN_1',
+      isManual: true,
+      activityId: '705736',
+      activityEntryId: 'ENT-705736-0029',
+      date: '2026-08-10',
+      deliveryDepartmentId: 'DEP_LINC',
+      hours: 6,
+      timesheetHours: 6
+    }
+  ], [
+    {
+      sessionId: 'act-705736-ENT-705736-0029-526625',
+      activityId: '705736',
+      activityEntryId: 'ENT-705736-0029',
+      date: '2026-08-10',
+      deliveryDepartmentId: 'DEP_LINC',
+      hours: 6,
+      timesheetHours: 6,
+      isManual: false
+    }
+  ]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].sessionId, 'MAN_1');
+});

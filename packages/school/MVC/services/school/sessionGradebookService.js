@@ -2,6 +2,7 @@ const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const gradebookWeightService = require('./gradebookWeightService');
 const schoolFileService = require('./schoolFileService');
+const sessionGradebookMakeupService = require('./sessionGradebookMakeupService');
 
 const GRADEBOOK_ATTACHMENT_ROLES = new Set(['test', 'answer_sheet', 'other']);
 const MAX_GRADEBOOK_ATTACHMENTS = 10;
@@ -45,6 +46,45 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
 
   const normalized = [];
   for (const gb of rawList) {
+    const isMakeupLinked = Boolean(String(gb?.makeupSource?.sessionId || '').trim()
+      && String(gb?.makeupSource?.gradebookId || '').trim());
+    if (isMakeupLinked) {
+      const totalScore = Number(gb.totalScore);
+      if (!Number.isFinite(totalScore) || totalScore <= 0) {
+        throw new Error('Each activity must have a positive total score.');
+      }
+      const weight = gradebookWeightService.resolveActivityWeight(gb);
+      if (!Number.isFinite(weight) || weight <= 0) {
+        throw new Error('Each activity must have a positive weight.');
+      }
+      const name = String(gb.name || '').trim();
+      if (!name) {
+        throw new Error('Each gradebook activity must have a name.');
+      }
+      const gbId = String(gb.id || '').trim() || `gb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const makeupNormalized = sessionGradebookMakeupService.normalizeMakeupGradebookOnSave({ ...gb, id: gbId }, context);
+      const mergedSkillIds = context.mergeHistoricalGradebookSkills
+        ? context.mergeHistoricalGradebookSkills(gb, existingGradebookById.get(gbId), sessionSkillPolicy.selectableIds)
+        : (Array.isArray(gb.skills) ? gb.skills : []);
+      const { skills, skillFocus } = gradebookSkillCatalogService.normalizeGradebookActivitySkills({
+        ...makeupNormalized,
+        skills: mergedSkillIds
+      }, {
+        skillCatalog: sessionSkillPolicy.catalog
+      });
+      normalized.push({
+        ...makeupNormalized,
+        id: gbId,
+        name: name.slice(0, 200),
+        skills,
+        skillFocus,
+        weight,
+        totalScore,
+        attachments: sanitizeGradebookAttachments(makeupNormalized.attachments)
+      });
+      continue;
+    }
+
     const totalScore = Number(gb.totalScore);
     if (!Number.isFinite(totalScore) || totalScore <= 0) {
       throw new Error('Each activity must have a positive total score.');

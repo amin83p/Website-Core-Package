@@ -81,8 +81,33 @@ function buildConflictRow(entry, conflictingEvent, type = 'schedule') {
     conflictEndTime: normalizeClockTime(conflictingEvent?.endTime || conflictingEvent?.end),
     sourceClassId: normalizeId(conflictingEvent?.classId),
     sourceSessionId: normalizeId(conflictingEvent?.sessionId),
-    sourceId: normalizeId(conflictingEvent?.id)
+    sourceId: normalizeId(conflictingEvent?.id),
+    sourceApprovalStatus: String(conflictingEvent?.approvalStatus || conflictingEvent?.sourceApprovalStatus || '').trim().toLowerCase()
   };
+}
+
+function enrichRejectedManualOverlapConflicts(conflicts = [], timesheetEntries = []) {
+  const bySessionId = new Map(
+    (Array.isArray(timesheetEntries) ? timesheetEntries : [])
+      .filter((row) => row && row.isDeleted !== true)
+      .map((row) => [normalizeId(row?.sessionId), row])
+      .filter(([sessionId]) => Boolean(sessionId))
+  );
+  return (Array.isArray(conflicts) ? conflicts : []).map((row) => {
+    const sourceSessionId = normalizeId(row?.sourceSessionId) || normalizeId(row?.sourceId);
+    const sourceEntry = sourceSessionId ? bySessionId.get(sourceSessionId) : null;
+    if (!sourceEntry
+      || sourceEntry.isManual !== true
+      || String(sourceEntry.approvalStatus || '').trim().toLowerCase() !== 'rejected') {
+      return row;
+    }
+    return {
+      ...row,
+      sourceApprovalStatus: 'rejected',
+      conflictLabel: 'Manager-rejected manual row (same time)',
+      userMessage: 'This time overlaps a manager-rejected manual row. An administrator must delete that row before you can add hours here.'
+    };
+  });
 }
 
 function normalizeManualConflictCandidate(row = {}, { provisionalSessionId = '' } = {}) {
@@ -98,7 +123,9 @@ function normalizeManualConflictCandidate(row = {}, { provisionalSessionId = '' 
     sessionId,
     classId,
     activityId,
+    activityEntryId: normalizeId(row?.activityEntryId),
     className: String(row?.className || row?.activityName || '').trim(),
+    activityName: String(row?.activityName || '').trim(),
     date,
     startTime,
     endTime,
@@ -120,7 +147,8 @@ function normalizeTimesheetOverlapCandidate(row = {}) {
     className: String(row?.className || '').trim(),
     date,
     startTime,
-    endTime
+    endTime,
+    approvalStatus: String(row?.approvalStatus || '').trim().toLowerCase()
   };
 }
 
@@ -199,6 +227,8 @@ async function listRoleAwareActivityScheduleEvents({ activeOrgId, personId, acti
     .filter((row) => activityEventMatchesRoles(row, roles))
     .map((row) => ({
       id: normalizeId(row?.id),
+      activityId: normalizeId(row?.activityId),
+      activityEntryId: normalizeId(row?.activityEntryId),
       role: normalizeRole((Array.isArray(row?.roles) ? row.roles[0] : '') || row?.roleLabel),
       label: String(row?.title || row?.className || 'Activity').trim(),
       classId: normalizeId(row?.classId),
@@ -208,6 +238,42 @@ async function listRoleAwareActivityScheduleEvents({ activeOrgId, personId, acti
       endTime: normalizeClockTime(row?.end)
     }))
     .filter((row) => row.date && row.startTime && row.endTime);
+}
+
+function scheduleEventLabelMatchesManualActivity(eventLabel = '', candidate = {}) {
+  const label = String(eventLabel || '').trim();
+  if (!label) return false;
+  const className = String(candidate?.className || '').trim();
+  const activityName = String(candidate?.activityName || '').trim();
+  if (className) {
+    if (label === className) return true;
+    if (label.endsWith(`: ${className}`)) return true;
+    if (label.includes(':')) {
+      const tail = label.split(':').pop().trim();
+      if (tail === className) return true;
+    }
+  }
+  if (activityName && label === activityName) return true;
+  if (activityName && className && label === `${activityName}: ${className}`) return true;
+  return false;
+}
+
+function isSameActivityWorkSessionScheduleEvent(event = {}, candidate = {}) {
+  const activityId = normalizeId(candidate?.activityId);
+  const entryId = normalizeId(candidate?.activityEntryId);
+  const eventActivityId = normalizeId(event?.activityId);
+  const eventLabel = String(event?.label || '').trim();
+  if (activityId && entryId) {
+    return eventActivityId === activityId
+      && normalizeId(event?.activityEntryId) === entryId;
+  }
+  if (activityId && eventActivityId === activityId && scheduleEventLabelMatchesManualActivity(eventLabel, candidate)) {
+    return true;
+  }
+  if (activityId && eventActivityId === activityId && entryId && normalizeId(event?.activityEntryId) === entryId) {
+    return true;
+  }
+  return false;
 }
 
 function isPriorPeriodAdjustmentRow(row = {}) {
@@ -221,12 +287,14 @@ function detectManualOverlapConflicts(candidates = [], scheduleEvents = []) {
     if (entry.isTimed) {
       scheduleEvents.forEach((event) => {
         if (normalizeDate(event?.date) !== normalizeDate(entry?.date)) return;
+        if (isSameActivityWorkSessionScheduleEvent(event, entry)) return;
         if (!hasOverlap(entry?.startTime, entry?.endTime, event?.startTime, event?.endTime)) return;
         conflicts.push(buildConflictRow(entry, event, 'schedule'));
       });
     } else {
       scheduleEvents.forEach((event) => {
         if (normalizeDate(event?.date) !== normalizeDate(entry?.date)) return;
+        if (isSameActivityWorkSessionScheduleEvent(event, entry)) return;
         conflicts.push(buildConflictRow(entry, {
           ...event,
           label: `${event?.label || 'Scheduled event'} (same day)`
@@ -275,11 +343,12 @@ function detectTimesheetInternalOverlaps(entries = [], { ignoreSessionId = '' } 
         date: other.date,
         startTime: other.startTime,
         endTime: other.endTime,
-        sessionId: other.sessionId
+        sessionId: other.sessionId,
+        approvalStatus: other.approvalStatus
       }, 'timesheet_overlap'));
     }
   });
-  return conflicts;
+  return enrichRejectedManualOverlapConflicts(conflicts, entries);
 }
 
 function dedupeConflicts(conflicts = []) {
@@ -387,13 +456,18 @@ async function detectRoleAwareManualEntryConflicts({
   });
 
   const internalConflicts = detectTimesheetInternalOverlaps(timesheetEntries, { ignoreSessionId });
-  const combined = [...scheduleConflicts, ...internalConflicts];
-  return dedupeConflicts(combined);
+  const combined = enrichRejectedManualOverlapConflicts(
+    dedupeConflicts([...scheduleConflicts, ...internalConflicts]),
+    timesheetEntries
+  );
+  return combined;
 }
 
 module.exports = {
   detectRoleAwareManualEntryConflicts,
   detectTimesheetInternalOverlaps,
+  detectManualOverlapConflicts,
+  enrichRejectedManualOverlapConflicts,
   normalizeManualConflictCandidate,
   normalizeClockTime
 };

@@ -137,6 +137,75 @@ class WorkdayHistory {
   }
 }
 
+function normalizeId(value) {
+  return String(value || '').trim();
+}
+
+function roundHours(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Number(parsed.toFixed(2));
+}
+
+async function alignActivityBoundEntryPlanningHours(entries = [], personId = '', reqUser = {}) {
+  const targetPersonId = normalizeId(personId);
+  if (!targetPersonId) return entries;
+  const activityService = require('./activityService');
+  const activityIds = [...new Set(
+    (Array.isArray(entries) ? entries : [])
+      .map((entry) => normalizeId(entry?.activityId))
+      .filter(Boolean)
+  )];
+  if (!activityIds.length) return entries;
+  const activityById = new Map();
+  await Promise.all(activityIds.map(async (activityId) => {
+    const activity = await schoolDataService.getDataById('activities', activityId, reqUser);
+    if (activity) activityById.set(activityId, activity);
+  }));
+
+  return (Array.isArray(entries) ? entries : []).map((entry) => {
+    const activityId = normalizeId(entry?.activityId);
+    if (!activityId) return entry;
+    const activity = activityById.get(activityId);
+    if (!activity) return entry;
+    const rawEntries = activityService.parseJsonArray(activity.entries);
+    let activityEntryId = normalizeId(entry?.activityEntryId);
+    let rawEntry = activityEntryId
+      ? rawEntries.find((row) => idsEqual(row?.entryId || row?.id, activityEntryId))
+      : null;
+    if (!rawEntry && targetPersonId && normalizeId(entry?.date)) {
+      const entryDate = normalizeId(entry.date);
+      rawEntry = rawEntries.find((row) => {
+        if (normalizeId(row?.date) !== entryDate) return false;
+        return activityService.normalizeActivityAssigneeRows(
+          activityService.parseJsonArray(row.assignees)
+        ).some((rowAssignee) => idsEqual(rowAssignee.personId, targetPersonId));
+      });
+    }
+    if (!rawEntry) return entry;
+    const assignee = activityService.normalizeActivityAssigneeRows(
+      activityService.parseJsonArray(rawEntry.assignees)
+    ).find((row) => idsEqual(row.personId, targetPersonId));
+    if (!assignee) {
+      return entry;
+    }
+    const assigneeHours = activityService.resolveActivityTimesheetEntryHours(activity, assignee, rawEntry);
+    if (!(assigneeHours > 0)) return entry;
+    const priorHours = timesheetPrintService.resolveStatHolidayPlanningHours(entry);
+    if (Math.abs(priorHours - assigneeHours) < 0.01) return entry;
+    const next = {
+      ...entry,
+      hours: assigneeHours,
+      timesheetHours: assigneeHours
+    };
+    if (entry.isManual === true) {
+      next.requestedHours = assigneeHours;
+      next.durationHours = roundHours(entry.durationHours ?? assigneeHours);
+    }
+    return next;
+  });
+}
+
 async function buildPersonWorkdayContext({
   orgId,
   personId,
@@ -173,11 +242,22 @@ async function buildPersonWorkdayContext({
     reqUser
   );
 
+  const rawPayableEntries = [];
   (Array.isArray(timesheets) ? timesheets : []).forEach((timesheet) => {
     if (!idsEqual(timesheet?.orgId, orgId)) return;
     if (!idsEqual(timesheet?.teacherId, personId)) return;
-    resolveAuthoritativeEntries(timesheet).forEach(ingestEntry);
+    resolveAuthoritativeEntries(timesheet).forEach((entry) => {
+      if (!isPayableWorkdayEntry(entry)) return;
+      rawPayableEntries.push(entry);
+    });
   });
+
+  const alignedPayableEntries = await alignActivityBoundEntryPlanningHours(
+    rawPayableEntries,
+    personId,
+    reqUser
+  );
+  alignedPayableEntries.forEach(ingestEntry);
 
   function ingestSupplementalEntry(entry) {
     if (!timesheetPrintService.isStatHolidayPlanningWorkdayEntry(entry)) return;
@@ -188,7 +268,13 @@ async function buildPersonWorkdayContext({
     hoursByDate.set(date, Number(((hoursByDate.get(date) || 0) + hours).toFixed(2)));
   }
 
-  (Array.isArray(supplementalEntries) ? supplementalEntries : []).forEach(ingestSupplementalEntry);
+  const supplementalList = Array.isArray(supplementalEntries) ? supplementalEntries : [];
+  const alignedSupplementalEntries = await alignActivityBoundEntryPlanningHours(
+    supplementalList,
+    personId,
+    reqUser
+  );
+  alignedSupplementalEntries.forEach(ingestSupplementalEntry);
 
   return {
     workdayHistory: new WorkdayHistory(hoursByDate),
@@ -208,6 +294,7 @@ module.exports = {
   getWeekday,
   resolveAuthoritativeEntries,
   isPayableWorkdayEntry,
+  alignActivityBoundEntryPlanningHours,
   buildWorkdayHistory,
   buildPersonWorkdayContext
 };

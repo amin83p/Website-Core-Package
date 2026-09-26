@@ -5,6 +5,7 @@ const timesheetParametersPolicyService = require('./timesheetParametersPolicySer
 const statutoryHolidaySchemeService = require('./statutoryHolidaySchemeService');
 const {
   addDays,
+  alignActivityBoundEntryPlanningHours,
   buildPersonWorkdayContext,
   WorkdayHistory,
   isWorkdayHistory
@@ -345,9 +346,13 @@ async function calculateStatutoryHolidayForPeriod({
     supplementalEntries: periodWorkdaySourceEntries
   });
   const boundaryWorkdayHistory = personWorkdayContext.workdayHistory;
-  const workdaySourceEntries = mergeWorkdaySourceEntries(
-    periodWorkdaySourceEntries,
-    personWorkdayContext.payableEntries
+  const workdaySourceEntries = await alignActivityBoundEntryPlanningHours(
+    mergeWorkdaySourceEntries(
+      periodWorkdaySourceEntries,
+      personWorkdayContext.payableEntries
+    ),
+    personId,
+    reqUser
   );
 
   const supplementalHoursByDate = buildSupplementalHoursByDate(workdaySourceEntries);

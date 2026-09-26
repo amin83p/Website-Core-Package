@@ -805,6 +805,19 @@ function isStatHolidayActivitySupplementalEntry(entry = {}) {
   return Boolean(cleanId(entry?.statHolidayId) && cleanId(entry?.statHolidayPersonId));
 }
 
+function savedRowCoversLiveActivitySession(savedRow = {}, liveRow = {}) {
+  const savedActivityId = cleanId(savedRow?.activityId);
+  const liveActivityId = cleanId(liveRow?.activityId);
+  if (!savedActivityId || !liveActivityId || !idsEqual(savedActivityId, liveActivityId)) return false;
+  const savedDate = cleanId(savedRow?.date);
+  const liveDate = cleanId(liveRow?.date);
+  if (!savedDate || savedDate !== liveDate) return false;
+  const savedEntryId = cleanId(savedRow?.activityEntryId);
+  const liveEntryId = cleanId(liveRow?.activityEntryId);
+  if (savedEntryId && liveEntryId && !idsEqual(savedEntryId, liveEntryId)) return false;
+  return true;
+}
+
 function assemblePeriodWorkdayEntries(existingEntries = [], liveSessions = []) {
   const entries = Array.isArray(existingEntries) ? existingEntries : [];
   const live = Array.isArray(liveSessions) ? liveSessions : [];
@@ -831,6 +844,9 @@ function assemblePeriodWorkdayEntries(existingEntries = [], liveSessions = []) {
     if (!sessionId || deletedAutoSessionIds.has(sessionId)) return false;
     if (seenSessionIds.has(sessionId)) return false;
     if (isStatHolidayActivitySupplementalEntry(entry)) return false;
+    if (cleanId(entry?.activityId) && savedRows.some((saved) => savedRowCoversLiveActivitySession(saved, entry))) {
+      return false;
+    }
     return true;
   });
   return [...savedRows, ...autoRows];
@@ -1076,5 +1092,6 @@ module.exports = {
   resolveHolidayTitle,
   mergeWorkdaySourceEntries,
   buildSupplementalHoursByDate,
-  isStatHolidayPlanningWorkdayEntry
+  isStatHolidayPlanningWorkdayEntry,
+  savedRowCoversLiveActivitySession
 };

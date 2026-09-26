@@ -99,6 +99,7 @@ const schoolStudentProfileLinkService = require('../../services/school/schoolStu
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 const gradebookWeightService = require('../../services/school/gradebookWeightService');
 const sessionGradebookService = require('../../services/school/sessionGradebookService');
+const sessionGradebookMakeupService = require('../../services/school/sessionGradebookMakeupService');
 const teachingOutlineSuggestionService = require('../../services/school/teachingOutlineSuggestionService');
 const teachingOutlineCatalogService = require('../../services/school/teachingOutlineCatalogService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
@@ -4657,6 +4658,9 @@ async function manageSession(req, res) {
             session.roster || [],
             rosterIdentityData
         );
+        const { inline: sessionGradebooksInline } = sessionGradebookMakeupService.partitionGradebooksForSessionManagerClient(
+            session.gradebooks
+        );
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,
@@ -4738,6 +4742,7 @@ async function manageSession(req, res) {
             sessionStudentCaseSummary: sessionStudentCaseService.summarizeSessionCases(visibleSessionStudentCases),
             studentCaseDetailPresets: getPresetConfig(),
             gradebookSkills: sessionSkillPolicy.renderCatalog,
+            sessionGradebooksInline,
             teachingOutlineContext,
             enrollmentLockedAttendancePersonIds,
             canOverrideEnrollmentNaLock: Boolean(canOverrideAttendanceEdit),
@@ -6460,60 +6465,148 @@ async function normalizeSessionGradebooksForSave(classData, session, rawList, re
             );
         }
     });
+    const classIdForSessions = toPublicId(classData?.id);
+    const allClassSessions = classIdForSessions
+        ? await schoolDataService.getClassSessions(classIdForSessions, reqUser)
+        : [];
+    const sourceSessionsById = new Map(
+        (Array.isArray(allClassSessions) ? allClassSessions : [])
+            .map((row) => [String(row?.sessionId || row?.id || '').trim(), row])
+            .filter(([id]) => id)
+    );
     return sessionGradebookService.normalizeSessionGradebooksFromRequest(rawList, {
         personIds,
         attendanceByPerson,
         existingGradebookById,
         sessionSkillPolicy,
-        mergeHistoricalGradebookSkills
+        mergeHistoricalGradebookSkills,
+        sourceSessionsById
     });
+}
+
+async function assertSessionGradebookEditable(req, { classId, sessionId }) {
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    const sessions = await schoolDataService.getClassSessions(classId, req.user);
+    const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+    if (sessionIndex === -1) throw new Error('Session not found');
+    assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
+    await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
+
+    const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
+        includeInactive: true
+    });
+    if (isMakeUpRequiredSessionByMap(statusMap, sessions[sessionIndex])) {
+        throw new Error('This original session is inactive because its status requires a make-up session. Gradebook is not available for this session. Create or open the make-up session instead.');
+    }
+
+    const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
+    const isTimesheetApprovedLock = schoolDependencyService.isSessionTimesheetApprovedLock(sessions[sessionIndex]);
+    const isAdministrativeSessionLock = isSessionLocked && !isTimesheetApprovedLock;
+    let canOverride = await adminAuthorityService.isAdminForRequestAsync(
+        req.user,
+        SECTIONS.SCHOOL_CLASSES,
+        OPERATIONS.UPDATE,
+        { section: { id: SECTIONS.SCHOOL_CLASSES } }
+    );
+
+    if (isAdministrativeSessionLock && !canOverride) {
+        throw new Error('This session is locked and cannot be edited.');
+    }
+    await sessionManagementService.assertSessionOperationAllowed({
+        classId,
+        sessionId,
+        session: sessions[sessionIndex],
+        classData,
+        allSessions: sessions,
+        reqUser: req.user,
+        source: 'session_manager',
+        operation: sessionManagementService.SESSION_OPERATIONS.SAVE_GRADEBOOK,
+        orgId: classData?.orgId,
+        orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
+        canOverride,
+        statusMap
+    });
+
+    return { classData, sessions, sessionIndex, session: sessions[sessionIndex] };
+}
+
+async function getGradebookMakeupSources(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { sessions, session } = await assertSessionGradebookEditable(req, { classId, sessionId });
+        const rows = sessionGradebookMakeupService.listMakeupPickerRows({
+            allSessions: sessions,
+            currentSession: session
+        });
+        return res.json({
+            status: 'success',
+            rows,
+            lookbackDays: sessionGradebookMakeupService.MAKEUP_SOURCE_LOOKBACK_DAYS
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function getGradebookMakeupActivities(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session, 'manageSession');
+        const { makeupLinked } = sessionGradebookMakeupService.partitionGradebooksForSessionManagerClient(
+            session.gradebooks
+        );
+        return res.json({ status: 'success', gradebooks: makeupLinked });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function postGradebookMakeupFrom(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const sourceSessionId = String(body.sourceSessionId || '').trim();
+        const sourceGradebookId = String(body.sourceGradebookId || '').trim();
+        if (!sourceSessionId || !sourceGradebookId) {
+            throw new Error('Source session and activity are required.');
+        }
+
+        const { classData, sessions, session } = await assertSessionGradebookEditable(req, { classId, sessionId });
+        const enrichedRoster = await buildEnrichedSessionRosterForMutation({
+            classData,
+            session,
+            reqUser: req.user
+        });
+        const currentPersonIds = [...new Set(enrichedRoster.map((r) => cleanPersonId(r.personId)).filter(Boolean))];
+
+        const preview = sessionGradebookMakeupService.previewMakeupGradebook({
+            allSessions: sessions,
+            currentSession: session,
+            sourceSessionId,
+            sourceGradebookId,
+            currentPersonIds
+        });
+
+        return res.json({
+            status: 'success',
+            previewStatus: preview.status,
+            messages: preview.messages || [],
+            cohort: preview.cohort || null,
+            gradebook: preview.gradebook || null
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
 }
 
 async function saveSessionGradebooks(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
-        if (sessionIndex === -1) throw new Error('Session not found');
-        assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
-        await assertSessionManagerSessionWithinClassWindowOrThrow(classData, sessions[sessionIndex], req.user);
-
-        const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
-            includeInactive: true
-        });
-        if (isMakeUpRequiredSessionByMap(statusMap, sessions[sessionIndex])) {
-            throw new Error('This original session is inactive because its status requires a make-up session. Gradebook is not available for this session. Create or open the make-up session instead.');
-        }
-
-        const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
-        const isTimesheetApprovedLock = schoolDependencyService.isSessionTimesheetApprovedLock(sessions[sessionIndex]);
-        const isAdministrativeSessionLock = isSessionLocked && !isTimesheetApprovedLock;
-        let canOverride = await adminAuthorityService.isAdminForRequestAsync(
-            req.user,
-            SECTIONS.SCHOOL_CLASSES,
-            OPERATIONS.UPDATE,
-            { section: { id: SECTIONS.SCHOOL_CLASSES } }
-        );
-
-        if (isAdministrativeSessionLock && !canOverride) {
-            throw new Error('This session is locked and cannot be edited.');
-        }
-        await sessionManagementService.assertSessionOperationAllowed({
-            classId,
-            sessionId,
-            session: sessions[sessionIndex],
-            classData,
-            allSessions: sessions,
-            reqUser: req.user,
-            source: 'session_manager',
-            operation: sessionManagementService.SESSION_OPERATIONS.SAVE_GRADEBOOK,
-            orgId: classData?.orgId,
-            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || '',
-            canOverride,
-            statusMap
-        });
+        const { classData, sessions, sessionIndex } = await assertSessionGradebookEditable(req, { classId, sessionId });
 
         let rawList = req.body?.gradebooks;
         if (typeof rawList === 'string') {
@@ -6760,7 +6853,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,
