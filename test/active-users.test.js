@@ -5,7 +5,8 @@ const {
   isRecentlyActiveSession,
   filterSessionsByCurrentPath,
   groupSessionsByUser,
-  computeSummaryMetrics
+  computeSummaryMetrics,
+  resolveActiveUserDisplayName
 } = require('../MVC/services/security/activeUsersService');
 
 const NOW = new Date('2026-07-12T12:00:00.000Z');
@@ -98,6 +99,34 @@ test('groupSessionsByUser deduplicates by user and keeps latest activity within 
   assert.equal(grouped[0].currentOrgId, 'ORG-2');
 });
 
+test('groupSessionsByUser keeps currentPath from the session with latest activity', () => {
+  const grouped = groupSessionsByUser([
+    {
+      status: 'active',
+      userId: 'USR-1',
+      lastActivityAt: '2026-07-12T11:54:00.000Z',
+      absoluteExpiry: '2026-07-12T20:00:00.000Z',
+      idleTimeoutMinutes: 1440,
+      currentPath: '/school/old-page',
+      currentPathUpdatedAt: '2026-07-12T11:50:00.000Z'
+    },
+    {
+      status: 'active',
+      userId: 'USR-1',
+      lastActivityAt: '2026-07-12T11:58:00.000Z',
+      absoluteExpiry: '2026-07-12T20:00:00.000Z',
+      idleTimeoutMinutes: 1440,
+      currentPath: '',
+      currentPathUpdatedAt: null
+    }
+  ], NOW, STALE_MINUTES);
+
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].lastActivityAt, '2026-07-12T11:58:00.000Z');
+  assert.equal(grouped[0].currentPath, '');
+  assert.equal(grouped[0].currentPathUpdatedAt, null);
+});
+
 test('computeSummaryMetrics calculates session and activity averages', () => {
   const summary = computeSummaryMetrics([
     {
@@ -166,4 +195,23 @@ test('groupSessionsByUser exposes current path from latest active session', () =
   assert.equal(grouped.length, 1);
   assert.equal(grouped[0].currentPath, '/newer');
   assert.equal(grouped[0].currentPathUpdatedAt, '2026-07-12T11:58:00.000Z');
+});
+
+test('resolveActiveUserDisplayName prefers composed person name over short displayName', () => {
+  const name = resolveActiveUserDisplayName(
+    {
+      displayName: 'Amin',
+      name: { first: 'Amin', last: 'Paknejad' }
+    },
+    null
+  );
+  assert.equal(name, 'Amin Paknejad');
+});
+
+test('resolveActiveUserDisplayName uses linked person record when user name is incomplete', () => {
+  const name = resolveActiveUserDisplayName(
+    { username: 'apak' },
+    { name: { first: 'Amin', last: 'Paknejad' } }
+  );
+  assert.equal(name, 'Amin Paknejad');
 });

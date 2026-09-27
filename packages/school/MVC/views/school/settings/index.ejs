@@ -32,6 +32,13 @@
       ? timesheetParametersPolicy.emptyEnrollmentSessions
       : 'hide'
   ).trim() || 'hide';
+  const manualActivityWorkSessionPolicy = (typeof timesheetParametersPolicy !== 'undefined' && timesheetParametersPolicy?.manualActivityWorkSession)
+    ? timesheetParametersPolicy.manualActivityWorkSession
+    : {
+      defaultTitle: 'Generated Work Session (Timesheet Editor)',
+      defaultStartTime: '08:00',
+      defaultEndTime: '20:00'
+    };
   const statutoryHolidayPayPolicy = (typeof timesheetParametersPolicy !== 'undefined' && timesheetParametersPolicy?.statutoryHolidayPay)
     ? timesheetParametersPolicy.statutoryHolidayPay
     : {
@@ -76,7 +83,7 @@
   const payableHolidayTypesSelected = Array.isArray(statutoryHolidayPayPolicy.payableHolidayTypes)
     ? statutoryHolidayPayPolicy.payableHolidayTypes
     : ['National Holiday', 'Observance Paid'];
-  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', importBaseStartTime: '00:00', saveImportedSessionsIntoOneWorkSession: true, importWorkSessionStartTime: '07:00', importWorkSessionEndTime: '21:00', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
+  const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', importBaseStartTime: '00:00', saveImportedSessionsIntoOneWorkSession: true, importWorkSessionStartTime: '07:00', importWorkSessionEndTime: '21:00', importWorkSessionDefaultTitle: 'Generated Work Session (Timesheet Import)', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
   const enrollmentFinishAlertPolicyJson = JSON.stringify(typeof enrollmentFinishAlertPolicy !== 'undefined' ? enrollmentFinishAlertPolicy : {}).replace(/</g, '\\u003c');
   const enrollmentFinishAlertDaysValue = (typeof enrollmentFinishAlertPolicy !== 'undefined' && enrollmentFinishAlertPolicy?.daysToExpectedFinishDate != null)
     ? String(enrollmentFinishAlertPolicy.daysToExpectedFinishDate)
@@ -110,6 +117,10 @@
   const saveImportedSessionsIntoOneWorkSessionValue = typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.saveImportedSessionsIntoOneWorkSession !== false;
   const timesheetImportWorkSessionStartTimeValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importWorkSessionStartTime) || '07:00').trim();
   const timesheetImportWorkSessionEndTimeValue = String((typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importWorkSessionEndTime) || '21:00').trim();
+  const timesheetImportWorkSessionDefaultTitleValue = String(
+    (typeof timesheetImportPolicy !== 'undefined' && timesheetImportPolicy?.importWorkSessionDefaultTitle)
+      || 'Generated Work Session (Timesheet Import)'
+  ).trim() || 'Generated Work Session (Timesheet Import)';
   const attendanceThresholdsEnabledFlag = typeof attendanceThresholdsEnabled === 'undefined'
     ? true
     : attendanceThresholdsEnabled !== false;
@@ -1573,6 +1584,24 @@
               </div>
             </div>
             <div class="rollup-feature-card mt-4">
+              <div class="fw-semibold mb-1">Manual activity work sessions</div>
+              <p class="small text-muted mb-3">When a paid manual activity row is approved, the system finds or creates a shared work session using the default title and time window below. Your description and comments are stored on the assignee note, not as the work session name. Matching reuses a posted session on the same date when the row times fit inside the session window.</p>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold" for="manualActivityWorkSessionDefaultTitle">Default work session title</label>
+                  <input class="form-control" type="text" id="manualActivityWorkSessionDefaultTitle" name="manualActivityWorkSessionDefaultTitle" maxlength="180" value="<%= manualActivityWorkSessionPolicy.defaultTitle || 'Generated Work Session (Timesheet Editor)' %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small fw-semibold" for="manualActivityWorkSessionDefaultStartTime">Default start time</label>
+                  <input class="form-control" type="time" id="manualActivityWorkSessionDefaultStartTime" name="manualActivityWorkSessionDefaultStartTime" value="<%= manualActivityWorkSessionPolicy.defaultStartTime || '08:00' %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small fw-semibold" for="manualActivityWorkSessionDefaultEndTime">Default end time</label>
+                  <input class="form-control" type="time" id="manualActivityWorkSessionDefaultEndTime" name="manualActivityWorkSessionDefaultEndTime" value="<%= manualActivityWorkSessionPolicy.defaultEndTime || '20:00' %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                </div>
+              </div>
+            </div>
+            <div class="rollup-feature-card mt-4">
               <div class="d-flex align-items-center justify-content-between gap-3 mb-1">
                 <div class="fw-semibold">Statutory holiday pay</div>
                 <div class="form-check form-switch mb-0">
@@ -1940,7 +1969,11 @@
                 </button>
               </div>
               <div class="collapse show p-3" id="timesheetImportWorkSessionCollapse">
-                <p class="small text-muted mb-3">Consolidate imported classes into one work session per day under the mapped activity. These options are fixed during this rollout.</p>
+                <p class="small text-muted mb-3">Consolidate imported classes into one work session per day on the mapped activity. Import finds an existing posted session on that date when its title matches the default below; otherwise it creates one with that title. Class rows are stored as assignees on that session. Existing daily shells that use a different title are not reused—rename them or align this default title.</p>
+                <div class="mb-3">
+                  <label class="form-label small fw-semibold" for="timesheetImportWorkSessionDefaultTitle">Default work session title</label>
+                  <input class="form-control" type="text" id="timesheetImportWorkSessionDefaultTitle" name="importWorkSessionDefaultTitle" maxlength="180" value="<%= timesheetImportWorkSessionDefaultTitleValue %>" <%= canUpdateFlag ? '' : 'disabled' %>>
+                </div>
                 <div class="form-check mb-3">
                   <input class="form-check-input" type="checkbox" id="saveImportedSessionsIntoOneWorkSession" name="saveImportedSessionsIntoOneWorkSession" value="true" <%= saveImportedSessionsIntoOneWorkSessionValue ? 'checked' : '' %> disabled>
                   <label class="form-check-label" for="saveImportedSessionsIntoOneWorkSession">Save Imported Sessions into One Work Session</label>
@@ -3580,6 +3613,9 @@
     const result = await postSettings('/school/settings/timesheet-parameters', {
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
       emptyEnrollmentSessions: selected?.value || 'hide',
+      manualActivityWorkSessionDefaultTitle: document.getElementById('manualActivityWorkSessionDefaultTitle')?.value || '',
+      manualActivityWorkSessionDefaultStartTime: document.getElementById('manualActivityWorkSessionDefaultStartTime')?.value || '08:00',
+      manualActivityWorkSessionDefaultEndTime: document.getElementById('manualActivityWorkSessionDefaultEndTime')?.value || '20:00',
       statutoryHolidayPayEnabled: document.getElementById('statutoryHolidayPayEnabled')?.checked ? 'true' : 'false',
       statutoryHolidayActivityId: equilibriumSchemeActivityId,
       ...schemePayload,
@@ -3599,6 +3635,13 @@
     }, button, 'timesheetParametersSettingsError');
     if (!result) return;
     timesheetParametersPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetParametersPolicy;
+    const savedManualWs = timesheetParametersPolicy?.manualActivityWorkSession || {};
+    const manualWsTitleInput = document.getElementById('manualActivityWorkSessionDefaultTitle');
+    const manualWsStartInput = document.getElementById('manualActivityWorkSessionDefaultStartTime');
+    const manualWsEndInput = document.getElementById('manualActivityWorkSessionDefaultEndTime');
+    if (manualWsTitleInput) manualWsTitleInput.value = String(savedManualWs.defaultTitle || '').trim();
+    if (manualWsStartInput) manualWsStartInput.value = String(savedManualWs.defaultStartTime || '08:00').trim();
+    if (manualWsEndInput) manualWsEndInput.value = String(savedManualWs.defaultEndTime || '20:00').trim();
     const savedStatPay = timesheetParametersPolicy?.statutoryHolidayPay || {};
     const savedDefaultSchemeId = String(savedStatPay.defaultSchemeId || 'equilibrium_school').trim();
     const defaultSchemeSelect = document.getElementById('statutoryHolidayDefaultSchemeId');
@@ -3890,10 +3933,16 @@
       saveImportedSessionsIntoOneWorkSession: 'true',
       importWorkSessionStartTime: document.getElementById('timesheetImportWorkSessionStartTime')?.value || '07:00',
       importWorkSessionEndTime: document.getElementById('timesheetImportWorkSessionEndTime')?.value || '21:00',
+      importWorkSessionDefaultTitle: document.getElementById('timesheetImportWorkSessionDefaultTitle')?.value || '',
       classNameActivityMappings: JSON.stringify(readTimesheetImportClassMappings())
     }, button, 'timesheetImportSettingsError');
     if (!result) return;
     timesheetImportPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetImportPolicy;
+    const savedImportWsTitle = document.getElementById('timesheetImportWorkSessionDefaultTitle');
+    if (savedImportWsTitle) {
+      savedImportWsTitle.value = String(timesheetImportPolicy?.importWorkSessionDefaultTitle || '').trim()
+        || 'Generated Work Session (Timesheet Import)';
+    }
     syncTimesheetImportClassMappingsFromPolicy();
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });

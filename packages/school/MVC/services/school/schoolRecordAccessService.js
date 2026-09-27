@@ -185,20 +185,26 @@ function isActivityWorkSessionAccessible({ activity, entry, access = {}, context
   if (access?.denyAll === true || access?.scopeMode === SCOPE_MODES.USER) return false;
   if (isOrgWideScope(access)) return true;
 
+  const scopeName = String(access?.scopeName || '').trim().toUpperCase();
+  const assigneeScoped = scopeName === 'OWNER' || scopeName === 'DIVISION' || scopeName === 'DEPARTMENT';
+
   if (context === 'manageWorkSession' || context === 'mutation') {
-    if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+    if (assigneeScoped || access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+      if (scopeName === 'OWNER' || assigneeScoped) {
+        return isAssigneeOnActivityEntry(entry, access.personId);
+      }
       return isAssigneeOnActivityEntry(entry, access.personId);
     }
     if (access?.scopeMode === SCOPE_MODES.OWNER) {
-      return isRecordOwnedByUser(activity, access.userId);
+      return isAssigneeOnActivityEntry(entry, access.personId);
     }
     return isOrgWideScope(access);
   }
 
-  if (access?.scopeMode === SCOPE_MODES.OWNER) {
-    return isRecordOwnedByUser(activity, access.userId);
+  if (assigneeScoped || access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+    return isAssigneeOnActivityEntry(entry, access.personId);
   }
-  if (access?.scopeMode === SCOPE_MODES.ASSIGNMENT) {
+  if (access?.scopeMode === SCOPE_MODES.OWNER) {
     return isAssigneeOnActivityEntry(entry, access.personId);
   }
   return true;

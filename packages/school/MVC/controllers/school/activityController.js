@@ -394,10 +394,20 @@ exports.saveWorkSessionMetadata = async (req, res) => {
     assertOrgAccess(result.context.activity, orgId);
     const payload = { status: 'success', message: 'Work session saved.', actionStateId: req.actionStateId, ...result };
     if (isAjax(req)) return res.json(payload);
-    res.redirect(activityWorkSessionService.buildSessionManageUrl(activityId, entryId));
+    res.redirect(result.manageUrl || activityWorkSessionService.buildSessionManageUrl(activityId, entryId));
   } catch (error) {
     logWorkSessionMutationError('metadata', error, req);
-    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    if (isAjax(req)) {
+      if (error.code === 'SESSION_METADATA_CONFLICTS') {
+        return res.status(409).json({
+          status: 'warning',
+          code: error.code,
+          message: error.message,
+          data: error.data || {}
+        });
+      }
+      return res.status(error.statusCode || 400).json({ status: 'error', message: error.message });
+    }
     res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
   }
 };

@@ -24,7 +24,8 @@ function pickStoredPolicyFields(row) {
   if (!row || typeof row !== 'object') return {};
   return {
     emptyEnrollmentSessions: row.emptyEnrollmentSessions,
-    statutoryHolidayPay: row.statutoryHolidayPay
+    statutoryHolidayPay: row.statutoryHolidayPay,
+    manualActivityWorkSession: row.manualActivityWorkSession
   };
 }
 

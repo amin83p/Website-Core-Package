@@ -7,6 +7,7 @@ const dataService = require('./schoolDataService');
 const schoolDependencyService = require('./schoolDependencyService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const timesheetPayrollContextService = require('./timesheetPayrollContextService');
+const timesheetImportPolicyService = require('./timesheetImportPolicyService');
 const { normalizeDateToken } = require('./timesheetExcel/timesheetExcelCellUtils');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -123,12 +124,18 @@ function resolveWorkSessionWindowDurationHours(startTime = '', endTime = '') {
   return Number(((endMinutes - startMinutes) / 60).toFixed(2));
 }
 
-function findFirstPostedEntryForDate(entries = [], date = '') {
+function workSessionTitleMatchesDefault(entryTitle = '', defaultTitle = '') {
+  return String(entryTitle || '').trim() === String(defaultTitle || '').trim();
+}
+
+function findPostedEntryForDateAndTitle(entries = [], date = '', defaultTitle = '') {
   const targetDate = cleanId(date);
-  if (!targetDate) return null;
+  const targetTitle = String(defaultTitle || '').trim();
+  if (!targetDate || !targetTitle) return null;
   return (Array.isArray(entries) ? entries : []).find((entry) => (
     cleanId(entry?.date) === targetDate
     && String(entry?.status || 'posted').trim().toLowerCase() === 'posted'
+    && workSessionTitleMatchesDefault(entry?.title, targetTitle)
   )) || null;
 }
 
@@ -295,6 +302,7 @@ function buildImportWorkSessionEntryDrafts({
   skipStacking = false,
   workSessionStartTime = '07:00',
   workSessionEndTime = '21:00',
+  workSessionDefaultTitle = '',
   consolidateIntoOneWorkSession = true
 }) {
   const stackedRows = skipStacking
@@ -329,7 +337,7 @@ function buildImportWorkSessionEntryDrafts({
     workSessionStartTime,
     workSessionEndTime
   );
-  const activityTitle = String(activity?.title || activity?.name || '').trim();
+  const sessionTitle = String(workSessionDefaultTitle || '').trim() || 'Imported sessions';
 
   return [...rowsByDate.entries()]
     .sort(([leftDate], [rightDate]) => String(leftDate).localeCompare(String(rightDate)))
@@ -362,7 +370,7 @@ function buildImportWorkSessionEntryDrafts({
       });
 
       return {
-        title: activityTitle || 'Imported sessions',
+        title: sessionTitle,
         date,
         startTime: workSessionStartTime,
         endTime: workSessionEndTime,
@@ -419,6 +427,7 @@ async function createImportWorkSessions({
   skipStacking = false,
   workSessionStartTime = '07:00',
   workSessionEndTime = '21:00',
+  workSessionDefaultTitle = '',
   consolidateIntoOneWorkSession = true,
   reqUser
 }) {
@@ -429,6 +438,10 @@ async function createImportWorkSessions({
   if (!activityService.isPersonEligibleForActivity(activity, targetPersonId)) {
     throw new Error('The import person is not eligible for the configured import activity.');
   }
+
+  const resolvedWorkSessionDefaultTitle = timesheetImportPolicyService.resolveImportWorkSessionDefaultTitle({
+    importWorkSessionDefaultTitle: workSessionDefaultTitle
+  });
 
   const drafts = buildImportWorkSessionEntryDrafts({
     compiledRows,
@@ -443,6 +456,7 @@ async function createImportWorkSessions({
     skipStacking,
     workSessionStartTime,
     workSessionEndTime,
+    workSessionDefaultTitle: resolvedWorkSessionDefaultTitle,
     consolidateIntoOneWorkSession
   });
   if (!drafts.length) {
@@ -472,15 +486,13 @@ async function createImportWorkSessions({
     });
   } else {
     for (const draft of drafts) {
-      const existingEntry = findFirstPostedEntryForDate(existingEntries, draft.date);
+      const defaultTitle = String(draft?.title || resolvedWorkSessionDefaultTitle || '').trim();
+      const existingEntry = findPostedEntryForDateAndTitle(existingEntries, draft.date, defaultTitle);
       if (existingEntry) {
         const entryId = cleanId(existingEntry.entryId);
         const entryIndex = existingEntries.findIndex((row) => cleanId(row?.entryId) === entryId);
         const mergedEntry = {
           ...existingEntry,
-          startTime: draft.startTime,
-          endTime: draft.endTime,
-          durationHours: draft.durationHours,
           assignees: [
             ...activityService.normalizeActivityAssigneeRows(existingEntry.assignees),
             ...draft.assignees
@@ -1037,7 +1049,8 @@ module.exports = {
   buildImportRowNotes,
   buildCompletedAssignee,
   buildImportWorkSessionEntryDrafts,
-  findFirstPostedEntryForDate,
+  findPostedEntryForDateAndTitle,
+  workSessionTitleMatchesDefault,
   importStampMatchesPersonPeriod,
   entryDateInImportPeriod,
   isImportAssigneeForTarget,

@@ -44,6 +44,22 @@
         "lastUpdateUser": "TEST_USER",
         "lastUpdateDateTime": "2026-09-14T04:58:58.383Z"
       }
+    },
+    "ORG_POLICY_RT_1790440467215": {
+      "importActivityId": "",
+      "allowImportInTimesheetManagement": false,
+      "allowImportInMyTimesheets": false,
+      "importTargetStatus": "draft",
+      "importBaseStartTime": "08:30",
+      "saveImportedSessionsIntoOneWorkSession": true,
+      "importWorkSessionStartTime": "08:00",
+      "importWorkSessionEndTime": "20:00",
+      "importWorkSessionDefaultTitle": "Generated Work Session (Timesheet Import)",
+      "classNameActivityMappings": [],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-26T16:34:27.228Z"
+      }
     }
   }
 }

@@ -29,6 +29,7 @@ function pickStoredPolicyFields(row) {
     saveImportedSessionsIntoOneWorkSession: row.saveImportedSessionsIntoOneWorkSession,
     importWorkSessionStartTime: row.importWorkSessionStartTime,
     importWorkSessionEndTime: row.importWorkSessionEndTime,
+    importWorkSessionDefaultTitle: row.importWorkSessionDefaultTitle,
     classNameActivityMappings: row.classNameActivityMappings
   };
 }

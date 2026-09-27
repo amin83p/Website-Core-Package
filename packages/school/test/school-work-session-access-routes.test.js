@@ -17,7 +17,8 @@ test('activity work-session routes allow SCHOOL_WORK_SESSIONS with SCHOOL_ACTIVI
   assert.match(routeSource, /SECTIONS\.SCHOOL_WORK_SESSIONS/);
   assert.match(routeSource, /SECTIONS\.SCHOOL_ACTIVITIES/);
   assert.match(routeSource, /WORK_SESSION_TRACK_SECTION\s*=\s*SECTIONS\.SCHOOL_WORK_SESSIONS/);
-  assert.match(routeSource, /\/:activityId\/work-sessions\/:entryId\/manage[\s\S]*?requireAccessAny\(WORK_SESSION_ACCESS_SECTIONS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /\/:activityId\/work-sessions\/:entryId\/manage[\s\S]*?requireAccessAny\(WORK_SESSION_ACCESS_SECTIONS,\s*OPERATIONS\.READ\)/);
+  assert.match(routeSource, /\/:activityId\/work-sessions\/manage[\s\S]*?requireAccessAny\(WORK_SESSION_ACCESS_SECTIONS,\s*OPERATIONS\.READ\)/);
   assert.match(routeSource, /\/:activityId\/work-sessions\/:entryId\/complete[\s\S]*?requireAccessAny\(WORK_SESSION_ACCESS_SECTIONS,\s*OPERATIONS\.UPDATE\)/);
   assert.match(routeSource, /\/:activityId\/work-sessions\/:entryId[\s\S]*?requireAccessAny\(WORK_SESSION_ACCESS_SECTIONS,\s*OPERATIONS\.DELETE\)/);
 });
@@ -34,10 +35,11 @@ test('work session explorer routes are gated on SCHOOL_WORK_SESSIONS', () => {
 
 test('activity work session admin check supports work sessions or activities admin', () => {
   const serviceSource = read('packages/school/MVC/services/school/activityWorkSessionService.js');
-  const adminSource = read('packages/school/MVC/services/school/schoolAdminAccessService.js');
+  const accessSource = read('packages/school/MVC/services/school/workSessionAccessService.js');
 
-  assert.match(serviceSource, /isWorkSessionsAdminViewer\(reqUser, operationId\)/);
-  assert.match(serviceSource, /isActivitiesAdminViewer\(reqUser, operationId\)/);
-  assert.match(adminSource, /function isWorkSessionsAdminViewer/);
-  assert.match(adminSource, /SECTIONS\.SCHOOL_WORK_SESSIONS/);
+  assert.match(serviceSource, /workSessionAccessService\.resolveWorkSessionAccessBundle/);
+  assert.match(accessSource, /resolveWorkSessionAccessBundle/);
+  assert.match(accessSource, /resolveReadCapabilities/);
+  assert.match(accessSource, /resolveReadAllCapabilities/);
+  assert.match(accessSource, /assertCanReadWorkSession/);
 });

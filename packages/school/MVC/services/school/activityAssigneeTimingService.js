@@ -58,14 +58,26 @@ function resolveAssigneeEndTime({
   return startTime ? deriveAssigneeEndTime(startTime, paidHours) : '';
 }
 
+function clockTimeToMinutes(value) {
+  const clock = normalizeClockTime(value);
+  if (!clock) return null;
+  const [hour, minute] = clock.split(':').map(Number);
+  return (hour * 60) + minute;
+}
+
+function hoursBetweenClockTimes(startTime, endTime) {
+  const startMinutes = clockTimeToMinutes(startTime);
+  const endMinutes = clockTimeToMinutes(endTime);
+  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) return 0;
+  return Number(((endMinutes - startMinutes) / 60).toFixed(2));
+}
+
 function validateAssigneeClockRange(startTime, endTime) {
   const start = normalizeClockTime(startTime);
   const end = normalizeClockTime(endTime);
   if (!start || !end) return { valid: true, message: '' };
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  const startMinutes = (sh * 60) + sm;
-  const endMinutes = (eh * 60) + em;
+  const startMinutes = clockTimeToMinutes(start);
+  const endMinutes = clockTimeToMinutes(end);
   if (endMinutes <= startMinutes) {
     return {
       valid: false,
@@ -73,6 +85,91 @@ function validateAssigneeClockRange(startTime, endTime) {
     };
   }
   return { valid: true, message: '' };
+}
+
+function validateAssigneeWithinSessionWindow(assigneeStartTime, assigneeEndTime, sessionStartTime, sessionEndTime) {
+  const sessionStart = normalizeClockTime(sessionStartTime);
+  const sessionEnd = normalizeClockTime(sessionEndTime);
+  const assigneeStart = normalizeClockTime(assigneeStartTime);
+  const assigneeEnd = normalizeClockTime(assigneeEndTime);
+  if (!sessionStart || !sessionEnd) return { valid: true, message: '' };
+  if (!assigneeStart || !assigneeEnd) {
+    return {
+      valid: false,
+      message: 'Assignee start and end times are required.'
+    };
+  }
+  const sessionStartMinutes = clockTimeToMinutes(sessionStart);
+  const sessionEndMinutes = clockTimeToMinutes(sessionEnd);
+  const assigneeStartMinutes = clockTimeToMinutes(assigneeStart);
+  const assigneeEndMinutes = clockTimeToMinutes(assigneeEnd);
+  if (assigneeStartMinutes < sessionStartMinutes) {
+    return {
+      valid: false,
+      message: 'Assignee start time cannot be before the work session start time.'
+    };
+  }
+  if (assigneeEndMinutes > sessionEndMinutes) {
+    return {
+      valid: false,
+      message: 'Assignee end time cannot be after the work session end time.'
+    };
+  }
+  return { valid: true, message: '' };
+}
+
+function validateAssigneePaidHoursWithinSpan(paidHours, assigneeStartTime, assigneeEndTime, isPaid = true) {
+  const hours = normalizePaidHours(paidHours, 0);
+  if (!isPaid) {
+    if (hours !== 0) {
+      return {
+        valid: false,
+        message: 'Paid hours must be zero when the assignee is not payable.'
+      };
+    }
+    return { valid: true, message: '' };
+  }
+  const spanHours = hoursBetweenClockTimes(assigneeStartTime, assigneeEndTime);
+  if (spanHours <= 0 && hours > 0) {
+    return {
+      valid: false,
+      message: 'Paid hours require a valid assignee time range.'
+    };
+  }
+  if (hours > spanHours + 0.001) {
+    return {
+      valid: false,
+      message: 'Paid hours cannot exceed the assignee time range.'
+    };
+  }
+  return { valid: true, message: '' };
+}
+
+function validateAssigneeTimingRules({ assignee = {}, entry = {} } = {}) {
+  const timing = resolveAssigneeTiming({ assignee, entry });
+  const rangeCheck = validateAssigneeClockRange(timing.startTime, timing.endTime);
+  if (!rangeCheck.valid) return rangeCheck;
+  const windowCheck = validateAssigneeWithinSessionWindow(
+    timing.startTime,
+    timing.endTime,
+    entry?.startTime,
+    entry?.endTime
+  );
+  if (!windowCheck.valid) return windowCheck;
+  const isPaid = assignee?.paid !== false;
+  const paidCheck = validateAssigneePaidHoursWithinSpan(
+    assignee?.paidHours,
+    timing.startTime,
+    timing.endTime,
+    isPaid
+  );
+  if (!paidCheck.valid) return paidCheck;
+  return { valid: true, message: '' };
+}
+
+function assertAssigneeTimingRules({ assignee = {}, entry = {} } = {}) {
+  const result = validateAssigneeTimingRules({ assignee, entry });
+  if (!result.valid) throw new Error(result.message || 'Invalid assignee timing.');
 }
 
 function applyAssigneeTiming(assignee = {}, entry = {}, overrides = {}) {
@@ -158,7 +255,13 @@ module.exports = {
   normalizePaidHours,
   deriveAssigneeEndTime,
   resolveAssigneeEndTime,
+  clockTimeToMinutes,
+  hoursBetweenClockTimes,
   validateAssigneeClockRange,
+  validateAssigneeWithinSessionWindow,
+  validateAssigneePaidHoursWithinSpan,
+  validateAssigneeTimingRules,
+  assertAssigneeTimingRules,
   resolveAssigneeTiming,
   applyAssigneeTiming,
   backfillAssigneeTiming,

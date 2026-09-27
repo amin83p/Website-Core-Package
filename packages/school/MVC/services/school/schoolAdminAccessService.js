@@ -7,6 +7,8 @@
 
 const { requireCoreModule } = require('./schoolCoreContracts');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+const effectiveAccessResolverService = requireCoreModule('MVC/services/security/effectiveAccessResolverService');
+const accessService = requireCoreModule('MVC/services/security/accessControl');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function buildOrgContext(user, sectionId, extra = {}) {
@@ -143,6 +145,110 @@ async function isAttendancesAdminViewerAsync(user, operationId = OPERATIONS.UPDA
   return isAdminForRequestAsync(user, SECTIONS.SCHOOL_ATTENDANCES, operationId);
 }
 
+function isFamilyABypassAdminAuthority(authority = {}) {
+  return Boolean(authority?.isSuperAdmin || authority?.isSectionAdmin);
+}
+
+function isFamilyBReadAllOrgOrAdminScope(scopeMode = '') {
+  return scopeMode === 'organization' || scopeMode === 'admin';
+}
+
+async function evaluateReadAllTimesheetAccess(user, sectionId, orgId) {
+  return accessService.evaluateAccess({
+    user,
+    sectionId,
+    operationId: OPERATIONS.READ_ALL,
+    orgId,
+    ipAddress: ''
+  });
+}
+
+async function canViewStatHolidayPayWarningsPanelAsync(user) {
+  if (!user) return false;
+  const orgId = user?.activeOrgId;
+  const operationId = OPERATIONS.READ_ALL;
+  const readAllSections = [SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, SECTIONS.SCHOOL_TIMESHEETS];
+
+  for (const sectionId of readAllSections) {
+    const authority = await adminAuthorityService.resolveAdminAuthorityAsync({
+      user,
+      sectionId,
+      operationId,
+      orgId,
+      section: { id: sectionId, category: 'SCHOOL' }
+    });
+    if (isFamilyABypassAdminAuthority(authority)) {
+      return true;
+    }
+    if (authority.isOperationAdminForRequest) {
+      return true;
+    }
+
+    const evaluation = await evaluateReadAllTimesheetAccess(user, sectionId, orgId);
+    if (!evaluation?.allowed) continue;
+    if (isFamilyABypassAdminAuthority(evaluation.adminContext || {})) {
+      return true;
+    }
+    const scopeId = String(
+      evaluation.scopeId || evaluation.effectiveAccess?.operation?.scopeId || ''
+    ).trim();
+    const scopeMode = scopeId ? await effectiveAccessResolverService.getScopeMode(scopeId) : '';
+    if (isFamilyBReadAllOrgOrAdminScope(scopeMode)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function evaluateWorkSessionUpdateAccess(user, sectionId, orgId) {
+  return accessService.evaluateAccess({
+    user,
+    sectionId,
+    operationId: OPERATIONS.UPDATE,
+    orgId,
+    ipAddress: ''
+  });
+}
+
+async function canEditAssigneeTimingAsync(user) {
+  if (!user) return false;
+  const orgId = user?.activeOrgId;
+  const operationId = OPERATIONS.UPDATE;
+  const sections = [SECTIONS.SCHOOL_WORK_SESSIONS, SECTIONS.SCHOOL_ACTIVITIES];
+
+  for (const sectionId of sections) {
+    const authority = await adminAuthorityService.resolveAdminAuthorityAsync({
+      user,
+      sectionId,
+      operationId,
+      orgId,
+      section: { id: sectionId, category: 'SCHOOL' }
+    });
+    if (isFamilyABypassAdminAuthority(authority)) {
+      return true;
+    }
+    if (authority.isOperationAdminForRequest) {
+      return true;
+    }
+
+    const evaluation = await evaluateWorkSessionUpdateAccess(user, sectionId, orgId);
+    if (!evaluation?.allowed) continue;
+    if (isFamilyABypassAdminAuthority(evaluation.adminContext || {})) {
+      return true;
+    }
+    const scopeId = String(
+      evaluation.scopeId || evaluation.effectiveAccess?.operation?.scopeId || ''
+    ).trim();
+    const scopeMode = scopeId ? await effectiveAccessResolverService.getScopeMode(scopeId) : '';
+    if (isFamilyBReadAllOrgOrAdminScope(scopeMode)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 module.exports = {
   isSuperAdmin,
   isAdminForSection,
@@ -170,5 +276,8 @@ module.exports = {
   isCalendarAdminViewer,
   isExamsAdminViewer,
   isAttendancesAdminViewer,
-  isAttendancesAdminViewerAsync
+  isAttendancesAdminViewerAsync,
+  canViewStatHolidayPayWarningsPanelAsync,
+  canEditAssigneeTimingAsync,
+  isFamilyABypassAdminAuthority
 };

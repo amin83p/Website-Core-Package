@@ -1,7 +1,7 @@
 // MVC/middleware/sessionEnforcement.js
 const dataService = require('../services/dataService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
-const { sanitizeCurrentPath } = require('../utils/pagePathUtils');
+const { isHtmlNavigationRequest, sanitizeCurrentPath } = require('../utils/pagePathUtils');
 const sessionRecordCacheService = require('../services/cache/sessionRecordCacheService');
 const sessionAuthDiagnosticLogService = require('../services/diagnostics/sessionAuthDiagnosticLogService');
 
@@ -90,7 +90,8 @@ function shouldUpdateCurrentPath(session = {}, currentPath = '', now = new Date(
 }
 
 function shouldTrackCurrentPathForRequest(req) {
-    return false;
+    if (!req || isPublicStaticAssetRequest(req)) return false;
+    return isHtmlNavigationRequest(req);
 }
 
 async function updateSessionCurrentPath(req, currentPath = '') {

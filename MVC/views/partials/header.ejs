@@ -975,40 +975,50 @@
     </div>
 
     <% if (typeof canViewActiveUsers !== 'undefined' && canViewActiveUsers) { %>
-    <div class="modal fade" id="activeUsersPreviewModal" tabindex="-1" aria-labelledby="activeUsersPreviewModalLabel" aria-hidden="true">
+    <div class="modal fade active-users-preview-modal" id="activeUsersPreviewModal" tabindex="-1" aria-labelledby="activeUsersPreviewModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content border-0 shadow-lg rounded-3">
-                <div class="modal-header bg-light border-bottom">
-                    <div class="me-auto">
-                        <h5 class="modal-title fw-bold text-dark mb-0" id="activeUsersPreviewModalLabel">
-                            <i class="bi bi-person-lines-fill me-2"></i>Active Users
-                        </h5>
-                        <p class="small text-muted mb-0 mt-1" id="activeUsersPreviewSubtitle">Users active in the last 5 minutes.</p>
+                <div class="modal-header active-users-preview-modal__header border-bottom-0 pb-0">
+                    <div class="me-auto d-flex align-items-start gap-3">
+                        <span class="active-users-preview-modal__icon-badge" aria-hidden="true">
+                            <i class="bi bi-person-lines-fill"></i>
+                        </span>
+                        <div>
+                            <h5 class="modal-title fw-bold text-dark mb-0" id="activeUsersPreviewModalLabel">Active Users</h5>
+                            <p class="small text-muted mb-0 mt-1" id="activeUsersPreviewSubtitle">Users active in the last 5 minutes.</p>
+                        </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body p-0">
+                <div class="modal-body active-users-preview-modal__body pt-3">
                     <div id="activeUsersPreviewLoading" class="text-center py-5">
                         <div class="spinner-border text-primary" role="status"></div>
                         <div class="mt-2 text-muted small">Loading active users...</div>
                     </div>
                     <div id="activeUsersPreviewError" class="alert alert-danger m-3 d-none" role="alert"></div>
                     <div id="activeUsersPreviewContent" class="d-none">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover mb-0 align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th class="ps-3">User</th>
-                                        <th>Last Activity</th>
-                                        <th class="text-center">Sessions</th>
-                                        <th class="pe-3">Org</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="activeUsersPreviewTableBody"></tbody>
-                            </table>
+                        <div class="active-users-preview-search mb-3">
+                            <label class="form-label visually-hidden" for="activeUsersPreviewSearch">Search active users</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white"><i class="bi bi-search" aria-hidden="true"></i></span>
+                                <input
+                                    type="search"
+                                    class="form-control"
+                                    id="activeUsersPreviewSearch"
+                                    placeholder="Search by name or username..."
+                                    autocomplete="off"
+                                >
+                            </div>
                         </div>
-                        <div id="activeUsersPreviewEmpty" class="text-center text-muted py-4 d-none">No active users right now.</div>
-                        <div class="border-top bg-light p-3">
+                        <div id="activeUsersPreviewList" class="active-users-preview-list" role="list"></div>
+                        <div id="activeUsersPreviewNoMatches" class="active-users-preview-empty text-center text-muted py-4 d-none" role="status">
+                            No users match your search.
+                        </div>
+                        <div id="activeUsersPreviewEmpty" class="active-users-preview-empty text-center text-muted py-5 d-none" role="status">
+                            <i class="bi bi-person-x fs-2 d-block mb-2 opacity-50" aria-hidden="true"></i>
+                            No active users right now.
+                        </div>
+                        <div class="active-users-preview-modal__stats border-top bg-light p-3 mt-2 rounded-bottom">
                             <div class="row g-2 text-center">
                                 <div class="col-6 col-md-3">
                                     <div class="small text-muted text-uppercase">Active Users</div>

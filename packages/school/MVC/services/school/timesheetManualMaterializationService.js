@@ -4,6 +4,9 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionIdService = require('./sessionIdService');
 const manualSessionIdService = require('./manualSessionIdService');
 const timesheetPayrollContextService = require('./timesheetPayrollContextService');
+const timesheetParametersPolicyService = require('./timesheetParametersPolicyService');
+const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+const manualWorkSessionService = require('./timesheetManualWorkSessionService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -170,11 +173,59 @@ async function resolveMaterializedAssigneeRole({ entry, timesheet, teacherId, re
   return buildAssigneeRoleFields('teacher');
 }
 
+async function resolveManualWorkSessionPolicyForMaterialize({
+  timesheet = {},
+  manualWorkSessionPolicy = null,
+  reqUser
+} = {}) {
+  if (manualWorkSessionPolicy) {
+    return manualWorkSessionService.resolveManualWorkSessionPolicy(manualWorkSessionPolicy);
+  }
+  const orgId = normalizeId(timesheet?.orgId);
+  if (orgId) {
+    const orgPolicy = await timesheetParametersPolicyModel.getPolicyForOrg(orgId);
+    return timesheetParametersPolicyService.resolveManualActivityWorkSessionPolicy(orgPolicy);
+  }
+  return timesheetParametersPolicyService.resolveManualActivityWorkSessionPolicy({});
+}
+
+function mergeMaterializedAssigneeIntoWorkEntry(workEntry, assignee, teacherId) {
+  const assignees = activityService.normalizeActivityAssigneeRows(workEntry.assignees);
+  const assigneeIndex = assignees.findIndex((row) => idsEqual(row.personId, teacherId));
+  if (assigneeIndex >= 0) {
+    assignees[assigneeIndex] = {
+      ...assignees[assigneeIndex],
+      ...assignee,
+      personId: normalizeId(teacherId),
+      personName: assignees[assigneeIndex].personName || assignee.personName || ''
+    };
+  } else {
+    assignees.push(assignee);
+  }
+  return { ...workEntry, assignees };
+}
+
+async function persistActivityWorkSessionChanges({
+  activity,
+  activityId,
+  mutableEntries,
+  reqUser
+}) {
+  const updated = {
+    ...activity,
+    entries: mutableEntries,
+    attendees: activityService.flattenActivityAssignees(mutableEntries)
+  };
+  await schoolDataService.updateData('activities', activityId, updated, reqUser);
+  return updated;
+}
+
 async function materializeActivityManualEntry({
   entry,
   timesheet,
   teacherId,
-  reqUser
+  reqUser,
+  manualWorkSessionPolicy = null
 }) {
   const activityId = normalizeId(entry?.activityId);
   if (!activityId) return null;
@@ -191,15 +242,26 @@ async function materializeActivityManualEntry({
   const entries = activityService.getActivityEntries(activity);
   const mutableEntries = [...entries];
   const hours = Number(parseFloat(entry?.durationHours ?? entry?.requestedHours ?? entry?.hours) || 0);
+  const wsPolicy = await resolveManualWorkSessionPolicyForMaterialize({
+    timesheet,
+    manualWorkSessionPolicy,
+    reqUser
+  });
+  const assigneeWindow = manualWorkSessionService.resolveAssigneeWindowFromManualEntry(entry);
   const evaluationType = activityService.normalizeEvaluationType(activity.evaluationType);
   const paid = activity.paid === true && entry?.activityPaid !== false;
   const nowIso = new Date().toISOString();
+  const assigneeNotes = manualWorkSessionService.resolveAssigneeNotesFromManualEntry(entry, {
+    defaultSessionTitle: wsPolicy.defaultTitle
+  });
   const assigneeBase = {
     personId: normalizeId(teacherId),
     personName: '',
     paid,
     paidHours: paid ? hours : 0,
-    notes: String(entry?.comment || entry?.description || '').trim(),
+    startTime: assigneeWindow.startTime,
+    endTime: assigneeWindow.endTime,
+    notes: assigneeNotes,
     materializedFromTimesheetId: normalizeId(timesheet?.id),
     materializedFromTimesheetEntryId: normalizeId(entry?.sessionId)
   };
@@ -222,73 +284,64 @@ async function materializeActivityManualEntry({
   const assigneeRoleFields = await resolveMaterializedAssigneeRole({ entry, timesheet, teacherId, reqUser });
   assignee = { ...assignee, ...assigneeRoleFields };
 
-  // Public activities link an existing work session; individual suggests create a new ENTRY.
+  const buildMaterializeResult = (activityEntryId, linkedExisting) => {
+    const sessionId = `act-${activityId}-${activityEntryId}-${normalizeId(teacherId)}`;
+    return { activityId, activityEntryId, sessionId, assignee, linkedExisting };
+  };
+
+  // Explicit public picker: link when the selected work session still exists.
   if (existingEntryId) {
     if (visibilityScope === 'individual') {
       throw new Error('Individual activity manual rows cannot materialize against an existing work session.');
     }
     const index = mutableEntries.findIndex((row) => normalizeId(row?.entryId || row?.id) === existingEntryId);
-    if (index < 0) {
-      throw new Error(`Work session ${existingEntryId} is no longer available on activity ${activityId}.`);
+    if (index >= 0) {
+      const workEntry = { ...mutableEntries[index] };
+      if (normalizeId(workEntry.status || 'posted').toLowerCase() !== 'posted') {
+        throw new Error(`Work session ${existingEntryId} must be posted before timesheet processing.`);
+      }
+      if (!activityService.isPersonEligibleForEntry(activity, workEntry, teacherId)) {
+        throw new Error('Teacher is no longer eligible for the selected work session.');
+      }
+      mutableEntries[index] = mergeMaterializedAssigneeIntoWorkEntry(workEntry, assignee, teacherId);
+      await persistActivityWorkSessionChanges({ activity, activityId, mutableEntries, reqUser });
+      return buildMaterializeResult(existingEntryId, true);
     }
-    const workEntry = { ...mutableEntries[index] };
-    if (normalizeId(workEntry.status || 'posted').toLowerCase() !== 'posted') {
-      throw new Error(`Work session ${existingEntryId} must be posted before timesheet processing.`);
-    }
-    if (!activityService.isPersonEligibleForEntry(activity, workEntry, teacherId)) {
-      throw new Error('Teacher is no longer eligible for the selected work session.');
-    }
-    const assignees = activityService.normalizeActivityAssigneeRows(workEntry.assignees);
-    const assigneeIndex = assignees.findIndex((row) => idsEqual(row.personId, teacherId));
-    if (assigneeIndex >= 0) {
-      assignees[assigneeIndex] = {
-        ...assignees[assigneeIndex],
-        ...assignee,
-        personId: normalizeId(teacherId),
-        personName: assignees[assigneeIndex].personName || assignee.personName || ''
-      };
-    } else {
-      assignees.push(assignee);
-    }
-    mutableEntries[index] = {
-      ...workEntry,
-      assignees
-    };
-    const updated = {
-      ...activity,
-      entries: mutableEntries,
-      attendees: activityService.flattenActivityAssignees(mutableEntries)
-    };
-    await schoolDataService.updateData('activities', activityId, updated, reqUser);
-    const sessionId = `act-${activityId}-${existingEntryId}-${normalizeId(teacherId)}`;
-    return { activityId, activityEntryId: existingEntryId, sessionId, assignee, linkedExisting: true };
   }
 
-  if (visibilityScope === 'school') {
-    throw new Error('Public activity manual rows must select an existing work session before processing.');
+  const matchedEntryId = manualWorkSessionService.findGenericWorkSessionForAssignee(mutableEntries, {
+    date: assigneeWindow.date,
+    defaultTitle: wsPolicy.defaultTitle,
+    assigneeStart: assigneeWindow.startTime,
+    assigneeEnd: assigneeWindow.endTime
+  });
+  if (matchedEntryId) {
+    const index = mutableEntries.findIndex((row) => normalizeId(row?.entryId || row?.id) === matchedEntryId);
+    if (index >= 0) {
+      const workEntry = { ...mutableEntries[index] };
+      if (!activityService.isPersonEligibleForEntry(activity, workEntry, teacherId)) {
+        throw new Error('Teacher is no longer eligible for the selected work session.');
+      }
+      mutableEntries[index] = mergeMaterializedAssigneeIntoWorkEntry(workEntry, assignee, teacherId);
+      await persistActivityWorkSessionChanges({ activity, activityId, mutableEntries, reqUser });
+      return buildMaterializeResult(matchedEntryId, true);
+    }
   }
 
   const entryId = nextActivityEntryId(mutableEntries);
   const workEntry = {
-    entryId,
-    title: String(entry?.description || entry?.className || activity.title || '').trim(),
-    date: normalizeDate(entry?.date),
-    startTime: String(entry?.startTime || '').trim(),
-    endTime: String(entry?.endTime || '').trim(),
-    durationHours: hours,
-    status: 'posted',
-    notes: String(entry?.comment || '').trim(),
-    assignees: [assignee]
+    ...manualWorkSessionService.buildGenericWorkSessionDraft({
+      date: assigneeWindow.date,
+      defaultTitle: wsPolicy.defaultTitle,
+      defaultStartTime: wsPolicy.defaultStartTime,
+      defaultEndTime: wsPolicy.defaultEndTime,
+      assignee
+    }),
+    entryId
   };
   mutableEntries.push(workEntry);
-  const updated = {
-    ...activity,
-    entries: mutableEntries,
-    attendees: activityService.flattenActivityAssignees(mutableEntries)
-  };
-  await schoolDataService.updateData('activities', activityId, updated, reqUser);
-  const sessionId = `act-${activityId}-${entryId}-${normalizeId(teacherId)}`;
-  return { activityId, activityEntryId: entryId, sessionId, assignee, linkedExisting: false };
+  await persistActivityWorkSessionChanges({ activity, activityId, mutableEntries, reqUser });
+  return buildMaterializeResult(entryId, false);
 }
 
 async function materializeApprovedTimesheetManualEntries({ timesheet = {}, period = {}, reqUser } = {}) {
@@ -310,6 +363,9 @@ async function materializeApprovedTimesheetManualEntries({ timesheet = {}, perio
     currentPeriod: period,
     reqUser
   });
+  const manualWorkSessionPolicy = timesheetParametersPolicyService.resolveManualActivityWorkSessionPolicy(
+    orgId ? await timesheetParametersPolicyModel.getPolicyForOrg(orgId) : {}
+  );
 
   const summary = {
     classSessions: [],
@@ -359,7 +415,8 @@ async function materializeApprovedTimesheetManualEntries({ timesheet = {}, perio
           entry,
           timesheet,
           teacherId,
-          reqUser
+          reqUser,
+          manualWorkSessionPolicy
         });
         if (!result) continue;
         const prior = entryBySessionId.get(normalizeId(entry.sessionId));

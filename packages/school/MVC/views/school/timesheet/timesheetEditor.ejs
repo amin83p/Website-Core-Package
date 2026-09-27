@@ -385,6 +385,16 @@
     color: #0d6efd;
     font-weight: 700;
   }
+  .ts-payroll-role-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.15em 0.45em;
+    vertical-align: middle;
+  }
+  .ts-payroll-role-footnote {
+    background-color: #f8f9fa;
+    border-top: 0 !important;
+  }
   .ts-department-code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     font-size: 0.95rem;
@@ -983,6 +993,7 @@
         </div>
     </div>
 
+    <% if (typeof canViewStatHolidayWarningsPanel !== 'undefined' && canViewStatHolidayWarningsPanel) { %>
     <div id="statHolidayWarningsPanel" class="card border-danger shadow-sm mb-4 d-none">
         <button type="button" class="card-header bg-danger-subtle border-danger d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#statHolidayWarningsCollapse" aria-expanded="false" aria-controls="statHolidayWarningsCollapse" id="statHolidayWarningsToggle">
             <div class="fw-bold text-danger-emphasis">
@@ -996,6 +1007,7 @@
             <div class="card-body border-top border-danger" id="statHolidayWarningsBody"></div>
         </div>
     </div>
+    <% } %>
 
     <div id="incompleteSessionsPanel" class="card border-warning shadow-sm mb-4 d-none">
         <button type="button" class="card-header bg-warning-subtle border-warning d-flex align-items-center justify-content-between py-3 w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#incompleteSessionsCollapse" aria-expanded="false" aria-controls="incompleteSessionsCollapse" id="incompleteSessionsToggle">
@@ -1005,7 +1017,7 @@
                 <span class="badge bg-warning text-dark ms-2" id="incompleteSessionsCount">0</span>
             </div>
             <div class="d-flex align-items-center gap-3">
-                <span class="small text-muted d-none d-md-inline">Expand to review class and activity work sessions, then refresh this timesheet.</span>
+                <span class="small text-muted d-none d-md-inline">Finalize class session statuses and complete activity assignees, then refresh this timesheet.</span>
                 <i class="bi bi-chevron-down incomplete-sessions-chevron" aria-hidden="true"></i>
             </div>
         </button>
@@ -1051,6 +1063,11 @@
                     <tbody id="tsBody">
                     </tbody>
                     <tfoot class="table-light border-top border-3">
+                        <tr id="tsPayrollRoleFootnoteRow" class="d-none">
+                            <td colspan="<%= isEditorLocked ? 7 : 8 %>" class="ts-payroll-role-footnote small text-muted ps-4 py-2 border-0">
+                                <i class="bi bi-person-badge me-1" aria-hidden="true"></i><span id="tsPayrollRoleFootnoteText"></span>
+                            </td>
+                        </tr>
                         <tr>
                             <td colspan="3" class="text-end fw-bold text-uppercase">Total Period Hours:</td>
                             <td class="ts-col-hours-regular"><span class="ts-hours-value" id="lbl_grandTotal">0.00</span></td>
@@ -1207,7 +1224,7 @@
                       </select>
                   </div>
               </div>
-              <div class="form-text">Public activities require picking an existing work session. Individual activities suggest a new work session for approval. Manual class sessions are temporarily disabled.</div>
+              <div class="form-text">Public activities can pick an existing work session or rely on the shared default session when approved. Individual activities use your date and times; description and comments appear on the assignee note, not as the shared work session title. Manual class sessions are temporarily disabled.</div>
           </div>
 
           <div class="mb-3 d-none" id="div_man_classPicker">
@@ -1227,7 +1244,7 @@
                   <input type="text" id="man_activityEntryLabel" class="form-control bg-white" placeholder="Choose a work session..." readonly>
                   <button type="button" class="btn btn-outline-primary" id="btnPickWorkSession"><i class="bi bi-search"></i></button>
               </div>
-              <div class="form-text">Required for public activities. Date and hours are taken from the selected work session.</div>
+              <div class="form-text">Optional for public activities when you pick a session. If you leave this blank, approval can still attach you to the org default shared work session. Date and hours come from the row or selected session.</div>
           </div>
           
           <div class="mb-3" id="div_man_desc">
@@ -1537,7 +1554,8 @@
     const USE_FROZEN_SNAPSHOT = <%= (typeof useFrozenSnapshot !== 'undefined' && useFrozenSnapshot) ? 'true' : 'false' %>;
     const MANUAL_ACTIVITIES = <%- JSON.stringify(manualActivities || []) %>;
     const INCOMPLETE_SESSIONS = <%- JSON.stringify(incompleteSessions || []) %>;
-    const STAT_HOLIDAY_WARNINGS = <%- JSON.stringify(typeof statHolidayWarnings !== 'undefined' ? statHolidayWarnings : []) %>;
+    const STAT_HOLIDAY_WARNINGS = <%- JSON.stringify((typeof canViewStatHolidayWarningsPanel !== 'undefined' && canViewStatHolidayWarningsPanel && typeof statHolidayWarnings !== 'undefined') ? statHolidayWarnings : []) %>;
+    const CAN_VIEW_STAT_HOLIDAY_WARNINGS_PANEL = <%= (typeof canViewStatHolidayWarningsPanel !== 'undefined' && canViewStatHolidayWarningsPanel) ? 'true' : 'false' %>;
     const STAT_HOLIDAY_PREVIEW_ROWS = <%- JSON.stringify(typeof statHolidayPreviewRows !== 'undefined' ? statHolidayPreviewRows : []) %>;
     const CAN_MANAGE_STAT_HOLIDAY_OVERRIDES = <%= (typeof canManageStatHolidayOverrides !== 'undefined' && canManageStatHolidayOverrides) ? 'true' : 'false' %>;
     const STAT_HOLIDAY_PREVIEW_ONLY = <%= (typeof statHolidayPreviewOnly !== 'undefined' && statHolidayPreviewOnly) ? 'true' : 'false' %>;
@@ -1889,9 +1907,9 @@ function toggleManualType() {
     }
     if (descInput) {
         descInput.placeholder = isPublicActivity
-            ? 'Filled from the selected work session (optional notes go below)'
+            ? 'Optional note for the assignee (not the shared work session title)'
             : (isIndividualActivity
-                ? 'Short description for the suggested work session...'
+                ? 'Short note stored on your assignee (shared session uses org default title)'
                 : 'e.g. Extra prep, admin work, meeting...');
         descInput.readOnly = isPublicActivity;
     }
@@ -2006,12 +2024,52 @@ document.addEventListener('DOMContentLoaded', () => {
         return PAYROLL_ROLES.includes(selected) ? selected : '';
     }
 
+    function formatPayrollRoleLabel(personRole) {
+        const role = String(personRole || PAYROLL_DEFAULT_ROLE || 'teacher').trim().toLowerCase();
+        return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Role';
+    }
+
+    function collectDistinctPayrollRolesInTimesheet() {
+        const roles = new Set();
+        (Array.isArray(activeEntries) ? activeEntries : []).forEach((entry) => {
+            if (shouldSuppressStatHolidayMetadataEntry(entry)) return;
+            if (STAT_HOLIDAY_PREVIEW_ONLY && isStatHolidayRelatedEntry(entry)) return;
+            const role = String(entry?.personRole || PAYROLL_DEFAULT_ROLE || 'teacher').trim().toLowerCase();
+            if (role) roles.add(role);
+        });
+        return Array.from(roles);
+    }
+
+    function shouldShowPayrollRoleOnRows() {
+        return collectDistinctPayrollRolesInTimesheet().length > 1;
+    }
+
     function payrollRoleBadge(personRole) {
-        if (!Array.isArray(PAYROLL_ROLES) || PAYROLL_ROLES.length <= 1) return '';
+        if (!shouldShowPayrollRoleOnRows()) return '';
         const role = String(personRole || PAYROLL_DEFAULT_ROLE || 'teacher').trim().toLowerCase();
         const klass = role === 'staff' ? 'bg-success' : 'bg-primary';
-        const label = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Role';
-        return `<span class="badge ${klass} ms-1">${label}</span>`;
+        const label = formatPayrollRoleLabel(role);
+        return `<span class="badge ${klass} ms-1 ts-payroll-role-badge">${escapeHtml(label)}</span>`;
+    }
+
+    function updatePayrollRoleFootnote() {
+        const row = document.getElementById('tsPayrollRoleFootnoteRow');
+        const textEl = document.getElementById('tsPayrollRoleFootnoteText');
+        if (!row || !textEl) return;
+        if (shouldShowPayrollRoleOnRows()) {
+            row.classList.add('d-none');
+            textEl.textContent = '';
+            return;
+        }
+        const distinct = collectDistinctPayrollRolesInTimesheet();
+        const role = distinct.length >= 1
+            ? distinct[0]
+            : ((Array.isArray(PAYROLL_ROLES) && PAYROLL_ROLES.length === 1)
+                ? PAYROLL_ROLES[0]
+                : (PAYROLL_DEFAULT_ROLE || 'teacher'));
+        const label = formatPayrollRoleLabel(role);
+        textEl.textContent = `All hours on this timesheet are recorded under your ${label} payroll role.`;
+        row.classList.remove('d-none');
     }
 
     function coTeacherBadge(entry) {
@@ -2268,7 +2326,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (entry.isPriorPeriodAdjustment === true) return true;
         if (entry.isReportReflection === true) return true;
         if (entry.isStatutoryHoliday === true || String(entry?.sessionId || '').startsWith('stathol-')) return true;
-        if (entry.isSchoolActivity === true || String(entry?.sessionId || '').startsWith('act-')) return true;
         if (entry.isFinalStatus === true) return true;
         if (entry.isFinalStatus === false) return false;
         return normalizeStatusCode(entry.status) === 'completed';
@@ -2375,6 +2432,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 colorBg: '#e2e3e5',
                 colorText: '#41464b',
                 colorBorder: '#adb5bd'
+            });
+        }
+        if (entry?.isSchoolActivity === true && entry?.isManual !== true) {
+            const evaluationType = String(entry?.activityEvaluationType || '').trim().toLowerCase();
+            const label = String(entry?.activityStatusLabel || '').trim()
+                || (evaluationType === 'completion' ? 'Completed activity' : 'Attended activity');
+            const completedMeta = resolveStatusMeta('completed') || {};
+            const warn = !isFinalAutoStatus(entry);
+            return buildStatusChipHtml({
+                icon: warn ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill',
+                label,
+                colorBg: warn ? '#fff3cd' : (completedMeta.colorBg || '#d1e7dd'),
+                colorText: warn ? '#664d03' : (completedMeta.colorText || '#0f5132'),
+                colorBorder: warn ? '#ffc107' : (completedMeta.colorBorder || '#198754')
             });
         }
         if (!STAT_HOLIDAY_PREVIEW_ONLY && hasStatHolidayCalculationDetails(entry)) {
@@ -2738,9 +2809,7 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     TIMESHEET_ENTRIES.forEach(e => {
         if (e.isDeleted) {
-            if (IS_ADMIN || e.isManual || e.isPriorPeriodAdjustment) {
-                deletedAutoSessionIds.push(e.sessionId);
-            }
+            deletedAutoSessionIds.push(e.sessionId);
         } else if (e.isManual || e.isPriorPeriodAdjustment || isLegacyImportEntry(e)) {
             activeEntries.push(e);
         } else {
@@ -3174,8 +3243,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: 'Sessions not finalized',
                 html: `<div class="ts-guidance-body">
                     <p>You have <strong>${dynamic.incompleteCount}</strong> incomplete session(s) in this period${breakdownText}.</p>
-                    <p>Finalize class session statuses and complete activity work sessions before submission.</p>
-                    <p class="small text-muted mb-0">Use the <strong>Incomplete Sessions</strong> panel on the page for the full list and links.</p>
+                    <p>Finalize class session statuses and mark activity assignees as attended or completed before submission.</p>
+                    <p class="small text-muted mb-0">Use the <strong>Incomplete Sessions</strong> panel for links to Manage Session and Manage Work Session, then refresh this page.</p>
                 </div>`
             });
         }
@@ -4857,6 +4926,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (String(entry?.approvalStatus || '').trim().toLowerCase() === 'approved') return 'Approved';
             return 'Manual';
         }
+        if (entry?.isSchoolActivity === true) {
+            const activityLabel = String(entry?.activityStatusLabel || '').trim();
+            if (activityLabel) return activityLabel;
+        }
         const status = normalizeTooltipDetailValue(entry?.status);
         return status ? resolveStatusLabel(status) : '';
     }
@@ -5361,6 +5434,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         tbody.innerHTML = tbodyHtml;
+        updatePayrollRoleFootnote();
 
         document.getElementById('lbl_grandTotal').innerText = grandTotalHours.toFixed(2);
         const optionalTotalEl = document.getElementById('lbl_grandTotalOptional');
@@ -5374,9 +5448,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const blockedByDeadline = IS_SUBMISSION_DEADLINE_PASSED && !ALLOW_LATE_SUBMISSION;
             if (hasUncompletedSessions) {
                 btnSubmit.disabled = true;
-                btnSubmit.innerHTML = '<i class="bi bi-lock-fill me-1"></i> Finalize Session Statuses to Submit';
+                btnSubmit.innerHTML = '<i class="bi bi-lock-fill me-1"></i> Finalize Sessions & Activities to Submit';
                 btnSubmit.classList.replace('btn-primary', 'btn-secondary');
-                btnSubmit.title = '';
+                btnSubmit.title = 'Finalize all class session statuses and complete activity assignees before submitting.';
             } else if (blockedByDeadline) {
                 btnSubmit.disabled = true;
                 btnSubmit.innerHTML = '<i class="bi bi-lock-fill me-1"></i> Deadline Passed';
@@ -7554,11 +7628,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function buildIncompleteStatusBadge(row) {
         const label = row?.statusLabel || row?.status || 'In progress';
         if (row?.sessionType === 'activity') {
-            const isPendingCompletion = String(row?.evaluationType || '').toLowerCase() === 'completion'
-                || String(label).toLowerCase().includes('pending');
-            const bg = isPendingCompletion ? '#fff3cd' : '#f8f9fa';
-            const border = isPendingCompletion ? '#ffc107' : '#dee2e6';
-            return `<span class="badge border text-dark" style="background-color:${escapeHtml(bg)};border-color:${escapeHtml(border)} !important;">${escapeHtml(label)}</span>`;
+            const bg = '#fff3cd';
+            const border = '#ffc107';
+            const text = '#664d03';
+            return `<span class="badge border text-dark" style="background-color:${escapeHtml(bg)};color:${escapeHtml(text)};border-color:${escapeHtml(border)} !important;">${escapeHtml(label)}</span>`;
         }
         const meta = getIncompleteSessionStatusMeta(row?.status);
         const bg = meta?.colorBg || '#fff3cd';
@@ -7646,6 +7719,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const body = document.getElementById('statHolidayWarningsBody');
         const countEl = document.getElementById('statHolidayWarningsCount');
         if (!panel || !body) return;
+        if (!CAN_VIEW_STAT_HOLIDAY_WARNINGS_PANEL) {
+            panel.classList.add('d-none');
+            return;
+        }
         if (STAT_HOLIDAY_PREVIEW_ONLY) {
             panel.classList.add('d-none');
             return;
@@ -7769,6 +7846,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tbody = document.getElementById('incompleteSessionsBody');
         const countEl = document.getElementById('incompleteSessionsCount');
         const toggleBtn = document.getElementById('incompleteSessionsToggle');
+        const collapseEl = document.getElementById('incompleteSessionsCollapse');
         if (!panel || !tbody) return;
         if (!rows.length) {
             panel.classList.add('d-none');
@@ -7777,9 +7855,19 @@ document.addEventListener('DOMContentLoaded', () => {
         panel.classList.remove('d-none');
         if (countEl) countEl.textContent = String(rows.length);
         tbody.innerHTML = buildIncompleteSessionsTableBodyHtml(rows);
+        const activityIncompleteCount = rows.filter((row) => row?.sessionType === 'activity').length;
+        const shouldAutoExpand = activityIncompleteCount > 0 || rows.length > 0;
         if (toggleBtn) {
-            toggleBtn.classList.add('collapsed');
-            toggleBtn.setAttribute('aria-expanded', 'false');
+            if (shouldAutoExpand) {
+                toggleBtn.classList.remove('collapsed');
+                toggleBtn.setAttribute('aria-expanded', 'true');
+            } else {
+                toggleBtn.classList.add('collapsed');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        }
+        if (collapseEl && shouldAutoExpand && typeof bootstrap !== 'undefined') {
+            bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false }).show();
         }
     }
 

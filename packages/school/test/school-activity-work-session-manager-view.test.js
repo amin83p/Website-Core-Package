@@ -38,5 +38,10 @@ test('activity work session manager view preserves per-assignee paid hours', () 
   assert.match(source, /function resolveRowPaidHours/);
   assert.match(source, /paidHours: isPaid \? Number\(resolveRowPaidHours\(row\)\.toFixed\(2\)\) : 0/);
   assert.match(source, /assignee\.paidHours \?\? entryRow\.durationHours/);
+  assert.match(source, /ws-paid-hours-edit/);
+  assert.match(source, /updateCapabilities/);
+  assert.match(source, /canManageAssigneeRoster/);
+  assert.match(source, /assignee\.canEditTiming/);
+  assert.match(source, /function validateVisibleAssigneeRowsClient/);
   assert.doesNotMatch(source, /row\.setAttribute\('data-paid-hours', hours\.toFixed\(2\)\)/);
 });

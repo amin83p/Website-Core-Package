@@ -28,6 +28,27 @@ test('validatePolicyInput accepts disabled import without activity', () => {
   assert.equal(policy.saveImportedSessionsIntoOneWorkSession, true);
   assert.equal(policy.importWorkSessionStartTime, '07:00');
   assert.equal(policy.importWorkSessionEndTime, '21:00');
+  assert.equal(
+    policy.importWorkSessionDefaultTitle,
+    timesheetImportPolicyService.DEFAULT_IMPORT_WORK_SESSION_TITLE
+  );
+});
+
+test('validatePolicyInput normalizes import work session default title', () => {
+  const policy = timesheetImportPolicyService.validatePolicyInput({
+    allowImportInTimesheetManagement: false,
+    importWorkSessionDefaultTitle: '  Daily import shell  '
+  });
+  assert.equal(policy.importWorkSessionDefaultTitle, 'Daily import shell');
+
+  const fallback = timesheetImportPolicyService.validatePolicyInput({
+    allowImportInTimesheetManagement: false,
+    importWorkSessionDefaultTitle: '   '
+  });
+  assert.equal(
+    fallback.importWorkSessionDefaultTitle,
+    timesheetImportPolicyService.DEFAULT_IMPORT_WORK_SESSION_TITLE
+  );
 });
 
 test('validatePolicyInput forces consolidated work session flag on', () => {

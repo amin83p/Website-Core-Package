@@ -261,6 +261,10 @@ test('timesheet editor and controller require payroll role for multi-role manual
   assert.match(editor, /resolveManualPersonRole/);
   assert.match(editor, /personRole/);
   assert.match(editor, /payrollRoleBadge/);
+  assert.match(editor, /ts-payroll-role-badge/);
+  assert.match(editor, /tsPayrollRoleFootnoteRow/);
+  assert.match(editor, /collectDistinctPayrollRolesInTimesheet/);
+  assert.match(editor, /updatePayrollRoleFootnote/);
   assert.match(editor, /Payroll setup warnings/);
 
   assert.match(controller, /timesheetPayrollContextService/);

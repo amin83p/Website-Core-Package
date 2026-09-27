@@ -12,6 +12,7 @@ function read(relativePath) {
 const activityService = require('../packages/school/MVC/services/school/activityService');
 const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
 const materializationService = require('../packages/school/MVC/services/school/timesheetManualMaterializationService');
+const timesheetParametersPolicyService = require('../packages/school/MVC/services/school/timesheetParametersPolicyService');
 const timesheetModel = require('../packages/school/MVC/models/school/timesheetModel');
 
 test('listManualEntryWorkSessionsForPerson returns only public posted sessions in period', async () => {
@@ -396,20 +397,24 @@ test('materializeActivityManualEntry creates new entry for individual suggest ro
     assert.ok(Array.isArray(savedActivity.entries) && savedActivity.entries.length >= 1);
     const created = savedActivity.entries.find((row) => String(row?.entryId || '') === String(result.activityEntryId || ''));
     assert.ok(created);
-    assert.equal(created.title, 'Suggested prep block');
+    assert.equal(created.title, timesheetParametersPolicyService.DEFAULT_MANUAL_ACTIVITY_WORK_SESSION_TITLE);
     assert.equal(created.date, '2026-07-15');
-    assert.equal(created.startTime, '14:00');
-    assert.equal(created.endTime, '16:00');
-    assert.equal(created.assignees[0].role, 'teacher');
-    assert.deepEqual(created.assignees[0].roles, ['teacher']);
+    assert.equal(created.startTime, '08:00');
+    assert.equal(created.endTime, '20:00');
+    assert.equal(created.assignees[0].startTime, '14:00');
+    assert.equal(created.assignees[0].endTime, '16:00');
+    assert.equal(created.assignees[0].notes, 'Suggested prep block');
   } finally {
     schoolDataService.getDataById = originalGetById;
     schoolDataService.updateData = originalUpdate;
   }
 });
 
-test('materializeActivityManualEntry rejects public rows without activityEntryId', async () => {
+test('materializeActivityManualEntry find-or-creates generic session for public rows without activityEntryId', async () => {
   const originalGetById = schoolDataService.getDataById;
+  const originalUpdate = schoolDataService.updateData;
+  let savedActivity = null;
+
   schoolDataService.getDataById = async () => ({
     id: 'ACT-PUB-3',
     orgId: '900000',
@@ -420,27 +425,35 @@ test('materializeActivityManualEntry rejects public rows without activityEntryId
     allowedPersonIds: ['P1'],
     entries: []
   });
+  schoolDataService.updateData = async (_entity, _id, payload) => {
+    savedActivity = payload;
+    return payload;
+  };
 
   try {
-    await assert.rejects(
-      () => materializationService.materializeActivityManualEntry({
-        entry: {
-          sessionId: 'MAN_BAD',
-          activityId: 'ACT-PUB-3',
-          approvalStatus: 'approved',
-          date: '2026-07-01',
-          startTime: '09:00',
-          endTime: '10:00',
-          durationHours: 1
-        },
-        timesheet: { id: 'TS3' },
-        teacherId: 'P1',
-        reqUser: { id: 'U1' }
-      }),
-      /must select an existing work session/i
+    const result = await materializationService.materializeActivityManualEntry({
+      entry: {
+        sessionId: 'MAN_BAD',
+        activityId: 'ACT-PUB-3',
+        activityPaid: true,
+        approvalStatus: 'approved',
+        date: '2026-07-01',
+        startTime: '09:00',
+        endTime: '10:00',
+        durationHours: 1
+      },
+      timesheet: { id: 'TS3', orgId: '900000' },
+      teacherId: 'P1',
+      reqUser: { id: 'U1' }
+    });
+    assert.ok(result.activityEntryId);
+    assert.equal(
+      savedActivity.entries[0].title,
+      timesheetParametersPolicyService.DEFAULT_MANUAL_ACTIVITY_WORK_SESSION_TITLE
     );
   } finally {
     schoolDataService.getDataById = originalGetById;
+    schoolDataService.updateData = originalUpdate;
   }
 });
 
@@ -478,7 +491,8 @@ test('timesheet model preserves activityEntryId and visibilityScope on manual ro
 test('materialization and conflict services keep public-link and individual-suggest contracts', () => {
   const materialization = read('packages/school/MVC/services/school/timesheetManualMaterializationService.js');
   assert.match(materialization, /linkedExisting/);
-  assert.match(materialization, /Public activity manual rows must select an existing work session/);
+  assert.match(materialization, /findGenericWorkSessionForAssignee/);
+  assert.match(materialization, /buildGenericWorkSessionDraft/);
   assert.match(materialization, /Individual activity manual rows cannot materialize against an existing work session/);
   assert.match(materialization, /applyActivityMaterializationMarkers/);
   assert.match(materialization, /revertMaterializedActivityManualEntry/);

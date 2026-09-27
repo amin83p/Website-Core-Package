@@ -615,6 +615,7 @@ async function performImportExecution({
         baseStartTime: policy.importBaseStartTime,
         workSessionStartTime: policy.importWorkSessionStartTime,
         workSessionEndTime: policy.importWorkSessionEndTime,
+        workSessionDefaultTitle: timesheetImportPolicyService.resolveImportWorkSessionDefaultTitle(policy),
         consolidateIntoOneWorkSession: policy.saveImportedSessionsIntoOneWorkSession !== false,
         skipStacking: true,
         reqUser

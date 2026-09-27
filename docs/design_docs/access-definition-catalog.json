@@ -42,6 +42,14 @@
       "docx": "classes-operation-scope-capabilities-2026-09-24.docx",
       "status": "implemented",
       "mongoNote": "Apply section/operation bindings in MongoDB sections collection (section 442039); no dedicated seed script in repo yet."
+    },
+    {
+      "sectionKeys": ["SCHOOL_WORK_SESSIONS"],
+      "title": "Work sessions (Manage Work Session)",
+      "markdown": "work-sessions-operation-scope-capabilities-2026-09-26.md",
+      "status": "implemented",
+      "seedScript": "packages/school/scripts/maintenance/seedSchoolWorkSessionsSection.js",
+      "mongoNote": "Section 555013; fallback section SCHOOL_ACTIVITIES on activity routes."
     }
   ],
   "crossCutting": [

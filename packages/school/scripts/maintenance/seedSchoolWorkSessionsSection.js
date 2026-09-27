@@ -48,6 +48,7 @@ const SYMBOL_DOC = Object.freeze({
 });
 
 const TEACHER_ACCESS_OPERATIONS = Object.freeze([
+  { operationId: 'OP1001', scopeId: 'SCP_DEPT' },
   { operationId: 'OP1002', scopeId: 'SCP_DEPT' },
   { operationId: 'OP1003', scopeId: 'SCP_DEPT' }
 ]);

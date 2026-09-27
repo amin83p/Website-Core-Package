@@ -82,7 +82,7 @@ router.delete('/delete/:id',
   ctrl.deleteActivity);
 
 router.get('/:activityId/work-sessions/manage',
-  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ_ALL),
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ),
   trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.manageWorkSessionsOverview);
 router.get('/:activityId/work-sessions/api/overview',
@@ -90,11 +90,11 @@ router.get('/:activityId/work-sessions/api/overview',
   trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
   ctrl.getWorkSessionsOverviewJson);
 router.get('/:activityId/work-sessions/:entryId/api/context',
-  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ_ALL),
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ),
   trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.getWorkSessionContextJson);
 router.get('/:activityId/work-sessions/:entryId/manage',
-  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ_ALL),
+  requireAccessAny(WORK_SESSION_ACCESS_SECTIONS, OPERATIONS.READ),
   trackActionState(WORK_SESSION_TRACK_SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.manageWorkSession);
 router.post('/:activityId/work-sessions/:entryId/metadata',

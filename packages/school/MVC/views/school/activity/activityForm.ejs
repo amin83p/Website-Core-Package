@@ -93,8 +93,11 @@
 
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
-    <h1 class="page-heading size-md m-0"><i class="bi bi-calendar-event me-2"></i><%= title %></h1>
-    <% if (isEdit) { %><span class="badge bg-primary border font-monospace"><%= row.id %></span><% } %>
+    <h1 class="page-heading size-md m-0"><%= typeof isEdit !== 'undefined' && isEdit ? 'Edit School Activity' : 'New School Activity' %></h1>
+    <div class="d-flex flex-column align-items-end gap-1">
+      <% if (typeof isEdit !== 'undefined' && isEdit) { %><span class="badge bg-primary border font-monospace">ID: <%= row.id %></span><% } %>
+      <a href="/school/activities" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to List</a>
+    </div>
   </div>
 
   <% const activityTimesheetLocked = (row.locked === true || String(row.locked) === 'true') && String(row.lockReason || '') === 'timesheet_approved'
@@ -123,7 +126,7 @@
     </div>
   <% } %>
 
-  <div class="form-container wide" style="max-width: 1180px;">
+  <div class="form-container wide" style="max-width: 1400px;">
     <form id="schoolActivityForm" method="POST" action="<%= isEdit ? '/school/activities/edit/' + row.id : '/school/activities/new' %>">
       <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
       <input type="hidden" name="entries" id="activityEntriesInput" value="[]">
@@ -144,24 +147,32 @@
       <script type="application/json" id="activityCategoriesData"><%- JSON.stringify(categories || []) %></script>
       <script type="application/json" id="activityAssigneeLockDisplays"><%- JSON.stringify(assigneeLockDisplaysForView) %></script>
 
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body p-4">
-          <div class="row g-3">
-            <div class="col-md-8">
-              <label class="form-label fw-bold">Title *</label>
-              <input type="text" name="title" id="activityTitle" class="form-control size-md" value="<%= row.title || '' %>" required>
+      <ul class="nav nav-tabs mb-4" id="activityTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-activity-general" type="button">General Info</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-activity-scope" type="button">Scope & People</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-activity-sessions" type="button">Work Sessions</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-activity-general">
+          <div class="row">
+            <div class="col-md-8 mb-3">
+              <label class="form-label">Title *</label>
+              <input type="text" name="title" id="activityTitle" class="form-control size-md" value="<%= row.title || '' %>" required placeholder="e.g., Content preparation sprint">
               <div class="form-text small">Use this as the parent work plan, such as content preparation or web development.</div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold">Status *</label>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Status *</label>
               <select name="status" class="form-select size-md">
                 <% ['draft', 'posted', 'cancelled'].forEach((status) => { %>
                   <option value="<%= status %>" <%= String(row.status || 'draft') === status ? 'selected' : '' %>><%= status[0].toUpperCase() + status.slice(1) %></option>
                 <% }) %>
               </select>
             </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold">Calendar Scope *</label>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Calendar Scope *</label>
               <select name="visibilityScope" id="activityVisibilityScope" class="form-select size-md" required<%= visibilityScopeLocked ? ' disabled' : '' %>>
                 <option value="school" <%= visibilityScope === 'school' ? 'selected' : '' %>>School / Public</option>
                 <option value="individual" <%= visibilityScope === 'individual' ? 'selected' : '' %>>Individual / Assigned people only</option>
@@ -172,8 +183,8 @@
               <div class="form-text small">Public activities appear on the School Calendar; individual activities only appear in assigned schedules.</div>
               <div id="activityVisibilityScopeLockHint" class="form-text small text-warning<%= visibilityScopeLocked ? '' : ' d-none' %>">Calendar scope cannot be changed after work sessions have been added.</div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold">Category *</label>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Category *</label>
               <select name="categoryId" id="activityCategoryId" class="form-select size-md" required>
                 <option value="">Select category</option>
                 <% (categories || []).forEach((cat) => { %>
@@ -181,8 +192,8 @@
                 <% }) %>
               </select>
             </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold">Department *</label>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Department *</label>
               <select name="departmentId" class="form-select size-md" required>
                 <option value="">Select department</option>
                 <% (departments || []).forEach((dep) => { %>
@@ -190,27 +201,14 @@
                 <% }) %>
               </select>
             </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold">Default Location</label>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Default Location</label>
               <input type="text" name="location" id="activityLocation" class="form-control size-md" value="<%= row.location || '' %>">
             </div>
-            <div class="col-md-4">
-              <div class="form-check form-switch mt-4">
-                <input class="form-check-input" type="checkbox" name="paid" id="activityPaid" <%= row.paid ? 'checked' : '' %>>
-                <label class="form-check-label fw-bold" for="activityPaid">Payable activity</label>
-              </div>
-              <div class="form-text small">Assignees can still be marked unpaid per work session.</div>
-            </div>
-            <div class="col-md-4">
-              <input type="hidden" name="showInTimesheetActivities" id="showInTimesheetActivitiesInput" value="<%= row.showInTimesheetActivities === false ? 'false' : 'true' %>">
-              <div class="form-check form-switch mt-4">
-                <input class="form-check-input" type="checkbox" id="showInTimesheetActivitiesSwitch" <%= row.showInTimesheetActivities !== false ? 'checked' : '' %>>
-                <label class="form-check-label fw-bold" for="showInTimesheetActivitiesSwitch">Show in timesheet activities</label>
-              </div>
-              <div class="form-text small">When off, this activity is hidden from the manual timesheet activity list for everyone. System-posted hours (for example statutory holiday pay) can still appear on the timesheet.</div>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fw-bold">Evaluation type *</label>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Evaluation type *</label>
               <select name="evaluationType" id="activityEvaluationType" class="form-select size-md" required <%= evaluationTypeLocked ? 'disabled' : '' %>>
                 <option value="attendance" <%= evaluationType === 'attendance' ? 'selected' : '' %>>Attendance — presence/absence is the criterion</option>
                 <option value="completion" <%= evaluationType === 'completion' ? 'selected' : '' %>>Completion — assignees must mark complete</option>
@@ -222,90 +220,109 @@
                 <div class="form-text small">Attendance activities use attendance recording on the manage page; completion activities require an explicit complete action.</div>
               <% } %>
             </div>
-            <div class="col-12">
-              <label class="form-label fw-bold">Parent Notes</label>
-              <textarea name="notes" rows="3" class="form-control size-md"><%= row.notes || '' %></textarea>
+          </div>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                <h6 class="fw-bold text-primary m-0"><i class="bi bi-cash-coin me-1"></i>Payroll & Timesheet</h6>
+              </div>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="paid" id="activityPaid" <%= row.paid ? 'checked' : '' %>>
+                    <label class="form-check-label" for="activityPaid">Payable activity</label>
+                  </div>
+                  <div class="form-text small">Assignees can still be marked unpaid per work session.</div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <input type="hidden" name="showInTimesheetActivities" id="showInTimesheetActivitiesInput" value="<%= row.showInTimesheetActivities === false ? 'false' : 'true' %>">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="showInTimesheetActivitiesSwitch" <%= row.showInTimesheetActivities !== false ? 'checked' : '' %>>
+                    <label class="form-check-label" for="showInTimesheetActivitiesSwitch">Show in timesheet activities</label>
+                  </div>
+                  <div class="form-text small">When off, this activity is hidden from the manual timesheet activity list for everyone.</div>
+                </div>
+              </div>
             </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Parent Notes</label>
+            <textarea name="notes" rows="3" class="form-control size-md"><%= row.notes || '' %></textarea>
           </div>
         </div>
-      </div>
 
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body p-4">
-          <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
-            <div>
-              <h5 class="m-0 fw-bold"><i class="bi bi-person-check me-2"></i>Scope Person Controls</h5>
-              <div class="small text-muted">Configure who can be assigned to this activity by scope, with optional exclusions.</div>
-            </div>
-          </div>
-
+        <div class="tab-pane fade" id="tab-activity-scope">
+          <h6 class="fw-bold text-primary mb-2"><i class="bi bi-person-check me-1"></i>Scope Person Controls</h6>
+          <p class="small text-muted mb-3">Configure who can be assigned to this activity by scope, with optional exclusions.</p>
           <div class="row g-3">
             <div class="col-12 d-none" id="activityAllowedPersonsGroup">
-              <div class="border rounded p-3 bg-light">
-                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                  <div>
-                    <div class="fw-bold">Allowed persons (Individual scope)</div>
-                    <div class="small text-muted">Only selected people can be assigned when scope is individual. Work session assignees cannot be removed; hide them to block timesheet activity selection instead.</div>
+              <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+                    <div>
+                      <h6 class="fw-bold text-primary mb-1">Allowed persons (Individual scope)</h6>
+                      <div class="small text-muted">Only selected people can be assigned when scope is individual. Work session assignees cannot be removed; hide them to block timesheet activity selection instead.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="activityAllowedPersonsSelectBtn"><i class="bi bi-person-plus me-1"></i>Select allowed persons</button>
                   </div>
-                  <button type="button" class="btn btn-outline-primary btn-sm" id="activityAllowedPersonsSelectBtn"><i class="bi bi-person-plus me-1"></i>Select allowed persons</button>
+                  <div class="table-responsive border rounded bg-white">
+                    <table class="table table-sm table-hover align-middle mb-0" id="activityAllowedPersonsTable">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Name</th>
+                          <th>Person ID</th>
+                          <th>Assignee</th>
+                          <th>Hidden</th>
+                          <th class="text-end">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="activityAllowedPersonsTbody"></tbody>
+                    </table>
+                  </div>
+                  <div class="small text-muted mt-2" id="activityAllowedPersonsEmptyHint">No allowed persons selected yet.</div>
                 </div>
-                <div class="table-responsive border rounded bg-white">
-                  <table class="table table-sm table-hover align-middle mb-0" id="activityAllowedPersonsTable">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Name</th>
-                        <th>Person ID</th>
-                        <th>Assignee</th>
-                        <th>Hidden</th>
-                        <th class="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody id="activityAllowedPersonsTbody"></tbody>
-                  </table>
-                </div>
-                <div class="small text-muted mt-2" id="activityAllowedPersonsEmptyHint">No allowed persons selected yet.</div>
               </div>
             </div>
 
             <div class="col-12" id="activityExcludedPersonsGroup">
-              <div class="border rounded p-3 bg-light">
-                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                  <div>
-                    <div class="fw-bold">Excluded persons</div>
-                    <div class="small text-muted">Excluded people cannot be assigned, shown in schedule, or extracted to timesheets for this activity. Work session assignees cannot be excluded.</div>
+              <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+                    <div>
+                      <h6 class="fw-bold text-primary mb-1">Excluded persons</h6>
+                      <div class="small text-muted">Excluded people cannot be assigned, shown in schedule, or extracted to timesheets for this activity. Work session assignees cannot be excluded.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="activityExcludedPersonsSelectBtn"><i class="bi bi-person-dash me-1"></i>Select exclusions</button>
                   </div>
-                  <button type="button" class="btn btn-outline-primary btn-sm" id="activityExcludedPersonsSelectBtn"><i class="bi bi-person-dash me-1"></i>Select exclusions</button>
+                  <div class="table-responsive border rounded bg-white">
+                    <table class="table table-sm table-hover align-middle mb-0" id="activityExcludedPersonsTable">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Name</th>
+                          <th>Person ID</th>
+                          <th>Assignee</th>
+                          <th class="text-end">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="activityExcludedPersonsTbody"></tbody>
+                    </table>
+                  </div>
+                  <div class="small text-muted mt-2" id="activityExcludedPersonsEmptyHint">No excluded persons configured.</div>
                 </div>
-                <div class="table-responsive border rounded bg-white">
-                  <table class="table table-sm table-hover align-middle mb-0" id="activityExcludedPersonsTable">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Name</th>
-                        <th>Person ID</th>
-                        <th>Assignee</th>
-                        <th class="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody id="activityExcludedPersonsTbody"></tbody>
-                  </table>
-                </div>
-                <div class="small text-muted mt-2" id="activityExcludedPersonsEmptyHint">No excluded persons configured.</div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="card border-0 shadow-sm">
-        <div class="card-body p-4">
-          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div class="tab-pane fade" id="tab-activity-sessions">
+          <div class="d-flex justify-content-between align-items-end mb-2 flex-wrap gap-2">
             <div>
-              <h5 class="m-0 fw-bold"><i class="bi bi-list-check me-2"></i>Sessions / Work Items</h5>
-              <div class="small text-muted">Each session can have its own date, time, assignees, and payable hours.</div>
+              <h6 class="fw-bold text-primary m-0"><i class="bi bi-list-check me-1"></i>Sessions / Work Items</h6>
+              <p class="small text-muted mb-0 mt-1">Each session can have its own date, time, assignees, and payable hours.</p>
             </div>
-            <button type="button" class="btn btn-outline-primary btn-sm" id="addActivityEntry"><i class="bi bi-plus-circle me-1"></i>Add Work Session</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="addActivityEntry"><i class="bi bi-plus"></i> Add Work Session</button>
           </div>
-          <div class="table-responsive table-scroll-wrapper border rounded bg-white" data-floating-row-actions="true" style="max-height: 460px; overflow-y: auto;">
+          <div class="table-responsive border rounded bg-white table-scroll-wrapper" data-floating-row-actions="true" style="max-height: 500px; overflow-y: auto;">
             <table class="table table-hover table-sm mb-0 align-middle" id="activityEntriesTable">
               <thead class="table-light text-nowrap position-sticky top-0" style="z-index: 1;">
                 <tr>
@@ -2508,5 +2525,13 @@ document.addEventListener('DOMContentLoaded', function () {
       if (selectedEntryIndex !== null && entryModalEl?.classList.contains('show')) renderEntryModal();
     })
     .catch(function () {});
+
+  const activityHash = String(window.location.hash || '').trim();
+  if (activityHash === '#tab-activity-sessions' || activityHash === '#tab-activity-scope') {
+    const tabBtn = document.querySelector('[data-bs-target="' + activityHash + '"]');
+    if (tabBtn && window.bootstrap?.Tab) {
+      window.bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+    }
+  }
 });
 </script>

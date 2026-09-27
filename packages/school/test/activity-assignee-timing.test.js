@@ -103,6 +103,67 @@ test('backfillActivityDocument updates assignees without timing', () => {
   assert.equal(result.activity.entries[0].assignees[0].endTime, '14:00');
 });
 
+test('validateAssigneeWithinSessionWindow rejects assignee outside session bounds', () => {
+  const ok = activityAssigneeTimingService.validateAssigneeWithinSessionWindow(
+    '09:00',
+    '17:00',
+    '08:00',
+    '18:00'
+  );
+  assert.equal(ok.valid, true);
+
+  const earlyStart = activityAssigneeTimingService.validateAssigneeWithinSessionWindow(
+    '07:00',
+    '12:00',
+    '08:00',
+    '18:00'
+  );
+  assert.equal(earlyStart.valid, false);
+
+  const lateEnd = activityAssigneeTimingService.validateAssigneeWithinSessionWindow(
+    '09:00',
+    '19:00',
+    '08:00',
+    '18:00'
+  );
+  assert.equal(lateEnd.valid, false);
+});
+
+test('validateAssigneePaidHoursWithinSpan caps paid hours at assignee duration', () => {
+  const ok = activityAssigneeTimingService.validateAssigneePaidHoursWithinSpan(
+    4,
+    '09:00',
+    '13:00',
+    true
+  );
+  assert.equal(ok.valid, true);
+
+  const over = activityAssigneeTimingService.validateAssigneePaidHoursWithinSpan(
+    5,
+    '09:00',
+    '13:00',
+    true
+  );
+  assert.equal(over.valid, false);
+
+  const notPaid = activityAssigneeTimingService.validateAssigneePaidHoursWithinSpan(0, '09:00', '13:00', false);
+  assert.equal(notPaid.valid, true);
+});
+
+test('validateAssigneeTimingRules composes clock, window, and paid hours checks', () => {
+  const valid = activityAssigneeTimingService.validateAssigneeTimingRules({
+    assignee: { paid: true, paidHours: 3, startTime: '10:00', endTime: '14:00' },
+    entry: { startTime: '08:00', endTime: '18:00', durationHours: 10 }
+  });
+  assert.equal(valid.valid, true);
+
+  const paidTooHigh = activityAssigneeTimingService.validateAssigneeTimingRules({
+    assignee: { paid: true, paidHours: 6, startTime: '10:00', endTime: '14:00' },
+    entry: { startTime: '08:00', endTime: '18:00', durationHours: 10 }
+  });
+  assert.equal(paidTooHigh.valid, false);
+});
+
 test('backfillActivityDocument is idempotent for matching timing', () => {
   const activity = {
     id: 'ACT-1',

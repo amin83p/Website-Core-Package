@@ -10,6 +10,8 @@ const IMPORT_TARGET_STATUSES = Object.freeze([
 const IMPORT_WORK_SESSION_MIN_TIME = '07:00';
 const IMPORT_WORK_SESSION_MAX_TIME = '21:00';
 
+const DEFAULT_IMPORT_WORK_SESSION_TITLE = 'Generated Work Session (Timesheet Import)';
+
 const DEFAULT_POLICY = Object.freeze({
   importActivityId: '',
   allowImportInTimesheetManagement: false,
@@ -19,8 +21,15 @@ const DEFAULT_POLICY = Object.freeze({
   saveImportedSessionsIntoOneWorkSession: true,
   importWorkSessionStartTime: IMPORT_WORK_SESSION_MIN_TIME,
   importWorkSessionEndTime: IMPORT_WORK_SESSION_MAX_TIME,
+  importWorkSessionDefaultTitle: DEFAULT_IMPORT_WORK_SESSION_TITLE,
   classNameActivityMappings: []
 });
+
+function normalizeImportWorkSessionDefaultTitle(value, fallback = DEFAULT_IMPORT_WORK_SESSION_TITLE) {
+  const title = String(value ?? '').trim();
+  if (!title) return fallback;
+  return title.slice(0, 180);
+}
 
 function cleanBoolean(value, fallback = false) {
   if (value === true || value === 'true' || value === 1 || value === '1' || value === 'on') return true;
@@ -144,6 +153,10 @@ function normalizePolicyFromStored(input = {}) {
     ),
     importWorkSessionStartTime,
     importWorkSessionEndTime,
+    importWorkSessionDefaultTitle: normalizeImportWorkSessionDefaultTitle(
+      input.importWorkSessionDefaultTitle,
+      DEFAULT_IMPORT_WORK_SESSION_TITLE
+    ),
     classNameActivityMappings: normalizeClassNameActivityMappings(input.classNameActivityMappings)
   };
 }
@@ -169,6 +182,10 @@ function normalizePolicyFromForm(input = {}) {
     ),
     importWorkSessionStartTime,
     importWorkSessionEndTime,
+    importWorkSessionDefaultTitle: normalizeImportWorkSessionDefaultTitle(
+      input.importWorkSessionDefaultTitle,
+      DEFAULT_IMPORT_WORK_SESSION_TITLE
+    ),
     classNameActivityMappings: normalizeClassNameActivityMappings(
       input.classNameActivityMappings,
       { enforceUnique: true }
@@ -178,6 +195,13 @@ function normalizePolicyFromForm(input = {}) {
 
 function resolvePolicy(input = {}) {
   return normalizePolicyFromStored(input);
+}
+
+function resolveImportWorkSessionDefaultTitle(policy = {}) {
+  return normalizeImportWorkSessionDefaultTitle(
+    resolvePolicy(policy).importWorkSessionDefaultTitle,
+    DEFAULT_IMPORT_WORK_SESSION_TITLE
+  );
 }
 
 function resolveImportTargetStatusForScope(policy = {}, scope = '') {
@@ -373,7 +397,10 @@ module.exports = {
   IMPORT_TARGET_STATUSES,
   IMPORT_WORK_SESSION_MIN_TIME,
   IMPORT_WORK_SESSION_MAX_TIME,
+  DEFAULT_IMPORT_WORK_SESSION_TITLE,
   DEFAULT_POLICY,
+  normalizeImportWorkSessionDefaultTitle,
+  resolveImportWorkSessionDefaultTitle,
   normalizeClassNameKey,
   normalizeClassNameActivityMappings,
   normalizeImportTargetStatus,

@@ -466,6 +466,224 @@ a.header-side-control-btn {
   flex-shrink: 0;
 }
 
+.active-users-preview-modal__header {
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  padding: 1.1rem 1.25rem 0.5rem;
+}
+
+.active-users-preview-modal__icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #e8f0fe;
+  color: #1d4ed8;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.active-users-preview-modal__body {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  padding-bottom: 0;
+}
+
+.active-users-preview-list {
+  display: grid;
+  gap: 0.65rem;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.active-users-preview-empty {
+  border: 1px dashed #dbe3ef;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.active-users-preview-search .input-group-text {
+  color: #64748b;
+}
+
+.active-users-preview-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.active-users-preview-card__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0.75rem 0.85rem;
+  color: inherit;
+}
+
+.active-users-preview-card__toggle:hover {
+  background: #f8fafc;
+}
+
+.active-users-preview-card__summary {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.active-users-preview-card__summary-time {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.active-users-preview-card__chevron {
+  color: #64748b;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.active-users-preview-card:not(.active-users-preview-card--collapsed) .active-users-preview-card__chevron {
+  transform: rotate(180deg);
+}
+
+.active-users-preview-card__details-inner {
+  padding: 0 0.85rem 0.85rem;
+  border-top: 1px solid #f1f5f9;
+  margin-top: -0.15rem;
+  padding-top: 0.65rem;
+}
+
+.active-users-preview-card__org-name {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.active-users-preview-card__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.active-users-preview-card__username {
+  font-size: 0.8rem;
+  color: #64748b;
+  display: block;
+}
+
+.active-users-preview-card__name {
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  word-break: break-word;
+}
+
+.active-users-preview-card__live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+  flex-shrink: 0;
+}
+
+.active-users-preview-card__username,
+.active-users-preview-card__email {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.active-users-preview-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.active-users-preview-card__org {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-users-preview-card__section {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.active-users-preview-card__section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.active-users-preview-card__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.2rem;
+}
+
+.active-users-preview-card__path-link {
+  font-weight: 600;
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+.active-users-preview-card__path-link:hover {
+  text-decoration: underline;
+}
+
+.active-users-preview-card__address {
+  font-size: 0.75rem;
+  color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 0.15rem;
+}
+
+.active-users-preview-card__request-time {
+  font-size: 0.85rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.active-users-preview-card__hint {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 0.1rem;
+}
+
+.active-users-preview-modal__stats {
+  margin-left: -1.25rem;
+  margin-right: -1.25rem;
+  margin-bottom: -0.75rem;
+}
+
 .page-diagnostics-header-switch {
   display: flex;
   align-items: center;

@@ -1072,6 +1072,26 @@ function buildIncompleteActivityStatusLabel(activity = {}, assignee = {}) {
   return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
 }
 
+function buildActivityTimesheetRowStatus(activity = {}, assignee = {}) {
+  const evaluationType = normalizeEvaluationType(activity.evaluationType);
+  if (evaluationType === 'completion') {
+    const isComplete = normalizeCompletionStatus(assignee) === 'completed';
+    return {
+      statusCode: isComplete ? 'completed' : 'pending',
+      statusLabel: isComplete ? 'Completed activity' : 'Pending completion',
+      evaluationType,
+      isFinalStatus: isComplete
+    };
+  }
+  const isAttended = normalizeStatus(assignee.status, 'attended') === 'attended';
+  return {
+    statusCode: isAttended ? 'attended' : 'pending',
+    statusLabel: isAttended ? 'Attended activity' : 'Not attended',
+    evaluationType,
+    isFinalStatus: isAttended
+  };
+}
+
 async function getIncompleteActivityWorkSessionsForPerson({ orgId, personId, periodStartDate, periodEndDate, reqUser } = {}) {
   const activities = await listActivities({ orgId, reqUser });
   const targetPersonId = normalizeId(personId);
@@ -1234,6 +1254,7 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
         .map((attendee) => {
           const hours = resolveActivityTimesheetEntryHours(activity, attendee, entry);
           const timing = activityAssigneeTimingService.resolveAssigneeTiming({ assignee: attendee, entry });
+          const rowStatus = buildActivityTimesheetRowStatus(activity, attendee);
           const importClassName = String(attendee?.legacyImportClassName || '').trim();
           const rowIndex = Number(attendee?.legacyImportRowIndex);
           const sessionIdSuffix = Number.isFinite(rowIndex) && rowIndex > 0 ? `-r${rowIndex}` : '';
@@ -1266,7 +1287,9 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             hours,
             durationHours: hours,
             timesheetHours: hours,
-            status: 'activity',
+            status: rowStatus.statusCode,
+            activityEvaluationType: rowStatus.evaluationType,
+            activityStatusLabel: rowStatus.statusLabel,
             comment: entry.notes || activity.notes || '',
             statHolidayId: normalizeId(entry?.statHolidayId || attendee?.statHolidayId),
             statHolidaySchemeId: normalizeId(entry?.statHolidaySchemeId || attendee?.statHolidaySchemeId) || 'equilibrium_school',
@@ -1274,7 +1297,7 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             statHolidayPersonId: normalizeId(entry?.statHolidayPersonId || attendee?.statHolidayPersonId),
             isManual: false,
             isSchoolActivity: true,
-            isFinalStatus: true,
+            isFinalStatus: rowStatus.isFinalStatus,
             personRole: resolveActivityEntryPersonRole(attendee),
             compensationLookup: {
               personId: targetPersonId,
@@ -1529,6 +1552,7 @@ module.exports = {
   getTimesheetEntriesForPerson,
   getIncompleteActivityWorkSessionsForPerson,
   buildIncompleteActivityStatusLabel,
+  buildActivityTimesheetRowStatus,
   calculateDurationHours,
   enrichActivityAttendeeNames,
   flattenActivityAssignees,

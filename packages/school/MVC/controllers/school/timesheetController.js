@@ -2778,7 +2778,7 @@ exports.viewTimesheet = async (req, res) => {
         const useFrozenSnapshot = ['submitted', 'processed'].includes(String(timesheet.status || '').toLowerCase())
             && Array.isArray(timesheet?.submissionSnapshot?.entries)
             && timesheet.submissionSnapshot.entries.length > 0;
-        const [canManagerUpdate, canFinanceConfigure, canOwnTimesheetExport, canManagementExport, canTimesheetsAdminUpdate, canDeleteRejectedManualRow] = await Promise.all([
+        const [canManagerUpdate, canFinanceConfigure, canOwnTimesheetExport, canManagementExport, canTimesheetsAdminUpdate, canDeleteRejectedManualRow, canViewStatHolidayWarningsPanel] = await Promise.all([
             hasTimesheetManagementAuthority(req.user, OPERATIONS.UPDATE),
             hasTimesheetManagementAuthority(req.user, OPERATIONS.CONFIGURE),
             accessUiService.canAccessTarget(req, {
@@ -2790,7 +2790,8 @@ exports.viewTimesheet = async (req, res) => {
                 operationId: OPERATIONS.EXPORT
             }),
             isTimesheetSectionAdmin(req.user, OPERATIONS.UPDATE),
-            isTimesheetSectionAdmin(req.user, OPERATIONS.DELETE)
+            isTimesheetSectionAdmin(req.user, OPERATIONS.DELETE),
+            schoolAdminAccessService.canViewStatHolidayPayWarningsPanelAsync(req.user)
         ]);
 
         let statHolidayWarnings = [];
@@ -2894,6 +2895,9 @@ exports.viewTimesheet = async (req, res) => {
                     previewRows: statHolidayPreviewRows
                 }
             );
+        }
+        if (!canViewStatHolidayWarningsPanel) {
+            statHolidayWarnings = [];
         }
 
         const payrollEditor = shapePayrollContextForEditor(payrollContext);
@@ -3048,6 +3052,7 @@ exports.viewTimesheet = async (req, res) => {
             ),
             statHolidayWarnings,
             statHolidayPreviewRows,
+            canViewStatHolidayWarningsPanel,
             canManageStatHolidayOverrides: canReviewerEdit && canManagerUpdate,
             statHolidayPreviewOnly: status === 'draft',
             statutoryHolidayUsesActivity,
@@ -3886,7 +3891,10 @@ exports.saveTimesheet = async (req, res) => {
                 reqUser: req.user
             });
             if (hasBlockingIncompleteClassSource || hasNonFinalAutoSession || (Array.isArray(incompleteActivitySources) && incompleteActivitySources.length)) {
-                throw new Error('Some auto sessions are not in a final status. Update session statuses before submission.');
+                throw new Error(
+                    'Some class sessions are not in a final status, or activity work sessions still have incomplete assignees. '
+                    + 'Update class session statuses and complete activity assignees before submission.'
+                );
             }
         }
 
@@ -3965,7 +3973,10 @@ exports.saveTimesheet = async (req, res) => {
                             entry: nextRow,
                             timesheet: existing,
                             teacherId: teacherContext.targetTeacherId,
-                            reqUser: req.user
+                            reqUser: req.user,
+                            manualWorkSessionPolicy: timesheetParametersPolicyService.resolveManualActivityWorkSessionPolicy(
+                                timesheetParametersPolicy
+                            )
                         });
                         if (materializeResult) {
                             nextRow = timesheetManualMaterializationService.applyActivityMaterializationMarkers(
@@ -5039,12 +5050,16 @@ exports.decideManualTimesheetRow = async (req, res) => {
 
         const activityId = String(decided.activityId || '').trim();
         const alreadyMaterialized = Boolean(decided.materializedAt || decided.materializedSessionId);
+        const manualWorkSessionPolicy = timesheetParametersPolicyService.resolveManualActivityWorkSessionPolicy(
+            await timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId)
+        );
         if (decision === 'approved' && activityId && !alreadyMaterialized) {
             const materializeResult = await timesheetManualMaterializationService.materializeActivityManualEntry({
                 entry: decided,
                 timesheet: existing,
                 teacherId: teacherContext.targetTeacherId,
-                reqUser: req.user
+                reqUser: req.user,
+                manualWorkSessionPolicy
             });
             if (materializeResult) {
                 decided = timesheetManualMaterializationService.applyActivityMaterializationMarkers(

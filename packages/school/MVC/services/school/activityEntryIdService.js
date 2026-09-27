@@ -75,7 +75,16 @@ function assignSequentialEntryIds(activityId, entries = []) {
       candidate = buildEntryId(activityToken, sequence);
     }
     usedIds.add(candidate);
-    return { ...row, entryId: candidate };
+    const priorId = resolveEntryId(row);
+    const legacyEntryId = row.legacyEntryId
+      || (priorId && priorId !== candidate && !isActivityScopedEntryId(priorId, activityToken)
+        ? priorId
+        : '');
+    return {
+      ...row,
+      entryId: candidate,
+      ...(legacyEntryId ? { legacyEntryId } : {})
+    };
   });
 }
 

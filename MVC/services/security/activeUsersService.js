@@ -4,6 +4,42 @@ const { SYSTEM_CONTEXT, DEFAULTS } = require('../../../config/constants');
 const { toPublicId } = require('../../utils/idAdapter');
 const { sanitizeCurrentPath } = require('../../utils/pagePathUtils');
 
+function readNamePart(source = {}, key = '') {
+  if (!source || typeof source !== 'object') return '';
+  return String(
+    source?.name?.[key]
+    || source?.[`${key}Name`]
+    || ''
+  ).trim();
+}
+
+function resolveActiveUserDisplayName(user = null, person = null) {
+  const preferred = readNamePart(person, 'preferred') || readNamePart(user, 'preferred')
+    || String(user?.preferredName || '').trim();
+  if (preferred) return preferred;
+
+  const first = readNamePart(person, 'first') || readNamePart(user, 'first')
+    || String(user?.firstName || '').trim();
+  const last = readNamePart(person, 'last') || readNamePart(user, 'last')
+    || String(user?.lastName || '').trim();
+  const composed = [first, last].filter(Boolean).join(' ').trim();
+  if (composed) return composed;
+
+  if (typeof user?.name === 'string' && user.name.trim()) return user.name.trim();
+
+  const displayName = String(user?.displayName || '').trim();
+  if (displayName) return displayName;
+
+  const personDisplay = String(
+    person?.displayName
+    || person?.fullName
+    || (typeof person?.name === 'string' ? person.name : '')
+  ).trim();
+  if (personDisplay) return personDisplay;
+
+  return String(user?.username || '').trim();
+}
+
 function parseSafeInt(value, fallback) {
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
@@ -64,8 +100,8 @@ function groupSessionsByUser(sessions = [], now = new Date(), staleMinutes = get
       existing.lastActivityAt = lastActivityAt.toISOString();
       existing.currentOrgId = session.currentOrgId || existing.currentOrgId;
       existing.deviceFingerprint = session.deviceFingerprint || existing.deviceFingerprint;
-      existing.currentPath = sanitizeCurrentPath(session.currentPath || '') || existing.currentPath || '';
-      existing.currentPathUpdatedAt = session.currentPathUpdatedAt || existing.currentPathUpdatedAt || null;
+      existing.currentPath = sanitizeCurrentPath(session.currentPath || '');
+      existing.currentPathUpdatedAt = session.currentPathUpdatedAt || null;
     }
   });
 
@@ -132,6 +168,48 @@ async function loadUsersByIds(userIds = []) {
   }));
 
   return userMap;
+}
+
+async function loadPersonsByUserMap(userMap = new Map()) {
+  const personIds = Array.from(new Set(
+    Array.from(userMap.values())
+      .map((user) => toPublicId(user?.personId))
+      .filter(Boolean)
+  ));
+  const personMap = new Map();
+  await Promise.all(personIds.map(async (personId) => {
+    const person = await dataService.getDataById('persons', personId, SYSTEM_CONTEXT).catch(() => null);
+    if (person?.id) {
+      personMap.set(String(person.id), person);
+    }
+  }));
+  return personMap;
+}
+
+async function loadOrganizationsByIds(orgIds = []) {
+  const uniqueIds = Array.from(new Set((Array.isArray(orgIds) ? orgIds : [])
+    .map((id) => toPublicId(id))
+    .filter(Boolean)));
+  const orgMap = new Map();
+  await Promise.all(uniqueIds.map(async (orgId) => {
+    const org = await dataService.getDataById('organizations', orgId, SYSTEM_CONTEXT).catch(() => null);
+    if (org?.id) {
+      orgMap.set(String(org.id), org);
+    }
+  }));
+  return orgMap;
+}
+
+function resolveOrganizationDisplayName(org = null, orgId = '') {
+  const fallback = String(orgId || '').trim();
+  if (!org || typeof org !== 'object') return fallback;
+  return String(
+    org?.identity?.displayName
+    || org?.identity?.legalName
+    || org?.name
+    || org?.orgName
+    || fallback
+  ).trim() || fallback;
 }
 
 function computeSummaryMetrics(enrichedRows = [], groupedRows = [], now = new Date()) {
@@ -227,24 +305,25 @@ async function buildSummary(enrichedRows = [], groupedRows = [], now = new Date(
   };
 }
 
-function mapActiveUserRow(groupRow, userMap) {
+function mapActiveUserRow(groupRow, userMap, personMap = new Map(), orgMap = new Map()) {
   const user = userMap.get(String(groupRow.userId || '').trim()) || null;
-  const displayName = String(
-    user?.displayName
-      || user?.name
-      || user?.username
-      || groupRow.userId
-      || ''
-  ).trim();
+  const person = user?.personId
+    ? personMap.get(String(toPublicId(user.personId) || '').trim()) || null
+    : null;
+  const displayName = resolveActiveUserDisplayName(user, person)
+    || String(groupRow.userId || '').trim();
+  const orgId = toPublicId(groupRow.currentOrgId) || String(groupRow.currentOrgId || '').trim() || null;
+  const org = orgId ? orgMap.get(String(orgId)) || null : null;
+  const currentOrgName = resolveOrganizationDisplayName(org, orgId || '');
 
   return {
     userId: groupRow.userId,
     username: String(user?.username || '').trim(),
-    email: String(user?.email || '').trim(),
     displayName,
     lastLoginAt: user?.lastLoginAt || null,
     lastActivityAt: groupRow.lastActivityAt,
-    currentOrgId: groupRow.currentOrgId || null,
+    currentOrgId: orgId,
+    currentOrgName,
     sessionCount: groupRow.sessionCount || 0,
     deviceFingerprint: groupRow.deviceFingerprint || null,
     currentPath: sanitizeCurrentPath(groupRow.currentPath || ''),
@@ -268,10 +347,12 @@ async function listActiveUsers({ query = {} } = {}) {
 
   const grouped = groupSessionsByUser(sessions, now, staleMinutes);
   const userMap = await loadUsersByIds(grouped.map((row) => row.userId));
+  const personMap = await loadPersonsByUserMap(userMap);
+  const orgMap = await loadOrganizationsByIds(grouped.map((row) => row.currentOrgId));
 
   const searchText = normalizeSearchText(query.q);
   const enriched = grouped
-    .map((row) => mapActiveUserRow(row, userMap))
+    .map((row) => mapActiveUserRow(row, userMap, personMap, orgMap))
     .filter((row) => matchesSearch(row, searchText));
 
   const summary = {
@@ -299,5 +380,6 @@ module.exports = {
   filterSessionsByCurrentPath,
   groupSessionsByUser,
   computeSummaryMetrics,
-  listActiveUsers
+  listActiveUsers,
+  resolveActiveUserDisplayName
 };

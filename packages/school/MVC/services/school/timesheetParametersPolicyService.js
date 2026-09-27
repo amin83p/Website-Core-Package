@@ -49,10 +49,74 @@ const DEFAULT_STATUTORY_HOLIDAY_PAY = Object.freeze({
   mappingActivityId: ''
 });
 
+const DEFAULT_MANUAL_ACTIVITY_WORK_SESSION_TITLE = 'Generated Work Session (Timesheet Editor)';
+
+const DEFAULT_MANUAL_ACTIVITY_WORK_SESSION = Object.freeze({
+  defaultTitle: DEFAULT_MANUAL_ACTIVITY_WORK_SESSION_TITLE,
+  defaultStartTime: '08:00',
+  defaultEndTime: '20:00'
+});
+
 const DEFAULT_POLICY = Object.freeze({
   emptyEnrollmentSessions: DEFAULT_EMPTY_ENROLLMENT_SESSIONS,
-  statutoryHolidayPay: DEFAULT_STATUTORY_HOLIDAY_PAY
+  statutoryHolidayPay: DEFAULT_STATUTORY_HOLIDAY_PAY,
+  manualActivityWorkSession: DEFAULT_MANUAL_ACTIVITY_WORK_SESSION
 });
+
+function parseClockTimeToMinutes(value) {
+  const token = String(value ?? '').trim();
+  if (!/^\d{2}:\d{2}$/.test(token)) return NaN;
+  const [h, m] = token.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return NaN;
+  return (h * 60) + m;
+}
+
+function normalizeManualActivityWorkSessionClockTime(value, fallback = '08:00') {
+  const token = String(value ?? '').trim();
+  if (!token) return fallback;
+  if (!/^\d{2}:\d{2}$/.test(token)) return fallback;
+  const minutes = parseClockTimeToMinutes(token);
+  if (!Number.isFinite(minutes)) return fallback;
+  const [h, m] = token.split(':').map(Number);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function normalizeManualActivityWorkSessionTitle(value, fallback = DEFAULT_MANUAL_ACTIVITY_WORK_SESSION_TITLE) {
+  const title = String(value ?? '').trim();
+  if (!title) return fallback;
+  return title.slice(0, 180);
+}
+
+function normalizeManualActivityWorkSession(input = {}, { strict = false } = {}) {
+  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const defaults = DEFAULT_MANUAL_ACTIVITY_WORK_SESSION;
+  const defaultStartTime = normalizeManualActivityWorkSessionClockTime(
+    source.defaultStartTime,
+    defaults.defaultStartTime
+  );
+  const defaultEndTime = normalizeManualActivityWorkSessionClockTime(
+    source.defaultEndTime,
+    defaults.defaultEndTime
+  );
+  const startMinutes = parseClockTimeToMinutes(defaultStartTime);
+  const endMinutes = parseClockTimeToMinutes(defaultEndTime);
+  if (strict && (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || endMinutes <= startMinutes)) {
+    const error = new Error('Manual activity work session end time must be later than start time.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return {
+    defaultTitle: normalizeManualActivityWorkSessionTitle(source.defaultTitle, defaults.defaultTitle),
+    defaultStartTime,
+    defaultEndTime
+  };
+}
+
+function resolveManualActivityWorkSessionPolicy(policy = {}) {
+  return normalizeManualActivityWorkSession(
+    resolvePolicy(policy).manualActivityWorkSession || DEFAULT_MANUAL_ACTIVITY_WORK_SESSION
+  );
+}
 
 function cleanToken(value = '') {
   return String(value ?? '').trim().toLowerCase();
@@ -201,7 +265,8 @@ function normalizeEmptyEnrollmentSessions(value, { strict = false } = {}) {
 function normalizePolicyFromStored(input = {}) {
   return {
     emptyEnrollmentSessions: normalizeEmptyEnrollmentSessions(input.emptyEnrollmentSessions),
-    statutoryHolidayPay: normalizeStatutoryHolidayPay(input.statutoryHolidayPay)
+    statutoryHolidayPay: normalizeStatutoryHolidayPay(input.statutoryHolidayPay),
+    manualActivityWorkSession: normalizeManualActivityWorkSession(input.manualActivityWorkSession)
   };
 }
 
@@ -295,8 +360,22 @@ function normalizePolicyFromForm(input = {}) {
     return Object.prototype.hasOwnProperty.call(input, key);
   }) || Object.prototype.hasOwnProperty.call(input, 'payableHolidayTypes');
 
+  const nestedManualWs = input.manualActivityWorkSession && typeof input.manualActivityWorkSession === 'object'
+    ? input.manualActivityWorkSession
+    : {};
   return {
     emptyEnrollmentSessions: normalizeEmptyEnrollmentSessions(input.emptyEnrollmentSessions, { strict: true }),
+    manualActivityWorkSession: normalizeManualActivityWorkSession({
+      defaultTitle: input.manualActivityWorkSessionDefaultTitle
+        ?? input['manualActivityWorkSession.defaultTitle']
+        ?? nestedManualWs.defaultTitle,
+      defaultStartTime: input.manualActivityWorkSessionDefaultStartTime
+        ?? input['manualActivityWorkSession.defaultStartTime']
+        ?? nestedManualWs.defaultStartTime,
+      defaultEndTime: input.manualActivityWorkSessionDefaultEndTime
+        ?? input['manualActivityWorkSession.defaultEndTime']
+        ?? nestedManualWs.defaultEndTime
+    }, { strict: true }),
     statutoryHolidayPay: normalizeStatutoryHolidayPay({
       enabled: input.statutoryHolidayPayEnabled ?? input['statutoryHolidayPay.enabled'] ?? nestedStat.enabled,
       activityId: input.statutoryHolidayActivityId ?? input['statutoryHolidayPay.activityId'] ?? nestedStat.activityId,
@@ -352,6 +431,7 @@ function resolvePolicy(input = {}) {
 function validatePolicyInput(input = {}) {
   const statutoryHolidaySchemeService = schemeService();
   const normalized = normalizePolicyFromForm(input);
+  normalizeManualActivityWorkSession(normalized.manualActivityWorkSession, { strict: true });
   const statPay = normalized.statutoryHolidayPay || {};
   if (statPay.enabled === false) return normalized;
 
@@ -436,7 +516,11 @@ module.exports = {
   DEFAULT_EMPTY_ENROLLMENT_SESSIONS,
   PAYABLE_HOLIDAY_TYPES,
   DEFAULT_STATUTORY_HOLIDAY_PAY,
+  DEFAULT_MANUAL_ACTIVITY_WORK_SESSION,
+  DEFAULT_MANUAL_ACTIVITY_WORK_SESSION_TITLE,
   DEFAULT_POLICY,
+  normalizeManualActivityWorkSession,
+  resolveManualActivityWorkSessionPolicy,
   normalizeEmptyEnrollmentSessions,
   normalizeStatutoryHolidayPay,
   normalizePolicyFromStored,

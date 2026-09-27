@@ -60,34 +60,30 @@ test('session current path updates are throttled between heartbeat writes', () =
   }, '/profile', now, { heartbeatDue: true }), true);
 });
 
-test('navigation never auto-tracks current path for any user flags', () => {
+test('html navigation tracks current path while skipping ajax and static assets', () => {
   const baseRequest = {
     method: 'GET',
     originalUrl: '/dashboard',
     headers: { accept: 'text/html' }
   };
 
-  assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest(baseRequest), false);
+  assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest(baseRequest), true);
   assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
     ...baseRequest,
-    user: { canUsePageDiagnostics: true, pageDiagnosticsEnabled: false }
+    headers: { accept: 'application/json', 'x-ajax-request': 'true' }
   }), false);
   assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
-    ...baseRequest,
-    user: { canUsePageDiagnostics: true, pageDiagnosticsEnabled: true }
-  }), false);
-  assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
-    ...baseRequest,
-    user: { uiAccess: { canViewActiveUsers: true } }
-  }), false);
-  assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
-    ...baseRequest,
+    method: 'GET',
     originalUrl: '/scripts/main.js',
-    user: { uiAccess: { canViewActiveUsers: true } }
+    headers: { accept: 'text/html' }
   }), false);
+  assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
+    ...baseRequest,
+    user: { uiAccess: { canViewActiveUsers: true } }
+  }), true);
 });
 
-test('post-auth current path tracker never writes on navigation', async () => {
+test('post-auth current path tracker writes on html navigation only', async () => {
   const originalUpdateData = dataService.updateData;
   const calls = [];
   dataService.updateData = async (...args) => {
@@ -105,18 +101,19 @@ test('post-auth current path tracker never writes on navigation', async () => {
         user: { canUsePageDiagnostics: true, pageDiagnosticsEnabled: true }
       }, {}, resolve);
     });
-    assert.equal(calls.length, 0);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][2].currentPath, '/dashboard');
 
     await new Promise((resolve) => {
       sessionEnforcement.trackCurrentPathAfterAuth({
         method: 'GET',
-        originalUrl: '/dashboard',
-        headers: { accept: 'text/html' },
+        originalUrl: '/security/active-users/data',
+        headers: { accept: 'application/json', 'x-ajax-request': 'true' },
         userSession: { id: 'SID123', currentPath: '', currentPathUpdatedAt: '' },
         user: { canViewActiveUsers: true }
       }, {}, resolve);
     });
-    assert.equal(calls.length, 0);
+    assert.equal(calls.length, 1);
   } finally {
     dataService.updateData = originalUpdateData;
   }

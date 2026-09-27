@@ -808,6 +808,47 @@ function formatActiveUsersRelativeTime(value) {
     return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 }
 
+function formatActiveUsersDateTime(value) {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString();
+}
+
+function getActiveUsersPageLabel(path) {
+    const clean = String(path || '').trim().replace(/\/+$/, '') || '/';
+    const segment = clean.split('/').filter(Boolean).pop() || 'Home';
+    return segment
+        .replace(/[-_]+/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getActiveUsersInitial(name) {
+    const text = String(name || '').trim();
+    if (!text) return '?';
+    const parts = text.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+        return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+    }
+    return text.charAt(0).toUpperCase();
+}
+
+function activeUsersPreviewCardDomId(userId) {
+    return `activeUserPreview-${String(userId || '').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+}
+
+function normalizeActiveUsersSearchText(value) {
+    return String(value ?? '').trim().toLowerCase();
+}
+
+function rowMatchesActiveUsersSearch(row, searchText) {
+    if (!searchText) return true;
+    const haystack = [
+        row?.displayName,
+        row?.username
+    ].map(normalizeActiveUsersSearchText).join(' ');
+    return haystack.includes(searchText);
+}
+
 function initActiveUsersPreviewModal() {
     const modal = document.getElementById('activeUsersPreviewModal');
     if (!modal) return;
@@ -815,8 +856,10 @@ function initActiveUsersPreviewModal() {
     const loadingEl = document.getElementById('activeUsersPreviewLoading');
     const errorEl = document.getElementById('activeUsersPreviewError');
     const contentEl = document.getElementById('activeUsersPreviewContent');
-    const tableBody = document.getElementById('activeUsersPreviewTableBody');
+    const listEl = document.getElementById('activeUsersPreviewList');
     const emptyEl = document.getElementById('activeUsersPreviewEmpty');
+    const noMatchesEl = document.getElementById('activeUsersPreviewNoMatches');
+    const searchInput = document.getElementById('activeUsersPreviewSearch');
     const footnoteEl = document.getElementById('activeUsersPreviewFootnote');
 
     const statCount = document.getElementById('activeUsersStatCount');
@@ -827,40 +870,155 @@ function initActiveUsersPreviewModal() {
     const statAvgSessions = document.getElementById('activeUsersStatAvgSessions');
     const statMultiSession = document.getElementById('activeUsersStatMultiSession');
 
+    let previewRowsAll = [];
+    let previewSummary = {};
+    const origin = String(window.location.origin || '').replace(/\/$/, '');
+
     function setLoading(isLoading) {
         if (loadingEl) loadingEl.classList.toggle('d-none', !isLoading);
         if (contentEl) contentEl.classList.toggle('d-none', isLoading);
         if (errorEl) errorEl.classList.add('d-none');
     }
 
-    function renderPreview(payload) {
-        const rows = Array.isArray(payload?.results) ? payload.results : [];
-        const summary = payload?.summary || {};
-        const totalUsers = Number(summary.activeUserCount || 0);
+    function renderCardList(rows) {
+        if (!listEl) return;
 
-        if (tableBody) {
-            if (!rows.length) {
-                tableBody.innerHTML = '';
-            } else {
-                tableBody.innerHTML = rows.map((row) => `
-                    <tr>
-                        <td class="ps-3">
-                            <div class="fw-semibold">${escapeActiveUsersHtml(row.displayName || row.username || row.userId)}</div>
-                            <div class="small text-muted">${escapeActiveUsersHtml(row.email || row.username || '-')}</div>
-                        </td>
-                        <td>
-                            <div class="small">${escapeActiveUsersHtml(formatActiveUsersRelativeTime(row.lastActivityAt))}</div>
-                        </td>
-                        <td class="text-center">
-                            <span class="badge bg-success-subtle text-success border border-success-subtle">${escapeActiveUsersHtml(row.sessionCount || 0)}</span>
-                        </td>
-                        <td class="pe-3 small text-muted">${escapeActiveUsersHtml(row.currentOrgId || '-')}</td>
-                    </tr>
-                `).join('');
-            }
+        if (!previewRowsAll.length) {
+            listEl.innerHTML = '';
+            if (emptyEl) emptyEl.classList.remove('d-none');
+            if (noMatchesEl) noMatchesEl.classList.add('d-none');
+            listEl.classList.add('d-none');
+            return;
         }
 
-        if (emptyEl) emptyEl.classList.toggle('d-none', rows.length > 0);
+        if (emptyEl) emptyEl.classList.add('d-none');
+
+        if (!rows.length) {
+            listEl.innerHTML = '';
+            listEl.classList.add('d-none');
+            if (noMatchesEl) noMatchesEl.classList.remove('d-none');
+            return;
+        }
+
+        if (noMatchesEl) noMatchesEl.classList.add('d-none');
+        listEl.classList.remove('d-none');
+
+        listEl.innerHTML = rows.map((row) => {
+            const displayName = row.displayName || row.username || row.userId || '-';
+            const username = String(row.username || '').trim();
+            const usernameLabel = username
+                ? `@${escapeActiveUsersHtml(username.replace(/^@+/, ''))}`
+                : '<span class="text-muted">—</span>';
+            const collapseId = activeUsersPreviewCardDomId(row.userId);
+            const path = String(row.currentPath || '').trim();
+            const pageLabel = path ? getActiveUsersPageLabel(path) : 'Unknown page';
+            const fullAddress = path ? `${origin}${path.startsWith('/') ? path : `/${path}`}` : '';
+            const pathUpdatedLine = row.currentPathUpdatedAt
+                ? `Page updated ${formatActiveUsersRelativeTime(row.currentPathUpdatedAt)}`
+                : '';
+            const orgLabel = String(row.currentOrgName || '').trim();
+
+            const pathBlock = path
+                ? `
+                    <a class="active-users-preview-card__path-link" href="${escapeActiveUsersHtml(fullAddress)}" target="_blank" rel="noopener noreferrer" title="${escapeActiveUsersHtml(fullAddress)}">
+                        ${escapeActiveUsersHtml(pageLabel)}
+                    </a>
+                    <div class="active-users-preview-card__address font-monospace" title="${escapeActiveUsersHtml(fullAddress)}">${escapeActiveUsersHtml(fullAddress)}</div>
+                `
+                : '<span class="text-muted small">No page tracked</span>';
+
+            return `
+                <article class="active-users-preview-card active-users-preview-card--collapsed" role="listitem" data-user-id="${escapeActiveUsersHtml(row.userId)}">
+                    <button
+                        type="button"
+                        class="active-users-preview-card__toggle"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#${escapeActiveUsersHtml(collapseId)}"
+                        aria-expanded="false"
+                        aria-controls="${escapeActiveUsersHtml(collapseId)}"
+                    >
+                        <span class="active-users-preview-card__avatar" aria-hidden="true">${escapeActiveUsersHtml(getActiveUsersInitial(displayName))}</span>
+                        <span class="active-users-preview-card__summary">
+                            <span class="active-users-preview-card__name">
+                                <span class="active-users-preview-card__live-dot" aria-hidden="true"></span>
+                                ${escapeActiveUsersHtml(displayName)}
+                            </span>
+                            <span class="active-users-preview-card__username">${usernameLabel}</span>
+                            <span class="active-users-preview-card__summary-time">${escapeActiveUsersHtml(formatActiveUsersDateTime(row.lastActivityAt))}</span>
+                        </span>
+                        <i class="bi bi-chevron-down active-users-preview-card__chevron" aria-hidden="true"></i>
+                    </button>
+                    <div class="collapse active-users-preview-card__details" id="${escapeActiveUsersHtml(collapseId)}">
+                        <div class="active-users-preview-card__details-inner">
+                            <div class="active-users-preview-card__section">
+                                <div class="active-users-preview-card__label">Current page</div>
+                                ${pathBlock}
+                                ${pathUpdatedLine ? `<div class="active-users-preview-card__hint">${escapeActiveUsersHtml(pathUpdatedLine)}</div>` : ''}
+                            </div>
+                            ${orgLabel ? `
+                            <div class="active-users-preview-card__section">
+                                <div class="active-users-preview-card__label">Active organization</div>
+                                <div class="active-users-preview-card__org-name">${escapeActiveUsersHtml(orgLabel)}</div>
+                            </div>
+                            ` : ''}
+                            <div class="active-users-preview-card__section">
+                                <div class="active-users-preview-card__label">Sessions</div>
+                                <div class="active-users-preview-card__hint">${escapeActiveUsersHtml(row.sessionCount || 0)} active session${Number(row.sessionCount) === 1 ? '' : 's'}</div>
+                                <div class="active-users-preview-card__hint">${escapeActiveUsersHtml(formatActiveUsersRelativeTime(row.lastActivityAt))}</div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            `;
+        }).join('');
+
+        listEl.querySelectorAll('.active-users-preview-card__toggle').forEach((toggle) => {
+            const targetSelector = toggle.getAttribute('data-bs-target');
+            const target = targetSelector ? document.querySelector(targetSelector) : null;
+            if (!target) return;
+            target.addEventListener('show.bs.collapse', () => {
+                toggle.closest('.active-users-preview-card')?.classList.remove('active-users-preview-card--collapsed');
+                toggle.setAttribute('aria-expanded', 'true');
+            });
+            target.addEventListener('hide.bs.collapse', () => {
+                toggle.closest('.active-users-preview-card')?.classList.add('active-users-preview-card--collapsed');
+                toggle.setAttribute('aria-expanded', 'false');
+            });
+        });
+    }
+
+    function updateFootnote(visibleCount) {
+        if (!footnoteEl) return;
+        const summary = previewSummary || {};
+        const totalUsers = Number(summary.activeUserCount || 0);
+        const loadedCount = previewRowsAll.length;
+        const staleMinutes = Number(summary.staleMinutes || 5);
+        const windowLabel = `active in the last ${staleMinutes} minute${staleMinutes === 1 ? '' : 's'}`;
+        const searchText = normalizeActiveUsersSearchText(searchInput?.value);
+
+        if (searchText) {
+            footnoteEl.textContent = `Showing ${visibleCount} of ${loadedCount} loaded user${loadedCount === 1 ? '' : 's'} (${totalUsers} ${windowLabel})`;
+            return;
+        }
+        footnoteEl.textContent = loadedCount < totalUsers
+            ? `Showing ${loadedCount} of ${totalUsers} users ${windowLabel}`
+            : `${totalUsers} user${totalUsers === 1 ? '' : 's'} ${windowLabel}`;
+    }
+
+    function applySearchFilter() {
+        const searchText = normalizeActiveUsersSearchText(searchInput?.value);
+        const filtered = previewRowsAll.filter((row) => rowMatchesActiveUsersSearch(row, searchText));
+        renderCardList(filtered);
+        updateFootnote(filtered.length);
+    }
+
+    function renderPreview(payload) {
+        previewRowsAll = Array.isArray(payload?.results) ? payload.results : [];
+        previewSummary = payload?.summary || {};
+
+        applySearchFilter();
+
+        const summary = previewSummary;
         if (statCount) statCount.textContent = String(summary.activeUserCount || 0);
         if (statSessions) statSessions.textContent = String(summary.activeSessionCount || 0);
         if (statDailyAvg) statDailyAvg.textContent = String(summary.avgDailyActiveUsers ?? 0);
@@ -879,20 +1037,12 @@ function initActiveUsersPreviewModal() {
             const staleMinutes = Number(summary.staleMinutes || 5);
             subtitleEl.textContent = `Users active in the last ${staleMinutes} minute${staleMinutes === 1 ? '' : 's'}.`;
         }
-        if (footnoteEl) {
-            const showing = rows.length;
-            const staleMinutes = Number(summary.staleMinutes || 5);
-            const windowLabel = `active in the last ${staleMinutes} minute${staleMinutes === 1 ? '' : 's'}`;
-            footnoteEl.textContent = showing < totalUsers
-                ? `Showing ${showing} of ${totalUsers} users ${windowLabel}`
-                : `${totalUsers} user${totalUsers === 1 ? '' : 's'} ${windowLabel}`;
-        }
     }
 
     async function loadPreview() {
         setLoading(true);
         try {
-            const response = await fetch('/security/active-users/data?preview=1&limit=12', {
+            const response = await fetch('/security/active-users/data?preview=1&limit=50', {
                 headers: { 'x-ajax-request': 'true' }
             });
             const payload = await response.json();
@@ -900,6 +1050,7 @@ function initActiveUsersPreviewModal() {
                 throw new Error(payload.message || 'Failed to load active users.');
             }
             setLoading(false);
+            if (searchInput) searchInput.value = '';
             renderPreview(payload);
         } catch (error) {
             setLoading(false);
@@ -909,6 +1060,12 @@ function initActiveUsersPreviewModal() {
                 errorEl.classList.remove('d-none');
             }
         }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            applySearchFilter();
+        });
     }
 
     modal.addEventListener('show.bs.modal', () => {
