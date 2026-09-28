@@ -30,3 +30,13 @@ test('session manager supports enrollment finish alert button styling', () => {
   assert.match(viewSource, /attendanceEnrollmentInfoAlert/);
   assert.match(viewSource, /btn-danger text-white enrollment-info-trigger-alert/);
 });
+
+test('enrollment info modal shows current CLB only', () => {
+  const block = viewSource.slice(
+    viewSource.indexOf('function renderEnrollmentClbGrid'),
+    viewSource.indexOf('function formatEnrollmentFinishDate')
+  );
+  assert.doesNotMatch(block, /Goal/);
+  assert.doesNotMatch(block, /goalSkills/);
+  assert.match(block, /currentSkills/);
+});

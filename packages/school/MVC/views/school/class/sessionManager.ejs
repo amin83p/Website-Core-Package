@@ -3292,11 +3292,16 @@
                 </div>
 
             </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <% if (!attendanceReadOnly) { %>
-                    <button type="button" class="btn btn-primary fw-bold" id="btnSaveDetails">Apply Time/Excuse</button>
+                <button type="button" class="btn btn-outline-warning" id="btnResetStudentAttendance" title="Clear this student back to not marked">Reset attendance</button>
                 <% } %>
+                <div class="d-flex gap-2 ms-auto">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <% if (!attendanceReadOnly) { %>
+                    <button type="button" class="btn btn-primary fw-bold" id="btnSaveDetails">Apply Time/Excuse</button>
+                    <% } %>
+                </div>
             </div>
         </div>
     </div>
@@ -5406,12 +5411,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return parts.length ? parts.join(' ') : 'Not recorded';
     }
 
-    function renderEnrollmentClbGrid(currentSkills, goalSkills) {
+    function renderEnrollmentClbGrid(currentSkills) {
         const gridEl = document.getElementById('attendanceEnrollmentInfoClbGrid');
         if (!gridEl) return;
 
         const hasAnyValue = ENROLLMENT_CLB_SKILL_CODES.some(([key]) => {
-            return String(currentSkills?.[key] || '').trim() || String(goalSkills?.[key] || '').trim();
+            return String(currentSkills?.[key] || '').trim();
         });
 
         if (!hasAnyValue) {
@@ -5421,16 +5426,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gridEl.innerHTML = ENROLLMENT_CLB_SKILL_CODES.map(([key, , label]) => {
             const current = String(currentSkills?.[key] || '').trim();
-            const goal = String(goalSkills?.[key] || '').trim();
             const currentClass = current ? 'current' : 'empty';
-            const goalClass = goal ? 'goal' : 'empty';
             return `<div class="enrollment-info-clb-skill">
                 <div class="enrollment-info-clb-skill-label">${conductEscapeHtml(label)}</div>
                 <div class="enrollment-info-clb-values">
-                    <span class="enrollment-info-clb-role">Current</span>
                     <span class="enrollment-info-clb-badge ${currentClass}">${conductEscapeHtml(current || '—')}</span>
-                    <span class="enrollment-info-clb-role">Goal</span>
-                    <span class="enrollment-info-clb-badge ${goalClass}">${conductEscapeHtml(goal || '—')}</span>
                 </div>
             </div>`;
         }).join('');
@@ -5563,7 +5563,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `Recorded ${formatEnrollmentFinishDate(payload.clbRecordedAt)}`
                 : '';
         }
-        renderEnrollmentClbGrid(payload.clbCurrent, payload.clbGoal);
+        renderEnrollmentClbGrid(payload.clbCurrent);
         const finishLabel = formatEnrollmentFinishDate(payload.finishDate);
         if (finishTextEl) finishTextEl.textContent = finishLabel;
         if (finishWrapEl) {
@@ -8658,6 +8658,49 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    document.getElementById('btnResetStudentAttendance')?.addEventListener('click', async () => {
+        const personId = String(document.getElementById('modalPersonId')?.value || '').trim();
+        const row = personId ? document.querySelector(`.roster-row[data-personid="${personId}"]`) : null;
+        if (!row) return;
+        if (window.sessionAttendanceReadOnly === true) {
+            await sessionMessageBox({
+                title: 'Cannot reset attendance',
+                icon: 'warning',
+                message: 'Attendance is read-only for this session.',
+                okText: 'Close',
+                okClass: 'btn-secondary'
+            });
+            return;
+        }
+        if (row.dataset?.enrollmentNaLocked === 'true') {
+            await sessionMessageBox({
+                title: 'Cannot reset attendance',
+                icon: 'warning',
+                message: 'This student is locked to N/A due to enrollment on-hold or an office exemption. Attendance administrator access is required to change it.',
+                okText: 'Close',
+                okClass: 'btn-secondary'
+            });
+            return;
+        }
+        const confirmed = await sessionConfirmBox({
+            title: 'Reset attendance?',
+            icon: 'warning',
+            message: 'Clear this student\'s attendance mark back to not marked? Save session to keep this change.',
+            confirmText: 'Reset attendance',
+            confirmClass: 'btn-warning'
+        });
+        if (!confirmed) return;
+        resetAttendanceForRosterRow(row);
+        delete row.dataset.lateModalPriorAttendance;
+        applyAttendanceRulesToRow(row);
+        refreshDetailsModalFromRosterRow(row, personId);
+        syncRosterDetailsButtonFromRow(row);
+        refreshAttendanceStatusSummary();
+        gbOnAttendanceChanged();
+        markSessionAutosaveRosterDirty();
+        detailsModalSnapshot = captureDetailsModalFormSnapshot();
+    });
+
     function applyBulkAttendance(value) {
         document.querySelectorAll('.roster-row').forEach((row) => {
             const target = row.querySelector(`.att-radio[value="${value}"]`);
@@ -8665,23 +8708,67 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function resetBulkAttendance() {
-        document.querySelectorAll('.roster-row').forEach((row) => {
-            row.querySelectorAll('.att-radio').forEach((radio) => {
-                if (!radio.disabled) radio.checked = false;
-            });
-            const lateInput = row.querySelector('.att-late');
-            const leaveInput = row.querySelector('.att-leave');
-            const lateExcusedInput = row.querySelector('.att-late-excused');
-            const earlyExcusedInput = row.querySelector('.att-early-excused');
-            const absenceExcusedInput = row.querySelector('.att-absence-excused');
-            if (lateInput && !lateInput.disabled) lateInput.value = '';
-            if (leaveInput && !leaveInput.disabled) leaveInput.value = '';
-            if (lateExcusedInput) lateExcusedInput.value = 'false';
-            if (earlyExcusedInput) earlyExcusedInput.value = 'false';
-            if (absenceExcusedInput) absenceExcusedInput.value = 'false';
-            updateLateMissingMinuteState(row);
+    function resetAttendanceForRosterRow(row) {
+        if (!row) return;
+        row.querySelectorAll('.att-radio').forEach((radio) => {
+            if (!radio.disabled) radio.checked = false;
         });
+        const lateInput = row.querySelector('.att-late');
+        const leaveInput = row.querySelector('.att-leave');
+        const lateExcusedInput = row.querySelector('.att-late-excused');
+        const earlyExcusedInput = row.querySelector('.att-early-excused');
+        const absenceExcusedInput = row.querySelector('.att-absence-excused');
+        if (lateInput && !lateInput.disabled) lateInput.value = '';
+        if (leaveInput && !leaveInput.disabled) leaveInput.value = '';
+        if (lateExcusedInput) lateExcusedInput.value = 'false';
+        if (earlyExcusedInput) earlyExcusedInput.value = 'false';
+        if (absenceExcusedInput) absenceExcusedInput.value = 'false';
+        updateLateMissingMinuteState(row);
+    }
+
+    function syncRosterDetailsButtonFromRow(row) {
+        if (!row) return;
+        const btn = row.querySelector('.btn-details');
+        if (!btn) return;
+        const icon = btn.querySelector('i');
+        const personId = row.getAttribute('data-personid');
+        const details = personId ? getAttendanceDetails(personId) : null;
+        const excuseVal = String(row.querySelector('.att-excuse')?.value || '').trim();
+        const lateExcusedInput = row.querySelector('.att-late-excused');
+        const earlyExcusedInput = row.querySelector('.att-early-excused');
+        const absenceExcusedInput = row.querySelector('.att-absence-excused');
+        const excuseAttachment = details?.excuseAttachment || null;
+        const hasComments = (details?.comments || []).length > 0;
+        const hasTimingExcuse = lateExcusedInput?.value === 'true' || earlyExcusedInput?.value === 'true';
+        const hasAbsenceExcuse = absenceExcusedInput?.value === 'true';
+        const hasLateMinutes = parseNonNegAttendanceMins(row.querySelector('.att-late')?.value) > 0;
+        const hasEarlyMinutes = parseNonNegAttendanceMins(row.querySelector('.att-leave')?.value) > 0;
+        const showYellow = hasLateMinutes || hasEarlyMinutes || excuseVal || excuseAttachment || hasComments || hasTimingExcuse || hasAbsenceExcuse;
+        if (showYellow) {
+            btn.className = 'btn btn-sm btn-details btn-warning text-dark';
+            if (icon) icon.className = 'bi bi-sticky-fill';
+        } else {
+            btn.className = 'btn btn-sm btn-details btn-outline-secondary';
+            if (icon) icon.className = 'bi bi-three-dots';
+        }
+    }
+
+    function refreshDetailsModalFromRosterRow(row, personId) {
+        if (!row || !personId) return;
+        modalLateExcused = false;
+        modalEarlyLeaveExcused = false;
+        modalAbsenceExcused = false;
+        const excuseRefEl = document.getElementById('modalExcuseRef');
+        if (excuseRefEl) excuseRefEl.value = row.querySelector('.att-excuse')?.value || '';
+        updateAttendanceTimingSessionLabel();
+        initAttendanceTimingFromSavedDetail(row);
+        recalculateAttendanceTimingTotals();
+        syncModalTimingExcuseControls();
+        syncModalAbsenceExcuseControls();
+    }
+
+    function resetBulkAttendance() {
+        document.querySelectorAll('.roster-row').forEach((row) => resetAttendanceForRosterRow(row));
     }
 
     /* --- Session content stream (manual content) --- */
@@ -11456,6 +11543,8 @@ function openDetailsModal(personId, name) {
     if (modalExcuseRef) modalExcuseRef.disabled = timingDisabled;
     const modalExcuseFile = document.getElementById('modalExcuseFile');
     if (modalExcuseFile) modalExcuseFile.disabled = timingDisabled;
+    const resetStudentAttendanceBtn = document.getElementById('btnResetStudentAttendance');
+    if (resetStudentAttendanceBtn) resetStudentAttendanceBtn.disabled = timingDisabled;
     if (row) {
         const savedLate = row.querySelector('.att-late')?.value || '';
         const savedEarly = row.querySelector('.att-leave')?.value || '';
