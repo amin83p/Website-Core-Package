@@ -7,6 +7,8 @@
     return;
   }
 
+  const DEFAULT_STAGE_WEEKDAYS = [1, 2, 3, 4];
+
   const PRESET_LABELS = {
     day: 'Day',
     week: 'Week',
@@ -1823,6 +1825,28 @@
     });
   }
 
+  function getStagedSessionIdsForAttempt(attemptId, anchorSessionId = '', classId = '') {
+    if (!state) return [];
+    const rows = Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate : [];
+    const normalizedAttemptId = String(attemptId || '').trim();
+    const anchorId = String(anchorSessionId || '').trim();
+    if (normalizedAttemptId) {
+      return rows
+        .filter((row) => String(row?.stagingAttemptId || '').trim() === normalizedAttemptId)
+        .map((row) => String(row?.sessionId || '').trim())
+        .filter(Boolean);
+    }
+    const batches = getStagingAttempts(classId);
+    const batch = batches.find((row) => (row?.sessionIds || []).some((sid) => String(sid || '').trim() === anchorId));
+    if (batch) {
+      const idSet = new Set((batch.sessionIds || []).map((sid) => String(sid || '').trim()).filter(Boolean));
+      return rows
+        .map((row) => String(row?.sessionId || '').trim())
+        .filter((id) => id && idSet.has(id));
+    }
+    return anchorId ? [anchorId] : [];
+  }
+
   function removePartialStagedAttempt(attemptId) {
     const id = String(attemptId || '').trim();
     if (!state || !id) return;
@@ -2561,8 +2585,7 @@
     bindStageModalEvents();
     stageDurationHours = 1;
     stageSessionCount = 4;
-    const anchorDow = new Date(`${context.date}T12:00:00`).getDay();
-    stageWeekdays = new Set([anchorDow]);
+    stageWeekdays = new Set(DEFAULT_STAGE_WEEKDAYS);
 
     const contextEl = qs('sessionEnrollmentStageContext');
     if (contextEl) {
@@ -2584,7 +2607,7 @@
     }
     syncStageCountDisplay(4);
     const skipEl = stageModalEl?.querySelector('#sessionEnrollmentStageSkipHolidays');
-    if (skipEl) skipEl.checked = false;
+    if (skipEl) skipEl.checked = true;
     const holidayHint = qs('sessionEnrollmentStageHolidayHint');
     if (holidayHint) {
       holidayHint.classList.add('d-none');
@@ -3702,6 +3725,8 @@
     buildPartialPickerData,
     collectHolidayDatesForRange,
     syncFromParentDrafts,
+    getStagedSessionIdsForAttempt,
+    refreshPartialPickerFromState,
     getStagingAttempts,
     deleteStagedSession,
     deleteSelectedStagedSessions,

@@ -1774,7 +1774,10 @@ async function buildEventsForPersonAndRange({
         markOverlappingEvents(events);
     }
 
-    return { events, personName, personOrgRoles, allStudents, allTeachers, person };
+    const classIdsWithSessionsInRange = collectClassIdsWithSessionsInEvents(events);
+    const activeClasses = buildActiveClassesForSchedulePerson(classMap, classIdsWithSessionsInRange);
+
+    return { events, personName, personOrgRoles, allStudents, allTeachers, person, activeClasses };
 }
 
 async function buildPersonScheduleEventsForSessions({
@@ -2100,7 +2103,18 @@ async function getPersonSchedule(req, res) {
             return mapped;
         });
 
-        res.json({ status: 'success', events, statusMeta, viewerScheduleAccess, availableRoles, selectedRole: effectiveRole, fingerprint });
+        const activeClasses = Array.isArray(personResult?.activeClasses) ? personResult.activeClasses : [];
+
+        res.json({
+            status: 'success',
+            events,
+            statusMeta,
+            viewerScheduleAccess,
+            availableRoles,
+            selectedRole: effectiveRole,
+            fingerprint,
+            activeClasses
+        });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
     }
@@ -2356,6 +2370,31 @@ function buildScheduleClassPickerItem(classRow = {}) {
         departmentName: String(classRow?.deliveryDepartmentName || '').trim(),
         registrationMode: String(classRow?.registrationMode || '').trim()
     };
+}
+
+function collectClassIdsWithSessionsInEvents(events = []) {
+    const ids = new Set();
+    (Array.isArray(events) ? events : []).forEach((event) => {
+        if (String(event?.eventType || '').trim() !== 'class_session') return;
+        const classId = normalizeId(event?.classId);
+        if (classId) ids.add(classId);
+    });
+    return ids;
+}
+
+function buildActiveClassesForSchedulePerson(classMap = new Map(), candidateClassIds = new Set()) {
+    const items = [];
+    const ids = candidateClassIds instanceof Set ? [...candidateClassIds] : (Array.isArray(candidateClassIds) ? candidateClassIds : []);
+    ids.forEach((classId) => {
+        const normalizedId = normalizeId(classId);
+        if (!normalizedId) return;
+        const row = classMap.get(normalizedId);
+        if (!row || !isActiveClassForSchedulePicker(row)) return;
+        const item = buildScheduleClassPickerItem(row);
+        if (item.id) items.push(item);
+    });
+    items.sort((a, b) => String(a.title || a.id).localeCompare(String(b.title || b.id), undefined, { sensitivity: 'base' }));
+    return items;
 }
 
 async function listInstructorClassesForSchedule(req, res) {
@@ -2751,6 +2790,9 @@ module.exports = {
     doesScheduleEventCountTowardHours,
     doesScheduleEventBlockConflicts,
     markOverlappingEvents,
-    isAllowedMergedSessionOverlap
+    isAllowedMergedSessionOverlap,
+    buildActiveClassesForSchedulePerson,
+    collectClassIdsWithSessionsInEvents,
+    isActiveClassForSchedulePicker
 };
 

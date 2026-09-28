@@ -20,6 +20,8 @@ test('scheduleAccessService centralizes admin and scope capability checks', () =
   assert.match(service, /accessService\.evaluateAccess/);
   assert.match(service, /buildSchoolListScope/);
   assert.match(service, /canSelectAnyPerson = isOperationAdmin/);
+  assert.match(service, /canOpenRollingEnrollment/);
+  assert.match(service, /SCHOOL_ROLLING_ENROLLMENT/);
 });
 
 test('my schedule admin viewer resolves section admin via async authority', () => {
@@ -29,6 +31,12 @@ test('my schedule admin viewer resolves section admin via async authority', () =
   assert.match(adminService, /isAdminForRequestAsync\(user, SECTIONS\.SCHOOL_SCHEDULES, OPERATIONS\.READ_ALL\)/);
   assert.match(controller, /isSchedulesAdminViewerAsync/);
   assert.match(controller, /await isScheduleAdminViewer\(req\.user\)/);
+});
+
+test('person schedule API returns activeClasses from buildEventsForPersonAndRange', () => {
+  const controller = read('MVC/controllers/school/scheduleController.js');
+  assert.match(controller, /buildActiveClassesForSchedulePerson/);
+  assert.match(controller, /activeClasses/);
 });
 
 test('schedule controller uses scheduleAccessService and scoped repository reads', () => {

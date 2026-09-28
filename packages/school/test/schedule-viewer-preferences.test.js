@@ -341,3 +341,50 @@ test('commit staged sessions and bulk delete update state without reloading sche
   assert.match(bulkDeleteBlock, /acknowledgeLocalScheduleMutation/);
   assert.doesNotMatch(bulkDeleteBlock, /loadSchedulePerson/);
 });
+
+test('Master Schedule Viewer loads holidays for the active date range', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(source, /syncScheduleHolidayDates/);
+  assert.match(source, /holidayDates:\s*getScheduleHolidayDatesForRender\(\)/);
+  assert.match(source, /isScheduleHolidayDate\(dateStr\)/);
+  assert.match(source, /collectHolidayDatesForRange/);
+});
+
+test('Master Schedule Viewer active class filter chip is wired in personSchedule', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(source, /activeClassFilterId/);
+  assert.match(source, /buildScheduleActiveClassChipHtml/);
+  assert.match(source, /isScheduleEventInActiveClassFocus/);
+  assert.match(source, /result\.activeClasses/);
+  assert.match(source, /is-schedule-class-filter-muted/);
+  assert.match(source, /resolveScheduleStageClassFromActiveFilter/);
+  assert.match(source, /syncScheduleActiveClassChipAfterStaging/);
+  assert.doesNotMatch(source, /!classes\.length \|\| !scheduleState\.loadedPersonIds/);
+});
+
+test('Master Schedule Viewer session context menu opens rolling enrollment', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(source, /btn_scheduleSessionContextRollingEnrollment/);
+  assert.match(source, /schedule-session-context-header-link/);
+  assert.match(source, /Rolling Enrollment/);
+  assert.match(source, /Manage Session/);
+  assert.match(source, /bi-box-arrow-up-right/);
+  assert.match(source, /scheduleSessionContextMenuTitle/);
+  assert.match(source, /buildRollingEnrollmentUrlForClass/);
+  assert.match(source, /rolling-enrollment/);
+  assert.match(source, /canOpenRollingEnrollment/);
+  assert.doesNotMatch(source, /schedule-session-context-action.*btn_scheduleSessionContextRollingEnrollment/);
+  assert.doesNotMatch(source, /schedule-session-context-action.*btn_scheduleSessionContextOpenSession/);
+});
+
+test('Master Schedule Viewer session context menu shows status chip with picker', () => {
+  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(source, /scheduleSessionContextStatusChip/);
+  assert.match(source, /scheduleSessionContextStatusPicker/);
+  assert.match(source, /closeScheduleSessionContextStatusPicker/);
+  assert.match(source, /isScheduleSessionContextStatusItemActionable/);
+  assert.match(source, /schedule-session-context-status-chip-toggle/);
+  const css = read('public/styles/session-calendar.css');
+  assert.match(css, /\.schedule-session-context-status-chip-toggle/);
+  assert.match(css, /flex-direction: row/);
+});

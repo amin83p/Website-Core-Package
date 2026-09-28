@@ -135,6 +135,19 @@ async function evaluateScheduleOperation(reqUser, operationId, ipAddress = '') {
   }
 }
 
+async function evaluateRollingEnrollmentOperation(reqUser, operationId, ipAddress = '') {
+  try {
+    return await accessService.evaluateAccess({
+      user: reqUser,
+      sectionId: SECTIONS.SCHOOL_ROLLING_ENROLLMENT,
+      operationId,
+      ipAddress
+    });
+  } catch (_) {
+    return { allowed: false, scopeId: '' };
+  }
+}
+
 function resolveAccessContext(options = {}) {
   const scopeId = String(
     options?.accessScope
@@ -155,9 +168,10 @@ async function buildScheduleCapabilities(reqUser = {}, options = {}) {
   const orgContext = buildOrgContext(reqUser);
   const activeOrgId = getActiveScheduleOrgId(reqUser);
 
-  const [readEval, readAllEval] = await Promise.all([
+  const [readEval, readAllEval, rollingEnrollmentReadAllEval] = await Promise.all([
     evaluateScheduleOperation(reqUser, OPERATIONS.READ, ipAddress),
-    evaluateScheduleOperation(reqUser, OPERATIONS.READ_ALL, ipAddress)
+    evaluateScheduleOperation(reqUser, OPERATIONS.READ_ALL, ipAddress),
+    evaluateRollingEnrollmentOperation(reqUser, OPERATIONS.READ_ALL, ipAddress)
   ]);
 
   const scopeId = String(
@@ -197,6 +211,7 @@ async function buildScheduleCapabilities(reqUser = {}, options = {}) {
   const canUseGlobalComparison = isOperationAdmin;
   const canDragCreateSessions = isOperationAdmin;
   const canLoadAllSchedules = isOperationAdmin;
+  const canOpenRollingEnrollment = Boolean(rollingEnrollmentReadAllEval?.allowed);
 
   const locked = canSelectAnyPerson
     ? {
@@ -222,6 +237,7 @@ async function buildScheduleCapabilities(reqUser = {}, options = {}) {
     canDragCreateSessions,
     canLoadAllSchedules,
     canDeleteClassSessions,
+    canOpenRollingEnrollment,
     activeOrgId,
     ...locked
   };
