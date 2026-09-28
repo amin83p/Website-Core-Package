@@ -159,6 +159,19 @@ const domainOpsService = {
 
   async updateWebsitePolicy(updates, requestingUser) {
     const websitePolicyCacheService = require('../cache/websitePolicyCacheService');
+    const dataBackendRuntimeService = require('../dataBackendRuntimeService');
+    const { resolveDataBackendConfig } = require('../../../config/dataBackend');
+    const { getActiveDataBackendMode } = require('../../infrastructure/runtime/dataBackendRuntime');
+
+    await dataBackendRuntimeService.syncActiveDataBackendForRepositoryAccess({ force: true });
+    const requestedMode = resolveDataBackendConfig(process.env).mode;
+    const activeMode = getActiveDataBackendMode();
+    if (requestedMode === 'mongo' && activeMode !== 'mongo') {
+      throw new Error(
+        'Website policy was not saved: MongoDB is the configured backend but the app is in JSON recovery mode. Restore Mongo connectivity, then save again.'
+      );
+    }
+
     const updated = await websitePolicyRepository.updatePolicy(updates, requestingUser);
     websitePolicyCacheService.invalidateWebsitePolicyCache();
     return updated;

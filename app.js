@@ -983,6 +983,10 @@ async function startServer() {
     dataBackendRuntimeService.setBackendChangeListener((config) => {
       registerCoreEntityQueryExecutors({ backendMode: config.mode });
       app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
+      try {
+        const websitePolicyCacheService = require('./MVC/services/cache/websitePolicyCacheService');
+        websitePolicyCacheService.clearWebsitePolicyCache();
+      } catch (_) { /* ignore during tests */ }
     });
     if (sessionStore && typeof sessionStore.ensureIndexes === 'function') {
       await sessionStore.ensureIndexes();
