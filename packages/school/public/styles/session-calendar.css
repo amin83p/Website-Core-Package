@@ -1318,7 +1318,7 @@
 .session-enrollment-stage-overlay.session-enrollment-stage-standalone {
   position: fixed;
   inset: 0;
-  z-index: 1060;
+  z-index: 1100;
 }
 
 .session-enrollment-stage-backdrop {

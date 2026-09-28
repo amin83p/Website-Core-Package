@@ -58,7 +58,7 @@ test('personSchedule includes stage modal and drag-create binding', () => {
 test('session-calendar.css defines full-viewport standalone stage overlay', () => {
   const source = read('public/styles/session-calendar.css');
   assert.match(source, /\.session-enrollment-stage-overlay\.session-enrollment-stage-standalone[\s\S]*position:\s*fixed/s);
-  assert.match(source, /\.session-enrollment-stage-overlay\.session-enrollment-stage-standalone[\s\S]*z-index:\s*1060/s);
+  assert.match(source, /\.session-enrollment-stage-overlay\.session-enrollment-stage-standalone[\s\S]*z-index:\s*1100/s);
 });
 
 test('personSchedule wires last-loaded refresh chip and stale detection', () => {

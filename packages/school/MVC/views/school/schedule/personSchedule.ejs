@@ -768,10 +768,12 @@
         box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
         transition: top 0.2s ease;
     }
-    body.modal-open #scheduleContainer .schedule-viewbar-sticky,
     body.schedule-stage-overlay-open #scheduleContainer .schedule-viewbar-sticky {
-        z-index: 1;
-        visibility: hidden;
+        z-index: 2;
+        pointer-events: none;
+    }
+    body.modal-open #scheduleContainer .schedule-viewbar-sticky {
+        z-index: 2;
         pointer-events: none;
     }
     .schedule-toolbar-hours {
