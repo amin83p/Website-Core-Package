@@ -145,6 +145,32 @@ function resolvePersonId(period = {}) {
   return '';
 }
 
+function formatAttendanceLabelForHoldBlocker(attendance = '') {
+  const key = String(attendance || '').trim().toLowerCase();
+  const labels = {
+    present: 'Present',
+    late: 'Late',
+    absent: 'Absent',
+    acf: 'ACF',
+    not_applicable: 'N/A',
+    excused: 'Excused'
+  };
+  return labels[key] || String(attendance || '').trim() || 'Recorded';
+}
+
+function buildHoldBlockerMessage(row = {}) {
+  const date = String(row.date || '').trim();
+  const attendanceLabel = formatAttendanceLabelForHoldBlocker(row.attendance);
+  let message = date
+    ? `Session on ${date} already has attendance recorded (${attendanceLabel}).`
+    : `This session already has attendance recorded (${attendanceLabel}).`;
+  const note = String(row.notes || '').trim();
+  if (note) {
+    message += ` Note: ${note}`;
+  }
+  return message;
+}
+
 function buildPreviewResult(period, sessions, startDate, endDate) {
   const personId = resolvePersonId(period);
   if (!personId) throw new Error('Enrollment period is missing a student person reference.');
@@ -156,7 +182,7 @@ function buildPreviewResult(period, sessions, startDate, endDate) {
       sessionId: row.sessionId,
       date: row.date,
       attendance: row.attendance,
-      message: `Session on ${row.date} already has attendance recorded (${row.attendance}).`
+      message: buildHoldBlockerMessage(row)
     }));
   return {
     periodId: period.id,

@@ -67,16 +67,20 @@ function buildMocks({ sessions = [], period = null, holds = [] } = {}) {
   };
 }
 
-function session(sessionId, date, attendance = '') {
+function session(sessionId, date, attendance = '', notes = '') {
+  const rosterRow = {};
+  if (attendance || notes) {
+    rosterRow.personId = personId;
+    if (attendance) rosterRow.attendance = attendance;
+    if (notes) rosterRow.notes = notes;
+  }
   return {
     id: sessionId,
     date,
     startTime: '09:00',
     endTime: '10:00',
     status: 'completed',
-    roster: attendance
-      ? [{ personId, attendance }]
-      : []
+    roster: rosterRow.personId ? [rosterRow] : []
   };
 }
 
@@ -136,6 +140,28 @@ test('applyHoldPeriod adds roster row with not_applicable and note when student 
     assert.equal(rosterRow.notes, 'Temporary pause');
     assert.equal(result.hold.sessionIds.length, 1);
     assert.equal(mocks.periodRow.enrollmentHoldPeriods.length, 1);
+  } finally {
+    holdService.__resetDependenciesForTest();
+  }
+});
+
+test('previewHoldPeriod blocker message uses friendly attendance label and roster note', async () => {
+  const mocks = buildMocks({
+    sessions: [
+      session('S1', '2026-01-15', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT, 'Doctor appointment')
+    ]
+  });
+  holdService.__setDependenciesForTest({ repositories: mocks.repositories });
+  try {
+    const preview = await holdService.previewHoldPeriod(periodId, {
+      startDate: '2026-01-10',
+      endDate: '2026-01-20',
+      reason: 'Family travel'
+    });
+    assert.equal(preview.blockers.length, 1);
+    assert.match(preview.blockers[0].message, /Present/);
+    assert.match(preview.blockers[0].message, /Doctor appointment/);
+    assert.equal(preview.canApply, false);
   } finally {
     holdService.__resetDependenciesForTest();
   }
@@ -368,6 +394,20 @@ test('session enrollment calendar supports on-hold preview whole-cycle view', ()
   assert.match(calendarSource, /isManageLikeMode\(\)/);
   assert.match(calendarSource, /enrollmentOnHoldPreview/);
   assert.match(calendarSource, /wholeCycle/);
+});
+
+test('session enrollment calendar surfaces on-hold blocker messages on conflict tiles', () => {
+  const calendarSource = fs.readFileSync(
+    path.join(__dirname, '../public/scripts/sessionEnrollmentCalendarModal.js'),
+    'utf8'
+  );
+  assert.match(calendarSource, /holdBlockerBySessionId/);
+  assert.match(calendarSource, /function resolveHoldBlockerDetail\(/);
+  assert.match(calendarSource, /function resolveHoldBlockerMessage\(/);
+  assert.match(calendarSource, /options\.holdBlockers/);
+  assert.match(calendarSource, /is-hold-blocker-reason/);
+  assert.match(calendarSource, /naState === 'blocked'/);
+  assert.match(viewSource, /holdBlockers:\s*Array\.isArray\(blockers\)/);
 });
 
 test('edit enrollment modal uses modal-xl layout', () => {

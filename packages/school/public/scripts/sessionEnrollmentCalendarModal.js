@@ -79,6 +79,22 @@
     return state.holdPreviewKind === 'applied' ? 'saved' : 'projected';
   }
 
+  function resolveHoldBlockerDetail(sessionId) {
+    const id = String(sessionId || '').trim();
+    if (!id || !state?.holdBlockerBySessionId) return null;
+    return state.holdBlockerBySessionId.get(id) || null;
+  }
+
+  function resolveHoldBlockerMessage(sessionId, ev = {}) {
+    const detail = resolveHoldBlockerDetail(sessionId);
+    if (detail?.message) return String(detail.message).trim();
+    const attendance = formatManageAttendanceLabel(ev?.attendance || detail?.attendance);
+    if (attendance) {
+      return `Already marked (${attendance}). Clear attendance on Manage Session before applying on-hold.`;
+    }
+    return 'Attendance already recorded. Clear it on Manage Session before applying on-hold.';
+  }
+
   function annotateOnHoldPreviewEvents() {
     if (!isOnHoldPreviewMode() || !Array.isArray(allEvents)) return;
     allEvents.forEach((ev) => {
@@ -454,7 +470,7 @@
       + '<div class="session-enrollment-legend-items">'
       +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Other enrollment session</span></div>'
       +   `<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch ${kind === 'applied' ? 'is-na-saved' : 'is-na-projected'}" aria-hidden="true"></span><span>${projectedLabel}</span></div>`
-      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-blocked" aria-hidden="true"></span><span>Attendance conflict (cannot apply)</span></div>'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-blocked" aria-hidden="true"></span><span>Attendance conflict (marked — see session for reason)</span></div>'
       + '</div>';
   }
 
@@ -689,6 +705,10 @@
   }
 
   function buildManageSessionMetaLine(ev = {}, naState = 'normal') {
+    if (naState === 'blocked') {
+      const sessionId = String(ev?.sessionId || '').trim();
+      return resolveHoldBlockerMessage(sessionId, ev);
+    }
     const parts = [];
     const attendance = formatManageAttendanceLabel(ev?.attendance);
     if (naState === 'normal' && attendance) parts.push(attendance);
@@ -698,7 +718,7 @@
 
   function buildManageNaHeadHtml(naState) {
     if (naState === 'blocked') {
-      return '<div class="session-manage-na-head is-blocked" style="color:#842029;font-weight:800;font-size:0.68rem;line-height:1.1;">Conflict</div>';
+      return '<div class="session-manage-na-head is-blocked">Conflict</div>';
     }
     if (naState === 'projected') {
       return '<div class="session-manage-na-head is-projected" style="color:#664d03;font-weight:800;font-size:0.68rem;line-height:1.1;">N/A · projected</div>';
@@ -757,6 +777,9 @@
     const inlineStyle = buildManageBlockInlineStyle(naState, attendance);
     const timeLabel = buildManageSessionTimeLabel(ev);
     const metaLabel = buildManageSessionMetaLine(ev, naState);
+    const metaClass = naState === 'blocked' ? 'session-block-meta is-hold-blocker-reason' : 'session-block-meta';
+    const blockerTitle = naState === 'blocked' ? resolveHoldBlockerMessage(sessionId, ev) : '';
+    const titleAttr = blockerTitle ? ` title="${core.escapeHtml(blockerTitle)}"` : '';
     const selectableAttr = isOnHoldPreviewMode() ? '0' : '1';
     return `
       <div class="${classes}"
@@ -768,16 +791,20 @@
            data-na-state="${core.escapeHtml(naState)}"
            role="button"
            aria-selected="false"
-           tabindex="0">
+           tabindex="0"${titleAttr}>
         ${buildManageNaHeadHtml(naState)}
         <div class="session-block-time" style="font-weight:600;font-size:0.72rem;line-height:1.2;font-variant-numeric:tabular-nums;">${core.escapeHtml(timeLabel)}</div>
-        <div class="session-block-meta" style="font-size:0.64rem;color:#5c636a;line-height:1.2;">${core.escapeHtml(metaLabel)}</div>
+        <div class="${metaClass}" style="font-size:0.64rem;color:#5c636a;line-height:1.2;">${core.escapeHtml(metaLabel)}</div>
       </div>
     `;
   }
 
-  function buildManageListChipHtml(naState, attendance = '') {
-    if (naState === 'blocked') return '<span class="session-manage-chip is-blocked">Conflict</span>';
+  function buildManageListChipHtml(naState, attendance = '', sessionId = '') {
+    if (naState === 'blocked') {
+      const message = resolveHoldBlockerMessage(sessionId, { attendance });
+      const shortLabel = formatManageAttendanceLabel(attendance) || 'marked';
+      return `<span class="session-manage-chip is-blocked" title="${core.escapeHtml(message)}">Conflict · ${core.escapeHtml(shortLabel)}</span>`;
+    }
     if (naState === 'projected') return '<span class="session-manage-chip is-na-projected">N/A · projected</span>';
     if (naState === 'saved') return '<span class="session-manage-chip is-na-saved">N/A</span>';
     if (naState === 'pending') return '<span class="session-manage-chip is-na-pending">N/A · pending</span>';
@@ -806,17 +833,20 @@
     ].filter(Boolean).join(' ');
     const timeLabel = buildManageSessionTimeLabel(ev);
     const metaLabel = buildManageSessionMetaLine(ev, naState);
-    const chipHtml = buildManageListChipHtml(naState, attendance);
+    const metaClass = naState === 'blocked' ? 'small is-hold-blocker-reason' : 'small text-muted';
+    const chipHtml = buildManageListChipHtml(naState, attendance, sessionId);
     const inlineStyle = buildManageBlockInlineStyle(naState, attendance);
+    const blockerTitle = naState === 'blocked' ? resolveHoldBlockerMessage(sessionId, ev) : '';
+    const titleAttr = blockerTitle ? ` title="${core.escapeHtml(blockerTitle)}"` : '';
     const selectableAttr = isOnHoldPreviewMode() ? '0' : '1';
     return `
-      <div class="${classes}" style="${inlineStyle}" data-session-id="${core.escapeHtml(sessionId)}" data-selectable="${selectableAttr}" data-session-kind="scheduled" data-na-marked="${naState !== 'normal' ? '1' : '0'}" data-na-state="${core.escapeHtml(naState)}" role="button" aria-selected="false">
+      <div class="${classes}" style="${inlineStyle}" data-session-id="${core.escapeHtml(sessionId)}" data-selectable="${selectableAttr}" data-session-kind="scheduled" data-na-marked="${naState !== 'normal' ? '1' : '0'}" data-na-state="${core.escapeHtml(naState)}" role="button" aria-selected="false"${titleAttr}>
         <div class="flex-grow-1">
           <div class="d-flex align-items-center gap-2 mb-1">
             ${chipHtml}
             <div class="fw-semibold session-manage-list-time">${core.escapeHtml(timeLabel)}</div>
           </div>
-          <div class="small text-muted">${core.escapeHtml(metaLabel)}</div>
+          <div class="${metaClass}">${core.escapeHtml(metaLabel)}</div>
         </div>
       </div>
     `;
@@ -3654,6 +3684,19 @@
           .map((id) => String(id || '').trim())
           .filter(Boolean)
       ),
+      holdBlockerBySessionId: (() => {
+        const map = new Map();
+        (Array.isArray(options.holdBlockers) ? options.holdBlockers : []).forEach((row) => {
+          const id = String(row?.sessionId || '').trim();
+          if (!id) return;
+          map.set(id, {
+            message: String(row?.message || '').trim(),
+            attendance: String(row?.attendance || '').trim(),
+            date: String(row?.date || '').trim()
+          });
+        });
+        return map;
+      })(),
       holdPreviewKind: String(options.previewKind || 'projected').trim()
     };
 

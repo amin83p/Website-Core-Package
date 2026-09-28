@@ -784,6 +784,20 @@
   color: #997404;
 }
 
+.session-manage-na-head.is-blocked {
+  color: #842029;
+}
+
+.session-block-meta.is-hold-blocker-reason,
+.is-hold-blocker-reason {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  color: #842029 !important;
+  line-height: 1.25;
+  white-space: normal;
+}
+
 .session-enrollment-block.session-manage-block .session-block-time {
   font-weight: 600;
   font-size: 0.72rem;

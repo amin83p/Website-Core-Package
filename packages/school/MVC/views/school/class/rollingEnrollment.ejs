@@ -13005,6 +13005,7 @@
       anchorDate: String(anchorDate || qs('onHold_startDate')?.value || row?.startDate || '').trim(),
       previewSessionIds,
       blockerSessionIds,
+      holdBlockers: Array.isArray(blockers) ? blockers : [],
       previewKind,
       requestJson
     });
