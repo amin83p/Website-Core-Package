@@ -1541,6 +1541,7 @@
 </div>
 
 <script src="/scripts/manualSessionIdHelper.js"></script>
+<script src="/scripts/timesheetDisplayComposer.js"></script>
 <script>
     const P_START = "<%= period.startDate %>";
     const P_END = "<%= period.endDate %>";
@@ -1706,6 +1707,9 @@
     const MAX_SESSION_HOURS = <%= maxSessionHours || 12 %>;
     const PAYROLL_ROLES = <%- JSON.stringify(typeof payrollRoles !== 'undefined' ? payrollRoles : []) %>;
     const PAYROLL_DEFAULT_ROLE = "<%= typeof payrollDefaultRole !== 'undefined' ? payrollDefaultRole : 'teacher' %>";
+    const TIMESHEET_DISPLAY_POLICY = <%- JSON.stringify(typeof timesheetDisplayPolicy !== 'undefined' ? timesheetDisplayPolicy : {}) %>;
+    const TIMESHEET_DEPARTMENTS = <%- JSON.stringify(typeof timesheetDepartments !== 'undefined' ? timesheetDepartments : []) %>;
+    const TIMESHEET_ACTIVE_ORG_ID = <%- JSON.stringify(String(activeOrgId || user?.activeOrgId || '').trim()) %>;
     const PAYROLL_WARNINGS = <%- JSON.stringify(typeof payrollWarnings !== 'undefined' ? payrollWarnings : []) %>;
     const TIMESHEET_GUIDANCE_BOOT = <%- JSON.stringify({
       isReadOnly: pageIsReadOnly,
@@ -4978,7 +4982,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return details.join('\n');
     }
 
+    function buildTimesheetDisplayComposeContext(extra) {
+        const map = new Map();
+        (Array.isArray(TIMESHEET_DEPARTMENTS) ? TIMESHEET_DEPARTMENTS : []).forEach((row) => {
+            const id = String(row?.id || '').trim();
+            if (id) map.set(id, row);
+        });
+        return {
+            ...(extra || {}),
+            departmentMap: map,
+            orgDepartments: TIMESHEET_DEPARTMENTS,
+            orgId: TIMESHEET_ACTIVE_ORG_ID
+        };
+    }
+
     function buildClassDescriptionCellHtml(entry) {
+        const composeCtx = buildTimesheetDisplayComposeContext({ escapeHtmlFn: escapeHtml });
+        const composed = (window.TimesheetDisplayComposer && typeof window.TimesheetDisplayComposer.composeTimesheetRowDisplay === 'function')
+            ? window.TimesheetDisplayComposer.composeTimesheetRowDisplay(
+                entry,
+                TIMESHEET_DISPLAY_POLICY,
+                composeCtx
+            )
+            : null;
         const departmentCode = String(entry?.deliveryDepartmentCode || entry?.departmentCode || '').trim();
         const fallback = String(
             entry?.description
@@ -4990,9 +5016,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const oneOnOneBadge = isDepartmentOneOnOneEntry(entry)
             ? '<span class="badge rounded-pill ts-one-on-one-badge">One on One</span>'
             : '';
-        const primaryContent = departmentCode
-            ? `<span class="ts-department-code">${escapeHtml(departmentCode)}</span>${oneOnOneBadge}`
-            : `<span class="ts-class-fallback">${escapeHtml(fallback)}</span>`;
+        const primaryContent = composed?.primaryHtml
+            ? `<span class="ts-class-composed">${composed.primaryHtml}</span>${oneOnOneBadge}`
+            : (departmentCode
+                ? `<span class="ts-department-code">${escapeHtml(departmentCode)}</span>${oneOnOneBadge}`
+                : `<span class="ts-class-fallback">${escapeHtml(fallback)}</span>`);
         const href = buildTimesheetEntryManagerHref(entry);
         const tooltip = href ? buildTimesheetEntryTooltip(entry) : '';
         const managerLabel = isTimesheetActivityEntry(entry) ? 'Open Manage Work Session' : 'Open Manage Session';
@@ -5006,6 +5034,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (entry?.isPriorPeriodAdjustment === true) {
             const referenceDate = String(entry?.adjustmentMeta?.sourceSessionDate || entry?.date || '').trim();
             return `<div class="ts-time-label mt-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Prior period correction${referenceDate ? `<span class="ms-1">Ref: ${escapeHtml(referenceDate)}</span>` : ''}</div>`;
+        }
+        const composed = (window.TimesheetDisplayComposer && typeof window.TimesheetDisplayComposer.composeTimesheetRowDisplay === 'function')
+            ? window.TimesheetDisplayComposer.composeTimesheetRowDisplay(
+                entry,
+                TIMESHEET_DISPLAY_POLICY,
+                buildTimesheetDisplayComposeContext({ escapeHtmlFn: escapeHtml })
+            )
+            : null;
+        if (composed?.showTimeRow && composed.timeRowHtml) {
+            return `<div class="ts-time-label mt-1"><i class="bi bi-clock me-1"></i>${composed.timeRowHtml}</div>`;
+        }
+        if (composed && !composed.showTimeRow) {
+            return '';
         }
         const startTime = String(entry?.startTime || '').trim();
         const endTime = String(entry?.endTime || '').trim();

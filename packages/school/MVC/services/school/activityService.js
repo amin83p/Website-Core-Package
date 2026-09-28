@@ -101,6 +101,17 @@ function resolveActivityTimesheetEntryHours(activity = {}, assignee = {}, entry 
     const paidHours = Number(assignee?.paidHours);
     return Number.isFinite(paidHours) && paidHours >= 0 ? Number(paidHours.toFixed(2)) : 0;
   }
+  const hasImportAssigneeTrace = Boolean(
+    normalizeId(assignee?.legacyImportBatchId)
+    || normalizeId(assignee?.legacyImportClassName)
+    || normalizeId(assignee?.legacyImportPersonId)
+  );
+  if (hasImportAssigneeTrace) {
+    const importPaidHours = Number(assignee?.paidHours);
+    return Number.isFinite(importPaidHours) && importPaidHours >= 0
+      ? Number(importPaidHours.toFixed(2))
+      : 0;
+  }
   return Number(assignee?.paidHours || entry?.durationHours || 0);
 }
 
@@ -424,12 +435,16 @@ function normalizeActivityEntry(entry = {}, activity = {}, index = 0) {
   const durationHours = Number(entry.durationHours || calculateDurationHours(startTime, endTime) || 0);
   const entryStatHolidayId = normalizeId(entry.statHolidayId);
   const statHolidayEntry = isStatHolidayActivityEntry(activity, entry);
+  const hasExplicitAssigneeList = Array.isArray(entry.assignees)
+    || (typeof entry.assignees === 'string' && String(entry.assignees).trim() !== '');
   let resolvedAssignees;
   if (assignees.length) {
     resolvedAssignees = statHolidayEntry
       ? resolveStatHolidayActivityEntryAssignees(entry, assignees)
       : assignees;
   } else if (statHolidayEntry || entryStatHolidayId) {
+    resolvedAssignees = [];
+  } else if (hasExplicitAssigneeList) {
     resolvedAssignees = [];
   } else {
     resolvedAssignees = fallbackAssignees.length
@@ -1238,7 +1253,9 @@ async function listManualEntryWorkSessionsForPerson({
 }
 
 async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, periodEndDate, reqUser } = {}) {
-  const activities = await listActivities({ orgId, reqUser });
+  const lookups = await loadActivityLookups(reqUser);
+  const activities = (await listActivitiesForOrg(orgId, reqUser))
+    .map((row) => enrichActivity(row, lookups));
   const targetPersonId = normalizeId(personId);
   const rows = activities.flatMap((activity) => {
     if (normalizeStatus(activity.status) !== 'posted' || activity.paid !== true) return [];
@@ -1268,7 +1285,23 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             attendee?.deliveryDepartmentName || attendee?.departmentName || ''
           ).trim();
           const resolvedDepartmentId = assigneeDepartmentId || activity.departmentId;
-          const resolvedDepartmentName = assigneeDepartmentName || activity.departmentName;
+          const departmentRow = lookups.departmentMap?.get(normalizeId(resolvedDepartmentId));
+          const resolvedDepartmentName = String(
+            departmentRow?.name
+            || departmentRow?.code
+            || assigneeDepartmentName
+            || activity.departmentName
+            || ''
+          ).trim();
+          const resolvedDepartmentCode = String(departmentRow?.code || '').trim();
+          const activityTitle = String(activity.title || '').trim();
+          const workSessionTitle = String(entry.title || '').trim();
+          const workSessionName = workSessionTitle && workSessionTitle !== activityTitle
+            ? workSessionTitle
+            : '';
+          const importedRowContent = importClassName
+            ? (className.includes(importClassName) ? className : `${activityTitle}: ${importClassName}`)
+            : '';
           return {
             sessionId: `act-${activity.id}-${entry.entryId}-${targetPersonId}${sessionIdSuffix}`,
             activityId: activity.id,
@@ -1278,10 +1311,16 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             endTime: timing.endTime || entry.endTime,
             className,
             classId: null,
+            activityName: activityTitle,
+            workSessionName,
+            assigneeNote: String(attendee.notes || '').trim(),
+            importedRowContent,
             deliveryDepartmentId: resolvedDepartmentId,
             deliveryDepartmentName: resolvedDepartmentName,
+            deliveryDepartmentCode: resolvedDepartmentCode,
             departmentId: resolvedDepartmentId,
             departmentName: resolvedDepartmentName,
+            departmentCode: resolvedDepartmentCode,
             categoryName: activity.categoryName,
             visibilityScope: activity.visibilityScope,
             hours,
@@ -1290,7 +1329,10 @@ async function getTimesheetEntriesForPerson({ orgId, personId, periodStartDate, 
             status: rowStatus.statusCode,
             activityEvaluationType: rowStatus.evaluationType,
             activityStatusLabel: rowStatus.statusLabel,
-            comment: entry.notes || activity.notes || '',
+            comment: String(attendee?.legacyImportTimesheetComment || '').trim()
+              || entry.notes
+              || activity.notes
+              || '',
             statHolidayId: normalizeId(entry?.statHolidayId || attendee?.statHolidayId),
             statHolidaySchemeId: normalizeId(entry?.statHolidaySchemeId || attendee?.statHolidaySchemeId) || 'equilibrium_school',
             statHolidayPeriodId: normalizeId(entry?.statHolidayPeriodId || attendee?.statHolidayPeriodId),

@@ -409,6 +409,35 @@ window.GenericPicker = (function() {
         }, delay);
     }
 
+    function syncBootstrapModalStackState() {
+        const openModals = Array.from(document.querySelectorAll('.modal.show'));
+        const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+        if (backdrops.length > openModals.length) {
+            for (let index = backdrops.length - 1; index >= openModals.length; index -= 1) {
+                backdrops[index]?.remove();
+            }
+        }
+        if (!openModals.length) {
+            document.querySelectorAll('.modal-backdrop').forEach((backdrop) => backdrop.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+            return;
+        }
+        document.body.classList.add('modal-open');
+        if (!document.body.style.overflow) {
+            document.body.style.overflow = 'hidden';
+        }
+        openModals.forEach((openModal, index) => {
+            const baseZ = 1050 + (index * 20);
+            openModal.style.setProperty('z-index', String(baseZ + 5), 'important');
+            const backdrop = document.querySelectorAll('.modal-backdrop')[index];
+            if (backdrop) {
+                backdrop.style.setProperty('z-index', String(baseZ), 'important');
+            }
+        });
+    }
+
     function init() {
         if (!inputEl) return;
         inputEl.addEventListener('input', (e) => {
@@ -417,6 +446,7 @@ window.GenericPicker = (function() {
         });
         modalEl.addEventListener('shown.bs.modal', () => {
             inputEl.focus();
+            syncBootstrapModalStackState();
         });
         modalEl.addEventListener('hidden.bs.modal', () => {
             clearSearchDebounce();
@@ -424,18 +454,7 @@ window.GenericPicker = (function() {
             document.querySelectorAll('.modal-backdrop.show').forEach((backdrop) => {
                 backdrop.style.removeProperty('z-index');
             });
-            const openModals = document.querySelectorAll('.modal.show');
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            if (!openModals.length) {
-                backdrops.forEach((backdrop) => backdrop.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('overflow');
-                document.body.style.removeProperty('padding-right');
-            } else if (backdrops.length > openModals.length) {
-                for (let index = backdrops.length - 1; index >= openModals.length; index -= 1) {
-                    backdrops[index]?.remove();
-                }
-            }
+            syncBootstrapModalStackState();
         });
         if (loadMoreBtn) {
             loadMoreBtn.addEventListener('click', () => {

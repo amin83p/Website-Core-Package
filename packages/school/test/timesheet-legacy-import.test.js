@@ -15,6 +15,9 @@ const timesheetManualMaterializationService = require('../MVC/services/school/ti
 const taskService = require('../MVC/services/school/taskService');
 const timesheetImportWorkSessionBuilderService = require('../MVC/services/school/timesheetImportWorkSessionBuilderService');
 const timesheetParametersPolicyModel = require('../MVC/models/school/timesheetParametersPolicyModel');
+const timesheetLiveAssemblyService = require('../MVC/services/school/timesheetLiveAssemblyService');
+const timesheetPayrollContextService = require('../MVC/services/school/timesheetPayrollContextService');
+const statutoryHolidayTimesheetLifecycleService = require('../MVC/services/school/statutoryHolidayTimesheetLifecycleService');
 const statutoryHolidayWorkSessionService = require('../MVC/services/school/statutoryHolidayWorkSessionService');
 const schoolRepositories = require('../MVC/repositories/school');
 const { sanitizeLegacyImport, sanitizeTimesheetPayload } = require('../MVC/models/school/timesheetModel');
@@ -25,7 +28,11 @@ const POLICY = {
   importActivityId: 'ACT_IMPORT',
   allowImportInTimesheetManagement: true,
   allowImportInMyTimesheets: true,
-  importTargetStatus: 'draft'
+  importTargetStatus: 'draft',
+  importBaseStartTime: '00:00',
+  saveImportedSessionsIntoOneWorkSession: true,
+  importWorkSessionStartTime: '07:00',
+  importWorkSessionEndTime: '21:00'
 };
 const ACTIVITY = {
   id: 'ACT_IMPORT',
@@ -55,17 +62,29 @@ function stubLegacyImportApplyDeps({
   const originals = {
     getPolicy: timesheetImportPolicyModel.getPolicyForOrg,
     getActivity: activityService.getActivity,
+    resolveImportActivity: timesheetLegacyImportService.resolveImportActivity,
     getById: dataService.getDataById,
     getTimesheet: dataService.getTimesheetByPeriodAndTeacher,
     addData: dataService.addData,
     updateData: dataService.updateData,
     deleteData: dataService.deleteData,
+    fetchAllData: dataService.fetchAllData,
     purgeRepo: schoolRepositories.timesheets.maintenancePurgeById,
     prepare: timesheetImportLifecycleService.prepareImportTargetPayload,
     finalize: timesheetImportLifecycleService.finalizeImportTargetAfterSave,
     unlock: schoolDependencyService.unlockSourcesForTimesheet,
     revert: timesheetManualMaterializationService.revertMaterializedRecordsForTimesheet,
-    resolveTask: taskService.resolveTimesheetTask
+    resolveTask: taskService.resolveTimesheetTask,
+    cleanupStatHoliday: timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget,
+    preCleanSessions: timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget,
+    trackedCleanSessions: timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod,
+    createSessions: timesheetImportWorkSessionBuilderService.createImportWorkSessions,
+    assemble: timesheetLiveAssemblyService.buildImportedTimesheetEntries,
+    payroll: timesheetPayrollContextService.resolvePayrollPersonContext,
+    getTimesheetParametersPolicy: timesheetParametersPolicyModel.getPolicyForOrg,
+    isStatHolidayPayEnabled: statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled,
+    applyStatHolidayOnTimesheetSubmit: statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit,
+    mergeStatHolidayRowsIntoEntries: statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries
   };
 
   const created = [];
@@ -73,6 +92,59 @@ function stubLegacyImportApplyDeps({
 
   timesheetImportPolicyModel.getPolicyForOrg = async () => POLICY;
   activityService.getActivity = async () => ACTIVITY;
+  timesheetLegacyImportService.resolveImportActivity = async () => ACTIVITY;
+  timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget = async () => ({ removedAssignees: 0 });
+  timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = async () => ({
+    removedEntries: 0,
+    removedAssignees: 0
+  });
+  timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = async () => ({
+    removedEntries: 0,
+    scannedActivities: 0,
+    cleanedActivities: []
+  });
+  timesheetImportWorkSessionBuilderService.createImportWorkSessions = async ({ batchId, compiledRows }) => ({
+    activityId: 'ACT_IMPORT',
+    batchId,
+    createdEntryIds: compiledRows.map((_row, index) => `ENT-${index + 1}`),
+    createdSessionIds: [],
+    rowCount: compiledRows.length
+  });
+  timesheetPayrollContextService.resolvePayrollPersonContext = async () => ({
+    personId: 'PERSON_1',
+    personName: 'Teacher One',
+    orgId: 'ORG_1',
+    roles: ['teacher'],
+    defaultRole: 'teacher',
+    roleRecords: {},
+    warnings: []
+  });
+  timesheetParametersPolicyModel.getPolicyForOrg = async () => ({
+    statutoryHolidayPay: { enabled: false }
+  });
+  dataService.fetchAllData = async (entityType) => (entityType === 'holidays' ? [] : []);
+  statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled = () => false;
+  statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit = async () => ({
+    rows: [],
+    warnings: [],
+    usesActivityMode: true,
+    syncOutcome: null
+  });
+  statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries = ({ entries = [] }) => entries;
+  timesheetLiveAssemblyService.buildImportedTimesheetEntries = async () => ({
+    entries: [{
+      sessionId: 'act-ACT_IMPORT-ENT-1-PERSON_1',
+      date: '2026-03-01',
+      hours: 2,
+      timesheetHours: 2,
+      isManual: false,
+      isSchoolActivity: true
+    }],
+    totalHours: 2,
+    statHolidayWarnings: [],
+    payrollContext: { defaultRole: 'teacher', roles: ['teacher'] },
+    personRole: 'teacher'
+  });
   dataService.getDataById = async (entityType, id) => {
     if (entityType === 'timesheetPeriods') {
       return periods[id] || {
@@ -100,8 +172,16 @@ function stubLegacyImportApplyDeps({
     created.push(saved);
     return saved;
   };
-  dataService.updateData = async () => {
-    throw new Error('updateData should not be called during create-only legacy import apply');
+  dataService.updateData = async (entityType, id, payload) => {
+    if (entityType !== 'timesheets') return payload;
+    if (addShouldFailOnPeriod && payload.periodId === addShouldFailOnPeriod) {
+      throw new Error(`Simulated failure for ${addShouldFailOnPeriod}`);
+    }
+    const saved = { ...payload, id };
+    const index = created.findIndex((row) => row.id === id);
+    if (index >= 0) created[index] = saved;
+    else created.push(saved);
+    return saved;
   };
   dataService.deleteData = async (entityType, id) => {
     const index = created.findIndex((row) => row.id === id);
@@ -128,6 +208,18 @@ function stubLegacyImportApplyDeps({
     restore: () => {
       timesheetImportPolicyModel.getPolicyForOrg = originals.getPolicy;
       activityService.getActivity = originals.getActivity;
+      timesheetLegacyImportService.resolveImportActivity = originals.resolveImportActivity;
+      timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget = originals.cleanupStatHoliday;
+      timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget = originals.preCleanSessions;
+      timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod = originals.trackedCleanSessions;
+      timesheetImportWorkSessionBuilderService.createImportWorkSessions = originals.createSessions;
+      timesheetLiveAssemblyService.buildImportedTimesheetEntries = originals.assemble;
+      timesheetPayrollContextService.resolvePayrollPersonContext = originals.payroll;
+      timesheetParametersPolicyModel.getPolicyForOrg = originals.getTimesheetParametersPolicy;
+      statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled = originals.isStatHolidayPayEnabled;
+      statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit = originals.applyStatHolidayOnTimesheetSubmit;
+      statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries = originals.mergeStatHolidayRowsIntoEntries;
+      dataService.fetchAllData = originals.fetchAllData;
       dataService.getDataById = originals.getById;
       dataService.getTimesheetByPeriodAndTeacher = originals.getTimesheet;
       dataService.addData = originals.addData;
@@ -449,7 +541,32 @@ test('applyLegacyImports skips periods that already have a timesheet', async () 
     assert.equal(outcome.skipped.length, 1);
     assert.equal(outcome.skipped[0].periodId, 'PER_B');
     assert.equal(stub.getCreated().length, 1);
+    assert.equal(stub.getCreated()[0].legacyImport.executionMode, 'activity_first');
   } finally {
+    stub.restore();
+  }
+});
+
+test('applyLegacyImports uses activity-first executor and work sessions', async () => {
+  const stub = stubLegacyImportApplyDeps();
+  let createSessionsCalls = 0;
+  const originalCreate = timesheetImportWorkSessionBuilderService.createImportWorkSessions;
+  timesheetImportWorkSessionBuilderService.createImportWorkSessions = async (args) => {
+    createSessionsCalls += 1;
+    return originalCreate(args);
+  };
+  try {
+    await timesheetLegacyImportService.applyLegacyImports({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      compileResults: [compileOkResult('PER_A')],
+      reqUser: REQ_USER,
+      scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+    });
+    assert.equal(createSessionsCalls, 1);
+    assert.equal(stub.getCreated()[0].legacyImport.executionMode, 'activity_first');
+  } finally {
+    timesheetImportWorkSessionBuilderService.createImportWorkSessions = originalCreate;
     stub.restore();
   }
 });
@@ -559,8 +676,8 @@ test('buildLegacyImportEntries maps optional-only rows to billable hours with op
   assert.equal(rows.length, 1);
   assert.equal(rows[0].hours, 1.5);
   assert.equal(rows[0].timesheetHours, 1.5);
-  assert.match(rows[0].comment, /This hour was optional \(1\.5 hrs\)/);
-  assert.match(rows[0].comment, /Student: Student A/);
+  assert.match(rows[0].comment, /OPTIONAL Hours \(1\.5 hrs\)/);
+  assert.match(rows[0].comment, /^Student A \|/);
 });
 
 test('strip legacy import entries via isLegacyImportEntry helper', () => {
@@ -596,14 +713,19 @@ test('effective entry service includes stored legacy import rows', () => {
   assert.match(effective, /timesheetLegacyImportService\.isLegacyImportEntry/);
 });
 
-test('legacy import apply resolves scoped target status and lifecycle wiring', () => {
+test('legacy import apply resolves scoped target status and activity-first executor wiring', () => {
   const legacy = require('node:fs').readFileSync(
     require('node:path').join(__dirname, '../MVC/services/school/timesheetLegacyImportService.js'),
     'utf8'
   );
+  const execution = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '../MVC/services/school/timesheetLegacyImportExecutionService.js'),
+    'utf8'
+  );
+  assert.match(legacy, /require\('\.\/timesheetLegacyImportExecutionService'\)/);
   assert.match(legacy, /resolveImportTargetStatusForScope\(policy, scope\)/);
-  assert.match(legacy, /timesheetImportLifecycleService\.prepareImportTargetPayload/);
-  assert.match(legacy, /timesheetImportLifecycleService\.finalizeImportTargetAfterSave/);
+  assert.match(execution, /timesheetImportLifecycleService\.prepareImportTargetPayload/);
+  assert.match(execution, /timesheetImportLifecycleService\.finalizeImportTargetAfterSave/);
   assert.match(legacy, /detectExistingTimesheetForImport/);
   assert.match(legacy, /rollbackAppliedLegacyImports/);
   assert.match(legacy, /responseStatus/);

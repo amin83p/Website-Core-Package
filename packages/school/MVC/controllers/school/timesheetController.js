@@ -26,6 +26,7 @@ const taskService = require('../../services/school/taskService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const timesheetSessionStudentLabelService = require('../../services/school/timesheetSessionStudentLabelService');
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+const timesheetDisplayPolicyModel = require('../../models/school/timesheetDisplayPolicyModel');
 const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
 const statutoryHolidayEligibilityService = require('../../services/school/statutoryHolidayEligibilityService');
 const statutoryHolidayWorkSessionService = require('../../services/school/statutoryHolidayWorkSessionService');
@@ -2570,12 +2571,15 @@ exports.viewTimesheet = async (req, res) => {
         }
         timesheet = normalizeTimesheetLifecycle(timesheet);
 
-        const [classes, departments, timesheetParametersPolicy] = await Promise.all([
+        const [classes, departments, timesheetParametersPolicy, timesheetDisplayPolicy] = await Promise.all([
             dataService.fetchAllData('classes', {}, req.user),
             dataService.fetchAllData('departments', {}, req.user),
-            timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId)
+            timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId),
+            timesheetDisplayPolicyModel.getPolicyForOrg(activeOrgId)
         ]);
         const scopedClasses = (Array.isArray(classes) ? classes : []).filter((row) => idsEqual(row?.orgId, activeOrgId));
+        const scopedDepartments = (Array.isArray(departments) ? departments : [])
+            .filter((row) => idsEqual(row?.orgId, activeOrgId));
         const liveSessionBuilders = [];
         const sessionsByClassId = new Map();
         const incompleteSessions = [];
@@ -3057,6 +3061,9 @@ exports.viewTimesheet = async (req, res) => {
             statHolidayPreviewOnly: status === 'draft',
             statutoryHolidayUsesActivity,
             statutoryHolidayRoundCalculatedHours: timesheetParametersPolicy?.statutoryHolidayPay?.roundCalculatedHours === true,
+            timesheetDisplayPolicy,
+            timesheetDepartments: scopedDepartments,
+            activeOrgId,
             canDeleteRejectedManualRow,
             navYear,
             prevPeriodNav,

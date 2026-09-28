@@ -8605,8 +8605,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (normalized.lateMinutes > 0 || normalized.earlyLeaveMinutes > 0) {
                         setAttendanceRadio(row, 'late');
                     } else {
-                        const prior = String(row.dataset.lateModalPriorAttendance || '').trim();
-                        setAttendanceRadio(row, prior && prior !== 'late' ? prior : 'present');
+                        const currentAttendance = row.querySelector('.att-radio:checked')?.value || '';
+                        if (currentAttendance === 'late') {
+                            const prior = String(row.dataset.lateModalPriorAttendance || '').trim();
+                            setAttendanceRadio(row, prior && prior !== 'late' ? prior : 'present');
+                        }
                     }
                     delete row.dataset.lateModalPriorAttendance;
 

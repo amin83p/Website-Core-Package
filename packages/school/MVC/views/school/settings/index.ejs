@@ -84,6 +84,7 @@
     ? statutoryHolidayPayPolicy.payableHolidayTypes
     : ['National Holiday', 'Observance Paid'];
   const timesheetImportPolicyJson = JSON.stringify(typeof timesheetImportPolicy !== 'undefined' ? timesheetImportPolicy : { importActivityId: '', allowImportInTimesheetManagement: false, allowImportInMyTimesheets: false, importTargetStatus: 'draft', importBaseStartTime: '00:00', saveImportedSessionsIntoOneWorkSession: true, importWorkSessionStartTime: '07:00', importWorkSessionEndTime: '21:00', importWorkSessionDefaultTitle: 'Generated Work Session (Timesheet Import)', classNameActivityMappings: [] }).replace(/</g, '\\u003c');
+  const timesheetDisplayPolicyJson = JSON.stringify(typeof timesheetDisplayPolicy !== 'undefined' ? timesheetDisplayPolicy : {}).replace(/</g, '\\u003c');
   const enrollmentFinishAlertPolicyJson = JSON.stringify(typeof enrollmentFinishAlertPolicy !== 'undefined' ? enrollmentFinishAlertPolicy : {}).replace(/</g, '\\u003c');
   const enrollmentFinishAlertDaysValue = (typeof enrollmentFinishAlertPolicy !== 'undefined' && enrollmentFinishAlertPolicy?.daysToExpectedFinishDate != null)
     ? String(enrollmentFinishAlertPolicy.daysToExpectedFinishDate)
@@ -2030,6 +2031,89 @@
         </div>
       </section>
 
+      <section class="school-settings-panel card border-0 shadow-sm" id="timesheet-display" role="tabpanel" aria-labelledby="settings-tab-timesheet-display" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Timesheet Display/Print</h2>
+              <p class="small text-muted mb-0">Choose and order the text shown in the Class / Description column for each timesheet row type. Session date and time appears on the secondary time row when that item is included.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <div class="alert alert-danger d-none js-settings-error" id="timesheetDisplaySettingsError" role="alert"></div>
+          <form id="timesheetDisplaySettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="accordion" id="timesheetDisplayKindAccordion">
+              <% const timesheetDisplayKindMeta = [
+                { key: 'pulledClassSession', title: 'Pulled Class Session' },
+                { key: 'pulledActivityAssignee', title: 'Pulled Activity Work Session — Assignee' },
+                { key: 'manualRow', title: 'Added Manual Row By Users' },
+                { key: 'importedTimesheet', title: 'Imported Timesheet' }
+              ]; %>
+              <% timesheetDisplayKindMeta.forEach((kindRow, kindIndex) => { %>
+                <div class="accordion-item border mb-2 rounded overflow-hidden">
+                  <h3 class="accordion-header" id="timesheetDisplayHeading-<%= kindRow.key %>">
+                    <button class="accordion-button <%= kindIndex === 0 ? '' : 'collapsed' %>" type="button" data-bs-toggle="collapse" data-bs-target="#timesheetDisplayCollapse-<%= kindRow.key %>" aria-expanded="<%= kindIndex === 0 ? 'true' : 'false' %>" aria-controls="timesheetDisplayCollapse-<%= kindRow.key %>">
+                      <%= kindRow.title %>
+                    </button>
+                  </h3>
+                  <div id="timesheetDisplayCollapse-<%= kindRow.key %>" class="accordion-collapse collapse <%= kindIndex === 0 ? 'show' : '' %>" aria-labelledby="timesheetDisplayHeading-<%= kindRow.key %>" data-bs-parent="#timesheetDisplayKindAccordion">
+                    <div class="accordion-body">
+                      <p class="small text-muted">The timesheet date column is separate. <strong>Session Start/End Time</strong> shows only start and end times. Choose <strong>Line 1</strong> or <strong>Line 2</strong> for each token, or remove Session Start/End Time to hide it. <strong>Department Name</strong> is required on Line 1 and cannot be removed.</p>
+                      <div class="table-responsive mb-2">
+                        <table class="table table-sm align-middle mb-0">
+                          <thead class="table-light">
+                            <tr>
+                              <th style="width:3rem;">#</th>
+                              <th>Type</th>
+                              <th>Content</th>
+                              <th style="width:8rem;">Display line</th>
+                              <th class="text-end" style="width:9rem;">Order</th>
+                              <% if (canUpdateFlag) { %><th class="text-end" style="width:4rem;"></th><% } %>
+                            </tr>
+                          </thead>
+                          <tbody id="timesheetDisplayLayoutBody-<%= kindRow.key %>"></tbody>
+                        </table>
+                      </div>
+                      <% if (canUpdateFlag) { %>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                          <div class="input-group input-group-sm" style="max-width: 16rem;">
+                            <select class="form-select js-ts-display-add-field" data-kind="<%= kindRow.key %>" aria-label="Add field for <%= kindRow.title %>">
+                              <option value="">Add field…</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-primary js-ts-display-add-field-btn" data-kind="<%= kindRow.key %>">Add</button>
+                          </div>
+                          <div class="input-group input-group-sm" style="max-width: 18rem;">
+                            <input type="text" class="form-control js-ts-display-separator-text" data-kind="<%= kindRow.key %>" maxlength="120" placeholder="Separator text" aria-label="Custom separator for <%= kindRow.title %>">
+                            <button type="button" class="btn btn-outline-secondary js-ts-display-add-separator-btn" data-kind="<%= kindRow.key %>">Add separator</button>
+                          </div>
+                        </div>
+                      <% } %>
+                      <div class="border rounded p-3 bg-light">
+                        <div class="small fw-semibold text-muted mb-1">Preview</div>
+                        <div class="small text-muted mb-1">Line 1</div>
+                        <div class="fw-bold text-primary" id="timesheetDisplayPreviewPrimary-<%= kindRow.key %>">—</div>
+                        <div class="small text-muted mt-2 mb-1">Line 2</div>
+                        <div class="small text-muted" id="timesheetDisplayPreviewTime-<%= kindRow.key %>"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="mt-4">
+                <button class="btn btn-primary" type="submit" id="btnSaveTimesheetDisplaySettings">
+                  <i class="bi bi-save me-1"></i>Save Timesheet Display/Print
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+
       <section class="school-settings-panel card border-0 shadow-sm" id="duplicate-student-registrations" role="tabpanel" aria-labelledby="settings-tab-duplicate-student-registrations" tabindex="0" hidden>
         <header class="school-settings-panel-header card-header px-4 py-3">
           <div class="d-flex align-items-center gap-3">
@@ -2154,6 +2238,8 @@
 
 <script src="/scripts/htmlTemplateEditor.js"></script>
 <script src="/scripts/sessionNotificationEmailBodyModal.js"></script>
+<script src="/scripts/timesheetDisplayComposer.js"></script>
+<script src="/scripts/schoolSettingsFormPayload.js"></script>
 
 <script>
 (() => {
@@ -2170,6 +2256,9 @@
   let studentAttendanceReportPolicy = <%- studentAttendanceReportPolicyJson %>;
   let timesheetParametersPolicy = <%- timesheetParametersPolicyJson %>;
   let timesheetImportPolicy = <%- timesheetImportPolicyJson %>;
+  let timesheetDisplayPolicy = <%- timesheetDisplayPolicyJson %>;
+  const TIMESHEET_DISPLAY_DEPARTMENTS = <%- JSON.stringify(typeof timesheetDepartments !== 'undefined' ? timesheetDepartments : []).replace(/</g, '\\u003c') %>;
+  const TIMESHEET_DISPLAY_ACTIVE_ORG_ID = <%- JSON.stringify(String(activeOrgId || user?.activeOrgId || '').trim()) %>;
   let enrollmentFinishAlertPolicy = <%- enrollmentFinishAlertPolicyJson %>;
   const timesheetImportActivityOptions = <%- timesheetImportActivityOptionsJson %>;
   const studentAttendanceReportOverallLabels = <%- studentAttendanceReportOverallLabelsJson %>;
@@ -2549,7 +2638,11 @@
           Accept: 'application/json',
           'X-AJAX-Request': 'true'
         },
-        body: new URLSearchParams(payload).toString()
+        body: new URLSearchParams(
+          typeof encodeSchoolSettingsFormPayload === 'function'
+            ? encodeSchoolSettingsFormPayload(payload)
+            : payload
+        ).toString()
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result || result.status !== 'success') {
@@ -4004,6 +4097,286 @@
     renderTimesheetImportClassMappingRows(mappings);
   }
 
+  const tsDisplayComposer = window.TimesheetDisplayComposer;
+  const TS_DISPLAY_PREVIEW_SAMPLES = {
+    pulledClassSession: {
+      sessionId: 'cls-1',
+      deliveryDepartmentCode: 'ESL',
+      deliveryDepartmentName: 'English as a Second Language',
+      className: 'Intermediate ESL',
+      date: '2026-03-10',
+      startTime: '09:00',
+      endTime: '11:00'
+    },
+    pulledActivityAssignee: {
+      sessionId: 'act-1',
+      isSchoolActivity: true,
+      deliveryDepartmentCode: 'ESL',
+      deliveryDepartmentName: 'Professional Development',
+      activityName: 'Staff Training',
+      workSessionName: 'March workshop',
+      assigneeNote: 'Facilitator',
+      className: 'Staff Training: March workshop',
+      date: '2026-03-11',
+      startTime: '13:00',
+      endTime: '15:00'
+    },
+    manualRow: {
+      sessionId: 'man-1',
+      isManual: true,
+      deliveryDepartmentName: 'Administration',
+      deliveryDepartmentCode: 'ADM',
+      activityName: 'Office coverage',
+      className: 'Office coverage',
+      date: '2026-03-12',
+      startTime: '08:30',
+      endTime: '10:00'
+    },
+    importedTimesheet: {
+      sessionId: 'legacyimp-1',
+      isLegacyImport: true,
+      deliveryDepartmentCode: 'LINC',
+      deliveryDepartmentName: 'Language Instruction',
+      importedRowContent: 'LINC 4 — Morning block',
+      className: 'LINC 4 — Morning block',
+      activityName: 'Legacy Import Activity',
+      date: '2026-03-13',
+      startTime: '09:00',
+      endTime: '12:00'
+    }
+  };
+
+  const TS_DISPLAY_MANDATORY_FIELD = (tsDisplayComposer && tsDisplayComposer.MANDATORY_DISPLAY_FIELD) || 'departmentName';
+
+  function getTimesheetDisplayPolicyRows(kind) {
+    const composer = tsDisplayComposer;
+    if (!composer) return [];
+    const resolved = composer.resolvePolicy(timesheetDisplayPolicy);
+    return Array.isArray(resolved[kind]) ? resolved[kind] : [];
+  }
+
+  function setTimesheetDisplayPolicyRows(kind, rows) {
+    if (!timesheetDisplayPolicy || typeof timesheetDisplayPolicy !== 'object') timesheetDisplayPolicy = {};
+    timesheetDisplayPolicy[kind] = Array.isArray(rows) ? rows : [];
+  }
+
+  function renderTimesheetDisplayFieldOptions(kind) {
+    const composer = tsDisplayComposer;
+    if (!composer) return;
+    document.querySelectorAll(`.js-ts-display-add-field[data-kind="${kind}"]`).forEach((select) => {
+      const allowed = composer.ALLOWED_FIELDS_BY_KIND[kind] || [];
+      const current = getTimesheetDisplayPolicyRows(kind);
+      const usedFields = new Set(current.filter((row) => row.kind === 'field').map((row) => row.field));
+      select.innerHTML = ['<option value="">Add field…</option>']
+        .concat(allowed.filter((field) => !usedFields.has(field)).map((field) => {
+          const label = composer.DISPLAY_FIELD_CATALOG[field] || field;
+          return `<option value="${escapeHtml(field)}">${escapeHtml(label)}</option>`;
+        }))
+        .join('');
+    });
+  }
+
+  function renderTimesheetDisplayLayoutKind(kind) {
+    const composer = tsDisplayComposer;
+    const body = document.getElementById(`timesheetDisplayLayoutBody-${kind}`);
+    if (!body || !composer) return;
+    const rows = getTimesheetDisplayPolicyRows(kind);
+    body.innerHTML = rows.map((row, index) => {
+      const typeLabel = row.kind === 'separator' ? 'Separator' : 'Field';
+      const isMandatoryDepartment = row.kind === 'field' && row.field === TS_DISPLAY_MANDATORY_FIELD;
+      const lineValue = composer.resolveTokenDisplayLine
+        ? composer.resolveTokenDisplayLine(row)
+        : (Number(row.line) === 2 ? 2 : 1);
+      const lineCell = isMandatoryDepartment
+        ? '<span class="small text-muted">Line 1 <span class="badge bg-secondary">Required</span></span>'
+        : `<select class="form-select form-select-sm js-ts-display-line" data-kind="${escapeHtml(kind)}" data-index="${index}" ${canUpdate ? '' : 'disabled'} aria-label="Display line for row ${index + 1}">
+            <option value="1"${lineValue === 1 ? ' selected' : ''}>Line 1</option>
+            <option value="2"${lineValue === 2 ? ' selected' : ''}>Line 2</option>
+          </select>`;
+      const content = row.kind === 'separator'
+        ? `<input type="text" class="form-control form-control-sm js-ts-display-separator-value" data-kind="${escapeHtml(kind)}" data-index="${index}" value="${escapeHtml(row.text || '')}" maxlength="120" ${canUpdate ? '' : 'disabled'}>`
+        : `<span class="small">${escapeHtml(composer.DISPLAY_FIELD_CATALOG[row.field] || row.field || '')}${isMandatoryDepartment ? ' <span class="text-muted">(required)</span>' : ''}</span>`;
+      const orderBtns = canUpdate
+        ? `<div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary js-ts-display-move-up" data-kind="${escapeHtml(kind)}" data-index="${index}" title="Move up"><i class="bi bi-arrow-up"></i></button>
+            <button type="button" class="btn btn-outline-secondary js-ts-display-move-down" data-kind="${escapeHtml(kind)}" data-index="${index}" title="Move down"><i class="bi bi-arrow-down"></i></button>
+          </div>`
+        : '';
+      const removeBtn = canUpdate && !isMandatoryDepartment
+        ? `<button type="button" class="btn btn-outline-danger btn-sm js-ts-display-remove-row" data-kind="${escapeHtml(kind)}" data-index="${index}" title="Remove"><i class="bi bi-trash"></i></button>`
+        : '';
+      return `<tr data-ts-display-kind="${escapeHtml(kind)}" data-ts-display-index="${index}">
+        <td class="text-muted small">${index + 1}</td>
+        <td class="small fw-semibold">${typeLabel}</td>
+        <td>${content}</td>
+        <td>${lineCell}</td>
+        <td class="text-end">${orderBtns}</td>
+        ${canUpdate ? `<td class="text-end">${removeBtn}</td>` : ''}
+      </tr>`;
+    }).join('');
+    renderTimesheetDisplayFieldOptions(kind);
+    refreshTimesheetDisplayPreview(kind);
+  }
+
+  function buildTimesheetDisplayPreviewContext() {
+    const map = new Map();
+    (Array.isArray(TIMESHEET_DISPLAY_DEPARTMENTS) ? TIMESHEET_DISPLAY_DEPARTMENTS : []).forEach((row) => {
+      const id = String(row?.id || '').trim();
+      if (id) map.set(id, row);
+    });
+    return {
+      departmentMap: map,
+      orgDepartments: TIMESHEET_DISPLAY_DEPARTMENTS,
+      orgId: TIMESHEET_DISPLAY_ACTIVE_ORG_ID
+    };
+  }
+
+  function enrichTimesheetDisplayPreviewSample(sample) {
+    const depts = Array.isArray(TIMESHEET_DISPLAY_DEPARTMENTS) ? TIMESHEET_DISPLAY_DEPARTMENTS : [];
+    const code = String(sample?.deliveryDepartmentCode || sample?.departmentCode || '').trim();
+    const name = String(sample?.deliveryDepartmentName || sample?.departmentName || '').trim();
+    let match = null;
+    if (code) {
+      match = depts.find((row) => String(row?.code || row?.departmentCode || '').trim() === code);
+    }
+    if (!match && name) {
+      match = depts.find((row) => String(row?.name || row?.title || '').trim() === name);
+    }
+    if (!match) return sample;
+    return {
+      ...sample,
+      deliveryDepartmentId: String(match.id || '').trim(),
+      deliveryDepartmentName: String(match.name || '').trim(),
+      deliveryDepartmentCode: String(match.code || match.departmentCode || '').trim()
+    };
+  }
+
+  function refreshTimesheetDisplayPreview(kind) {
+    const composer = tsDisplayComposer;
+    if (!composer) return;
+    const sample = enrichTimesheetDisplayPreviewSample(TS_DISPLAY_PREVIEW_SAMPLES[kind] || {});
+    const composeCtx = buildTimesheetDisplayPreviewContext();
+    const composed = composer.composeTimesheetRowDisplay(sample, timesheetDisplayPolicy, composeCtx);
+    const primaryEl = document.getElementById(`timesheetDisplayPreviewPrimary-${kind}`);
+    const timeEl = document.getElementById(`timesheetDisplayPreviewTime-${kind}`);
+    if (primaryEl) primaryEl.textContent = composed.primaryText || '—';
+    if (timeEl) {
+      timeEl.textContent = composed.showTimeRow ? composed.timeRowText : '(not shown)';
+      timeEl.classList.toggle('text-muted', !composed.showTimeRow);
+      timeEl.classList.toggle('fst-italic', !composed.showTimeRow);
+    }
+  }
+
+  function renderAllTimesheetDisplayLayouts() {
+    const composer = tsDisplayComposer;
+    if (!composer) return;
+    timesheetDisplayPolicy = composer.resolvePolicy(timesheetDisplayPolicy);
+    (composer.ROW_KINDS || []).forEach((kind) => renderTimesheetDisplayLayoutKind(kind));
+  }
+
+  function collectTimesheetDisplayPolicyFromDom() {
+    const composer = tsDisplayComposer;
+    if (!composer) return {};
+    const out = {};
+    (composer.ROW_KINDS || []).forEach((kind) => {
+      const rows = getTimesheetDisplayPolicyRows(kind).map((row, index) => {
+        const lineSelect = document.querySelector(`.js-ts-display-line[data-kind="${kind}"][data-index="${index}"]`);
+        const line = row.kind === 'field' && row.field === TS_DISPLAY_MANDATORY_FIELD
+          ? 1
+          : (Number(lineSelect?.value) === 2 ? 2 : 1);
+        if (row.kind === 'separator') {
+          const input = document.querySelector(`.js-ts-display-separator-value[data-kind="${kind}"][data-index="${index}"]`);
+          return { kind: 'separator', text: String(input?.value || row.text || '').slice(0, 120), line };
+        }
+        return { kind: 'field', field: row.field, line };
+      });
+      out[kind] = rows;
+    });
+    return out;
+  }
+
+  document.getElementById('timesheetDisplaySettingsForm')?.addEventListener('click', (event) => {
+    const composer = tsDisplayComposer;
+    if (!composer || !canUpdate) return;
+    const moveUp = event.target.closest('.js-ts-display-move-up');
+    const moveDown = event.target.closest('.js-ts-display-move-down');
+    const removeBtn = event.target.closest('.js-ts-display-remove-row');
+    const addFieldBtn = event.target.closest('.js-ts-display-add-field-btn');
+    const addSeparatorBtn = event.target.closest('.js-ts-display-add-separator-btn');
+    if (moveUp || moveDown || removeBtn) {
+      const btn = moveUp || moveDown || removeBtn;
+      const kind = btn.dataset.kind;
+      const index = Number(btn.dataset.index);
+      const rows = [...getTimesheetDisplayPolicyRows(kind)];
+      if (moveUp && index > 0) {
+        [rows[index - 1], rows[index]] = [rows[index], rows[index - 1]];
+      } else if (moveDown && index < rows.length - 1) {
+        [rows[index + 1], rows[index]] = [rows[index], rows[index + 1]];
+      } else if (removeBtn) {
+        rows.splice(index, 1);
+      }
+      setTimesheetDisplayPolicyRows(kind, rows);
+      renderTimesheetDisplayLayoutKind(kind);
+      return;
+    }
+    if (addFieldBtn) {
+      const kind = addFieldBtn.dataset.kind;
+      const select = document.querySelector(`.js-ts-display-add-field[data-kind="${kind}"]`);
+      const field = String(select?.value || '').trim();
+      if (!field) return;
+      const rows = [...getTimesheetDisplayPolicyRows(kind), {
+        kind: 'field',
+        field,
+        line: field === 'sessionDateTime' ? 2 : 1
+      }];
+      setTimesheetDisplayPolicyRows(kind, rows);
+      renderTimesheetDisplayLayoutKind(kind);
+      return;
+    }
+    if (addSeparatorBtn) {
+      const kind = addSeparatorBtn.dataset.kind;
+      const input = document.querySelector(`.js-ts-display-separator-text[data-kind="${kind}"]`);
+      const text = String(input?.value ?? '');
+      const rows = [...getTimesheetDisplayPolicyRows(kind), { kind: 'separator', text, line: 1 }];
+      setTimesheetDisplayPolicyRows(kind, rows);
+      if (input) input.value = '';
+      renderTimesheetDisplayLayoutKind(kind);
+    }
+  });
+
+  document.getElementById('timesheetDisplaySettingsForm')?.addEventListener('input', (event) => {
+    if (event.target.classList.contains('js-ts-display-separator-value')
+      || event.target.classList.contains('js-ts-display-line')) {
+      const kind = event.target.dataset.kind;
+      if (kind) refreshTimesheetDisplayPreview(kind);
+    }
+  });
+
+  document.getElementById('timesheetDisplaySettingsForm')?.addEventListener('change', (event) => {
+    if (!event.target.classList.contains('js-ts-display-line')) return;
+    const kind = event.target.dataset.kind;
+    const index = Number(event.target.dataset.index);
+    const rows = [...getTimesheetDisplayPolicyRows(kind)];
+    if (!rows[index]) return;
+    rows[index] = { ...rows[index], line: Number(event.target.value) === 2 ? 2 : 1 };
+    setTimesheetDisplayPolicyRows(kind, rows);
+    renderTimesheetDisplayLayoutKind(kind);
+  });
+
+  document.getElementById('timesheetDisplaySettingsForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveTimesheetDisplaySettings');
+    const layouts = collectTimesheetDisplayPolicyFromDom();
+    const result = await postSettings('/school/settings/timesheet-display', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      layouts
+    }, button, 'timesheetDisplaySettingsError');
+    if (!result) return;
+    timesheetDisplayPolicy = result.policy && typeof result.policy === 'object' ? result.policy : timesheetDisplayPolicy;
+    renderAllTimesheetDisplayLayouts();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
   document.getElementById('btnAddTimesheetImportClassMapping')?.addEventListener('click', () => {
     if (!canUpdate) return;
     const next = readTimesheetImportClassMappings();
@@ -4828,5 +5201,6 @@
   initializeSmmrReportTemplates();
   initializeSmmrOverallTemplates();
   renderSarReportExportFormatControls();
+  renderAllTimesheetDisplayLayouts();
 })();
 </script>

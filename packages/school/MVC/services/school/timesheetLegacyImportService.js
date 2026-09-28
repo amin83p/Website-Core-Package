@@ -743,26 +743,26 @@ function buildLegacyImportEntries({
       const date = cleanId(row?.date);
       const className = String(row?.className || '').trim();
       if (!date || !Number.isFinite(hours) || hours <= 0) return null;
-      const commentParts = [];
-      if (row?.comment) commentParts.push(String(row.comment).trim());
-      if (row?.studentName) commentParts.push(`Student: ${String(row.studentName).trim()}`);
-      const optionalComment = timesheetImportWorkSessionBuilderService.buildImportOptionalHoursComment(row?.optionalHours);
-      if (optionalComment) commentParts.push(optionalComment);
       return {
         sessionId: `legacyimp-${targetPeriodId}-${targetPersonId}-${index + 1}`,
         date,
         className,
+        description: className,
+        importedRowContent: className,
+        legacyImportClassName: className,
         hours,
         timesheetHours: hours,
         durationHours: hours,
         status: 'activity',
-        comment: commentParts.filter(Boolean).join(' | '),
+        comment: timesheetImportWorkSessionBuilderService.buildImportTimesheetComment(row),
         isManual: false,
         isSchoolActivity: true,
         isLegacyImport: true,
         isFinalStatus: true,
         activityId,
         activityName: activityTitle,
+        deliveryDepartmentId: departmentId,
+        deliveryDepartmentName: departmentName,
         departmentId,
         departmentName,
         categoryName,
@@ -813,11 +813,14 @@ async function applyLegacyImportForPeriod({
   personId,
   periodId,
   compileResults = [],
-  activity,
+  activity: _legacyActivityParam,
   reqUser,
   importedBy = '',
-  importTargetStatus = 'draft'
+  importTargetStatus = 'draft',
+  policy = null,
+  scope = IMPORT_SCOPES.MANAGEMENT
 }) {
+  const resolvedPolicy = policy || await assertImportAllowed({ orgId, scope });
   const period = await dataService.getDataById('timesheetPeriods', periodId, reqUser);
   if (!period) throw new Error('Timesheet period not found.');
   if (!idsEqual(period.orgId, orgId)) throw new Error('Timesheet period is not in the active organization.');
@@ -838,61 +841,49 @@ async function applyLegacyImportForPeriod({
   const combinedRows = (Array.isArray(compileResults) ? compileResults : [])
     .flatMap((result) => (Array.isArray(result?.rows) ? result.rows : []));
   const lastResult = (Array.isArray(compileResults) ? compileResults : []).slice(-1)[0] || null;
-  const legacyEntries = buildLegacyImportEntries({
-    compiledRows: combinedRows,
-    activity,
-    personId,
-    periodId
-  });
-  if (!legacyEntries.length) {
+  if (!combinedRows.length) {
     throw new Error('No import rows were available for the selected period.');
   }
 
-  const nowIso = new Date().toISOString();
-  const payload = {
+  const targetPersonId = cleanId(personId);
+  const targetPeriodId = cleanId(periodId);
+  const sourceFileName = String(lastResult?.fileName || 'imported.xlsx').trim();
+  const batchId = timesheetImportWorkSessionBuilderService.buildImportBatchId({
+    periodId: targetPeriodId,
+    personId: targetPersonId,
+    sourceFileName
+  });
+
+  const executionOutcome = await require('./timesheetLegacyImportExecutionService')
+    .executeActivityFirstImportForPeriod({
     orgId,
-    periodId: cleanId(periodId),
-    teacherId: cleanId(personId),
-    status: 'draft',
-    entries: legacyEntries,
-    totalHours: calculateStoredEntryTotalHours(legacyEntries),
-    legacyImport: {
-      activityId: cleanId(activity.id),
-      sourceFileName: String(lastResult?.fileName || 'imported.xlsx').trim(),
-      importedAt: nowIso,
-      importedBy: cleanId(importedBy),
-      rowCount: legacyEntries.length,
-      matchedPeriodId: cleanId(periodId)
-    }
-  };
+    personId: targetPersonId,
+    period,
+    policy: resolvedPolicy,
+    compiledRows: combinedRows,
+    batchId,
+    sourceFileName,
+    targetStatus: importTargetStatus,
+    priorTimesheet: null,
+    reqUser,
+    requirePayrollRoleWhenAmbiguous: false
+  });
 
-  const { payload: lifecyclePayload, requiresPostSaveFinalization, appliedStatus } =
-    timesheetImportLifecycleService.prepareImportTargetPayload({
-      basePayload: payload,
-      period,
-      targetStatus: importTargetStatus,
-      reqUser,
-      priorTimesheet: null
-    });
-
-  let saved = await persistTimesheetPayload(lifecyclePayload, reqUser);
-  if (requiresPostSaveFinalization) {
-    saved = await timesheetImportLifecycleService.finalizeImportTargetAfterSave({
-      savedTimesheet: saved,
-      period,
-      targetStatus: appliedStatus,
-      reqUser,
-      dataService
-    });
+  const saved = executionOutcome.saved;
+  const legacyImport = saved?.legacyImport && typeof saved.legacyImport === 'object'
+    ? saved.legacyImport
+    : {};
+  if (cleanId(importedBy)) {
+    legacyImport.importedBy = cleanId(importedBy);
   }
 
   return {
     timesheet: saved,
     timesheetId: cleanId(saved?.id),
-    rowCount: legacyEntries.length,
-    periodId: cleanId(periodId),
-    sourceFileName: payload.legacyImport.sourceFileName,
-    appliedStatus
+    rowCount: executionOutcome.totalAssigneeRowCount,
+    periodId: targetPeriodId,
+    sourceFileName: String(legacyImport.sourceFileName || sourceFileName).trim(),
+    appliedStatus: executionOutcome.appliedStatus
   };
 }
 
@@ -1024,7 +1015,8 @@ async function applyLegacyImports({
         activity,
         reqUser,
         importedBy: cleanId(reqUser?.id),
-        importTargetStatus
+        importTargetStatus,
+        policy
       });
       rollbackStack.push({
         periodId: outcome.periodId,

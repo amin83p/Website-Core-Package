@@ -46,3 +46,12 @@ test('session manager shows a highlighted completion check beside the title for 
   assert.ok(source.includes('bi-check-lg'));
   assert.ok(source.includes('box-shadow: 0 0 0 0.2rem rgba(34, 197, 94, 0.18)'));
 });
+
+test('session manager save details preserves non-late attendance when timing minutes are zero', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(source, /if \(currentAttendance === 'late'\)/);
+  assert.doesNotMatch(
+    source,
+    /} else {\s*const prior = String\(row\.dataset\.lateModalPriorAttendance \|\| ''\)\.trim\(\);\s*setAttendanceRadio\(row, prior && prior !== 'late' \? prior : 'present'\);/
+  );
+});

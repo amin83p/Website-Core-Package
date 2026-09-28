@@ -79,6 +79,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     order: 46
   }),
   Object.freeze({
+    key: 'timesheet-display',
+    title: 'Timesheet Display/Print',
+    description: 'Configure how timesheet row descriptions appear in the editor and printouts.',
+    icon: 'bi-layout-text-window-reverse',
+    order: 46.5
+  }),
+  Object.freeze({
     key: 'duplicate-student-registrations',
     title: 'Duplicate Student Profiles',
     description: 'Find multiple student records linked to the same person in this organization.',

@@ -146,12 +146,29 @@ test('buildImportWorkSessionEntryDrafts with skipStacking preserves pre-assigned
 });
 
 test('buildImportRowNotes mentions optional hours in comment', () => {
-  const notes = builder.buildImportRowNotes({
+  const notes = builder.buildImportTimesheetComment({
     comment: 'Cancelled session',
     optionalHours: 1.5
   });
   assert.match(notes, /Cancelled session/);
-  assert.match(notes, /This hour was optional \(1\.5 hrs\)/);
+  assert.match(notes, /OPTIONAL Hours \(1\.5 hrs\)/);
+});
+
+test('buildImportAssigneeNote uses class name only', () => {
+  assert.equal(builder.buildImportAssigneeNote({
+    className: ' Math 10 ',
+    comment: 'Prep',
+    studentName: 'Alex'
+  }), 'Math 10');
+});
+
+test('buildImportTimesheetComment orders student optional then excel comment', () => {
+  const comment = builder.buildImportTimesheetComment({
+    studentName: 'Alex',
+    optionalHours: 1,
+    comment: 'Prep work'
+  });
+  assert.equal(comment, 'Alex | OPTIONAL Hours (1 hr) | Prep work');
 });
 
 test('buildImportWorkSessionEntryDrafts bills optional-only rows with optional comment', () => {
@@ -173,8 +190,9 @@ test('buildImportWorkSessionEntryDrafts bills optional-only rows with optional c
 
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].assignees[0].paidHours, 1);
-  assert.match(drafts[0].assignees[0].notes, /This hour was optional \(1 hr\)/);
-  assert.match(drafts[0].assignees[0].notes, /Student: Student A/);
+  assert.equal(drafts[0].assignees[0].notes, 'ELA One on One');
+  assert.match(drafts[0].assignees[0].legacyImportTimesheetComment, /Student A/);
+  assert.match(drafts[0].assignees[0].legacyImportTimesheetComment, /OPTIONAL Hours \(1 hr\)/);
 });
 
 test('buildCompletedAssignee marks attendance activities attended', () => {
@@ -225,7 +243,8 @@ test('buildImportWorkSessionEntryDrafts stamp import trace metadata on assignees
   assert.equal(drafts[0].assignees[0].legacyImportClassName, 'Math');
   assert.equal(drafts[0].assignees[0].startTime, '00:00');
   assert.equal(drafts[0].assignees[0].endTime, '02:00');
-  assert.match(drafts[0].assignees[0].notes, /Prep/);
+  assert.equal(drafts[0].assignees[0].notes, 'Math');
+  assert.equal(drafts[0].assignees[0].legacyImportTimesheetComment, 'Prep');
 });
 
 test('filterImportWorkSessionsForTarget removes person entries inside period dates', () => {
@@ -571,6 +590,191 @@ test('findPostedEntryForDateAndTitle matches posted entry by date and title only
   assert.equal(builder.findPostedEntryForDateAndTitle(entries, '2026-01-09', 'Missing'), null);
 });
 
+test('resolveActivityTimesheetEntryHours uses import assignee paidHours not entry duration', () => {
+  const activityService = require('../MVC/services/school/activityService');
+  assert.equal(
+    activityService.resolveActivityTimesheetEntryHours(
+      { paid: true },
+      { personId: 'P1', paidHours: 3, legacyImportClassName: 'ELA 10' },
+      { durationHours: 30 }
+    ),
+    3
+  );
+});
+
+test('entryEligibleForImportMerge allows only import-stamped entries', () => {
+  assert.equal(builder.entryEligibleForImportMerge({ assignees: [] }), false);
+  assert.equal(builder.entryEligibleForImportMerge({
+    assignees: [{ personId: 'P1', legacyImportBatchId: 'BATCH_1', paidHours: 2 }]
+  }), true);
+  assert.equal(builder.entryEligibleForImportMerge({
+    assignees: [{ personId: 'P1', paidHours: 30, status: 'attended' }]
+  }), false);
+  assert.equal(builder.entryEligibleForImportMerge({
+    legacyImportBatchId: 'BATCH_1',
+    assignees: []
+  }), true);
+});
+
+test('createImportWorkSessions creates new entry when placeholder shell is empty', async () => {
+  const activityService = require('../MVC/services/school/activityService');
+  const dataService = require('../MVC/services/school/schoolDataService');
+  const defaultTitle = 'Generated Work Session (Timesheet Import)';
+  const existingEntry = {
+    entryId: 'ENT-SHELL',
+    title: defaultTitle,
+    date: '2026-01-01',
+    startTime: '07:00',
+    endTime: '21:00',
+    durationHours: 14,
+    status: 'posted',
+    assignees: [],
+    excludedPersonIds: []
+  };
+  const activity = {
+    id: 'ACT_EAL',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    title: 'EAL',
+    entries: [existingEntry]
+  };
+
+  const originalEligible = activityService.isPersonEligibleForActivity;
+  const originalUpdate = dataService.updateData;
+  let savedPayload = null;
+
+  activityService.isPersonEligibleForActivity = () => true;
+  dataService.updateData = async (_type, _id, payload) => {
+    savedPayload = payload;
+    return payload;
+  };
+
+  try {
+    await builder.createImportWorkSessions({
+      orgId: 'ORG_1',
+      activity,
+      compiledRows: [{ date: '2026-01-16', className: '1 on 1 EAL', hours: 3 }],
+      personId: 'PERSON_1',
+      personName: 'Teacher',
+      personRole: 'teacher',
+      periodId: 'PER_A',
+      batchId: 'BATCH_1',
+      sourceFileName: 'jan.xlsx',
+      workSessionDefaultTitle: defaultTitle,
+      reqUser: {}
+    });
+
+    assert.equal(savedPayload.entries.length, 2);
+    assert.equal(savedPayload.entries[0].entryId, 'ENT-SHELL');
+    assert.equal(savedPayload.entries[0].assignees.length, 0);
+    assert.equal(savedPayload.entries[1].date, '2026-01-16');
+    assert.equal(savedPayload.entries[1].assignees.length, 1);
+    assert.equal(savedPayload.entries[1].assignees[0].paidHours, 3);
+  } finally {
+    activityService.isPersonEligibleForActivity = originalEligible;
+    dataService.updateData = originalUpdate;
+  }
+});
+
+test('createImportWorkSessions creates new entry when matching shell has only manual assignees', async () => {
+  const activityService = require('../MVC/services/school/activityService');
+  const dataService = require('../MVC/services/school/schoolDataService');
+  const defaultTitle = 'Generated Work Session (Timesheet Import)';
+  const existingEntry = {
+    entryId: 'ENT-SHELL',
+    title: defaultTitle,
+    date: '2026-01-01',
+    startTime: '08:00',
+    endTime: '18:00',
+    durationHours: 30,
+    status: 'posted',
+    assignees: [{ personId: 'PERSON_1', status: 'attended', paid: true, paidHours: 30 }],
+    excludedPersonIds: []
+  };
+  const activity = {
+    id: 'ACT_ELA',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    title: 'ELA',
+    entries: [existingEntry]
+  };
+
+  const originalEligible = activityService.isPersonEligibleForActivity;
+  const originalUpdate = dataService.updateData;
+  let savedPayload = null;
+
+  activityService.isPersonEligibleForActivity = () => true;
+  dataService.updateData = async (_type, _id, payload) => {
+    savedPayload = payload;
+    return payload;
+  };
+
+  try {
+    await builder.createImportWorkSessions({
+      orgId: 'ORG_1',
+      activity,
+      compiledRows: [{ date: '2026-01-01', className: 'ELA 10', hours: 3 }],
+      personId: 'PERSON_1',
+      personName: 'Teacher',
+      personRole: 'teacher',
+      periodId: 'PER_JAN',
+      batchId: 'BATCH_1',
+      sourceFileName: 'jan.xlsx',
+      workSessionDefaultTitle: defaultTitle,
+      reqUser: {}
+    });
+
+    assert.equal(savedPayload.entries.length, 2);
+    assert.equal(savedPayload.entries[0].entryId, 'ENT-SHELL');
+    assert.equal(savedPayload.entries[0].assignees.length, 1);
+    assert.equal(savedPayload.entries[0].assignees[0].paidHours, 30);
+    assert.equal(savedPayload.entries[1].assignees.length, 1);
+    assert.equal(savedPayload.entries[1].assignees[0].paidHours, 3);
+    assert.equal(savedPayload.entries[1].assignees[0].legacyImportClassName, 'ELA 10');
+  } finally {
+    activityService.isPersonEligibleForActivity = originalEligible;
+    dataService.updateData = originalUpdate;
+  }
+});
+
+test('getActivityEntries keeps empty entry assignees without projecting activity attendee totals', () => {
+  const activityService = require('../MVC/services/school/activityService');
+  const activity = {
+    id: 'ACT_EAL',
+    paid: true,
+    evaluationType: 'attendance',
+    entries: [
+      {
+        entryId: 'ENT-SHELL',
+        date: '2026-01-01',
+        title: 'Default',
+        status: 'posted',
+        assignees: []
+      },
+      {
+        entryId: 'ENT-JUL',
+        date: '2026-07-16',
+        title: 'Generated Work Session (Timesheet Import)',
+        status: 'posted',
+        assignees: [
+          { personId: 'PERSON_1', paidHours: 3, legacyImportClassName: 'EAL', status: 'attended', paid: true },
+          { personId: 'PERSON_1', paidHours: 3, legacyImportClassName: 'EAL', status: 'attended', paid: true }
+        ]
+      }
+    ],
+    attendees: [
+      { personId: 'PERSON_1', paidHours: 6, status: 'attended', paid: true }
+    ]
+  };
+  const entries = activityService.getActivityEntries(activity);
+  const shell = entries.find((row) => row.entryId === 'ENT-SHELL');
+  assert.equal(shell.assignees.length, 0);
+});
+
 test('createImportWorkSessions reuses matching title without changing session window', async () => {
   const activityService = require('../MVC/services/school/activityService');
   const dataService = require('../MVC/services/school/schoolDataService');
@@ -583,7 +787,7 @@ test('createImportWorkSessions reuses matching title without changing session wi
     endTime: '18:00',
     durationHours: 10,
     status: 'posted',
-    assignees: [{ personId: 'PERSON_0', status: 'attended', paid: true, paidHours: 1 }],
+    assignees: [{ personId: 'PERSON_0', legacyImportBatchId: 'BATCH_OLD', status: 'attended', paid: true, paidHours: 1 }],
     excludedPersonIds: []
   };
   const activity = {
@@ -622,11 +826,12 @@ test('createImportWorkSessions reuses matching title without changing session wi
     });
 
     assert.equal(outcome.rowCount, 1);
-    assert.equal(savedPayload.entries.length, 1);
+    assert.equal(savedPayload.entries.length, 2);
     assert.equal(savedPayload.entries[0].entryId, 'ENT-DAY-1');
-    assert.equal(savedPayload.entries[0].startTime, '08:00');
-    assert.equal(savedPayload.entries[0].endTime, '18:00');
-    assert.equal(savedPayload.entries[0].assignees.length, 2);
+    assert.equal(savedPayload.entries[0].assignees.length, 1);
+    assert.equal(savedPayload.entries[1].date, '2026-01-09');
+    assert.equal(savedPayload.entries[1].assignees.length, 1);
+    assert.equal(savedPayload.entries[1].assignees[0].paidHours, 3);
   } finally {
     activityService.isPersonEligibleForActivity = originalEligible;
     dataService.updateData = originalUpdate;
@@ -742,6 +947,164 @@ test('removeImportWorkSessionsByBatchId removes assignees only and keeps daily e
     activityService.getActivity = originalGetActivity;
     dataService.updateData = originalUpdate;
     schoolDependencyService.forceUnlockImportBatchActivityEntries = originalUnlock;
+  }
+});
+
+test('stripImportAssigneesForTarget removes period-stamped import assignees outside pay period dates', () => {
+  const activity = { id: 'ACT_EAL', paid: true, evaluationType: 'attendance' };
+  const entries = [{
+    entryId: 'ENT-SHELL',
+    date: '2026-01-01',
+    title: 'Generated Work Session (Timesheet Import)',
+    status: 'posted',
+    assignees: [{
+      personId: 'PERSON_1',
+      legacyImportBatchId: 'BATCH_OLD',
+      legacyImportPeriodId: 'PER_JAN16',
+      legacyImportClassName: '1 on 1 EAL',
+      paidHours: 45,
+      status: 'attended',
+      paid: true
+    }]
+  }];
+  const outcome = builder.stripImportAssigneesForTarget(entries, activity, {
+    personId: 'PERSON_1',
+    periodId: 'PER_JAN16',
+    periodStartDate: '2026-01-16',
+    periodEndDate: '2026-01-31'
+  });
+  assert.equal(outcome.removedAssignees, 1);
+  assert.equal(outcome.entries[0].assignees.length, 0);
+});
+
+test('createImportWorkSessions strips misplaced import assignees from ineligible placeholder shells', async () => {
+  const activityService = require('../MVC/services/school/activityService');
+  const dataService = require('../MVC/services/school/schoolDataService');
+  const defaultTitle = 'Generated Work Session (Timesheet Import)';
+  const activity = {
+    id: 'ACT_EAL',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    title: 'EAL',
+    entries: [{
+      entryId: 'ENT-SHELL',
+      title: defaultTitle,
+      date: '2026-01-01',
+      startTime: '07:00',
+      endTime: '21:00',
+      durationHours: 14,
+      status: 'posted',
+      assignees: [{
+        personId: 'PERSON_1',
+        legacyImportBatchId: 'BATCH_OLD',
+        legacyImportPeriodId: 'PER_JAN16',
+        legacyImportClassName: '1 on 1 EAL',
+        paidHours: 45,
+        status: 'attended',
+        paid: true
+      }]
+    }]
+  };
+
+  const originalEligible = activityService.isPersonEligibleForActivity;
+  const originalUpdate = dataService.updateData;
+  let savedPayload = null;
+
+  activityService.isPersonEligibleForActivity = () => true;
+  dataService.updateData = async (_type, _id, payload) => {
+    savedPayload = payload;
+    return payload;
+  };
+
+  try {
+    await builder.createImportWorkSessions({
+      orgId: 'ORG_1',
+      activity,
+      compiledRows: [{ date: '2026-01-16', className: '1 on 1 EAL', hours: 3 }],
+      personId: 'PERSON_1',
+      personName: 'Teacher',
+      personRole: 'teacher',
+      periodId: 'PER_JAN16',
+      batchId: 'BATCH_NEW',
+      sourceFileName: 'jan.xlsx',
+      workSessionDefaultTitle: defaultTitle,
+      reqUser: {}
+    });
+
+    const shell = savedPayload.entries.find((row) => row.entryId === 'ENT-SHELL');
+    assert.equal(shell.assignees.length, 0);
+    const importEntry = savedPayload.entries.find((row) => row.date === '2026-01-16');
+    assert.ok(importEntry);
+    assert.equal(importEntry.assignees[0].paidHours, 3);
+  } finally {
+    activityService.isPersonEligibleForActivity = originalEligible;
+    dataService.updateData = originalUpdate;
+  }
+});
+
+test('createImportWorkSessions strips import assignees on wrong dates even without legacyImportPeriodId', async () => {
+  const activityService = require('../MVC/services/school/activityService');
+  const dataService = require('../MVC/services/school/schoolDataService');
+  const defaultTitle = 'Generated Work Session (Timesheet Import)';
+  const activity = {
+    id: 'ACT_EAL',
+    orgId: 'ORG_1',
+    status: 'posted',
+    paid: true,
+    evaluationType: 'attendance',
+    title: 'EAL',
+    entries: [{
+      entryId: 'ENT-SHELL',
+      title: 'Default',
+      date: '2026-01-01',
+      startTime: '07:00',
+      endTime: '21:00',
+      durationHours: 14,
+      status: 'posted',
+      assignees: [{
+        personId: 'PERSON_1',
+        legacyImportBatchId: 'BATCH_OLD',
+        legacyImportClassName: '1 on 1 EAL',
+        paidHours: 45,
+        status: 'attended',
+        paid: true
+      }]
+    }]
+  };
+
+  const originalEligible = activityService.isPersonEligibleForActivity;
+  const originalUpdate = dataService.updateData;
+  let savedPayload = null;
+
+  activityService.isPersonEligibleForActivity = () => true;
+  dataService.updateData = async (_type, _id, payload) => {
+    savedPayload = payload;
+    return payload;
+  };
+
+  try {
+    await builder.createImportWorkSessions({
+      orgId: 'ORG_1',
+      activity,
+      compiledRows: [{ date: '2026-07-16', className: '1 on 1 EAL', hours: 3 }],
+      personId: 'PERSON_1',
+      personName: 'Teacher',
+      personRole: 'teacher',
+      periodId: 'PER_JUL',
+      batchId: 'BATCH_NEW',
+      sourceFileName: 'jul.xlsx',
+      workSessionDefaultTitle: defaultTitle,
+      reqUser: {}
+    });
+
+    const shell = savedPayload.entries.find((row) => row.entryId === 'ENT-SHELL');
+    assert.equal(shell.assignees.length, 0);
+    assert.equal(savedPayload.entries.some((row) => row.date === '2026-07-16'), true);
+  } finally {
+    activityService.isPersonEligibleForActivity = originalEligible;
+    dataService.updateData = originalUpdate;
   }
 });
 

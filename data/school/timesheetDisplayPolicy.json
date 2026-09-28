@@ -1,0 +1,672 @@
+{
+  "byOrgId": {
+    "ORG_DISPLAY_RT_1790561223781": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "className"
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime"
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName"
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime"
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName"
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime"
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "importedRowContent"
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime"
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T02:07:03.796Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790561239455": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "className"
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime"
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName"
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime"
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName"
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime"
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "importedRowContent"
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime"
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T02:07:19.465Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790561565278": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T02:12:45.288Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790561603193": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T02:13:23.203Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790564345207": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T02:59:05.218Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790564691468": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T03:04:51.487Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790564882070": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T03:08:02.092Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790566439847": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T03:33:59.876Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790566588312": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T03:36:28.327Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790566693399": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T03:38:13.411Z"
+      }
+    },
+    "ORG_DISPLAY_RT_1790569529847": {
+      "pulledClassSession": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "className",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "pulledActivityAssignee": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "manualRow": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "importedTimesheet": [
+        {
+          "kind": "field",
+          "field": "departmentName",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "importedRowContent",
+          "line": 1
+        },
+        {
+          "kind": "field",
+          "field": "sessionDateTime",
+          "line": 2
+        }
+      ],
+      "audit": {
+        "lastUpdateUser": "TEST_USER",
+        "lastUpdateDateTime": "2026-09-28T04:25:29.867Z"
+      }
+    }
+  }
+}

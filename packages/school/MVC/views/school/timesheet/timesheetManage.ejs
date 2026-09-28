@@ -690,17 +690,40 @@
     });
   }
 
-  function cleanupModalLayerArtifacts() {
-    if (typeof window.hideLoading === 'function') {
-      window.hideLoading({ force: true });
+  function syncBootstrapModalStackState() {
+    const openModals = Array.from(document.querySelectorAll('.modal.show'));
+    const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+    if (backdrops.length > openModals.length) {
+      for (let index = backdrops.length - 1; index >= openModals.length; index -= 1) {
+        backdrops[index]?.remove();
+      }
     }
-    const openModals = document.querySelectorAll('.modal.show');
     if (!openModals.length) {
       document.querySelectorAll('.modal-backdrop').forEach((backdrop) => backdrop.remove());
       document.body.classList.remove('modal-open');
       document.body.style.removeProperty('overflow');
       document.body.style.removeProperty('padding-right');
+      return;
     }
+    document.body.classList.add('modal-open');
+    if (!document.body.style.overflow) {
+      document.body.style.overflow = 'hidden';
+    }
+    openModals.forEach((openModal, index) => {
+      const baseZ = 1050 + (index * 20);
+      openModal.style.setProperty('z-index', String(baseZ + 5), 'important');
+      const backdrop = document.querySelectorAll('.modal-backdrop')[index];
+      if (backdrop) {
+        backdrop.style.setProperty('z-index', String(baseZ), 'important');
+      }
+    });
+  }
+
+  function cleanupModalLayerArtifacts() {
+    if (typeof window.hideLoading === 'function') {
+      window.hideLoading({ force: true });
+    }
+    syncBootstrapModalStackState();
   }
 
   function buildTimesheetEditorUrl(periodId, personId) {

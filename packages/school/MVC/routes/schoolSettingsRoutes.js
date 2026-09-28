@@ -111,6 +111,11 @@ router.post('/timesheet-import',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveTimesheetImportPolicy);
 
+router.post('/timesheet-display',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
+  ctrl.saveTimesheetDisplayPolicy);
+
 router.get('/duplicate-student-registrations/scan',
   requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, { keepActive: true }),

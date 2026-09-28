@@ -412,6 +412,34 @@ function buildCatalog() {
       }
     },
     {
+      key: 'school.timesheetImportPolicy',
+      domain: 'School',
+      section: 'Timesheet Import Policy',
+      source: 'school/timesheetImportPolicy.json',
+      collection: 'schoolTimesheetImportPolicy',
+      sourceFormat: 'single_object',
+      transformRecord: (record) => ({ ...(record || {}), id: 'timesheet-import-policy' }),
+      inverseTransformRecord: (record) => {
+        const next = { ...(record || {}) };
+        if (next.id === 'timesheet-import-policy') delete next.id;
+        return next;
+      }
+    },
+    {
+      key: 'school.timesheetDisplayPolicy',
+      domain: 'School',
+      section: 'Timesheet Display/Print Policy',
+      source: 'school/timesheetDisplayPolicy.json',
+      collection: 'schoolTimesheetDisplayPolicy',
+      sourceFormat: 'single_object',
+      transformRecord: (record) => ({ ...(record || {}), id: 'timesheet-display-policy' }),
+      inverseTransformRecord: (record) => {
+        const next = { ...(record || {}) };
+        if (next.id === 'timesheet-display-policy') delete next.id;
+        return next;
+      }
+    },
+    {
       key: 'school.enrollmentFinishAlertPolicy',
       domain: 'School',
       section: 'Enrollment Finish Alert Policy',

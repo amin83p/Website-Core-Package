@@ -11,6 +11,7 @@ const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolic
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyReportPolicyModel');
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
+const timesheetDisplayPolicyModel = require('../../models/school/timesheetDisplayPolicyModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const dataBackendRuntimeService = requireCoreModule('MVC/services/dataBackendRuntimeService');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -66,6 +67,7 @@ function resolvePolicyModel(catalogEntry) {
   if (catalogEntry?.policyModel === 'studentAttendanceReport') return studentAttendanceReportPolicyModel;
   if (catalogEntry?.policyModel === 'semiMonthlyReport') return semiMonthlyReportPolicyModel;
   if (catalogEntry?.policyModel === 'timesheetParameters') return timesheetParametersPolicyModel;
+  if (catalogEntry?.policyModel === 'timesheetDisplay') return timesheetDisplayPolicyModel;
   return null;
 }
 

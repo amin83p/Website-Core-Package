@@ -31,12 +31,14 @@ const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyRep
 const timesheetParametersPolicyModel = require('../../models/school/timesheetParametersPolicyModel');
 const enrollmentFinishAlertPolicyModel = require('../../models/school/enrollmentFinishAlertPolicyModel');
 const timesheetImportPolicyModel = require('../../models/school/timesheetImportPolicyModel');
+const timesheetDisplayPolicyModel = require('../../models/school/timesheetDisplayPolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportPolicyService = require('../../services/school/studentAttendanceReportPolicyService');
 const semiMonthlyReportPolicyService = require('../../services/school/semiMonthlyReportPolicyService');
 const timesheetParametersPolicyService = require('../../services/school/timesheetParametersPolicyService');
 const enrollmentFinishAlertPolicyService = require('../../services/school/enrollmentFinishAlertPolicyService');
 const timesheetImportPolicyService = require('../../services/school/timesheetImportPolicyService');
+const timesheetDisplayPolicyService = require('../../services/school/timesheetDisplayPolicyService');
 const timesheetLegacyImportService = require('../../services/school/timesheetLegacyImportService');
 const statutoryHolidayDayMappingService = require('../../services/school/statutoryHolidayDayMappingService');
 const activityService = require('../../services/school/activityService');
@@ -404,6 +406,7 @@ async function loadSettingsPageData(req) {
     semiMonthlyReportPolicy,
     timesheetParametersPolicy,
     timesheetImportPolicy,
+    timesheetDisplayPolicy,
     enrollmentFinishAlertPolicy,
     canUpdate
   ] = await Promise.all([
@@ -417,6 +420,7 @@ async function loadSettingsPageData(req) {
     semiMonthlyReportPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetParametersPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetImportPolicyModel.getPolicyForOrg(activeOrgId),
+    timesheetDisplayPolicyModel.getPolicyForOrg(activeOrgId),
     enrollmentFinishAlertPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
@@ -468,6 +472,17 @@ async function loadSettingsPageData(req) {
     }))
     .filter((row) => row.id)
     .sort((a, b) => a.name.localeCompare(b.name));
+  const activeOrgKey = String(activeOrgId || '').trim();
+  const timesheetDepartments = (Array.isArray(departmentRows) ? departmentRows : [])
+    .filter((row) => !activeOrgKey || String(row?.orgId || '').trim() === activeOrgKey)
+    .map((row) => ({
+      id: String(row?.id || '').trim(),
+      orgId: String(row?.orgId || '').trim(),
+      name: String(row?.name || row?.title || '').trim(),
+      code: String(row?.code || row?.departmentCode || '').trim(),
+      active: row?.active !== false
+    }))
+    .filter((row) => row.id);
   const statutoryHolidaySchemes = statutoryHolidaySchemeService.resolveSchemes(timesheetParametersPolicy);
 
   return {
@@ -495,6 +510,11 @@ async function loadSettingsPageData(req) {
     semiMonthlyReportPolicy,
     timesheetParametersPolicy,
     timesheetImportPolicy,
+    timesheetDisplayPolicy,
+    timesheetDepartments,
+    timesheetDisplayFieldCatalog: timesheetDisplayPolicyService.DISPLAY_FIELD_CATALOG,
+    timesheetDisplayRowKinds: timesheetDisplayPolicyService.ROW_KINDS,
+    timesheetDisplayAllowedFieldsByKind: timesheetDisplayPolicyService.ALLOWED_FIELDS_BY_KIND,
     enrollmentFinishAlertPolicy,
     timesheetImportActivityOptions,
     statutoryHolidayPublicActivityOptions,
@@ -994,6 +1014,38 @@ async function saveTimesheetImportPolicy(req, res) {
   }
 }
 
+async function saveTimesheetDisplayPolicy(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    let parsedBody = req.body || {};
+    if (typeof parsedBody.layouts === 'string') {
+      try {
+        parsedBody = { ...parsedBody, ...JSON.parse(parsedBody.layouts) };
+      } catch (_error) {
+        const error = new Error('Invalid timesheet display layout JSON.');
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+    const normalized = timesheetDisplayPolicyService.validatePolicyInput(parsedBody);
+    const policy = await timesheetDisplayPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      normalized,
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Timesheet Display/Print settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save Timesheet Display/Print settings.'
+    });
+  }
+}
+
 async function saveEnrollmentFinishAlertPolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -1169,6 +1221,7 @@ module.exports = {
   previewStatutoryHolidayDayMapping,
   mapStatutoryHolidayDays,
   saveTimesheetImportPolicy,
+  saveTimesheetDisplayPolicy,
   scanDuplicateStudentProfilesApi,
   saveAutosavePolicy,
   saveSessionAccessPolicy,

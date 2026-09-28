@@ -83,16 +83,25 @@ function buildImportOptionalHoursComment(optionalHours) {
   const value = Number(optionalHours);
   if (!Number.isFinite(value) || value <= 0) return '';
   const label = value === 1 ? 'hr' : 'hrs';
-  return `This hour was optional (${value} ${label})`;
+  return `OPTIONAL Hours (${value} ${label})`;
+}
+
+function buildImportAssigneeNote(row = {}) {
+  return String(row?.className || '').trim();
+}
+
+function buildImportTimesheetComment(row = {}) {
+  const commentParts = [];
+  const studentName = String(row?.studentName || '').trim();
+  if (studentName) commentParts.push(studentName);
+  const optionalComment = buildImportOptionalHoursComment(row?.optionalHours);
+  if (optionalComment) commentParts.push(optionalComment);
+  if (row?.comment) commentParts.push(String(row.comment).trim());
+  return commentParts.filter(Boolean).join(' | ');
 }
 
 function buildImportRowNotes(row = {}) {
-  const commentParts = [];
-  if (row?.comment) commentParts.push(String(row.comment).trim());
-  if (row?.studentName) commentParts.push(`Student: ${String(row.studentName).trim()}`);
-  const optionalComment = buildImportOptionalHoursComment(row?.optionalHours);
-  if (optionalComment) commentParts.push(optionalComment);
-  return commentParts.filter(Boolean).join(' | ');
+  return buildImportTimesheetComment(row);
 }
 
 function normalizeImportRowDate(value) {
@@ -137,6 +146,25 @@ function findPostedEntryForDateAndTitle(entries = [], date = '', defaultTitle = 
     && String(entry?.status || 'posted').trim().toLowerCase() === 'posted'
     && workSessionTitleMatchesDefault(entry?.title, targetTitle)
   )) || null;
+}
+
+function entryHasImportAssigneeTrace(entry = {}) {
+  if (
+    cleanId(entry?.legacyImportBatchId)
+    || cleanId(entry?.legacyImportPersonId)
+    || cleanId(entry?.legacyImportPeriodId)
+  ) {
+    return true;
+  }
+  return activityService.normalizeActivityAssigneeRows(entry?.assignees).some((assignee) => (
+    cleanId(assignee?.legacyImportBatchId)
+    || cleanId(assignee?.legacyImportClassName)
+    || cleanId(assignee?.legacyImportPersonId)
+  ));
+}
+
+function entryEligibleForImportMerge(entry = {}) {
+  return entryHasImportAssigneeTrace(entry);
 }
 
 function stackCompiledRowsByDate(compiledRows = [], { baseStartTime = '00:00' } = {}) {
@@ -256,7 +284,8 @@ function buildLegacyImportWorkSessionEntryDrafts({
 
   return stackedRows.map((row, index) => {
     const title = String(row?.className || '').trim();
-    const notes = buildImportRowNotes(row);
+    const assigneeNote = buildImportAssigneeNote(row);
+    const timesheetComment = buildImportTimesheetComment(row);
     const entryDraft = {
       title,
       date: row.date,
@@ -264,7 +293,7 @@ function buildLegacyImportWorkSessionEntryDrafts({
       endTime: row.endTime,
       durationHours: row.durationHours,
       status: 'posted',
-      notes
+      notes: ''
     };
     return {
       ...entryDraft,
@@ -275,11 +304,12 @@ function buildLegacyImportWorkSessionEntryDrafts({
         personName,
         personRole,
         hours: row.durationHours,
-        notes,
+        notes: assigneeNote,
         importTrace: {
           ...importTrace,
           legacyImportRowIndex: index + 1,
-          legacyImportClassName: title
+          legacyImportClassName: title,
+          legacyImportTimesheetComment: timesheetComment
         }
       })],
       excludedPersonIds: [],
@@ -344,7 +374,8 @@ function buildImportWorkSessionEntryDrafts({
     .map(([date, dayRows]) => {
       const assignees = dayRows.map((row, index) => {
         const className = String(row?.className || '').trim();
-        const notes = buildImportRowNotes(row);
+        const assigneeNote = buildImportAssigneeNote(row);
+        const timesheetComment = buildImportTimesheetComment(row);
         const stackedEntry = {
           startTime: row.startTime,
           endTime: row.endTime,
@@ -357,14 +388,15 @@ function buildImportWorkSessionEntryDrafts({
           personName,
           personRole,
           hours: row.durationHours,
-          notes,
+          notes: assigneeNote,
           importTrace: {
             legacyImportBatchId: cleanId(batchId),
             legacyImportSourceFileName: String(sourceFileName || '').trim(),
             legacyImportPeriodId: targetPeriodId,
             legacyImportPersonId: targetPersonId,
             legacyImportRowIndex: index + 1,
-            legacyImportClassName: className
+            legacyImportClassName: className,
+            legacyImportTimesheetComment: timesheetComment
           }
         });
       });
@@ -464,6 +496,22 @@ async function createImportWorkSessions({
   }
 
   let existingEntries = [...activityService.getActivityEntries(activity)];
+  const importDraftDates = new Set(
+    drafts.map((draft) => cleanId(draft?.date)).filter(Boolean)
+  );
+  const importTargetOptions = {
+    personId: targetPersonId,
+    periodId: cleanId(periodId),
+    draftDates: importDraftDates
+  };
+  existingEntries = existingEntries.map((entry) => {
+    const assignees = activityService.normalizeActivityAssigneeRows(entry.assignees);
+    const keptAssignees = assignees.filter((assignee) => (
+      !shouldStripImportAssigneeDuringRefresh(assignee, entry, activity, importTargetOptions)
+    ));
+    if (keptAssignees.length === assignees.length) return entry;
+    return { ...entry, assignees: keptAssignees };
+  });
   const touchedEntryIds = new Set();
   const createdSessionIds = [];
   let assigneeRowCount = 0;
@@ -486,33 +534,6 @@ async function createImportWorkSessions({
     });
   } else {
     for (const draft of drafts) {
-      const defaultTitle = String(draft?.title || resolvedWorkSessionDefaultTitle || '').trim();
-      const existingEntry = findPostedEntryForDateAndTitle(existingEntries, draft.date, defaultTitle);
-      if (existingEntry) {
-        const entryId = cleanId(existingEntry.entryId);
-        const entryIndex = existingEntries.findIndex((row) => cleanId(row?.entryId) === entryId);
-        const mergedEntry = {
-          ...existingEntry,
-          assignees: [
-            ...activityService.normalizeActivityAssigneeRows(existingEntry.assignees),
-            ...draft.assignees
-          ]
-        };
-        if (entryIndex >= 0) existingEntries[entryIndex] = mergedEntry;
-        if (entryId) touchedEntryIds.add(entryId);
-        draft.assignees.forEach((assignee) => {
-          const rowIndex = Number(assignee?.legacyImportRowIndex) || 0;
-          createdSessionIds.push(buildImportActivitySessionId({
-            activityId: activity.id,
-            entryId,
-            personId: targetPersonId,
-            rowIndex
-          }));
-          assigneeRowCount += 1;
-        });
-        continue;
-      }
-
       const [createdEntry] = assignImportEntryIds(activity.id, existingEntries, [draft]);
       existingEntries.push(createdEntry);
       const entryId = cleanId(createdEntry.entryId);
@@ -578,6 +599,26 @@ function importStampMatchesPersonPeriod(entry = {}, {
   });
 }
 
+function assigneeHasImportWorkSessionStamp(assignee = {}) {
+  return Boolean(
+    cleanId(assignee?.legacyImportBatchId)
+    || cleanId(assignee?.legacyImportClassName)
+    || cleanId(assignee?.legacyImportPersonId)
+  );
+}
+
+function shouldStripImportAssigneeDuringRefresh(assignee = {}, entry = {}, activity = {}, options = {}) {
+  if (isImportAssigneeForTarget(assignee, entry, activity, options)) return true;
+  const targetPersonId = cleanId(options.personId);
+  const assigneePersonId = cleanId(assignee?.legacyImportPersonId) || cleanId(assignee?.personId);
+  if (!targetPersonId || !idsEqual(assigneePersonId, targetPersonId)) return false;
+  if (!assigneeHasImportWorkSessionStamp(assignee)) return false;
+  const entryDate = cleanId(entry?.date);
+  const draftDates = options.draftDates;
+  if (!(draftDates instanceof Set) || !draftDates.size || !entryDate) return false;
+  return !draftDates.has(entryDate);
+}
+
 function isImportAssigneeForTarget(assignee = {}, entry = {}, activity = {}, {
   personId = '',
   periodId = '',
@@ -590,7 +631,6 @@ function isImportAssigneeForTarget(assignee = {}, entry = {}, activity = {}, {
   const targetBatchId = cleanId(batchId);
   const date = cleanId(entry?.date);
   if (!targetPersonId || !date) return false;
-  if (!entryDateInImportPeriod(date, periodStartDate, periodEndDate)) return false;
 
   const assigneePersonId = cleanId(assignee?.legacyImportPersonId) || cleanId(assignee?.personId);
   if (!idsEqual(assigneePersonId, targetPersonId)) return false;
@@ -601,6 +641,17 @@ function isImportAssigneeForTarget(assignee = {}, entry = {}, activity = {}, {
   }
 
   const assigneePeriodId = cleanId(assignee?.legacyImportPeriodId);
+  const hasImportRowStamp = Boolean(
+    cleanId(assignee?.legacyImportBatchId)
+    || cleanId(assignee?.legacyImportClassName)
+    || assigneePeriodId
+  );
+  if (hasImportRowStamp && assigneePeriodId && targetPeriodId && idsEqual(assigneePeriodId, targetPeriodId)) {
+    return true;
+  }
+
+  if (!entryDateInImportPeriod(date, periodStartDate, periodEndDate)) return false;
+
   if (assigneePeriodId && targetPeriodId && idsEqual(assigneePeriodId, targetPeriodId)) return true;
   if (assigneePeriodId && !targetPeriodId) return true;
 
@@ -620,7 +671,6 @@ function isImportWorkSessionEntryForTarget(entry, activity = {}, options = {}) {
   const targetPersonId = cleanId(options.personId);
   const date = cleanId(entry?.date);
   if (!targetPersonId || !date) return false;
-  if (!entryDateInImportPeriod(date, options.periodStartDate, options.periodEndDate)) return false;
 
   const assignees = activityService.normalizeActivityAssigneeRows(entry.assignees);
   if (assignees.some((assignee) => isImportAssigneeForTarget(assignee, entry, activity, options))) {
@@ -630,6 +680,8 @@ function isImportWorkSessionEntryForTarget(entry, activity = {}, options = {}) {
   if (importStampMatchesPersonPeriod(entry, { personId: targetPersonId, periodId: options.periodId })) {
     return true;
   }
+
+  if (!entryDateInImportPeriod(date, options.periodStartDate, options.periodEndDate)) return false;
 
   if (!activityService.isPersonEligibleForEntry(activity, entry, targetPersonId)) return false;
   return assignees.some((assignee) => idsEqual(assignee.personId, targetPersonId)
@@ -1045,11 +1097,15 @@ module.exports = {
   normalizeImportRowDate,
   resolveImportBillableHours,
   buildImportOptionalHoursComment,
+  buildImportAssigneeNote,
+  buildImportTimesheetComment,
   stackCompiledRowsByDate,
   buildImportRowNotes,
   buildCompletedAssignee,
   buildImportWorkSessionEntryDrafts,
   findPostedEntryForDateAndTitle,
+  entryHasImportAssigneeTrace,
+  entryEligibleForImportMerge,
   workSessionTitleMatchesDefault,
   importStampMatchesPersonPeriod,
   entryDateInImportPeriod,

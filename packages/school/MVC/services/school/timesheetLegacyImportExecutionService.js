@@ -469,32 +469,32 @@ async function resolveImportActivitiesForExecution({
   };
 }
 
-async function performImportExecution({
+async function executeActivityFirstImportForPeriod({
   orgId,
   personId,
-  periodId,
-  personRole = '',
-  targetStatus = '',
-  compileResult = null,
+  period,
+  policy,
+  compiledRows = [],
   batchId = '',
-  reqUser
+  sourceFileName = '',
+  personRole = '',
+  personName = '',
+  targetStatus = 'draft',
+  priorTimesheet = null,
+  reqUser,
+  requirePayrollRoleWhenAmbiguous = true
 }) {
-  const policy = await timesheetLegacyImportService.assertImportAllowed({
-    orgId,
-    scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
-  });
   const resolvedTargetStatus = resolveImportExecutionTargetStatus(targetStatus, policy);
   const shouldApplyStatHoliday = resolvedTargetStatus !== 'draft';
 
   const targetPersonId = cleanId(personId);
-  const targetPeriodId = cleanId(periodId);
+  const targetPeriodId = cleanId(period?.id);
   const resolvedBatchId = cleanId(batchId) || timesheetImportWorkSessionBuilderService.buildImportBatchId({
     periodId: targetPeriodId,
     personId: targetPersonId,
-    sourceFileName: compileResult?.fileName
+    sourceFileName
   });
-  const sourceFileName = String(compileResult?.fileName || 'imported.xlsx').trim();
-  const compiledRows = Array.isArray(compileResult?.rows) ? compileResult.rows : [];
+  const resolvedSourceFileName = String(sourceFileName || 'imported.xlsx').trim();
   const stackedRows = timesheetImportWorkSessionBuilderService.stackCompiledRowsByDate(
     compiledRows,
     { baseStartTime: policy.importBaseStartTime }
@@ -511,6 +511,291 @@ async function performImportExecution({
     compiledRows: stackedRows
   });
   const usedActivityIds = [...buckets.keys()];
+
+  const payrollContext = await timesheetPayrollContextService.resolvePayrollPersonContext({
+    orgId,
+    personId: targetPersonId,
+    reqUser
+  });
+  let resolvedPersonRole = timesheetPayrollContextService.normalizePayrollRole(personRole)
+    || (payrollContext.roles.length === 1 ? payrollContext.roles[0] : '');
+  if (requirePayrollRoleWhenAmbiguous && payrollContext.roles.length > 1 && !resolvedPersonRole) {
+    const error = new Error('Select a payroll role before performing this import.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (resolvedPersonRole && !payrollContext.roles.includes(resolvedPersonRole)) {
+    const error = new Error('The selected payroll role is not valid for this person.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const effectivePersonRole = resolvedPersonRole || payrollContext.defaultRole;
+  const resolvedPersonName = personName
+    ? String(personName).trim()
+    : await resolveImportPersonName({
+      orgId,
+      personId: targetPersonId,
+      reqUser,
+      fallback: payrollContext.personName
+    });
+
+  await timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget({
+    orgId,
+    personId: targetPersonId,
+    period,
+    reqUser
+  });
+  for (const activityId of usedActivityIds) {
+    await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget({
+      activityId,
+      personId: targetPersonId,
+      periodId: targetPeriodId,
+      periodStartDate: period.startDate,
+      periodEndDate: period.endDate,
+      reqUser
+    });
+    await timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod({
+      orgId,
+      personId: targetPersonId,
+      periodStartDate: period.startDate,
+      periodEndDate: period.endDate,
+      importActivityId: activityId,
+      reqUser
+    });
+  }
+
+  const workSessionOutcomes = [];
+  for (const [activityId, rows] of buckets.entries()) {
+    const activity = activityCache.get(activityId);
+    if (!activity || !rows.length) continue;
+    const outcome = await timesheetImportWorkSessionBuilderService.createImportWorkSessions({
+      orgId,
+      activity,
+      compiledRows: rows,
+      personId: targetPersonId,
+      personName: resolvedPersonName,
+      personRole: effectivePersonRole,
+      periodId: targetPeriodId,
+      batchId: resolvedBatchId,
+      sourceFileName: resolvedSourceFileName,
+      baseStartTime: policy.importBaseStartTime,
+      workSessionStartTime: policy.importWorkSessionStartTime,
+      workSessionEndTime: policy.importWorkSessionEndTime,
+      workSessionDefaultTitle: timesheetImportPolicyService.resolveImportWorkSessionDefaultTitle(policy),
+      consolidateIntoOneWorkSession: policy.saveImportedSessionsIntoOneWorkSession !== false,
+      skipStacking: true,
+      reqUser
+    });
+    workSessionOutcomes.push({
+      activityId: cleanId(outcome.activityId),
+      createdEntryIds: outcome.createdEntryIds,
+      createdSessionIds: outcome.createdSessionIds,
+      rowCount: outcome.rowCount
+    });
+  }
+
+  const totalAssigneeRowCount = workSessionOutcomes.reduce((sum, row) => sum + Number(row.rowCount || 0), 0);
+  const createdEntryIds = workSessionOutcomes.flatMap((row) => row.createdEntryIds || []);
+
+  const allowedImportSessionIds = new Set();
+  workSessionOutcomes.forEach((outcome) => {
+    timesheetImportWorkSessionBuilderService.buildImportActivitySessionIds({
+      activityId: outcome.activityId,
+      personId: targetPersonId,
+      entryIds: outcome.createdEntryIds,
+      sessionIds: outcome.createdSessionIds
+    }).forEach((sessionId) => allowedImportSessionIds.add(sessionId));
+  });
+  const importActivitySessionGuard = {
+    activityId: cleanId(defaultActivity.id),
+    protectedActivityIds,
+    personId: targetPersonId,
+    allowedSessionIds: allowedImportSessionIds
+  };
+  const assembly = await timesheetLiveAssemblyService.buildImportedTimesheetEntries({
+    orgId,
+    personId: targetPersonId,
+    period,
+    reqUser,
+    personName: resolvedPersonName,
+    personRole: effectivePersonRole,
+    allowManagerOverride: false,
+    supplementalEntryFilter: buildImportSupplementalEntryFilter(resolvedBatchId),
+    importActivitySessionGuard
+  });
+  if (!assembly.entries.length) {
+    throw new Error('No timesheet entries were assembled for the selected period.');
+  }
+
+  let importEntries = assembly.entries;
+  let importTotalHours = assembly.totalHours;
+  let statHolidayWarnings = [];
+  let effectiveTargetStatus = resolvedTargetStatus;
+  let statHolidayBlocked = false;
+  const [timesheetParametersPolicy, allHolidays] = await Promise.all([
+    timesheetParametersPolicyModel.getPolicyForOrg(orgId),
+    dataService.fetchAllData('holidays', {}, reqUser)
+  ]);
+  if (shouldApplyStatHoliday
+    && statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled(timesheetParametersPolicy)) {
+    const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
+      [],
+      importEntries
+    );
+    const statHolidayMaterialization = await statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit({
+      orgId,
+      personId: targetPersonId,
+      personName: resolvedPersonName,
+      personRole: effectivePersonRole,
+      period,
+      policy: timesheetParametersPolicy,
+      holidays: allHolidays,
+      periodEntries: periodWorkdayEntries,
+      existingEntries: importEntries,
+      reqUser
+    });
+    statHolidayWarnings = Array.isArray(statHolidayMaterialization?.warnings)
+      ? statHolidayMaterialization.warnings
+      : [];
+    const blockingErrors = Array.isArray(statHolidayMaterialization?.blockingErrors)
+      ? statHolidayMaterialization.blockingErrors.filter(Boolean)
+      : [];
+    statHolidayBlocked = blockingErrors.length > 0
+      || statHolidayMaterialization?.syncOutcome?.blocked === true;
+    if (statHolidayBlocked) {
+      effectiveTargetStatus = 'draft';
+      statHolidayWarnings = [
+        ...statHolidayWarnings,
+        ...blockingErrors.map((message) => ({
+          blocking: true,
+          reasons: [message]
+        }))
+      ];
+    }
+    importEntries = statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries({
+      entries: importEntries,
+      statHolidayRows: statHolidayMaterialization?.rows || [],
+      usesActivityMode: statHolidayMaterialization?.usesActivityMode === true,
+      existingEntriesBySessionId: new Map()
+    });
+    if (statHolidayMaterialization?.usesActivityMode === true && !statHolidayBlocked) {
+      const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(timesheetParametersPolicy);
+      const schemeActivityIds = new Set(
+        statutoryHolidaySchemeService.resolveAllSchemeActivityIds(resolvedPolicy)
+          .map((activityId) => cleanId(activityId))
+          .filter(Boolean)
+      );
+      const refreshedActivitySessions = await activityService.getTimesheetEntriesForPerson({
+        orgId,
+        personId: targetPersonId,
+        periodStartDate: period.startDate,
+        periodEndDate: period.endDate,
+        reqUser
+      });
+      const scopedStatHolidaySessions = (Array.isArray(refreshedActivitySessions) ? refreshedActivitySessions : [])
+        .filter((row) => schemeActivityIds.has(cleanId(row?.activityId)));
+      importEntries = mergeStatHolidayActivitySessionsIntoEntries(importEntries, scopedStatHolidaySessions);
+    }
+    importTotalHours = timesheetLiveAssemblyService.calculateTimesheetTotal(importEntries);
+  }
+
+  const nowIso = new Date().toISOString();
+  const basePayload = {
+    orgId,
+    periodId: targetPeriodId,
+    teacherId: targetPersonId,
+    status: 'draft',
+    entries: importEntries,
+    totalHours: importTotalHours,
+    legacyImport: {
+      activityId: cleanId(defaultActivity.id),
+      sourceFileName: resolvedSourceFileName,
+      importedAt: nowIso,
+      importedBy: cleanId(reqUser?.id),
+      rowCount: totalAssigneeRowCount,
+      matchedPeriodId: targetPeriodId,
+      legacyImportBatchId: resolvedBatchId,
+      executionMode: 'activity_first',
+      workSessionEntryIds: createdEntryIds,
+      workSessionActivities: workSessionOutcomes.map((outcome) => ({
+        activityId: outcome.activityId,
+        entryIds: outcome.createdEntryIds,
+        rowCount: outcome.rowCount
+      }))
+    }
+  };
+  if (priorTimesheet?.id) {
+    basePayload.id = cleanId(priorTimesheet.id);
+  }
+
+  const { payload: lifecyclePayload, requiresPostSaveFinalization, appliedStatus } =
+    timesheetImportLifecycleService.prepareImportTargetPayload({
+      basePayload,
+      period,
+      targetStatus: effectiveTargetStatus,
+      reqUser,
+      priorTimesheet
+    });
+
+  let saved = await timesheetLegacyImportService.persistTimesheetPayload(lifecyclePayload, reqUser);
+  if (requiresPostSaveFinalization) {
+    saved = await timesheetImportLifecycleService.finalizeImportTargetAfterSave({
+      savedTimesheet: saved,
+      period,
+      targetStatus: appliedStatus || effectiveTargetStatus,
+      reqUser,
+      dataService
+    });
+  }
+
+  return {
+    batchId: resolvedBatchId,
+    defaultActivity,
+    usedActivityIds,
+    workSessionOutcomes,
+    totalAssigneeRowCount,
+    totalDailyEntryCount: workSessionOutcomes.reduce(
+      (sum, row) => sum + (Array.isArray(row.createdEntryIds) ? row.createdEntryIds.length : 0),
+      0
+    ),
+    createdEntryIds,
+    saved,
+    importEntries,
+    importTotalHours,
+    statHolidayWarnings,
+    statHolidayBlocked,
+    resolvedTargetStatus,
+    effectiveTargetStatus,
+    appliedStatus: String(appliedStatus || effectiveTargetStatus || 'draft'),
+    requiresPostSaveFinalization
+  };
+}
+
+async function performImportExecution({
+  orgId,
+  personId,
+  periodId,
+  personRole = '',
+  targetStatus = '',
+  compileResult = null,
+  batchId = '',
+  reqUser
+}) {
+  const policy = await timesheetLegacyImportService.assertImportAllowed({
+    orgId,
+    scope: timesheetLegacyImportService.IMPORT_SCOPES.MANAGEMENT
+  });
+  const resolvedTargetStatus = resolveImportExecutionTargetStatus(targetStatus, policy);
+
+  const targetPersonId = cleanId(personId);
+  const targetPeriodId = cleanId(periodId);
+  const resolvedBatchId = cleanId(batchId) || timesheetImportWorkSessionBuilderService.buildImportBatchId({
+    periodId: targetPeriodId,
+    personId: targetPersonId,
+    sourceFileName: compileResult?.fileName
+  });
+  const sourceFileName = String(compileResult?.fileName || 'imported.xlsx').trim();
+  const compiledRows = Array.isArray(compileResult?.rows) ? compileResult.rows : [];
 
   const period = await dataService.getDataById('timesheetPeriods', targetPeriodId, reqUser);
   if (!period) throw new Error('Timesheet period not found.');
@@ -544,25 +829,6 @@ async function performImportExecution({
     personId: targetPersonId,
     reqUser
   });
-  const resolvedPersonRole = timesheetPayrollContextService.normalizePayrollRole(personRole)
-    || (payrollContext.roles.length === 1 ? payrollContext.roles[0] : '');
-  if (payrollContext.roles.length > 1 && !resolvedPersonRole) {
-    const error = new Error('Select a payroll role before performing this import.');
-    error.statusCode = 400;
-    throw error;
-  }
-  if (resolvedPersonRole && !payrollContext.roles.includes(resolvedPersonRole)) {
-    const error = new Error('The selected payroll role is not valid for this person.');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const personName = await resolveImportPersonName({
-    orgId,
-    personId: targetPersonId,
-    reqUser,
-    fallback: payrollContext.personName
-  });
 
   const steps = {
     workSessions: { status: 'pending', summary: '', error: '' },
@@ -570,70 +836,42 @@ async function performImportExecution({
     processed: { status: 'pending', summary: '', error: '' }
   };
   let createdTimesheetId = '';
+  let defaultActivityId = '';
+  let usedActivityIds = [];
 
   try {
     steps.workSessions.status = 'running';
-    await timesheetLegacyImportService.cleanupStatHolidayForTimesheetTarget({
+    const executionOutcome = await executeActivityFirstImportForPeriod({
       orgId,
       personId: targetPersonId,
       period,
-      reqUser
+      policy,
+      compiledRows,
+      batchId: resolvedBatchId,
+      sourceFileName,
+      personRole,
+      personName: payrollContext.personName,
+      targetStatus: resolvedTargetStatus,
+      priorTimesheet,
+      reqUser,
+      requirePayrollRoleWhenAmbiguous: true
     });
-    for (const activityId of usedActivityIds) {
-      await timesheetImportWorkSessionBuilderService.removeImportWorkSessionsForTarget({
-        activityId,
-        personId: targetPersonId,
-        periodId: targetPeriodId,
-        periodStartDate: period.startDate,
-        periodEndDate: period.endDate,
-        reqUser
-      });
-      await timesheetImportWorkSessionBuilderService.removeTrackedImportWorkSessionsForPersonPeriod({
-        orgId,
-        personId: targetPersonId,
-        periodStartDate: period.startDate,
-        periodEndDate: period.endDate,
-        importActivityId: activityId,
-        reqUser
-      });
-    }
-
-    const workSessionOutcomes = [];
-    for (const [activityId, rows] of buckets.entries()) {
-      const activity = activityCache.get(activityId);
-      if (!activity || !rows.length) continue;
-      const outcome = await timesheetImportWorkSessionBuilderService.createImportWorkSessions({
-        orgId,
-        activity,
-        compiledRows: rows,
-        personId: targetPersonId,
-        personName,
-        personRole: resolvedPersonRole || payrollContext.defaultRole,
-        periodId: targetPeriodId,
-        batchId: resolvedBatchId,
-        sourceFileName,
-        baseStartTime: policy.importBaseStartTime,
-        workSessionStartTime: policy.importWorkSessionStartTime,
-        workSessionEndTime: policy.importWorkSessionEndTime,
-        workSessionDefaultTitle: timesheetImportPolicyService.resolveImportWorkSessionDefaultTitle(policy),
-        consolidateIntoOneWorkSession: policy.saveImportedSessionsIntoOneWorkSession !== false,
-        skipStacking: true,
-        reqUser
-      });
-      workSessionOutcomes.push({
-        activityId: cleanId(outcome.activityId),
-        createdEntryIds: outcome.createdEntryIds,
-        createdSessionIds: outcome.createdSessionIds,
-        rowCount: outcome.rowCount
-      });
-    }
-
-    const totalAssigneeRowCount = workSessionOutcomes.reduce((sum, row) => sum + Number(row.rowCount || 0), 0);
-    const totalDailyEntryCount = workSessionOutcomes.reduce(
-      (sum, row) => sum + (Array.isArray(row.createdEntryIds) ? row.createdEntryIds.length : 0),
-      0
-    );
-    const createdEntryIds = workSessionOutcomes.flatMap((row) => row.createdEntryIds || []);
+    defaultActivityId = cleanId(executionOutcome.defaultActivity?.id);
+    usedActivityIds = executionOutcome.usedActivityIds || [];
+    const {
+      workSessionOutcomes,
+      totalAssigneeRowCount,
+      totalDailyEntryCount,
+      createdEntryIds,
+      saved,
+      importEntries,
+      importTotalHours,
+      statHolidayWarnings,
+      statHolidayBlocked,
+      appliedStatus: savedStatusLabel,
+      requiresPostSaveFinalization,
+      effectiveTargetStatus
+    } = executionOutcome;
     const activityCount = workSessionOutcomes.length;
     steps.workSessions = {
       status: 'success',
@@ -646,149 +884,7 @@ async function performImportExecution({
     };
 
     steps.timesheet.status = 'running';
-    const allowedImportSessionIds = new Set();
-    workSessionOutcomes.forEach((outcome) => {
-      timesheetImportWorkSessionBuilderService.buildImportActivitySessionIds({
-        activityId: outcome.activityId,
-        personId: targetPersonId,
-        entryIds: outcome.createdEntryIds,
-        sessionIds: outcome.createdSessionIds
-      }).forEach((sessionId) => allowedImportSessionIds.add(sessionId));
-    });
-    const importActivitySessionGuard = {
-      activityId: cleanId(defaultActivity.id),
-      protectedActivityIds,
-      personId: targetPersonId,
-      allowedSessionIds: allowedImportSessionIds
-    };
-    const assembly = await timesheetLiveAssemblyService.buildImportedTimesheetEntries({
-      orgId,
-      personId: targetPersonId,
-      period,
-      reqUser,
-      personName,
-      personRole: resolvedPersonRole || payrollContext.defaultRole,
-      allowManagerOverride: false,
-      supplementalEntryFilter: buildImportSupplementalEntryFilter(resolvedBatchId),
-      importActivitySessionGuard
-    });
-    if (!assembly.entries.length) {
-      throw new Error('No timesheet entries were assembled for the selected period.');
-    }
-
-    let importEntries = assembly.entries;
-    let importTotalHours = assembly.totalHours;
-    let statHolidayWarnings = [];
-    let effectiveTargetStatus = resolvedTargetStatus;
-    let statHolidayBlocked = false;
-    const [timesheetParametersPolicy, allHolidays] = await Promise.all([
-      timesheetParametersPolicyModel.getPolicyForOrg(orgId),
-      dataService.fetchAllData('holidays', {}, reqUser)
-    ]);
-    if (shouldApplyStatHoliday
-      && statutoryHolidayTimesheetLifecycleService.isStatHolidayPayEnabled(timesheetParametersPolicy)) {
-      const periodWorkdayEntries = statutoryHolidayEligibilityService.assemblePeriodWorkdayEntries(
-        [],
-        importEntries
-      );
-      const statHolidayMaterialization = await statutoryHolidayTimesheetLifecycleService.applyStatHolidayOnTimesheetSubmit({
-        orgId,
-        personId: targetPersonId,
-        personName,
-        personRole: resolvedPersonRole || payrollContext.defaultRole,
-        period,
-        policy: timesheetParametersPolicy,
-        holidays: allHolidays,
-        periodEntries: periodWorkdayEntries,
-        existingEntries: importEntries,
-        reqUser
-      });
-      statHolidayWarnings = Array.isArray(statHolidayMaterialization?.warnings)
-        ? statHolidayMaterialization.warnings
-        : [];
-      const blockingErrors = Array.isArray(statHolidayMaterialization?.blockingErrors)
-        ? statHolidayMaterialization.blockingErrors.filter(Boolean)
-        : [];
-      statHolidayBlocked = blockingErrors.length > 0
-        || statHolidayMaterialization?.syncOutcome?.blocked === true;
-      if (statHolidayBlocked) {
-        effectiveTargetStatus = 'draft';
-        statHolidayWarnings = [
-          ...statHolidayWarnings,
-          ...blockingErrors.map((message) => ({
-            blocking: true,
-            reasons: [message]
-          }))
-        ];
-      }
-      importEntries = statutoryHolidayTimesheetLifecycleService.mergeStatHolidayRowsIntoEntries({
-        entries: importEntries,
-        statHolidayRows: statHolidayMaterialization?.rows || [],
-        usesActivityMode: statHolidayMaterialization?.usesActivityMode === true,
-        existingEntriesBySessionId: new Map()
-      });
-      if (statHolidayMaterialization?.usesActivityMode === true && !statHolidayBlocked) {
-        const resolvedPolicy = timesheetParametersPolicyService.resolvePolicy(timesheetParametersPolicy);
-        const schemeActivityIds = new Set(
-          statutoryHolidaySchemeService.resolveAllSchemeActivityIds(resolvedPolicy)
-            .map((activityId) => cleanId(activityId))
-            .filter(Boolean)
-        );
-        const refreshedActivitySessions = await activityService.getTimesheetEntriesForPerson({
-          orgId,
-          personId: targetPersonId,
-          periodStartDate: period.startDate,
-          periodEndDate: period.endDate,
-          reqUser
-        });
-        const scopedStatHolidaySessions = (Array.isArray(refreshedActivitySessions) ? refreshedActivitySessions : [])
-          .filter((row) => schemeActivityIds.has(cleanId(row?.activityId)));
-        importEntries = mergeStatHolidayActivitySessionsIntoEntries(importEntries, scopedStatHolidaySessions);
-      }
-      importTotalHours = timesheetLiveAssemblyService.calculateTimesheetTotal(importEntries);
-    }
-
-    const nowIso = new Date().toISOString();
-    const basePayload = {
-      orgId,
-      periodId: targetPeriodId,
-      teacherId: targetPersonId,
-      status: 'draft',
-      entries: importEntries,
-      totalHours: importTotalHours,
-      legacyImport: {
-        activityId: cleanId(defaultActivity.id),
-        sourceFileName,
-        importedAt: nowIso,
-        importedBy: cleanId(reqUser?.id),
-        rowCount: totalAssigneeRowCount,
-        matchedPeriodId: targetPeriodId,
-        legacyImportBatchId: resolvedBatchId,
-        executionMode: 'activity_first',
-        workSessionEntryIds: createdEntryIds,
-        workSessionActivities: workSessionOutcomes.map((outcome) => ({
-          activityId: outcome.activityId,
-          entryIds: outcome.createdEntryIds,
-          rowCount: outcome.rowCount
-        }))
-      }
-    };
-    if (priorTimesheet?.id) {
-      basePayload.id = cleanId(priorTimesheet.id);
-    }
-
-    const { payload: lifecyclePayload, requiresPostSaveFinalization, appliedStatus } =
-      timesheetImportLifecycleService.prepareImportTargetPayload({
-        basePayload,
-        period,
-        targetStatus: effectiveTargetStatus,
-        reqUser,
-        priorTimesheet
-      });
-
-    let saved = await timesheetLegacyImportService.persistTimesheetPayload(lifecyclePayload, reqUser);
     createdTimesheetId = cleanId(saved?.id);
-    const savedStatusLabel = String(appliedStatus || effectiveTargetStatus || 'draft');
     const draftFallbackNote = statHolidayBlocked && resolvedTargetStatus !== 'draft'
       ? ` Saved as draft because statutory holiday work sessions are missing in Settings (requested ${resolvedTargetStatus}).`
       : '';
@@ -804,18 +900,11 @@ async function performImportExecution({
 
     if (requiresPostSaveFinalization) {
       steps.processed.status = 'running';
-      saved = await timesheetImportLifecycleService.finalizeImportTargetAfterSave({
-        savedTimesheet: saved,
-        period,
-        targetStatus: appliedStatus || resolvedTargetStatus,
-        reqUser,
-        dataService
-      });
       steps.processed = {
         status: 'success',
-        summary: describeImportFinalizeSummary(appliedStatus || resolvedTargetStatus),
+        summary: describeImportFinalizeSummary(savedStatusLabel),
         error: '',
-        timesheetId: cleanId(saved?.id),
+        timesheetId: createdTimesheetId,
         appliedStatus: savedStatusLabel
       };
     }
@@ -841,7 +930,7 @@ async function performImportExecution({
 
     const rolledBack = await rollbackImportExecution({
       batchId: resolvedBatchId,
-      activityId: cleanId(defaultActivity.id),
+      activityId: defaultActivityId,
       activityIds: usedActivityIds,
       timesheetId: createdTimesheetId,
       reqUser
@@ -858,6 +947,7 @@ async function performImportExecution({
 module.exports = {
   buildImportExecutionPlan,
   performImportExecution,
+  executeActivityFirstImportForPeriod,
   rollbackImportExecution,
   resolveImportActivitiesForExecution,
   isPerformableCompileResult,

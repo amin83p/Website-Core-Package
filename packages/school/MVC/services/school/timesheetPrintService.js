@@ -2,6 +2,8 @@
 
 const schoolDataService = require('./schoolDataService');
 const timesheetEffectiveEntryService = require('./timesheetEffectiveEntryService');
+const timesheetDisplayPolicyService = require('./timesheetDisplayPolicyService');
+const timesheetDisplayPolicyModel = require('../../models/school/timesheetDisplayPolicyModel');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const classSessionCapacityService = require('./classSessionCapacityService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -13,6 +15,10 @@ const LEGACY_DISPLAY_FIELDS = Object.freeze([
   'description',
   'activityId',
   'activityName',
+  'workSessionName',
+  'assigneeNote',
+  'importedRowContent',
+  'legacyImportClassName',
   'categoryName',
   'deliveryDepartmentId',
   'deliveryDepartmentName',
@@ -284,7 +290,7 @@ function buildLookupMaps(effective = {}) {
   const departmentMap = new Map((Array.isArray(effective.departments) ? effective.departments : [])
     .map((row) => [cleanText(row?.id), row])
     .filter(([id]) => Boolean(id)));
-  return { classMap, departmentMap };
+  return { classMap, departmentMap, departments: Array.isArray(effective.departments) ? effective.departments : [] };
 }
 
 function resolveDepartmentMeta(entry = {}, lookups = {}) {
@@ -538,7 +544,7 @@ function resolveStatusLabel(entry = {}) {
   return titleCase(entry.status || (entry.isManual === true ? 'manual' : '')) || '-';
 }
 
-function shapePrintEntry(entry = {}, lookups = {}) {
+function shapePrintEntry(entry = {}, lookups = {}, displayPolicy = null) {
   const department = resolveDepartmentMeta(entry, lookups);
   const requestedHours = resolveRequestedHours(entry);
   const payableHours = resolvePayableHours(entry);
@@ -590,11 +596,23 @@ function shapePrintEntry(entry = {}, lookups = {}) {
     timeLabel = startTime ? `${startTime}${endTime ? ` – ${endTime}` : ''}` : 'Manual time';
   }
 
+  const resolvedDisplayPolicy = displayPolicy || lookups.displayPolicy || timesheetDisplayPolicyService.DEFAULT_POLICY;
+  const enrichedEntry = timesheetDisplayPolicyService.enrichEntryDisplayMetadata(entry);
+  const composed = timesheetDisplayPolicyService.composeTimesheetRowDisplay(enrichedEntry, resolvedDisplayPolicy, {
+    departmentMap: lookups.departmentMap,
+    orgDepartments: lookups.departments,
+    orgId: cleanText(entry.orgId || lookups.orgId)
+  });
+  const displayPrimaryText = composed.primaryText || primaryLabel;
+  const displayTimeLine = composed.showTimeRow ? composed.timeRowText : '';
+
   return {
     ...entry,
     department,
-    primaryLabel,
-    secondaryLabel: name && name !== primaryLabel ? name : '',
+    primaryLabel: displayPrimaryText,
+    secondaryLabel: composed.showTimeRow ? '' : (name && name !== primaryLabel ? name : ''),
+    displayPrimaryText,
+    displayTimeLine,
     isActivity,
     requestedHours,
     payableHours,
@@ -602,7 +620,7 @@ function shapePrintEntry(entry = {}, lookups = {}) {
     regularDisplayHours,
     regularHoursLabel,
     optionalHoursLabel,
-    scheduleLabel: timeLabel,
+    scheduleLabel: displayTimeLine || timeLabel,
     payableNote,
     hoursIsStruck,
     timeLabel,
@@ -694,11 +712,13 @@ function buildDepartmentTotals(entries = [], lookups = {}) {
   return { rows, totals };
 }
 
-function buildShapedPrintEntriesFromEffective(effective = {}) {
+function buildShapedPrintEntriesFromEffective(effective = {}, displayPolicy = null) {
   const authoritative = resolveAuthoritativeEntries(effective);
   const lookups = buildLookupMaps(effective);
+  if (displayPolicy) lookups.displayPolicy = displayPolicy;
+  const policy = displayPolicy || timesheetDisplayPolicyService.DEFAULT_POLICY;
   const entries = sortEntriesBySchedule(authoritative.entries)
-    .map((entry) => shapePrintEntry(entry, lookups));
+    .map((entry) => shapePrintEntry(entry, lookups, policy));
   return { authoritative, lookups, entries };
 }
 
@@ -713,7 +733,8 @@ async function buildTimesheetPrintDocument({
   activeOrgId,
   reqUser,
   holidays = null,
-  printReviewType = 'managerial'
+  printReviewType = 'managerial',
+  displayPolicy = null
 }) {
   const normalizedReviewType = parsePrintReviewType(printReviewType);
   const personId = cleanText(person?.id || person?.personId);
@@ -723,7 +744,9 @@ async function buildTimesheetPrintDocument({
     activeOrgId,
     reqUser
   });
-  const { authoritative, entries } = buildShapedPrintEntriesFromEffective(effective);
+  const resolvedDisplayPolicy = displayPolicy
+    || await timesheetDisplayPolicyModel.getPolicyForOrg(activeOrgId);
+  const { authoritative, entries } = buildShapedPrintEntriesFromEffective(effective, resolvedDisplayPolicy);
   const entriesByDate = new Map();
   entries.forEach((entry) => {
     const date = cleanText(entry.date);
@@ -850,9 +873,10 @@ async function buildTimesheetPrintContext({
 }) {
   const normalizedReviewType = parsePrintReviewType(printReviewType);
   const documents = [];
-  const [holidays, organizationName] = await Promise.all([
+  const [holidays, organizationName, displayPolicy] = await Promise.all([
     schoolDataService.fetchAllData('holidays', {}, reqUser),
-    resolveOrganizationName(reqUser, activeOrgId)
+    resolveOrganizationName(reqUser, activeOrgId),
+    timesheetDisplayPolicyModel.getPolicyForOrg(activeOrgId)
   ]);
   for (const person of (Array.isArray(people) ? people : [])) {
     // Deliberately sequential to avoid multiplying class/enrollment reads for large batches.
@@ -863,7 +887,8 @@ async function buildTimesheetPrintContext({
       activeOrgId,
       reqUser,
       holidays,
-      printReviewType: normalizedReviewType
+      printReviewType: normalizedReviewType,
+      displayPolicy
     }));
   }
   const printedAtIso = new Date().toISOString();

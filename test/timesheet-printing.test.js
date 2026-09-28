@@ -440,7 +440,9 @@ function sampleDocument(name, overrides = {}) {
       holidayName: '',
       entries: [{
         department: { code: 'EAL', name: 'English' },
-        primaryLabel: 'ESL',
+        primaryLabel: 'EAL',
+        displayPrimaryText: 'EAL',
+        displayTimeLine: '08:00 – 09:30',
         secondaryLabel: '<script>alert(1)</script>',
         isOneOnOne: true,
         roleLabel: 'Teacher',
@@ -586,7 +588,8 @@ test('print review type defaults to managerial and financial uses a compact desc
 
   assert.match(managerialHtml, /print-review-managerial/);
   assert.doesNotMatch(managerialHtml, /Statutory Holiday Pay Summary/);
-  assert.match(managerialHtml, /class="session-class-time-line">&lt;script&gt;alert\(1\)&lt;\/script&gt; - 08:00 – 09:30<\/div>/);
+  assert.match(managerialHtml, /class="session-class-time-line">08:00 – 09:30<\/div>/);
+  assert.doesNotMatch(managerialHtml, /session-class-time-line">.*alert\(1\)/);
   assert.match(managerialHtml, /class="badge role-badge">Teacher<\/span>/);
   assert.match(managerialHtml, /class="badge status-badge">Completed<\/span>/);
 });
@@ -643,6 +646,32 @@ test('shapePrintEntry exposes split regular and optional hour labels without hrs
   assert.equal(shaped.regularDisplayHours, 0);
   assert.equal(shaped.optionalHours, 1.5);
 
+  const displayPolicy = {
+    pulledClassSession: [
+      { kind: 'separator', text: '[' },
+      { kind: 'field', field: 'className' },
+      { kind: 'separator', text: ']' },
+      { kind: 'field', field: 'sessionDateTime' }
+    ],
+    pulledActivityAssignee: printService.shapePrintEntry ? [] : [],
+    manualRow: [],
+    importedTimesheet: []
+  };
+  const composedRow = printService.shapePrintEntry({
+    sessionId: 'sess-display',
+    deliveryDepartmentCode: 'ESL',
+    className: 'Algebra',
+    startTime: '09:00',
+    endTime: '10:00'
+  }, { classMap: new Map(), departmentMap: new Map() }, {
+    pulledClassSession: displayPolicy.pulledClassSession,
+    pulledActivityAssignee: [{ kind: 'field', field: 'departmentName' }],
+    manualRow: [{ kind: 'field', field: 'departmentName' }],
+    importedTimesheet: [{ kind: 'field', field: 'importedRowContent' }]
+  });
+  assert.equal(composedRow.displayPrimaryText, 'ESL[Algebra]');
+  assert.equal(composedRow.displayTimeLine, '09:00 – 10:00');
+
   const pending = printService.shapePrintEntry({
     sessionId: 'pending-row',
     isManual: true,
@@ -650,10 +679,11 @@ test('shapePrintEntry exposes split regular and optional hour labels without hrs
     requestedHours: 2.5
   }, { classMap: new Map(), departmentMap: new Map() });
 
-  assert.equal(pending.regularHoursLabel, '2.50');
-  assert.equal(pending.hoursIsStruck, true);
-  assert.equal(pending.payableNote, '0.00 payable (pending)');
+  assert.equal(pending.regularHoursLabel, '0.00');
+  assert.equal(pending.hoursIsStruck, false);
+  assert.equal(pending.payableNote, '');
   assert.equal(pending.optionalHoursLabel, '—');
+  assert.equal(pending.displayTimeLine, 'Manual time');
 });
 
 test('standalone print view renders safe single and batch documents with print CSS', () => {
@@ -776,7 +806,8 @@ test('standalone print view renders safe single and batch documents with print C
   assert.doesNotMatch(html, /border-left: 0; border-right: 0;/);
   assert.match(html, /class="badge status-badge">Completed<\/span>\s*<span class="comment-separator">-<\/span><span class="comment-text">Printed comment<\/span>/);
   assert.match(html, /class="session-department-line">\s*<span class="session-department-text">EAL<\/span>/);
-  assert.match(html, /class="session-class-time-line">&lt;script&gt;alert\(1\)&lt;\/script&gt; - 08:00 – 09:30<\/div>/);
+  assert.match(html, /class="session-class-time-line">08:00 – 09:30<\/div>/);
+  assert.doesNotMatch(html, /session-class-time-line">.*alert\(1\)/);
   assert.doesNotMatch(html, /class="schedule-label"/);
   assert.doesNotMatch(html, /class="primary-label"/);
   assert.match(html, /Total Period Hours:/);
@@ -835,7 +866,6 @@ test('standalone print view renders safe single and batch documents with print C
   assert.doesNotMatch(html, /class="document-footer"/);
   assert.doesNotMatch(html, /Manager Approved/);
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
-  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, />Act</);
 });
 

@@ -373,21 +373,58 @@ test('School Settings Mongo seed is idempotent and links the SCHOOL parent', () 
 
 test('settings policy persistence remains organization-keyed for JSON and Mongo', () => {
   const controller = read('packages/school/MVC/controllers/school/schoolSettingsController.js');
-  const conductModel = read('packages/school/MVC/models/school/conductRatingScalePolicyModel.js');
-  const attendanceModel = read('packages/school/MVC/models/school/attendanceMatrixPolicyModel.js');
-  const studentAttendanceReportModel = read('packages/school/MVC/models/school/studentAttendanceReportPolicyModel.js');
-  const timesheetParametersModel = read('packages/school/MVC/models/school/timesheetParametersPolicyModel.js');
+  const settingsView = read('packages/school/MVC/views/school/settings/index.ejs');
+  const policyModels = [
+    'packages/school/MVC/models/school/conductRatingScalePolicyModel.js',
+    'packages/school/MVC/models/school/attendanceMarkAppearancePolicyModel.js',
+    'packages/school/MVC/models/school/attendanceMatrixPolicyModel.js',
+    'packages/school/MVC/models/school/studentAttendanceReportPolicyModel.js',
+    'packages/school/MVC/models/school/semiMonthlyReportPolicyModel.js',
+    'packages/school/MVC/models/school/autosavePolicyModel.js',
+    'packages/school/MVC/models/school/sessionAccessPolicyModel.js',
+    'packages/school/MVC/models/school/enrollmentFinishAlertPolicyModel.js',
+    'packages/school/MVC/models/school/timesheetParametersPolicyModel.js',
+    'packages/school/MVC/models/school/timesheetImportPolicyModel.js',
+    'packages/school/MVC/models/school/timesheetDisplayPolicyModel.js'
+  ].map(read);
   assert.match(controller, /String\(user\?\.activeOrgId \|\| ''\)\.trim\(\)/);
   assert.doesNotMatch(controller, /primaryOrgId/);
-  [conductModel, attendanceModel, timesheetParametersModel].forEach((source) => {
+  assert.match(settingsView, /schoolSettingsFormPayload\.js/);
+  assert.match(settingsView, /encodeSchoolSettingsFormPayload/);
+  policyModels.forEach((source) => {
     assert.match(source, /runByRepositoryBackend/);
-    assert.match(source, /byOrgId\[(?:orgKey\(activeOrgId\)|key)\]/);
     assert.match(source, /json:/);
     assert.match(source, /mongo:/);
   });
-  assert.match(attendanceModel, /thresholdsEnabled/);
-  assert.match(attendanceModel, /getPolicyCatalogForOrg/);
-  assert.match(studentAttendanceReportModel, /overallReportTemplateIds/);
+  assert.match(policyModels[2], /thresholdsEnabled/);
+  assert.match(policyModels[2], /getPolicyCatalogForOrg/);
+  assert.match(policyModels[3], /overallReportTemplateIds/);
+});
+
+test('school settings form payload encoder preserves nested layout JSON for urlencoded POST', () => {
+  const { encodeSchoolSettingsFormPayload } = require(
+    '../packages/school/public/scripts/schoolSettingsFormPayload.js'
+  );
+  const layouts = {
+    manualRow: [
+      { kind: 'field', field: 'departmentName', line: 1 },
+      { kind: 'separator', text: ' | ', line: 1 }
+    ]
+  };
+  const encoded = encodeSchoolSettingsFormPayload({
+    actionStateId: 'STATE_1',
+    layouts,
+    enabled: true
+  });
+  assert.equal(encoded.actionStateId, 'STATE_1');
+  assert.equal(encoded.enabled, 'true');
+  assert.equal(encoded.layouts, JSON.stringify(layouts));
+  assert.doesNotMatch(encoded.layouts, /\[object Object\]/);
+
+  const service = require('../packages/school/MVC/services/school/timesheetDisplayPolicyService');
+  const merged = { ...encoded, ...JSON.parse(encoded.layouts) };
+  const normalized = service.validatePolicyInput(merged);
+  assert.equal(normalized.manualRow.some((row) => row.kind === 'separator'), true);
 });
 
 test('attendance settings reject empty, invalid, and ambiguous default rows', () => {

@@ -466,12 +466,14 @@
                     </td>
                   <% } %>
                   <%
-                    const sessionDepartmentLine = String(entry.department?.code || entry.primaryLabel || entry.department?.name || 'Activity').trim();
-                    const sessionClassLabel = String(entry.secondaryLabel || entry.primaryLabel || '').trim();
-                    const sessionTimeLabel = String(entry.scheduleLabel || '').trim();
-                    const sessionClassTimeLine = isFinancialPrint
+                    const sessionDepartmentLine = String(entry.displayPrimaryText || entry.primaryLabel || entry.department?.code || entry.department?.name || 'Activity').trim();
+                    const sessionClassLabel = String(entry.secondaryLabel || '').trim();
+                    const sessionTimeLabel = String(entry.displayTimeLine || entry.scheduleLabel || '').trim();
+                    const sessionSecondaryLine = isFinancialPrint
                       ? ''
-                      : [sessionClassLabel, sessionTimeLabel].filter(Boolean).join(' - ');
+                      : (entry.displayTimeLine
+                        ? sessionTimeLabel
+                        : [sessionClassLabel, sessionTimeLabel].filter(Boolean).join(' - '));
                   %>
                   <td>
                     <div class="session-description">
@@ -480,7 +482,7 @@
                         <% if (entry.isOneOnOne) { %><span class="badge one-on-one-badge">One on One</span><% } %>
                         <% if (!isFinancialPrint && entry.roleLabel) { %><span class="badge role-badge"><%= entry.roleLabel %></span><% } %>
                       </div>
-                      <% if (sessionClassTimeLine) { %><div class="session-class-time-line"><%= sessionClassTimeLine %></div><% } %>
+                      <% if (sessionSecondaryLine) { %><div class="session-class-time-line"><%= sessionSecondaryLine %></div><% } %>
                     </div>
                   </td>
                   <td>

@@ -829,6 +829,44 @@ test('performImportExecution requires role when person has teacher and staff rol
   }
 });
 
+test('performImportExecution assembles imported rows with assignee note and comment fields', async () => {
+  const stub = stubExecutionDeps();
+  const originalAssemble = timesheetLiveAssemblyService.buildImportedTimesheetEntries;
+  timesheetLiveAssemblyService.buildImportedTimesheetEntries = async () => ({
+    entries: [{
+      sessionId: 'act-ACT_IMPORT-ENT-1-PERSON_1',
+      date: '2026-03-01',
+      hours: 2,
+      timesheetHours: 2,
+      assigneeNote: 'Math 10',
+      comment: 'Alex | OPTIONAL Hours (1 hr) | Prep',
+      isManual: false,
+      isSchoolActivity: true
+    }],
+    totalHours: 2,
+    statHolidayWarnings: [],
+    payrollContext: { defaultRole: 'teacher', roles: ['teacher'] },
+    personRole: 'teacher'
+  });
+  try {
+    await executionService.performImportExecution({
+      orgId: 'ORG_1',
+      personId: 'PERSON_1',
+      periodId: 'PER_A',
+      personRole: 'teacher',
+      compileResult: compileOkResult('PER_A'),
+      batchId: 'BATCH_COMMENT',
+      reqUser: REQ_USER
+    });
+    const saved = stub.getCreatedTimesheets()[0];
+    assert.equal(saved.entries[0].assigneeNote, 'Math 10');
+    assert.equal(saved.entries[0].comment, 'Alex | OPTIONAL Hours (1 hr) | Prep');
+  } finally {
+    timesheetLiveAssemblyService.buildImportedTimesheetEntries = originalAssemble;
+    stub.restore();
+  }
+});
+
 test('performImportExecution creates work sessions across mapped and default activities', async () => {
   const mappedPolicy = {
     ...POLICY,
