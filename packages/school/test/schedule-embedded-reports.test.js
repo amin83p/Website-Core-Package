@@ -105,8 +105,9 @@ test('personSchedule wires embedded report preprocessing and badge rendering', (
   assert.match(source, /prepareEventsByDateForTimelineGrid\(eventsByDate\)/);
   assert.match(source, /buildEmbeddedReportBadgesHtml\(ev\?\.embeddedReports\)/);
   assert.match(source, /getEmbeddedReportTooltipLine/);
-  assert.match(source, /\.schedule-embedded-reports/);
-  assert.match(source, /\.schedule-embedded-report-badge/);
   assert.match(source, /buildScheduleEmbeddedReportsClass/);
-  assert.match(source, /\.has-embedded-reports/);
+  const css = read('public/styles/schedule-viewer.css');
+  assert.match(css, /\.schedule-embedded-reports/);
+  assert.match(css, /\.schedule-embedded-report-badge/);
+  assert.match(css, /\.has-embedded-reports/);
 });
