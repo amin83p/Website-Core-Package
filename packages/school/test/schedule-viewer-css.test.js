@@ -28,6 +28,8 @@ test('schedule-viewer.css includes critical layout selectors', () => {
   assert.match(css, /\.schedule-viewbar-sticky\b/);
   assert.match(css, /body\.schedule-stage-overlay-open/);
   assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(css, /@media \(hover: hover\)/);
+  assert.match(css, /\.conflict-zone,\s*\n\s*\.cal-day\.conflict \{ animation: none; \}/);
 });
 
 test('package mirror matches served schedule-viewer.css', () => {
