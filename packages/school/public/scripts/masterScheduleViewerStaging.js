@@ -604,8 +604,14 @@
             });
             deps.scheduleState.draftBatchesByPersonId[person.id] = [...keptBatches, ...Array.from(payloadBatchById.values())];
             recomputeDraftOverlaps(person.id);
+            const stagedPaddingOptions = typeof deps.getStagedViewPaddingRangeOptions === 'function'
+                ? deps.getStagedViewPaddingRangeOptions()
+                : {};
             const viewRange = sessions.length
-                ? deps.scheduleCalendarCore.computeStagedSessionsViewRange(sessions, payload.viewRange || {})
+                ? deps.scheduleCalendarCore.computeStagedSessionsViewRange(sessions, {
+                    ...(payload.viewRange || {}),
+                    ...stagedPaddingOptions
+                })
                 : (payload.viewRange || {});
             const start = String(viewRange.startDate || '').trim();
             const end = String(viewRange.endDate || '').trim();
@@ -838,8 +844,12 @@
                     }
                     return;
                 }
+                const stagedPaddingOptions = typeof deps.getStagedViewPaddingRangeOptions === 'function'
+                    ? deps.getStagedViewPaddingRangeOptions()
+                    : {};
                 const paddedRange = deps.scheduleCalendarCore.computeStagedSessionsViewRange(result.sessions, {
-                    anchorDate: scheduleStageContext.date
+                    anchorDate: scheduleStageContext.date,
+                    ...stagedPaddingOptions
                 });
                 const startDate = paddedRange.startDate;
                 const endDate = paddedRange.endDate;
@@ -882,7 +892,8 @@
                     sessionsToCreate: result.sessions,
                     existingEvents,
                     startDate,
-                    endDate
+                    endDate,
+                    ...stagedPaddingOptions
                 });
                 window.SessionEnrollmentCalendarModal.open({
                     mode: 'partial',
@@ -890,6 +901,7 @@
                     classLabel: scheduleStageClassContext.classLabel,
                     startDate,
                     endDate,
+                    ...stagedPaddingOptions,
                     sessionsToCreate: sessionsWithAttempt,
                     stagingAttempts,
                     existingEvents,
@@ -1961,6 +1973,16 @@
                 if (event) openScheduleDraftEditOverlay(event, source);
             });
     
+            document.getElementById('btn_scheduleDraftContextSelect')?.addEventListener('click', (clickEvent) => {
+                clickEvent.preventDefault();
+                const event = scheduleDraftContextEvent;
+                const source = scheduleDraftContextSource;
+                hideScheduleDraftSessionContextMenu();
+                if (event && typeof deps.openScheduleSessionBulkSelectModal === 'function') {
+                    deps.openScheduleSessionBulkSelectModal(event, { mode: 'draft', source });
+                }
+            });
+
             document.getElementById('btn_scheduleDraftContextSelectPass')?.addEventListener('click', (clickEvent) => {
                 clickEvent.preventDefault();
                 const event = scheduleDraftContextEvent;

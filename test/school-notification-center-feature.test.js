@@ -43,6 +43,8 @@ test('School notification centre routes, services, repositories, and views are w
   const policyService = readText('packages/school/MVC/services/school/notificationCenterOperationPolicyService.js');
   const runScopeService = readText('packages/school/MVC/services/school/notificationCenterRunScopeService.js');
   assert.match(routes, /SECTIONS\.SCHOOL_NOTIFICATION_CENTER/);
+  assert.match(routes, /requireNotificationCenterOperation/);
+  assert.match(routes, /notificationCenterRouteGuards/);
   assert.match(accessService, /notificationCenterOperationPolicyService/);
   assert.match(accessService, /OPERATIONS\.DELETE/);
   assert.match(policyService, /canDeleteOutbox/);
@@ -110,7 +112,11 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(listView, /Scheduled emails/);
   assert.match(listView, /canViewRuleMetadata/);
   assert.match(listView, /canDeleteRuns/);
-  assert.match(listView, /READ_ALL access to view recent runs/);
+  assert.match(listView, /READ_ALL access to view recent run results/);
+  assert.match(listView, /ncDeleteSelectedRuns/);
+  assert.match(listView, /canRemoveRunResults/);
+  assert.match(listView, /js-nc-delete-rule-runs/);
+  assert.match(listView, /Delete run results/);
   assert.match(listView, /runs\/<%= run\.id %>\/delete/);
   assert.match(listView, /js-nc-delete-run-form/);
   assert.match(listView, /X-AJAX-Request/);

@@ -11,7 +11,9 @@ const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const reportScopePolicy = require('./reportScopePolicy');
 const reportRosterService = require('./reportRosterService');
-const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
+const classEnrollmentDeleteService = require('./classEnrollmentDeleteService');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function inferAssignmentReportScope(row) {
   try {
@@ -70,6 +72,82 @@ async function resolveClassStudentIds({
   });
 
   return [...resolvedSet];
+}
+
+function nameLooksLikeUnresolvedId(name, personId) {
+  const token = String(name || '').trim();
+  const pid = String(personId || '').trim();
+  if (!token) return true;
+  if (pid && token === pid) return true;
+  return /^\d+$/.test(token);
+}
+
+async function resolveTargetPersonDisplayName(personId, reqUser, studentRowByPersonId, personById) {
+  const pid = String(personId || '').trim();
+  if (!pid) return 'Unknown student';
+  const studentRow = studentRowByPersonId.get(pid);
+  const studentId = toPublicId(studentRow?.id);
+  let person = personById.get(pid);
+  if (!person) {
+    person = await schoolPersonAccessService.getPersonById({ reqUser, personId: pid });
+    if (person) personById.set(pid, person);
+  }
+  let name = schoolPersonAccessService.formatPersonName(person, '');
+  if (nameLooksLikeUnresolvedId(name, pid) && studentId) {
+    const studentLabel = await classEnrollmentDeleteService.resolveStudentLabel(studentId, reqUser);
+    if (studentLabel && !nameLooksLikeUnresolvedId(studentLabel, studentId)) {
+      name = studentLabel;
+    }
+  }
+  if (nameLooksLikeUnresolvedId(name, pid)) {
+    const fallback = String(studentRow?.displayName || studentRow?.name || studentRow?.fullName || '').trim();
+    if (fallback && !nameLooksLikeUnresolvedId(fallback, pid)) name = fallback;
+  }
+  return nameLooksLikeUnresolvedId(name, pid) ? 'Unknown student' : name;
+}
+
+async function formatInvalidTargetStudentLabels(personIds = [], reqUser) {
+  const ids = [...new Set(
+    (Array.isArray(personIds) ? personIds : [])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean)
+  )];
+  if (!ids.length) return [];
+  const students = await schoolDataService.fetchAllData('students', {}, reqUser);
+  const studentRowByPersonId = new Map();
+  (Array.isArray(students) ? students : []).forEach((student) => {
+    const personId = String(student?.personId || '').trim();
+    if (personId) studentRowByPersonId.set(personId, student);
+  });
+  const personById = new Map();
+  const labels = [];
+  for (let index = 0; index < ids.length; index += 1) {
+    const personId = ids[index];
+    // eslint-disable-next-line no-await-in-loop
+    labels.push(await resolveTargetPersonDisplayName(personId, reqUser, studentRowByPersonId, personById));
+  }
+  return labels;
+}
+
+function buildInactiveEnrollmentForRowError({
+  rowLabel,
+  rowStart,
+  rowEnd,
+  invalidLabels
+}) {
+  const names = (Array.isArray(invalidLabels) ? invalidLabels : [])
+    .map((name) => String(name || '').trim())
+    .filter(Boolean);
+  const listed = names.join('\n');
+  const periodHint = rowStart && rowEnd
+    ? `${rowStart} through ${rowEnd}`
+    : String(rowLabel || '').trim();
+  return [
+    'INACTIVE_ENROLLMENT_ROW',
+    String(rowLabel || '').trim(),
+    periodHint,
+    listed
+  ].join('|');
 }
 
 function resolveAssignmentDurationFromTargetRows(targetRows = []) {
@@ -657,7 +735,8 @@ const reportIntegrityService = {
         let rowStudentIds = Array.isArray(targetRow?.targetStudentIds)
           ? targetRow.targetStudentIds.map((id) => String(id || '').trim()).filter(Boolean)
           : [];
-        if (!rowStudentIds.length && Array.isArray(selectedTargetStudentIds) && selectedTargetStudentIds.length) {
+        // Legacy single-target saves only: do not apply assignment-wide student union to each row.
+        if (!rowStudentIds.length && !targetRowsProvided && Array.isArray(selectedTargetStudentIds) && selectedTargetStudentIds.length) {
           rowStudentIds = selectedTargetStudentIds.map((id) => String(id || '').trim()).filter(Boolean);
         }
         if (reportScope === 'each_student' && !rowStudentIds.length) {
@@ -668,7 +747,14 @@ const reportIntegrityService = {
         }
         const invalidIds = rowStudentIds.filter((studentId) => !eligibleSet.has(studentId));
         if (invalidIds.length) {
-          throw new Error(`One or more selected students are not actively enrolled for target row (${rowLabel}).`);
+          // eslint-disable-next-line no-await-in-loop
+          const invalidLabels = await formatInvalidTargetStudentLabels(invalidIds, reqUser);
+          throw new Error(buildInactiveEnrollmentForRowError({
+            rowLabel,
+            rowStart,
+            rowEnd,
+            invalidLabels
+          }));
         }
         rowStudentIds.forEach((studentId) => persistedUnionStudentIds.add(studentId));
         effectiveTargetRows[rowIndex] = {

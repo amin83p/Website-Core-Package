@@ -1,0 +1,50 @@
+.schedule-person-chip-color-popover {
+    display: none;
+    min-width: 14rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.14);
+}
+.schedule-person-chip-color-popover.is-open {
+    display: block;
+}
+.schedule-person-chip-color-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+    margin-bottom: 0.55rem;
+}
+.schedule-person-chip-color-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+}
+.schedule-person-chip-color-field-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.schedule-person-chip-color-actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+.schedule-person-tab.has-custom-chip-colors {
+    font-weight: 800;
+}
+.schedule-person-tab.has-custom-chip-colors .badge {
+    background: rgba(255, 255, 255, 0.35) !important;
+    color: inherit !important;
+    border-color: rgba(255, 255, 255, 0.45) !important;
+}
+.schedule-person-tab.has-custom-chip-colors.active {
+    background: var(--schedule-person-tab-bg);
+    color: var(--schedule-person-tab-text);
+    border-color: var(--schedule-person-tab-border);
+    box-shadow: 0 0 0 2px var(--schedule-person-tab-text), 0 0.35rem 0.9rem rgba(15, 23, 42, 0.16);
+}

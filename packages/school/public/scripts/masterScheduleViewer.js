@@ -42,6 +42,9 @@
     const TIMELINE_START_HOUR = scheduleCalendarCore?.TIMELINE_START_HOUR ?? 7;
     const TIMELINE_END_HOUR = scheduleCalendarCore?.TIMELINE_END_HOUR ?? 22;
     const TOTAL_MINUTES = (TIMELINE_END_HOUR - TIMELINE_START_HOUR) * 60;
+    const DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE = 2;
+    const DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER = 2;
+    const MAX_STAGED_VIEW_PADDING_WEEKS = 12;
 
     function timeToMinutes(timeStr) {
         if (scheduleCalendarCore) return scheduleCalendarCore.timeToMinutes(timeStr);
@@ -206,6 +209,42 @@
             (Array.isArray(prefs.persons) && prefs.persons.length)
             || (prefs.startDate && prefs.endDate)
         );
+    }
+
+    function clampStagedViewPaddingWeeks(value, fallback) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.max(0, Math.min(MAX_STAGED_VIEW_PADDING_WEEKS, Math.floor(parsed)));
+    }
+
+    function readStagedViewPaddingFromPrefs(prefs = initialScheduleViewerPrefs) {
+        const source = prefs && typeof prefs === 'object' ? prefs : {};
+        return {
+            paddingWeeksBefore: clampStagedViewPaddingWeeks(
+                source.stagedViewPaddingWeeksBefore,
+                DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE
+            ),
+            paddingWeeksAfter: clampStagedViewPaddingWeeks(
+                source.stagedViewPaddingWeeksAfter,
+                DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER
+            )
+        };
+    }
+
+    function formatStagedViewPaddingLabel(padding = {}) {
+        const before = clampStagedViewPaddingWeeks(
+            padding.paddingWeeksBefore,
+            DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE
+        );
+        const after = clampStagedViewPaddingWeeks(
+            padding.paddingWeeksAfter,
+            DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER
+        );
+        return `${before} wk before · ${after} wk after`;
+    }
+
+    function getStagedViewPaddingRangeOptions(prefs = initialScheduleViewerPrefs) {
+        return readStagedViewPaddingFromPrefs(prefs);
     }
     function isLeaveEvent(event) {
         const candidates = [
@@ -1007,6 +1046,7 @@
         suppressGridClick: false,
         autoChangeDetectorEnabled: readScheduleAutoChangeDetector(),
         serverWorkspaceSaved: prefsHaveSavedWorkspace(initialScheduleViewerPrefs),
+        suppressWorkspaceAutoPersist: 0,
         timelinePreset: readTimelinePresetFromPrefs(initialScheduleViewerPrefs),
         weekTimelineOverrides: readWeekTimelineOverrides(),
         holidayDateSet: new Set(),
@@ -1128,6 +1168,10 @@
     function applyScheduleAutoChangeDetector(enabled, options = {}) {
         scheduleState.autoChangeDetectorEnabled = enabled === true;
         if (options.persist === true) {
+            if (scheduleState.serverWorkspaceSaved === true) {
+                queueScheduleWorkspaceAutoPersist();
+                return;
+            }
             if (scheduleViewerPrefsSaveTimer) window.clearTimeout(scheduleViewerPrefsSaveTimer);
             scheduleViewerPrefsSaveTimer = window.setTimeout(() => {
                 void persistScheduleViewerPreferencesPartial({ autoChangeDetector: enabled === true }, { silent: true });
@@ -1375,6 +1419,7 @@
     let hideScheduleDraftMoveOverlay = function hideScheduleDraftMoveOverlay() {};
     let openScheduleSavedSessionEditOverlay = function openScheduleSavedSessionEditOverlay() {};
     let openScheduleSavedSessionMoveOverlay = function openScheduleSavedSessionMoveOverlay() {};
+    let scheduleAdminUi = null;
 
     if (canDragCreateSessions && global.MasterScheduleViewerStaging && typeof global.MasterScheduleViewerStaging.install === 'function') {
       const stagingDeps = {
@@ -1395,7 +1440,9 @@
         isScheduleEventMutableUnderClassFocus, selectedScheduleRole, syncScheduleActiveClassChipAfterStaging,
         getScheduleRange, appendSavedClassSessionsToState, patchSavedClassSessionEventInState,
         applySavedSessionScheduleUpdate, resolveStagingPassSessionIds, getSelectedDraftEvents,
-        updateScheduleDraftSelectedControls, selectDraftSessionsInStagingPass
+        updateScheduleDraftSelectedControls, selectDraftSessionsInStagingPass,
+        getStagedViewPaddingRangeOptions,
+        openScheduleSessionBulkSelectModal
       };
       const stagingExports = global.MasterScheduleViewerStaging.install(stagingDeps);
       if (stagingExports && typeof stagingExports === 'object') {
@@ -1417,6 +1464,22 @@
         if (typeof stagingExports.openScheduleSavedSessionEditOverlay === 'function') openScheduleSavedSessionEditOverlay = stagingExports.openScheduleSavedSessionEditOverlay;
         if (typeof stagingExports.openScheduleSavedSessionMoveOverlay === 'function') openScheduleSavedSessionMoveOverlay = stagingExports.openScheduleSavedSessionMoveOverlay;
       }
+    }
+
+    if (canSelectAnyPerson && global.MasterScheduleViewerAdmin && typeof global.MasterScheduleViewerAdmin.install === 'function') {
+      scheduleAdminUi = global.MasterScheduleViewerAdmin.install({
+        escapeHtml,
+        scheduleState,
+        persistScheduleViewerPreferencesPartial,
+        renderSchedulePersonTabs,
+        mapSchedulePersonsForPreferences,
+        closeOtherSchedulePopovers: () => {
+          closeScheduleTimeRangePopover();
+          closeScheduleStagedPaddingPopover();
+          closeScheduleDaySizePopover();
+          closeScheduleActiveClassPopover();
+        }
+      });
     }
 
     function countActivePersonDraftSessions() {
@@ -2412,11 +2475,13 @@
             });
             document.querySelector('#scheduleSessionContextMenu .schedule-session-context-menu-section-label')?.classList.add('d-none');
             document.getElementById('scheduleSessionContextStatusList')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextSelect')?.classList.add('d-none');
         } else {
             renderScheduleSessionContextMenuHeader(event);
             renderScheduleSessionContextStatusList(event);
             bulkSection?.classList.add('d-none');
             bulkDivider?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextSelect')?.classList.toggle('d-none', !isClass);
             const quickEdit = isClass && isScheduledClassSessionScheduleEditable(event);
             const canMoveDate = isClass && canScheduleSessionChangeDate(event);
             document.getElementById('btn_scheduleSessionContextEdit')?.classList.toggle('d-none', !quickEdit);
@@ -2572,6 +2637,8 @@
         const menu = document.getElementById('scheduleSessionContextMenu');
         const visualArea = document.getElementById('visualDisplayArea');
         if (!menu || !visualArea) return;
+
+        bindScheduleSessionBulkSelectModal();
 
         visualArea.addEventListener('contextmenu', (mouseEvent) => {
             if (mouseEvent.target.closest('[data-schedule-session-select], .schedule-session-select')) return;
@@ -2735,6 +2802,12 @@
             hideScheduleSessionContextMenu();
             if (event) await openScheduleSessionEnrollmentModal(event);
         });
+        document.getElementById('btn_scheduleSessionContextSelect')?.addEventListener('click', (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            if (event) openScheduleSessionBulkSelectModal(event, { mode: 'saved', source: 'timeline' });
+        });
         document.getElementById('btn_scheduleSessionEnrollmentRefreshCurrent')?.addEventListener('click', async (clickEvent) => {
             clickEvent.preventDefault();
             const event = scheduleSessionEnrollmentModalEvent;
@@ -2885,6 +2958,355 @@
         refreshScheduleActiveView();
     }
 
+    let scheduleBulkSelectAnchor = null;
+    let scheduleBulkSelectMode = '';
+    let scheduleBulkSelectSource = 'timeline';
+    let scheduleSessionBulkSelectModalInstance = null;
+
+    function normalizeBulkSelectIsoDate(value) {
+        const cleaned = scheduleCalendarCore?.normalizeDateOnly?.(value) || String(value || '').trim();
+        return cleaned;
+    }
+
+    function compareBulkSelectIsoDates(a, b) {
+        const left = normalizeBulkSelectIsoDate(a);
+        const right = normalizeBulkSelectIsoDate(b);
+        if (!left || !right) return 0;
+        if (left < right) return -1;
+        if (left > right) return 1;
+        return 0;
+    }
+
+    function unionIsoDateRange(current, extraStart, extraEnd) {
+        const curStart = normalizeBulkSelectIsoDate(current?.startDate);
+        const curEnd = normalizeBulkSelectIsoDate(current?.endDate);
+        const extStart = normalizeBulkSelectIsoDate(extraStart);
+        const extEnd = normalizeBulkSelectIsoDate(extraEnd);
+        if (!curStart || !curEnd) {
+            if (!extStart || !extEnd) return { startDate: '', endDate: '', changed: false };
+            return { startDate: extStart, endDate: extEnd, changed: true };
+        }
+        let startDate = curStart;
+        let endDate = curEnd;
+        if (extStart && compareBulkSelectIsoDates(extStart, startDate) < 0) startDate = extStart;
+        if (extEnd && compareBulkSelectIsoDates(extEnd, endDate) > 0) endDate = extEnd;
+        const changed = startDate !== curStart || endDate !== curEnd;
+        return { startDate, endDate, changed };
+    }
+
+    function dateExtentsFromEvents(events) {
+        const list = Array.isArray(events) ? events : [];
+        let minDate = '';
+        let maxDate = '';
+        list.forEach((ev) => {
+            const date = normalizeBulkSelectIsoDate(ev?.date);
+            if (!date) return;
+            if (!minDate || compareBulkSelectIsoDates(date, minDate) < 0) minDate = date;
+            if (!maxDate || compareBulkSelectIsoDates(date, maxDate) > 0) maxDate = date;
+        });
+        if (!minDate || !maxDate) return { minDate: null, maxDate: null };
+        return { minDate, maxDate };
+    }
+
+    function defaultBulkSelectStopDate(anchorDate) {
+        const anchor = normalizeBulkSelectIsoDate(anchorDate);
+        const rangeEnd = normalizeBulkSelectIsoDate(getScheduleRange().endDate);
+        const anchorPlusThreeMonths = anchor && scheduleCalendarCore?.addDaysIso
+            ? scheduleCalendarCore.addDaysIso(anchor, 90)
+            : rangeEnd;
+        if (rangeEnd && anchorPlusThreeMonths) {
+            return rangeEnd < anchorPlusThreeMonths ? rangeEnd : anchorPlusThreeMonths;
+        }
+        return rangeEnd || anchorPlusThreeMonths || anchor;
+    }
+
+    function listBulkSelectCandidateEvents(personId, mode) {
+        const pid = String(personId || '').trim();
+        if (!pid) return [];
+        if (mode === 'draft') {
+            return (scheduleState.draftEventsByPersonId?.[pid] || []).filter((ev) => ev?.isDraft === true);
+        }
+        const base = Array.isArray(scheduleState.eventsByPersonId[pid]) ? scheduleState.eventsByPersonId[pid] : [];
+        return base.filter((ev) => isClassSessionScheduleEvent(ev));
+    }
+
+    function readBulkSelectModalSelectionMode() {
+        const checked = document.querySelector('input[name="scheduleSessionBulkSelectMode"]:checked');
+        return String(checked?.value || 'count').trim() === 'date' ? 'date' : 'count';
+    }
+
+    function syncBulkSelectModalModeUi() {
+        const selectionMode = readBulkSelectModalSelectionMode();
+        const stopInput = document.getElementById('scheduleSessionBulkSelectStopDate');
+        const countInput = document.getElementById('scheduleSessionBulkSelectCount');
+        const isDateMode = selectionMode === 'date';
+        if (stopInput) stopInput.disabled = !isDateMode;
+        if (countInput) countInput.disabled = isDateMode;
+    }
+
+    function bulkSelectCountModeHorizonEnd(anchorDate) {
+        const anchor = normalizeBulkSelectIsoDate(anchorDate);
+        const rangeEnd = normalizeBulkSelectIsoDate(getScheduleRange().endDate);
+        const twoYearsOut = anchor && scheduleCalendarCore?.addDaysIso
+            ? scheduleCalendarCore.addDaysIso(anchor, 730)
+            : rangeEnd;
+        let end = rangeEnd || twoYearsOut || anchor;
+        if (twoYearsOut && compareBulkSelectIsoDates(twoYearsOut, end) > 0) end = twoYearsOut;
+        return end || anchor;
+    }
+
+    function collectMatchingSessionsForBulkSelect(anchorEvent, options = {}) {
+        const anchor = anchorEvent && typeof anchorEvent === 'object' ? anchorEvent : null;
+        const mode = String(options.mode || 'saved').trim() === 'draft' ? 'draft' : 'saved';
+        const selectionMode = String(options.selectionMode || 'count').trim() === 'date' ? 'date' : 'count';
+        const stopDate = selectionMode === 'date' ? normalizeBulkSelectIsoDate(options.stopDate) : '';
+        const maxCount = selectionMode === 'count'
+            ? Math.max(0, Math.floor(Number(options.maxCount) || 0))
+            : 0;
+        const person = activeSchedulePerson();
+        if (!anchor || !person?.id) return [];
+        if (selectionMode === 'date' && !stopDate) return [];
+        if (selectionMode === 'count' && !maxCount) return [];
+        const anchorDate = normalizeBulkSelectIsoDate(anchor.date);
+        const classId = String(anchor.classId || '').trim();
+        const anchorStartMin = timeToMinutes(anchor.start);
+        const anchorEndMin = timeToMinutes(anchor.end);
+        if (!anchorDate || !classId || anchorEndMin <= anchorStartMin) return [];
+        if (selectionMode === 'date' && compareBulkSelectIsoDates(stopDate, anchorDate) < 0) return [];
+        const candidates = listBulkSelectCandidateEvents(person.id, mode)
+            .filter((ev) => String(ev?.classId || '').trim() === classId)
+            .filter((ev) => {
+                const date = normalizeBulkSelectIsoDate(ev?.date);
+                if (!date) return false;
+                if (compareBulkSelectIsoDates(date, anchorDate) < 0) return false;
+                if (selectionMode === 'date' && compareBulkSelectIsoDates(date, stopDate) > 0) return false;
+                const startMin = timeToMinutes(ev?.start);
+                return startMin >= anchorStartMin && startMin <= anchorEndMin;
+            })
+            .sort((a, b) => {
+                const dateCmp = compareBulkSelectIsoDates(a?.date, b?.date);
+                if (dateCmp !== 0) return dateCmp;
+                return timeToMinutes(a?.start) - timeToMinutes(b?.start);
+            });
+        if (selectionMode === 'count') return candidates.slice(0, maxCount);
+        return candidates;
+    }
+
+    function buildBulkSelectCollectOptions(anchorEvent, criteria) {
+        const anchorDate = normalizeBulkSelectIsoDate(anchorEvent?.date);
+        const selectionMode = criteria.selectionMode === 'date' ? 'date' : 'count';
+        return {
+            mode: criteria.mode,
+            selectionMode,
+            stopDate: selectionMode === 'date' ? criteria.stopDate : '',
+            maxCount: selectionMode === 'count' ? criteria.maxCount : 0
+        };
+    }
+
+    function bulkSelectRangeEndForProvisionalLoad(anchorDate, criteria) {
+        if (criteria.selectionMode === 'date') return normalizeBulkSelectIsoDate(criteria.stopDate);
+        return bulkSelectCountModeHorizonEnd(anchorDate);
+    }
+
+    function applyBulkSessionSelection(matches = [], options = {}) {
+        const mode = String(options.mode || 'saved').trim() === 'draft' ? 'draft' : 'saved';
+        const source = options.source === 'partialModal' ? 'partialModal' : 'timeline';
+        const list = Array.isArray(matches) ? matches : [];
+        if (!list.length) return 0;
+        if (mode === 'draft') {
+            if (countActiveScheduleSelectedSessions() > 0) {
+                if (typeof uiAlert === 'function') {
+                    uiAlert('Clear saved session selections before selecting staged sessions.', 'Staged session selection', { icon: 'info' });
+                }
+                return 0;
+            }
+            const selectionSet = getActiveDraftSelectionSet();
+            selectionSet.clear();
+            list.forEach((ev) => {
+                const id = String(ev?.sessionId || ev?.id || '').trim();
+                if (id) selectionSet.add(id);
+            });
+            refreshScheduleActiveView();
+            if (source === 'partialModal' && window.SessionEnrollmentCalendarModal?.refreshPartialPickerFromState) {
+                window.SessionEnrollmentCalendarModal.refreshPartialPickerFromState();
+            } else {
+                syncPartialModalFromTimelineDrafts();
+            }
+            return list.length;
+        }
+        if (countActiveDraftSelectedSessions() > 0) {
+            if (typeof uiAlert === 'function') {
+                uiAlert('Clear staged session selections before selecting saved sessions.', 'Saved session selection', { icon: 'info' });
+            }
+            return 0;
+        }
+        const selectionSet = getActiveScheduleSelectionSet();
+        selectionSet.clear();
+        let added = 0;
+        const anchorClassId = String(options.anchorClassId || '').trim();
+        list.forEach((ev) => {
+            const key = scheduleSessionSelectionKey(ev);
+            if (!key) return;
+            const classId = String(ev?.classId || '').trim();
+            const allowed = anchorClassId && classId === anchorClassId
+                ? isClassSessionScheduleEvent(ev) && countActiveDraftSelectedSessions() === 0
+                : canSelectScheduleSession(ev);
+            if (!allowed) return;
+            selectionSet.add(key);
+            added += 1;
+        });
+        refreshScheduleActiveView();
+        return added;
+    }
+
+    function canOpenScheduleSessionBulkSelectModal(anchorEvent, mode = 'saved') {
+        if (!anchorEvent) return false;
+        if (mode === 'draft') {
+            if (!canDragCreateSessions || anchorEvent.isDraft !== true) return false;
+            return countActiveScheduleSelectedSessions() === 0;
+        }
+        if (!canSelectAnyPerson || !isClassSessionScheduleEvent(anchorEvent)) return false;
+        return countActiveDraftSelectedSessions() === 0;
+    }
+
+    function openScheduleSessionBulkSelectModal(anchorEvent, options = {}) {
+        const mode = String(options.mode || 'saved').trim() === 'draft' ? 'draft' : 'saved';
+        const source = options.source === 'partialModal' ? 'partialModal' : 'timeline';
+        if (!canOpenScheduleSessionBulkSelectModal(anchorEvent, mode)) {
+            if (mode === 'draft' && countActiveScheduleSelectedSessions() > 0) {
+                if (typeof uiAlert === 'function') {
+                    uiAlert('Clear saved session selections before selecting staged sessions.', 'Staged session selection', { icon: 'info' });
+                }
+            } else if (mode === 'saved' && countActiveDraftSelectedSessions() > 0) {
+                if (typeof uiAlert === 'function') {
+                    uiAlert('Clear staged session selections before selecting saved sessions.', 'Saved session selection', { icon: 'info' });
+                }
+            }
+            return;
+        }
+        const modalEl = document.getElementById('scheduleSessionBulkSelectModal');
+        if (!modalEl || !anchorEvent) return;
+        scheduleBulkSelectAnchor = anchorEvent;
+        scheduleBulkSelectMode = mode;
+        scheduleBulkSelectSource = source;
+        const hintEl = document.getElementById('scheduleSessionBulkSelectHint');
+        const stopInput = document.getElementById('scheduleSessionBulkSelectStopDate');
+        const countInput = document.getElementById('scheduleSessionBulkSelectCount');
+        const modeCountRadio = document.getElementById('scheduleSessionBulkSelectModeCount');
+        const anchorDate = normalizeBulkSelectIsoDate(anchorEvent.date);
+        const defaultStop = defaultBulkSelectStopDate(anchorDate);
+        if (modeCountRadio) modeCountRadio.checked = true;
+        syncBulkSelectModalModeUi();
+        if (stopInput) {
+            stopInput.min = anchorDate || '';
+            stopInput.value = defaultStop || anchorDate || '';
+        }
+        const previewDateMatches = collectMatchingSessionsForBulkSelect(anchorEvent, {
+            mode,
+            selectionMode: 'date',
+            stopDate: stopInput?.value || defaultStop,
+            maxCount: 0
+        });
+        const defaultCount = Math.min(10, Math.max(1, previewDateMatches.length || 1));
+        if (countInput) countInput.value = String(defaultCount);
+        if (hintEl) {
+            const classLabel = getEventTitle(anchorEvent);
+            const timeLabel = formatScheduleClockRange(anchorEvent.start, anchorEvent.end);
+            hintEl.textContent = `Anchor: ${classLabel} · ${anchorDate || '—'} · ${timeLabel}. Choose session count or an end date (one at a time).`;
+        }
+        if (!scheduleSessionBulkSelectModalInstance && window.bootstrap?.Modal) {
+            scheduleSessionBulkSelectModalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        }
+        scheduleSessionBulkSelectModalInstance?.show();
+    }
+
+    async function applyScheduleSessionBulkSelectModal() {
+        const anchor = scheduleBulkSelectAnchor;
+        const mode = scheduleBulkSelectMode;
+        const source = scheduleBulkSelectSource;
+        const stopInput = document.getElementById('scheduleSessionBulkSelectStopDate');
+        const countInput = document.getElementById('scheduleSessionBulkSelectCount');
+        const selectionMode = readBulkSelectModalSelectionMode();
+        const stopDate = normalizeBulkSelectIsoDate(stopInput?.value);
+        const maxCount = Math.floor(Number(countInput?.value) || 0);
+        const anchorDate = normalizeBulkSelectIsoDate(anchor?.date);
+        const criteria = { mode, selectionMode, stopDate, maxCount };
+        if (!anchor) return;
+        if (selectionMode === 'count' && maxCount < 1) {
+            await uiAlert('Enter how many sessions to select (at least 1).', 'Select sessions', { icon: 'info' });
+            return;
+        }
+        if (selectionMode === 'date' && !stopDate) {
+            await uiAlert('Choose an end date for selection.', 'Select sessions', { icon: 'info' });
+            return;
+        }
+        if (selectionMode === 'date' && compareBulkSelectIsoDates(stopDate, anchorDate) < 0) {
+            await uiAlert('End date must be on or after the selected session date.', 'Select sessions', { icon: 'info' });
+            return;
+        }
+        const anchorStartMin = timeToMinutes(anchor.start);
+        const anchorEndMin = timeToMinutes(anchor.end);
+        if (anchorEndMin <= anchorStartMin) {
+            await uiAlert('The selected session must have a valid start and end time.', 'Select sessions', { icon: 'info' });
+            return;
+        }
+        const collectOpts = buildBulkSelectCollectOptions(anchor, criteria);
+        const provisionalEnd = bulkSelectRangeEndForProvisionalLoad(anchorDate, criteria);
+        let rangeReloaded = false;
+        const provisional = await ensureScheduleViewRangeForBulkSelect({
+            startDate: anchorDate,
+            endDate: provisionalEnd,
+            mode
+        });
+        if (provisional.reloaded) rangeReloaded = true;
+        let matches = collectMatchingSessionsForBulkSelect(anchor, collectOpts);
+        if (!matches.length) {
+            await uiAlert('No sessions match the time window and date range.', 'Select sessions', { icon: 'info' });
+            return;
+        }
+        const extents = dateExtentsFromEvents(matches);
+        if (extents.minDate && extents.maxDate) {
+            const finalRange = await ensureScheduleViewRangeForBulkSelect({
+                startDate: extents.minDate,
+                endDate: extents.maxDate,
+                mode
+            });
+            if (finalRange.reloaded) rangeReloaded = true;
+        }
+        if (rangeReloaded) {
+            matches = collectMatchingSessionsForBulkSelect(anchor, collectOpts);
+            if (!matches.length) {
+                await uiAlert('No sessions match the time window and date range.', 'Select sessions', { icon: 'info' });
+                return;
+            }
+        }
+        const added = applyBulkSessionSelection(matches, {
+            mode,
+            source,
+            anchorClassId: String(anchor?.classId || '').trim()
+        });
+        if (!added) return;
+        const firstMatchDate = normalizeBulkSelectIsoDate(matches[0]?.date);
+        if (firstMatchDate) {
+            scheduleState.pendingStagedScrollDate = firstMatchDate;
+            focusScheduleTimelineOnFirstStagedSession(firstMatchDate);
+        }
+        scheduleSessionBulkSelectModalInstance?.hide();
+        scheduleBulkSelectAnchor = null;
+    }
+
+    function bindScheduleSessionBulkSelectModal() {
+        if (bindScheduleSessionBulkSelectModal.bound) return;
+        bindScheduleSessionBulkSelectModal.bound = true;
+        document.querySelectorAll('input[name="scheduleSessionBulkSelectMode"]').forEach((input) => {
+            input.addEventListener('change', () => syncBulkSelectModalModeUi());
+        });
+        document.getElementById('btn_scheduleSessionBulkSelectApply')?.addEventListener('click', (clickEvent) => {
+            clickEvent.preventDefault();
+            void applyScheduleSessionBulkSelectModal();
+        });
+    }
+
     function activeScheduleSelectedClassId() {
         const firstKey = Array.from(getActiveScheduleSelectionSet())[0] || '';
         return scheduleSessionClassIdFromKey(firstKey);
@@ -2983,8 +3405,10 @@
     }
 
     function openScheduleActiveClassPopover() {
+        scheduleAdminUi?.closePersonChipColorPopover?.();
         closeScheduleTimeRangePopover();
         closeScheduleDaySizePopover();
+        closeScheduleStagedPaddingPopover();
         const host = document.querySelector('.schedule-active-class-popover-host');
         if (!host) return;
         host.querySelector('.schedule-active-class-popover')?.classList.add('is-open');
@@ -3436,17 +3860,26 @@
         return Boolean(range.startDate && range.endDate);
     }
 
+    function mapSchedulePersonsForPreferences() {
+        return scheduleState.persons.map((person) => {
+            const row = {
+                id: person.id,
+                name: person.name || person.id,
+                selectedRole: String(person.selectedRole || '').trim()
+            };
+            if (person.chipBgColor) row.chipBgColor = String(person.chipBgColor).trim();
+            if (person.chipTextColor) row.chipTextColor = String(person.chipTextColor).trim();
+            return row;
+        });
+    }
+
     function buildScheduleWorkspacePayload() {
         const range = getScheduleRange();
         return {
             startDate: range.startDate,
             endDate: range.endDate,
             activePersonId: scheduleState.activePersonId || '',
-            persons: scheduleState.persons.map((person) => ({
-                id: person.id,
-                name: person.name || person.id,
-                selectedRole: String(person.selectedRole || '').trim()
-            })),
+            persons: mapSchedulePersonsForPreferences(),
             autoChangeDetector: isScheduleAutoChangeDetectorEnabled()
         };
     }
@@ -3475,9 +3908,62 @@
 
     function buildScheduleWorkspaceActionsHtml() {
         const parts = [];
-        if (hasScheduleWorkspaceToSave()) parts.push(buildScheduleWorkspaceSaveChipHtml());
+        if (hasScheduleWorkspaceToSave() && !hasServerSavedWorkspace()) {
+            parts.push(buildScheduleWorkspaceSaveChipHtml());
+        }
         if (hasServerSavedWorkspace()) parts.push(buildScheduleWorkspaceClearChipHtml());
         return parts.join('');
+    }
+
+    let scheduleWorkspaceAutoPersistTimer = null;
+
+    function beginSuppressWorkspaceAutoPersist() {
+        scheduleState.suppressWorkspaceAutoPersist += 1;
+    }
+
+    function endSuppressWorkspaceAutoPersist() {
+        scheduleState.suppressWorkspaceAutoPersist = Math.max(0, scheduleState.suppressWorkspaceAutoPersist - 1);
+    }
+
+    async function putScheduleWorkspacePreferences(payload, options = {}) {
+        const silent = options.silent === true;
+        try {
+            const res = await fetch(SCHEDULE_VIEWER_PREFS_API, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-AJAX-Request': 'true',
+                    Accept: 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') {
+                throw new Error(result.message || 'Unable to save workspace.');
+            }
+            markServerWorkspaceSaved(true);
+            if (initialScheduleViewerPrefs && typeof initialScheduleViewerPrefs === 'object') {
+                Object.assign(initialScheduleViewerPrefs, payload);
+            }
+            if (silent) renderSchedulePersonTabs();
+            return true;
+        } catch (error) {
+            if (!silent) {
+                await uiAlert(error.message || 'Unable to save workspace.', 'Save workspace', { icon: 'error' });
+            }
+            return false;
+        }
+    }
+
+    function queueScheduleWorkspaceAutoPersist() {
+        if (scheduleState.suppressWorkspaceAutoPersist > 0) return;
+        if (!hasServerSavedWorkspace() || !hasScheduleWorkspaceToSave()) return;
+        if (scheduleWorkspaceAutoPersistTimer) window.clearTimeout(scheduleWorkspaceAutoPersistTimer);
+        scheduleWorkspaceAutoPersistTimer = window.setTimeout(() => {
+            scheduleWorkspaceAutoPersistTimer = null;
+            void putScheduleWorkspacePreferences(buildScheduleWorkspacePayload(), { silent: true });
+        }, 250);
     }
 
     function buildScheduleWorkspaceActionsContainerHtml() {
@@ -3497,31 +3983,11 @@
             { icon: 'warning', cancelText: 'Cancel', confirmText: 'Save', confirmClass: 'btn-primary btn-md' }
         );
         if (!confirmed) return;
-        try {
-            const payload = buildScheduleWorkspacePayload();
-            const res = await fetch(SCHEDULE_VIEWER_PREFS_API, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-AJAX-Request': 'true',
-                    Accept: 'application/json'
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify(payload)
-            });
-            const result = await res.json().catch(() => ({}));
-            if (!res.ok || result.status !== 'success') {
-                throw new Error(result.message || 'Unable to save workspace.');
-            }
-            markServerWorkspaceSaved(true);
-            if (initialScheduleViewerPrefs && typeof initialScheduleViewerPrefs === 'object') {
-                Object.assign(initialScheduleViewerPrefs, payload);
-            }
-            renderSchedulePersonTabs();
-            await uiAlert('Workspace saved.', 'Save workspace', { icon: 'success' });
-        } catch (error) {
-            await uiAlert(error.message || 'Unable to save workspace.', 'Save workspace', { icon: 'error' });
-        }
+        const payload = buildScheduleWorkspacePayload();
+        const saved = await putScheduleWorkspacePreferences(payload, { silent: false });
+        if (!saved) return;
+        renderSchedulePersonTabs();
+        await uiAlert('Workspace saved.', 'Save workspace', { icon: 'success' });
     }
 
     async function clearScheduleWorkspace() {
@@ -3636,9 +4102,12 @@
                 ? `<button type="button" class="schedule-person-tab-close" data-schedule-remove-person="${escapeHtml(person.id)}" aria-label="Close tab" title="Close tab">&times;</button>`
                 : '';
             const roleCount = (Array.isArray(person.availableRoles) && person.availableRoles.length) ? person.availableRoles.length : 'All';
+            const tabDecoration = scheduleAdminUi?.personTabDecoration?.(person) || { extraClass: '', extraStyle: '' };
+            const tabExtraClass = tabDecoration.extraClass ? ` ${tabDecoration.extraClass}` : '';
+            const tabExtraStyle = tabDecoration.extraStyle ? ` style="${escapeHtml(tabDecoration.extraStyle)}"` : '';
             const tabWrap = `
                 <div class="schedule-person-tab-wrap">
-                    <button type="button" class="btn btn-sm schedule-person-tab ${active ? 'active' : ''}" data-schedule-person-tab="${escapeHtml(person.id)}">
+                    <button type="button" class="btn btn-sm schedule-person-tab ${active ? 'active' : ''}${tabExtraClass}" data-schedule-person-tab="${escapeHtml(person.id)}"${tabExtraStyle}>
                         <i class="bi bi-person-circle"></i>
                         <span class="text-truncate">${escapeHtml(person.name || person.id)}</span>
                         <span class="badge text-bg-light border">${escapeHtml(roleCount)}</span>
@@ -3683,21 +4152,30 @@
         const id = resolveSchedulePersonId(item);
         if (!id) return null;
         let person = scheduleState.persons.find((row) => row.id === id);
+        let addedNewPerson = false;
         if (!person) {
+            addedNewPerson = true;
             person = {
                 id,
                 name: resolvePersonPickerName(item) || String(item?.displayName || item?.name || id).trim() || id,
                 availableRoles: Array.isArray(item?.availableRoles) ? item.availableRoles : [],
                 selectedRole: String(options.selectedRole || item?.selectedRole || selectedScheduleRole() || '').trim()
             };
+            if (item?.chipBgColor) person.chipBgColor = String(item.chipBgColor).trim();
+            if (item?.chipTextColor) person.chipTextColor = String(item.chipTextColor).trim();
             scheduleState.persons.push(person);
         } else {
             person.name = resolvePersonPickerName(item) || person.name || id;
             if (Array.isArray(item?.availableRoles)) person.availableRoles = item.availableRoles;
             person.selectedRole = String(options.selectedRole || item?.selectedRole || selectedScheduleRole() || person.selectedRole || '').trim();
+            if (item?.chipBgColor) person.chipBgColor = String(item.chipBgColor).trim();
+            if (item?.chipTextColor) person.chipTextColor = String(item.chipTextColor).trim();
         }
         sortSchedulePersons();
         if (!scheduleState.activePersonId || options.activate) scheduleState.activePersonId = id;
+        if (addedNewPerson && !options.suppressWorkspaceAutoPersist) {
+            queueScheduleWorkspaceAutoPersist();
+        }
         return person;
     }
 
@@ -3715,6 +4193,7 @@
             scheduleState.activePersonId = scheduleState.persons[0]?.id || '';
             clearRemoteUpdatePending();
         }
+        queueScheduleWorkspaceAutoPersist();
         refreshScheduleActiveView();
     }
 
@@ -4407,7 +4886,9 @@
     }
 
     function openScheduleTimeRangePopover() {
+        scheduleAdminUi?.closePersonChipColorPopover?.();
         closeScheduleDaySizePopover();
+        closeScheduleStagedPaddingPopover();
         closeScheduleActiveClassPopover();
         const host = document.querySelector('.schedule-time-range-popover-host');
         if (!host) return;
@@ -4465,6 +4946,140 @@
         closeScheduleTimeRangePopover();
     }
 
+    function scheduleStagedPaddingPopoverHostHtml() {
+        const padding = readStagedViewPaddingFromPrefs();
+        const label = formatStagedViewPaddingLabel(padding);
+        return `
+            <div class="schedule-staged-padding-popover-host">
+                <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-staged-padding-toggle aria-label="Adjust staged session view padding" title="Adjust staged session view padding" aria-expanded="false" aria-controls="scheduleStagedPaddingPopover">
+                    <i class="bi bi-calendar-range" aria-hidden="true"></i>
+                </button>
+                <div class="schedule-staged-padding-popover" id="scheduleStagedPaddingPopover" role="dialog" aria-label="Staged session view padding">
+                    <div class="schedule-day-size-popover-label">Staged session padding</div>
+                    <div class="schedule-staged-padding-fields">
+                        <label class="schedule-staged-padding-field">
+                            <span class="schedule-staged-padding-field-label">Weeks before</span>
+                            <input type="number" class="form-control form-control-sm" id="scheduleStagedPaddingWeeksBeforeInput" value="${escapeHtml(String(padding.paddingWeeksBefore))}" min="0" max="${MAX_STAGED_VIEW_PADDING_WEEKS}" step="1" aria-label="Weeks before first staged session">
+                        </label>
+                        <label class="schedule-staged-padding-field">
+                            <span class="schedule-staged-padding-field-label">Weeks after</span>
+                            <input type="number" class="form-control form-control-sm" id="scheduleStagedPaddingWeeksAfterInput" value="${escapeHtml(String(padding.paddingWeeksAfter))}" min="0" max="${MAX_STAGED_VIEW_PADDING_WEEKS}" step="1" aria-label="Weeks after last staged session">
+                        </label>
+                    </div>
+                    <div class="schedule-staged-padding-summary">
+                        <span class="badge text-bg-light border" id="scheduleStagedPaddingBadge">${escapeHtml(label)}</span>
+                    </div>
+                    <div class="schedule-staged-padding-actions">
+                        <button type="button" class="btn btn-sm btn-primary" data-schedule-staged-padding-apply>Apply</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-schedule-staged-padding-reset>Default</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function closeScheduleStagedPaddingPopover() {
+        const host = document.querySelector('.schedule-staged-padding-popover-host');
+        if (!host) return;
+        host.querySelector('.schedule-staged-padding-popover')?.classList.remove('is-open');
+        const toggle = host.querySelector('[data-schedule-staged-padding-toggle]');
+        toggle?.setAttribute('aria-expanded', 'false');
+        toggle?.classList.remove('active');
+    }
+
+    function openScheduleStagedPaddingPopover() {
+        scheduleAdminUi?.closePersonChipColorPopover?.();
+        closeScheduleDaySizePopover();
+        closeScheduleTimeRangePopover();
+        closeScheduleActiveClassPopover();
+        const host = document.querySelector('.schedule-staged-padding-popover-host');
+        if (!host) return;
+        const padding = readStagedViewPaddingFromPrefs();
+        const beforeInput = host.querySelector('#scheduleStagedPaddingWeeksBeforeInput');
+        const afterInput = host.querySelector('#scheduleStagedPaddingWeeksAfterInput');
+        const badge = host.querySelector('#scheduleStagedPaddingBadge');
+        if (beforeInput) beforeInput.value = String(padding.paddingWeeksBefore);
+        if (afterInput) afterInput.value = String(padding.paddingWeeksAfter);
+        if (badge) badge.textContent = formatStagedViewPaddingLabel(padding);
+        host.querySelector('.schedule-staged-padding-popover')?.classList.add('is-open');
+        const toggle = host.querySelector('[data-schedule-staged-padding-toggle]');
+        toggle?.setAttribute('aria-expanded', 'true');
+        toggle?.classList.add('active');
+    }
+
+    function toggleScheduleStagedPaddingPopover() {
+        const popover = document.querySelector('.schedule-staged-padding-popover.is-open');
+        if (popover) closeScheduleStagedPaddingPopover();
+        else openScheduleStagedPaddingPopover();
+    }
+
+    function readStagedViewPaddingFromPopoverInputs(host) {
+        if (!host) return null;
+        const beforeRaw = host.querySelector('#scheduleStagedPaddingWeeksBeforeInput')?.value;
+        const afterRaw = host.querySelector('#scheduleStagedPaddingWeeksAfterInput')?.value;
+        return {
+            paddingWeeksBefore: clampStagedViewPaddingWeeks(
+                beforeRaw,
+                DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE
+            ),
+            paddingWeeksAfter: clampStagedViewPaddingWeeks(
+                afterRaw,
+                DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER
+            )
+        };
+    }
+
+    function syncScheduleStagedPaddingPopoverPreview() {
+        const host = document.querySelector('.schedule-staged-padding-popover-host');
+        if (!host) return;
+        const padding = readStagedViewPaddingFromPopoverInputs(host);
+        if (!padding) return;
+        const badge = host.querySelector('#scheduleStagedPaddingBadge');
+        if (badge) badge.textContent = formatStagedViewPaddingLabel(padding);
+    }
+
+    async function applyScheduleStagedPaddingFromPopover() {
+        const host = document.querySelector('.schedule-staged-padding-popover-host');
+        const padding = readStagedViewPaddingFromPopoverInputs(host);
+        if (!padding) return;
+        const saved = await persistScheduleViewerPreferencesPartial({
+            stagedViewPaddingWeeksBefore: padding.paddingWeeksBefore,
+            stagedViewPaddingWeeksAfter: padding.paddingWeeksAfter
+        });
+        if (!saved) return;
+        closeScheduleStagedPaddingPopover();
+    }
+
+    async function resetScheduleStagedPaddingToDefault() {
+        const saved = await persistScheduleViewerPreferencesPartial({
+            stagedViewPaddingWeeksBefore: DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE,
+            stagedViewPaddingWeeksAfter: DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER
+        });
+        if (!saved) return;
+        closeScheduleStagedPaddingPopover();
+    }
+
+    function bindScheduleStagedPaddingPopoverDismiss() {
+        if (bindScheduleStagedPaddingPopoverDismiss.bound) return;
+        bindScheduleStagedPaddingPopoverDismiss.bound = true;
+        document.addEventListener('click', (event) => {
+            const host = document.querySelector('.schedule-staged-padding-popover-host');
+            if (!host) return;
+            const popover = host.querySelector('.schedule-staged-padding-popover');
+            if (!popover?.classList.contains('is-open')) return;
+            if (host.contains(event.target)) return;
+            closeScheduleStagedPaddingPopover();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            closeScheduleStagedPaddingPopover();
+        });
+        document.addEventListener('input', (event) => {
+            if (!event.target?.closest?.('.schedule-staged-padding-popover-host')) return;
+            syncScheduleStagedPaddingPopoverPreview();
+        });
+    }
+
     function bindScheduleTimeRangePopoverDismiss() {
         if (bindScheduleTimeRangePopoverDismiss.bound) return;
         bindScheduleTimeRangePopoverDismiss.bound = true;
@@ -4520,7 +5135,9 @@
     }
 
     function openScheduleDaySizePopover() {
+        scheduleAdminUi?.closePersonChipColorPopover?.();
         closeScheduleTimeRangePopover();
+        closeScheduleStagedPaddingPopover();
         const host = document.querySelector('.schedule-day-size-popover-host');
         if (!host) return;
         host.querySelector('.schedule-day-size-popover')?.classList.add('is-open');
@@ -4642,6 +5259,9 @@
         const showWeekGridControls = mode === 'verticalTimeline' || mode === 'timeline';
         const daySizeControl = showWeekGridControls ? scheduleDaySizePopoverHostHtml(mode) : '';
         const timeRangeControl = showWeekGridControls ? scheduleTimeRangePopoverHostHtml() : '';
+        const stagedPaddingControl = (canSelectAnyPerson && showWeekGridControls)
+            ? scheduleStagedPaddingPopoverHostHtml()
+            : '';
         const hideEmptyDaysButton = showWeekGridControls ? scheduleHideEmptyDaysButtonHtml() : '';
         const row2RightControls = showWeekGridControls
             ? `<div class="schedule-viewbar-grid-controls">${scheduleGridToolbarControlsHtml()}</div>`
@@ -4656,6 +5276,7 @@
                     </div>
                     <div class="schedule-viewbar-row-right schedule-viewbar-actions">
                     ${timeRangeControl}
+                    ${stagedPaddingControl}
                     ${daySizeControl}
                     ${switchButtons}
                         ${hideEmptyDaysButton}
@@ -5274,6 +5895,32 @@
         }
     }
 
+    async function reloadActiveScheduleForViewRange(options = {}) {
+        const person = activeSchedulePerson();
+        if (!person?.id) return false;
+        scheduleState.loadedPersonIds.delete(person.id);
+        return await loadSchedulePerson(person, { silent: options.silent !== false });
+    }
+
+    async function ensureScheduleViewRangeForBulkSelect({ startDate, endDate, mode } = {}) {
+        const extraStart = normalizeBulkSelectIsoDate(startDate);
+        const extraEnd = normalizeBulkSelectIsoDate(endDate);
+        if (!extraStart && !extraEnd) return { changed: false, reloaded: false };
+        const union = unionIsoDateRange(getScheduleRange(), extraStart, extraEnd);
+        if (!union.changed || !union.startDate || !union.endDate) {
+            return { changed: false, reloaded: false };
+        }
+        setDateRangeFromIso(union.startDate, union.endDate);
+        setActiveRangeChip('');
+        queueScheduleWorkspaceAutoPersist();
+        if (String(mode || '').trim() === 'draft') {
+            refreshScheduleViewWithHolidays();
+            return { changed: true, reloaded: false };
+        }
+        const reloaded = await reloadActiveScheduleForViewRange({ silent: true });
+        return { changed: true, reloaded: reloaded === true };
+    }
+
     async function loadActiveSchedulePerson() {
         const person = activeSchedulePerson();
         if (!person) {
@@ -5493,11 +6140,13 @@ if (canLoadAllSchedules) {
     document.getElementById('sch_startDate')?.addEventListener('change', () => {
         resetScheduleActiveClassFilter();
         clearLoadedSchedules();
+        queueScheduleWorkspaceAutoPersist();
         refreshScheduleViewWithHolidays();
     });
     document.getElementById('sch_endDate')?.addEventListener('change', () => {
         resetScheduleActiveClassFilter();
         clearLoadedSchedules();
+        queueScheduleWorkspaceAutoPersist();
         refreshScheduleViewWithHolidays();
     });
 
@@ -5525,7 +6174,20 @@ if (canLoadAllSchedules) {
         }
         const tab = event.target.closest('[data-schedule-person-tab]');
         if (!tab) return;
-        scheduleState.activePersonId = tab.getAttribute('data-schedule-person-tab') || scheduleState.activePersonId;
+        const personId = tab.getAttribute('data-schedule-person-tab') || '';
+        if (scheduleAdminUi?.handlePersonTabClick?.({
+            event,
+            tab,
+            personId,
+            isActive: personId === scheduleState.activePersonId
+        })) {
+            return;
+        }
+        const previousActivePersonId = scheduleState.activePersonId;
+        scheduleState.activePersonId = personId || scheduleState.activePersonId;
+        if (previousActivePersonId !== scheduleState.activePersonId) {
+            queueScheduleWorkspaceAutoPersist();
+        }
         resetScheduleActiveClassFilter();
         syncScheduleActiveClassesForActivePerson();
         refreshScheduleActiveView();
@@ -5533,6 +6195,7 @@ if (canLoadAllSchedules) {
 
     bindScheduleDaySizePopoverDismiss();
     bindScheduleTimeRangePopoverDismiss();
+    bindScheduleStagedPaddingPopoverDismiss();
     bindScheduleActiveClassPopoverDismiss();
 
     document.getElementById('legendContainer')?.addEventListener('input', (event) => {
@@ -5593,6 +6256,25 @@ if (canLoadAllSchedules) {
         if (timeRangeReset) {
             event.preventDefault();
             resetScheduleTimeRangeToDefault();
+            return;
+        }
+        const stagedPaddingToggle = event.target.closest('[data-schedule-staged-padding-toggle]');
+        if (stagedPaddingToggle) {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleScheduleStagedPaddingPopover();
+            return;
+        }
+        const stagedPaddingApply = event.target.closest('[data-schedule-staged-padding-apply]');
+        if (stagedPaddingApply) {
+            event.preventDefault();
+            void applyScheduleStagedPaddingFromPopover();
+            return;
+        }
+        const stagedPaddingReset = event.target.closest('[data-schedule-staged-padding-reset]');
+        if (stagedPaddingReset) {
+            event.preventDefault();
+            void resetScheduleStagedPaddingToDefault();
             return;
         }
         const daySizeToggle = event.target.closest('[data-schedule-day-size-toggle]');
@@ -6287,49 +6969,57 @@ if (canLoadAllSchedules) {
         );
 
         if (hasSavedWorkspace && !hasUrlDateRange) {
-            if (savedPrefs.startDate && savedPrefs.endDate) {
-                document.getElementById('sch_startDate').value = savedPrefs.startDate;
-                document.getElementById('sch_endDate').value = savedPrefs.endDate;
-            } else {
-                applyDefaultWeekRange();
-            }
-            if (typeof savedPrefs.autoChangeDetector === 'boolean') {
-                applyScheduleAutoChangeDetector(savedPrefs.autoChangeDetector);
-            }
-            scheduleState.timelinePreset = readTimelinePresetFromPrefs(savedPrefs);
+            beginSuppressWorkspaceAutoPersist();
+            try {
+                if (savedPrefs.startDate && savedPrefs.endDate) {
+                    document.getElementById('sch_startDate').value = savedPrefs.startDate;
+                    document.getElementById('sch_endDate').value = savedPrefs.endDate;
+                } else {
+                    applyDefaultWeekRange();
+                }
+                if (typeof savedPrefs.autoChangeDetector === 'boolean') {
+                    applyScheduleAutoChangeDetector(savedPrefs.autoChangeDetector);
+                }
+                scheduleState.timelinePreset = readTimelinePresetFromPrefs(savedPrefs);
 
-            const savedPersons = Array.isArray(savedPrefs.persons) ? savedPrefs.persons : [];
-            if (savedPersons.length) {
-                savedPersons.forEach((entry) => {
-                    addSchedulePerson({
-                        id: entry.id,
-                        personId: entry.id,
-                        displayName: entry.name || entry.id,
-                        selectedRole: entry.selectedRole || ''
-                    }, {
-                        selectedRole: entry.selectedRole || '',
-                        activate: entry.id === savedPrefs.activePersonId
+                const savedPersons = Array.isArray(savedPrefs.persons) ? savedPrefs.persons : [];
+                if (savedPersons.length) {
+                    savedPersons.forEach((entry) => {
+                        addSchedulePerson({
+                            id: entry.id,
+                            personId: entry.id,
+                            displayName: entry.name || entry.id,
+                            selectedRole: entry.selectedRole || '',
+                            chipBgColor: entry.chipBgColor || '',
+                            chipTextColor: entry.chipTextColor || ''
+                        }, {
+                            selectedRole: entry.selectedRole || '',
+                            activate: entry.id === savedPrefs.activePersonId,
+                            suppressWorkspaceAutoPersist: true
+                        });
                     });
-                });
-            } else if (!canSelectAnyPerson && initialLockedPersonId) {
-                addSchedulePerson({
-                    id: initialLockedPersonId,
-                    personId: initialLockedPersonId,
-                    displayName: initialLockedPersonName || initialLockedPersonId,
-                    availableRoles: initialScheduleRoles
-                }, { activate: true, selectedRole: initialDefaultRole });
-            }
+                } else if (!canSelectAnyPerson && initialLockedPersonId) {
+                    addSchedulePerson({
+                        id: initialLockedPersonId,
+                        personId: initialLockedPersonId,
+                        displayName: initialLockedPersonName || initialLockedPersonId,
+                        availableRoles: initialScheduleRoles
+                    }, { activate: true, selectedRole: initialDefaultRole, suppressWorkspaceAutoPersist: true });
+                }
 
-            if (savedPrefs.activePersonId && scheduleState.persons.some((person) => person.id === savedPrefs.activePersonId)) {
-                scheduleState.activePersonId = savedPrefs.activePersonId;
-            } else if (scheduleState.persons.length) {
-                scheduleState.activePersonId = scheduleState.persons[0].id;
-            }
+                if (savedPrefs.activePersonId && scheduleState.persons.some((person) => person.id === savedPrefs.activePersonId)) {
+                    scheduleState.activePersonId = savedPrefs.activePersonId;
+                } else if (scheduleState.persons.length) {
+                    scheduleState.activePersonId = scheduleState.persons[0].id;
+                }
 
-            renderSchedulePersonTabs();
-            refreshScheduleViewWithHolidays();
-            if (scheduleState.persons.length) {
-                await loadAllSavedSchedulePersons();
+                renderSchedulePersonTabs();
+                refreshScheduleViewWithHolidays();
+                if (scheduleState.persons.length) {
+                    await loadAllSavedSchedulePersons();
+                }
+            } finally {
+                endSuppressWorkspaceAutoPersist();
             }
             return;
         }

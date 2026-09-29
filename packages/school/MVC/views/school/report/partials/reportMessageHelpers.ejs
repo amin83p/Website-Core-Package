@@ -136,6 +136,35 @@
     return typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
   }
 
+  function buildInactiveEnrollmentSaveFailureModalHtml(message = '') {
+    const raw = String(message || '').trim();
+    if (!raw.startsWith('INACTIVE_ENROLLMENT_ROW|')) return null;
+    const parts = raw.split('|');
+    if (parts.length < 4) return null;
+    const rowLabel = parts[1] || '';
+    const periodHint = parts[2] || '';
+    const names = parts.slice(3).join('|').split('\n').map((row) => row.trim()).filter(Boolean);
+    if (!names.length) return null;
+    const listItems = names.map((name) => (
+      `<li class="mb-1">${escapeReportMessage(name)}</li>`
+    )).join('');
+    const rowLine = rowLabel
+      ? `<p class="mb-2">Target row: <strong>${escapeReportMessage(rowLabel)}</strong></p>`
+      : '';
+    const periodLine = periodHint
+      ? `<p class="small text-muted mb-2">Enrollment must be active for the full report period (<strong>${escapeReportMessage(periodHint)}</strong>).</p>`
+      : '';
+    return (
+      '<div class="text-start report-inactive-enrollment-error">'
+      + '<p class="mb-2">The following students are not actively enrolled for this reporting period:</p>'
+      + rowLine
+      + periodLine
+      + `<ul class="list-unstyled mb-0 ps-0" style="max-height:min(14rem,38vh);overflow-y:auto;border:1px solid rgba(15,23,42,.12);border-radius:.375rem;padding:.5rem .75rem;background:#fff;">${listItems}</ul>`
+      + '<p class="small text-muted mt-3 mb-0">Remove them from the row, adjust the report dates, or update class enrollment so their enrollment covers the full period.</p>'
+      + '</div>'
+    );
+  }
+
   function buildDocxExportCancelledModalHtml(message = '') {
     const raw = String(message || '').trim();
     const prefix = 'DOCX export cancelled. Missing stored values for:';
@@ -188,11 +217,18 @@
     let resolvedMessage = message;
     let resolvedSize = size;
     if (!resolvedHtml && icon === 'error') {
-      const docxHtml = buildDocxExportCancelledModalHtml(plainReportMessage(message));
-      if (docxHtml) {
-        resolvedMessage = docxHtml;
+      const inactiveEnrollmentHtml = buildInactiveEnrollmentSaveFailureModalHtml(message);
+      if (inactiveEnrollmentHtml) {
+        resolvedMessage = inactiveEnrollmentHtml;
         resolvedHtml = true;
         resolvedSize = 'lg';
+      } else {
+        const docxHtml = buildDocxExportCancelledModalHtml(plainReportMessage(message));
+        if (docxHtml) {
+          resolvedMessage = docxHtml;
+          resolvedHtml = true;
+          resolvedSize = 'lg';
+        }
       }
     }
     const displayMessage = resolvedHtml ? String(resolvedMessage ?? '') : escapeReportMessage(plainReportMessage(resolvedMessage));
@@ -239,6 +275,7 @@
     buildTemplateFileComplianceModalHtml,
     buildSnapshotComplianceSaveFailureModalHtml,
     buildDocxExportCancelledModalHtml,
+    buildInactiveEnrollmentSaveFailureModalHtml,
     formatPdfAcroFieldType,
     showReportMessage,
     confirmReportAction

@@ -57,6 +57,20 @@
     return String(state?.mode || '').trim() === 'partial';
   }
 
+  function partialModePaddingOptions(source = {}) {
+    const before = Number(source.paddingWeeksBefore);
+    const after = Number(source.paddingWeeksAfter);
+    return {
+      paddingWeeksBefore: Number.isFinite(before) ? before : 2,
+      paddingWeeksAfter: Number.isFinite(after) ? after : 2
+    };
+  }
+
+  function stagedPaddingOptionsFromState() {
+    if (!state) return partialModePaddingOptions();
+    return partialModePaddingOptions(state);
+  }
+
   function isEventNaMarked(ev = {}) {
     if (isOnHoldPreviewMode()) {
       const previewState = resolveOnHoldPreviewNaState(ev);
@@ -368,7 +382,8 @@
     state.viewRange = core.computeStagedSessionsViewRange(state.sessionsToCreate || [], {
       startDate: state.startDate,
       endDate: state.endDate,
-      anchorDate: state.anchorDate || state.startDate
+      anchorDate: state.anchorDate || state.startDate,
+      ...stagedPaddingOptionsFromState()
     });
     state.anchorDate = core.clampAnchorDate(
       state.viewRange.anchorDate || state.viewRange.startDate,
@@ -1831,7 +1846,8 @@
     const nextRange = core.computeStagedSessionsViewRange(state.sessionsToCreate || [], {
       startDate: state.startDate,
       endDate: state.endDate,
-      anchorDate: state.anchorDate || state.startDate
+      anchorDate: state.anchorDate || state.startDate,
+      ...stagedPaddingOptionsFromState()
     });
     const prevStart = core.normalizeDateOnly(state.viewRange?.startDate);
     const prevEnd = core.normalizeDateOnly(state.viewRange?.endDate);
@@ -3552,7 +3568,8 @@
     const viewRange = core.computeStagedSessionsViewRange(sessionsToCreate, {
       startDate: options.startDate,
       endDate: options.endDate,
-      anchorDate: options.anchorDate || options.startDate
+      anchorDate: options.anchorDate || options.startDate,
+      ...partialModePaddingOptions(options)
     });
     const startDate = viewRange.startDate;
     const endDate = viewRange.endDate;
@@ -3662,6 +3679,7 @@
       ),
       dayWidth: Number(options.dayWidth || 140),
       dayWidthUserAdjusted: false,
+      ...partialModePaddingOptions(options),
       scheduleDefaults: (options.scheduleDefaults && typeof options.scheduleDefaults === 'object')
         ? options.scheduleDefaults
         : {},

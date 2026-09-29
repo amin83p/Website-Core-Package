@@ -915,6 +915,55 @@ body.modal-open #scheduleContainer .schedule-viewbar-sticky {
     gap: 0.4rem;
     justify-content: flex-end;
 }
+.schedule-staged-padding-popover-host {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.schedule-staged-padding-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    z-index: 1080;
+    min-width: 16rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.14);
+}
+.schedule-staged-padding-popover.is-open {
+    display: block;
+}
+.schedule-staged-padding-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+    margin-bottom: 0.55rem;
+}
+.schedule-staged-padding-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin: 0;
+}
+.schedule-staged-padding-field-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.schedule-staged-padding-summary {
+    margin-bottom: 0.55rem;
+}
+.schedule-staged-padding-actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
 .schedule-selected-count-pill {
     display: inline-flex;
     align-items: center;

@@ -36,15 +36,19 @@
       <% if (!rows.length) { %>
         <tr><td colspan="6" class="text-center py-5 text-muted">No scheduled emails from Notification Centre yet.</td></tr>
       <% } %>
-      <% rows.forEach((row) => { %>
+      <% rows.forEach((row) => {
+        const runLabel = String(row.runLabel || '').trim();
+      %>
         <tr>
-          <td class="ps-4"><%= row.sendAt || '' %></td>
+          <td class="ps-4"><%= row.sendAt ? (typeof formatOrgDateTime === 'function' ? formatOrgDateTime(row.sendAt) : row.sendAt) : '—' %></td>
           <td><%= row.to %></td>
           <td><%= row.subject %></td>
           <td><span class="badge bg-light text-dark border"><%= fmt(row.status) %></span></td>
           <td>
-            <% if (row.meta && row.meta.runId) { %>
-              <a href="/school/notification-center/runs/<%= row.meta.runId %>"><%= row.meta.runId %></a>
+            <% if (row.runHref && runLabel) { %>
+              <a href="<%= row.runHref %>"><%= runLabel %></a>
+            <% } else if (runLabel) { %>
+              <%= runLabel %>
             <% } else { %>—<% } %>
           </td>
           <td class="text-end pe-4">
@@ -53,7 +57,7 @@
                 <button type="submit" class="btn btn-sm btn-outline-warning">Cancel</button>
               </form>
             <% } %>
-            <% if (canDeleteOutbox && (row.status === 'cancelled' || row.status === 'failed')) { %>
+            <% if (canDeleteOutbox && (row.status === 'cancelled' || row.status === 'failed' || row.status === 'sent')) { %>
               <form method="post" action="/school/notification-center/outbox/<%= row.id %>/delete" class="d-inline ms-1">
                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
               </form>

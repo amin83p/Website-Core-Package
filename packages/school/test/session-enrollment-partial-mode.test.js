@@ -113,10 +113,25 @@ test('computeStagedSessionsViewRange falls back to custom range when no sessions
   assert.equal(range.preset, 'custom');
 });
 
+test('computeStagedSessionsViewRange supports asymmetric padding weeks', () => {
+  const core = loadSessionCalendarCore();
+  const range = core.computeStagedSessionsViewRange([
+    { date: '2026-01-15' }
+  ], {
+    paddingWeeksBefore: 1,
+    paddingWeeksAfter: 3
+  });
+  assert.equal(range.startDate, '2026-01-05');
+  assert.equal(range.endDate, '2026-02-08');
+  const weeks = core.buildWeekBlocks(range);
+  assert.equal(weeks.length, 5);
+});
+
 test('partial modal recomputes staged session view range from all sessions', () => {
   const modalSource = read('public/scripts/sessionEnrollmentCalendarModal.js');
   assert.match(modalSource, /refreshPartialViewRangeFromStagedSessions/);
   assert.match(modalSource, /computeStagedSessionsViewRange/);
+  assert.match(modalSource, /partialModePaddingOptions/);
 });
 
 test('commitScheduleStageCreate syncs master schedule before opening partial modal', () => {

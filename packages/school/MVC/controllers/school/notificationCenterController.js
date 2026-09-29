@@ -16,6 +16,10 @@ const notificationRuleModel = require('../../models/school/notificationRuleModel
 
 const { formatNotificationTokenLabel, SESSION_DATE_RANGE_TYPES } = notificationRuleModel;
 
+const { OPERATIONS } = require('../../../config/accessConstants');
+
+const notificationCenterOperationPolicyService = require('../../services/school/notificationCenterOperationPolicyService');
+
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
@@ -53,6 +57,52 @@ function getActiveOrgIdOrThrow(reqUser) {
 function wantsJson(req) {
 
   return Boolean(req.xhr || req.headers['x-ajax-request'] || String(req.headers.accept || '').includes('application/json'));
+
+}
+
+
+
+async function listNcOutboxRowsForDisplay(orgId, reqUser, { limit = 20 } = {}) {
+
+  const rows = await emailOutboxService.listByMetaSource(
+
+    orgId,
+
+    notificationCenterComposeService.NC_META_SOURCE
+
+  );
+
+  const sorted = (Array.isArray(rows) ? rows : []).slice().sort((a, b) => (
+
+    String(b.sendAt || '').localeCompare(String(a.sendAt || ''))
+
+  ));
+
+  const capped = sorted.slice(0, Math.max(1, Math.min(Number(limit) || 20, 500)));
+
+  const runs = await notificationCenterRunService.listRuns(orgId, { limit: 200 }, reqUser);
+
+  const runById = new Map((Array.isArray(runs) ? runs : []).map((run) => [String(run.id), run]));
+
+  return capped.map((row) => {
+
+    const runId = String(row?.meta?.runId || '').trim();
+
+    const run = runId ? runById.get(runId) : null;
+
+    const runLabel = String(run?.ruleLabel || run?.ruleType || '').trim();
+
+    return {
+
+      ...row,
+
+      runLabel,
+
+      runHref: runId ? `/school/notification-center/runs/${encodeURIComponent(runId)}` : ''
+
+    };
+
+  });
 
 }
 
@@ -175,9 +225,23 @@ async function showHome(req, res) {
 
       : [];
 
+    const deleteEvaluation = await notificationCenterAccessService.evaluateOperation(
+      req.user,
+      OPERATIONS.DELETE,
+      req.ip
+    );
+
+    const deletePolicy = await notificationCenterOperationPolicyService.applyOperationPolicy({
+      user: req.user,
+      operationId: OPERATIONS.DELETE,
+      evaluation: deleteEvaluation
+    });
+
+    const canRemoveRunResults = deletePolicy.allowed === true;
+
     if (isAjax(req)) {
 
-      return res.json({ status: 'success', results: data, pagination, runs });
+      return res.json({ status: 'success', results: data, pagination, runs, canRemoveRunResults });
 
     }
 
@@ -194,6 +258,8 @@ async function showHome(req, res) {
       data,
 
       runs,
+
+      canRemoveRunResultsFlag: canRemoveRunResults,
 
       searchableFields,
 
@@ -638,13 +704,7 @@ async function showOutbox(req, res) {
 
     }
 
-    const rows = await emailOutboxService.listByMetaSource(
-
-      orgId,
-
-      notificationCenterComposeService.NC_META_SOURCE
-
-    );
+    const rows = await listNcOutboxRowsForDisplay(orgId, req.user, { limit: 500 });
 
     return res.render('school/notificationCenter/outboxList', await baseView(req, res, {
 

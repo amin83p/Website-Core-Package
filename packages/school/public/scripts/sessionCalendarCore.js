@@ -298,7 +298,15 @@
   }
 
   function computeStagedSessionsViewRange(sessions = [], options = {}) {
-    const paddingWeeks = Number(options.paddingWeeks ?? 2);
+    const legacyPadding = Number(options.paddingWeeks);
+    const paddingWeeksBefore = Number(
+      options.paddingWeeksBefore ?? (Number.isFinite(legacyPadding) ? legacyPadding : 2)
+    );
+    const paddingWeeksAfter = Number(
+      options.paddingWeeksAfter ?? (Number.isFinite(legacyPadding) ? legacyPadding : 2)
+    );
+    const safeBefore = Number.isFinite(paddingWeeksBefore) ? Math.max(0, paddingWeeksBefore) : 2;
+    const safeAfter = Number.isFinite(paddingWeeksAfter) ? Math.max(0, paddingWeeksAfter) : 2;
     const dates = (Array.isArray(sessions) ? sessions : [])
       .map((row) => normalizeDateOnly(row?.date))
       .filter(Boolean)
@@ -310,8 +318,8 @@
     }
     const firstWeekMonday = mondayOfWeek(dates[0]);
     const lastWeekMonday = mondayOfWeek(dates[dates.length - 1]);
-    const startDate = addDaysIso(firstWeekMonday, -(paddingWeeks * 7));
-    const endDate = addDaysIso(lastWeekMonday, 6 + (paddingWeeks * 7));
+    const startDate = addDaysIso(firstWeekMonday, -(safeBefore * 7));
+    const endDate = addDaysIso(lastWeekMonday, 6 + (safeAfter * 7));
     return { startDate, endDate, preset: 'custom', anchorDate: dates[0] };
   }
 

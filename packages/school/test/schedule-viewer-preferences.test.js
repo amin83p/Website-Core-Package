@@ -114,6 +114,60 @@ test('emptyPreferences includes default timeline hours', () => {
   assert.equal(prefs.timelineEndHour, 22);
 });
 
+test('emptyPreferences includes default staged view padding weeks', () => {
+  const prefs = emptyPreferences();
+  assert.equal(prefs.stagedViewPaddingWeeksBefore, 2);
+  assert.equal(prefs.stagedViewPaddingWeeksAfter, 2);
+});
+
+test('extractPreferences normalizes staged view padding weeks', () => {
+  const prefs = extractPreferences({
+    stagedViewPaddingWeeksBefore: 1,
+    stagedViewPaddingWeeksAfter: 3
+  });
+  assert.equal(prefs.stagedViewPaddingWeeksBefore, 1);
+  assert.equal(prefs.stagedViewPaddingWeeksAfter, 3);
+
+  const clamped = extractPreferences({
+    stagedViewPaddingWeeksBefore: -1,
+    stagedViewPaddingWeeksAfter: 99
+  });
+  assert.equal(clamped.stagedViewPaddingWeeksBefore, 0);
+  assert.equal(clamped.stagedViewPaddingWeeksAfter, 12);
+});
+
+test('normalizePersonEntry stores valid chip colors and drops invalid values', () => {
+  const { extractPreferences } = require('../MVC/services/school/scheduleViewerPreferencesService');
+  const prefs = extractPreferences({
+    persons: [{
+      id: 'P1',
+      name: 'Alpha',
+      chipBgColor: '#abc',
+      chipTextColor: 'not-a-color'
+    }]
+  });
+  assert.equal(prefs.persons.length, 1);
+  assert.equal(prefs.persons[0].chipBgColor, '#aabbcc');
+  assert.ok(!prefs.persons[0].chipTextColor);
+});
+
+test('mergePreferences updates staged view padding without clearing workspace fields', () => {
+  const current = extractPreferences({
+    startDate: '2026-09-01',
+    endDate: '2026-09-07',
+    activePersonId: 'P1',
+    persons: [{ id: 'P1', name: 'Alpha' }]
+  });
+  const merged = mergePreferences(current, {
+    stagedViewPaddingWeeksBefore: 0,
+    stagedViewPaddingWeeksAfter: 4
+  });
+  assert.equal(merged.startDate, '2026-09-01');
+  assert.equal(merged.persons.length, 1);
+  assert.equal(merged.stagedViewPaddingWeeksBefore, 0);
+  assert.equal(merged.stagedViewPaddingWeeksAfter, 4);
+});
+
 test('sanitizeForAccess keeps only locked person for non-admin viewers', () => {
   const prefs = extractPreferences({
     startDate: '2026-09-01',
@@ -238,6 +292,20 @@ test('schedule routes expose viewer-preferences endpoints', () => {
   assert.match(routeSource, /saveScheduleViewerPreferences/);
 });
 
+test('personSchedule loads person chip color admin assets only for canSelectAnyPerson', () => {
+  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const adminJs = read('public/scripts/masterScheduleViewerAdmin.js');
+  assert.match(view, /if \(canSelectAnyPerson\) \{ %>\s*<link rel="stylesheet" href="\/styles\/schedule-viewer-admin\.css"/s);
+  assert.match(view, /if \(canSelectAnyPerson\) \{ %>\s*<script src="\/scripts\/masterScheduleViewerAdmin\.js"><\/script>/s);
+  assert.match(adminJs, /schedule-person-chip-color-popover/);
+  assert.match(adminJs, /chipBgColor/);
+  const core = read('public/scripts/masterScheduleViewer.js');
+  assert.match(core, /MasterScheduleViewerAdmin\.install/);
+  assert.doesNotMatch(core, /schedule-person-chip-color-popover/);
+  assert.match(core, /mapSchedulePersonsForPreferences/);
+  assert.match(core, /handlePersonTabClick/);
+});
+
 test('personSchedule wires workspace save and user-settings restore', () => {
   const view = read('MVC/views/school/schedule/personSchedule.ejs');
   const source = readMasterScheduleViewerJs();
@@ -248,6 +316,12 @@ test('personSchedule wires workspace save and user-settings restore', () => {
   assert.match(source, /saveScheduleWorkspace/);
   assert.match(source, /clearScheduleWorkspace/);
   assert.match(source, /buildScheduleWorkspaceActionsHtml/);
+  assert.match(source, /hasScheduleWorkspaceToSave\(\) && !hasServerSavedWorkspace\(\)/);
+  assert.match(source, /queueScheduleWorkspaceAutoPersist/);
+  assert.match(source, /putScheduleWorkspacePreferences/);
+  assert.match(source, /suppressWorkspaceAutoPersist/);
+  assert.match(source, /addedNewPerson[\s\S]*queueScheduleWorkspaceAutoPersist/);
+  assert.match(source, /sch_startDate[\s\S]*queueScheduleWorkspaceAutoPersist/);
   assert.match(source, /data-schedule-workspace-actions/);
   assert.match(source, /schedule-person-tab-group--with-actions/);
   assert.match(source, /schedulePersonTabs.*addEventListener\('click'[\s\S]*data-schedule-save-workspace/);
@@ -267,6 +341,10 @@ test('personSchedule wires workspace save and user-settings restore', () => {
   assert.match(source, /data-schedule-day-size-toggle/);
   assert.match(source, /schedule-day-size-popover/);
   assert.match(source, /data-schedule-time-range-toggle/);
+  assert.match(source, /data-schedule-staged-padding-toggle/);
+  assert.match(source, /scheduleStagedPaddingPopoverHostHtml/);
+  assert.match(source, /stagedViewPaddingWeeksBefore/);
+  assert.match(source, /getStagedViewPaddingRangeOptions/);
   assert.match(source, /data-schedule-week-expand-time/);
   assert.match(source, /buildScheduleSaveDraftsButtonHtml/);
   assert.match(source, /commitScheduleDraftSessions/);

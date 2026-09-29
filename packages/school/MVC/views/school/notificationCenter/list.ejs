@@ -1,3 +1,7 @@
+<% const canRemoveRunResults = typeof canRemoveRunResultsFlag === 'boolean'
+  ? canRemoveRunResultsFlag === true
+  : (access?.canDeleteRuns === true || access?.evaluations?.del?.adminBypass === true); %>
+
 <%- include('partials/tablePages-start', {
 
   title,
@@ -81,7 +85,6 @@
 
             <% if (showRuleMetadata) { %>
             <div class="fw-semibold text-dark"><%= rule.label %></div>
-            <% if (rule.id) { %><div class="x-small text-muted font-monospace"><%= rule.id %></div><% } %>
             <% } else { %>
             <span class="text-muted">—</span>
             <% } %>
@@ -121,7 +124,7 @@
 
           <td class="table-actions text-end pe-4">
 
-            <% if (access?.canConfigure || access?.canRunNow) { %>
+            <% if (access?.canConfigure || access?.canRunNow || canRemoveRunResults) { %>
 
             <div class="row-actions-wrap">
 
@@ -146,6 +149,16 @@
                     <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-play-fill me-2"></i>Run now</button>
 
                   </form>
+
+                <% } %>
+
+                <% if (canRemoveRunResults) { %>
+
+                  <button type="button" class="btn btn-outline-danger btn-sm js-nc-delete-rule-runs" data-rule-id="<%= rule.id %>" data-rule-label="<%= rule.label || rule.ruleType || 'rule' %>">
+
+                    <i class="bi bi-trash me-2"></i>Delete run results
+
+                  </button>
 
                 <% } %>
 
@@ -181,11 +194,25 @@
 
 
 
-<div class="mt-4 mb-2">
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mt-4 mb-2">
 
-  <h2 class="h5 fw-bold text-dark mb-0"><i class="bi bi-clock-history me-2"></i>Recent runs</h2>
+  <div>
 
-  <p class="small text-muted mb-0">Preview results from manual and scheduled evaluations. Open a run to review findings.</p>
+    <h2 class="h5 fw-bold text-dark mb-0"><i class="bi bi-clock-history me-2"></i>Recent run results</h2>
+
+    <p class="small text-muted mb-0">Stored results from <strong>Run now</strong> and scheduled rule evaluation. Open a row to review findings, or select runs to delete them.</p>
+
+  </div>
+
+  <% if (canRemoveRunResults && (runs || []).length) { %>
+
+    <button type="button" class="btn btn-outline-danger btn-sm" id="ncDeleteSelectedRuns" disabled>
+
+      <i class="bi bi-trash me-1"></i> Delete selected runs
+
+    </button>
+
+  <% } %>
 
 </div>
 
@@ -197,9 +224,19 @@
 
       <tr>
 
+        <% if (canRemoveRunResults) { %>
+
+          <th class="text-center" style="width:2.75rem;" title="Select run results to delete">
+
+            <input type="checkbox" class="form-check-input mt-0" id="ncRecentRunsSelectAll" aria-label="Select all recent run results">
+
+          </th>
+
+        <% } %>
+
         <th class="ps-4 text-center" data-column="review" style="width:3rem;">Review</th>
 
-        <th class="draggable" data-column="ruleLabel">Rule <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="ruleLabel">Run <span class="sort-icon"></span></th>
 
         <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
 
@@ -219,11 +256,11 @@
 
       <% if (!access?.canViewRuns) { %>
 
-        <tr data-nc-runs-locked="1"><td colspan="7" class="text-center py-4 text-muted">You need READ_ALL access to view recent runs.</td></tr>
+        <tr data-nc-runs-locked="1"><td colspan="<%= canRemoveRunResults ? 8 : 7 %>" class="text-center py-4 text-muted">You need READ_ALL access to view recent run results.</td></tr>
 
       <% } else if (!(runs || []).length) { %>
 
-        <tr data-nc-empty-runs="1"><td colspan="7" class="text-center py-4 text-muted">No runs yet.</td></tr>
+        <tr data-nc-empty-runs="1"><td colspan="<%= canRemoveRunResults ? 8 : 7 %>" class="text-center py-4 text-muted">No run results yet.</td></tr>
 
       <% } else { %>
 
@@ -235,7 +272,17 @@
 
         %>
 
-          <tr class="nc-run-row" data-run-href="<%= runHref %>">
+          <tr class="nc-run-row" data-run-href="<%= runHref %>" data-run-id="<%= run.id %>" data-rule-id="<%= run.ruleId || '' %>">
+
+            <% if (canRemoveRunResults) { %>
+
+              <td class="text-center js-nc-run-select-wrap" data-sort-value="">
+
+                <input type="checkbox" class="form-check-input mt-0 js-nc-run-select" value="<%= run.id %>" aria-label="Select run result for <%= run.ruleLabel || run.ruleType || 'delete' %>">
+
+              </td>
+
+            <% } %>
 
             <td class="ps-4 text-center" data-sort-value="<%= viewed ? '1' : '0' %>">
 
@@ -267,7 +314,7 @@
 
             <td class="table-actions text-end pe-4">
 
-              <% if (access?.canViewRuns || access?.canDeleteRuns) { %>
+              <% if (access?.canViewRuns || canRemoveRunResults) { %>
 
               <div class="row-actions-wrap">
 
@@ -285,7 +332,7 @@
 
                   <% } %>
 
-                  <% if (access?.canDeleteRuns) { %>
+                  <% if (canRemoveRunResults) { %>
 
                     <form method="post" action="/school/notification-center/runs/<%= run.id %>/delete" class="d-inline js-nc-delete-run-form">
 
@@ -339,15 +386,305 @@
 
     if (tbody.querySelector('tr[data-nc-empty-runs]')) return;
 
+    const table = tbody.closest('#nc-recent-runs-table');
+
+    const colspan = table?.querySelector('th #ncRecentRunsSelectAll') ? 8 : 7;
+
     const row = document.createElement('tr');
 
     row.setAttribute('data-nc-empty-runs', '1');
 
-    row.innerHTML = '<td colspan="7" class="text-center py-4 text-muted">No runs yet.</td>';
+    row.innerHTML = `<td colspan="${colspan}" class="text-center py-4 text-muted">No run results yet.</td>`;
 
     tbody.appendChild(row);
 
   }
+
+  function resolveCsrfHeaders() {
+
+    const csrfToken = resolveCsrfToken();
+
+    const headers = {
+
+      Accept: 'application/json',
+
+      'X-AJAX-Request': '1'
+
+    };
+
+    if (csrfToken) {
+
+      headers['x-csrf-token'] = csrfToken;
+
+      headers['csrf-token'] = csrfToken;
+
+    }
+
+    return headers;
+
+  }
+
+  async function deleteNotificationRunByUrl(deleteUrl, row) {
+
+    const response = await fetch(deleteUrl, {
+
+      method: 'POST',
+
+      headers: resolveCsrfHeaders(),
+
+      credentials: 'same-origin'
+
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || payload.status !== 'ok') {
+
+      throw new Error(payload.message || 'Could not delete this run.');
+
+    }
+
+    if (row) row.remove();
+
+  }
+
+  function syncNcRecentRunsBulkUi() {
+
+    const tbody = document.querySelector('#nc-recent-runs-table tbody');
+
+    const selectAll = document.getElementById('ncRecentRunsSelectAll');
+
+    const deleteBtn = document.getElementById('ncDeleteSelectedRuns');
+
+    const boxes = tbody ? Array.from(tbody.querySelectorAll('.js-nc-run-select')) : [];
+
+    const checked = boxes.filter((box) => box.checked);
+
+    if (deleteBtn) {
+
+      deleteBtn.disabled = checked.length === 0;
+
+    }
+
+    if (selectAll) {
+
+      selectAll.disabled = boxes.length === 0;
+
+      selectAll.checked = boxes.length > 0 && checked.length === boxes.length;
+
+      selectAll.indeterminate = checked.length > 0 && checked.length < boxes.length;
+
+    }
+
+  }
+
+  document.getElementById('ncRecentRunsSelectAll')?.addEventListener('change', (event) => {
+
+    const checked = event.target.checked;
+
+    document.querySelectorAll('#nc-recent-runs-table .js-nc-run-select').forEach((box) => {
+
+      box.checked = checked;
+
+    });
+
+    syncNcRecentRunsBulkUi();
+
+  });
+
+  document.querySelectorAll('.js-nc-run-select').forEach((box) => {
+
+    box.addEventListener('change', () => syncNcRecentRunsBulkUi());
+
+    box.addEventListener('click', (event) => event.stopPropagation());
+
+  });
+
+  document.querySelectorAll('.js-nc-run-select-wrap').forEach((cell) => {
+
+    cell.addEventListener('click', (event) => event.stopPropagation());
+
+  });
+
+  document.getElementById('ncDeleteSelectedRuns')?.addEventListener('click', async () => {
+
+    const selected = Array.from(document.querySelectorAll('#nc-recent-runs-table .js-nc-run-select:checked'));
+
+    if (!selected.length) return;
+
+    const choice = await showMessageModal({
+
+      title: 'Delete runs',
+
+      icon: 'warning',
+
+      message: `Delete ${selected.length} selected notification run(s)? This cannot be undone.`,
+
+      size: 'md',
+
+      buttons: [
+
+        { text: 'Cancel', class: 'btn-secondary btn-md' },
+
+        { text: 'Delete', class: 'btn-danger btn-md' }
+
+      ]
+
+    });
+
+    if (choice !== 'Delete') return;
+
+    const deleteBtn = document.getElementById('ncDeleteSelectedRuns');
+
+    if (deleteBtn) deleteBtn.disabled = true;
+
+    const tbody = document.querySelector('#nc-recent-runs-table tbody');
+
+    const failures = [];
+
+    for (const box of selected) {
+
+      const runId = String(box.value || '').trim();
+
+      const row = box.closest('tr.nc-run-row');
+
+      const deleteUrl = `/school/notification-center/runs/${encodeURIComponent(runId)}/delete`;
+
+      try {
+
+        await deleteNotificationRunByUrl(deleteUrl, row);
+
+      } catch (error) {
+
+        failures.push(error?.message || runId);
+
+      }
+
+    }
+
+    ensureRecentRunsEmptyState(tbody);
+
+    syncNcRecentRunsBulkUi();
+
+    if (failures.length) {
+
+      await showMessageModal({
+
+        title: 'Some deletes failed',
+
+        message: failures.slice(0, 5).join('\n'),
+
+        icon: 'error',
+
+        size: 'md'
+
+      });
+
+    }
+
+  });
+
+  syncNcRecentRunsBulkUi();
+
+  document.querySelectorAll('.js-nc-delete-rule-runs').forEach((button) => {
+
+    button.addEventListener('click', async () => {
+
+      const ruleId = String(button.getAttribute('data-rule-id') || '').trim();
+
+      const ruleLabel = String(button.getAttribute('data-rule-label') || '').trim() || 'this rule';
+
+      const runRows = ruleId
+
+        ? Array.from(document.querySelectorAll(`tr.nc-run-row[data-rule-id="${ruleId}"]`))
+
+        : [];
+
+      if (!runRows.length) {
+
+        await showMessageModal({
+
+          title: 'No run results',
+
+          message: `There are no recent run results listed for “${ruleLabel}”. Scroll to Recent run results or run the rule again.`,
+
+          icon: 'info',
+
+          size: 'md'
+
+        });
+
+        return;
+
+      }
+
+      const choice = await showMessageModal({
+
+        title: 'Delete run results',
+
+        icon: 'warning',
+
+        message: `Delete ${runRows.length} recent run result(s) for “${ruleLabel}”? This cannot be undone.`,
+
+        size: 'md',
+
+        buttons: [
+
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+
+          { text: 'Delete', class: 'btn-danger btn-md' }
+
+        ]
+
+      });
+
+      if (choice !== 'Delete') return;
+
+      const tbody = document.querySelector('#nc-recent-runs-table tbody');
+
+      const failures = [];
+
+      for (const row of runRows) {
+
+        const runId = String(row.getAttribute('data-run-id') || '').trim();
+
+        if (!runId) continue;
+
+        try {
+
+          await deleteNotificationRunByUrl(`/school/notification-center/runs/${encodeURIComponent(runId)}/delete`, row);
+
+        } catch (error) {
+
+          failures.push(error?.message || runId);
+
+        }
+
+      }
+
+      ensureRecentRunsEmptyState(tbody);
+
+      syncNcRecentRunsBulkUi();
+
+      if (failures.length) {
+
+        await showMessageModal({
+
+          title: 'Some deletes failed',
+
+          message: failures.slice(0, 5).join('\n'),
+
+          icon: 'error',
+
+          size: 'md'
+
+        });
+
+      }
+
+    });
+
+  });
 
   document.querySelectorAll('.js-nc-delete-run-form').forEach((form) => {
 
@@ -385,55 +722,17 @@
 
       const tbody = row?.closest('tbody');
 
-      const csrfToken = resolveCsrfToken();
-
-      const headers = {
-
-        Accept: 'application/json',
-
-        'X-AJAX-Request': '1'
-
-      };
-
-      if (csrfToken) {
-
-        headers['x-csrf-token'] = csrfToken;
-
-        headers['csrf-token'] = csrfToken;
-
-      }
-
       const submitButton = form.querySelector('button[type="submit"]');
 
       if (submitButton) submitButton.disabled = true;
 
       try {
 
-        const response = await fetch(form.action, {
+        await deleteNotificationRunByUrl(form.action, row);
 
-          method: 'POST',
+        ensureRecentRunsEmptyState(tbody);
 
-          headers,
-
-          credentials: 'same-origin'
-
-        });
-
-        const payload = await response.json().catch(() => ({}));
-
-        if (!response.ok || payload.status !== 'ok') {
-
-          throw new Error(payload.message || 'Could not delete this run.');
-
-        }
-
-        if (row) {
-
-          row.remove();
-
-          ensureRecentRunsEmptyState(tbody);
-
-        }
+        syncNcRecentRunsBulkUi();
 
       } catch (error) {
 
@@ -467,7 +766,7 @@
 
     row.addEventListener('click', (event) => {
 
-      if (event.target.closest('a, button, form, .row-actions-wrap')) return;
+      if (event.target.closest('a, button, form, .row-actions-wrap, .js-nc-run-select-wrap')) return;
 
       const href = row.getAttribute('data-run-href');
 

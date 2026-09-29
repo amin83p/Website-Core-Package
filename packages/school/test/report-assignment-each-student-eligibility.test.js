@@ -355,6 +355,171 @@ test('validateAssignmentCrossEntityContext stores per-row targetStudentIds for e
   }
 });
 
+test('validateAssignmentCrossEntityContext validates only per-row students when target rows are provided', async () => {
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    fetchAllData: schoolDataService.fetchAllData,
+    getTemplateById: schoolRepositories.reportTemplates.getById,
+    listActiveStudentIdsForClass: classEnrollmentReadService.listActiveStudentIdsForClass
+  };
+  try {
+    schoolDataService.getDataById = async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLS-1') return classData;
+      return null;
+    };
+    schoolDataService.getClassSessions = async () => ([
+      {
+        sessionId: 'SES-1',
+        date: '2026-09-08',
+        startTime: '09:00',
+        endTime: '10:00',
+        roster: []
+      },
+      {
+        sessionId: 'SES-2',
+        date: '2026-09-15',
+        startTime: '09:00',
+        endTime: '10:00',
+        roster: []
+      }
+    ]);
+    schoolDataService.fetchAllData = async (entityType) => {
+      if (entityType === 'students') {
+        return [
+          { id: 'REG-1', personId: 'STU-1', displayName: 'Row One Student' },
+          { id: 'REG-2', personId: 'STU-2', displayName: 'Row Two Student' }
+        ];
+      }
+      return [];
+    };
+    schoolRepositories.reportTemplates.getById = async () => template;
+    classEnrollmentReadService.listActiveStudentIdsForClass = async () => ({
+      source: 'canonical',
+      studentIds: new Set(['REG-1']),
+      usedFallback: false
+    });
+
+    await assert.rejects(
+      () => reportIntegrityService.validateAssignmentCrossEntityContext({
+        classId: 'CLS-1',
+        templateId: 'TPL-1',
+        reqUser,
+        reportScope: 'selected_students',
+        hasSessionTargets: true,
+        selectedSessionIds: ['SES-1', 'SES-2'],
+        teacherIds: ['TCH-1'],
+        requestedReportStartDate: '2026-09-01',
+        requestedReportDueDate: '2026-09-15',
+        selectedTargetStudentIds: ['STU-1', 'STU-2'],
+        targetRows: [
+          buildSessionTargetRow({
+            rowId: 'row-1',
+            sessionId: 'SES-1',
+            sessionDate: '2026-09-08',
+            reportStartDate: '2026-09-08',
+            reportDueDate: '2026-09-15',
+            targetStudentIds: ['STU-1']
+          }),
+          buildSessionTargetRow({
+            rowId: 'row-2',
+            sessionId: 'SES-2',
+            sessionDate: '2026-09-15',
+            reportStartDate: '2026-09-08',
+            reportDueDate: '2026-09-15',
+            targetStudentIds: ['STU-2']
+          })
+        ]
+      }),
+      (error) => {
+        const message = String(error?.message || error);
+        assert.match(message, /Row Two Student/);
+        assert.doesNotMatch(message, /Row One Student/);
+        return true;
+      }
+    );
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.fetchAllData = originals.fetchAllData;
+    schoolRepositories.reportTemplates.getById = originals.getTemplateById;
+    classEnrollmentReadService.listActiveStudentIdsForClass = originals.listActiveStudentIdsForClass;
+  }
+});
+
+test('validateAssignmentCrossEntityContext lists students not enrolled for target row', async () => {
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    fetchAllData: schoolDataService.fetchAllData,
+    getTemplateById: schoolRepositories.reportTemplates.getById,
+    listActiveStudentIdsForClass: classEnrollmentReadService.listActiveStudentIdsForClass
+  };
+  try {
+    schoolDataService.getDataById = async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLS-1') return classData;
+      return null;
+    };
+    schoolDataService.getClassSessions = async () => ([{
+      sessionId: 'SES-1',
+      date: '2026-09-15',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: []
+    }]);
+    schoolDataService.fetchAllData = async (entityType) => {
+      if (entityType === 'students') {
+        return [
+          { id: 'REG-1', personId: 'STU-1', displayName: 'Ada Active' },
+          { id: 'REG-2', personId: 'STU-2', displayName: 'Ben Inactive' }
+        ];
+      }
+      return [];
+    };
+    schoolRepositories.reportTemplates.getById = async () => template;
+    classEnrollmentReadService.listActiveStudentIdsForClass = async () => ({
+      source: 'canonical',
+      studentIds: new Set(['REG-1']),
+      usedFallback: false
+    });
+
+    await assert.rejects(
+      () => reportIntegrityService.validateAssignmentCrossEntityContext({
+        classId: 'CLS-1',
+        templateId: 'TPL-1',
+        reqUser,
+        reportScope: 'selected_students',
+        hasSessionTargets: true,
+        selectedSessionIds: ['SES-1'],
+        teacherIds: ['TCH-1'],
+        requestedReportStartDate: '2026-09-01',
+        requestedReportDueDate: '2026-09-15',
+        selectedTargetStudentIds: [],
+        targetRows: [buildSessionTargetRow({
+          sessionDate: '2026-09-15',
+          reportStartDate: '2026-09-15',
+          reportDueDate: '2026-09-15',
+          targetStudentIds: ['STU-1', 'STU-2']
+        })]
+      }),
+      (error) => {
+        const message = String(error?.message || error);
+        assert.ok(message.startsWith('INACTIVE_ENROLLMENT_ROW|'));
+        assert.match(message, /Ben Inactive/);
+        assert.doesNotMatch(message, /student REG-2/);
+        assert.match(message, /2026-09-15 through 2026-09-15/);
+        return true;
+      }
+    );
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.fetchAllData = originals.fetchAllData;
+    schoolRepositories.reportTemplates.getById = originals.getTemplateById;
+    classEnrollmentReadService.listActiveStudentIdsForClass = originals.listActiveStudentIdsForClass;
+  }
+});
+
 test('validateAssignmentCrossEntityContext fails selected_students when a row has no students', async () => {
   const originals = {
     getDataById: schoolDataService.getDataById,

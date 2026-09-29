@@ -10,6 +10,9 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DEFAULT_TIMELINE_START_HOUR = 7;
 const DEFAULT_TIMELINE_END_HOUR = 22;
 const TIMELINE_MIN_SPAN_HOURS = 2;
+const DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE = 2;
+const DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER = 2;
+const MAX_STAGED_VIEW_PADDING_WEEKS = 12;
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -32,15 +35,33 @@ function normalizeIsoDate(value) {
   return cleaned;
 }
 
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+function normalizeChipColor(value) {
+  const cleaned = String(value || '').trim();
+  if (!HEX_COLOR_RE.test(cleaned)) return '';
+  if (cleaned.length === 4) {
+    const r = cleaned[1];
+    const g = cleaned[2];
+    const b = cleaned[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return cleaned.toLowerCase();
+}
+
 function normalizePersonEntry(entry = {}) {
   const id = String(entry?.id || entry?.personId || '').trim();
   if (!id) return null;
   const name = String(entry?.name || entry?.displayName || '').trim() || id;
   const selectedRole = String(entry?.selectedRole || '').trim();
+  const chipBgColor = normalizeChipColor(entry.chipBgColor);
+  const chipTextColor = normalizeChipColor(entry.chipTextColor);
   return {
     id,
     name,
-    ...(selectedRole ? { selectedRole } : {})
+    ...(selectedRole ? { selectedRole } : {}),
+    ...(chipBgColor ? { chipBgColor } : {}),
+    ...(chipTextColor ? { chipTextColor } : {})
   };
 }
 
@@ -75,6 +96,12 @@ function normalizeTimelineBounds(startHour, endHour) {
   return { timelineStartHour: start, timelineEndHour: end };
 }
 
+function normalizeStagedViewPaddingWeeks(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.min(MAX_STAGED_VIEW_PADDING_WEEKS, Math.floor(parsed)));
+}
+
 function emptyPreferences() {
   return {
     startDate: '',
@@ -83,7 +110,9 @@ function emptyPreferences() {
     persons: [],
     autoChangeDetector: true,
     timelineStartHour: DEFAULT_TIMELINE_START_HOUR,
-    timelineEndHour: DEFAULT_TIMELINE_END_HOUR
+    timelineEndHour: DEFAULT_TIMELINE_END_HOUR,
+    stagedViewPaddingWeeksBefore: DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE,
+    stagedViewPaddingWeeksAfter: DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER
   };
 }
 
@@ -101,6 +130,14 @@ function extractPreferences(source = {}) {
     autoChangeDetector = source.autoChangeDetector;
   }
   const timeline = normalizeTimelineBounds(source.timelineStartHour, source.timelineEndHour);
+  const stagedViewPaddingWeeksBefore = normalizeStagedViewPaddingWeeks(
+    source.stagedViewPaddingWeeksBefore,
+    DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE
+  );
+  const stagedViewPaddingWeeksAfter = normalizeStagedViewPaddingWeeks(
+    source.stagedViewPaddingWeeksAfter,
+    DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER
+  );
   return {
     startDate,
     endDate,
@@ -108,8 +145,19 @@ function extractPreferences(source = {}) {
     persons,
     autoChangeDetector,
     timelineStartHour: timeline.timelineStartHour,
-    timelineEndHour: timeline.timelineEndHour
+    timelineEndHour: timeline.timelineEndHour,
+    stagedViewPaddingWeeksBefore,
+    stagedViewPaddingWeeksAfter
   };
+}
+
+function hasPersistableScheduleViewerExtras(prefs = {}) {
+  const normalized = extractPreferences(prefs);
+  return normalized.timelineStartHour !== DEFAULT_TIMELINE_START_HOUR
+    || normalized.timelineEndHour !== DEFAULT_TIMELINE_END_HOUR
+    || normalized.stagedViewPaddingWeeksBefore !== DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE
+    || normalized.stagedViewPaddingWeeksAfter !== DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER
+    || normalized.autoChangeDetector === false;
 }
 
 function hasSavedPreferences(prefs = {}) {
@@ -155,7 +203,7 @@ function readEntry(settings = {}) {
 function buildNextSettings(currentSettings = {}, prefs = {}) {
   const next = clonePlainObject(currentSettings);
   const normalized = extractPreferences(prefs);
-  if (!hasSavedPreferences(normalized)) {
+  if (!hasSavedPreferences(normalized) && !hasPersistableScheduleViewerExtras(normalized)) {
     delete next[SETTINGS_ROOT];
     return next;
   }
@@ -193,6 +241,18 @@ function mergePreferences(current = {}, incoming = {}) {
     );
     next.timelineStartHour = timeline.timelineStartHour;
     next.timelineEndHour = timeline.timelineEndHour;
+  }
+  if (Object.prototype.hasOwnProperty.call(incoming, 'stagedViewPaddingWeeksBefore')) {
+    next.stagedViewPaddingWeeksBefore = normalizeStagedViewPaddingWeeks(
+      incoming.stagedViewPaddingWeeksBefore,
+      DEFAULT_STAGED_VIEW_PADDING_WEEKS_BEFORE
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(incoming, 'stagedViewPaddingWeeksAfter')) {
+    next.stagedViewPaddingWeeksAfter = normalizeStagedViewPaddingWeeks(
+      incoming.stagedViewPaddingWeeksAfter,
+      DEFAULT_STAGED_VIEW_PADDING_WEEKS_AFTER
+    );
   }
   return extractPreferences(next);
 }
