@@ -753,6 +753,7 @@
     flex-shrink: 0;
     white-space: nowrap;
 }
+/* Master Schedule viewbar/workspace UI (personSchedule loads this file before session-calendar.css). */
 .schedule-viewbar-chips {
     display: flex;
     align-items: center;

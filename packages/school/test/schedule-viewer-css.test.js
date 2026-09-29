@@ -30,6 +30,14 @@ test('schedule-viewer.css includes critical layout selectors', () => {
   assert.match(css, /prefers-reduced-motion: reduce/);
   assert.match(css, /@media \(hover: hover\)/);
   assert.match(css, /\.conflict-zone,\s*\n\s*\.cal-day\.conflict \{ animation: none; \}/);
+  assert.match(css, /\.schedule-workspace-actions\b/);
+});
+
+test('session-calendar.css does not duplicate Master Schedule viewbar workspace rules', () => {
+  const calendarCss = fs.readFileSync(path.join(repoRoot, 'public/styles/session-calendar.css'), 'utf8');
+  assert.doesNotMatch(calendarCss, /\.schedule-viewbar-chips\s*\{/);
+  assert.doesNotMatch(calendarCss, /\.schedule-workspace-actions\s*\{/);
+  assert.match(calendarCss, /schedule-viewer\.css/);
 });
 
 test('package mirror matches served schedule-viewer.css', () => {
