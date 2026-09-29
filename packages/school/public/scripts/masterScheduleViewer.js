@@ -4285,12 +4285,59 @@
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 applyScheduleWeekGridLayout(mode);
+                syncScheduleAdminWeekRailVisibility();
                 if (!scheduleState.focusStagedSessionOnNextLayout || !activePersonHasDraftStagedSessions()) return;
                 scheduleState.focusStagedSessionOnNextLayout = false;
                 const person = activeSchedulePerson();
                 const date = scheduleState.pendingStagedScrollDate || getFirstDraftStagedSessionDate(person?.id);
                 if (date) focusScheduleTimelineOnFirstStagedSession(date);
             });
+        });
+    }
+
+    function syncScheduleAdminWeekRailVisibility() {
+        if (!canSelectAnyPerson) return;
+        const rail = document.getElementById('scheduleAdminWeekRail');
+        if (!rail) return;
+        const scheduleContainer = document.getElementById('scheduleContainer');
+        const container = document.getElementById('visualDisplayArea');
+        const mode = normalizedScheduleViewMode();
+        const weekGridMode = mode === 'verticalTimeline' || mode === 'timeline';
+        const show = Boolean(
+            scheduleContainer
+            && !scheduleContainer.classList.contains('d-none')
+            && container
+            && container.classList.contains('schedule-week-grid-host')
+            && weekGridMode
+        );
+        rail.classList.toggle('d-none', !show);
+        if (show) syncScheduleAdminWeekRailStickyTop();
+    }
+
+    function syncScheduleAdminWeekRailStickyTop() {
+        if (!canSelectAnyPerson) return;
+        const railInner = document.querySelector('#scheduleAdminWeekRail .schedule-admin-week-rail-inner');
+        if (!railInner || railInner.closest('.d-none')) return;
+        const viewbarTopRaw = getComputedStyle(document.documentElement).getPropertyValue('--schedule-viewbar-sticky-top').trim();
+        const viewbarTop = Number.parseFloat(viewbarTopRaw) || 110;
+        const railHeight = railInner.offsetHeight || 140;
+        const minTop = viewbarTop + 8;
+        const maxTop = Math.max(minTop, window.innerHeight - railHeight - 8);
+        const centeredTop = (window.innerHeight - railHeight) / 2;
+        const stickyTop = Math.min(maxTop, Math.max(minTop, centeredTop));
+        document.documentElement.style.setProperty('--schedule-admin-rail-sticky-top', `${stickyTop.toFixed(2)}px`);
+    }
+
+    function bindScheduleAdminWeekRail() {
+        if (!canSelectAnyPerson || bindScheduleAdminWeekRail.bound) return;
+        bindScheduleAdminWeekRail.bound = true;
+        const rail = document.getElementById('scheduleAdminWeekRail');
+        if (!rail) return;
+        // Enrollment action handlers will be wired in a follow-up pass.
+        rail.addEventListener('click', (clickEvent) => {
+            if (clickEvent.target.closest('[data-schedule-admin-action]')) {
+                clickEvent.preventDefault();
+            }
         });
     }
 
@@ -5100,6 +5147,7 @@
             document.getElementById('legendContainer').innerHTML = '';
             refreshScheduleSummary([]);
             setSchedulePrintEnabled(false);
+            syncScheduleAdminWeekRailVisibility();
             return;
         }
         document.getElementById('scheduleContainer')?.classList.remove('d-none');
@@ -5108,6 +5156,7 @@
             refreshScheduleSummary([]);
             setSchedulePrintEnabled(false);
             container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedule for ${escapeHtml(person.name || person.id)}...</div></div>`;
+            syncScheduleAdminWeekRailVisibility();
             return;
         }
         if (!scheduleState.loadedPersonIds.has(person.id)) {
@@ -5115,6 +5164,7 @@
             refreshScheduleSummary([]);
             setSchedulePrintEnabled(false);
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-arrow-clockwise fs-1 d-block mb-2"></i>Schedule is ready to load for ${escapeHtml(person.name || person.id)}.</div>`;
+            syncScheduleAdminWeekRailVisibility();
             return;
         }
         if (scheduleState.errorByPersonId[person.id]) {
@@ -5122,6 +5172,7 @@
             refreshScheduleSummary([]);
             setSchedulePrintEnabled(false);
             container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i>${escapeHtml(scheduleState.errorByPersonId[person.id])}</div>`;
+            syncScheduleAdminWeekRailVisibility();
             return;
         }
         const events = getScheduleEventsForPerson(person.id);
@@ -5139,6 +5190,7 @@
             syncScheduleMonthViewLayout(container);
             renderCalendarView(grouped, range.startDate, range.endDate, container);
             setSchedulePrintEnabled(true);
+            syncScheduleAdminWeekRailVisibility();
             return;
         }
         clearScheduleMonthViewLayout(container);
@@ -5146,6 +5198,7 @@
         if (!events.length && scheduleState.hideEmptyDays) {
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
             setSchedulePrintEnabled(true);
+            syncScheduleAdminWeekRailVisibility();
             return;
         }
         const rendered = mode === 'timeline'
@@ -5159,6 +5212,7 @@
         }
         setSchedulePrintEnabled(true);
         if (typeof schedulePersistDraftBackup === 'function') schedulePersistDraftBackup();
+        syncScheduleAdminWeekRailVisibility();
     }
 
     async function loadSchedulePerson(person, options = {}) {
@@ -6307,6 +6361,7 @@ if (canLoadAllSchedules) {
             }
         }
         document.documentElement.style.setProperty('--schedule-viewbar-sticky-top', `${topPx.toFixed(2)}px`);
+        syncScheduleAdminWeekRailStickyTop();
     }
 
     function bindScheduleViewbarStickyOffset() {
@@ -6334,6 +6389,7 @@ if (canLoadAllSchedules) {
     }
 
     bindScheduleViewbarStickyOffset();
+    bindScheduleAdminWeekRail();
     if (typeof bindScheduleDraftUnloadGuard === 'function') bindScheduleDraftUnloadGuard();
     void initializeScheduleViewer();
 

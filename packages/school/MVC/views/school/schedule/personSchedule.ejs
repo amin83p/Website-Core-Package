@@ -178,11 +178,22 @@
 
   <div id="scheduleContainer" class="d-none">
     <div class="card border-0 shadow-sm">
-      <div class="card-header schedule-viewbar-sticky bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2 py-2 px-3">
+      <div class="card-header schedule-viewbar-sticky bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div class="d-flex gap-3 align-items-center flex-wrap small w-100" id="legendContainer"></div>
       </div>
-      <div class="card-body p-2 p-md-3 schedule-calendar-card-body">
-        <div id="visualDisplayArea" class="schedule-visual-area"></div>
+      <div class="card-body schedule-calendar-card-body">
+        <div class="schedule-visual-layout">
+          <% if (canSelectAnyPerson) { %>
+          <aside id="scheduleAdminWeekRail" class="schedule-admin-week-rail d-none" aria-label="Enrollment actions">
+            <div class="schedule-admin-week-rail-inner">
+              <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="enroll-students" title="Enroll Students" aria-label="Enroll Students"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
+              <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="move-enrollments" title="Move Sessions/Enrollments" aria-label="Move Sessions/Enrollments"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></button>
+              <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="delete-enrollment" title="Delete Enrollment" aria-label="Delete Enrollment"><i class="bi bi-person-x" aria-hidden="true"></i></button>
+            </div>
+          </aside>
+          <% } %>
+          <div id="visualDisplayArea" class="schedule-visual-area"></div>
+        </div>
       </div>
     </div>
   </div>

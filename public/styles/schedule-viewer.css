@@ -1165,8 +1165,57 @@ button.schedule-loaded-at-chip.is-stale:focus {
     max-height: none;
     overflow-y: visible;
 }
+.schedule-visual-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.15rem;
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+.schedule-visual-layout > .schedule-visual-area {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.schedule-admin-week-rail {
+    flex: 0 0 2.25rem;
+    width: 2.25rem;
+    align-self: stretch;
+    min-height: 0;
+}
+.schedule-admin-week-rail-inner {
+    position: sticky;
+    top: var(--schedule-admin-rail-sticky-top, calc(50vh - 4rem));
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    pointer-events: auto;
+}
+.schedule-calendar-card-body.is-month-view .schedule-admin-week-rail,
+#scheduleContainer.d-none .schedule-admin-week-rail {
+    display: none !important;
+}
+body.schedule-stage-overlay-open #scheduleContainer .schedule-admin-week-rail-inner,
+body.modal-open #scheduleContainer .schedule-admin-week-rail-inner {
+    pointer-events: none;
+    opacity: 0.45;
+}
+#scheduleContainer > .card > .schedule-viewbar-sticky.card-header {
+    padding: 0.5rem;
+}
 .schedule-calendar-card-body {
     min-height: min(92vh, 1280px);
+}
+#scheduleContainer > .card > .schedule-calendar-card-body {
+    padding: 0.5rem 0.25rem;
+}
+@media (min-width: 768px) {
+    #scheduleContainer > .card > .schedule-calendar-card-body {
+        padding-left: 0.4rem;
+        padding-right: 0.4rem;
+    }
 }
 .schedule-calendar-card-body.is-month-view {
     min-height: 0;
