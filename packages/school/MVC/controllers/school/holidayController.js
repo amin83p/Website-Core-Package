@@ -217,11 +217,13 @@ async function listHolidaysInRange(req, res) {
 
         // pull all holidays then filter in-range
         const allHolidays = await schoolDataService.fetchData('holidays', { q: '' }, req.user);
+        const startToken = String(start).trim();
+        const endToken = String(end).trim();
         const holidays = (allHolidays || []).filter(h => {
             if (!h || !h.date) return false;
-            const d = new Date(h.date);
-            if (isNaN(d.getTime())) return false;
-            return d >= startD && d <= endD;
+            const dateToken = String(h.date).trim().slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateToken)) return false;
+            return dateToken >= startToken && dateToken <= endToken;
         });
 
         return res.json({ status: 'success', holidays });

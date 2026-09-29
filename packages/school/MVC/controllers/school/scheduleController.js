@@ -21,6 +21,7 @@ const schoolPersonAccessService = require('../../services/school/schoolPersonAcc
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
+const { buildMasterScheduleViewerClientConfig } = require('../../services/school/masterScheduleViewerClientConfig');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
 const scheduleSessionMutationService = require('../../services/school/scheduleSessionMutationService');
 const sessionManagementService = require('../../services/school/sessionManagementService');
@@ -1980,6 +1981,12 @@ async function showSchedulePage(req, res) {
             })
             : scheduleViewerPreferencesService.emptyPreferences();
 
+        const masterScheduleViewerClientConfig = buildMasterScheduleViewerClientConfig({
+            scheduleCapabilities,
+            viewerScheduleAccess,
+            initialScheduleViewerPrefs
+        });
+
         res.render('school/schedule/personSchedule', {
             title: 'Master Schedule Viewer',
             includeModal: true,
@@ -1991,7 +1998,8 @@ async function showSchedulePage(req, res) {
             viewerScheduleAccess,
             scheduleCapabilities,
             attendanceMarkAppearanceResolved,
-            initialScheduleViewerPrefs
+            initialScheduleViewerPrefs,
+            masterScheduleViewerClientConfig
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -2514,10 +2522,16 @@ async function postCommitStagedSessions(req, res) {
             ...createdSessions.map((row) => normalizeDateOnly(row?.date)).filter(Boolean),
             ...pendingStagedSessions.map((row) => normalizeDateOnly(row?.date)).filter(Boolean)
         ];
-        const startDate = normalizeDateOnly(req.body?.startDate)
+        let startDate = normalizeDateOnly(req.body?.startDate)
             || (sessionDates.length ? sessionDates.reduce((min, date) => (date < min ? date : min)) : '');
-        const endDate = normalizeDateOnly(req.body?.endDate)
+        let endDate = normalizeDateOnly(req.body?.endDate)
             || (sessionDates.length ? sessionDates.reduce((max, date) => (date > max ? date : max)) : '');
+        if (sessionDates.length) {
+            const minSessionDate = sessionDates.reduce((min, date) => (date < min ? date : min));
+            const maxSessionDate = sessionDates.reduce((max, date) => (date > max ? date : max));
+            if (!startDate || minSessionDate < startDate) startDate = minSessionDate;
+            if (!endDate || maxSessionDate > endDate) endDate = maxSessionDate;
+        }
         const role = normalizeScheduleRole(req.body?.role || '');
         let commitEvents = [];
         let fingerprint = '';

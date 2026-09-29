@@ -5,6 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
+const { readMasterScheduleViewerJs, readPersonScheduleView } = require('./helpers/scheduleViewerSource');
 
 function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
@@ -62,17 +63,18 @@ test('schedule routes expose instructor-classes endpoint', () => {
 });
 
 test('person schedule wires class picker, partial calendar, and draft events', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = readPersonScheduleView();
+  const source = readMasterScheduleViewerJs();
   assert.match(view, /sessionEnrollmentCalendarModal/);
   assert.match(view, /sessionEnrollmentCalendarModal\.js/);
   assert.match(view, /scheduleClassPickerModal/);
-  assert.match(view, /openScheduleClassPickerModal/);
-  assert.match(view, /SessionEnrollmentCalendarModal\.open/);
-  assert.match(view, /mode:\s*'partial'/);
-  assert.match(view, /draftEventsByPersonId/);
-  assert.match(view, /is-schedule-draft/);
-  assert.match(view, /computeStagedSessionsViewRange/);
-  assert.doesNotMatch(view, /Session creation from Master Schedule is not enabled yet/);
+  assert.match(source, /openScheduleClassPickerModal/);
+  assert.match(source, /SessionEnrollmentCalendarModal\.open/);
+  assert.match(source, /mode:\s*'partial'/);
+  assert.match(source, /draftEventsByPersonId/);
+  assert.match(source, /is-schedule-draft/);
+  assert.match(source, /computeStagedSessionsViewRange/);
+  assert.doesNotMatch(source, /Session creation from Master Schedule is not enabled yet/);
 });
 
 test('computeStagedSessionsViewRange pads one session with two weeks before and after', () => {
@@ -118,8 +120,8 @@ test('partial modal recomputes staged session view range from all sessions', () 
 });
 
 test('commitScheduleStageCreate syncs master schedule before opening partial modal', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  const fnMatch = view.match(/async function commitScheduleStageCreate\(\) \{[\s\S]*?\n    \}/);
+  const staging = read('public/scripts/masterScheduleViewerStaging.js');
+  const fnMatch = staging.match(/async function commitScheduleStageCreate\(\) \{[\s\S]*?\n        \}/);
   assert.ok(fnMatch, 'commitScheduleStageCreate should exist');
   const body = fnMatch[0];
   const applyIdx = body.indexOf('applyDraftStagedSessionsToSchedule');
@@ -130,8 +132,8 @@ test('commitScheduleStageCreate syncs master schedule before opening partial mod
 });
 
 test('applyDraftStagedSessionsToSchedule clears preset range chip for padded dates', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  const fnMatch = view.match(/function applyDraftStagedSessionsToSchedule\(payload = \{\}\) \{[\s\S]*?\n    \}/);
+  const staging = read('public/scripts/masterScheduleViewerStaging.js');
+  const fnMatch = staging.match(/function applyDraftStagedSessionsToSchedule\(payload = \{\}\) \{[\s\S]*?\n        \}/);
   assert.ok(fnMatch, 'applyDraftStagedSessionsToSchedule should exist');
   const body = fnMatch[0];
   assert.match(body, /setDateRangeFromIso\(/);
@@ -147,18 +149,18 @@ test('buildPartialPickerData excludes synced draft events from existingEvents', 
 });
 
 test('commitScheduleStageCreate passes non-draft existing events to partial modal', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  const fnMatch = view.match(/async function commitScheduleStageCreate\(\) \{[\s\S]*?\n    \}/);
+  const staging = read('public/scripts/masterScheduleViewerStaging.js');
+  const fnMatch = staging.match(/async function commitScheduleStageCreate\(\) \{[\s\S]*?\n        \}/);
   assert.ok(fnMatch, 'commitScheduleStageCreate should exist');
   assert.match(fnMatch[0], /filter\(\(ev\) => ev\?\.isDraft !== true\)/);
 });
 
 test('master schedule keeps stacked multi-week height for padded staged ranges', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  const fnMatch = view.match(/function computeScheduleGridViewportHeight\(container, weekCount = 1\) \{[\s\S]*?\n    \}/);
+  const source = readMasterScheduleViewerJs();
+  const fnMatch = source.match(/function computeScheduleGridViewportHeight\(container, weekCount = 1\) \{[\s\S]*?\n    \}/);
   assert.ok(fnMatch, 'computeScheduleGridViewportHeight should exist');
   assert.match(fnMatch[0], /stackedHeight/);
-  assert.doesNotMatch(view, /schedule-week-grid-multi-week/);
+  assert.doesNotMatch(source, /schedule-week-grid-multi-week/);
 });
 
 test('partial modal scrolls to first staged session week on open and focuses master schedule on close', () => {
@@ -167,9 +169,9 @@ test('partial modal scrolls to first staged session week on open and focuses mas
   assert.match(modalSource, /scrollPartialToFirstStagedSession\(\)/);
   assert.match(modalSource, /onClose: options\.onClose/);
   assert.match(modalSource, /setTimeout\(\(\) => \{[\s\S]*onClose\(closeDate\)/);
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(view, /focusScheduleTimelineOnFirstStagedSession/);
-  assert.match(view, /focusStagedSessionOnNextLayout/);
-  assert.match(view, /scrollSchedulePageToWeekRow/);
-  assert.match(view, /onClose:[\s\S]*focusScheduleTimelineOnFirstStagedSession/);
+  const source = readMasterScheduleViewerJs();
+  assert.match(source, /focusScheduleTimelineOnFirstStagedSession/);
+  assert.match(source, /focusStagedSessionOnNextLayout/);
+  assert.match(source, /scrollSchedulePageToWeekRow/);
+  assert.match(source, /onClose:[\s\S]*focusScheduleTimelineOnFirstStagedSession/);
 });

@@ -54,8 +54,10 @@ test('person schedule view conditionally loads admin-only assets', () => {
   assert.match(view, /scheduleCapabilities/);
   assert.match(view, /canDragCreateSessions/);
   assert.match(view, /if \(canDragCreateSessions\)/);
+  assert.match(view, /masterScheduleViewerStaging\.js/);
   assert.match(view, /if \(canSelectAnyPerson\)/);
-  assert.match(view, /if \(canLoadAllSchedules\)/);
+  assert.match(view, /btn_loadAllSchedules/);
+  assert.match(view, /masterScheduleViewer\.js/);
 });
 
 test('self-only schedule page does not always include admin modals in template branches', () => {

@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const scheduleController = require('../MVC/controllers/school/scheduleController');
+const { readMasterScheduleViewerJs } = require('./helpers/scheduleViewerSource');
 
 function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
@@ -50,7 +51,7 @@ test('schedule routes expose person-schedule-version endpoint', () => {
 });
 
 test('personSchedule wires smart schedule polling without auto-reload on fingerprint change', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /person-schedule-version/);
   assert.match(source, /scheduleFingerprintByPersonId/);
   assert.match(source, /pollScheduleVersionForActivePerson/);
@@ -74,13 +75,14 @@ test('personSchedule wires smart schedule polling without auto-reload on fingerp
 });
 
 test('personSchedule uses window.showMessageModal for uiAlert and uiConfirm without native confirm', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
-  const helpersBlock = source.slice(source.indexOf('function inferScheduleAlertIcon'), source.indexOf('const SCHEDULE_DAY_WIDTH_STORAGE_KEY'));
+  const source = readMasterScheduleViewerJs();
+  const coreOnly = read('public/scripts/masterScheduleViewer.js');
+  const helpersBlock = coreOnly.slice(coreOnly.indexOf('function inferScheduleAlertIcon'), coreOnly.indexOf('const SCHEDULE_DAY_WIDTH_STORAGE_KEY'));
   assert.match(helpersBlock, /window\.showMessageModal/);
   assert.match(helpersBlock, /inferScheduleAlertIcon/);
   assert.match(helpersBlock, /confirmDiscardPendingDraftsIfNeeded/);
   assert.doesNotMatch(helpersBlock, /\bconfirm\(/);
-  assert.doesNotMatch(source, /addEventListener\('beforeunload'[\s\S]*countAllPendingDraftSessions/);
+  assert.doesNotMatch(coreOnly, /addEventListener\('beforeunload'[\s\S]*countAllPendingDraftSessions/);
 });
 
 function buildOverlappingClassSessionEvent(overrides = {}) {

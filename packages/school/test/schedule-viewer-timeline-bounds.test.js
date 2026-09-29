@@ -5,6 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
+const { readMasterScheduleViewerJs, readPersonScheduleView } = require('./helpers/scheduleViewerSource');
 
 function loadSessionCalendarCore() {
   const scriptPath = path.join(__dirname, '../public/scripts/sessionCalendarCore.js');
@@ -69,13 +70,14 @@ test('expandTimelineBoundsToFitSessions widens only enough for sessions', () => 
 });
 
 test('personSchedule wires display-hours popover and per-week expand controls', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = readPersonScheduleView();
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /data-schedule-time-range-toggle/);
+  assert.match(source, /data-schedule-week-expand-time/);
   assert.match(source, /scheduleTimeRangePopover/);
   assert.match(source, /scheduleTimelineStartInput/);
   assert.match(source, /scheduleTimelineEndInput/);
   assert.match(source, /data-schedule-time-range-apply/);
-  assert.match(source, /data-schedule-week-expand-time/);
   assert.match(source, /data-schedule-week-reset-time/);
   assert.match(source, /getScheduleMaxHourSlotsForLayout/);
   assert.match(source, /timelineStartHour/);

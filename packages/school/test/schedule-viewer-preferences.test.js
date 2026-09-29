@@ -17,6 +17,13 @@ function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
 }
 
+function readMasterScheduleViewerJs() {
+  return [
+    read('public/scripts/masterScheduleViewer.js'),
+    read('public/scripts/masterScheduleViewerStaging.js')
+  ].join('\n');
+}
+
 test('extractPreferences normalizes dates, persons, and autoChangeDetector', () => {
   const prefs = extractPreferences({
     startDate: '2026-09-01',
@@ -232,9 +239,10 @@ test('schedule routes expose viewer-preferences endpoints', () => {
 });
 
 test('personSchedule wires workspace save and user-settings restore', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
 
-  assert.match(source, /initialScheduleViewerPrefs/);
+  assert.match(view, /masterScheduleViewerConfig/);
   assert.match(source, /data-schedule-save-workspace/);
   assert.match(source, /data-schedule-clear-workspace/);
   assert.match(source, /saveScheduleWorkspace/);
@@ -244,7 +252,11 @@ test('personSchedule wires workspace save and user-settings restore', () => {
   assert.match(source, /schedule-person-tab-group--with-actions/);
   assert.match(source, /schedulePersonTabs.*addEventListener\('click'[\s\S]*data-schedule-save-workspace/);
   assert.match(source, /schedulePersonTabs.*addEventListener\('click'[\s\S]*data-schedule-clear-workspace/);
-  assert.doesNotMatch(source, /schedule-viewbar-row-left schedule-viewbar-chips[\s\S]*data-schedule-workspace-actions/);
+  const legendBlock = source.slice(
+    source.indexOf('function renderScheduleControls'),
+    source.indexOf('function groupEventsByDate')
+  );
+  assert.doesNotMatch(legendBlock, /schedule-viewbar-chips[\s\S]*data-schedule-workspace-actions/);
   assert.match(source, /initializeScheduleViewer/);
   assert.match(source, /loadAllSavedSchedulePersons/);
   assert.match(source, /SCHEDULE_VIEWER_PREFS_API/);
@@ -270,7 +282,7 @@ test('schedule routes expose saved session mutation endpoints', () => {
 });
 
 test('personSchedule wires saved session schedule editing for admins', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /isScheduledClassSessionForQuickEdit/);
   assert.match(source, /isWorkSessionScheduleEvent/);
   assert.match(source, /data-schedule-editable="1"/);
@@ -290,7 +302,7 @@ test('personSchedule wires saved session schedule editing for admins', () => {
 });
 
 test('status updates patch state and rerender single block instead of reloading schedule', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   const classStatusBlock = source.slice(source.indexOf('async function applyClassSessionStatusUpdate'), source.indexOf('async function applyWorkSessionStatusUpdate'));
   const workStatusBlock = source.slice(source.indexOf('async function applyWorkSessionStatusUpdate'), source.indexOf('function buildSessionManagerUrlForEvent'));
   assert.match(classStatusBlock, /showLoading\('Updating session status/);
@@ -302,7 +314,7 @@ test('status updates patch state and rerender single block instead of reloading 
 });
 
 test('schedule updates show waiting modal during applySavedSessionScheduleUpdate', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   const scheduleUpdateBlock = source.slice(
     source.indexOf('async function applySavedSessionScheduleUpdate'),
     source.indexOf('async function applyClassSessionStatusUpdate')
@@ -310,28 +322,51 @@ test('schedule updates show waiting modal during applySavedSessionScheduleUpdate
   assert.match(scheduleUpdateBlock, /showLoading\(forceConflicts === true \? 'Saving session schedule/);
   assert.match(scheduleUpdateBlock, /'Updating session schedule\.\.\.'/);
   assert.match(scheduleUpdateBlock, /hideLoading\(\{ force: true \}\)/);
-  assert.match(scheduleUpdateBlock, /loadingShown = false;\s*const conflicts/s);
+  assert.match(scheduleUpdateBlock, /loadingShown = false;\s*if \(deferPostUpdate\)/s);
   assert.match(scheduleUpdateBlock, /await uiConfirm/);
   assert.match(scheduleUpdateBlock, /acknowledgeLocalScheduleMutation/);
   assert.match(scheduleUpdateBlock, /revertSavedSessionScheduleInState/);
 });
 
 test('personSchedule uiAlert and uiConfirm route through window.showMessageModal', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /window\.showMessageModal/);
   assert.match(source, /inferScheduleAlertIcon/);
   assert.doesNotMatch(source, /return confirm\(/);
 });
 
+test('saved session bulk edit exposes markup and applies schedule per session without changing date', () => {
+  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = read('public/scripts/masterScheduleViewer.js');
+  assert.match(view, /btn_scheduleSessionContextEditSelected/);
+  assert.match(view, /scheduleSavedBulkEditOverlay/);
+  assert.match(view, /id="scheduleSavedBulkEditDate"[^>]*disabled/);
+  assert.match(view, /data-saved-bulk-edit-duration="1"/);
+  assert.match(source, /function getSelectedSavedClassSessionEvents/);
+  assert.match(source, /function openScheduleSavedBulkEditOverlay/);
+  assert.match(source, /isSavedSessionMultiSelectContextMenu/);
+  assert.match(source, /Edit or delete selected sessions/);
+  const bulkApplyBlock = source.slice(
+    source.indexOf('async function applyScheduleSavedBulkEditOverlay'),
+    source.indexOf('function isSavedSessionBulkContextMenu')
+  );
+  assert.match(bulkApplyBlock, /applySavedSessionScheduleUpdate\(\{/);
+  assert.match(bulkApplyBlock, /date: sessionDate/);
+  assert.match(bulkApplyBlock, /lookupSessionDate: sessionDate/);
+  assert.match(bulkApplyBlock, /deferPostUpdate: true/);
+});
+
 test('commit staged sessions and bulk delete update state without reloading schedule', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
-  const commitBlock = source.slice(
-    source.indexOf('async function commitScheduleDraftSessions'),
-    source.indexOf('let scheduleStageEditAttemptId')
+  const source = readMasterScheduleViewerJs();
+  const staging = read('public/scripts/masterScheduleViewerStaging.js');
+  const commitBlock = staging.slice(
+    staging.indexOf('async function commitScheduleDraftSessions'),
+    staging.indexOf('let scheduleStageEditAttemptId')
   );
   assert.match(commitBlock, /appendSavedClassSessionsToState/);
   assert.match(commitBlock, /acknowledgeLocalScheduleMutation/);
-  assert.doesNotMatch(commitBlock, /loadSchedulePerson/);
+  assert.match(commitBlock, /loadSchedulePerson\(person, \{ silent: true \}\)/);
+  assert.match(commitBlock, /totalAppended <= 0/);
 
   const bulkDeleteBlock = source.slice(
     source.indexOf('async function openScheduleBulkSessionDeleteModal'),
@@ -343,15 +378,23 @@ test('commit staged sessions and bulk delete update state without reloading sche
 });
 
 test('Master Schedule Viewer loads holidays for the active date range', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /syncScheduleHolidayDates/);
+  assert.match(source, /fetchScheduleHolidayDatesForRange/);
   assert.match(source, /holidayDates:\s*getScheduleHolidayDatesForRender\(\)/);
   assert.match(source, /isScheduleHolidayDate\(dateStr\)/);
-  assert.match(source, /collectHolidayDatesForRange/);
+  assert.match(source, /refreshScheduleViewWithHolidays/);
+});
+
+test('staging session import refreshes holidays after expanding view range', () => {
+  const staging = read('public/scripts/masterScheduleViewerStaging.js');
+  assert.match(staging, /deps\.setDateRangeFromIso\(start, end\)[\s\S]*deps\.refreshScheduleViewWithHolidays\(\)/);
+  const core = read('public/scripts/masterScheduleViewer.js');
+  assert.match(core, /scheduleState\.holidayRangeKey = ''/);
 });
 
 test('Master Schedule Viewer active class filter chip is wired in personSchedule', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /activeClassFilterId/);
   assert.match(source, /buildScheduleActiveClassChipHtml/);
   assert.match(source, /isScheduleEventInActiveClassFocus/);
@@ -363,22 +406,23 @@ test('Master Schedule Viewer active class filter chip is wired in personSchedule
 });
 
 test('Master Schedule Viewer session context menu opens rolling enrollment', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(source, /btn_scheduleSessionContextRollingEnrollment/);
-  assert.match(source, /schedule-session-context-header-link/);
-  assert.match(source, /Rolling Enrollment/);
-  assert.match(source, /Manage Session/);
-  assert.match(source, /bi-box-arrow-up-right/);
+  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
+  assert.match(view, /btn_scheduleSessionContextRollingEnrollment/);
+  assert.match(view, /schedule-session-context-header-link/);
+  assert.match(view, /Rolling Enrollment/);
+  assert.match(view, /Manage Session/);
+  assert.match(view, /bi-box-arrow-up-right/);
   assert.match(source, /scheduleSessionContextMenuTitle/);
   assert.match(source, /buildRollingEnrollmentUrlForClass/);
   assert.match(source, /rolling-enrollment/);
   assert.match(source, /canOpenRollingEnrollment/);
-  assert.doesNotMatch(source, /schedule-session-context-action.*btn_scheduleSessionContextRollingEnrollment/);
-  assert.doesNotMatch(source, /schedule-session-context-action.*btn_scheduleSessionContextOpenSession/);
+  assert.doesNotMatch(view, /schedule-session-context-action.*btn_scheduleSessionContextRollingEnrollment/);
+  assert.doesNotMatch(view, /schedule-session-context-action.*btn_scheduleSessionContextOpenSession/);
 });
 
 test('Master Schedule Viewer session context menu shows status chip with picker', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /scheduleSessionContextStatusChip/);
   assert.match(source, /scheduleSessionContextStatusPicker/);
   assert.match(source, /closeScheduleSessionContextStatusPicker/);

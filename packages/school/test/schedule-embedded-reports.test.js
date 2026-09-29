@@ -9,6 +9,7 @@ const {
   embedSessionReportsForTimeline,
   prepareEventsByDateForTimelineGrid
 } = require('../MVC/utils/scheduleEmbeddedReportUtils');
+const { readMasterScheduleViewerJs, readPersonScheduleView } = require('./helpers/scheduleViewerSource');
 
 function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
@@ -98,9 +99,9 @@ test('prepareEventsByDateForTimelineGrid embeds per day without cross-day leakag
 });
 
 test('personSchedule wires embedded report preprocessing and badge rendering', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(source, /scheduleEmbeddedReportUtils\.js/);
-  assert.match(source, /function prepareEventsByDateForTimelineGrid/);
+  const view = readPersonScheduleView();
+  const source = readMasterScheduleViewerJs();
+  assert.match(view, /scheduleEmbeddedReportUtils\.js/);
   assert.match(source, /function buildEmbeddedReportBadgesHtml/);
   assert.match(source, /prepareEventsByDateForTimelineGrid\(eventsByDate\)/);
   assert.match(source, /buildEmbeddedReportBadgesHtml\(ev\?\.embeddedReports\)/);

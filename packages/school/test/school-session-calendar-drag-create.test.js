@@ -5,6 +5,7 @@ const path = require('path');
 const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
+const { readMasterScheduleViewerJs, readPersonScheduleView } = require('./helpers/scheduleViewerSource');
 
 function loadSessionCalendarCore() {
   const scriptPath = path.join(root, 'public/scripts/sessionCalendarCore.js');
@@ -45,9 +46,10 @@ test('resolveVerticalDragContext returns null without valid grid target', () => 
 });
 
 test('personSchedule includes stage modal and drag-create binding', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(source, /sessionEnrollmentStageModal/);
-  assert.match(source, /sessionEnrollmentCalendarModal/);
+  const view = readPersonScheduleView();
+  const source = readMasterScheduleViewerJs();
+  assert.match(view, /sessionEnrollmentCalendarModal/);
+  assert.match(view, /include\('school\/partials\/sessionEnrollmentCalendarModal'\)/);
   assert.match(source, /bindScheduleDragCreate/);
   assert.match(source, /bindCalendarDragCreate/);
   assert.match(source, /session-enrollment-stage-standalone/);
@@ -62,7 +64,7 @@ test('session-calendar.css defines full-viewport standalone stage overlay', () =
 });
 
 test('personSchedule wires last-loaded refresh chip and stale detection', () => {
-  const source = read('MVC/views/school/schedule/personSchedule.ejs');
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /lastLoadedAtByPersonId/);
   assert.match(source, /data-schedule-refresh-loaded/);
   assert.match(source, /schedule-loaded-at-chip/);

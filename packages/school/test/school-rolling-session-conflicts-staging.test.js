@@ -555,10 +555,8 @@ test('commitStagedSessions returns createdCount 0 when dates already exist', asy
 });
 
 test('master schedule UI keeps drafts on zero-created save and uses commit timeout', () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, '../MVC/views/school/schedule/personSchedule.ejs'),
-    'utf8'
-  );
+  const { readMasterScheduleViewerJs } = require('./helpers/scheduleViewerSource');
+  const source = readMasterScheduleViewerJs();
   assert.match(source, /fetchWithScheduleTimeout/);
   assert.match(source, /SCHEDULE_COMMIT_TIMEOUT_MS/);
   assert.match(source, /if \(createdCount > 0\)/);
