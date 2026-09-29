@@ -1045,8 +1045,8 @@
         if (!start || !end) return [];
         try {
             const resp = await fetch(
-                `/school/holidays/api/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
-                { headers: { Accept: 'application/json' }, credentials: 'same-origin' }
+                `/school/schedules/api/holiday-dates?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+                { headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }, credentials: 'same-origin' }
             );
             const data = await resp.json().catch(() => ({}));
             const holidays = Array.isArray(data?.holidays) ? data.holidays : [];

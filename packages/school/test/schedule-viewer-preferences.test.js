@@ -381,9 +381,17 @@ test('Master Schedule Viewer loads holidays for the active date range', () => {
   const source = readMasterScheduleViewerJs();
   assert.match(source, /syncScheduleHolidayDates/);
   assert.match(source, /fetchScheduleHolidayDatesForRange/);
+  assert.match(source, /\/school\/schedules\/api\/holiday-dates/);
   assert.match(source, /holidayDates:\s*getScheduleHolidayDatesForRender\(\)/);
   assert.match(source, /isScheduleHolidayDate\(dateStr\)/);
   assert.match(source, /refreshScheduleViewWithHolidays/);
+});
+
+test('schedule routes expose holiday dates for schedule viewers', () => {
+  const routeSource = read('MVC/routes/scheduleRoutes.js');
+  assert.match(routeSource, /\/api\/holiday-dates/);
+  assert.match(routeSource, /getScheduleHolidayDatesInRange/);
+  assert.match(routeSource, /SECTIONS\.SCHOOL_SCHEDULES,\s*OPERATIONS\.READ_ALL/);
 });
 
 test('staging session import refreshes holidays after expanding view range', () => {

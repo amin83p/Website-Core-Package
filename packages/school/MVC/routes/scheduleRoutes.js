@@ -20,6 +20,11 @@ router.get('/api/my-schedule',
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ),
   ctrl.getMyScheduleData);
 
+router.get('/api/holiday-dates',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getScheduleHolidayDatesInRange);
+
 router.get(['/', '/viewer'],
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),

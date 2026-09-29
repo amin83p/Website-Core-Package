@@ -22,6 +22,7 @@ const classSessionCapacityService = require('../../services/school/classSessionC
 const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
 const { buildMasterScheduleViewerClientConfig } = require('../../services/school/masterScheduleViewerClientConfig');
+const holidayController = require('./holidayController');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
 const scheduleSessionMutationService = require('../../services/school/scheduleSessionMutationService');
 const sessionManagementService = require('../../services/school/sessionManagementService');
@@ -1832,6 +1833,10 @@ async function buildPersonScheduleEventsForSessions({
     };
 }
 
+async function getScheduleHolidayDatesInRange(req, res) {
+    return holidayController.listHolidaysInRange(req, res);
+}
+
 async function showMySchedulePage(req, res) {
     try {
         const isAdminViewer = await isScheduleAdminViewer(req.user);
@@ -2767,6 +2772,7 @@ module.exports = {
     saveScheduleViewerPreferences,
     showMySchedulePage,
     getMyScheduleData,
+    getScheduleHolidayDatesInRange,
     getPersonSchedule,
     getPersonScheduleVersion,
     pickerSchoolSchedulePersons,
