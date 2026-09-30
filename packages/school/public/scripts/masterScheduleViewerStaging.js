@@ -399,7 +399,15 @@
                         .filter((batch) => String(batch?.attemptId || '') !== attemptId);
                 }
             }
-            if (suppressRefresh) return;
+            if (suppressRefresh) {
+                if (removed?.classId && typeof deps.prunePendingEnrollmentsForClass === 'function') {
+                    deps.prunePendingEnrollmentsForClass(String(removed.classId).trim());
+                }
+                return;
+            }
+            if (removed?.classId && typeof deps.prunePendingEnrollmentsForClass === 'function') {
+                deps.prunePendingEnrollmentsForClass(String(removed.classId).trim());
+            }
             recomputeDraftOverlaps(person.id);
             deps.scheduleState.remoteUpdatePending = true;
             deps.refreshScheduleActiveView();
@@ -521,7 +529,19 @@
             const person = deps.activeSchedulePerson();
             const id = String(attemptId || '').trim();
             if (!person?.id || !id) return;
+            const drafts = Array.isArray(deps.scheduleState.draftEventsByPersonId?.[person.id])
+                ? deps.scheduleState.draftEventsByPersonId[person.id]
+                : [];
+            const classIds = new Set(
+                drafts
+                    .filter((ev) => String(ev?.stagingAttemptId || '') === id)
+                    .map((ev) => String(ev?.classId || '').trim())
+                    .filter(Boolean)
+            );
             removeDraftBatchSessions(person.id, id);
+            classIds.forEach((cid) => {
+                if (typeof deps.prunePendingEnrollmentsForClass === 'function') deps.prunePendingEnrollmentsForClass(cid);
+            });
             recomputeDraftOverlaps(person.id);
             deps.scheduleState.remoteUpdatePending = true;
             deps.refreshScheduleActiveView();
@@ -661,6 +681,9 @@
                 : [];
             deps.scheduleState.draftBatchesByPersonId[pid] = batches.filter((batch) => String(batch?.classId || '') !== cid);
             deps.scheduleState.selectedDraftSessionIdsByPersonId[pid] = new Set();
+            if (typeof deps.clearPendingEnrollStudentsForClass === 'function') {
+                deps.clearPendingEnrollStudentsForClass(cid);
+            }
             deps.schedulePersistDraftBackup();
         }
     
@@ -710,6 +733,9 @@
                         .map((ev) => draftEventToStagedSession(ev, person))
                         .filter((row) => row.sessionId && row.date && row.startTime && row.endTime);
                     if (!pendingStagedSessions.length) continue;
+                    const pendingEnrollments = typeof deps.getPendingEnrollStudentsForClass === 'function'
+                        ? deps.getPendingEnrollStudentsForClass(classId)
+                        : [];
                     const res = await deps.fetchWithScheduleTimeout(deps.SCHEDULE_COMMIT_STAGED_API, {
                         method: 'POST',
                         headers: {
@@ -722,6 +748,7 @@
                             classId,
                             personId: person.id,
                             pendingStagedSessions,
+                            pendingEnrollments,
                             extendCycleEndDate,
                             startDate: range.startDate,
                             endDate: range.endDate,
@@ -756,6 +783,9 @@
                         totalAppended += Number(deps.appendSavedClassSessionsToState(person.id, result?.data?.events || []) || 0);
                         const fp = String(result?.data?.fingerprint || '').trim();
                         if (fp) lastCommitFingerprint = fp;
+                        if (typeof deps.clearPendingEnrollStudentsForClass === 'function') {
+                            deps.clearPendingEnrollStudentsForClass(classId);
+                        }
                     }
                 }
                 if (loadingShown && typeof window.hideLoading === 'function') {
@@ -1267,6 +1297,16 @@
             header.innerHTML = `<div class="schedule-session-context-menu-title">${title}</div>${meta ? `<div class="schedule-session-context-menu-meta">${meta}</div>` : ''}`;
         }
     
+        function setDraftManagePendingEnrollmentsVisibility(event, selectedIds, showManage) {
+            const manageBtn = document.getElementById('btn_scheduleDraftContextManagePendingEnrollments');
+            const manageBulkBtn = document.getElementById('btn_scheduleDraftContextManagePendingEnrollmentsBulk');
+            [manageBtn, manageBulkBtn].forEach((btn) => {
+                if (!btn) return;
+                btn.classList.toggle('d-none', !showManage);
+                btn.disabled = !showManage;
+            });
+        }
+
         function showScheduleDraftSessionContextMenu(event, mouseEvent, source = 'timeline') {
             const menu = document.getElementById('scheduleDraftSessionContextMenu');
             if (!menu || !event || event.isDraft !== true) return;
@@ -1279,6 +1319,8 @@
             const bulkDivider = document.getElementById('scheduleDraftSessionContextMenuBulkDivider');
             const singleSection = document.getElementById('scheduleDraftSessionContextMenuSingle');
             const batchSection = document.getElementById('scheduleDraftSessionContextMenuBatch');
+            const showManagePending = typeof deps.canManagePendingEnrollmentsForDraftContext === 'function'
+                && deps.canManagePendingEnrollmentsForDraftContext(event, selectedIds);
             if (isBulkContext) {
                 const header = document.getElementById('scheduleDraftSessionContextMenuHeader');
                 if (header) {
@@ -1288,6 +1330,7 @@
                 bulkDivider?.classList.remove('d-none');
                 singleSection?.classList.add('d-none');
                 batchSection?.classList.add('d-none');
+                setDraftManagePendingEnrollmentsVisibility(event, selectedIds, showManagePending);
             } else {
                 renderScheduleDraftSessionContextMenuHeader(event);
                 bulkSection?.classList.add('d-none');
@@ -1308,9 +1351,12 @@
                     passBtn.classList.toggle('disabled', passCount === 0);
                     passBtn.setAttribute('aria-disabled', passCount === 0 ? 'true' : 'false');
                 }
+                setDraftManagePendingEnrollmentsVisibility(event, selectedIds, showManagePending);
             }
             const menuWidth = 280;
-            const menuHeight = isBulkContext ? 120 : 220;
+            const menuHeight = isBulkContext
+                ? (showManagePending ? 160 : 120)
+                : (showManagePending ? 260 : 220);
             const left = Math.min(mouseEvent.clientX, window.innerWidth - menuWidth - 8);
             const top = Math.min(mouseEvent.clientY, window.innerHeight - menuHeight - 8);
             if (menu.parentElement !== document.body) document.body.appendChild(menu);
@@ -1926,15 +1972,27 @@
                 deps.updateScheduleDraftSelectedControls();
                 return;
             }
+            const person = deps.activeSchedulePerson();
+            const classIds = new Set();
+            if (person?.id) {
+                selectedIds.forEach((sessionId) => {
+                    const sid = String(sessionId || '').trim();
+                    const match = (deps.scheduleState.draftEventsByPersonId?.[person.id] || [])
+                        .find((ev) => String(ev?.sessionId || ev?.id || '').trim() === sid);
+                    if (match?.classId) classIds.add(String(match.classId).trim());
+                });
+            }
             selectedIds.forEach((sessionId) => {
                 deleteDraftSession(sessionId, { suppressRefresh: true });
             });
-            const person = deps.activeSchedulePerson();
             if (person?.id) {
                 deps.scheduleState.selectedDraftSessionIdsByPersonId[person.id] = new Set();
                 recomputeDraftOverlaps(person.id);
                 deps.scheduleState.remoteUpdatePending = true;
             }
+            classIds.forEach((cid) => {
+                if (typeof deps.prunePendingEnrollmentsForClass === 'function') deps.prunePendingEnrollmentsForClass(cid);
+            });
             deps.refreshScheduleActiveView();
             syncPartialModalFromTimelineDrafts();
         }
@@ -1990,6 +2048,20 @@
                 hideScheduleDraftSessionContextMenu();
                 if (event) deps.selectDraftSessionsInStagingPass(event, source);
             });
+
+            function openManagePendingEnrollmentsFromDraftMenu(clickEvent) {
+                clickEvent.preventDefault();
+                const event = scheduleDraftContextEvent;
+                hideScheduleDraftSessionContextMenu();
+                const classId = String(event?.classId || '').trim();
+                if (!classId) return;
+                if (typeof deps.openPendingEnrollmentManageModal === 'function') {
+                    deps.openPendingEnrollmentManageModal(classId);
+                }
+            }
+
+            document.getElementById('btn_scheduleDraftContextManagePendingEnrollments')?.addEventListener('click', openManagePendingEnrollmentsFromDraftMenu);
+            document.getElementById('btn_scheduleDraftContextManagePendingEnrollmentsBulk')?.addEventListener('click', openManagePendingEnrollmentsFromDraftMenu);
     
             document.getElementById('btn_scheduleDraftContextDeleteAll')?.addEventListener('click', (clickEvent) => {
                 clickEvent.preventDefault();
@@ -2133,7 +2205,8 @@
             isDraftSelected: deps.isDraftSessionSelected,
             getSelectedDraftIds: () => Array.from(deps.getActiveDraftSelectionSet()),
             clearDraftSelection: deps.clearActiveDraftSessionSelection,
-            hasPendingDraftWork: deps.hasPendingDraftWorkForPerson
+            hasPendingDraftWork: deps.hasPendingDraftWorkForPerson,
+            buildScheduleDraftEnrollmentBadge: deps.buildScheduleDraftEnrollmentBadge
         };
     
     return {

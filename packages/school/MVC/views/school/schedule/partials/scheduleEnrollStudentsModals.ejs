@@ -1,0 +1,130 @@
+<div class="modal fade" id="scheduleEnrollCapacityBlockModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle text-warning me-1"></i>Session capacity conflict</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">This class uses 1-on-1 session capacity. The following selected sessions already have a student enrolled.</p>
+        <div id="scheduleEnrollCapacityBlockBody"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleEnrollProgramRegModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-journal-check me-1"></i>Program registration</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Register each student in an allowed program before continuing. Registration date cannot be after the first selected session.</p>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Student</th>
+                <th>Program registration</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleEnrollProgramRegTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn_scheduleEnrollProgramRegNext" disabled>Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleEnrollQueueModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-people-fill me-1"></i>Enroll students</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="border rounded bg-light-subtle p-3 mb-3">
+          <div class="row g-2 small">
+            <div class="col-md-3"><span class="text-muted d-block">Start date</span><strong id="scheduleEnrollQueueStartDate">—</strong></div>
+            <div class="col-md-3"><span class="text-muted d-block">End date</span><strong id="scheduleEnrollQueueEndDate">—</strong></div>
+            <div class="col-md-3"><span class="text-muted d-block">Sessions</span><strong id="scheduleEnrollQueueSessionCount">—</strong></div>
+            <div class="col-md-3"><span class="text-muted d-block">Session capacity</span><strong id="scheduleEnrollQueueCapacity">—</strong></div>
+          </div>
+        </div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Student</th>
+                <th>Funder</th>
+                <th>Claim number</th>
+                <th>Reason start (note)</th>
+                <th>Status</th>
+                <th class="text-end">Enroll</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleEnrollQueueTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleEnrollPendingManageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-check me-1"></i>Manage drafted enrollments</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">Changes apply when you use <strong>Save staged sessions</strong> on the schedule.</p>
+        <div class="border rounded bg-light-subtle p-3 mb-3">
+          <div class="row g-2 small">
+            <div class="col-md-3"><span class="text-muted d-block">Start date</span><strong id="scheduleEnrollPendingManageStartDate">—</strong></div>
+            <div class="col-md-3"><span class="text-muted d-block">End date</span><strong id="scheduleEnrollPendingManageEndDate">—</strong></div>
+            <div class="col-md-3"><span class="text-muted d-block">Sessions</span><strong id="scheduleEnrollPendingManageSessionCount">—</strong></div>
+            <div class="col-md-3"><span class="text-muted d-block">Session capacity</span><strong id="scheduleEnrollPendingManageCapacity">—</strong></div>
+          </div>
+        </div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Student</th>
+                <th>Funder</th>
+                <th>Claim number</th>
+                <th>Reason start (note)</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleEnrollPendingManageTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer d-flex flex-wrap justify-content-between gap-2">
+        <button type="button" class="btn btn-outline-danger btn-sm" id="btn_scheduleEnrollPendingManageRemoveAll">Remove all for class</button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn_scheduleEnrollPendingManageSave">Save changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

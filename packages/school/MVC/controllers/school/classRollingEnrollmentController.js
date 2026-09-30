@@ -5842,7 +5842,8 @@ module.exports = {
   postExecuteRollingEnrollment,
   postPreviewBatchSessions,
   postEnrollmentGapConflictReview,
-  postAppendBatchSessions
+  postAppendBatchSessions,
+  buildRollingEnrollmentEngineHooks
 };
 
 

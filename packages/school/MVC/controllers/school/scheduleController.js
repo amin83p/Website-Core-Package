@@ -21,6 +21,7 @@ const schoolPersonAccessService = require('../../services/school/schoolPersonAcc
 const classSessionCapacityService = require('../../services/school/classSessionCapacityService');
 const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
+const scheduleEnrollStudentsService = require('../../services/school/scheduleEnrollStudentsService');
 const { buildMasterScheduleViewerClientConfig } = require('../../services/school/masterScheduleViewerClientConfig');
 const holidayController = require('./holidayController');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
@@ -2522,6 +2523,40 @@ async function postCommitStagedSessions(req, res) {
             reqUser: req.user
         });
 
+        const pendingEnrollments = scheduleEnrollStudentsService.parsePendingEnrollmentsFromBody(req.body);
+        const enrollmentResults = [];
+        if (pendingEnrollments.length) {
+            const rollingEnrollmentEngineService = require('../../services/school/rollingEnrollmentEngineService');
+            const { buildRollingEnrollmentEngineHooks } = require('./classRollingEnrollmentController');
+            const refreshedClass = await schoolDataService.getDataById('classes', classId, req.user, accessContext) || classData;
+            for (const entry of pendingEnrollments) {
+                try {
+                    const engineResult = await rollingEnrollmentEngineService.execute({
+                        classData: refreshedClass,
+                        reqUser: req.user,
+                        rawRequest: {
+                            classId,
+                            ...entry,
+                            pendingStagedSessions: []
+                        },
+                        hooks: buildRollingEnrollmentEngineHooks(req, refreshedClass)
+                    });
+                    enrollmentResults.push({
+                        studentId: String(entry?.studentId || '').trim(),
+                        ok: engineResult?.summary?.failed === 0,
+                        summary: engineResult?.summary || null,
+                        results: engineResult?.results || []
+                    });
+                } catch (enrollmentError) {
+                    enrollmentResults.push({
+                        studentId: String(entry?.studentId || '').trim(),
+                        ok: false,
+                        error: enrollmentError.message || 'Enrollment failed.'
+                    });
+                }
+            }
+        }
+
         const createdSessions = Array.isArray(appendResult.createdSessions) ? appendResult.createdSessions : [];
         const sessionDates = [
             ...createdSessions.map((row) => normalizeDateOnly(row?.date)).filter(Boolean),
@@ -2571,6 +2606,7 @@ async function postCommitStagedSessions(req, res) {
                 createdSessions,
                 events: commitEvents,
                 fingerprint,
+                enrollmentResults,
                 cycleEndDateExtended: appendResult.cycleEndDateExtended === true,
                 previousCycleEndDate: appendResult.previousCycleEndDate || '',
                 newCycleEndDate: appendResult.newCycleEndDate || ''
@@ -2578,6 +2614,97 @@ async function postCommitStagedSessions(req, res) {
         });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message || 'Unable to save staged sessions.' });
+    }
+}
+
+async function postEnrollStudentsPrepare(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const { sessionMode, sessions } = scheduleEnrollStudentsService.parseSessionsFromBody(req.body || {});
+        const payload = await scheduleEnrollStudentsService.prepareEnrollStudents({
+            classId: req.body?.classId,
+            sessionMode,
+            sessions,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({ status: 'success', data: payload });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to prepare Enroll Students.' });
+    }
+}
+
+async function postEnrollStudentsSessionCapacityCheck(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const { sessions } = scheduleEnrollStudentsService.parseSessionsFromBody(req.body || {});
+        const classId = req.body?.classId || sessions[0]?.classId;
+        const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+        if (!classData) throw new Error('Class not found.');
+        const result = await scheduleEnrollStudentsService.checkOneOnOneSessionOccupancy({
+            classData,
+            sessions,
+            reqUser: req.user
+        });
+        return res.json({ status: 'success', data: result });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to evaluate session capacity.' });
+    }
+}
+
+async function postEnrollStudentsStudentPickerExclusions(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const classId = req.body?.classId;
+        const startDate = scheduleEnrollStudentsService.normalizeDateOnly(req.body?.startDate);
+        const endDate = scheduleEnrollStudentsService.normalizeDateOnly(req.body?.endDate);
+        const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+        if (!classData) throw new Error('Class not found.');
+        const excludeStudentIds = await scheduleEnrollStudentsService.listStudentPickerExclusions({
+            classData,
+            startDate,
+            endDate,
+            reqUser: req.user,
+            activeOrgId: req.user?.activeOrgId
+        });
+        return res.json({ status: 'success', excludeStudentIds });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to load student exclusions.' });
+    }
+}
+
+async function postEnrollStudentsProgramRegistrations(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const studentIds = Array.isArray(req.body?.studentIds) ? req.body.studentIds : [];
+        const payload = await scheduleEnrollStudentsService.buildProgramRegistrationRows({
+            classId: req.body?.classId,
+            studentIds,
+            firstSessionDate: req.body?.firstSessionDate,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({ status: 'success', data: payload, actionStateId: req.actionStateId || '' });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to load program registrations.' });
+    }
+}
+
+async function postEnrollStudentsProgramRegistrationFinalize(req, res) {
+    try {
+        const result = await scheduleEnrollStudentsService.finalizeProgramRegistration({
+            classId: req.body?.classId,
+            studentId: req.body?.studentId,
+            programId: req.body?.programId,
+            registrationDate: req.body?.registrationDate || req.body?.effectiveDate,
+            note: req.body?.note,
+            reqUser: req.user,
+            req
+        });
+        const ok = result.status === 'registered';
+        return res.status(ok ? 200 : 400).json({ status: ok ? 'success' : 'error', data: result, message: result.message });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to finalize program registration.' });
     }
 }
 
@@ -2781,6 +2908,11 @@ module.exports = {
     getSessionAttendanceList,
     getSessionEnrollmentList,
     postCommitStagedSessions,
+    postEnrollStudentsPrepare,
+    postEnrollStudentsSessionCapacityCheck,
+    postEnrollStudentsStudentPickerExclusions,
+    postEnrollStudentsProgramRegistrations,
+    postEnrollStudentsProgramRegistrationFinalize,
     postBulkDeleteSessionsPreview,
     postBulkDeleteSessions,
     getSessionManagementPolicy,

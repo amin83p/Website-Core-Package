@@ -462,6 +462,8 @@
 
 <% if (canSelectAnyPerson) { %>
 <%- include('partials/modal_GenericPicker') %>
+<%- include('school/partials/studentClaimNumbersModal') %>
+<%- include('school/schedule/partials/scheduleEnrollStudentsModals') %>
 <% } %>
 <%- include('partials/tablePages-end') %>
 
@@ -478,6 +480,9 @@
 <% } %>
 <% if (canSelectAnyPerson) { %>
 <script src="/scripts/masterScheduleViewerAdmin.js"></script>
+<script src="/scripts/studentClaimNumbersManager.js"></script>
+<script src="/scripts/rollingEnrollmentGroupClient.js"></script>
+<script src="/scripts/masterScheduleEnrollStudents.js"></script>
 <% } %>
 <script src="/scripts/masterScheduleViewer.js"></script>
 

@@ -1024,6 +1024,8 @@
         loadingPersonId: '',
         selectedSessionKeysByPersonId: {},
         selectedDraftSessionIdsByPersonId: {},
+        pendingEnrollStudentsByClassId: {},
+        pendingEnrollMetaByClassId: {},
         lastLoadedAtByPersonId: {},
         scheduleFingerprintByPersonId: {},
         staleAfterHidden: false,
@@ -1224,7 +1226,8 @@
         if (!canDragCreateSessions || !window.localStorage) return;
         try {
             const hasDrafts = countAllPendingDraftSessions() > 0
-                || Object.values(scheduleState.draftBatchesByPersonId || {}).some((rows) => Array.isArray(rows) && rows.length);
+                || Object.values(scheduleState.draftBatchesByPersonId || {}).some((rows) => Array.isArray(rows) && rows.length)
+                || Object.values(scheduleState.pendingEnrollStudentsByClassId || {}).some((rows) => Array.isArray(rows) && rows.length);
             if (!hasDrafts) {
                 window.localStorage.removeItem(SCHEDULE_DRAFT_BACKUP_KEY);
                 return;
@@ -1232,6 +1235,8 @@
             window.localStorage.setItem(SCHEDULE_DRAFT_BACKUP_KEY, JSON.stringify({
                 draftEventsByPersonId: scheduleState.draftEventsByPersonId || {},
                 draftBatchesByPersonId: scheduleState.draftBatchesByPersonId || {},
+                pendingEnrollStudentsByClassId: scheduleState.pendingEnrollStudentsByClassId || {},
+                pendingEnrollMetaByClassId: scheduleState.pendingEnrollMetaByClassId || {},
                 savedAt: new Date().toISOString()
             }));
         } catch (_) { /* storage unavailable */ }
@@ -1273,6 +1278,16 @@
                 if (Array.isArray(scheduleState.draftBatchesByPersonId[personId]) && scheduleState.draftBatchesByPersonId[personId].length) return;
                 scheduleState.draftBatchesByPersonId[personId] = rows;
             });
+            if (!Object.keys(scheduleState.pendingEnrollStudentsByClassId || {}).length) {
+                scheduleState.pendingEnrollStudentsByClassId = payload.pendingEnrollStudentsByClassId && typeof payload.pendingEnrollStudentsByClassId === 'object'
+                    ? payload.pendingEnrollStudentsByClassId
+                    : {};
+            }
+            if (!Object.keys(scheduleState.pendingEnrollMetaByClassId || {}).length) {
+                scheduleState.pendingEnrollMetaByClassId = payload.pendingEnrollMetaByClassId && typeof payload.pendingEnrollMetaByClassId === 'object'
+                    ? payload.pendingEnrollMetaByClassId
+                    : {};
+            }
         } catch (_) { /* storage unavailable */ }
     }
 
@@ -1401,6 +1416,11 @@
         return '<span class="badge bg-warning text-dark schedule-draft-badge mb-1">Draft</span>';
     }
 
+    function buildScheduleDraftEnrollmentBadge(event) {
+        if (!stagedSessionHasPendingEnrollment(event)) return '';
+        return '<span class="badge bg-info-subtle text-info-emphasis border schedule-draft-enrollment-badge mb-1">Draft enrollment</span>';
+    }
+
 
     let bindScheduleDragCreate = function bindScheduleDragCreate() {};
     let resolveScheduleDraftEventFromTarget = function resolveScheduleDraftEventFromTarget() { return null; };
@@ -1442,7 +1462,23 @@
         applySavedSessionScheduleUpdate, resolveStagingPassSessionIds, getSelectedDraftEvents,
         updateScheduleDraftSelectedControls, selectDraftSessionsInStagingPass,
         getStagedViewPaddingRangeOptions,
-        openScheduleSessionBulkSelectModal
+        openScheduleSessionBulkSelectModal,
+        getPendingEnrollStudentsForClass,
+        clearPendingEnrollStudentsForClass,
+        getPendingEnrollMetaForClass,
+        setPendingEnrollMetaForClass,
+        classHasPendingEnrollments,
+        canManagePendingEnrollmentsForDraftContext,
+        stagedSessionHasPendingEnrollment,
+        replacePendingEnrollStudentsForClass,
+        removePendingEnrollStudentAt,
+        prunePendingEnrollmentsForClass,
+        buildScheduleDraftEnrollmentBadge,
+        openPendingEnrollmentManageModal: (classId) => {
+            if (typeof global.MasterScheduleEnrollStudents?.openPendingEnrollmentManageModal === 'function') {
+                global.MasterScheduleEnrollStudents.openPendingEnrollmentManageModal(classId);
+            }
+        }
       };
       const stagingExports = global.MasterScheduleViewerStaging.install(stagingDeps);
       if (stagingExports && typeof stagingExports === 'object') {
@@ -3661,6 +3697,171 @@
         }).filter((row) => row && isClassSessionScheduleEvent(row));
     }
 
+    function getPendingEnrollMetaForClass(classId) {
+        const id = String(classId || '').trim();
+        const meta = scheduleState.pendingEnrollMetaByClassId?.[id];
+        return meta && typeof meta === 'object' ? { ...meta } : null;
+    }
+
+    function setPendingEnrollMetaForClass(classId, meta) {
+        const id = String(classId || '').trim();
+        if (!id || !meta || typeof meta !== 'object') return;
+        if (!scheduleState.pendingEnrollMetaByClassId) scheduleState.pendingEnrollMetaByClassId = {};
+        scheduleState.pendingEnrollMetaByClassId[id] = { ...meta };
+        if (canDragCreateSessions) schedulePersistDraftBackup();
+    }
+
+    function classHasPendingEnrollments(classId) {
+        const id = String(classId || '').trim();
+        const rows = scheduleState.pendingEnrollStudentsByClassId?.[id];
+        return Array.isArray(rows) && rows.length > 0;
+    }
+
+    function pendingEnrollmentStudentSignatureForSession(classId, sessionId) {
+        const cid = String(classId || '').trim();
+        const sid = String(sessionId || '').trim();
+        if (!cid || !sid) return '';
+        const entries = scheduleState.pendingEnrollStudentsByClassId?.[cid];
+        if (!Array.isArray(entries) || !entries.length) return '';
+        const studentIds = entries
+            .filter((entry) => (Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [])
+                .some((linkedId) => String(linkedId || '').trim() === sid))
+            .map((entry) => String(entry?.students?.[0]?.studentId || entry?.studentId || '').trim())
+            .filter(Boolean)
+            .sort();
+        return studentIds.join('\u0001');
+    }
+
+    function draftSessionsShareSamePendingEnrollments(classId, sessionIds) {
+        const cid = String(classId || '').trim();
+        const ids = (Array.isArray(sessionIds) ? sessionIds : [])
+            .map((row) => String(row || '').trim())
+            .filter(Boolean);
+        if (!cid || !ids.length || !classHasPendingEnrollments(cid)) return false;
+        const signatures = ids.map((sessionId) => pendingEnrollmentStudentSignatureForSession(cid, sessionId));
+        const first = signatures[0];
+        if (!first) return false;
+        return signatures.every((signature) => signature === first);
+    }
+
+    function canManagePendingEnrollmentsForDraftContext(event, selectedIdsSet) {
+        const classId = String(event?.classId || '').trim();
+        const sessionId = String(event?.sessionId || event?.id || '').trim();
+        if (!classId || !sessionId) return false;
+        const selectedIds = selectedIdsSet && typeof selectedIdsSet.has === 'function' ? selectedIdsSet : new Set();
+        const contextSessionIds = selectedIds.size >= 2 && selectedIds.has(sessionId)
+            ? Array.from(selectedIds)
+            : [sessionId];
+        return draftSessionsShareSamePendingEnrollments(classId, contextSessionIds);
+    }
+
+    function stagedSessionHasPendingEnrollment(event) {
+        if (event?.isDraft !== true) return false;
+        const classId = String(event?.classId || '').trim();
+        const sessionId = String(event?.sessionId || event?.id || '').trim();
+        if (!classId || !sessionId) return false;
+        const entries = scheduleState.pendingEnrollStudentsByClassId?.[classId];
+        if (!Array.isArray(entries) || !entries.length) return false;
+        return entries.some((entry) => (Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [])
+            .some((sid) => String(sid || '').trim() === sessionId));
+    }
+
+    function replacePendingEnrollStudentsForClass(classId, entries) {
+        const id = String(classId || '').trim();
+        if (!id) return;
+        if (!scheduleState.pendingEnrollStudentsByClassId) scheduleState.pendingEnrollStudentsByClassId = {};
+        const rows = Array.isArray(entries) ? entries.map((row) => ({ ...(row || {}) })) : [];
+        if (!rows.length) {
+            clearPendingEnrollStudentsForClass(id);
+            return;
+        }
+        scheduleState.pendingEnrollStudentsByClassId[id] = rows;
+        if (canDragCreateSessions) schedulePersistDraftBackup();
+    }
+
+    function removePendingEnrollStudentAt(classId, index) {
+        const id = String(classId || '').trim();
+        const rows = scheduleState.pendingEnrollStudentsByClassId?.[id];
+        if (!id || !Array.isArray(rows)) return;
+        const idx = Number(index);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= rows.length) return;
+        rows.splice(idx, 1);
+        if (!rows.length) clearPendingEnrollStudentsForClass(id);
+        else if (canDragCreateSessions) schedulePersistDraftBackup();
+    }
+
+    function collectStagedSessionIdsForClass(classId) {
+        const cid = String(classId || '').trim();
+        const ids = new Set();
+        Object.values(scheduleState.draftEventsByPersonId || {}).forEach((rows) => {
+            (Array.isArray(rows) ? rows : []).forEach((ev) => {
+                if (ev?.isDraft !== true) return;
+                if (String(ev?.classId || '').trim() !== cid) return;
+                const sid = String(ev?.sessionId || ev?.id || '').trim();
+                if (sid) ids.add(sid);
+            });
+        });
+        return ids;
+    }
+
+    function prunePendingEnrollmentsForClass(classId) {
+        const cid = String(classId || '').trim();
+        if (!cid || !classHasPendingEnrollments(cid)) return;
+        const liveIds = collectStagedSessionIdsForClass(cid);
+        const entries = getPendingEnrollStudentsForClass(cid);
+        const next = entries.map((entry) => ({
+            ...entry,
+            selectedSessionIds: (Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [])
+                .map((sid) => String(sid || '').trim())
+                .filter((sid) => liveIds.has(sid))
+        })).filter((entry) => entry.selectedSessionIds.length > 0);
+        if (!next.length) clearPendingEnrollStudentsForClass(cid);
+        else replacePendingEnrollStudentsForClass(cid, next);
+    }
+
+    function getPendingEnrollStudentsForClass(classId) {
+        const id = String(classId || '').trim();
+        const rows = scheduleState.pendingEnrollStudentsByClassId?.[id];
+        return Array.isArray(rows) ? rows.slice() : [];
+    }
+
+    function appendPendingEnrollStudentForClass(classId, entry) {
+        const id = String(classId || '').trim();
+        if (!id || !entry || typeof entry !== 'object') return;
+        if (!scheduleState.pendingEnrollStudentsByClassId) scheduleState.pendingEnrollStudentsByClassId = {};
+        if (!Array.isArray(scheduleState.pendingEnrollStudentsByClassId[id])) {
+            scheduleState.pendingEnrollStudentsByClassId[id] = [];
+        }
+        scheduleState.pendingEnrollStudentsByClassId[id].push({ ...entry });
+        if (canDragCreateSessions) schedulePersistDraftBackup();
+    }
+
+    function clearPendingEnrollStudentsForClass(classId) {
+        const id = String(classId || '').trim();
+        if (scheduleState.pendingEnrollStudentsByClassId && id) {
+            delete scheduleState.pendingEnrollStudentsByClassId[id];
+        }
+        if (scheduleState.pendingEnrollMetaByClassId && id) {
+            delete scheduleState.pendingEnrollMetaByClassId[id];
+        }
+        if (canDragCreateSessions) schedulePersistDraftBackup();
+    }
+
+    let enrollStudentsRailHandler = null;
+    function bindEnrollStudentsRail(handler) {
+        enrollStudentsRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
+    function showScheduleBootstrapModal(modalEl) {
+        if (!modalEl || !window.bootstrap?.Modal) return;
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    function hideScheduleBootstrapModal(modalEl) {
+        if (!modalEl || !window.bootstrap?.Modal) return;
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    }
+
     function isSavedSessionMultiSelectContextMenu(event) {
         if (!isClassSessionScheduleEvent(event)) return false;
         if (countActiveScheduleSelectedSessions() < 2) return false;
@@ -4812,10 +5013,14 @@
         bindScheduleAdminWeekRail.bound = true;
         const rail = document.getElementById('scheduleAdminWeekRail');
         if (!rail) return;
-        // Enrollment action handlers will be wired in a follow-up pass.
+        // Enrollment action handlers (enroll-students wired via masterScheduleEnrollStudents.js).
         rail.addEventListener('click', (clickEvent) => {
-            if (clickEvent.target.closest('[data-schedule-admin-action]')) {
-                clickEvent.preventDefault();
+            const actionEl = clickEvent.target.closest('[data-schedule-admin-action]');
+            if (!actionEl) return;
+            clickEvent.preventDefault();
+            const action = String(actionEl.getAttribute('data-schedule-admin-action') || '').trim();
+            if (action === 'enroll-students' && typeof enrollStudentsRailHandler === 'function') {
+                void enrollStudentsRailHandler();
             }
         });
     }
@@ -6509,6 +6714,7 @@ if (canLoadAllSchedules) {
                              ${selectionControl}
                              ${statusChip}
                              ${buildScheduleDraftBadge(ev)}
+                             ${buildScheduleDraftEnrollmentBadge(ev)}
                              <div class="schedule-event-title">${isReportScheduleEvent(ev) ? `${buildReportPriorityMarker(ev)} ` : ''}${escapeHtml(eventTitle)}</div>
                              ${embeddedReportBadges}
                              ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
@@ -6557,6 +6763,7 @@ if (canLoadAllSchedules) {
                          ${selectionControl}
                          ${statusChip}
                          ${buildScheduleDraftBadge(ev)}
+                         ${buildScheduleDraftEnrollmentBadge(ev)}
                          <div class="schedule-event-title">${isReportScheduleEvent(ev) ? `${buildReportPriorityMarker(ev)} ` : ''}${escapeHtml(eventTitle)}</div>
                          ${embeddedReportBadges}
                          ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
@@ -7079,6 +7286,30 @@ if (canLoadAllSchedules) {
     }
 
     bindScheduleViewbarStickyOffset();
+    if (canSelectAnyPerson && typeof global.installMasterScheduleEnrollStudents === 'function') {
+        global.installMasterScheduleEnrollStudents({
+            uiAlert,
+            uiConfirm,
+            escapeHtml,
+            showBootstrapModal: showScheduleBootstrapModal,
+            hideBootstrapModal: hideScheduleBootstrapModal,
+            bindEnrollStudentsRail,
+            countActiveScheduleSelectedSessions,
+            countActiveDraftSelectedSessions,
+            getSelectedSavedClassSessionEvents,
+            getSelectedDraftEvents,
+            setPendingEnrollStudentsForClass: appendPendingEnrollStudentForClass,
+            setPendingEnrollMetaForClass,
+            getPendingEnrollStudentsForClass,
+            getPendingEnrollMetaForClass,
+            replacePendingEnrollStudentsForClass,
+            removePendingEnrollStudentAt,
+            clearPendingEnrollStudentsForClass,
+            refreshScheduleViewWithHolidays,
+            syncPartialModalFromTimelineDrafts,
+            schedulePersistDraftBackup: () => { if (canDragCreateSessions) schedulePersistDraftBackup(); }
+        });
+    }
     bindScheduleAdminWeekRail();
     if (typeof bindScheduleDraftUnloadGuard === 'function') bindScheduleDraftUnloadGuard();
     void initializeScheduleViewer();

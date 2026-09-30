@@ -109,6 +109,7 @@ function getReportRosterStatusesForClass(classItem = {}) {
 const classEnrollmentReadService = {
   HISTORICAL_ROLLING_ROSTER_STATUSES,
   getReportRosterStatusesForClass,
+  isRollingClassItem,
 
   async listActiveStudentIdsForClass({
     classId,

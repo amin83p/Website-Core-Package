@@ -3043,6 +3043,9 @@
       const draftEvent = { ...ev, isDraft: true };
       const draftSelect = menu?.buildDraftSelectHtml ? menu.buildDraftSelectHtml(draftEvent) : '';
       const draftSelected = menu?.isDraftSelected?.(draftEvent) ? ' is-session-selected is-draft-selected' : '';
+      const draftEnrollBadge = menu?.buildScheduleDraftEnrollmentBadge
+        ? menu.buildScheduleDraftEnrollmentBadge(draftEvent)
+        : '';
       const classes = [
         'session-enrollment-block',
         'is-staged',
@@ -3059,6 +3062,7 @@
           <span class="session-cal-draft-resize-handle session-cal-draft-resize-handle-top" data-resize-edge="top" aria-hidden="true"></span>
           <span class="session-cal-draft-resize-handle session-cal-draft-resize-handle-bottom" data-resize-edge="bottom" aria-hidden="true"></span>
           <div class="session-block-status">Staged</div>
+          ${draftEnrollBadge ? `<div class="session-block-draft-enroll">${draftEnrollBadge}</div>` : ''}
           <div class="session-block-teacher">${core.escapeHtml(ev?.teacherName || 'Teacher')}</div>
           <div class="session-block-hours">${core.escapeHtml(core.formatHours(ev?.durationHours))}</div>
           <div class="session-block-time small text-muted">${core.escapeHtml(timeLabel)}</div>
@@ -3089,6 +3093,9 @@
       const draftEvent = { ...ev, isDraft: true };
       const draftSelect = menu?.buildDraftSelectHtml ? menu.buildDraftSelectHtml(draftEvent) : '';
       const draftSelected = menu?.isDraftSelected?.(draftEvent) ? ' is-session-selected is-draft-selected' : '';
+      const draftEnrollBadge = menu?.buildScheduleDraftEnrollmentBadge
+        ? menu.buildScheduleDraftEnrollmentBadge(draftEvent)
+        : '';
       const classes = [
         'session-day-card',
         'is-staged',
@@ -3100,6 +3107,7 @@
             ${draftSelect}
             <div class="flex-grow-1">
               <div class="fw-semibold">Staged · ${core.escapeHtml(timeLabel)}</div>
+              ${draftEnrollBadge ? `<div class="mt-1">${draftEnrollBadge}</div>` : ''}
               <div class="small text-muted">${core.escapeHtml(ev?.teacherName || 'Teacher')}</div>
             </div>
           </div>
